@@ -71,7 +71,10 @@ public:
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
   static void shutdownAll();
 
-  void shutdown() override { shutdown_ = true; }
+  void shutdown() override {
+    shutdown_ = true;
+    xds_config_tracker_.reset();
+  }
   bool isShutdown() { return shutdown_; }
 
   // TODO (dmitri-d) return a naked pointer instead of the wrapper once the legacy mux has been
@@ -108,7 +111,7 @@ public:
     handleStreamEstablishmentFailure(next_attempt_may_send_initial_resource_version);
   }
   void onWriteable() override { trySendDiscoveryRequests(); }
-  void onDiscoveryResponse(std::unique_ptr<RS>&& message,
+  void onDiscoveryResponse(ResponseProtoPtr<RS>&& message,
                            ControlPlaneStats& control_plane_stats) override {
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
   }

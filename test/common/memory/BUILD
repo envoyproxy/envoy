@@ -12,21 +12,21 @@ envoy_package()
 envoy_cc_test(
     name = "aligned_allocator_test",
     srcs = ["aligned_allocator_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = ["//source/common/memory:aligned_allocator_lib"],
 )
 
 envoy_cc_test(
     name = "debug_test",
     srcs = ["debug_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = ["//source/common/memory:stats_lib"],
 )
 
 envoy_cc_test(
     name = "memory_release_test",
     srcs = ["memory_release_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/memory:stats_lib",
         "//test/test_common:logging_lib",
@@ -37,7 +37,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "heap_shrinker_test",
     srcs = ["heap_shrinker_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/memory:heap_shrinker_lib",

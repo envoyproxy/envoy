@@ -2,8 +2,7 @@
 
 Envoy uses [BoringSSL](https://github.com/google/boringssl) as its default SSL library. [OpenSSL](https://github.com/openssl/openssl) is also supported by the build system as an alternative SSL library.
 
-For FIPS-compliant builds, Envoy supports both BoringSSL-FIPS and [AWS-LC](https://github.com/aws/aws-lc) FIPS,
-which provides FIPS support for the aarch64 and ppc64le architectures.
+For FIPS-compliant builds, Envoy supports BoringSSL-FIPS.
 
 ## Default (non-FIPS)
 
@@ -36,16 +35,6 @@ bazel build --config=boringssl-fips //source/exe:envoy-static
 - **Supported architectures:** Linux x86_64, aarch64
 - **Version string:** `BoringSSL-FIPS` (visible in `envoy --version`)
 
-### AWS-LC FIPS
-
-```bash
-bazel build --config=aws-lc-fips //source/exe:envoy-static
-```
-
-- **Supported architectures:** Linux x86_64, aarch64, ppc64le
-- **Version string:** `AWS-LC-FIPS` (visible in `envoy --version`)
-- **Note:** HTTP/3 (QUIC) is disabled for AWS-LC builds
-
 ## OpenSSL
 
 BoringSSL is the supported and default SSL implementation in Envoy. OpenSSL is offered as an alternative.
@@ -73,9 +62,9 @@ The legacy `--define boringssl=fips` flag no longer works. Migrate as follows:
 | Legacy | New |
 |--------|-----|
 | `--define boringssl=fips` | `--config=boringssl-fips` |
-| `--define boringssl=fips` (on ppc64le) | `--config=aws-lc-fips` |
+| `--define boringssl=fips` (on ppc64le) | `--config=openssl` |
 
-The legacy flag automatically selected AWS-LC on ppc64le. With the new approach, you must explicitly choose the library.
+The legacy flag automatically selected a FIPS library on ppc64le. With the new approach, you must explicitly choose the library. On ppc64le, use `--config=openssl` (FIPS mode in OpenSSL is enforced at runtime).
 
 ## SSL flag integrity
 
@@ -96,6 +85,5 @@ envoy --version
 Look for:
 
 - `BoringSSL-FIPS` — BoringSSL FIPS build
-- `AWS-LC-FIPS` — AWS-LC FIPS build
 - `BoringSSL` — Standard (non-FIPS) build
 - `OpenSSL` — OpenSSL build

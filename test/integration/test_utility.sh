@@ -8,6 +8,10 @@
 #
 # https://github.com/apache/incubator-pagespeed-mod/blob/c7cc4f22c79ada8077be2a16afc376dc8f8bd2da/pagespeed/automatic/system_test_helpers.sh#L383
 
+# TODO(phlax): Cleanup once bzlmod migration is complete
+ENVOY_SRCDIR="${TEST_SRCDIR}/${TEST_WORKSPACE}"
+export ENVOY_SRCDIR
+
 CURRENT_TEST="NONE"
 function start_test() {
     CURRENT_TEST="$1"
@@ -142,4 +146,4 @@ wait_for_stat() {
     echo "$ret"
 }
 
-[[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_SRCDIR}/envoy/source/exe/envoy-static"
+[[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_SRCDIR}/${TEST_WORKSPACE}/source/exe/envoy-static"

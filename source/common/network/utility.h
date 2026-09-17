@@ -420,6 +420,17 @@ public:
 
     return result;
   }
+
+  /**
+   * Validates that a network namespace referenced by a filepath can be entered, i.e. that the file
+   * exists and can be opened. This is intended to be used at config-admission time so that a
+   * misconfigured (e.g. non-existent) network namespace is rejected rather than causing a failure
+   * deep in the connection/socket creation path.
+   *
+   * @param netns filepath referencing the network namespace to validate.
+   * @return OkStatus if the namespace file can be opened, an error status otherwise.
+   */
+  static absl::Status validateNetworkNamespace(absl::string_view netns);
 #endif
 
 private:

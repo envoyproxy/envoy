@@ -30,6 +30,10 @@ MockDetector::~MockDetector() = default;
 MockHealthCheckHostMonitor::MockHealthCheckHostMonitor() = default;
 MockHealthCheckHostMonitor::~MockHealthCheckHostMonitor() = default;
 
+MockHostLbPolicyData::MockHostLbPolicyData(bool receives_orca_load_report)
+    : receives_orca_load_report_(receives_orca_load_report) {}
+MockHostLbPolicyData::~MockHostLbPolicyData() = default;
+
 MockHostDescription::MockHostDescription()
     : address_(*Network::Utility::resolveUrl("tcp://10.0.0.1:443")),
       socket_factory_(new testing::NiceMock<Network::MockTransportSocketFactory>) {

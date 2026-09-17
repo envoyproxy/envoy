@@ -53,14 +53,24 @@ public:
   // Get extraction policy for a specific method
   const std::vector<AttributeExtractionRule>& getFieldsForMethod(const std::string& method) const;
 
+  // Get the attribute path corresponding to Mcp-Name for a method.
+  // Returns empty when the method has no name-like attribute.
+  std::string getNameAttributePath(const std::string& method) const;
+
   // Get merged requirements for a specific method (global + method-specific).
   const FieldRequirements& getFieldRequirementsForMethod(const std::string& method) const;
 
   // Add method configuration
   void addMethodConfig(absl::string_view method, std::vector<AttributeExtractionRule> fields);
 
-  // Get all global fields to always extract
+  // Global fields to always extract
   const absl::flat_hash_set<std::string>& getAlwaysExtract() const { return always_extract_; }
+
+  // Get all registered method fields for all methods
+  const absl::flat_hash_map<std::string, std::vector<AttributeExtractionRule>>&
+  getAllMethodFields() const {
+    return method_fields_;
+  }
 
   // Security configuration
   bool rejectDuplicateKeys() const { return reject_duplicate_keys_; }
@@ -157,7 +167,7 @@ private:
   bool requiredFieldsCollected() const;
 
   // Store field in temp storage
-  void storeField(const std::string& path, const Protobuf::Value& value);
+  void storeField(const std::string& path, absl::string_view name, const Protobuf::Value& value);
 
   // Copy selected fields from temp to final
   void copySelectedFields();
@@ -168,6 +178,16 @@ private:
 
   // Helper to build full path from cache
   std::string buildFullPath(absl::string_view name) const;
+
+  // Selective extraction filtering helpers
+  bool isPathInteresting(absl::string_view path) const;
+  void updateActiveTargetPaths();
+
+  struct TargetPathInfo {
+    std::string path;
+    std::string path_dot;
+  };
+  std::vector<TargetPathInfo> active_target_paths_;
 
   Protobuf::Struct temp_storage_;   // Store all fields temporarily
   Protobuf::Struct& root_metadata_; // Final filtered metadata

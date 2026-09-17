@@ -68,7 +68,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(
     Protocols, ApiKeyAuthIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Request with valid credential.

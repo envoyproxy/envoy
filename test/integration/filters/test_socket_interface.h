@@ -75,6 +75,7 @@ private:
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  Api::IoCallUint64Result send(const void* buffer, size_t length) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,
                                   const Address::Instance& peer_address) override;
@@ -104,7 +105,7 @@ private:
 class TestSocketInterface : public SocketInterfaceImpl {
 public:
   /**
-   * Override the behavior of the IoSocketHandleImpl::writev() and
+   * Override the behavior of the IoSocketHandleImpl::writev(), IoSocketHandleImpl::send(), and
    * IoSocketHandleImpl::sendmsg() methods.
    * The supplied callback is invoked with the slices arguments of the write method and the index
    * of the accepted socket.

@@ -15,13 +15,16 @@
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 
 namespace Envoy {
@@ -628,7 +631,7 @@ TEST(PipeInstanceTest, AbstractNamespace) {
   EXPECT_EQ(Type::Pipe, address->type());
   EXPECT_EQ(nullptr, address->ip());
 #else
-  EXPECT_FALSE(PipeInstance::create("@/foo").status().ok());
+  EXPECT_THAT(PipeInstance::create("@/foo").status(), Not(IsOk()));
 #endif
 }
 
@@ -650,7 +653,7 @@ TEST(PipeInstanceTest, EmbeddedNullAbstractNamespace) {
   EXPECT_EQ(Type::Pipe, address->type());
   EXPECT_EQ(nullptr, address->ip());
 #else
-  EXPECT_FALSE(PipeInstance::create(embedded_null).status().ok());
+  EXPECT_THAT(PipeInstance::create(embedded_null).status(), Not(IsOk()));
 #endif
 }
 
@@ -699,7 +702,7 @@ TEST(AddressFromSockAddrDeathTest, IPv4) {
 
   // Invalid family.
   sin.sin_family = AF_UNSPEC;
-  EXPECT_FALSE(addressFromSockAddr(ss, sizeof(sockaddr_in)).ok());
+  EXPECT_THAT(addressFromSockAddr(ss, sizeof(sockaddr_in)), Not(IsOk()));
 }
 
 TEST(AddressFromSockAddrDeathTest, IPv6) {
@@ -759,7 +762,7 @@ TEST(AddressFromSockAddrDeathTest, Pipe) {
 #if defined(__linux__)
   EXPECT_EQ("@/some/abstract/path", (*addressFromSockAddr(ss, ss_len))->asString());
 #else
-  EXPECT_FALSE(addressFromSockAddr(ss, ss_len).ok());
+  EXPECT_THAT(addressFromSockAddr(ss, ss_len), Not(IsOk()));
 #endif
 }
 

@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
@@ -13,6 +16,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
@@ -246,6 +250,48 @@ TEST_F(BenchmarkTest, ProcessBufferedResponseBody) {
       });
   initialize();
   measureHttpGets("buffered-response-body", 2000);
+}
+
+TEST_F(BenchmarkTest, ProcessComplexResponse) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+
+  auto add_many_headers = [](envoy::service::ext_proc::v3::CommonResponse* response) {
+    auto* mutation = response->mutable_header_mutation();
+    for (int i = 0; i < 50; i++) {
+      auto* new_hdr = mutation->add_set_headers();
+      new_hdr->mutable_append()->set_value(false);
+      new_hdr->mutable_header()->set_key(absl::StrCat("x-envoy-benchmark-", i));
+      new_hdr->mutable_header()->set_raw_value(
+          "some-long-value-to-force-allocation-uniqueness-and-size");
+    }
+  };
+
+  test_processor_.start(
+      ipVersion(),
+      [add_many_headers](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        ProcessingRequest request_in;
+        ASSERT_TRUE(stream->Read(&request_in));
+        ASSERT_TRUE(request_in.has_request_headers());
+        ProcessingResponse request_out;
+        add_many_headers(request_out.mutable_request_headers()->mutable_response());
+        stream->Write(request_out);
+
+        ProcessingRequest response_in;
+        ASSERT_TRUE(stream->Read(&response_in));
+        ASSERT_TRUE(response_in.has_response_headers());
+        ProcessingResponse response_out;
+        add_many_headers(response_out.mutable_response_headers()->mutable_response());
+        stream->Write(response_out);
+
+        ProcessingRequest body_in;
+        ASSERT_TRUE(stream->Read(&body_in));
+        ASSERT_TRUE(body_in.has_response_body());
+        ProcessingResponse body_out;
+        add_many_headers(body_out.mutable_response_body()->mutable_response());
+        stream->Write(body_out);
+      });
+  initialize();
+  measureHttpGets("complex-response", 2000);
 }
 
 } // namespace

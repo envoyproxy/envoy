@@ -84,6 +84,7 @@ constexpr absl::string_view RequestTrailerProcessingEffectField =
     "request_trailer_processing_effect";
 constexpr absl::string_view ResponseTrailerProcessingEffectField =
     "response_trailer_processing_effect";
+constexpr absl::string_view DestinationField = "destination";
 
 std::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -144,6 +145,16 @@ initUntypedReceivingNamespaces(const ExtProcPerRoute& config) {
 
   return {initNamespaces(config.overrides().metadata_options().receiving_namespaces().untyped())};
 }
+std::optional<std::vector<std::string>>
+initTypedReceivingNamespaces(const ExtProcPerRoute& config) {
+  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
+      !config.overrides().metadata_options().has_receiving_namespaces()) {
+    return std::nullopt;
+  }
+
+  return {initNamespaces(config.overrides().metadata_options().receiving_namespaces().typed())};
+}
+
 std::optional<std::vector<std::string>>
 initUntypedClusterMetadataForwardingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
@@ -269,6 +280,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       untyped_receiving_namespaces_(
           config.metadata_options().receiving_namespaces().untyped().begin(),
           config.metadata_options().receiving_namespaces().untyped().end()),
+      typed_receiving_namespaces_(config.metadata_options().receiving_namespaces().typed().begin(),
+                                  config.metadata_options().receiving_namespaces().typed().end()),
       untyped_cluster_metadata_forwarding_namespaces_(
           config.metadata_options().cluster_metadata_forwarding_namespaces().untyped().begin(),
           config.metadata_options().cluster_metadata_forwarding_namespaces().untyped().end()),
@@ -304,7 +317,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       disable_immediate_response_(config.disable_immediate_response()), is_upstream_(is_upstream),
       graceful_grpc_close_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_graceful_grpc_close")),
-      allow_content_length_header_(config.allow_content_length_header()) {
+      allow_content_length_header_(config.allow_content_length_header()),
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
@@ -490,6 +504,7 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<int>(decoding_processor_effects_.trailer_effect_));
   (*struct_msg->mutable_fields())[RequestBodyProcessingEffectField].set_number_value(
       static_cast<int>(decoding_processor_effects_.body_effect_));
+  (*struct_msg->mutable_fields())[DestinationField].set_string_value(destination());
   return struct_msg;
 }
 
@@ -532,6 +547,7 @@ std::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
   parts.push_back(absl::StrCat("bs:", bytes_sent_));
   parts.push_back(absl::StrCat("br:", bytes_received_));
   parts.push_back(absl::StrCat("os:", static_cast<int>(grpc_status_before_first_call_)));
+  parts.push_back(absl::StrCat("ds:", destination()));
 
   return absl::StrJoin(parts, ",");
 }
@@ -622,6 +638,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == GrpcStatusBeforeFirstCallField) {
     return static_cast<int64_t>(grpc_status_before_first_call_);
   }
+  if (field_name == DestinationField) {
+    return absl::string_view(destination());
+  }
   return {};
 }
 
@@ -636,6 +655,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
       untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)),
+      typed_receiving_namespaces_(initTypedReceivingNamespaces(config)),
       untyped_cluster_metadata_forwarding_namespaces_(
           initUntypedClusterMetadataForwardingNamespaces(config)),
       typed_cluster_metadata_forwarding_namespaces_(
@@ -643,6 +663,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       failure_mode_allow_(config.overrides().has_failure_mode_allow()
                               ? std::optional<bool>(config.overrides().failure_mode_allow().value())
                               : std::nullopt),
+      emit_client_span_(config.overrides().has_emit_client_span()
+                            ? std::optional<bool>(config.overrides().emit_client_span().value())
+                            : std::nullopt),
       processing_request_modifier_factory_cb_(
           createProcessingRequestModifierCb(config.overrides(), builder, context)) {}
 
@@ -662,6 +685,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces().has_value()
                                         ? more_specific.untypedReceivingMetadataNamespaces()
                                         : less_specific.untypedReceivingMetadataNamespaces()),
+      typed_receiving_namespaces_(more_specific.typedReceivingMetadataNamespaces().has_value()
+                                      ? more_specific.typedReceivingMetadataNamespaces()
+                                      : less_specific.typedReceivingMetadataNamespaces()),
       untyped_cluster_metadata_forwarding_namespaces_(
           more_specific.untypedClusterMetadataForwardingNamespaces().has_value()
               ? more_specific.untypedClusterMetadataForwardingNamespaces()
@@ -673,6 +699,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       failure_mode_allow_(more_specific.failureModeAllow().has_value()
                               ? more_specific.failureModeAllow()
                               : less_specific.failureModeAllow()),
+      emit_client_span_(more_specific.emitClientSpan().has_value()
+                            ? more_specific.emitClientSpan()
+                            : less_specific.emitClientSpan()),
       processing_request_modifier_factory_cb_(
           more_specific.processing_request_modifier_factory_cb_
               ? more_specific.processing_request_modifier_factory_cb_
@@ -716,7 +745,7 @@ void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, b
 
 void Filter::onComplete(ProcessingResponse& response) {
   ENVOY_STREAM_LOG(debug, "Received successful response from server", *decoder_callbacks_);
-  auto resp_ptr = std::make_unique<ProcessingResponse>(response);
+  auto resp_ptr = Grpc::ResponsePtr<ProcessingResponse>(response);
   onReceiveMessage(std::move(resp_ptr));
 }
 
@@ -776,7 +805,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
                        .setBufferBodyForRetry(grpc_service_.has_retry_policy())
-                       .setSampled(std::nullopt)
+                       .setSampled(emit_client_span_ ? std::nullopt : std::make_optional(false))
                        .setRemoteCloseTimeout(config_->remoteCloseTimeout());
 
     ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
@@ -1382,11 +1411,8 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   // If there is no external processing configured in the encoding path,
   // and no more external processing is needed in the decoding path,
   // closing the gRPC stream if it is still open.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
-    if (encoding_state_.noExternalProcess() && decoding_state_.noMoreExternalProcess()) {
-      closeStreamMaybeGraceful();
-    }
+  if (encoding_state_.noExternalProcess() && decoding_state_.noMoreExternalProcess()) {
+    closeStreamMaybeGraceful();
   }
 
   return status;
@@ -1419,6 +1445,9 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
   encodeProtocolConfig(req);
+  if (end_stream) {
+    state.setEosSentToServerWithBody(true);
+  }
   return req;
 }
 
@@ -1463,28 +1492,38 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 }
 
 void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info) {
-  if (stream_info == nullptr || logging_info_ == nullptr) {
+  if (logging_info_ == nullptr) {
     return;
   }
 
-  const auto& upstream_meter = stream_info->getUpstreamBytesMeter();
-  if (upstream_meter != nullptr) {
-    logging_info_->setBytesSent(upstream_meter->wireBytesSent());
-    logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
-  }
-  // Only set upstream host in logging info once.
-  if (logging_info_->upstreamHost() == nullptr) {
-    logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+  if (stream_info != nullptr) {
+    const auto& upstream_meter = stream_info->getUpstreamBytesMeter();
+    if (upstream_meter != nullptr) {
+      logging_info_->setBytesSent(upstream_meter->wireBytesSent());
+      logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
+    }
+    // Only set upstream host in logging info once.
+    if (logging_info_->upstreamHost() == nullptr) {
+      logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+    }
+
+    // Only set cluster info in logging info once.
+    if (logging_info_->clusterInfo() == nullptr) {
+      logging_info_->setClusterInfo(stream_info->upstreamClusterInfoSharedPtr());
+    }
+
+    // Response code details should actually be set as many times as possible, since it's
+    // the *final* response code details that will give the most useful information.
+    logging_info_->setHttpResponseCodeDetails(stream_info->responseCodeDetails());
   }
 
-  // Only set cluster info in logging info once.
-  if (logging_info_->clusterInfo() == nullptr) {
-    logging_info_->setClusterInfo(stream_info->upstreamClusterInfoSharedPtr());
+  absl::string_view destination = "";
+  if (config_with_hash_key_.config().has_envoy_grpc()) {
+    destination = config_with_hash_key_.config().envoy_grpc().cluster_name();
+  } else if (config_with_hash_key_.config().has_google_grpc()) {
+    destination = config_with_hash_key_.config().google_grpc().target_uri();
   }
-
-  // Response code details should actually be set as many times as possible, since it's
-  // the *final* response code details that will give the most useful information.
-  logging_info_->setHttpResponseCodeDetails(stream_info->responseCodeDetails());
+  logging_info_->setDestination(destination);
 }
 
 void Filter::logStreamInfo() {
@@ -1494,9 +1533,12 @@ void Filter::logStreamInfo() {
     return;
   }
 
-  if (stream_ != nullptr && grpc_service_.has_envoy_grpc()) {
+  if (grpc_service_.has_envoy_grpc()) {
     // Envoy gRPC service
-    logStreamInfoBase(&stream_->streamInfo());
+    logStreamInfoBase(stream_ != nullptr ? &stream_->streamInfo() : nullptr);
+  } else {
+    // Google gRPC service or others
+    logStreamInfoBase(nullptr);
   }
 }
 
@@ -1620,36 +1662,67 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
   (*req.mutable_attributes())[FilterName] = std::move(attributes);
 }
 
+void Filter::setUntypedDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                                       const ProcessingResponse& response) {
+  if (!state.untypedReceivingMetadataNamespaces().empty() && response.has_dynamic_metadata()) {
+    const auto& response_metadata = response.dynamic_metadata().fields();
+    const auto& receiving_namespaces = state.untypedReceivingMetadataNamespaces();
+    for (const auto& context_key : response_metadata) {
+      bool found_allowed_namespace = false;
+      if (auto metadata_it = std::find(receiving_namespaces.begin(), receiving_namespaces.end(),
+                                       context_key.first);
+          metadata_it != receiving_namespaces.end()) {
+        cb->streamInfo().setDynamicMetadata(context_key.first, context_key.second.struct_value());
+        found_allowed_namespace = true;
+      }
+      if (!found_allowed_namespace) {
+        ENVOY_STREAM_LOG(debug,
+                         "processing response included dynamic metadata for namespace not "
+                         "configured for receiving: {}",
+                         *cb, context_key.first);
+      }
+    }
+  } else if (response.has_dynamic_metadata()) {
+    ENVOY_STREAM_LOG(debug,
+                     "processing response included dynamic metadata, but no receiving "
+                     "namespaces are configured.",
+                     *cb);
+  }
+}
+
+void Filter::setTypedDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                                     const ProcessingResponse& response) {
+  if (!state.typedReceivingMetadataNamespaces().empty() &&
+      !response.typed_dynamic_metadata().empty()) {
+    const auto& response_typed_metadata = response.typed_dynamic_metadata();
+    const auto& receiving_typed_namespaces = state.typedReceivingMetadataNamespaces();
+    for (const auto& context_key : response_typed_metadata) {
+      bool found_allowed_namespace = false;
+      if (auto metadata_it = std::find(receiving_typed_namespaces.begin(),
+                                       receiving_typed_namespaces.end(), context_key.first);
+          metadata_it != receiving_typed_namespaces.end()) {
+        cb->streamInfo().setDynamicTypedMetadata(context_key.first, context_key.second);
+        found_allowed_namespace = true;
+      }
+      if (!found_allowed_namespace) {
+        ENVOY_STREAM_LOG(debug,
+                         "processing response included typed dynamic metadata for namespace not "
+                         "configured for receiving: {}",
+                         *cb, context_key.first);
+      }
+    }
+  } else if (!response.typed_dynamic_metadata().empty()) {
+    ENVOY_STREAM_LOG(debug,
+                     "processing response included typed dynamic metadata, but no typed receiving "
+                     "namespaces are configured.",
+                     *cb);
+  }
+}
+
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
                                 const ProcessingResponse& response) {
-  if (state.untypedReceivingMetadataNamespaces().empty() || !response.has_dynamic_metadata()) {
-    if (response.has_dynamic_metadata()) {
-      ENVOY_STREAM_LOG(debug,
-                       "processing response included dynamic metadata, but no receiving "
-                       "namespaces are configured.",
-                       *decoder_callbacks_);
-    }
-    return;
-  }
-
-  const auto& response_metadata = response.dynamic_metadata().fields();
-  const auto& receiving_namespaces = state.untypedReceivingMetadataNamespaces();
-  for (const auto& context_key : response_metadata) {
-    bool found_allowed_namespace = false;
-    if (auto metadata_it =
-            std::find(receiving_namespaces.begin(), receiving_namespaces.end(), context_key.first);
-        metadata_it != receiving_namespaces.end()) {
-      cb->streamInfo().setDynamicMetadata(context_key.first,
-                                          response_metadata.at(context_key.first).struct_value());
-      found_allowed_namespace = true;
-    }
-    if (!found_allowed_namespace) {
-      ENVOY_STREAM_LOG(debug,
-                       "processing response included dynamic metadata for namespace not "
-                       "configured for receiving: {}",
-                       *decoder_callbacks_, context_key.first);
-    }
-  }
+  setUntypedDynamicMetadata(cb, state, response);
+  setTypedDynamicMetadata(cb, state, response);
 }
 
 void Filter::setEncoderDynamicMetadata(const ProcessingResponse& response) {
@@ -1734,8 +1807,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
                                                const bool eos_seen_in_body) {
   // Bail out if the gRPC stream has already been closed. This can happen in scenarios
   // like immediate responses or rejected header mutations.
-  if (stream_ == nullptr || !Runtime::runtimeFeatureEnabled(
-                                "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+  if (stream_ == nullptr) {
     return;
   }
 
@@ -1788,7 +1860,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
   }
 }
 
-void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
+void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
 
   if (config_->observabilityMode()) {
     ENVOY_STREAM_LOG(trace, "Ignoring received message when observability mode is enabled",
@@ -1812,6 +1884,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     return;
   }
 
+  ENVOY_STREAM_LOG(debug, "Received {} response {}", *decoder_callbacks_,
+                   responseCaseToString(response->response_case()), response->DebugString());
+
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
@@ -1829,16 +1904,24 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     if (config_->isAllowedOverrideMode(mode_override)) {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server for this request",
                        *decoder_callbacks_);
+      const auto old_decoding_body_mode = decoding_state_.bodyMode();
       decoding_state_.setProcessingMode(mode_override);
       encoding_state_.setProcessingMode(mode_override);
+
+      // If the response case is not set, this response message is for overriding the
+      // processing mode only.
+      if (response->response_case() == ProcessingResponse::ResponseCase::RESPONSE_NOT_SET) {
+        // If this function call returns false, it's a spurious response, and is handled
+        // by the default case of the switch statement below.
+        if (decoding_state_.handleStandaloneModeOverride(old_decoding_body_mode)) {
+          return;
+        }
+      }
     } else {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server is disallowed",
                        *decoder_callbacks_);
     }
   }
-
-  ENVOY_STREAM_LOG(debug, "Received {} response {}", *decoder_callbacks_,
-                   responseCaseToString(response->response_case()), response->DebugString());
 
   bool eos_seen_in_body = false;
   absl::Status processing_status;
@@ -1893,8 +1976,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
         on_processing_response_->afterReceivingImmediateResponse(
             response->immediate_response(), absl::OkStatus(), decoder_callbacks_->streamInfo());
       }
+      stats_.stream_msgs_received_.inc();
       sendImmediateResponse(response->immediate_response());
-      processing_status = absl::OkStatus();
+      return;
     }
     break;
   default:
@@ -1907,6 +1991,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   if (processing_status.ok()) {
     stats_.stream_msgs_received_.inc();
+    // Close the gRPC stream if no more external processing needed.
+    closeGrpcStreamIfLastRespReceived(*response, eos_seen_in_body);
   } else if (absl::IsFailedPrecondition(processing_status)) {
     // Processing code uses this specific error code in the case that a
     // message was received out of order.
@@ -1936,9 +2022,6 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     stats_.stream_msgs_received_.inc();
     handleErrorResponse(processing_status);
   }
-
-  // Close the gRPC stream if no more external processing needed.
-  closeGrpcStreamIfLastRespReceived(*response, eos_seen_in_body);
 }
 
 absl::Status Filter::handleStreamingImmediateResponse(
@@ -2196,6 +2279,15 @@ void Filter::mergePerRouteConfig() {
     encoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
   }
 
+  if (merged_config->typedReceivingMetadataNamespaces().has_value()) {
+    typed_receiving_namespaces_ = merged_config->typedReceivingMetadataNamespaces().value();
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new typed receiving metadata namespaces from per-route configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setTypedReceivingMetadataNamespaces(typed_receiving_namespaces_);
+    encoding_state_.setTypedReceivingMetadataNamespaces(typed_receiving_namespaces_);
+  }
+
   if (merged_config->untypedClusterMetadataForwardingNamespaces().has_value()) {
     untyped_cluster_metadata_forwarding_namespaces_ =
         merged_config->untypedClusterMetadataForwardingNamespaces().value();
@@ -2228,6 +2320,12 @@ void Filter::mergePerRouteConfig() {
     ENVOY_STREAM_LOG(trace, "Setting new failureModeAllow from per-route configuration",
                      *decoder_callbacks_);
     failure_mode_allow_ = merged_config->failureModeAllow().value();
+  }
+
+  if (merged_config->emitClientSpan().has_value()) {
+    ENVOY_STREAM_LOG(trace, "Setting new emitClientSpan from per-route configuration",
+                     *decoder_callbacks_);
+    emit_client_span_ = merged_config->emitClientSpan().value();
   }
 
   if (merged_config->hasProcessingRequestModifierConfig()) {

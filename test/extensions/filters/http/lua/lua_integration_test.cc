@@ -1301,6 +1301,142 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   cleanup();
 }
 
+// The scripts below emit whichever filter context the request resolved to, as a header, so that
+// the precedence between the filter-level and the per-route context is observable end to end.
+// `tostring()` is used so that an empty context is reported as "nil" rather than as a missing
+// header, which is what a disabled filter would look like.
+const std::string FILTER_AND_CODE_WITH_FILTER_CONTEXT =
+    R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  filter_context:
+    key: from_filter
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local value = request_handle:filterContext():get("key")
+        request_handle:headers():add("context", tostring(value))
+      end
+  source_codes:
+    named.lua:
+      inline_string: |
+        function envoy_on_request(request_handle)
+          local value = request_handle:filterContext():get("key")
+          request_handle:headers():add("context", tostring(value))
+        end
+)EOF";
+
+const std::string FILTER_CONTEXT_ROUTE_CONFIG =
+    R"EOF(
+name: filter_context_routes
+virtual_hosts:
+- name: rds_vhost_1
+  domains: ["foo.lyft.com"]
+  routes:
+  - match:
+      prefix: "/lua/context/no-per-route"
+    route:
+      cluster: cluster_0
+  - match:
+      prefix: "/lua/context/route-without-context"
+    route:
+      cluster: cluster_0
+    typed_per_filter_config:
+      lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        name: named.lua
+  - match:
+      prefix: "/lua/context/route-with-context"
+    route:
+      cluster: cluster_0
+    typed_per_filter_config:
+      lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        filter_context:
+          key: from_route
+  - match:
+      prefix: "/lua/context/route-empty-context"
+    route:
+      cluster: cluster_0
+    typed_per_filter_config:
+      lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        filter_context: {}
+- name: rds_vhost_2
+  domains: ["bar.lyft.com"]
+  typed_per_filter_config:
+    lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+      filter_context:
+        key: from_vhost
+  routes:
+  - match:
+      prefix: "/lua/context/vhost"
+    route:
+      cluster: cluster_0
+  - match:
+      prefix: "/lua/context/route-shadows-vhost"
+    route:
+      cluster: cluster_0
+    typed_per_filter_config:
+      lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        name: named.lua
+)EOF";
+
+// Where handle:filterContext() resolves from, with a context configured on the filter, on a route
+// and on a virtual host. The last case is the one a unit test cannot reach, since it mocks
+// mostSpecificPerFilterConfig() rather than running real route resolution.
+TEST_P(LuaIntegrationTest, FilterContextPrecedence) {
+  initializeWithYaml(FILTER_AND_CODE_WITH_FILTER_CONTEXT, FILTER_CONTEXT_ROUTE_CONFIG);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto check_request = [this](absl::string_view authority, absl::string_view path,
+                              absl::string_view expected_context) {
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", std::string(path)},
+                                                   {":scheme", "http"},
+                                                   {":authority", std::string(authority)},
+                                                   {"x-forwarded-for", "10.0.0.1"}};
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    waitForNextUpstreamRequest(0);
+
+    auto entry = upstream_request_->headers().get(Http::LowerCaseString("context"));
+    ASSERT_FALSE(entry.empty()) << "no context header found for " << path;
+    EXPECT_EQ(expected_context, entry[0]->value().getStringView()) << "path: " << path;
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  };
+
+  // No per route configuration at all: the filter-level context.
+  check_request("foo.lyft.com", "/lua/context/no-per-route", "from_filter");
+
+  // A per route configuration which selects a script but sets no context: still the filter-level
+  // one.
+  check_request("foo.lyft.com", "/lua/context/route-without-context", "from_filter");
+
+  // A per route context replaces the filter-level one.
+  check_request("foo.lyft.com", "/lua/context/route-with-context", "from_route");
+
+  // An explicitly empty per route context hides the filter-level one rather than falling back.
+  check_request("foo.lyft.com", "/lua/context/route-empty-context", "nil");
+
+  // A context on the virtual host applies to a route which has no configuration of its own.
+  check_request("bar.lyft.com", "/lua/context/vhost", "from_vhost");
+
+  // Only the most specific LuaPerRoute is consulted, so the route's shadows the virtual host's
+  // entirely: with no context of its own, the fallback is the filter-level one, not the virtual
+  // host's.
+  check_request("bar.lyft.com", "/lua/context/route-shadows-vhost", "from_filter");
+
+  cleanup();
+}
+
 TEST_P(LuaIntegrationTest, DirectResponseLuaMetadata) {
   if (!testing_downstream_filter_) {
     GTEST_SKIP() << "Direct response only works with downstream filters";

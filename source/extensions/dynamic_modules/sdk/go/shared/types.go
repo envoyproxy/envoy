@@ -197,6 +197,10 @@ const (
 	AttributeIDXdsFilterChainName
 	// health_check
 	AttributeIDHealthCheck
+	// upstream.server_name
+	AttributeIDUpstreamRequestedServerName
+	// xds.virtual_cluster_name
+	AttributeIDXdsVirtualClusterName
 )
 
 // LogLevel is the log level for messages logged via the host environment's logging mechanism.
@@ -322,6 +326,11 @@ const (
 	MetricsInvalidTags
 	MetricsFrozen
 )
+
+// GenericSecretID is an opaque identifier for a generic secret subscribed to via
+// HttpFilterConfigHandle.SubscribeGenericSecret. The zero value is never valid and is what
+// SubscribeGenericSecret returns when the subscription could not be created.
+type GenericSecretID uint64
 
 // HttpHeaderType identifies which HTTP header map to access. It corresponds to
 // envoy_dynamic_module_type_http_header_type. The values match the ABI's enum order:

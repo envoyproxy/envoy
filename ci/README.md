@@ -38,9 +38,9 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 
 # Build image base and compiler versions
 
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 13 and Clang 18 compiler.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 13 and Clang 22 compiler.
 
-The source for theis images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository.
 
 The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests. This is configured with `--config=clang`. We have an additional Linux CI run with GCC which builds binary only, configured with `--config=gcc`.
@@ -192,6 +192,11 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
 * `check_and_fix_proto_format` &mdash; check and fix configuration, fomatting and build issues in API proto files.
 * `format`&mdash; run validation, linting and formatting tools.
+* `lockfiles`/`lockfiles.regenerate` &mdash; regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
+* `lockfiles.check` &mdash; regenerate all `MODULE.bazel.lock` files and fail with a diff summary if any lockfile changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
+* `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, and dependabot configuration.
+* `registry` &mdash; update the Envoy bazel-registry hash in `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate all `MODULE.bazel.lock` files. Set `ENVOY_REGISTRY_HASH` to use a specific hash, `ENVOY_REGISTRY_REPO` to override the repository used for `git ls-remote`, or `ENVOY_REGISTRY_BRANCH` to override the branch used for the bump and checked by `deps`/`registry.check`.
+* `registry.check` &mdash; verify the pinned bazel-registry commit exists, is an ancestor of the target branch (`ENVOY_REGISTRY_BRANCH`, default `main`), and (for non-`-dev` versions) is tagged.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 ## On Windows

@@ -49,6 +49,8 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+
+#include "quiche/quic/core/crypto/crypto_protocol.h"
 #endif
 
 using testing::Eq;
@@ -69,6 +71,81 @@ TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
 
   testTrailers(10, 20, true, true);
+}
+
+// A QUERY request (RFC 10008) is routed upstream with its method and mandatory content intact,
+// for every combination of downstream and upstream protocol.
+TEST_P(ProtocolIntegrationTest, QueryMethod) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "QUERY"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-type", "application/sql"}},
+      128);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("QUERY", upstream_request_->headers().getMethodValue());
+  EXPECT_EQ("application/sql", upstream_request_->headers().getContentTypeValue());
+  EXPECT_EQ(128U, upstream_request_->bodyLength());
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(64, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(64U, response->body().size());
+}
+
+// With the runtime guard disabled, a downstream QUERY request is rejected by the HTTP/1 codec as
+// it was before RFC 10008 support was added. Only an HTTP/1 downstream is covered: the runtime
+// override applies to the whole test process, so for an HTTP/2 or HTTP/3 downstream the request
+// would be forwarded to the HTTP/1 fake upstream and rejected by its server codec instead. Envoy's
+// own upstream HTTP/1 codec parses responses and never validates request methods.
+TEST_P(DownstreamProtocolIntegrationTest, QueryMethodRuntimeGuardDisabled) {
+  if (GetParam().downstream_protocol != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "The QUERY method runtime guard is only consulted by the HTTP/1 codec";
+  }
+
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_allow_query_method", "false");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "QUERY"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-type", "application/sql"}},
+      128);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_protocol_error")->value());
+}
+
+// RFC 10008 Section 2 requires servers to fail a QUERY request whose Content-Type is missing. The
+// check lives in the connection manager rather than a codec, so it applies to every downstream
+// protocol.
+TEST_P(DownstreamProtocolIntegrationTest, QueryMethodMissingContentType) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "QUERY"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
@@ -264,6 +341,54 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterNotFound) { testRouterNotFound()
 TEST_P(ProtocolIntegrationTest, RouterVirtualClusters) { testRouterVirtualClusters(); }
 
 TEST_P(ProtocolIntegrationTest, RouterStats) { testRouteStats(); }
+
+TEST_P(ProtocolIntegrationTest, IgnorePathParametersInPathMatchingPerSegmentEnabled) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_match()
+            ->set_prefix("/foo/bar");
+        hcm.mutable_route_config()->set_ignore_path_parameters_in_path_matching(true);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setPath("/foo;param1=1/bar;param2=2");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, IgnorePathParametersInPathMatchingPerSegmentDisabled) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_match()
+            ->set_prefix("/foo/bar");
+        hcm.mutable_route_config()->set_ignore_path_parameters_in_path_matching(true);
+      });
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.strip_path_parameters_per_segment",
+                                    "false");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setPath("/foo;param1=1/bar;param2=2");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+}
 
 // Change the default route to be restrictive, and send a POST to an alternate route.
 TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
@@ -5088,76 +5213,6 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamMixedCaseHeaders) {
   }
 }
 
-TEST_P(ProtocolIntegrationTest, ValidateUpstreamHeadersWithOverride) {
-  if (use_universal_header_validator_) {
-    // UHV always validated headers before sending them upstream. This test is not applicable
-    // when UHV is enabled.
-    return;
-  }
-  if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    testing_upstream_intentionally_ = true;
-  }
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-  config_helper_.prependFilter(
-      "{ name: invalid-header-filter, typed_config: { \"@type\": "
-      "\"type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig\" } }");
-
-  initialize();
-
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"x-add-invalid-header-key", "true"}});
-
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    // HTTP/1 upstream will parse the invalid header as two values: x-foo and x-oops.
-    // This is a defined and known behavior when the runtime guard is disabled.
-    waitForNextUpstreamRequest();
-
-    EXPECT_EQ("hello", upstream_request_->headers()
-                           .get(Http::LowerCaseString("x-foo"))[0]
-                           ->value()
-                           .getStringView());
-    EXPECT_EQ("yes", upstream_request_->headers()
-                         .get(Http::LowerCaseString("x-oops"))[0]
-                         ->value()
-                         .getStringView());
-
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().getStatusValue());
-  } else if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    // nghttp2 throws an error when parsing the invalid header value, resets the
-    // upstream connection, and sends back a local 503 reply.
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-    response->waitForHeaders();
-
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_TRUE(response->complete());
-
-    EXPECT_EQ("503", response->headers().getStatusValue());
-    EXPECT_THAT(waitForAccessLog(access_log_name_),
-                HasSubstr("upstream_reset_before_response_started{connection_termination}"));
-  } else {
-    response->waitForHeaders();
-
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_TRUE(response->complete());
-
-    EXPECT_EQ("503", response->headers().getStatusValue());
-  }
-}
-
 // Test buffering and then continuing after too many response bytes to buffer.
 TEST_P(ProtocolIntegrationTest, BufferContinue) {
   // Bytes sent is configured for http/2 flow control windows.
@@ -5493,10 +5548,8 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 #endif
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
-  // TODO(yanavlasov): remove runtime override after making disable_client_header_validation_ work
-  // for non UHV builds
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
   disable_client_header_validation_ = true;
+  disableCodecHeaderValidation();
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -5522,10 +5575,8 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
-  // TODO(yanavlasov): remove runtime override after making disable_client_header_validation_ work
-  // for non UHV builds
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
   disable_client_header_validation_ = true;
+  disableCodecHeaderValidation();
   // For H/1 this test is equivalent to InvalidRequestHeaderName
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
@@ -5556,8 +5607,6 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
 
 TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderName) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
 
   initialize();
 
@@ -5629,10 +5678,6 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
 TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseData) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream", "true");
 
   useAccessLog("%DURATION% %ROUNDTRIP_DURATION% %REQUEST_DURATION% %REQUEST_TX_DURATION% "
                "%RESPONSE_DURATION% %RESPONSE_TX_DURATION%");
@@ -6317,6 +6362,11 @@ TEST_P(ProtocolIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailers) {
 
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    // For HTTP/3, the STOP_SENDING(NO_ERROR) arrives after the response and may or may not be
+    // processed before/after the stream is finished. Use waitForAnyTermination() to avoid flakes.
+    ASSERT_TRUE(response->waitForAnyTermination());
+    codec_client_->close();
   } else {
     ASSERT_TRUE(response->waitForReset());
     EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());

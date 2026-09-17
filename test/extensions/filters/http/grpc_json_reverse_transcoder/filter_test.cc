@@ -37,7 +37,7 @@ makeConfig(const envoy::extensions::filters::http::grpc_json_reverse_transcoder:
            Api::Api& api) {
   absl::Status creation_status = absl::OkStatus();
   auto config = std::make_shared<GrpcJsonReverseTranscoderConfig>(proto, api, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
   return config;
 }
 
@@ -888,7 +888,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, ParseBinaryConfig) {
   config.set_descriptor_binary(api_->fileSystem().fileReadToEnd(bookstoreDescriptorPath()).value());
   absl::Status creation_status = absl::OkStatus();
   GrpcJsonReverseTranscoderConfig filter_config(config, *api_, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 }
 
 // Test parsing of an invalid proto descriptor binary.
@@ -917,14 +917,14 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, ConfigWithoutDescriptor) {
 TEST_F(GrpcJsonReverseTranscoderFilterTest, CreateTranscoder) {
   absl::Status creation_status = absl::OkStatus();
   auto config = GrpcJsonReverseTranscoderConfig(bookstoreProtoConfig(), *api_, creation_status);
-  ASSERT_TRUE(creation_status.ok());
+  ASSERT_OK(creation_status);
 
   const auto* cb_descriptor = config.GetMethodDescriptor("/bookstore.Bookstore/CreateBook");
   EXPECT_TRUE(cb_descriptor);
   TranscoderInputStreamImpl request_in1, response_in1;
   StatusOr<std::unique_ptr<Transcoder>> transcoder1_or =
       config.CreateTranscoder(cb_descriptor, request_in1, response_in1);
-  EXPECT_TRUE(transcoder1_or.ok());
+  EXPECT_OK(transcoder1_or);
 }
 
 } // namespace

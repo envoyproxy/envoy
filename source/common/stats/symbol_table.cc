@@ -50,15 +50,6 @@ SymbolTable::Encoding::~Encoding() {
   ASSERT(mem_block_.capacity() == 0);
 }
 
-size_t SymbolTable::Encoding::encodingSizeBytes(uint64_t number) {
-  size_t num_bytes = 0;
-  do {
-    ++num_bytes;
-    number >>= 7;
-  } while (number != 0);
-  return num_bytes;
-}
-
 void SymbolTable::Encoding::appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block) {
   // UTF-8-like encoding where a value 127 or less gets written as a single
   // byte. For higher values we write the low-order 7 bits with a 1 in
@@ -674,20 +665,47 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
   }
 }
 
-SymbolTable::StoragePtr SymbolTable::join(const StatNameVec& stat_names) const {
+SymbolTable::StoragePtr SymbolTable::join(absl::Span<const StatName> stat_names) const {
   size_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     if (!stat_name.empty()) {
       num_bytes += stat_name.dataSize();
     }
   }
-  MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
-  Encoding::appendEncoding(num_bytes, mem_block);
+  return heapJoin(stat_names, num_bytes);
+}
+
+void StatNameJoiner::join(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table) {
+  // The elided path below drops storage_ without copying anything out of it, so it needs the same
+  // aliasing check that SymbolTable::inlineJoin() makes for the assembling path.
+  ASSERT(!storage_.checkStatNameOverlaps(stat_names),
+         "stat_names should not contain name overlapping with the storage");
+
+  // A join with at most one non-empty name produces bytes identical to that name, so the
+  // allocation can be skipped and the name referenced directly.
+  StatName sole_name;
+  bool needs_join = false;
   for (StatName stat_name : stat_names) {
-    stat_name.appendDataToMemBlock(mem_block);
+    if (stat_name.empty()) {
+      continue;
+    }
+    if (!sole_name.empty()) {
+      needs_join = true;
+      break;
+    }
+    sole_name = stat_name;
   }
-  ASSERT(mem_block.capacityRemaining() == 0);
-  return mem_block.release();
+
+  if (needs_join) {
+    // Assemble straight into storage_. Taking the returned-by-value form here would cost a copy:
+    // the bytes land at runtime-varying offsets, so the compiler can fold the result into an
+    // initialization but not into an assignment.
+    symbol_table.inlineJoin(stat_names, storage_);
+    stat_name_ = storage_.statName();
+  } else {
+    storage_ = SymbolTable::InlineStorage{};
+    stat_name_ = sole_name;
+  }
 }
 
 void SymbolTable::populateList(const StatName* names, uint32_t num_names, StatNameList& list) {
@@ -714,6 +732,40 @@ void SymbolTable::populateList(const StatName* names, uint32_t num_names, StatNa
   // total_size_bytes. After appending all the encoded data into the
   // allocated byte array, we should have exhausted all the memory
   // we though we needed.
+  ASSERT(mem_block.capacityRemaining() == 0);
+  list.moveStorageIntoList(mem_block.release());
+}
+
+void SymbolTable::populateList(StatName tagged_name, StatName base_name, StatNameTagSpan name_tags,
+                               StatNameList& list) {
+  const size_t stat_name_count = name_tags.size() * 2 + 2;
+
+  RELEASE_ASSERT(stat_name_count < 256, "Maximum number elements in a StatNameList exceeded");
+
+  // One byte for the number of names, plus the size of each name.
+  size_t total_size_bytes = 1;
+  total_size_bytes += tagged_name.size() + base_name.size();
+  for (const auto& tag : name_tags) {
+    total_size_bytes += tag.first.size() + tag.second.size();
+  }
+
+  // Now allocate the exact number of bytes required and move the encodings into storage.
+  MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
+  mem_block.appendOne(stat_name_count);
+  Encoding::appendToMemBlock(tagged_name, mem_block);
+  Encoding::appendToMemBlock(base_name, mem_block);
+  incRefCount(tagged_name);
+  incRefCount(base_name);
+  for (const auto& tag : name_tags) {
+    Encoding::appendToMemBlock(tag.first, mem_block);
+    Encoding::appendToMemBlock(tag.second, mem_block);
+    incRefCount(tag.first);
+    incRefCount(tag.second);
+  }
+
+  // This assertion double-checks the arithmetic where we computed total_size_bytes. After appending
+  // all the encoded data into the allocated byte array, we should have exhausted all the memory we
+  // thought we needed.
   ASSERT(mem_block.capacityRemaining() == 0);
   list.moveStorageIntoList(mem_block.release());
 }

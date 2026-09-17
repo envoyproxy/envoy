@@ -74,7 +74,7 @@ api_listener:
       )EOF";
   }
 
-  NiceMock<Http::MockResponseEncoder> stream_encoder_;
+  testing::NiceMock<Http::MockResponseEncoder> stream_encoder_;
 };
 
 ACTION_P(Notify, notification) { notification->Notify(); }

@@ -8,6 +8,7 @@
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -88,7 +89,7 @@ TEST(ConfigTest, ConfigWithDrainCloseCheck) {
   config.set_cluster("cluster");
   config.mutable_check_drain_close()->set_value(true);
 
-  EXPECT_TRUE(factory.createFilterFactoryFromProto(config, context).ok());
+  EXPECT_OK(factory.createFilterFactoryFromProto(config, context));
 }
 
 TEST(ConfigTest, TunnelingConfigWithFormatters) {
@@ -115,7 +116,7 @@ TEST(ConfigTest, TunnelingConfigWithFormatters) {
   formatter->set_name("envoy.formatter.TestFormatter");
   std::ignore = formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
 
-  EXPECT_TRUE(factory.createFilterFactoryFromProto(config, context).ok());
+  EXPECT_OK(factory.createFilterFactoryFromProto(config, context));
 }
 
 TEST(ConfigTest, TunnelingConfigWithUnknownFormatter) {

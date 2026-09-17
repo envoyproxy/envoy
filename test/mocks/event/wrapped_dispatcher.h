@@ -25,6 +25,14 @@ public:
     impl_.registerWatchdog(watchdog, min_touch_interval);
   }
 
+  void registerEvwatchObserver(Evwatch::Observer& observer) override {
+    impl_.registerEvwatchObserver(observer);
+  }
+
+  void unregisterEvwatchObserver(Evwatch::Observer& observer) override {
+    impl_.unregisterEvwatchObserver(observer);
+  }
+
   TimeSource& timeSource() override { return impl_.timeSource(); }
 
   void initializeStats(Stats::Scope& scope, const std::optional<std::string>& prefix) override {

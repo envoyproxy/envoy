@@ -39,6 +39,7 @@ public:
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
 
+  void setAbortiveClose() override;
   Api::IoCallUint64Result close() override;
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
@@ -49,6 +50,8 @@ public:
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
 
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
+
+  Api::IoCallUint64Result send(const void* buffer, size_t length) override;
 
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,

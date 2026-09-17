@@ -15,6 +15,7 @@ namespace UdpFilters {
 namespace DnsFilter {
 namespace {
 
+using testing::NiceMock;
 using ResponseValidator = Utils::DnsResponseValidator;
 
 // Mock OS getaddrinfo.

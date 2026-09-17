@@ -5,6 +5,7 @@
 
 #include "test/extensions/filters/network/generic_proxy/mocks/codec.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -16,6 +17,7 @@ namespace Codec {
 namespace Http1 {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::NiceMock;
 
 TEST(Http1MessageFrameTest, Http1MessageFrameTest) {
@@ -623,7 +625,7 @@ TEST_F(Http1ServerCodecTest, EncodeHeaderOnlyResponse) {
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(response, encoding_context).ok());
+    EXPECT_OK(codec_->encode(response, encoding_context));
   }
 }
 
@@ -642,8 +644,7 @@ TEST_F(Http1ServerCodecTest, EncodeResponseWhichMissRequiredHeaders) {
   // Encode the request.
   {
     auto status_or = codec_->encode(response, encoding_context);
-    EXPECT_FALSE(status_or.ok());
-    EXPECT_EQ(status_or.status().message(), "missing required headers");
+    EXPECT_THAT(status_or, HasStatusMessage("missing required headers"));
   }
 }
 
@@ -661,8 +662,7 @@ TEST_F(Http1ServerCodecTest, EncodeResponseButNoActiveRequest) {
   // Encode the response.
   {
     auto status_or = codec_->encode(response, encoding_context);
-    EXPECT_FALSE(status_or.ok());
-    EXPECT_EQ(status_or.status().message(), "no request for coming response");
+    EXPECT_THAT(status_or, HasStatusMessage("no request for coming response"));
   }
 }
 
@@ -693,7 +693,7 @@ TEST_F(Http1ServerCodecTest, EncodeResponseWithBody) {
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(response, encoding_context).ok());
+    EXPECT_OK(codec_->encode(response, encoding_context));
 
     EXPECT_CALL(codec_callbacks_, writeToConnection(_))
         .WillOnce(Invoke([](Buffer::Instance& buffer) {
@@ -701,7 +701,7 @@ TEST_F(Http1ServerCodecTest, EncodeResponseWithBody) {
 
           buffer.drain(buffer.length());
         }));
-    EXPECT_TRUE(codec_->encode(body, encoding_context).ok());
+    EXPECT_OK(codec_->encode(body, encoding_context));
   }
 }
 
@@ -732,7 +732,7 @@ TEST_F(Http1ServerCodecTest, EncodeResponseWithChunkedBody) {
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(response, encoding_context).ok());
+    EXPECT_OK(codec_->encode(response, encoding_context));
 
     EXPECT_CALL(codec_callbacks_, writeToConnection(_))
         .WillOnce(Invoke([](Buffer::Instance& buffer) {
@@ -744,7 +744,7 @@ TEST_F(Http1ServerCodecTest, EncodeResponseWithChunkedBody) {
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(body, encoding_context).ok());
+    EXPECT_OK(codec_->encode(body, encoding_context));
   }
 }
 TEST_F(Http1ServerCodecTest, EncodeResponseWithChunkedBodyButNotSetChunkHeader) {
@@ -775,7 +775,7 @@ TEST_F(Http1ServerCodecTest, EncodeResponseWithChunkedBodyButNotSetChunkHeader) 
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(response, encoding_context).ok());
+    EXPECT_OK(codec_->encode(response, encoding_context));
 
     EXPECT_CALL(codec_callbacks_, writeToConnection(_))
         .WillOnce(Invoke([](Buffer::Instance& buffer) {
@@ -787,7 +787,7 @@ TEST_F(Http1ServerCodecTest, EncodeResponseWithChunkedBodyButNotSetChunkHeader) 
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(body, encoding_context).ok());
+    EXPECT_OK(codec_->encode(body, encoding_context));
   }
 }
 
@@ -829,8 +829,8 @@ TEST_F(Http1ServerCodecTest, DecodeRequestAndEncodeResponse) {
     EXPECT_CALL(codec_callbacks_, writeToConnection(_)).Times(2);
 
     // Encode the response.
-    EXPECT_TRUE(codec_->encode(response, encoding_context).ok());
-    EXPECT_TRUE(codec_->encode(body, encoding_context).ok());
+    EXPECT_OK(codec_->encode(response, encoding_context));
+    EXPECT_OK(codec_->encode(body, encoding_context));
   }
 }
 
@@ -912,13 +912,12 @@ TEST_F(Http1ServerCodecTest, ResponseCompleteBeforeRequestComplete) {
 
   EXPECT_CALL(codec_callbacks_, writeToConnection(_));
   // Encode the response.
-  EXPECT_TRUE(codec_->encode(response, encoding_context).ok());
+  EXPECT_OK(codec_->encode(response, encoding_context));
 
   EXPECT_CALL(codec_callbacks_, writeToConnection(_));
 
   auto status_or = codec_->encode(body, encoding_context);
-  EXPECT_FALSE(status_or.ok());
-  EXPECT_EQ(status_or.status().message(), "response complete before request complete");
+  EXPECT_THAT(status_or, HasStatusMessage("response complete before request complete"));
 }
 
 TEST_F(Http1ServerCodecTest, NewRequestBeforeFirstRequestComplete) {
@@ -1146,7 +1145,7 @@ TEST_F(Http1ServerCodecTest, EncodeResponseInSingleFrameMode) {
         }));
     auto status = codec_->encode(response, encoding_context);
     std::cout << status.status().message() << std::endl;
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
   }
 }
 
@@ -1206,7 +1205,7 @@ public:
             buffer.drain(buffer.length());
           }));
 
-      EXPECT_TRUE(codec_->encode(request, encoding_context).ok());
+      EXPECT_OK(codec_->encode(request, encoding_context));
 
       EXPECT_CALL(codec_callbacks_, writeToConnection(_))
           .WillOnce(Invoke([](Buffer::Instance& buffer) {
@@ -1214,7 +1213,7 @@ public:
             buffer.drain(buffer.length());
           }));
 
-      EXPECT_TRUE(codec_->encode(body, encoding_context).ok());
+      EXPECT_OK(codec_->encode(body, encoding_context));
     }
   }
 
@@ -1244,7 +1243,7 @@ public:
             buffer.drain(buffer.length());
           }));
 
-      EXPECT_TRUE(codec_->encode(request, encoding_context).ok());
+      EXPECT_OK(codec_->encode(request, encoding_context));
     }
   }
 
@@ -1750,7 +1749,7 @@ TEST_F(Http1ClientCodecTest, EncodeHeaderOnlyRequest) {
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(request, encoding_context).ok());
+    EXPECT_OK(codec_->encode(request, encoding_context));
   }
 }
 
@@ -1772,8 +1771,7 @@ TEST_F(Http1ClientCodecTest, EncodeRequestMissRequiredHeaders) {
   // Encode the request.
   {
     auto status_or = codec_->encode(request, encoding_context);
-    EXPECT_FALSE(status_or.ok());
-    EXPECT_EQ(status_or.status().message(), "missing required headers");
+    EXPECT_THAT(status_or, HasStatusMessage("missing required headers"));
   }
 }
 
@@ -1807,7 +1805,7 @@ TEST_F(Http1ClientCodecTest, EncodeRequestWithBody) {
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(request, encoding_context).ok());
+    EXPECT_OK(codec_->encode(request, encoding_context));
 
     EXPECT_CALL(codec_callbacks_, writeToConnection(_))
         .WillOnce(Invoke([](Buffer::Instance& buffer) {
@@ -1815,7 +1813,7 @@ TEST_F(Http1ClientCodecTest, EncodeRequestWithBody) {
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(body, encoding_context).ok());
+    EXPECT_OK(codec_->encode(body, encoding_context));
   }
 }
 
@@ -1849,7 +1847,7 @@ TEST_F(Http1ClientCodecTest, EncodeRequestWithChunkdBody) {
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(request, encoding_context).ok());
+    EXPECT_OK(codec_->encode(request, encoding_context));
 
     EXPECT_CALL(codec_callbacks_, writeToConnection(_))
         .WillOnce(Invoke([](Buffer::Instance& buffer) {
@@ -1861,7 +1859,7 @@ TEST_F(Http1ClientCodecTest, EncodeRequestWithChunkdBody) {
           buffer.drain(buffer.length());
         }));
 
-    EXPECT_TRUE(codec_->encode(body, encoding_context).ok());
+    EXPECT_OK(codec_->encode(body, encoding_context));
   }
 }
 
@@ -1888,8 +1886,8 @@ TEST_F(Http1ClientCodecTest, EncodeRequestAndDecodeResponse) {
     EXPECT_CALL(codec_callbacks_, writeToConnection(_)).Times(2);
 
     // Encode the request.
-    EXPECT_TRUE(codec_->encode(request, encoding_context).ok());
-    EXPECT_TRUE(codec_->encode(body, encoding_context).ok());
+    EXPECT_OK(codec_->encode(request, encoding_context));
+    EXPECT_OK(codec_->encode(body, encoding_context));
 
     Buffer::OwnedImpl buffer;
 
@@ -1929,7 +1927,7 @@ TEST_F(Http1ClientCodecTest, ResponseCompleteBeforeRequestComplete) {
   EXPECT_CALL(codec_callbacks_, writeToConnection(_));
 
   // Encode the request. Only the headers are encoded and the body is not encoded.
-  EXPECT_TRUE(codec_->encode(request, encoding_context).ok());
+  EXPECT_OK(codec_->encode(request, encoding_context));
 
   Buffer::OwnedImpl buffer;
 
@@ -1983,7 +1981,7 @@ TEST_F(Http1ClientCodecTest, EncodeRequestInSingleFrameMode) {
                                        "body");
           buffer.drain(buffer.length());
         }));
-    EXPECT_TRUE(codec_->encode(request, encoding_context).ok());
+    EXPECT_OK(codec_->encode(request, encoding_context));
   }
 }
 

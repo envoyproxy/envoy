@@ -24,6 +24,7 @@
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -79,8 +80,8 @@ protected:
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
     // Drain notifications are scheduled whenever a listener or its filter chains begin draining.
     // They are not the focus of these tests, so allow them in any number.
-    EXPECT_CALL(*worker_, onListenerDrain(_)).Times(::testing::AnyNumber());
-    EXPECT_CALL(*worker_, onFilterChainDrain(_, _)).Times(::testing::AnyNumber());
+    EXPECT_CALL(*worker_, onListenerDrain(_, _)).Times(::testing::AnyNumber());
+    EXPECT_CALL(*worker_, onFilterChainDrain(_, _, _)).Times(::testing::AnyNumber());
     ON_CALL(server_.validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor));
     ON_CALL(server_.validation_context_, dynamicValidationVisitor())
@@ -392,7 +393,7 @@ protected:
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _, _));
-    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+    ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 
@@ -441,7 +442,7 @@ protected:
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _, _));
-    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+    ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 

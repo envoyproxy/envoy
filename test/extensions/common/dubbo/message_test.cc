@@ -314,8 +314,11 @@ TEST(RpcRequestTest, InitializeWithBufferTest) {
   {
     RpcRequest request("a", "b", "c", "d");
     Buffer::OwnedImpl buffer(std::string({
-        0x2, 'Z', 'Z', // The types string
-        'T', 'F',      // true and false
+        0x2,
+        'Z',
+        'Z', // The types string
+        'T',
+        'F', // true and false
     }));
 
     // Initialize the request with the correct buffer.
@@ -341,10 +344,13 @@ TEST(RpcRequestTest, InitializeWithBufferTest) {
     // Empty attachments will be encoded to the buffer when buffer() is called
     // and the underlying buffer is empty.
     EXPECT_EQ(request.content().buffer().toString(), std::string({
-                                                         0x2, 'Z', 'Z', // The types string
-                                                         'T', 'F',      // true and false
-                                                         'H',           // Attachments start
-                                                         'Z',           // Attachments end
+                                                         0x2,
+                                                         'Z',
+                                                         'Z', // The types string
+                                                         'T',
+                                                         'F', // true and false
+                                                         'H', // Attachments start
+                                                         'Z', // Attachments end
                                                      }));
 
     // Set the attachment.

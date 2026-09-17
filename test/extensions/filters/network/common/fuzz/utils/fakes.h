@@ -11,10 +11,11 @@ namespace Configuration {
 class FakeListenerInfo : public Network::ListenerInfo {
 public:
   explicit FakeListenerInfo(const envoy::config::listener::v3::Listener& config)
-      : metadata_(config.metadata()), direction_(config.traffic_direction()),
+      : name_(config.name()), metadata_(config.metadata()), direction_(config.traffic_direction()),
         is_quic_(config.udp_listener_config().has_quic_options()),
         bypass_overload_manager_(config.bypass_overload_manager()) {}
   FakeListenerInfo() = default;
+  absl::string_view name() const override { return name_; }
   const envoy::config::core::v3::Metadata& metadata() const override {
     return metadata_.proto_metadata_;
   }
@@ -24,8 +25,12 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
   bool isQuic() const override { return is_quic_; }
   bool shouldBypassOverloadManager() const override { return bypass_overload_manager_; }
+  envoy::config::listener::v3::Listener::DrainType drainType() const override {
+    return envoy::config::listener::v3::Listener::DEFAULT;
+  }
 
 private:
+  const std::string name_;
   Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
   envoy::config::core::v3::TrafficDirection direction_ = envoy::config::core::v3::UNSPECIFIED;
   const bool is_quic_ = false;

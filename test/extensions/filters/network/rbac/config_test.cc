@@ -72,14 +72,14 @@ private:
     Stats::IsolatedStoreImpl store;
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
     EXPECT_THROW(
-        std::make_shared<RoleBasedAccessControlFilterConfig>(
+        std::ignore = std::make_shared<RoleBasedAccessControlFilterConfig>(
             config, *store.rootScope(), context, ProtobufMessage::getStrictValidationVisitor()),
         Envoy::EnvoyException);
 
     config.clear_matcher();
     *config.mutable_shadow_matcher() = matcher_proto;
     EXPECT_THROW(
-        std::make_shared<RoleBasedAccessControlFilterConfig>(
+        std::ignore = std::make_shared<RoleBasedAccessControlFilterConfig>(
             config, *store.rootScope(), context, ProtobufMessage::getStrictValidationVisitor()),
         Envoy::EnvoyException);
   }

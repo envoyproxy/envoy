@@ -13,16 +13,21 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 
+#include "test/common/http/header_formatter_test_utils.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatus;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 
@@ -171,6 +176,17 @@ TEST(HttpUtility, stripQueryString) {
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/?x=1&y=2")), "/foo/bar/");
 }
 
+TEST(HttpUtility, stripQueryStringView) {
+  EXPECT_EQ(Utility::stripQueryStringView(""), "");
+  EXPECT_EQ(Utility::stripQueryStringView("?"), "");
+  EXPECT_EQ(Utility::stripQueryStringView("/"), "/");
+  EXPECT_EQ(Utility::stripQueryStringView("/?"), "/");
+  EXPECT_EQ(Utility::stripQueryStringView("/?x=1"), "/");
+  EXPECT_EQ(Utility::stripQueryStringView("/foo"), "/foo");
+  EXPECT_EQ(Utility::stripQueryStringView("/foo/bar?a=b&b=c"), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryStringView("/foo/bar/?x=1&y=2"), "/foo/bar/");
+}
+
 TEST(HttpUtility, replaceQueryString) {
   // Replace with nothing
   auto params = Utility::QueryParamsMulti();
@@ -218,6 +234,9 @@ TEST(HttpUtility, testQueryParamModification) {
   EXPECT_EQ(params.getFirstValue("a").value(), "1");
   EXPECT_EQ(params.getFirstValue("b").value(), "foo");
   EXPECT_FALSE(params.getFirstValue("d").has_value());
+  EXPECT_EQ(params.getFirstValueView("a").value(), "1");
+  EXPECT_EQ(params.getFirstValueView("b").value(), "foo");
+  EXPECT_FALSE(params.getFirstValueView("d").has_value());
   params.remove("b");
   EXPECT_EQ(params.toString(), "?a=1&a=2&c=4");
   params.overwrite("a", "bar");
@@ -654,32 +673,6 @@ TEST(HttpUtility, parseHttp2Settings) {
   }
 
   {
-
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.safe_http2_options", "false"}});
-
-    using ::Envoy::Http2::Utility::OptionsLimits;
-    auto http2_options = parseHttp2OptionsFromV3Yaml("{}");
-    EXPECT_EQ(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE, http2_options.hpack_table_size().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS_LEGACY,
-              http2_options.max_concurrent_streams().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE_LEGACY,
-              http2_options.initial_stream_window_size().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE_LEGACY,
-              http2_options.initial_connection_window_size().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES,
-              http2_options.max_outbound_frames().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES,
-              http2_options.max_outbound_control_frames().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD,
-              http2_options.max_consecutive_inbound_frames_with_empty_payload().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM,
-              http2_options.max_inbound_priority_frames_per_stream().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT,
-              http2_options.max_inbound_window_update_frames_per_data_frame_sent().value());
-  }
-
-  {
     const std::string yaml = R"EOF(
 hpack_table_size: 1
 max_concurrent_streams: 2
@@ -759,58 +752,143 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
   Protobuf::BoolValue hcm_value;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
 
   // nothing explicitly configured, default to false (i.e. default stream error behavior for HCM)
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .stream_error_on_invalid_http_message_);
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                   .stream_error_on_invalid_http_message_);
 
   // http1_options.stream_error overrides HCM.stream_error
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
   hcm_value.set_value(false);
-  EXPECT_TRUE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .stream_error_on_invalid_http_message_);
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                  .stream_error_on_invalid_http_message_);
 
   // http1_options.stream_error overrides HCM.stream_error (flip boolean value)
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
   hcm_value.set_value(true);
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .stream_error_on_invalid_http_message_);
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                   .stream_error_on_invalid_http_message_);
 
   http1_options.clear_override_stream_error_on_invalid_http_message();
 
   // fallback to HCM.stream_error
   hcm_value.set_value(true);
-  EXPECT_TRUE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .stream_error_on_invalid_http_message_);
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                  .stream_error_on_invalid_http_message_);
 
   // fallback to HCM.stream_error (flip boolean value)
   hcm_value.set_value(false);
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .stream_error_on_invalid_http_message_);
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                   .stream_error_on_invalid_http_message_);
+}
+
+// StatefulHeaderKeyFormatterFactoryConfig::createFromProto() was replaced by
+// createFactoryFromProto(), which takes a factory context and returns a status, and the old method
+// is deprecated rather than removed. An extension that only implements the deprecated method -
+// which is what every out-of-tree extension written before the change does - must still be reached
+// when Envoy calls the new one.
+class LegacyOnlyFormatterFactory : public StatefulHeaderKeyFormatterFactory {
+public:
+  StatefulHeaderKeyFormatterPtr create() override { return nullptr; }
+};
+
+class LegacyOnlyFormatterFactoryConfig : public StatefulHeaderKeyFormatterFactoryConfig {
+public:
+  std::string name() const override { return "envoy.test.legacy_only_formatter"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::StringValue>();
+  }
+
+  // Deliberately implements only the deprecated method.
+  StatefulHeaderKeyFormatterFactorySharedPtr createFromProto(const Protobuf::Message&) override {
+    return std::make_shared<LegacyOnlyFormatterFactory>();
+  }
+};
+
+TEST(HttpUtility, StatefulFormatterDeprecatedFactoryOverloadStillReached) {
+  LegacyOnlyFormatterFactoryConfig factory;
+  Registry::InjectFactory<StatefulHeaderKeyFormatterFactoryConfig> registered(factory);
+
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  auto* stateful_formatter =
+      http1_options.mutable_header_key_format()->mutable_stateful_formatter();
+  stateful_formatter->set_name("envoy.test.legacy_only_formatter");
+  Protobuf::StringValue formatter_config;
+  ASSERT_TRUE(stateful_formatter->mutable_typed_config()->PackFrom(formatter_config));
+
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  auto settings = Http1::parseHttp1Settings(http1_options, context, creation_status);
+
+  EXPECT_THAT(creation_status, IsOk());
+  EXPECT_EQ(Http1Settings::HeaderKeyFormat::StatefulFormatter, settings.header_key_format_);
+  EXPECT_NE(nullptr, settings.stateful_header_key_formatter_);
+}
+
+// A formatter that rejects its configuration must have the failure reported through
+// creation_status, and parseHttp1Settings() must return default settings rather than the
+// half-populated ones it had built before it reached the formatter.
+TEST(HttpUtility, StatefulFormatterCreationFailureIsPropagated) {
+  RejectingStatefulFormatterFactoryConfig factory;
+  Registry::InjectFactory<StatefulHeaderKeyFormatterFactoryConfig> registered(factory);
+
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  // Set a field that is populated before the formatter is created, so that default settings can be
+  // told apart from partially populated ones.
+  http1_options.set_allow_chunked_length(true);
+  useRejectingStatefulFormatter(http1_options);
+
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  auto settings = Http1::parseHttp1Settings(http1_options, context, creation_status);
+
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         Eq(RejectingStatefulFormatterFactoryConfig::kError)));
+  EXPECT_EQ(Http1Settings::HeaderKeyFormat::Default, settings.header_key_format_);
+  EXPECT_EQ(nullptr, settings.stateful_header_key_formatter_);
+  EXPECT_FALSE(settings.allow_chunked_length_);
+}
+
+TEST(HttpUtility, StatefulFormatterCreationFailureIsPropagatedWithHcmOverload) {
+  RejectingStatefulFormatterFactoryConfig factory;
+  Registry::InjectFactory<StatefulHeaderKeyFormatterFactoryConfig> registered(factory);
+
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  http1_options.set_allow_chunked_length(true);
+  useRejectingStatefulFormatter(http1_options);
+
+  Protobuf::BoolValue hcm_value;
+  hcm_value.set_value(true);
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  auto settings =
+      Http1::parseHttp1Settings(http1_options, context, hcm_value, true, creation_status);
+
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         Eq(RejectingStatefulFormatterFactoryConfig::kError)));
+  EXPECT_EQ(Http1Settings::HeaderKeyFormat::Default, settings.header_key_format_);
+  EXPECT_EQ(nullptr, settings.stateful_header_key_formatter_);
+  EXPECT_FALSE(settings.allow_chunked_length_);
+  EXPECT_FALSE(settings.validate_scheme_);
+  EXPECT_FALSE(settings.stream_error_on_invalid_http_message_);
 }
 
 TEST(HttpUtility, AllowCustomMethods) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
   Protobuf::BoolValue hcm_value;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
 
   EXPECT_FALSE(http1_options.allow_custom_methods());
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .allow_custom_methods_);
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                   .allow_custom_methods_);
 
   http1_options.set_allow_custom_methods(true);
-  EXPECT_TRUE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .allow_custom_methods_);
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                  .allow_custom_methods_);
 }
 
 TEST(HttpUtility, getLastAddressFromXFF) {
@@ -2001,6 +2079,9 @@ TEST(Utility, isSafeRequest) {
   request_headers.setMethod("DELETE");
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
   request_headers.setMethod("PATCH");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+  // QUERY is safe per RFC 10008 but deliberately excluded; see the TODO in isSafeRequest().
+  request_headers.setMethod("QUERY");
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
 
   request_headers.setMethod("GET");

@@ -19,6 +19,7 @@ envoy_cc_mock(
         "//envoy/ssl:context_interface",
         "//envoy/ssl:context_manager_interface",
         "//envoy/stats:stats_interface",
+        "//source/common/tls:context_lib",
         "//source/common/tls/cert_validator:cert_validator_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],

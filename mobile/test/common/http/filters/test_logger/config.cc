@@ -7,9 +7,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace TestLogger {
 
-Http::FilterFactoryCb Factory::createFilterFactoryFromProtoTyped(
-    const envoymobile::extensions::filters::http::test_logger::TestLogger&, const std::string&,
-    Server::Configuration::FactoryContext&) {
+absl::StatusOr<Http::FilterFactoryCb> Factory::createHttpFilterFactoryFromProtoTyped(
+    const envoymobile::extensions::filters::http::test_logger::TestLogger&,
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
 
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>());

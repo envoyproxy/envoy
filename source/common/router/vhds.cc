@@ -16,16 +16,16 @@
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/stats/prefix_utility.h"
 
 namespace Envoy {
 namespace Router {
 
 absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
-    RouteConfigUpdatePtr& config_update_info,
+    const envoy::config::route::v3::RouteConfiguration& route_config,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    Rds::RouteConfigProvider* route_config_provider) {
-  const auto& vhds_config_source =
-      config_update_info->protobufConfigurationCast().vhds().config_source();
+    bool from_rds, VhdsConfigUpdateReceiver& receiver, Init::Manager& init_manager) {
+  const auto& vhds_config_source = route_config.vhds().config_source();
   // VHDS only supports Delta xDS. This can be specified either explicitly via DELTA_GRPC
   // or implicitly by using ADS when the parent ADS stream is in Delta mode.
   const bool is_ads = vhds_config_source.config_source_specifier_case() ==
@@ -55,45 +55,63 @@ absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
 
   auto status = absl::OkStatus();
   auto ret = std::unique_ptr<VhdsSubscription>(new VhdsSubscription(
-      config_update_info, factory_context, stat_prefix, route_config_provider, status));
+      route_config, factory_context, stat_prefix, from_rds, receiver, init_manager, status));
   RETURN_IF_ERROR(status);
   return ret;
 }
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
-VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
+namespace {
+
+// Creates the '<stat_prefix>[rds.]vhds.<route config name>.' scope of a VHDS subscription. There is
+// no tag extractor for the VHDS route config name, so it stays part of the tag-extracted name and
+// mergeStatPrefix() only adds the tag of the parent prefix.
+//
+// `stat_prefix` is the parent prefix alone, for example 'http.<stat_prefix>.'. A VHDS subscription
+// of a route configuration delivered over RDS is nested under that route configuration's own 'rds.'
+// namespace, while one of a static route configuration is not.
+Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view stat_prefix,
+                                       bool from_rds, absl::string_view route_config_name) {
+  const Stats::TaggedStatName prefix = Stats::mergeStatPrefix(
+      scope.symbolTable(), stat_prefix,
+      absl::StrCat(from_rds ? "rds.vhds." : "vhds.", route_config_name, "."));
+  return scope.scopeFromTaggedName(prefix.baseName(), prefix.tags(), prefix.name());
+}
+
+} // namespace
+
+VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfiguration& route_config,
                                    Server::Configuration::ServerFactoryContext& factory_context,
-                                   const std::string& stat_prefix,
-                                   Rds::RouteConfigProvider* route_config_provider,
+                                   const std::string& stat_prefix, bool from_rds,
+                                   VhdsConfigUpdateReceiver& receiver, Init::Manager& init_manager,
                                    absl::Status& status)
-    : config_update_info_(config_update_info),
-      scope_(factory_context.scope().createScope(
-          stat_prefix + "vhds." + config_update_info_->protobufConfigurationCast().name() + ".")),
+    : receiver_(receiver), route_config_name_(route_config.name()),
+      scope_(createStatsScope(factory_context.scope(), stat_prefix, from_rds, route_config_name_)),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
-      init_target_(fmt::format("VhdsConfigSubscription {}",
-                               config_update_info_->protobufConfigurationCast().name()),
+      init_target_(fmt::format("VhdsConfigSubscription {}", route_config_name_),
                    [this]() {
                      // Start with no concrete subscription; virtual hosts are fetched on demand.
                      // Accept every resource under this route configuration's namespace, so that
                      // on-demand virtual hosts -- whose resource names are
                      // "<route_config_name>/<vhost>" -- are routed back to this subscription's
                      // watch without being subscribed on the wire.
-                     subscription_->accept(
-                         {config_update_info_->protobufConfigurationCast().name() + "/*"});
+                     subscription_->accept({route_config_name_ + "/*"});
                      subscription_->start({});
                    }),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
-                            "name"),
-      route_config_provider_(route_config_provider) {
+                            "name") {
   const auto resource_name = resource_type_helper_.getResourceName();
   Envoy::Config::SubscriptionOptions options;
   absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_update_info_->protobufConfigurationCast().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this,
+          route_config.vhds().config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this,
           resource_type_helper_.resourceDecoder(), options);
   SET_AND_RETURN_IF_NOT_OK(status_or.status(), status);
   subscription_ = std::move(status_or.value());
+  // Registered last, so that the target's callback never runs before subscription_ is set. That
+  // can't happen with the per-update init manager, which is always Uninitialized here, but this
+  // keeps it true regardless of which init manager is handed in.
+  init_manager.add(init_target_);
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {
@@ -112,7 +130,7 @@ absl::Status VhdsSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
-  RouteConfigUpdateReceiver::VirtualHostRefVector added_vhosts;
+  VhdsConfigUpdateReceiver::VirtualHostRefVector added_vhosts;
   std::set<std::string> added_resource_ids;
   for (const auto& resource : added_resources) {
     added_resource_ids.emplace(resource.get().name());
@@ -127,15 +145,13 @@ absl::Status VhdsSubscription::onConfigUpdate(
         Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::VirtualHost>(
             resource.get().resource()));
   }
-  if (config_update_info_->onVhdsUpdate(added_vhosts, std::move(added_resource_ids),
-                                        removed_resources, version_info)) {
+  // The receiver builds the new route configuration, warms it up and publishes it to its observer.
+  // This subscription doesn't publish anything itself.
+  if (receiver_.onVhdsUpdate(added_vhosts, std::move(added_resource_ids), removed_resources,
+                             version_info)) {
     stats_.config_reload_.inc();
-    ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}",
-              config_update_info_->protobufConfigurationCast().name(),
-              config_update_info_->configHash());
-    if (route_config_provider_ != nullptr) {
-      RETURN_IF_NOT_OK(route_config_provider_->onConfigUpdate());
-    }
+    ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} version={}",
+              route_config_name_, version_info);
   }
 
   init_target_.ready();

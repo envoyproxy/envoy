@@ -1,5 +1,7 @@
 #include "source/server/active_udp_listener.h"
 
+#include <functional>
+
 #include "envoy/network/exception.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
@@ -11,6 +13,18 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
+class UdpHotRestartSessionHandleImpl : public Network::UdpHotRestartSessionHandle {
+public:
+  explicit UdpHotRestartSessionHandleImpl(std::function<void()> on_destroy)
+      : on_destroy_(std::move(on_destroy)) {}
+  ~UdpHotRestartSessionHandleImpl() override { on_destroy_(); }
+
+private:
+  const std::function<void()> on_destroy_;
+};
+} // namespace
+
 ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t concurrency,
                                              Network::UdpConnectionHandler& parent,
                                              Network::Socket& listen_socket,
@@ -103,6 +117,18 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
 }
 
 void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
+  if (udp_listener_ == nullptr) {
+    // Already shut down.
+    return;
+  }
+
+  if (non_dispatched_udp_packet_handler_.has_value() &&
+      !active_sessions_.contains(data.addresses_)) {
+    // Draining for hot restart: this session isn't ours, hand it to the child instance.
+    non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
+    return;
+  }
+
   for (auto& read_filter : read_filters_) {
     Network::FilterStatus status = read_filter->onData(data);
     if (status == Network::FilterStatus::StopIteration) {
@@ -136,6 +162,18 @@ void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& fil
 }
 
 Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }
+
+Network::UdpHotRestartSessionHandlePtr ActiveRawUdpListener::registerHotRestartSession(
+    const Network::Address::InstanceConstSharedPtr& local_address,
+    const Network::Address::InstanceConstSharedPtr& peer_address) {
+  Network::UdpRecvData::LocalPeerAddresses key{local_address, peer_address};
+  const bool inserted = active_sessions_.insert(key).second;
+  ASSERT(inserted, "hot restart session registered twice");
+  return std::make_unique<UdpHotRestartSessionHandleImpl>([this, key = std::move(key)]() {
+    const size_t erased = active_sessions_.erase(key);
+    ASSERT(erased == 1, "hot restart session unregistered while unknown");
+  });
+}
 
 } // namespace Server
 } // namespace Envoy

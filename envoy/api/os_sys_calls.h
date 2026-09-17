@@ -1,6 +1,5 @@
 #pragma once
 
-#include <sys/resource.h>
 #include <sys/stat.h>
 
 #include <chrono>
@@ -301,14 +300,9 @@ public:
   virtual void freeaddrinfo(addrinfo* res) PURE;
 
   /**
-   * @see man getrlimit
+   * @see Increase soft file descriptor limit to match hard limit.
    */
-  virtual SysCallIntResult getrlimit(int resource, struct rlimit* rlim) PURE;
-
-  /**
-   * @see man setrlimit
-   */
-  virtual SysCallIntResult setrlimit(int resource, const struct rlimit* rlim) PURE;
+  virtual SysCallIntResult raiseFileLimits() PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

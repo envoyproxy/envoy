@@ -8,6 +8,7 @@
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.pb.h"
 
 #include "source/common/config/api_version.h"
 #include "source/common/network/socket_option_impl.h"
@@ -17,6 +18,7 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/fake_access_log.h"
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration.h"
@@ -24,8 +26,11 @@
 #include "test/integration/tcp_proxy_integration_test.pb.validate.h"
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_random_generator.h"
 
 #include "absl/functional/any_invocable.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -706,6 +711,25 @@ TEST_P(TcpProxyIntegrationTest, UpstreamRstPropagation) {
 
   auto log_result = waitForAccessLog(access_log_path);
   EXPECT_THAT(log_result, Eq("RemoteReset"));
+}
+
+// Verifies that downstream RST is propagated to upstream as RST (default behavior).
+TEST_P(TcpProxyIntegrationTest, DownstreamRstPropagation) {
+  enableHalfClose(false);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  // Downstream sends RST.
+  tcp_client->close(Network::ConnectionCloseType::AbortReset);
+
+  // Upstream should receive RST.
+  ASSERT_TRUE(fake_upstream_connection->waitForRstDisconnect());
 }
 #endif
 
@@ -1779,9 +1803,10 @@ TEST_P(TcpProxySslIntegrationTest, SslConnectionDataEarlyReadNotCached) {
   // The second access log is when the connection closes, so the handshake is complete and
   // a valid peer cert is now available.
   log_result = waitForAccessLog(access_log_path, 1, false);
-  EXPECT_EQ(log_result,
-            "san=spiffe://lyft.com/frontend-team,http://frontend.lyft.com "
-            "fingerprint=c07e14fc43b9c7b3d92f1004f91d3a9e071d9c93a58afc76b4c14303ae3a0f34");
+  EXPECT_EQ(log_result, absl::StrCat("san=spiffe://lyft.com/frontend-team,http://frontend.lyft.com "
+                                     "fingerprint=",
+                                     absl::AsciiStrToLower(
+                                         absl::StrReplaceAll(TEST_CLIENT_CERT_HASH, {{":", ""}}))));
 }
 
 // Test that Envoy does not crash when a downstream TLS connection is rejected
@@ -2275,7 +2300,7 @@ TEST_P(TcpProxyIntegrationTest, ClusterBufferHighWatermarkTimeoutClosesUpstream)
   // Disable reads from the upstream to simulate a slow upstream.
   ASSERT_TRUE(fake_upstream_connection->readDisable(true));
 
-  std::string payload(256 * 1024, 'a');
+  std::string payload(2048 * 1024, 'a');
   ASSERT_TRUE(tcp_client->write(payload, false));
 
   timeSystem().advanceTimeWait(std::chrono::milliseconds(500));

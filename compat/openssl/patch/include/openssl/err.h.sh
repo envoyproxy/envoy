@@ -21,7 +21,6 @@ uncomment.sh "$1" --comment -h \
   --uncomment-regex '\s\sERR_NUM_LIBS' '};' \
   --uncomment-macro 'ERR_R_[A-Z0-9_]*_LIB' \
   --uncomment-macro-redef 'ERR_R_[[:alnum:]_]*' \
-  --sed 's|ossl_ERR_R_OVERFLOW|ossl_ERR_R_INTERNAL_ERROR|' \
   --uncomment-func-decl ERR_func_error_string \
   --uncomment-func-decl ERR_error_string \
   --uncomment-macro ERR_ERROR_STRING_BUF_LEN \
@@ -30,3 +29,13 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl ERR_put_error \
   --uncomment-macro-redef ERR_NUM_ERRORS \
   --sed '/#define ERR_PACK/i#define ERR_PACK(lib, reason) (lib == ossl_ERR_LIB_SYS) ? (ossl_ERR_SYSTEM_FLAG | reason) : ossl_ERR_PACK(lib, 0, reason)'
+
+# BoringSSL defines ERR_R_OVERFLOW as a distinct error from ERR_R_INTERNAL_ERROR.
+# OpenSSL has no equivalent, so define it with a unique value (273 is above
+# OpenSSL's highest ERR_R_* base of 272) to avoid duplicate-case errors.
+cat >> "$1" <<'EOF'
+
+#ifndef ERR_R_OVERFLOW
+#define ERR_R_OVERFLOW (273 | ERR_R_FATAL)
+#endif
+EOF

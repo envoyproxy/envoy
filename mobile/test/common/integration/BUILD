@@ -32,6 +32,7 @@ envoy_cc_test_with_engine_builder(
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",
         "//test/common/mocks/dns:mock_dns_resolver_lib",
+        "@envoy//envoy/common:logger",
         "@envoy//source/common/quic:active_quic_listener_lib",
         "@envoy//source/common/quic:client_connection_factory_lib",
         "@envoy//source/common/quic:quic_server_factory_lib",
@@ -84,6 +85,7 @@ envoy_cc_test_library(
     repository = "@envoy",
     deps = [
         "//library/common:engine_common_lib",
+        "@envoy//bazel:cpp_runfiles",
         "@envoy//source/common/listener_manager:listener_manager_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
@@ -228,6 +230,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
+        "@envoy//bazel:cpp_runfiles",
         "@envoy//source/common/event:libevent_lib",
         "@envoy//source/common/tls:context_config_lib",
         "@envoy//source/common/tls:context_lib",

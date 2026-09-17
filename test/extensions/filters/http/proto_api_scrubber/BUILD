@@ -38,10 +38,11 @@ envoy_cc_test(
         "//test/config/integration/certs",
         "//test/proto:apikeys_proto_descriptor",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/extensions/common/matcher:matcher_lib",
+        "//source/extensions/filters/http/proto_api_scrubber:config",
         "//source/extensions/filters/http/proto_api_scrubber:filter_config",
         "//source/extensions/matching/http/cel_input:cel_input_lib",
         "//source/extensions/matching/input_matchers/cel_matcher:config",
@@ -66,7 +67,7 @@ envoy_cc_test(
         "//test/proto:apikeys_proto_descriptor",
         "//test/proto:bookstore_proto_descriptor",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
@@ -85,6 +86,7 @@ envoy_cc_test(
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/strings",
@@ -102,7 +104,7 @@ envoy_extension_cc_test(
         "//test/proto:apikeys_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",

@@ -18,12 +18,14 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
 using testing::AnyNumber;
 using testing::ByMove;
@@ -491,8 +493,7 @@ TEST_F(SocketConfigFactoryTest, CreateSocketFactoryWithoutTransportSocket) {
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   auto factory_or_error = factory_->createTransportSocketFactory(config, context);
-  EXPECT_TRUE(factory_or_error.status().ok());
-  EXPECT_NE(nullptr, factory_or_error.value());
+  EXPECT_THAT(factory_or_error, IsOkAndHolds(::testing::NotNull()));
 }
 
 TEST(ParseTest, TestValidResponse) {

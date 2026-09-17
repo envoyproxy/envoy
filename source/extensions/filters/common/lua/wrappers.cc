@@ -391,7 +391,7 @@ int SslConnectionWrapper::luaCiphersuiteId(lua_State* state) {
 }
 
 int SslConnectionWrapper::luaCiphersuiteString(lua_State* state) {
-  const std::string& cipher_suite = connection_info_.ciphersuiteString();
+  const absl::string_view cipher_suite = connection_info_.ciphersuiteString();
   lua_pushlstring(state, cipher_suite.data(), cipher_suite.size());
   return 1;
 }

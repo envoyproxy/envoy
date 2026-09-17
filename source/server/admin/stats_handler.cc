@@ -225,13 +225,15 @@ Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
                                 {"html", "active-html", "text", "json"}};
   Admin::ParamDescriptor filter{Admin::ParamDescriptor::Type::String, "filter",
                                 "Regular expression (Google re2) for filtering stats"};
+  Admin::ParamDescriptor invert_filter{Admin::ParamDescriptor::Type::Boolean, "invert_filter",
+                                       "Invert the filter regex"};
   Admin::ParamDescriptor type{Admin::ParamDescriptor::Type::Enum,
                               "type",
                               "Stat types to include.",
                               {StatLabels::All, StatLabels::Counters, StatLabels::Histograms,
                                StatLabels::Gauges, StatLabels::TextReadouts}};
 
-  Admin::ParamDescriptorVec params{usedonly, filter};
+  Admin::ParamDescriptorVec params{usedonly, filter, invert_filter};
   if (!active_mode) {
     params.push_back(format);
   }

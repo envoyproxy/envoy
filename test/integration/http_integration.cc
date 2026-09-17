@@ -20,6 +20,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_annotations.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
@@ -46,6 +47,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 
 #include "absl/time/time.h"
 #include "base_integration_test.h"
@@ -383,6 +385,11 @@ HttpIntegrationTest::~HttpIntegrationTest() {
         << "test requires explicit cleanupUpstreamAndDownstream";
   }
   cleanupUpstreamAndDownstream();
+  // Reset last, once the connections are torn down. The server's workers outlive this destructor
+  // (`test_server_` belongs to the base class), so they may still read the flag; it is atomic for
+  // that reason.
+  Http::HeaderUtility::disable_request_header_validation_for_tests_.store(
+      false, std::memory_order_relaxed);
 }
 
 void HttpIntegrationTest::initialize() {
@@ -506,13 +513,35 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   // will interpret that as an unexpected disconnect. The codec client is not
   // subject to the same failure mode.
   if (fake_upstream_connection_) {
-    AssertionResult result = fake_upstream_connection_->close();
+    AssertionResult result = AssertionSuccess();
+    const bool is_http3 = fake_upstream_connection_->type() == Http::CodecType::HTTP3;
+    if (is_http3) {
+      // QUIC connections do not support half-close.
+      result = fake_upstream_connection_->close();
+    } else {
+      // A local close only proves that the fake upstream dispatcher closed its socket. Initiate a
+      // fake-upstream FIN; closing the downstream below also makes TCP proxy and CONNECT paths that
+      // enable upstream half-close fully close their paired upstream.
+      result = fake_upstream_connection_->halfCloseForCleanup();
+    }
     RELEASE_ASSERT(result, result.message());
+    if (codec_client_) {
+      codec_client_->close();
+    }
     result = fake_upstream_connection_->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
+
+    // Envoy closes its socket before raising connection callbacks, so run a worker barrier after
+    // observing its close to ensure the callback has removed the connection from its connection
+    // pool. Some fixtures stop the server before cleaning up their fake upstreams; they cannot
+    // issue another request, so no worker barrier is needed.
+    if (!is_http3 && test_server_) {
+      test_server_->waitForWorkerThreads();
+    }
+    result = fake_upstream_connection_->waitForNoPost();
+    RELEASE_ASSERT(result, result.message());
     fake_upstream_connection_.reset();
-  }
-  if (codec_client_) {
+  } else if (codec_client_) {
     codec_client_->close();
   }
 }
@@ -1006,7 +1035,7 @@ void HttpIntegrationTest::testRouterRetryOnResetBeforeRequestAfterHeaders() {
   auto response = std::move(encoder_decoder.second);
   auto status = request_encoder_->encodeHeaders(headers, false);
   // Make sure we transmit headers successfully
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(status);
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   // Reset the upstream connection after the headers have been sent
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -1419,6 +1448,12 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
         hcm.mutable_max_request_headers_kb()->set_value(max_size);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
+        // Disable route timeout to prevent 504 on slow CI (#44416).
+        auto* route = hcm.mutable_route_config()
+                          ->mutable_virtual_hosts(0)
+                          ->mutable_routes(0)
+                          ->mutable_route();
+        route->mutable_timeout()->set_seconds(0);
       });
   setMaxRequestHeadersKb(max_size);
   setMaxRequestHeadersCount(max_count);

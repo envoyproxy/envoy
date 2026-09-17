@@ -188,11 +188,17 @@ func hostLog(level shared.LogLevel, format string, args []any) {
 		return
 	}
 	message := fmt.Sprintf(format, args...)
-	C.envoy_dynamic_module_callback_log(
+	// Skip hostLog and the public Log wrapper so the host reports the module call site instead of a
+	// location inside the SDK. An empty file is a fine fallback if the caller cannot be resolved.
+	_, sourceFile, sourceLine, _ := runtime.Caller(2)
+	C.envoy_dynamic_module_callback_log_v2(
 		(C.envoy_dynamic_module_type_log_level)(logLevel),
 		stringToModuleBuffer(message),
+		stringToModuleBuffer(sourceFile),
+		C.uint32_t(sourceLine),
 	)
 	runtime.KeepAlive(message)
+	runtime.KeepAlive(sourceFile)
 }
 
 type dymHeaderMap struct {
@@ -859,6 +865,26 @@ func (h *dymHttpFilterHandle) SetMetadata(metadataNamespace, key string, value a
 	runtime.KeepAlive(metadataNamespace)
 	runtime.KeepAlive(key)
 	runtime.KeepAlive(strValue)
+}
+
+func (h *dymHttpFilterHandle) SetMetadataStruct(metadataNamespace string, serializedStruct []byte) {
+	C.envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		bytesToModuleBuffer(serializedStruct),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(serializedStruct)
+}
+
+func (h *dymHttpFilterHandle) SetTypedMetadata(metadataNamespace string, serializedAny []byte) {
+	C.envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		bytesToModuleBuffer(serializedAny),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(serializedAny)
 }
 
 func (h *dymHttpFilterHandle) GetAttributeNumber(
@@ -1566,6 +1592,21 @@ func (h *dymHttpFilterHandle) IncrementCounterValue(id shared.MetricID,
 	return shared.MetricsResult(ret)
 }
 
+func (h *dymHttpFilterHandle) GetGenericSecret(
+	id shared.GenericSecretID,
+) (shared.UnsafeEnvoyBuffer, bool) {
+	var value C.envoy_dynamic_module_type_envoy_buffer
+	ok := C.envoy_dynamic_module_callback_http_filter_get_generic_secret(
+		h.hostPluginPtr,
+		(C.size_t)(uint64(id)),
+		&value,
+	)
+	if !bool(ok) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(value), true
+}
+
 func newDymStreamPluginHandle(
 	hostPluginPtr C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 ) *dymHttpFilterHandle {
@@ -1608,6 +1649,8 @@ func newDymStreamPluginHandle(
 }
 
 type dymConfigHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr    C.envoy_dynamic_module_type_http_filter_config_envoy_ptr
 	calloutCallbacks map[uint64]shared.HttpCalloutCallback
 	streamCallbacks  map[uint64]shared.HttpStreamCallback
@@ -1616,6 +1659,16 @@ type dymConfigHandle struct {
 
 func (h *dymConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
 	hostLog(level, format, args)
+}
+
+func (h *dymConfigHandle) GetLogLevel() shared.LogLevel {
+	return shared.LogLevel(C.envoy_dynamic_module_callback_get_log_level())
+}
+
+func (h *dymConfigHandle) IsLogLevelEnabled(level shared.LogLevel) bool {
+	return bool(C.envoy_dynamic_module_callback_log_enabled(
+		(C.envoy_dynamic_module_type_log_level)(uint32(level)),
+	))
 }
 
 func (h *dymConfigHandle) DefineHistogram(name string,
@@ -1774,6 +1827,36 @@ func (h *dymConfigHandle) IncrementCounterValue(id shared.MetricID,
 	return shared.MetricsResult(ret)
 }
 
+func (h *dymConfigHandle) SubscribeGenericSecret(
+	name string, sdsConfigSource string,
+) shared.GenericSecretID {
+	id := C.envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+		// An empty buffer tells Envoy to resolve the name as a static secret.
+		stringToModuleBuffer(sdsConfigSource),
+	)
+	runtime.KeepAlive(name)
+	runtime.KeepAlive(sdsConfigSource)
+	// 0 is reserved to signal that the subscription could not be created.
+	return shared.GenericSecretID(uint64(id))
+}
+
+func (h *dymConfigHandle) GetGenericSecret(
+	id shared.GenericSecretID,
+) (shared.UnsafeEnvoyBuffer, bool) {
+	var value C.envoy_dynamic_module_type_envoy_buffer
+	ok := C.envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+		h.hostConfigPtr,
+		(C.size_t)(uint64(id)),
+		&value,
+	)
+	if !bool(ok) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(value), true
+}
+
 func (h *dymConfigHandle) HttpCallout(
 	cluster string, headers [][2]string, body []byte, timeoutMs uint64,
 	cb shared.HttpCalloutCallback) (shared.HttpCalloutInitResult, uint64) {
@@ -1899,7 +1982,9 @@ func (h *dymConfigHandle) GetScheduler() shared.Scheduler {
 	return h.scheduler
 }
 
-type dymRouteConfigHandle struct{}
+type dymRouteConfigHandle struct {
+	dymCommonHandle
+}
 
 func (h *dymRouteConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
 	hostLog(level, format, args)
@@ -2495,6 +2580,8 @@ type statSinkWrapper struct {
 // configuration pointer used to define and set gauges and, lazily, a scheduler
 // whose committed tasks run on the main thread.
 type dymStatSinkHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr C.envoy_dynamic_module_type_stat_sink_config_envoy_ptr
 	scheduler     *dymScheduler
 }

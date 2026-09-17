@@ -2,6 +2,7 @@
 #include "source/server/admin/stats_html_render.h"
 
 #include "test/server/admin/stats_render_test_base.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -101,6 +102,33 @@ TEST_F(StatsHtmlRenderTest, RenderActive) {
   StatsHtmlRender renderer(response_headers_, response_, params_);
   renderer.setupStatsPage(handler(), params_, response_);
   EXPECT_THAT(response_.toString(), HasSubstr("<script>"));
+}
+
+TEST_F(StatsHtmlRenderTest, SanitizeNameInString) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_html_stats_names", "true"}});
+  StatsHtmlRender renderer{response_headers_, response_, params_};
+  EXPECT_THAT(render<std::string>(renderer, "<script>alert(1)</script>", "value"),
+              HasSubstr("&lt;script&gt;alert(1)&lt;/script&gt;: \"value\"\n"));
+}
+
+TEST_F(StatsHtmlRenderTest, SanitizeNameInUnsigned) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_html_stats_names", "true"}});
+  StatsHtmlRender renderer{response_headers_, response_, params_};
+  EXPECT_THAT(render<uint64_t>(renderer, "<script>alert(1)</script>", 42),
+              HasSubstr("&lt;script&gt;alert(1)&lt;/script&gt;: 42\n"));
+}
+
+TEST_F(StatsHtmlRenderTest, SanitizeNameInHistogramTextMode) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_html_stats_names", "true"}});
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
+  StatsHtmlRender renderer{response_headers_, response_, params_};
+  Stats::ParentHistogram& histogram = populateHistogram("h1", {200, 300, 300});
+  std::string result = render<>(renderer, "<script>alert(1)</script>", histogram);
+  EXPECT_THAT(result, HasSubstr("&lt;script&gt;alert(1)&lt;/script&gt;:"));
+  EXPECT_THAT(result, Not(HasSubstr("<script>alert(1)</script>:")));
 }
 
 } // namespace Server

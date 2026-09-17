@@ -61,7 +61,7 @@ std::shared_ptr<JsonTranscoderConfig> makeSharedTranscoderConfig(
     Api::Api& api) {
   absl::Status creation_status = absl::OkStatus();
   auto config = std::make_shared<JsonTranscoderConfig>(proto, api, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
   return config;
 }
 
@@ -70,7 +70,7 @@ std::shared_ptr<JsonTranscoderConfig> makeSharedTranscoderConfig(
 #define MAKE_TRANSCODER_CONFIG(name, ...)                                                          \
   absl::Status name##_status = absl::OkStatus();                                                   \
   JsonTranscoderConfig name(__VA_ARGS__, name##_status);                                           \
-  ASSERT_TRUE(name##_status.ok())
+  ASSERT_OK(name##_status)
 
 class GrpcJsonTranscoderFilterTestBase {
 protected:
@@ -154,19 +154,17 @@ protected:
 };
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseConfig) {
-  EXPECT_TRUE(transcoderConfigStatus(
-                  getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                                 "bookstore.Bookstore"),
-                  *api_)
-                  .ok());
+  EXPECT_OK(transcoderConfigStatus(
+      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                     "bookstore.Bookstore"),
+      *api_));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseConfigSkipRecalculating) {
-  EXPECT_TRUE(transcoderConfigStatus(
-                  getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                                 "bookstore.Bookstore", true),
-                  *api_)
-                  .ok());
+  EXPECT_OK(transcoderConfigStatus(
+      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                     "bookstore.Bookstore", true),
+      *api_));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseBinaryConfig) {
@@ -176,7 +174,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, ParseBinaryConfig) {
           .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"))
           .value());
   proto_config.add_services("bookstore.Bookstore");
-  EXPECT_TRUE(transcoderConfigStatus(proto_config, *api_).ok());
+  EXPECT_OK(transcoderConfigStatus(proto_config, *api_));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, UnknownService) {
@@ -287,7 +285,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoder) {
   const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
                                               method_info, unknown_variable_bindings);
 
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_TRUE(transcoder);
   EXPECT_EQ("bookstore.Bookstore.ListShelves", method_info->descriptor_->full_name());
 }
@@ -309,7 +307,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
   const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
                                               method_info, unknown_variable_bindings);
 
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_TRUE(transcoder);
   EXPECT_EQ("bookstore.Bookstore.DeleteShelf", method_info->descriptor_->full_name());
 }
@@ -378,7 +376,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
   const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
                                               method_info, unknown_variable_bindings);
 
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_TRUE(transcoder);
   EXPECT_TRUE(unknown_variable_bindings.key().empty());
 }
@@ -399,7 +397,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsCaptured) {
   const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
                                               method_info, unknown_query_params);
 
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_TRUE(transcoder);
   ASSERT_TRUE(unknown_query_params.key().contains("foo"));
   ASSERT_TRUE(unknown_query_params.key().contains("eep"));
@@ -426,7 +424,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
   const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
                                               method_info, unknown_variable_bindings);
 
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_TRUE(transcoder);
   EXPECT_EQ("bookstore.Bookstore.ListShelves", method_info->descriptor_->full_name());
 }
@@ -478,7 +476,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
   const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
                                               method_info, unknown_variable_bindings);
 
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_TRUE(transcoder);
   EXPECT_EQ("bookstore.Bookstore.PostWildcard", method_info->descriptor_->full_name());
 }

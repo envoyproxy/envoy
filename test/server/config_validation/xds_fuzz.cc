@@ -116,9 +116,7 @@ void XdsFuzzTest::close() {
  */
 bool XdsFuzzTest::eraseListener(const std::string& listener_name) {
   const auto orig_size = listeners_.size();
-  listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
-                                  [&](auto& listener) { return listener.name() == listener_name; }),
-                   listeners_.end());
+  std::erase_if(listeners_, [&](auto& listener) { return listener.name() == listener_name; });
   return orig_size != listeners_.size();
 }
 
@@ -395,7 +393,7 @@ std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutes
   auto map = test_server_->server().admin()->getConfigTracker().getCallbacksMap();
 
   // There is no route config dump before envoy has a route.
-  if (map.find("routes") == map.end()) {
+  if (!map.contains("routes")) {
     return {};
   }
 

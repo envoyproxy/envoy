@@ -1,3 +1,5 @@
+#include <format>
+
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -25,12 +27,12 @@ class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpV
                              public MySQLTestUtils,
                              public BaseIntegrationTest {
   std::string mysqlConfig() {
-    return fmt::format(
-        fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "contrib/mysql_proxy/filters/network/test/mysql_test_config.yaml"))),
-        Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getAnyAddressString(GetParam()));
+    std::string loopback_address = Network::Test::getLoopbackAddressString(GetParam());
+    std::string any_address = Network::Test::getAnyAddressString(GetParam());
+    return std::vformat(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+                            "contrib/mysql_proxy/filters/network/test/mysql_test_config.yaml")),
+                        std::make_format_args(Platform::null_device_path, loopback_address,
+                                              loopback_address, any_address));
   }
 
 public:

@@ -68,7 +68,7 @@ envoy_cc_test_library(
         "uber_readfilter.cc",
     ],
     hdrs = ["uber_readfilter.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":network_readfilter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
@@ -90,15 +90,15 @@ envoy_cc_fuzz_test(
     srcs = ["network_readfilter_fuzz_test.cc"],
     corpus = "network_readfilter_corpus",
     dictionaries = ["network_readfilter_fuzz_test.dict"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":uber_readfilter_lib",
         ":vig_anymap_ext_lib",
+        "//bazel/deps:libprotobuf-mutator",
         "//source/common/config:utility_lib",
         "//source/common/http:rds_lib",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
-        "@libprotobuf-mutator//:libprotobuf_mutator",
     ] + envoy_filters_from_selected(READFILTER_FUZZ_FILTERS),
 )
 
@@ -120,7 +120,7 @@ envoy_cc_test_library(
         "uber_writefilter.cc",
     ],
     hdrs = ["uber_writefilter.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":network_writefilter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
@@ -135,7 +135,7 @@ envoy_cc_fuzz_test(
     name = "network_writefilter_fuzz_test",
     srcs = ["network_writefilter_fuzz_test.cc"],
     corpus = "network_writefilter_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # All Envoy network filters must be linked to the test in order for the fuzzer to pick
     # these up via the NamedNetworkFilterConfigFactory.
     deps = [

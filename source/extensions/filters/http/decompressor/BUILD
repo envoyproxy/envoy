@@ -38,6 +38,7 @@ envoy_cc_extension(
         "//envoy/compression/decompressor:decompressor_config_interface",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/http/decompressor/v3:pkg_cc_proto",
     ],
 )

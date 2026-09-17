@@ -11,6 +11,8 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -18,6 +20,7 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -91,7 +94,7 @@ public:
   // Create a simple formatter that returns a static string.
   Formatter::FormatterConstSharedPtr createFormatterFromString(const std::string& format_str) {
     auto formatter_or_error = Formatter::FormatterImpl::create(format_str, false);
-    EXPECT_TRUE(formatter_or_error.ok());
+    EXPECT_OK(formatter_or_error);
     return std::move(formatter_or_error.value());
   }
 
@@ -224,8 +227,8 @@ TEST_F(GeoipFilterTest, GeoipInfoSerialization) {
   auto proto = info.serializeAsProto();
   ASSERT_NE(nullptr, proto);
   const auto& proto_struct = dynamic_cast<const Protobuf::Struct&>(*proto);
-  EXPECT_EQ("Seattle", proto_struct.fields().at("x-geo-city").string_value());
-  EXPECT_EQ("US", proto_struct.fields().at("x-geo-country").string_value());
+  EXPECT_THAT(proto_struct.fields(), UnorderedElementsAre(IsStructString("x-geo-city", "Seattle"),
+                                                          IsStructString("x-geo-country", "US")));
 
   // Test serializeAsString.
   auto json_string = info.serializeAsString();
@@ -424,6 +427,40 @@ TEST_F(GeoipFilterTest, ClientIpFormatterAccessor) {
 
   // Verify the accessor returns a non-null formatter.
   EXPECT_NE(nullptr, config_->clientIpFormatter());
+}
+
+// A geolocation lookup needs an IP address, and the downstream connection address is not
+// necessarily one. The filter must skip the lookup rather than pass a non-IP address to the
+// provider, which asserts on one.
+class GeoipFilterNonIpAddressTest : public GeoipFilterTest {
+public:
+  void expectLookupSkipped(Network::Address::InstanceConstSharedPtr remote_address) {
+    initializeProviderFactory();
+    initializeFilter(BasicGeoipConfig);
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(remote_address);
+    // No lookup is attempted, but the connection is still counted in the total alongside skipped.
+    expectStatsTotalIncremented();
+    EXPECT_CALL(stats_, counter("prefix.geoip.skipped"));
+    EXPECT_CALL(*dummy_driver_, lookup(_, _)).Times(0);
+    EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+    EXPECT_FALSE(filter_state_->hasData<GeoipInfo>(std::string(GeoipFilterStateKey)));
+  }
+};
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForNonIpDownstreamAddress) {
+  expectLookupSkipped(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_address_for_test"));
+}
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForPipeDownstreamAddress) {
+  auto pipe_or_error = Network::Address::PipeInstance::create("/tmp/envoy_geoip_test.sock");
+  ASSERT_TRUE(pipe_or_error.ok());
+  expectLookupSkipped(std::move(*pipe_or_error));
+}
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForNullDownstreamAddress) {
+  expectLookupSkipped(nullptr);
 }
 
 } // namespace

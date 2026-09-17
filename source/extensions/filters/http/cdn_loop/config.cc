@@ -21,9 +21,10 @@ using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::parseCdnId;
 using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::ParseContext;
 using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::ParsedCdnId;
 
-absl::StatusOr<Http::FilterFactoryCb> CdnLoopFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> CdnLoopFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
-    const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& /*context*/) {
+    Server::Configuration::ServerFactoryContext& /*context*/,
+    Server::Configuration::ExtraFactoryContext&) {
   StatusOr<ParsedCdnId> context = parseCdnId(ParseContext(config.cdn_id()));
   if (!context.ok() || !context->context().atEnd()) {
     return absl::InvalidArgumentError(

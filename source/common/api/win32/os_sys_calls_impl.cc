@@ -487,13 +487,9 @@ SysCallIntResult OsSysCallsImpl::getaddrinfo(const char* node, const char* servi
 
 void OsSysCallsImpl::freeaddrinfo(addrinfo* res) { ::freeaddrinfo(res); }
 
-SysCallIntResult OsSysCallsImpl::getrlimit(int resource, struct rlimit* rlim) {
-  // Windows does not support all resource limits.
+SysCallIntResult OsSysCallsImpl::raiseFileLimits() {
+  // Windows does not support this functionality.
   return {0, 0};
-}
-
-SysCallIntResult OsSysCallsImpl::setrlimit(int resource, const struct rlimit* rlim) {
-  PANIC("not implemented");
 }
 
 } // namespace Api

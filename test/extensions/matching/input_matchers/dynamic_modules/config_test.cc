@@ -1,5 +1,6 @@
 #include "envoy/registry/registry.h"
 
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/matching/input_matchers/dynamic_modules/config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -23,6 +24,22 @@ public:
     std::string shared_object_dir =
         std::filesystem::path(shared_object_path).parent_path().string();
     TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", shared_object_dir, 1);
+  }
+
+  // Returns the number of times matcher_lifecycle_counter has destroyed its configuration. The
+  // module handle is held so the shared counter stays alive across the factory's own load.
+  std::function<int()> configDestroyCounter() {
+    using GetConfigDestroyCountFuncType = int (*)();
+    auto module = Extensions::DynamicModules::newDynamicModule(
+        Extensions::DynamicModules::testSharedObjectPath("matcher_lifecycle_counter", "c"),
+        /*do_not_close=*/true);
+    EXPECT_TRUE(module.ok());
+    auto destroy_count = module.value()->getFunctionPointer<GetConfigDestroyCountFuncType>(
+        "getMatcherConfigDestroyCount");
+    EXPECT_TRUE(destroy_count.ok());
+    return [module = std::shared_ptr(std::move(module.value())), count = destroy_count.value()]() {
+      return count();
+    };
   }
 
   DynamicModuleInputMatcherFactory factory_;
@@ -231,6 +248,58 @@ TEST_F(DynamicModuleInputMatcherFactoryTest, FactoryRegistration) {
   auto* factory = Registry::FactoryRegistry<::Envoy::Matcher::InputMatcherFactory>::getFactory(
       "envoy.matching.matchers.dynamic_modules");
   EXPECT_NE(nullptr, factory);
+}
+
+// The factory callback may run more than once, and every matcher instance shares one in-module
+// configuration. Releasing all of them must destroy the configuration exactly once.
+TEST_F(DynamicModuleInputMatcherFactoryTest, SharedConfigDestroyedOnceForMultipleMatchers) {
+  const auto destroy_count = configDestroyCounter();
+  const int before = destroy_count();
+
+  const std::string yaml = R"EOF(
+dynamic_module_config:
+  name: matcher_lifecycle_counter
+  do_not_close: true
+matcher_name: test_matcher
+)EOF";
+  envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
+      proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  {
+    auto factory_cb = factory_.createInputMatcherFactoryCb(proto_config, context_);
+    auto matcher1 = factory_cb();
+    auto matcher2 = factory_cb();
+    EXPECT_NE(nullptr, matcher1);
+    EXPECT_NE(nullptr, matcher2);
+    // The configuration is still referenced, so it has not been destroyed yet.
+    EXPECT_EQ(before, destroy_count());
+  }
+
+  EXPECT_EQ(before + 1, destroy_count());
+}
+
+// A factory callback that is never invoked still owns the in-module configuration and must destroy
+// it once when released, so a rejected match tree does not leak the configuration.
+TEST_F(DynamicModuleInputMatcherFactoryTest, ConfigDestroyedWhenFactoryCallbackNeverInvoked) {
+  const auto destroy_count = configDestroyCounter();
+  const int before = destroy_count();
+
+  const std::string yaml = R"EOF(
+dynamic_module_config:
+  name: matcher_lifecycle_counter
+  do_not_close: true
+matcher_name: test_matcher
+)EOF";
+  envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
+      proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  {
+    auto factory_cb = factory_.createInputMatcherFactoryCb(proto_config, context_);
+  }
+
+  EXPECT_EQ(before + 1, destroy_count());
 }
 
 } // namespace

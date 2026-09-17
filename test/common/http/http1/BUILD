@@ -14,7 +14,7 @@ envoy_package()
 envoy_cc_test(
     name = "header_formatter_test",
     srcs = ["header_formatter_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http/http1:header_formatter_lib",
     ],
@@ -23,7 +23,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/event:dispatcher_interface",
@@ -32,6 +32,7 @@ envoy_cc_test(
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
+        "//source/common/http/http1:legacy_parser_lib",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//test/common/memory:memory_test_utility_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -43,6 +44,7 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
@@ -51,16 +53,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "balsa_parser_test",
     srcs = ["balsa_parser_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http/http1:balsa_parser_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
 envoy_cc_benchmark_binary(
     name = "balsa_parser_benchmark",
     srcs = ["balsa_parser_benchmark_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http/http1:balsa_parser_lib",
         "@benchmark",
@@ -75,7 +78,7 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -94,6 +97,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
@@ -103,7 +107,7 @@ envoy_cc_fuzz_test(
     name = "http1_connection_fuzz_test",
     srcs = ["http1_connection_fuzz_test.cc"],
     corpus = "http1_connection_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",

@@ -68,6 +68,11 @@ private:
       fallback_factory_;
   // The storage for thread local quic config.
   ThreadLocal::TypedSlot<ThreadLocalQuicConfig> tls_slot_;
+  // The value of envoy.reloadable_features.quic_upstream_client_certificates, latched at
+  // construction so that config-load validation, the SDS update validation hook and certificate
+  // installation agree for the lifetime of this factory; a runtime flag flip only affects
+  // factories created afterwards.
+  const bool client_certificates_enabled_;
 };
 
 class QuicClientTransportSocketConfigFactory

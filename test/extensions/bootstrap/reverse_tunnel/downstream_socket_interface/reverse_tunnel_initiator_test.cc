@@ -128,9 +128,9 @@ TEST_F(ReverseTunnelInitiatorTest, CreateEmptyConfigProto) {
   EXPECT_NE(config, nullptr);
 
   // Should be able to cast to the correct type.
-  auto* typed_config =
-      dynamic_cast<envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
-                       DownstreamReverseConnectionSocketInterface*>(config.get());
+  auto* typed_config = Protobuf::DynamicCastMessage<
+      envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+          DownstreamReverseConnectionSocketInterface>(config.get());
   EXPECT_NE(typed_config, nullptr);
 }
 

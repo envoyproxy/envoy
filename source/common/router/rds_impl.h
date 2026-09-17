@@ -25,11 +25,8 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/callback_impl.h"
-#include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
-#include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
-#include "source/common/init/watcher_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/rds/common/proto_traits_impl.h"
 #include "source/common/rds/rds_route_config_provider_impl.h"
@@ -38,7 +35,6 @@
 #include "source/common/rds/route_config_update_receiver_impl.h"
 #include "source/common/rds/static_route_config_provider_impl.h"
 #include "source/common/router/route_provider_manager.h"
-#include "source/common/router/vhds.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -67,10 +63,7 @@ public:
   ~RdsRouteConfigSubscription() override;
 
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
-  void updateOnDemand(const std::string& aliases);
-  void maybeCreateInitManager(const std::string& version_info,
-                              std::unique_ptr<Init::ManagerImpl>& init_manager,
-                              std::unique_ptr<Cleanup>& resume_rds);
+  void updateOnDemand(const std::string& alias) { config_update_info_->updateOnDemand(alias); }
 
 protected:
   RdsRouteConfigSubscription(
@@ -83,8 +76,6 @@ protected:
       absl::Status& creation_status);
 
 private:
-  absl::Status beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>& noop_init_manager,
-                                    std::unique_ptr<Cleanup>& resume_rds) override;
   absl::Status afterProviderUpdate() override;
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
@@ -92,7 +83,6 @@ private:
     return update_callback_manager_.add(callback);
   }
 
-  VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<absl::Status> update_callback_manager_;
 

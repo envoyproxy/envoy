@@ -3,6 +3,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -48,7 +49,7 @@ TEST(NamedHttpFilterConfigFactoryTest, CreateFilterFactory) {
   Server::Configuration::MockFactoryContext context;
   ProtobufTypes::MessagePtr message{new Envoy::Protobuf::Struct()};
 
-  EXPECT_TRUE(factory.createFilterFactoryFromProto(*message, stats_prefix, context).status().ok());
+  EXPECT_OK(factory.createFilterFactoryFromProto(*message, stats_prefix, context).status());
 }
 
 TEST(NamedHttpFilterConfigFactoryTest, Dependencies) {
@@ -57,7 +58,7 @@ TEST(NamedHttpFilterConfigFactoryTest, Dependencies) {
   Server::Configuration::MockFactoryContext context;
   ProtobufTypes::MessagePtr message{new Envoy::Protobuf::Struct()};
 
-  EXPECT_TRUE(factory.createFilterFactoryFromProto(*message, stats_prefix, context).status().ok());
+  EXPECT_OK(factory.createFilterFactoryFromProto(*message, stats_prefix, context).status());
 
   EXPECT_EQ(factory.dependencies()->decode_required().size(), 1);
 }

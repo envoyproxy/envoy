@@ -179,7 +179,12 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 }
 
 void EnvoyQuicServerSession::Initialize() {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_enable_reset_ssl_after_handshake")) {
+    enable_reset_ssl_after_handshake();
+  }
   quic::QuicServerSessionBase::Initialize();
+
   initialized_ = true;
   MaybeAddSessionToIdleList();
   quic_connection_->setEnvoyConnection(*this, *this);
@@ -257,24 +262,43 @@ void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionM
   position_.emplace(connection_map, filter_chain, position);
 }
 
+void EnvoyQuicServerSession::setClientCertificateValidated() { quic_ssl_info_->onCertValidated(); }
+
 quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
   quic::QuicSSLConfig config = quic::QuicServerSessionBase::GetSSLConfig();
-  config.early_data_enabled = position_.has_value()
-                                  ? dynamic_cast<const QuicServerTransportSocketFactory&>(
-                                        position_->filter_chain_.transportSocketFactory())
-                                        .earlyDataEnabled()
-                                  : true;
-  config.disable_ticket_support = position_.has_value()
-                                      ? !dynamic_cast<const QuicServerTransportSocketFactory&>(
-                                             position_->filter_chain_.transportSocketFactory())
-                                             .resumptionEnabled()
-                                      : false;
+  if (position_.has_value()) {
+    const auto& transport_socket_factory = dynamic_cast<const QuicServerTransportSocketFactory&>(
+        position_->filter_chain_.transportSocketFactory());
+    if (transport_socket_factory.requiresClientCertificate()) {
+      config.client_cert_mode = quic::ClientCertMode::kRequire;
+    } else if (transport_socket_factory.clientCertificateValidationConfigured() &&
+               Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.quic_mtls_server_enabled")) {
+      // Request but do not require a client certificate when a validation context is configured
+      // without `require_client_certificate`, matching the TCP TLS behavior. The required path is
+      // gated at config time, so this optional path is gated by the runtime guard here.
+      config.client_cert_mode = quic::ClientCertMode::kRequest;
+    } else {
+      config.client_cert_mode = quic::ClientCertMode::kNone;
+    }
+    config.early_data_enabled = transport_socket_factory.earlyDataEnabled();
+    config.disable_ticket_support = !transport_socket_factory.resumptionEnabled();
+  } else {
+    config.early_data_enabled = true;
+    config.client_cert_mode = quic::ClientCertMode::kNone;
+    config.disable_ticket_support = false;
+  }
   return config;
 }
 
 void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                                               const quic::QuicSocketAddress& peer_address,
                                               const quic::QuicReceivedPacket& packet) {
+  // The first packet processed by the server session carries the client's initial ClientHello,
+  // so record its arrival as the downstream handshake start. The setter only keeps the first
+  // value, so subsequent packets don't overwrite it.
+  streamInfo().downstreamTiming().onDownstreamHandshakeStart(dispatcher_.timeSource());
+
   // If L4 filters causes the connection to be closed early during initialization, now
   // is the time to actually close the connection.
   maybeHandleCloseDuringInitialize();

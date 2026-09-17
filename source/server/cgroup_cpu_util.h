@@ -7,7 +7,9 @@
 
 #include "source/common/singleton/threadsafe_singleton.h"
 
+#include "absl/base/thread_annotations.h"
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 
@@ -27,11 +29,32 @@ public:
 };
 
 /**
+ * Why-detail for a detection result, emitted by CgroupDetectorImpl::logResult(). `is_error` selects
+ * the level: warn for malformed input, debug for benign "no limit applies" outcomes.
+ */
+struct CgroupDetectionDiagnostic {
+  std::string message;
+  bool is_error = false;
+};
+
+/**
  * Production implementation of cgroup CPU detection.
  */
 class CgroupDetectorImpl : public CgroupDetector {
 public:
   std::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs) override;
+
+  // Detection runs in the OptionsImpl constructor before logging is configured. The result is
+  // stashed and logged by logResult() once logging is initialized, so the diagnostic doesn't leak
+  // to stderr during early startup.
+  void logResult();
+
+private:
+  absl::Mutex mutex_;
+  bool ran_ ABSL_GUARDED_BY(mutex_) = false;
+  std::optional<uint32_t> detected_limit_ ABSL_GUARDED_BY(mutex_);
+  // Why-detail for a no-limit result, emitted by logResult().
+  CgroupDetectionDiagnostic detection_diagnostic_ ABSL_GUARDED_BY(mutex_);
 };
 
 using CgroupDetectorSingleton = ThreadSafeSingleton<CgroupDetectorImpl>;
@@ -87,9 +110,11 @@ public:
    * Detects CPU limit from `cgroup` `v2` or `v1` with hierarchy scanning.
    * Scans `cgroup` hierarchy and takes minimum effective limit for container-aware CPU detection.
    * @param fs Filesystem instance for file operations.
+   * @param diag If non-null, set to a why-detail explanation when no limit is detected.
    * @return CPU limit or std::nullopt if no `cgroup` limit found.
    */
-  static std::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs);
+  static std::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs,
+                                             CgroupDetectionDiagnostic* diag = nullptr);
 
 private:
   /**
@@ -197,22 +222,24 @@ private:
    * @param fs Filesystem instance.
    * @return CPU limit as float64 ratio, nullopt if unlimited/invalid.
    */
-  static std::optional<double> readActualLimits(const CpuFiles& cpu_files,
-                                                Filesystem::Instance& fs);
+  static std::optional<double> readActualLimits(const CpuFiles& cpu_files, Filesystem::Instance& fs,
+                                                CgroupDetectionDiagnostic* diag = nullptr);
 
   /**
    * Reads actual CPU limits from `cgroup` `v1` files with quota/period parsing.
    * @param cpu_files Cached file content from `v1` files.
    * @return CPU limit as float64 ratio, nullopt if unlimited/invalid.
    */
-  static std::optional<double> readActualLimitsV1(const CpuFiles& cpu_files);
+  static std::optional<double> readActualLimitsV1(const CpuFiles& cpu_files,
+                                                  CgroupDetectionDiagnostic* diag = nullptr);
 
   /**
    * Reads actual CPU limits from `cgroup` `v2` files with "quota period" parsing.
    * @param cpu_files Cached file content from `v2` files.
    * @return CPU limit as float64 ratio, nullopt if unlimited/invalid.
    */
-  static std::optional<double> readActualLimitsV2(const CpuFiles& cpu_files);
+  static std::optional<double> readActualLimitsV2(const CpuFiles& cpu_files,
+                                                  CgroupDetectionDiagnostic* diag = nullptr);
 
   // `Cgroup` `v2` paths
   static constexpr absl::string_view CGROUP_V2_CPU_MAX = "/sys/fs/cgroup/cpu.max";
@@ -270,12 +297,14 @@ public:
     return CgroupCpuUtil::accessCgroupV2Files(cgroup_info, fs);
   }
 
-  static std::optional<double> readActualLimitsV1(const CpuFiles& cpu_files) {
-    return CgroupCpuUtil::readActualLimitsV1(cpu_files);
+  static std::optional<double> readActualLimitsV1(const CpuFiles& cpu_files,
+                                                  CgroupDetectionDiagnostic* diag = nullptr) {
+    return CgroupCpuUtil::readActualLimitsV1(cpu_files, diag);
   }
 
-  static std::optional<double> readActualLimitsV2(const CpuFiles& cpu_files) {
-    return CgroupCpuUtil::readActualLimitsV2(cpu_files);
+  static std::optional<double> readActualLimitsV2(const CpuFiles& cpu_files,
+                                                  CgroupDetectionDiagnostic* diag = nullptr) {
+    return CgroupCpuUtil::readActualLimitsV2(cpu_files, diag);
   }
 };
 

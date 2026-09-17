@@ -1,5 +1,6 @@
 use abi::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
+use std::cell::{Cell, RefCell};
 
 declare_init_functions!(
   init,
@@ -56,19 +57,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BasicStreamLifecycleConfig 
   fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BasicStreamLifecycleFilter {
       cluster_name: self.cluster_name.clone(),
-      received_response: false,
+      received_response: Cell::new(false),
     })
   }
 }
 
 struct BasicStreamLifecycleFilter {
   cluster_name: String,
-  received_response: bool,
+  received_response: Cell<bool>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BasicStreamLifecycleFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -97,7 +98,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BasicStreamLifecycleFilter {
   }
 
   fn on_http_stream_headers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _stream_handle: u64,
     _headers: &[(EnvoyBuffer, EnvoyBuffer)],
@@ -107,7 +108,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BasicStreamLifecycleFilter {
   }
 
   fn on_http_stream_data(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _stream_handle: u64,
     _data: &[EnvoyBuffer],
@@ -116,8 +117,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BasicStreamLifecycleFilter {
     // Process data.
   }
 
-  fn on_http_stream_complete(&mut self, envoy_filter: &mut EHF, _stream_handle: u64) {
-    self.received_response = true;
+  fn on_http_stream_complete(&self, envoy_filter: &mut EHF, _stream_handle: u64) {
+    self.received_response.set(true);
     envoy_filter.send_response(
       200,
       &[("x-stream", b"success")],
@@ -131,7 +132,7 @@ impl Drop for BasicStreamLifecycleFilter {
   fn drop(&mut self) {
     // Ensure we received the response.
     assert!(
-      self.received_response,
+      self.received_response.get(),
       "Stream did not complete successfully"
     );
   }
@@ -150,21 +151,21 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BidirectionalStreamingConfi
   fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BidirectionalStreamingFilter {
       cluster_name: self.cluster_name.clone(),
-      stream_handle: 0,
-      chunks_received: 0,
+      stream_handle: Cell::new(0),
+      chunks_received: Cell::new(0),
     })
   }
 }
 
 struct BidirectionalStreamingFilter {
   cluster_name: String,
-  stream_handle: u64,
-  chunks_received: usize,
+  stream_handle: Cell<u64>,
+  chunks_received: Cell<usize>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BidirectionalStreamingFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -187,7 +188,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BidirectionalStreamingFilter {
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
-    self.stream_handle = handle;
+    self.stream_handle.set(handle);
 
     // Send chunk 1.
     let chunk1 = b"chunk1";
@@ -208,19 +209,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BidirectionalStreamingFilter {
   }
 
   fn on_http_stream_data(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     stream_handle: u64,
     _data: &[EnvoyBuffer],
     _end_stream: bool,
   ) {
-    assert_eq!(stream_handle, self.stream_handle);
-    self.chunks_received += 1;
+    assert_eq!(stream_handle, self.stream_handle.get());
+    self.chunks_received.set(self.chunks_received.get() + 1);
   }
 
-  fn on_http_stream_complete(&mut self, envoy_filter: &mut EHF, stream_handle: u64) {
-    assert_eq!(stream_handle, self.stream_handle);
-    let chunks_str = self.chunks_received.to_string();
+  fn on_http_stream_complete(&self, envoy_filter: &mut EHF, stream_handle: u64) {
+    assert_eq!(stream_handle, self.stream_handle.get());
+    let chunks_str = self.chunks_received.get().to_string();
     envoy_filter.send_response(
       200,
       &[("x-chunks-received", chunks_str.as_bytes())],
@@ -243,21 +244,21 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MultipleStreamsConfig {
   fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(MultipleStreamsFilter {
       cluster_name: self.cluster_name.clone(),
-      stream_handles: Vec::new(),
-      completed_streams: 0,
+      stream_handles: RefCell::new(Vec::new()),
+      completed_streams: Cell::new(0),
     })
   }
 }
 
 struct MultipleStreamsFilter {
   cluster_name: String,
-  stream_handles: Vec<u64>,
-  completed_streams: usize,
+  stream_handles: RefCell<Vec<u64>>,
+  completed_streams: Cell<usize>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MultipleStreamsFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -277,22 +278,22 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MultipleStreamsFilter {
       );
 
       if result == envoy_dynamic_module_type_http_callout_init_result::Success {
-        self.stream_handles.push(handle);
+        self.stream_handles.borrow_mut().push(handle);
       }
     }
 
-    if self.stream_handles.len() != 3 {
+    if self.stream_handles.borrow().len() != 3 {
       envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
     }
 
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
-  fn on_http_stream_complete(&mut self, envoy_filter: &mut EHF, stream_handle: u64) {
-    assert!(self.stream_handles.contains(&stream_handle));
-    self.completed_streams += 1;
+  fn on_http_stream_complete(&self, envoy_filter: &mut EHF, stream_handle: u64) {
+    assert!(self.stream_handles.borrow().contains(&stream_handle));
+    self.completed_streams.set(self.completed_streams.get() + 1);
 
-    if self.completed_streams == 3 {
+    if self.completed_streams.get() == 3 {
       envoy_filter.send_response(200, &[("x-stream", b"all_success")], None, None);
     }
   }
@@ -311,23 +312,23 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamResetConfig {
   fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(StreamResetFilter {
       cluster_name: self.cluster_name.clone(),
-      stream_handle: 0,
-      received_headers: false,
-      reset_called: false,
+      stream_handle: Cell::new(0),
+      received_headers: Cell::new(false),
+      reset_called: Cell::new(false),
     })
   }
 }
 
 struct StreamResetFilter {
   cluster_name: String,
-  stream_handle: u64,
-  received_headers: bool,
-  reset_called: bool,
+  stream_handle: Cell<u64>,
+  received_headers: Cell<bool>,
+  reset_called: Cell<bool>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamResetFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -349,19 +350,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamResetFilter {
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
-    self.stream_handle = handle;
+    self.stream_handle.set(handle);
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
   fn on_http_stream_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     stream_handle: u64,
     _headers: &[(EnvoyBuffer, EnvoyBuffer)],
     _end_stream: bool,
   ) {
-    assert_eq!(stream_handle, self.stream_handle);
-    self.received_headers = true;
+    assert_eq!(stream_handle, self.stream_handle.get());
+    self.received_headers.set(true);
 
     // Immediately reset the stream after receiving headers.
     unsafe {
@@ -370,13 +371,13 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamResetFilter {
   }
 
   fn on_http_stream_reset(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     stream_handle: u64,
     _reset_reason: envoy_dynamic_module_type_http_stream_reset_reason,
   ) {
-    assert_eq!(stream_handle, self.stream_handle);
-    self.reset_called = true;
+    assert_eq!(stream_handle, self.stream_handle.get());
+    self.reset_called.set(true);
 
     // Send response indicating reset occurred.
     envoy_filter.send_response(
@@ -390,8 +391,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamResetFilter {
 
 impl Drop for StreamResetFilter {
   fn drop(&mut self) {
-    assert!(self.received_headers, "Never received headers before reset");
-    assert!(self.reset_called, "Reset callback was not called");
+    assert!(
+      self.received_headers.get(),
+      "Never received headers before reset"
+    );
+    assert!(self.reset_called.get(), "Reset callback was not called");
   }
 }
 
@@ -408,19 +412,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UpstreamResetConfig {
   fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(UpstreamResetFilter {
       cluster_name: self.cluster_name.clone(),
-      stream_handle: 0,
+      stream_handle: Cell::new(0),
     })
   }
 }
 
 struct UpstreamResetFilter {
   cluster_name: String,
-  stream_handle: u64,
+  stream_handle: Cell<u64>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -442,17 +446,17 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
-    self.stream_handle = handle;
+    self.stream_handle.set(handle);
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
   fn on_http_stream_reset(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     stream_handle: u64,
     _reason: envoy_dynamic_module_type_http_stream_reset_reason,
   ) {
-    assert_eq!(stream_handle, self.stream_handle);
+    assert_eq!(stream_handle, self.stream_handle.get());
     envoy_filter.send_response(200, &[("x-reset", b"true")], Some(b"upstream_reset"), None);
   }
 }

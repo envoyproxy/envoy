@@ -42,8 +42,8 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "@abseil-cpp//absl/strings:str_format",
-        "@com_google_protobuf//third_party/utf8_range:utf8_validity",
         "@nlohmann_json//:json",
+        "@protobuf//third_party/utf8_range:utf8_validity",
     ],
 )
 

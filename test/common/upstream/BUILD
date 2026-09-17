@@ -17,7 +17,7 @@ envoy_package()
 envoy_cc_test(
     name = "od_cds_api_impl_test",
     srcs = ["od_cds_api_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/config:subscription_interface",
         "//source/common/stats:isolated_store_lib",
@@ -27,6 +27,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:missing_cluster_notifier_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -34,7 +35,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xdstp_od_cds_api_impl_test",
     srcs = ["xdstp_od_cds_api_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/config:subscription_interface",
         "//source/common/stats:isolated_store_lib",
@@ -44,6 +45,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:missing_cluster_notifier_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -53,7 +55,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cds_api_impl_test",
     srcs = ["cds_api_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
         "//source/common/config:utility_lib",
@@ -63,6 +65,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -73,7 +76,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_discovery_manager_test",
     srcs = ["cluster_discovery_manager_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:cleanup_lib",
@@ -85,7 +88,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "deferred_cluster_initialization_test",
     srcs = ["deferred_cluster_initialization_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":test_cluster_manager",
         "//envoy/upstream:cluster_manager_interface",
@@ -95,6 +98,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/config:config_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/base",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -137,7 +141,7 @@ envoy_cc_test(
     name = "cluster_manager_impl_test",
     size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     deps = [
         ":cluster_manager_impl_test_common",
         ":test_cluster_manager",
@@ -185,6 +189,7 @@ envoy_cc_test(
         "//source/common/config:xds_resource_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
         "//test/mocks/upstream:od_cds_api_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -202,6 +207,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )
@@ -221,6 +227,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
@@ -228,7 +235,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_update_tracker_test",
     srcs = ["cluster_update_tracker_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/upstream:cluster_update_tracker_lib",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -239,7 +246,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_pool_map_impl_test",
     srcs = ["conn_pool_map_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/http:conn_pool_interface",
         "//source/common/upstream:conn_pool_map_impl_lib",
@@ -254,7 +261,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "wrsq_scheduler_test",
     srcs = ["wrsq_scheduler_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/upstream:scheduler_lib",
         "//test/mocks:common_lib",
@@ -264,7 +271,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "edf_scheduler_test",
     srcs = ["edf_scheduler_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/upstream:scheduler_lib",
         "//test/test_common:utility_lib",
@@ -279,7 +286,7 @@ envoy_cc_test_library(
     hdrs = [
         "health_check_fuzz_test_utils.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
         "//source/extensions/health_checkers/grpc:health_checker_lib",
@@ -295,13 +302,29 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "health_checker_test_base_lib",
+    hdrs = [
+        "health_checker_test_base.h",
+    ],
+    deps = [
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+    ],
+)
+
 envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = [
         "health_checker_impl_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        ":health_checker_test_base_lib",
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -330,6 +353,53 @@ envoy_cc_test(
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/health_check/event_sinks/file/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "grpc_health_checker_impl_test",
+    srcs = [
+        "grpc_health_checker_impl_test.cc",
+    ],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":health_checker_test_base_lib",
+        ":utility_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:health_checker_lib",
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/health_check/event_sinks/file:file_sink_lib",
+        "//source/extensions/health_checkers/grpc:health_checker_lib",
+        "//source/extensions/health_checkers/http:health_checker_lib",
+        "//source/extensions/health_checkers/tcp:health_checker_lib",
+        "//test/common/http:common_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:transport_socket_match_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -342,7 +412,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "host_stats_test",
     srcs = ["host_stats_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:host_description_interface",
     ],
@@ -351,7 +421,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "host_utility_test",
     srcs = ["host_utility_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
         "//source/common/network:utility_lib",
@@ -370,7 +440,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_balancer_context_base_test",
     srcs = ["load_balancer_context_base_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/upstream:load_balancer_context_base_lib",
         "//test/mocks/upstream:host_mocks",
@@ -381,7 +451,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_balancer_simulation_test",
     srcs = ["load_balancer_simulation_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
         "//source/common/common:random_generator_lib",
@@ -406,7 +476,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_reporter_test",
     srcs = ["load_stats_reporter_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
@@ -428,7 +498,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hds_test",
     srcs = ["hds_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/tls:context_lib",
         "//source/common/upstream:health_discovery_service_lib",
@@ -450,6 +520,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/health/v3:pkg_cc_proto",
@@ -460,7 +531,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "outlier_detection_impl_test",
     srcs = ["outlier_detection_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
         "//envoy/common:time_interface",
@@ -478,6 +549,7 @@ envoy_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
@@ -487,7 +559,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "priority_conn_pool_map_impl_test",
     srcs = ["priority_conn_pool_map_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/http:conn_pool_interface",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
@@ -502,7 +574,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "resource_manager_impl_test",
     srcs = ["resource_manager_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:upstream_interface",
         "//source/common/upstream:resource_manager_lib",
@@ -532,7 +604,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "transport_socket_matcher_test",
     srcs = ["transport_socket_matcher_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/api:api_interface",
         "//envoy/matcher:matcher_interface",
@@ -552,6 +624,7 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -562,7 +635,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "prod_cluster_info_factory_test",
     srcs = ["prod_cluster_info_factory_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
         "//source/common/upstream:prod_cluster_info_factory_lib",
@@ -580,8 +653,9 @@ envoy_cc_test(
     name = "upstream_impl_test",
     srcs = ["upstream_impl_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//test/test_common:status_utility_lib",
         ":test_local_address_selector",
         ":utility_lib",
         "//envoy/api:api_interface",
@@ -589,10 +663,12 @@ envoy_cc_test(
         "//envoy/http:codec_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:metadata_lib",
+        "//source/common/conn_pool:pending_stream_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
+        "//source/common/queue_policy:queue_policy_base_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/eds:eds_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
@@ -629,6 +705,7 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -697,7 +774,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "cluster_factory_impl_test",
     srcs = ["cluster_factory_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
         "//envoy/api:api_interface",
@@ -725,6 +802,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
@@ -734,7 +812,7 @@ envoy_cc_test_library(
     name = "health_check_fuzz_lib",
     srcs = ["health_check_fuzz.cc"],
     hdrs = ["health_check_fuzz.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":health_check_fuzz_proto_cc_proto",
         ":health_check_fuzz_utils_lib",
@@ -756,7 +834,7 @@ envoy_cc_fuzz_test(
     name = "health_check_fuzz_test",
     srcs = ["health_check_fuzz_test.cc"],
     corpus = "health_check_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":health_check_fuzz_lib",
         ":health_check_fuzz_proto_cc_proto",
@@ -789,7 +867,7 @@ envoy_cc_test(
     name = "default_local_address_selector_test",
     size = "small",
     srcs = ["default_local_address_selector_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:base_includes",
         "//envoy/network:socket_interface",
@@ -805,7 +883,7 @@ envoy_cc_test(
     name = "local_address_selector_integration_test",
     size = "large",
     srcs = ["local_address_selector_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "test_local_address_selector",
         "//source/extensions/load_balancing_policies/round_robin:config",

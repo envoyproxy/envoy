@@ -33,12 +33,14 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::IsSubstring;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -1060,13 +1062,13 @@ TEST_P(GrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
-  ASSERT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz").ok());
+  ASSERT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz"));
   // Update to foo type should resend Node.
   expectSendMessage("foo", {"x", "y"}, "", true);
-  ASSERT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo").ok());
+  ASSERT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo"));
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, "", true);
-  ASSERT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar").ok());
+  ASSERT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar"));
   // only destruction of foo watch is going to result in an unsubscribe message.
   // bar watch is empty and its destruction doesn't change it resource list.
   expectSendMessage("foo", {}, "", false);
@@ -1419,18 +1421,17 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
   // No disconnect and replacement of the original async_client.
   EXPECT_CALL(async_stream_, resetStream()).Times(0);
   EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _)).Times(0);
-  EXPECT_FALSE(grpc_mux_
-                   ->updateMuxSource(
-                       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(
-                           replaced_async_client_),
-                       /*failover_async_client=*/nullptr,
-                       /*scope=*/*stats_.rootScope(),
-                       /*backoff_strategy=*/
-                       std::make_unique<JitteredExponentialBackOffStrategy>(
-                           SubscriptionFactory::RetryInitialDelayMs,
-                           SubscriptionFactory::RetryMaxDelayMs, random_),
-                       ads_config_wrong_settings)
-                   .ok());
+  EXPECT_THAT(
+      grpc_mux_->updateMuxSource(
+          /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
+          /*failover_async_client=*/nullptr,
+          /*scope=*/*stats_.rootScope(),
+          /*backoff_strategy=*/
+          std::make_unique<JitteredExponentialBackOffStrategy>(
+              SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+              random_),
+          ads_config_wrong_settings),
+      Not(IsOk()));
   // Ending test, removing subscriptions for type_url_foo.
   expectSendMessage(type_url, {}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     &async_stream_);

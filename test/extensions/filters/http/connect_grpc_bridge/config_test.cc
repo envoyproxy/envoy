@@ -31,8 +31,10 @@ TEST(ConnectGrpcBridgeFilterConfigTest, ConnectGrpcBridgeFilterWithServerContext
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   ConnectGrpcFilterConfigFactory factory;
   envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig config;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
+      factory.createHttpFilterFactoryFromProto(config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_)).Times(AtLeast(1));
   cb(filter_callback);

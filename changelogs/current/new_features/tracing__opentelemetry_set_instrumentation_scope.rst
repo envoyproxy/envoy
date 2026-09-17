@@ -1,0 +1,1 @@
+tracing: added :ref:`set_instrumentation_scope <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.set_instrumentation_scope>` option to the OpenTelemetry tracer to allow controlling the emission of the instrumentation scope name and version in traces.

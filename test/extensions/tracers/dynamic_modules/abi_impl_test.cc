@@ -7,6 +7,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -34,10 +35,10 @@ public:
     setTestModulesSearchPath();
     auto module =
         Envoy::Extensions::DynamicModules::newDynamicModuleByName("tracer_no_op", false, false);
-    EXPECT_TRUE(module.ok());
+    EXPECT_OK(module);
     auto config_or = newDynamicModuleTracerConfig("test_tracer", "", "test_ns",
                                                   std::move(module.value()), *store_.rootScope());
-    EXPECT_TRUE(config_or.ok());
+    EXPECT_OK(config_or);
     config_ = config_or.value();
     // Re-open stat creation so tests can call `define_*` from the test thread.
     config_->stat_creation_frozen_ = false;
@@ -545,7 +546,7 @@ TEST_F(AbiImplTest, MetricsFrozenAfterInit) {
 }
 
 // Drives concurrent labeled increments from multiple threads to verify no data race in the
-// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+// registry's shared stat name pool. Run under `--config=tsan` to verify.
 TEST_F(AbiImplTest, MetricsConcurrentIncrementCounterVecNoRace) {
   envoy_dynamic_module_type_module_buffer name = {.ptr = "race_counter", .length = 12};
   std::string label_name_str = "status";

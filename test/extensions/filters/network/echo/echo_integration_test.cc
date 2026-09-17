@@ -1,6 +1,7 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/server/utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -70,11 +71,10 @@ filter_chains:
   test_server_->setOnWorkerListenerAddedCb(
       [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
   test_server_->server().dispatcher().post([this, json, &listener_added_by_manager]() -> void {
-    EXPECT_TRUE(test_server_->server()
-                    .listenerManager()
-                    .addOrUpdateListener(Server::parseListenerFromV3Yaml(json), "", true)
-                    .status()
-                    .ok());
+    EXPECT_OK(test_server_->server()
+                  .listenerManager()
+                  .addOrUpdateListener(Server::parseListenerFromV3Yaml(json), "", true)
+                  .status());
     listener_added_by_manager.setReady();
   });
   listener_added_by_worker.waitReady();

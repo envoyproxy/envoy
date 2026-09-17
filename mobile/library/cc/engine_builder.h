@@ -33,7 +33,7 @@ public:
   virtual ~EngineBuilder() = default;
   static std::string nativeNameToConfig(absl::string_view name);
 
-  EngineBuilder& setLogLevel(Logger::Logger::Levels log_level);
+  EngineBuilder& setLogLevel(Logger::Levels log_level);
   EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
   EngineBuilder& enableLogger(bool logger_on);
   EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
@@ -199,7 +199,7 @@ private:
     Protobuf::Any typed_config_{};
   };
 
-  Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
+  Logger::Levels log_level_ = Logger::Levels::info;
   std::unique_ptr<EnvoyLogger> logger_{nullptr};
   bool enable_logger_{true};
   std::unique_ptr<EngineCallbacks> callbacks_;

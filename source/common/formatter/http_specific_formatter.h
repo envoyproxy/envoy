@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/formatter/substitution_formatter.h"
+#include "envoy/grpc/status.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/utility.h"
@@ -31,6 +32,10 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -45,6 +50,10 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class HeaderFormatter {
@@ -54,7 +63,9 @@ public:
 
 protected:
   std::optional<std::string> format(OptRef<const Http::HeaderMap> headers) const;
+  bool formatTo(std::string& sink, OptRef<const Http::HeaderMap> headers) const;
   Protobuf::Value formatValue(OptRef<const Http::HeaderMap> headers) const;
+  void formatValueTo(ValueSink& sink, OptRef<const Http::HeaderMap> headers) const;
 
 private:
   const Http::HeaderEntry* findHeader(OptRef<const Http::HeaderMap> headers) const;
@@ -78,6 +89,10 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   uint64_t extractHeadersByteSize(OptRef<const Http::RequestHeaderMap> request_headers,
@@ -97,8 +112,12 @@ public:
   // FormatterProvider
   std::optional<std::string> format(const Context& context,
                                     const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -112,8 +131,12 @@ public:
   // FormatterProvider
   std::optional<std::string> format(const Context& context,
                                     const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -127,8 +150,12 @@ public:
   // FormatterProvider
   std::optional<std::string> format(const Context& context,
                                     const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -140,6 +167,10 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -151,6 +182,10 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
@@ -173,9 +208,18 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   static absl::StatusOr<Format> parseFormat(absl::string_view format);
+
+  // Returns the gRPC status of the request, or nullopt if the request isn't a gRPC request or
+  // carries no status.
+  std::optional<Grpc::Status::GrpcStatus> getGrpcStatus(const Context& context,
+                                                        const StreamInfo::StreamInfo& info) const;
 
   const Format format_;
 };
@@ -189,6 +233,10 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   const std::string parameter_key_;
@@ -210,6 +258,10 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
   QueryParametersFormatter(DecodeOption option, std::optional<size_t> max_length)
       : option_(option), max_length_(max_length) {}
@@ -235,11 +287,20 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
   PathFormatter(bool with_query, PathFormatterOption option, std::optional<size_t> max_length)
       : with_query_(with_query), option_(option), max_length_(max_length) {}
 
 private:
+  // Returns the path to report, already stripped of the query and truncated per the configured
+  // options, or nullopt when there is no path to report. The view points into the request
+  // headers and is only valid for the duration of the call.
+  std::optional<absl::string_view> pathView(const Context& context) const;
+
   const bool with_query_{};
   const PathFormatterOption option_{};
   std::optional<size_t> max_length_;
@@ -256,7 +317,7 @@ public:
 
 private:
   using FormatterProviderCreateFunc =
-      std::function<FormatterProviderPtr(absl::string_view, std::optional<size_t>)>;
+      std::function<absl::StatusOr<FormatterProviderPtr>(absl::string_view, std::optional<size_t>)>;
 
   using FormatterProviderLookupTbl =
       absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,

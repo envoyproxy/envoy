@@ -37,7 +37,7 @@ class ThreadFactoryImplWin32 : public ThreadFactory {
 public:
   // Thread::ThreadFactory
   ThreadPtr createThread(std::function<void()> thread_routine, OptionsOptConstRef options) override;
-  ThreadId currentThreadId() override;
+  ThreadId currentThreadId() const override;
 };
 
 } // namespace Thread

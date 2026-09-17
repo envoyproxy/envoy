@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 package(default_visibility = [
     "//test/extensions/access_loggers/dynamic_modules:__pkg__",
     "//test/extensions/clusters/dynamic_modules:__pkg__",
+    "//test/extensions/config/validators/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/bootstrap:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
@@ -13,6 +14,8 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/stat_sink:__pkg__",
     "//test/extensions/formatter/dynamic_modules:__pkg__",
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
+    "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
+    "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
@@ -49,6 +52,8 @@ test_program(name = "bootstrap_init_target_test")
 
 test_program(name = "bootstrap_timer_test")
 
+test_program(name = "bootstrap_signed_callout_test")
+
 test_program(name = "bootstrap_file_watcher_test")
 
 test_program(name = "bootstrap_admin_handler_test")
@@ -71,6 +76,8 @@ test_program(name = "health_checker_integration_test")
 
 test_program(name = "upstream_http_tcp_bridge")
 
+test_program(name = "cluster_specifier_integration_test")
+
 test_program(name = "cluster_integration_test")
 
 test_program(name = "cluster_filter_state_test")
@@ -80,3 +87,7 @@ test_program(name = "cluster_dynamic_metadata_test")
 test_program(name = "stat_sink_integration_test")
 
 test_program(name = "transport_socket_integration_test")
+
+test_program(name = "early_header_mutation_integration_test")
+
+test_program(name = "config_validator_test")

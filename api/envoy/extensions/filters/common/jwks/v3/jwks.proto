@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.common.jwks.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/http_uri.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.common.jwks.v3";
+option java_outer_classname = "JwksProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/common/jwks/v3;jwksv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Common JWKS fetch]
+// Configuration for fetching a JSON Web Key Set (JWKS) from a remote HTTP server and caching it,
+// shared by extensions that need remote JWKS.
+
+// This message specifies how to fetch JWKS from remote and how to cache it.
+message RemoteJwks {
+  // The HTTP URI to fetch the JWKS. For example:
+  //
+  // .. code-block:: yaml
+  //
+  //    http_uri:
+  //      uri: https://www.googleapis.com/oauth2/v1/certs
+  //      cluster: jwt.www.googleapis.com|443
+  //      timeout: 1s
+  //
+  config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
+
+  // Duration after which the cached JWKS should be expired. If not specified, default cache
+  // duration is 10 minutes.
+  google.protobuf.Duration cache_duration = 2 [(validate.rules).duration = {
+    lt {seconds: 9000000000}
+    gte {nanos: 1000000}
+  }];
+
+  // Fetch Jwks asynchronously in the main thread before the listener is activated.
+  // Fetched Jwks can be used by all worker threads.
+  //
+  // If this feature is not enabled:
+  //
+  // * The Jwks is fetched on-demand when the requests come. During the fetching, first
+  //   few requests are paused until the Jwks is fetched.
+  // * Each worker thread fetches its own Jwks since Jwks cache is per worker thread.
+  //
+  // If this feature is enabled:
+  //
+  // * Fetched Jwks is done in the main thread before the listener is activated. Its fetched
+  //   Jwks can be used by all worker threads. Each worker thread doesn't need to fetch its own.
+  // * Jwks is ready when the requests come, not need to wait for the Jwks fetching.
+  //
+  JwksAsyncFetch async_fetch = 3;
+
+  // Retry policy for fetching Jwks. optional. turned off by default.
+  //
+  // For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   retry_policy:
+  //     retry_back_off:
+  //       base_interval: 0.01s
+  //       max_interval: 20s
+  //     num_retries: 10
+  //
+  // will yield a randomized truncated exponential backoff policy with an initial delay of 10ms
+  // 10 maximum attempts spaced at most 20s seconds.
+  //
+  // .. code-block:: yaml
+  //
+  //   retry_policy:
+  //     num_retries:1
+  //
+  // uses the default :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`.
+  // with the default base interval is 1000 milliseconds. and the default maximum interval of 10 times the base interval.
+  //
+  // if num_retries is omitted, the default is to allow only one retry.
+  //
+  //
+  // If enabled, the retry policy will apply to all Jwks fetching approaches, e.g. on demand or asynchronously in background.
+  //
+  //
+  config.core.v3.RetryPolicy retry_policy = 4;
+}
+
+// Fetch Jwks asynchronously in the main thread when the filter config is parsed.
+// The listener is activated only after the Jwks is fetched.
+// When the Jwks is expired in the cache, it is fetched again in the main thread.
+// The fetched Jwks from the main thread can be used by all worker threads.
+message JwksAsyncFetch {
+  // If false, the listener is activated after the initial fetch is completed.
+  // The initial fetch result can be either successful or failed.
+  // If true, it is activated without waiting for the initial fetch to complete.
+  // Default is false.
+  bool fast_listener = 1;
+
+  // The duration to refetch after a failed fetch. If not specified, default is 1 second.
+  google.protobuf.Duration failed_refetch_duration = 2;
+}

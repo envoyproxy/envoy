@@ -139,7 +139,26 @@ public:
   Configuration::MockStatsConfig stats_config_;
 };
 
-class AdminStatsTest : public StatsHandlerTest, public testing::Test {};
+class AdminStatsTest : public StatsHandlerTest, public testing::Test {
+protected:
+  void testInvertFilter(absl::string_view url, absl::string_view foo_match,
+                        absl::string_view bar_match) {
+    store_->counterFromString("cluster.foo.total").add(10);
+    store_->counterFromString("cluster.bar.total").add(20);
+
+    auto filtered = handlerStats(absl::StrCat(url, "&filter=foo"));
+    EXPECT_THAT(filtered.second, HasSubstr(foo_match));
+    EXPECT_THAT(filtered.second, Not(HasSubstr(bar_match)));
+
+    auto inverted = handlerStats(absl::StrCat(url, "&filter=foo&invert_filter"));
+    EXPECT_THAT(inverted.second, Not(HasSubstr(foo_match)));
+    EXPECT_THAT(inverted.second, HasSubstr(bar_match));
+
+    auto all = handlerStats(url);
+    EXPECT_THAT(all.second, HasSubstr(foo_match));
+    EXPECT_THAT(all.second, HasSubstr(bar_match));
+  }
+};
 
 TEST_F(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
@@ -1220,6 +1239,19 @@ TEST_F(AdminStatsTest, SortedHistograms) {
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"h1", "h2", "h3", "h4"});
   }
+}
+
+TEST_F(AdminStatsTest, HandlerStatsInvertFilterText) {
+  testInvertFilter("/stats?format=text", "cluster.foo.total", "cluster.bar.total");
+}
+
+TEST_F(AdminStatsTest, HandlerStatsInvertFilterPrometheus) {
+  testInvertFilter("/stats?format=prometheus", "envoy_cluster_foo_total",
+                   "envoy_cluster_bar_total");
+}
+
+TEST_F(AdminStatsTest, HandlerStatsInvertFilterJson) {
+  testInvertFilter("/stats?format=json", "cluster.foo.total", "cluster.bar.total");
 }
 
 // Sets up a test using real threads to reproduce a race between deleting scopes

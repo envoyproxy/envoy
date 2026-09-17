@@ -40,6 +40,7 @@ struct RdsStats {
  * RDS config providers.
  */
 class RdsRouteConfigSubscription : Envoy::Config::SubscriptionCallbacks,
+                                   RouteConfigUpdateObserver,
                                    protected Logger::Loggable<Logger::Id::rds> {
 public:
   static absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>>
@@ -82,10 +83,20 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
 
-  virtual absl::Status beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>&,
-                                            std::unique_ptr<Cleanup>&) {
-    return absl::OkStatus();
-  }
+  // Rds::RouteConfigUpdateObserver
+  // Called by the receiver when the route configuration that it built is warmed up. Publishes the
+  // new route configuration and signals that this subscription is ready.
+  void onConfigWarmed() override;
+
+  // Hooks that a derived subscription uses to react to a warmed up route configuration being
+  // published.
+  //
+  // NOTE: a non-OK status returned by either hook does NOT affect xDS configuration loading. By
+  // the time these run the route configuration has been warmed up and is published regardless, and
+  // the call is not necessarily on the xDS update call stack - an update that warms up
+  // asynchronously completes long after the xDS response was accepted - so there is nothing left
+  // to reject. A failure is only logged as a warning.
+  virtual absl::Status beforeProviderUpdate() { return absl::OkStatus(); }
   virtual absl::Status afterProviderUpdate() { return absl::OkStatus(); }
 
 protected:

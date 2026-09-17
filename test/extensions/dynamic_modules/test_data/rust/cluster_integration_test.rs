@@ -28,11 +28,35 @@ fn new_cluster_config(
   match name {
     "sync_host_selection" => Some(Box::new(SyncHostSelectionClusterConfig {
       upstream_address: config_str.to_string(),
+      logical_hostname: None,
+      metrics: envoy_cluster_metrics,
+    })),
+    "logical_hostname" => Some(Box::new(SyncHostSelectionClusterConfig {
+      upstream_address: config_str.to_string(),
+      logical_hostname: Some("test.lyft.com".to_string()),
       metrics: envoy_cluster_metrics,
     })),
     "async_host_selection" => Some(Box::new(AsyncHostSelectionClusterConfig {
-      upstream_address: config_str.to_string(),
+      upstream_addresses: vec![config_str.to_string()],
+      logical_hostnames: Vec::new(),
     })),
+    "async_logical_hostnames" => {
+      // Each line is "<logical hostname>,<connection address>", for example:
+      // "a.lyft.com,127.0.0.1:10001" or "b.lyft.com,[::1]:10002".
+      // Split on the comma to keep the TLS hostname separate from the socket address.
+      let hosts: Option<Vec<_>> = config_str
+        .lines()
+        .map(|line| line.split_once(','))
+        .collect();
+      let (logical_hostnames, upstream_addresses) = hosts?
+        .into_iter()
+        .map(|(hostname, address)| (hostname.to_string(), address.to_string()))
+        .unzip();
+      Some(Box::new(AsyncHostSelectionClusterConfig {
+        upstream_addresses,
+        logical_hostnames,
+      }))
+    },
     "scheduler_host_update" => Some(Box::new(SchedulerHostUpdateClusterConfig {
       upstream_address: config_str.to_string(),
     })),
@@ -69,6 +93,16 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "healthy_hosts_rebuild" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("healthy_hosts_rebuilt_total")
+        .ok();
+      Some(Box::new(HealthyHostsRebuildClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     "worker_timer" => {
       let armed_id = envoy_cluster_metrics
         .define_counter("timer_armed_total")
@@ -76,13 +110,27 @@ fn new_cluster_config(
       let fired_id = envoy_cluster_metrics
         .define_counter("timer_fired_total")
         .ok();
+      // Resolve a counter vec handle once so the timer records by handle from the worker thread.
+      let fired_handle = envoy_cluster_metrics
+        .define_counter_vec("timer_fired_by_outcome", &["outcome"])
+        .ok()
+        .and_then(|id| {
+          envoy_cluster_metrics
+            .resolve_counter_vec(id, &["fired"])
+            .ok()
+        });
       Some(Box::new(WorkerTimerClusterConfig {
         upstream_address: config_str.to_string(),
         armed_id,
         fired_id,
+        fired_handle,
         metrics: envoy_cluster_metrics,
       }))
     },
+    "native_lb_test" => Some(Box::new(NativeLbTestClusterConfig {
+      upstream_address: config_str.to_string(),
+      metrics: envoy_cluster_metrics,
+    })),
     _ => None,
   }
 }
@@ -93,6 +141,7 @@ fn new_cluster_config(
 
 struct SyncHostSelectionClusterConfig {
   upstream_address: String,
+  logical_hostname: Option<String>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -101,6 +150,7 @@ impl ClusterConfig for SyncHostSelectionClusterConfig {
     let counter_id = self.metrics.define_counter("requests_routed").ok();
     Box::new(SyncHostSelectionCluster {
       upstream_address: self.upstream_address.clone(),
+      logical_hostname: self.logical_hostname.clone(),
       hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
       counter_id,
       metrics: self.metrics.clone(),
@@ -110,6 +160,7 @@ impl ClusterConfig for SyncHostSelectionClusterConfig {
 
 struct SyncHostSelectionCluster {
   upstream_address: String,
+  logical_hostname: Option<String>,
   hosts: SharedHostList,
   counter_id: Option<EnvoyCounterId>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
@@ -119,19 +170,28 @@ impl Cluster for SyncHostSelectionCluster {
   fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
     let addresses = vec![self.upstream_address.clone()];
     let weights = vec![1u32];
-    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+    let host_ptrs = match &self.logical_hostname {
+      Some(hostname) => {
+        envoy_cluster.add_hosts_with_hostnames(&addresses, std::slice::from_ref(hostname), &weights)
+      },
+      None => envoy_cluster.add_hosts(&addresses, &weights),
+    };
+    if let Some(host_ptrs) = host_ptrs {
       self.hosts.lock().unwrap().0 = host_ptrs;
     }
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(SyncHostSelectionLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(SyncHostSelectionLb {
       hosts: self.hosts.clone(),
       index: AtomicUsize::new(0),
       counter_id: self.counter_id,
       metrics: self.metrics.clone(),
-    })
+    }))
   }
 }
 
@@ -165,37 +225,52 @@ impl ClusterLb for SyncHostSelectionLb {
 // =============================================================================
 
 struct AsyncHostSelectionClusterConfig {
-  upstream_address: String,
+  upstream_addresses: Vec<String>,
+  logical_hostnames: Vec<String>,
 }
 
 impl ClusterConfig for AsyncHostSelectionClusterConfig {
   fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
     Box::new(AsyncHostSelectionCluster {
-      upstream_address: self.upstream_address.clone(),
+      upstream_addresses: self.upstream_addresses.clone(),
+      logical_hostnames: self.logical_hostnames.clone(),
       hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
     })
   }
 }
 
 struct AsyncHostSelectionCluster {
-  upstream_address: String,
+  upstream_addresses: Vec<String>,
+  logical_hostnames: Vec<String>,
   hosts: SharedHostList,
 }
 
 impl Cluster for AsyncHostSelectionCluster {
   fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
-    let addresses = vec![self.upstream_address.clone()];
-    let weights = vec![1u32];
-    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+    let weights = vec![1u32; self.upstream_addresses.len()];
+    let host_ptrs = if self.logical_hostnames.is_empty() {
+      envoy_cluster.add_hosts(&self.upstream_addresses, &weights)
+    } else {
+      envoy_cluster.add_hosts_with_hostnames(
+        &self.upstream_addresses,
+        &self.logical_hostnames,
+        &weights,
+      )
+    };
+    if let Some(host_ptrs) = host_ptrs {
       self.hosts.lock().unwrap().0 = host_ptrs;
     }
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(AsyncHostSelectionLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(AsyncHostSelectionLb {
       hosts: self.hosts.clone(),
-    })
+      select_by_header: !self.logical_hostnames.is_empty(),
+    }))
   }
 }
 
@@ -216,21 +291,40 @@ impl AsyncCompletionTask {
 
 struct AsyncHostSelectionLb {
   hosts: SharedHostList,
+  select_by_header: bool,
 }
 
 impl ClusterLb for AsyncHostSelectionLb {
   fn choose_host(
     &mut self,
-    _context: Option<&dyn ClusterLbContext>,
+    context: Option<&dyn ClusterLbContext>,
     async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
   ) -> HostSelectionResult {
     let hosts = self.hosts.lock().unwrap();
     if hosts.0.is_empty() {
       return HostSelectionResult::NoHost;
     }
+    let index = if self.select_by_header {
+      // The test sets x-upstream-index to 0 or 1 to select A or B in a fixed order.
+      // The argument 0 reads the first header value; its contents select the upstream.
+      let index = context
+        .and_then(|context| context.get_downstream_header("x-upstream-index", 0))
+        .and_then(|(value, _)| {
+          std::str::from_utf8(value.as_slice())
+            .ok()?
+            .parse::<usize>()
+            .ok()
+        });
+      match index {
+        Some(index) if index < hosts.0.len() => index,
+        _ => return HostSelectionResult::NoHost,
+      }
+    } else {
+      0
+    };
     let task = AsyncCompletionTask {
       completion: async_completion,
-      host: hosts.0[0],
+      host: hosts.0[index],
     };
     // Spawn a background thread to complete the host selection asynchronously.
     // The ABI implementation posts the completion to the correct worker thread.
@@ -282,11 +376,14 @@ impl Cluster for SchedulerHostUpdateCluster {
     scheduler.commit(ADD_HOST_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(SchedulerHostUpdateLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(SchedulerHostUpdateLb {
       hosts: self.hosts.clone(),
       membership_update_count: AtomicUsize::new(0),
-    })
+    }))
   }
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
@@ -361,10 +458,13 @@ impl Cluster for LifecycleCallbacksCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(LifecycleCallbacksLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(LifecycleCallbacksLb {
       hosts: self.hosts.clone(),
-    })
+    }))
   }
 
   fn on_server_initialized(&mut self, _envoy_cluster: &dyn EnvoyCluster) {
@@ -457,10 +557,13 @@ impl Cluster for RunOnAllWorkersCluster {
     scheduler.commit(RUN_ON_ALL_WORKERS_TRIGGER_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(RunOnAllWorkersLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(RunOnAllWorkersLb {
       hosts: self.hosts.clone(),
-    })
+    }))
   }
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
@@ -542,13 +645,16 @@ impl Cluster for WorkerLocalRebuildCluster {
     scheduler.commit(WORKER_LOCAL_REBUILD_ADD_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(WorkerLocalRebuildLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(WorkerLocalRebuildLb {
       hosts: Vec::new(),
       index: 0,
       counter_id: self.counter_id,
       metrics: self.metrics.clone(),
-    })
+    }))
   }
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
@@ -656,13 +762,16 @@ impl Cluster for MemberUpdatePackedAddressCluster {
     scheduler.commit(PACKED_ADDRESS_ADD_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(MemberUpdatePackedAddressLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(MemberUpdatePackedAddressLb {
       hosts: Vec::new(),
       index: 0,
       counter_id: self.counter_id,
       metrics: self.metrics.clone(),
-    })
+    }))
   }
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
@@ -758,6 +867,7 @@ struct WorkerTimerClusterConfig {
   upstream_address: String,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -768,6 +878,7 @@ impl ClusterConfig for WorkerTimerClusterConfig {
       hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
       armed_id: self.armed_id,
       fired_id: self.fired_id,
+      fired_handle: self.fired_handle,
       metrics: self.metrics.clone(),
     })
   }
@@ -778,6 +889,7 @@ struct WorkerTimerCluster {
   hosts: SharedHostList,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -791,14 +903,18 @@ impl Cluster for WorkerTimerCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(WorkerTimerLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(WorkerTimerLb {
       hosts: self.hosts.clone(),
       timer: None,
       armed_id: self.armed_id,
       fired_id: self.fired_id,
+      fired_handle: self.fired_handle,
       metrics: self.metrics.clone(),
-    })
+    }))
   }
 }
 
@@ -807,6 +923,7 @@ struct WorkerTimerLb {
   timer: Option<Box<dyn EnvoyClusterWorkerTimer>>,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -849,7 +966,195 @@ impl ClusterLb for WorkerTimerLb {
     if let Some(fired_id) = self.fired_id {
       let _ = self.metrics.increment_counter(fired_id, 1);
     }
+    // Record the same fire through the resolved handle, which allocates nothing per call.
+    if let Some(fired_handle) = self.fired_handle {
+      fired_handle.add(1);
+    }
     // Re-arm for periodic firing.
     timer.enable(std::time::Duration::from_millis(WORKER_TIMER_INTERVAL_MS));
+  }
+}
+
+// =============================================================================
+// Native LB test: module provides a load balancer that must be bypassed.
+// =============================================================================
+//
+// choose_host increments native_lb_requests. Tests configure a native lb_policy
+// (LEAST_REQUEST, ROUND_ROBIN, RANDOM) so Envoy uses its factory LB; the module's
+// choose_host must never run, so native_lb_requests stays 0.
+
+struct NativeLbTestClusterConfig {
+  upstream_address: String,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for NativeLbTestClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    let counter_id = self.metrics.define_counter("native_lb_requests").ok();
+    Box::new(NativeLbTestCluster {
+      upstream_address: self.upstream_address.clone(),
+      hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
+      counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct NativeLbTestCluster {
+  upstream_address: String,
+  hosts: SharedHostList,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for NativeLbTestCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    let addresses = vec![self.upstream_address.clone()];
+    let weights = vec![1u32];
+    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+      self.hosts.lock().unwrap().0 = host_ptrs;
+    }
+    envoy_cluster.pre_init_complete();
+  }
+
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(NativeLbTestLb {
+      hosts: self.hosts.clone(),
+      index: AtomicUsize::new(0),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    }))
+  }
+}
+
+struct NativeLbTestLb {
+  hosts: SharedHostList,
+  index: AtomicUsize,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for NativeLbTestLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    let hosts = self.hosts.lock().unwrap();
+    if hosts.0.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    let idx = self.index.fetch_add(1, Ordering::Relaxed) % hosts.0.len();
+    if let Some(counter_id) = self.counter_id {
+      let _ = self.metrics.increment_counter(counter_id, 1);
+    }
+    HostSelectionResult::Selected(hosts.0[idx])
+  }
+}
+
+// =============================================================================
+// Healthy-partition bulk rebuild.
+// =============================================================================
+//
+// Mirrors the worker-local-rebuild flow, but on_host_membership_update rebuilds the routable set
+// from get_healthy_hosts in one ABI crossing rather than applying the member-update delta. It
+// increments a counter once the bulk read agrees with get_healthy_host_count, so the test can wait
+// for every worker to converge before routing through a pointer the bulk getter returned.
+
+const HEALTHY_HOSTS_REBUILD_ADD_EVENT_ID: u64 = 400;
+
+struct HealthyHostsRebuildClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for HealthyHostsRebuildClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(HealthyHostsRebuildCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct HealthyHostsRebuildCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for HealthyHostsRebuildCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.pre_init_complete();
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(HEALTHY_HOSTS_REBUILD_ADD_EVENT_ID);
+  }
+
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(HealthyHostsRebuildLb {
+      hosts: Vec::new(),
+      index: 0,
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    }))
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id == HEALTHY_HOSTS_REBUILD_ADD_EVENT_ID {
+      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+    }
+  }
+}
+
+struct HealthyHostsRebuildLb {
+  hosts: Vec<usize>,
+  index: usize,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for HealthyHostsRebuildLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    if self.hosts.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    let idx = self.index % self.hosts.len();
+    self.index += 1;
+    HostSelectionResult::Selected(
+      self.hosts[idx] as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    )
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    _num_hosts_added: usize,
+    _num_hosts_removed: usize,
+  ) {
+    // Rebuild the routable set from the whole healthy partition in one crossing.
+    let mut healthy = Vec::new();
+    if !envoy_lb.get_healthy_hosts(0, &mut healthy) {
+      return;
+    }
+    self.hosts = healthy.iter().map(|&host| host as usize).collect();
+    // Increment once the bulk read is non-empty and agrees with the per-host count, so the test can
+    // wait for every worker to converge.
+    if !self.hosts.is_empty() && self.hosts.len() == envoy_lb.get_healthy_host_count(0) {
+      if let Some(counter_id) = self.counter_id {
+        let _ = self.metrics.increment_counter(counter_id, 1);
+      }
+    }
   }
 }

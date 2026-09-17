@@ -1,14 +1,28 @@
 #include "source/extensions/filters/http/a2a/a2a_json_parser.h"
 
+#include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::_;
+using testing::AllOf;
+using testing::Contains;
+using testing::ElementsAre;
+using testing::IsSupersetOf;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace A2a {
 namespace {
+
+using ::Envoy::StatusHelpers::IsOk;
+using testing::Not;
 
 class A2aJsonParserTest : public ::testing::Test {
 protected:
@@ -41,126 +55,34 @@ TEST_F(A2aJsonParserTest, ParseSimpleMessageSend) {
   })";
 
   // Parse the JSON string.
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
 
   // Verify overall validity and method.
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "message/send");
 
-  // Verify top-level extracted fields.
-  EXPECT_EQ(parser_.metadata().fields().at("method").string_value(), "message/send");
-
-  // Verify fields within params.
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("taskId").string_value(),
-      "task-abc-987");
-
-  // Verify fields within params.message.
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("taskId")
-                .string_value(),
-            "task1");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("contextId")
-                .string_value(),
-            "context1");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("messageId")
-                .string_value(),
-            "msg1");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("role")
-                .string_value(),
-            "user");
-
-  // Verify fields within params.configuration.
-  EXPECT_TRUE(parser_.metadata()
-                  .fields()
-                  .at("params")
-                  .struct_value()
-                  .fields()
-                  .at("configuration")
-                  .struct_value()
-                  .fields()
-                  .at("blocking")
-                  .bool_value());
-
-  // Verify fields within params.metadata.
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("metadata")
-                .struct_value()
-                .fields()
-                .at("baz")
-                .string_value(),
-            "qux");
-  EXPECT_TRUE(parser_.metadata()
-                  .fields()
-                  .at("params")
-                  .struct_value()
-                  .fields()
-                  .at("configuration")
-                  .struct_value()
-                  .fields()
-                  .at("acceptedOutputModes")
-                  .has_list_value());
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("configuration")
-                .struct_value()
-                .fields()
-                .at("acceptedOutputModes")
-                .list_value()
-                .values_size(),
-            1);
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("configuration")
-                .struct_value()
-                .fields()
-                .at("acceptedOutputModes")
-                .list_value()
-                .values(0)
-                .string_value(),
-            "text/plain");
+  // Verify extracted fields.
+  EXPECT_THAT(
+      parser_.metadata().fields(),
+      IsSupersetOf(StructMatchers(
+          IsStructString("method", "message/send"),
+          IsStructStruct(
+              "params",
+              UnorderedElementsAre(
+                  IsStructString("taskId", "task-abc-987"),
+                  IsStructStruct("message",
+                                 UnorderedElementsAre(IsStructString("taskId", "task1"),
+                                                      IsStructString("contextId", "context1"),
+                                                      IsStructString("messageId", "msg1"),
+                                                      IsStructString("role", "user"))),
+                  IsStructStruct("configuration",
+                                 UnorderedElementsAre(
+                                     IsStructBool("blocking", true),
+                                     IsStructList("acceptedOutputModes",
+                                                  ElementsAre(IsStructValueString("text/plain"))))),
+                  IsStructStruct("metadata",
+                                 UnorderedElementsAre(IsStructString("baz", "qux"))))))));
 }
 
 TEST_F(A2aJsonParserTest, ParseMessageSend) {
@@ -202,211 +124,55 @@ TEST_F(A2aJsonParserTest, ParseMessageSend) {
   })";
 
   // Parse the JSON string.
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
 
   // Verify overall validity and method.
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "message/send");
 
-  // Verify top-level extracted fields.
-  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "123");
-  EXPECT_EQ(parser_.metadata().fields().at("method").string_value(), "message/send");
-
-  // Verify fields within params.
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("taskId").string_value(),
-      "task-abc-987");
-
-  // Verify fields within params.message.
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("taskId")
-                .string_value(),
-            "task1");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("contextId")
-                .string_value(),
-            "context1");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("messageId")
-                .string_value(),
-            "msg1");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("role")
-                .string_value(),
-            "user");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("kind")
-                .string_value(),
-            "message");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("metadata")
-                .struct_value()
-                .fields()
-                .at("foo")
-                .string_value(),
-            "bar");
-
-  // Verify list within params.message.parts.
-  EXPECT_TRUE(parser_.metadata()
-                  .fields()
-                  .at("params")
-                  .struct_value()
-                  .fields()
-                  .at("message")
-                  .struct_value()
-                  .fields()
-                  .at("parts")
-                  .has_list_value());
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("parts")
-                .list_value()
-                .values_size(),
-            2);
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("parts")
-                .list_value()
-                .values(0)
-                .struct_value()
-                .fields()
-                .at("text")
-                .string_value(),
-            "Can you analyze the attached CSV for Q3 sales trends?");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("parts")
-                .list_value()
-                .values(1)
-                .struct_value()
-                .fields()
-                .at("file")
-                .struct_value()
-                .fields()
-                .at("uri")
-                .string_value(),
-            "https://example.com/secure/data.csv");
-
-  // Verify fields within params.configuration.
-  EXPECT_TRUE(parser_.metadata()
-                  .fields()
-                  .at("params")
-                  .struct_value()
-                  .fields()
-                  .at("configuration")
-                  .struct_value()
-                  .fields()
-                  .at("blocking")
-                  .bool_value());
-
-  // Verify fields within params.metadata.
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("metadata")
-                .struct_value()
-                .fields()
-                .at("baz")
-                .string_value(),
-            "qux");
-  EXPECT_TRUE(parser_.metadata()
-                  .fields()
-                  .at("params")
-                  .struct_value()
-                  .fields()
-                  .at("configuration")
-                  .struct_value()
-                  .fields()
-                  .at("acceptedOutputModes")
-                  .has_list_value());
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("configuration")
-                .struct_value()
-                .fields()
-                .at("acceptedOutputModes")
-                .list_value()
-                .values_size(),
-            1);
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("configuration")
-                .struct_value()
-                .fields()
-                .at("acceptedOutputModes")
-                .list_value()
-                .values(0)
-                .string_value(),
-            "text/plain");
+  // Verify extracted fields.
+  EXPECT_THAT(
+      parser_.metadata().fields(),
+      UnorderedElementsAre(
+          IsStructString("jsonrpc", "2.0"), IsStructString("id", "123"),
+          IsStructString("method", "message/send"),
+          IsStructStruct(
+              "params",
+              UnorderedElementsAre(
+                  IsStructString("taskId", "task-abc-987"),
+                  IsStructStruct(
+                      "message",
+                      UnorderedElementsAre(
+                          IsStructString("taskId", "task1"),
+                          IsStructString("contextId", "context1"),
+                          IsStructString("messageId", "msg1"), IsStructString("role", "user"),
+                          IsStructList(
+                              "parts",
+                              ElementsAre(
+                                  IsStructValueStruct(UnorderedElementsAre(
+                                      IsStructString("type", "text"),
+                                      IsStructString("text", "Can you analyze the attached CSV for "
+                                                             "Q3 sales trends?"))),
+                                  IsStructValueStruct(UnorderedElementsAre(
+                                      IsStructString("type", "file"),
+                                      IsStructStruct(
+                                          "file",
+                                          UnorderedElementsAre(
+                                              IsStructString("mimeType", "text/csv"),
+                                              IsStructString(
+                                                  "uri",
+                                                  "https://example.com/secure/data.csv"))))))),
+                          IsStructString("kind", "message"),
+                          IsStructStruct("metadata",
+                                         UnorderedElementsAre(IsStructString("foo", "bar"))))),
+                  IsStructStruct("configuration",
+                                 UnorderedElementsAre(
+                                     IsStructBool("blocking", true),
+                                     IsStructList("acceptedOutputModes",
+                                                  ElementsAre(IsStructValueString("text/plain"))))),
+                  IsStructStruct("metadata",
+                                 UnorderedElementsAre(IsStructString("baz", "qux")))))));
 }
 
 TEST_F(A2aJsonParserTest, ParseMessageSendMultiChunks) {
@@ -433,33 +199,34 @@ TEST_F(A2aJsonParserTest, ParseMessageSendMultiChunks) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(part1).ok());
-  ASSERT_TRUE(parser_.parse(part2).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(part1));
+  ASSERT_OK(parser_.parse(part2));
+  ASSERT_OK(parser_.finishParse());
 
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "message/send");
-  EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");
-  EXPECT_EQ(parser_.metadata().fields().at("method").string_value(), "message/send");
-  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "123");
-
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("taskId").string_value(),
-      "task-abc-987");
-
-  const auto& message =
-      parser_.metadata().fields().at("params").struct_value().fields().at("message").struct_value();
-  EXPECT_EQ(message.fields().at("taskId").string_value(), "task1");
-  EXPECT_EQ(message.fields().at("contextId").string_value(), "context1");
-  EXPECT_EQ(message.fields().at("messageId").string_value(), "msg1");
-  EXPECT_EQ(message.fields().at("role").string_value(), "user");
-
-  EXPECT_TRUE(message.fields().at("parts").has_list_value());
-  EXPECT_EQ(message.fields().at("parts").list_value().values_size(), 1);
-  const auto& part0 = message.fields().at("parts").list_value().values(0).struct_value();
-  EXPECT_EQ(part0.fields().at("type").string_value(), "text");
-  EXPECT_EQ(part0.fields().at("text").string_value(),
-            "Can you analyze the attached CSV for Q3 sales trends?");
+  EXPECT_THAT(
+      parser_.metadata().fields(),
+      UnorderedElementsAre(
+          IsStructString("jsonrpc", "2.0"), IsStructString("method", "message/send"),
+          IsStructString("id", "123"),
+          IsStructStruct(
+              "params",
+              UnorderedElementsAre(
+                  IsStructString("taskId", "task-abc-987"),
+                  IsStructStruct(
+                      "message",
+                      UnorderedElementsAre(
+                          IsStructString("taskId", "task1"),
+                          IsStructString("contextId", "context1"),
+                          IsStructString("messageId", "msg1"), IsStructString("role", "user"),
+                          IsStructList(
+                              "parts",
+                              ElementsAre(IsStructValueStruct(UnorderedElementsAre(
+                                  IsStructString("type", "text"),
+                                  IsStructString("text",
+                                                 "Can you analyze the attached CSV for Q3 sales "
+                                                 "trends?")))))))))));
 }
 
 TEST_F(A2aJsonParserTest, ParseTasksGet) {
@@ -476,36 +243,19 @@ TEST_F(A2aJsonParserTest, ParseTasksGet) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/get");
-  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "124");
-
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("id").string_value(),
-      "task1");
-
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("historyLength")
-                .number_value(),
-            10);
-
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("metadata")
-                .struct_value()
-                .fields()
-                .at("foo")
-                .string_value(),
-            "bar");
+  EXPECT_THAT(
+      parser_.metadata().fields(),
+      IsSupersetOf(StructMatchers(
+          IsStructString("id", "124"),
+          IsStructStruct(
+              "params", UnorderedElementsAre(
+                            IsStructString("id", "task1"), IsStructNumber("historyLength", 10),
+                            IsStructStruct("metadata",
+                                           UnorderedElementsAre(IsStructString("foo", "bar"))))))));
 }
 
 TEST_F(A2aJsonParserTest, ParseTasksList) {
@@ -525,66 +275,23 @@ TEST_F(A2aJsonParserTest, ParseTasksList) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/list");
-  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "125");
-  EXPECT_EQ(parser_.metadata().fields().at("method").string_value(), "tasks/list");
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("tenant").string_value(),
-      "mytenant");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("contextId")
-                .string_value(),
-            "ctx-123");
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("status").string_value(),
-      "working");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("pageSize")
-                .number_value(),
-            50);
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("pageToken")
-                .string_value(),
-            "token123");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("historyLength")
-                .number_value(),
-            5);
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("lastUpdatedAfter")
-                .number_value(),
-            1234567890);
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("includeArtifacts")
-                .bool_value(),
-            true);
+  EXPECT_THAT(parser_.metadata().fields(),
+              UnorderedElementsAre(
+                  IsStructString("jsonrpc", "2.0"), IsStructString("id", "125"),
+                  IsStructString("method", "tasks/list"),
+                  IsStructStruct(
+                      "params", UnorderedElementsAre(IsStructString("tenant", "mytenant"),
+                                                     IsStructString("contextId", "ctx-123"),
+                                                     IsStructString("status", "working"),
+                                                     IsStructNumber("pageSize", 50),
+                                                     IsStructString("pageToken", "token123"),
+                                                     IsStructNumber("historyLength", 5),
+                                                     IsStructNumber("lastUpdatedAfter", 1234567890),
+                                                     IsStructBool("includeArtifacts", true)))));
 }
 
 TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigSet) {
@@ -606,99 +313,30 @@ TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigSet) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/set");
-  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "126");
-  EXPECT_EQ(parser_.metadata().fields().at("method").string_value(),
-            "tasks/pushNotificationConfig/set");
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("taskId").string_value(),
-      "task123");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("pushNotificationConfig")
-                .struct_value()
-                .fields()
-                .at("id")
-                .string_value(),
-            "config1");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("pushNotificationConfig")
-                .struct_value()
-                .fields()
-                .at("url")
-                .string_value(),
-            "https://example.com/notify");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("pushNotificationConfig")
-                .struct_value()
-                .fields()
-                .at("token")
-                .string_value(),
-            "secret-token");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("pushNotificationConfig")
-                .struct_value()
-                .fields()
-                .at("authentication")
-                .struct_value()
-                .fields()
-                .at("schemes")
-                .list_value()
-                .values(0)
-                .string_value(),
-            "Bearer");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("pushNotificationConfig")
-                .struct_value()
-                .fields()
-                .at("authentication")
-                .struct_value()
-                .fields()
-                .at("credentials")
-                .string_value(),
-            "abc");
-}
-
-// TODO(tyxia) Handle unrecognized methods/fields.
-TEST_F(A2aJsonParserTest, ParseUnrecognizedMethod) {
-  const std::string json = R"({
-    "jsonrpc": "2.0",
-    "method": "unknown/method",
-    "id": "123",
-    "params": {
-      "someField": "someValue"
-    }
-  })";
-
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
-  EXPECT_TRUE(parser_.isValidA2aRequest());
-  EXPECT_EQ(parser_.getMethod(), "unknown/method");
-  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "123");
-  // params should not be extracted for unknown method
-  EXPECT_FALSE(parser_.metadata().fields().contains("params"));
+  EXPECT_THAT(parser_.metadata().fields(),
+              UnorderedElementsAre(
+                  IsStructString("jsonrpc", "2.0"), IsStructString("id", "126"),
+                  IsStructString("method", "tasks/pushNotificationConfig/set"),
+                  IsStructStruct(
+                      "params",
+                      UnorderedElementsAre(
+                          IsStructString("taskId", "task123"),
+                          IsStructStruct(
+                              "pushNotificationConfig",
+                              UnorderedElementsAre(
+                                  IsStructString("id", "config1"),
+                                  IsStructString("url", "https://example.com/notify"),
+                                  IsStructString("token", "secret-token"),
+                                  IsStructStruct(
+                                      "authentication",
+                                      UnorderedElementsAre(
+                                          IsStructList("schemes",
+                                                       ElementsAre(IsStructValueString("Bearer"))),
+                                          IsStructString("credentials", "abc")))))))));
 }
 
 TEST_F(A2aJsonParserTest, InvalidJson) {
@@ -712,8 +350,8 @@ TEST_F(A2aJsonParserTest, InvalidJson) {
 
   // The parse call itself will succeed since it is streaming and waiting for more data,
   // but finishParse should definitely fail.
-  ASSERT_TRUE(parser_.parse(json).ok());
-  EXPECT_FALSE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  EXPECT_THAT(parser_.finishParse(), Not(IsOk()));
 }
 
 TEST_F(A2aJsonParserTest, MissingJsonRpc) {
@@ -723,8 +361,8 @@ TEST_F(A2aJsonParserTest, MissingJsonRpc) {
     "params": {}
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   // Should return false because 'jsonrpc' field is missing from extracted metadata
   EXPECT_FALSE(parser_.isValidA2aRequest());
 }
@@ -744,17 +382,15 @@ TEST_F(A2aJsonParserTest, ParseTasksListMissingOptionalFields) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/list");
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("tenant").string_value(),
-      "mytenant");
-
-  // Verify historyLength is missing
-  EXPECT_FALSE(
-      parser_.metadata().fields().at("params").struct_value().fields().contains("historyLength"));
+  // historyLength should not be present.
+  EXPECT_THAT(
+      parser_.metadata().fields(),
+      Contains(IsStructStruct("params", AllOf(Contains(IsStructString("tenant", "mytenant")),
+                                              Not(Contains(Key("historyLength")))))));
 }
 
 TEST_F(A2aJsonParserTest, GetTaskRequest) {
@@ -770,33 +406,21 @@ TEST_F(A2aJsonParserTest, GetTaskRequest) {
     }
   }
 })";
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/get");
-  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 102);
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("id").string_value(),
-      "task-uuid-12345");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("historyLength")
-                .number_value(),
-            10);
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("metadata")
-                .struct_value()
-                .fields()
-                .at("request_source")
-                .string_value(),
-            "status_check_button");
+  EXPECT_THAT(
+      parser_.metadata().fields(),
+      UnorderedElementsAre(
+          IsStructString("jsonrpc", "2.0"), IsStructNumber("id", 102),
+          IsStructString("method", "tasks/get"),
+          IsStructStruct(
+              "params",
+              UnorderedElementsAre(
+                  IsStructString("id", "task-uuid-12345"), IsStructNumber("historyLength", 10),
+                  IsStructStruct("metadata", UnorderedElementsAre(IsStructString(
+                                                 "request_source", "status_check_button")))))));
 }
 
 TEST_F(A2aJsonParserTest, CancelTaskRequest) {
@@ -811,25 +435,21 @@ TEST_F(A2aJsonParserTest, CancelTaskRequest) {
     }
   }
 })";
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/cancel");
-  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 103);
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("id").string_value(),
-      "task-uuid-12345");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("metadata")
-                .struct_value()
-                .fields()
-                .at("reason")
-                .string_value(),
-            "User initiated cancellation");
+  EXPECT_THAT(
+      parser_.metadata().fields(),
+      UnorderedElementsAre(
+          IsStructString("jsonrpc", "2.0"), IsStructNumber("id", 103),
+          IsStructString("method", "tasks/cancel"),
+          IsStructStruct(
+              "params",
+              UnorderedElementsAre(
+                  IsStructString("id", "task-uuid-12345"),
+                  IsStructStruct("metadata", UnorderedElementsAre(IsStructString(
+                                                 "reason", "User initiated cancellation")))))));
 }
 
 TEST_F(A2aJsonParserTest, ResubscribeTaskRequest) {
@@ -845,33 +465,21 @@ TEST_F(A2aJsonParserTest, ResubscribeTaskRequest) {
     }
   }
 })";
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/resubscribe");
-  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 106);
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("id").string_value(),
-      "task-uuid-67890");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("metadata")
-                .struct_value()
-                .fields()
-                .at("client_state")
-                .string_value(),
-            "reconnecting");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("historyLength")
-                .number_value(),
-            2);
+  EXPECT_THAT(
+      parser_.metadata().fields(),
+      UnorderedElementsAre(
+          IsStructString("jsonrpc", "2.0"), IsStructNumber("id", 106),
+          IsStructString("method", "tasks/resubscribe"),
+          IsStructStruct("params",
+                         UnorderedElementsAre(
+                             IsStructString("id", "task-uuid-67890"),
+                             IsStructNumber("historyLength", 2),
+                             IsStructStruct("metadata", UnorderedElementsAre(IsStructString(
+                                                            "client_state", "reconnecting")))))));
 }
 
 TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigGet) {
@@ -886,33 +494,20 @@ TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigGet) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/get");
-  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 130);
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("id").string_value(),
-      "task-uuid-12345");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("metadata")
-                .struct_value()
-                .fields()
-                .at("foo")
-                .string_value(),
-            "bar");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("pushNotificationConfigId")
-                .string_value(),
-            "config-abc");
+  EXPECT_THAT(parser_.metadata().fields(),
+              UnorderedElementsAre(
+                  IsStructString("jsonrpc", "2.0"), IsStructNumber("id", 130),
+                  IsStructString("method", "tasks/pushNotificationConfig/get"),
+                  IsStructStruct("params",
+                                 UnorderedElementsAre(
+                                     IsStructString("id", "task-uuid-12345"),
+                                     IsStructStruct("metadata", UnorderedElementsAre(
+                                                                    IsStructString("foo", "bar"))),
+                                     IsStructString("pushNotificationConfigId", "config-abc")))));
 }
 
 TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigList) {
@@ -927,33 +522,20 @@ TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigList) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/list");
-  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 131);
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("id").string_value(),
-      "task-uuid-12345");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("metadata")
-                .struct_value()
-                .fields()
-                .at("foo")
-                .string_value(),
-            "bar");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("pushNotificationConfigId")
-                .string_value(),
-            "config-abc");
+  EXPECT_THAT(parser_.metadata().fields(),
+              UnorderedElementsAre(
+                  IsStructString("jsonrpc", "2.0"), IsStructNumber("id", 131),
+                  IsStructString("method", "tasks/pushNotificationConfig/list"),
+                  IsStructStruct("params",
+                                 UnorderedElementsAre(
+                                     IsStructString("id", "task-uuid-12345"),
+                                     IsStructStruct("metadata", UnorderedElementsAre(
+                                                                    IsStructString("foo", "bar"))),
+                                     IsStructString("pushNotificationConfigId", "config-abc")))));
 }
 
 TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigDelete) {
@@ -967,22 +549,18 @@ TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigDelete) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/delete");
-  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 132);
-  EXPECT_EQ(
-      parser_.metadata().fields().at("params").struct_value().fields().at("id").string_value(),
-      "task-uuid-12345");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("pushNotificationConfigId")
-                .string_value(),
-            "config-abc");
+  EXPECT_THAT(
+      parser_.metadata().fields(),
+      UnorderedElementsAre(
+          IsStructString("jsonrpc", "2.0"), IsStructNumber("id", 132),
+          IsStructString("method", "tasks/pushNotificationConfig/delete"),
+          IsStructStruct("params", UnorderedElementsAre(
+                                       IsStructString("id", "task-uuid-12345"),
+                                       IsStructString("pushNotificationConfigId", "config-abc")))));
 }
 
 TEST_F(A2aJsonParserTest, ParseAgentGetAuthenticatedExtendedCard) {
@@ -993,11 +571,11 @@ TEST_F(A2aJsonParserTest, ParseAgentGetAuthenticatedExtendedCard) {
     "params": {}
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "agent/getAuthenticatedExtendedCard");
-  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 133);
+  EXPECT_THAT(parser_.metadata().fields(), Contains(IsStructNumber("id", 133)));
 }
 
 TEST_F(A2aJsonParserTest, GetNestedValue) {
@@ -1016,16 +594,16 @@ TEST_F(A2aJsonParserTest, GetNestedValue) {
       }
     }
   })";
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
 
-  // Valid paths
-  EXPECT_EQ(parser_.getNestedValue("params.taskId")->string_value(), "task-abc-987");
-  EXPECT_EQ(parser_.getNestedValue("params.message.role")->string_value(), "user");
-  EXPECT_TRUE(parser_.getNestedValue("params.configuration.blocking")->bool_value());
+  // Valid paths.
+  EXPECT_THAT(*parser_.getNestedValue("params.taskId"), IsStructValueString("task-abc-987"));
+  EXPECT_THAT(*parser_.getNestedValue("params.message.role"), IsStructValueString("user"));
+  EXPECT_THAT(*parser_.getNestedValue("params.configuration.blocking"), IsStructValueBool(true));
 
-  // Invalid paths
+  // Invalid paths.
   EXPECT_EQ(parser_.getNestedValue(""), nullptr);
   EXPECT_EQ(parser_.getNestedValue("params.message.foo"), nullptr);
   EXPECT_EQ(parser_.getNestedValue("params.taskId.foo"), nullptr);
@@ -1038,21 +616,21 @@ TEST_F(A2aJsonParserTest, Reset) {
   const std::string json2 =
       R"({"jsonrpc": "2.0", "method": "tasks/cancel", "id": "2", "params": {"id": "task2"}})";
 
-  ASSERT_TRUE(parser_.parse(json1).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json1));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/get");
-  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "1");
+  EXPECT_THAT(parser_.metadata().fields(), Contains(IsStructString("id", "1")));
 
   parser_.reset();
   EXPECT_FALSE(parser_.isValidA2aRequest());
   EXPECT_TRUE(parser_.metadata().fields().empty());
 
-  ASSERT_TRUE(parser_.parse(json2).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json2));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/cancel");
-  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "2");
+  EXPECT_THAT(parser_.metadata().fields(), Contains(IsStructString("id", "2")));
 }
 
 TEST_F(A2aJsonParserTest, ParseResponseWithResult) {
@@ -1081,35 +659,28 @@ TEST_F(A2aJsonParserTest, ParseResponseWithResult) {
   }
 })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
-  EXPECT_TRUE(parser_.metadata().fields().contains("jsonrpc"));
-  EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");
-  EXPECT_TRUE(parser_.metadata().fields().contains("id"));
-  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "1");
-  EXPECT_TRUE(parser_.metadata().fields().contains("result"));
-  EXPECT_TRUE(parser_.metadata().fields().at("result").has_struct_value());
-
-  const auto& result = parser_.metadata().fields().at("result").struct_value().fields();
-  EXPECT_EQ(result.at("kind").string_value(), "task");
-  EXPECT_EQ(result.at("id").string_value(), "run-uuid");
-  EXPECT_EQ(result.at("contextId").string_value(), "f5bd2a40-74b6-4f7a-b649-ea3f09890003");
-
-  const auto& status = result.at("status").struct_value().fields();
-  EXPECT_EQ(status.at("state").string_value(), "completed");
-
-  const auto& artifacts = result.at("artifacts").list_value();
-  ASSERT_EQ(artifacts.values_size(), 1);
-  const auto& artifact = artifacts.values(0).struct_value().fields();
-  EXPECT_EQ(artifact.at("artifactId").string_value(), "artifact-uuid");
-  EXPECT_EQ(artifact.at("name").string_value(), "Assistant Response");
-
-  const auto& parts = artifact.at("parts").list_value();
-  ASSERT_EQ(parts.values_size(), 1);
-  const auto& part = parts.values(0).struct_value().fields();
-  EXPECT_EQ(part.at("kind").string_value(), "text");
-  EXPECT_EQ(part.at("text").string_value(), "Hello back");
+  EXPECT_THAT(parser_.metadata().fields(),
+              UnorderedElementsAre(
+                  IsStructString("jsonrpc", "2.0"), IsStructString("id", "1"),
+                  IsStructStruct(
+                      "result",
+                      UnorderedElementsAre(
+                          IsStructString("kind", "task"), IsStructString("id", "run-uuid"),
+                          IsStructString("contextId", "f5bd2a40-74b6-4f7a-b649-ea3f09890003"),
+                          IsStructStruct(
+                              "status", UnorderedElementsAre(IsStructString("state", "completed"))),
+                          IsStructList(
+                              "artifacts",
+                              ElementsAre(IsStructValueStruct(UnorderedElementsAre(
+                                  IsStructString("artifactId", "artifact-uuid"),
+                                  IsStructString("name", "Assistant Response"),
+                                  IsStructList("parts",
+                                               ElementsAre(IsStructValueStruct(UnorderedElementsAre(
+                                                   IsStructString("kind", "text"),
+                                                   IsStructString("text", "Hello back")))))))))))));
 }
 
 TEST_F(A2aJsonParserTest, GetTaskErrorResponse) {
@@ -1123,22 +694,17 @@ TEST_F(A2aJsonParserTest, GetTaskErrorResponse) {
         "data": null
     }
     })";
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
-  EXPECT_TRUE(parser_.metadata().fields().contains("jsonrpc"));
-  EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");
-  EXPECT_TRUE(parser_.metadata().fields().contains("id"));
-  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 102);
-  EXPECT_TRUE(parser_.metadata().fields().contains("result"));
-  EXPECT_EQ(parser_.metadata().fields().at("result").null_value(), Protobuf::NULL_VALUE);
-  EXPECT_TRUE(parser_.metadata().fields().contains("error"));
-  EXPECT_TRUE(parser_.metadata().fields().at("error").has_struct_value());
-
-  const auto& error = parser_.metadata().fields().at("error").struct_value().fields();
-  EXPECT_EQ(error.at("code").number_value(), -32001);
-  EXPECT_EQ(error.at("message").string_value(), "Task not found");
-  EXPECT_EQ(error.at("data").null_value(), Protobuf::NULL_VALUE);
+  EXPECT_THAT(parser_.metadata().fields(),
+              UnorderedElementsAre(
+                  IsStructString("jsonrpc", "2.0"), IsStructNumber("id", 102),
+                  IsStructNull("result", Protobuf::NULL_VALUE),
+                  IsStructStruct(
+                      "error", UnorderedElementsAre(IsStructNumber("code", -32001),
+                                                    IsStructString("message", "Task not found"),
+                                                    IsStructNull("data", Protobuf::NULL_VALUE)))));
 }
 
 } // namespace

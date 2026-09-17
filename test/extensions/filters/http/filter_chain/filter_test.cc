@@ -9,6 +9,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -46,8 +47,9 @@ public:
   }
 
   absl::StatusOr<Http::FilterFactoryCb>
-  createHttpFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                                   Server::Configuration::ServerFactoryContext&) override {
+  createHttpFilterFactoryFromProto(const Protobuf::Message&,
+                                   Server::Configuration::ServerFactoryContext&,
+                                   Server::Configuration::ExtraFactoryContext&) override {
     return [this](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<Http::MockStreamDecoderFilter>());
       filter_added_++;
@@ -85,7 +87,7 @@ public:
       TestUtility::loadFromYaml(yaml_config, proto_config);
     }
     auto callback_or_error = factory_.createFilterFactoryFromProto(proto_config, "test.", context_);
-    EXPECT_TRUE(callback_or_error.status().ok());
+    EXPECT_OK(callback_or_error.status());
     cb_ = callback_or_error.value();
   }
 
@@ -94,9 +96,12 @@ public:
   const Router::RouteSpecificFilterConfig* makePerRoute(const std::string& yaml) {
     FilterChainConfigProtoPerRoute proto_per_route;
     TestUtility::loadFromYaml(yaml, proto_per_route);
-    auto config_or_error = factory_.createRouteSpecificFilterConfig(
-        proto_per_route, context_.serverFactoryContext(), context_.messageValidationVisitor());
-    EXPECT_TRUE(config_or_error.status().ok());
+    const std::string empty_stats_prefix;
+    Server::Configuration::ExtraFactoryContext extra_context{context_.messageValidationVisitor(),
+                                                             empty_stats_prefix};
+    auto config_or_error = factory_.createHttpFilterRouteConfig(
+        proto_per_route, context_.serverFactoryContext(), extra_context);
+    EXPECT_OK(config_or_error.status());
     per_route_configs_.push_back(config_or_error.value());
     return per_route_configs_.back().get();
   }

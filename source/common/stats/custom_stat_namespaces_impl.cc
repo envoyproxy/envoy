@@ -8,7 +8,7 @@ namespace Stats {
 
 bool CustomStatNamespacesImpl::registered(const absl::string_view name) const {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  return namespaces_.find(name) != namespaces_.end();
+  return namespaces_.contains(name);
 }
 
 void CustomStatNamespacesImpl::registerStatNamespace(const absl::string_view name) {

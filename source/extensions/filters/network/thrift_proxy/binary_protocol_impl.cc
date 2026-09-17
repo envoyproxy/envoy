@@ -389,7 +389,7 @@ bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMe
 
   uint32_t name_len = buffer.peekBEInt<uint32_t>();
 
-  if (buffer.length() < 9 + name_len) {
+  if (buffer.length() < static_cast<uint64_t>(name_len) + 9) {
     return false;
   }
 

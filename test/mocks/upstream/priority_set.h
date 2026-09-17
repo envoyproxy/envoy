@@ -31,6 +31,8 @@ public:
   MOCK_METHOD(void, batchHostUpdate, (BatchUpdateCb&));
   MOCK_METHOD(HostMapConstSharedPtr, crossPriorityHostMap, (), (const));
 
+  bool batchUpdateActive() const override { return batch_update_active_; }
+
   MockHostSet* getMockHostSet(uint32_t priority) {
     getHostSet(priority); // Ensure the host set exists.
     return reinterpret_cast<MockHostSet*>(host_sets_[priority].get());
@@ -43,6 +45,7 @@ public:
       priority_update_cb_helper_;
 
   HostMapConstSharedPtr cross_priority_host_map_{std::make_shared<HostMap>()};
+  bool batch_update_active_{false};
 };
 } // namespace Upstream
 } // namespace Envoy

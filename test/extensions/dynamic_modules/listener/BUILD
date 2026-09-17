@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -18,7 +19,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:listener_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/listener/dynamic_modules:config",
@@ -26,6 +27,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -37,7 +39,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/listener/dynamic_modules:config",
@@ -55,8 +57,9 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/registry",
         "//source/common/http:message_lib",
         "//source/common/network:address_lib",
         "//source/common/network:io_socket_error_lib",
@@ -70,10 +73,11 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -82,12 +86,16 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:listener_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/registry",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/listener/dynamic_modules:config",
+        "//source/extensions/filters/network/direct_response:config",
         "//source/extensions/filters/network/echo:config",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//test/integration:integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/dynamic_modules/v3:pkg_cc_proto",

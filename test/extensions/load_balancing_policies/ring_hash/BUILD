@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     name = "ring_hash_lb_test",
     srcs = ["ring_hash_lb_test.cc"],
     extension_names = ["envoy.load_balancing_policies.ring_hash"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/router:router_interface",
         "//source/common/network:utility_lib",
@@ -33,6 +33,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
@@ -42,12 +43,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.ring_hash"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:priority_set_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg_cc_proto",
     ],
@@ -58,7 +60,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.ring_hash"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/ring_hash:config",
@@ -71,10 +73,11 @@ envoy_extension_cc_test(
 envoy_cc_benchmark_binary(
     name = "ring_hash_lb_benchmark",
     srcs = ["ring_hash_lb_benchmark.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/ring_hash:ring_hash_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 

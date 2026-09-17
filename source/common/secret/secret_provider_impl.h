@@ -9,6 +9,9 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/thread_local/thread_local_object.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Secret {
 
@@ -58,7 +61,12 @@ public:
   static absl::StatusOr<std::unique_ptr<ThreadLocalGenericSecretProvider>>
   create(GenericSecretConfigProviderSharedPtr&& provider, ThreadLocal::SlotAllocator& tls,
          Api::Api& api);
+  // Returns the value of a single-value generic secret, or an empty string when the secret was
+  // distributed as a multi-entry secret.
   const std::string& secret() const;
+  // Returns the value of the named entry of a multi-entry generic secret, or an empty string when
+  // no such entry is present.
+  const std::string& secret(absl::string_view name) const;
 
 protected:
   ThreadLocalGenericSecretProvider(GenericSecretConfigProviderSharedPtr&& provider,
@@ -67,9 +75,14 @@ protected:
 
 private:
   struct ThreadLocalSecret : public ThreadLocal::ThreadLocalObject {
-    explicit ThreadLocalSecret(const std::string& value) : value_(value) {}
+    ThreadLocalSecret(std::string value, absl::flat_hash_map<std::string, std::string> values)
+        : value_(std::move(value)), values_(std::move(values)) {}
     std::string value_;
+    absl::flat_hash_map<std::string, std::string> values_;
   };
+  // Reads the single value and any named entries from the current secret.
+  absl::Status read(std::string& value,
+                    absl::flat_hash_map<std::string, std::string>& values) const;
   absl::Status update();
   GenericSecretConfigProviderSharedPtr provider_;
   Api::Api& api_;

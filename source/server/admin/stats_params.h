@@ -68,6 +68,7 @@ struct StatsParams {
   HiddenFlag hidden_{HiddenFlag::Exclude};
   std::string filter_string_;
   std::shared_ptr<re2::RE2> re2_filter_;
+  bool filter_inverted_{false};
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::Unset};
   // If set, emit native histograms with at most this many buckets per histogram.
   std::optional<uint32_t> native_histogram_max_buckets_;
@@ -88,11 +89,13 @@ struct StatsParams {
       return false;
     }
 
-    if (re2_filter_ != nullptr && !re2::RE2::PartialMatch(metric.name(), *re2_filter_)) {
-      return false;
-    }
+    return !re2_filter_ || shouldShowMetricName(metric.name());
+  }
 
-    return true;
+  bool shouldShowMetricName(absl::string_view metric_name) const {
+    ASSERT(re2_filter_ != nullptr);
+    bool should_show = re2::RE2::PartialMatch(metric_name, *re2_filter_);
+    return should_show != filter_inverted_;
   }
 
   template <class StatType> bool shouldShowMetricWithoutFilter(const StatType& metric) const {

@@ -18,7 +18,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/ip_tagging/test_data:ip_tagging_files",
     ],
     extension_names = ["envoy.filters.http.ip_tagging"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
@@ -31,8 +31,10 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",
     ],
@@ -46,7 +48,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/ip_tagging/test_data:ip_tagging_files",
     ],
     extension_names = ["envoy.filters.http.ip_tagging"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/ip_tagging:config",
         "//test/integration:http_integration_lib",

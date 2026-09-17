@@ -43,7 +43,7 @@ involved and how Envoy plays a role, read the CNCF
 * [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-maintainers): Use this list
   to reach all core Envoy maintainers.
 * [Twitter](https://twitter.com/EnvoyProxy/): Follow along on Twitter!
-* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](https://communityinviter.com/apps/envoyproxy/envoy).
+* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](https://www.envoyproxy.io/slack).
   * NOTE: Response to user questions is best effort on Slack. For a "guaranteed" response please email
     envoy-users@ per the guidance in the following linked thread.
 
@@ -96,7 +96,7 @@ For further details please see our complete [security release process](SECURITY.
 
 ### ppc64le builds
 
-Builds for the ppc64le architecture or using aws-lc are not covered by the envoy security policy. The ppc64le architecture is currently best-effort and not maintained by the Envoy maintainers.
+Builds for the ppc64le architecture are not covered by the envoy security policy. The ppc64le architecture is currently best-effort and not maintained by the Envoy maintainers.
 
 [![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
 

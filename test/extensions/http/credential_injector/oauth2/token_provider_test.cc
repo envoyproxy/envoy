@@ -7,6 +7,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -92,7 +93,7 @@ TEST(TokenProvider, FetchFailureInjectsStaleTokenWhenNotExpired) {
   auto injector = std::make_shared<OAuth2ClientCredentialTokenInjector>(token_provider);
   Envoy::Http::TestRequestHeaderMapImpl headers;
   absl::Status status = injector->inject(headers, false);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_EQ(
       "Bearer valid-access-token",
       headers.get(Envoy::Http::CustomHeaders::get().Authorization)[0]->value().getStringView());

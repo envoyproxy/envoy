@@ -1,7 +1,11 @@
 #include "source/common/rds/rds_route_config_subscription.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/rds/util.h"
+#include "source/common/stats/prefix_utility.h"
+
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Rds {
@@ -22,6 +26,28 @@ absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>> RdsRouteConfigSubscr
   return ret;
 }
 
+namespace {
+
+// Creates the '<stat_prefix><rds type>.<route config name>.' scope of a subscription, with the
+// route config name carried by an explicit 'envoy.rds_route_config' tag rather than being
+// recovered from the stat name by a tag extractor.
+//
+// `stat_prefix` is the parent prefix alone, for example 'http.<stat_prefix>.', so that
+// mergeStatPrefix() can extract its tag; the type token this subscription contributes is derived
+// from `rds_type` and becomes part of the subscription's own name.
+Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view stat_prefix,
+                                       absl::string_view rds_type,
+                                       absl::string_view route_config_name) {
+  const std::string type_prefix = absl::StrCat(absl::AsciiStrToLower(rds_type), ".");
+  const Stats::TaggedStatName prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, type_prefix,
+                             {{Envoy::Config::TagNames::get().RDS_ROUTE_CONFIG, route_config_name}},
+                             absl::StrCat(type_prefix, route_config_name, "."));
+  return scope.scopeFromTaggedName(prefix.baseName(), prefix.tags(), prefix.name());
+}
+
+} // namespace
+
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     RouteConfigUpdatePtr&& config_update,
     Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
@@ -31,7 +57,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager,
     absl::Status& creation_status)
     : route_config_name_(route_config_name),
-      scope_(factory_context.scope().createScope(stat_prefix + route_config_name_ + ".")),
+      scope_(createStatsScope(factory_context.scope(), stat_prefix, rds_type, route_config_name_)),
       factory_context_(factory_context),
       parent_init_target_(
           fmt::format("RdsRouteConfigSubscription {} init {}", rds_type, route_config_name_),
@@ -60,9 +86,16 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
   local_init_manager_.add(local_init_target_);
+  // The receiver warms up the route configuration that it builds on every update and notifies this
+  // subscription once it's ready to be published.
+  config_update_info_->setObserver(*this);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
+  // To destroy the receiver to ensure it will never callback to this observer.
+  config_update_info_->setObserver({});
+  config_update_info_.reset();
+
   // If we get destroyed during initialization, make sure we signal that we "initialized".
   local_init_target_.ready();
 
@@ -80,7 +113,13 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     ENVOY_LOG(debug, "Missing {} RouteConfiguration for {} in onConfigUpdate()", rds_type_,
               route_config_name_);
     stats_.update_empty_.inc();
-    local_init_target_.ready();
+    // Don't signal readiness if a previous update is still warming up, that update publishes and
+    // signals readiness itself. An empty resource list doesn't invalidate it: it leaves the
+    // currently published route configuration in place.
+    if (!config_update_info_->configWarming()) {
+      config_update_info_->onRdsFailure();
+      local_init_target_.ready();
+    }
     return absl::OkStatus();
   }
   if (resources.size() != 1) {
@@ -107,26 +146,50 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     ENVOY_LOG(warn, "rds: route config '{}' rejected: {}", route_config_name_, msg);
     return absl::InvalidArgumentError(msg);
   }
-  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
-  std::unique_ptr<Cleanup> resume_rds;
-  if (config_update_info_->onRdsUpdate(route_config, version_info)) {
-    stats_.config_reload_.inc();
-    stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
+  // The new route configuration is built and warmed up by the receiver, which calls back into
+  // onConfigWarmed() to publish it. Note that this may happen before onRdsUpdate() returns, i.e.
+  // synchronously, if there is nothing to warm up.
+  RETURN_IF_NOT_OK(config_update_info_->onRdsUpdate(route_config, version_info));
 
-    RETURN_IF_NOT_OK(beforeProviderUpdate(noop_init_manager, resume_rds));
+  // If the update was applied and there was nothing to warm up, onConfigWarmed() has already
+  // signalled readiness, so this is a no-op. Otherwise signal it here, unless an update is still
+  // warming up - that one publishes and signals readiness itself.
+  if (!config_update_info_->configWarming()) {
+    local_init_target_.ready();
+  }
 
-    ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
-              config_update_info_->configHash());
+  return absl::OkStatus();
+}
 
-    if (route_config_provider_ != nullptr) {
-      RETURN_IF_NOT_OK(route_config_provider_->onConfigUpdate());
+void RdsRouteConfigSubscription::onConfigWarmed() {
+  stats_.config_reload_.inc();
+  stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
+
+  // None of the statuses below are propagated to the xDS layer: the route configuration is
+  // published regardless, and this is not necessarily running on the xDS update call stack, so
+  // there is nothing left to reject. A failure is only logged. See the comments on the hooks in
+  // the header and on RouteConfigProvider::onConfigUpdate().
+  if (const absl::Status status = beforeProviderUpdate(); !status.ok()) {
+    ENVOY_LOG(warn, "rds: beforeProviderUpdate() failed for route config '{}': {}",
+              route_config_name_, status.message());
+  }
+
+  ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
+            config_update_info_->configHash());
+
+  if (route_config_provider_ != nullptr) {
+    if (const absl::Status status = route_config_provider_->onConfigUpdate(); !status.ok()) {
+      ENVOY_LOG(warn, "rds: onConfigUpdate() failed for route config '{}': {}", route_config_name_,
+                status.message());
     }
+  }
 
-    RETURN_IF_NOT_OK(afterProviderUpdate());
+  if (const absl::Status status = afterProviderUpdate(); !status.ok()) {
+    ENVOY_LOG(warn, "rds: afterProviderUpdate() failed for route config '{}': {}",
+              route_config_name_, status.message());
   }
 
   local_init_target_.ready();
-  return absl::OkStatus();
 }
 
 absl::Status RdsRouteConfigSubscription::onConfigUpdate(
@@ -148,6 +211,9 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
 void RdsRouteConfigSubscription::onConfigUpdateFailed(
     Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException*) {
   ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
+  // Tell the receiver as well that the RDS subscription gave up to block the owning init manager
+  // and the parent (e.g. listener, filter chain) from waiting for a route configuration.
+  config_update_info_->onRdsFailure();
   // We need to allow server startup to continue, even if we have a bad
   // config.
   local_init_target_.ready();

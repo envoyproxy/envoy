@@ -10,11 +10,22 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "bridge_status_lib",
+    srcs = ["bridge_status.cc"],
+    hdrs = ["bridge_status.h"],
+    deps = [
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "mcp_json_rest_bridge_filter_lib",
     srcs = ["mcp_json_rest_bridge_filter.cc"],
     hdrs = ["mcp_json_rest_bridge_filter.h"],
     deps = [
+        ":bridge_status_lib",
         ":http_request_builder_lib",
+        ":sse_response_extractor_lib",
         ":trace_context_lib",
         "//envoy/common:optref_lib",
         "//envoy/http:filter_interface",
@@ -48,8 +59,10 @@ envoy_cc_library(
     srcs = ["http_request_builder.cc"],
     hdrs = ["http_request_builder.h"],
     deps = [
+        ":bridge_status_lib",
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
@@ -63,5 +76,17 @@ envoy_cc_library(
     deps = [
         "//source/common/tracing:tracing_validation_lib",
         "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
+    name = "sse_response_extractor_lib",
+    srcs = ["sse_response_extractor.cc"],
+    hdrs = ["sse_response_extractor.h"],
+    deps = [
+        "//source/common/http/sse:sse_parser_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
     ],
 )

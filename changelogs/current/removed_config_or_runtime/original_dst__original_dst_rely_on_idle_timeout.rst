@@ -1,0 +1,1 @@
+Removed the runtime guard ``envoy.reloadable_features.original_dst_rely_on_idle_timeout`` and the legacy code path it guarded. The original destination cluster now always checks whether hosts are in use by connection pools before removing them.

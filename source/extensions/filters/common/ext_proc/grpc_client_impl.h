@@ -56,7 +56,7 @@ public:
   }
 
   // AsyncStreamCallbacks
-  void onReceiveMessage(std::unique_ptr<ResponseType>&& message) override;
+  void onReceiveMessage(Grpc::ResponsePtr<ResponseType>&& message) override;
 
   // RawAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
@@ -67,6 +67,16 @@ public:
   StreamInfo::StreamInfo& streamInfo() override { return stream_.streamInfo(); }
 
   bool grpcSidestreamFlowControl() { return grpc_side_stream_flow_control_; }
+
+  ~ProcessorStreamImpl() override {
+    if (stream_closed_ || stream_ == nullptr) {
+      return;
+    }
+    // If the stream is still open for some reasons, close it now to avoid dangling reference at
+    // the underlying gRPC stream.
+    ENVOY_LOG(debug, "ProcessorStreamImpl::~ProcessorStreamImpl: stream is still open, closing");
+    close();
+  }
 
 private:
   // Private constructor only can be invoked within this class.
@@ -165,7 +175,7 @@ bool ProcessorStreamImpl<RequestType, ResponseType>::halfCloseAndDeleteOnRemoteC
 
 template <typename RequestType, typename ResponseType>
 void ProcessorStreamImpl<RequestType, ResponseType>::onReceiveMessage(
-    std::unique_ptr<ResponseType>&& response) {
+    Grpc::ResponsePtr<ResponseType>&& response) {
   if (!callbacks_.has_value()) {
     ENVOY_LOG(debug, "Underlying filter object has been destroyed.");
     return;

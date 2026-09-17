@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/logger.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
@@ -18,6 +19,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -26,10 +28,13 @@
 // Please see iam_roles_anywhere_test_generator.py in this directory to replicate these test cases
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::Eq;
 using testing::InvokeWithoutArgs;
 using testing::MockFunction;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -1205,7 +1210,7 @@ public:
 };
 
 TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, SignEmptyPayload) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
   auto mock_credentials_provider = std::make_shared<MockX509CredentialsProvider>();
 
@@ -1226,11 +1231,11 @@ TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, SignEmptyPayload) {
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
   status = roles_anywhere_signer->signEmptyPayload(headers, "ap-southeast-2");
   // Will fail because credentials are invalid
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
 }
 
 TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, SignUnsignedPayload) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
   auto mock_credentials_provider = std::make_shared<MockX509CredentialsProvider>();
   X509Credentials creds =
@@ -1250,7 +1255,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, SignUnsignedPayload) {
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
   status = roles_anywhere_signer->signUnsignedPayload(headers, "ap-southeast-2");
   // Will fail because credentials are invalid
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
   mock_credentials_provider.reset();
 }
 
@@ -1273,8 +1278,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, NoMethod) {
   headers.setPath("/");
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
   status = roles_anywhere_signer->signUnsignedPayload(headers, "ap-southeast-2");
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "Message is missing :method header");
+  EXPECT_THAT(status, HasStatusMessage("Message is missing :method header"));
 }
 
 TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, NoPath) {
@@ -1296,8 +1300,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, NoPath) {
   headers.setMethod("GET");
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
   status = roles_anywhere_signer->signUnsignedPayload(headers, "ap-southeast-2");
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "Message is missing :path header");
+  EXPECT_THAT(status, HasStatusMessage("Message is missing :path header"));
 }
 
 TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, NoCredentials) {
@@ -1318,9 +1321,8 @@ TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, NoCredentials) {
   headers.setPath("/");
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
   status = roles_anywhere_signer->signEmptyPayload(headers, "ap-southeast-2");
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(),
-            "Unable to sign IAM Roles Anywhere payload - no x509 credentials found");
+  EXPECT_THAT(status, HasStatusMessage(
+                          "Unable to sign IAM Roles Anywhere payload - no x509 credentials found"));
 }
 
 class ControlledCredentialsProvider : public CredentialsProvider {

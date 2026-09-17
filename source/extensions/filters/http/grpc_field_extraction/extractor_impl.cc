@@ -7,6 +7,7 @@
 
 #include "source/common/common/logger.h"
 
+#include "absl/strings/str_cat.h"
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_factory.h"
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_interface.h"
 
@@ -38,7 +39,15 @@ absl::Status ExtractorImpl::init(
   for (const auto& it : field_extractions.request_field_extractions()) {
     auto extractor_or_error = extractor_factory.Create(request_type_url, it.first);
     RETURN_IF_NOT_OK(extractor_or_error.status());
-    per_field_extractors_.emplace(it.first, std::move(extractor_or_error.value()));
+
+    const std::string& metadata_key =
+        it.second.metadata_key().empty() ? it.first : it.second.metadata_key();
+    PerFieldExtractor entry{it.first, std::move(extractor_or_error.value())};
+    if (!per_field_extractors_.emplace(metadata_key, std::move(entry)).second) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("multiple field extractions are configured for the dynamic metadata key `",
+                       metadata_key, "`"));
+    }
   }
   return absl::OkStatus();
 }
@@ -48,13 +57,12 @@ ExtractorImpl::processRequest(Protobuf::field_extraction::MessageData& message) 
 
   ExtractionResult result;
   for (const auto& it : per_field_extractors_) {
-    absl::StatusOr<Protobuf::Value> extracted_value = it.second->ExtractValue(message);
+    absl::StatusOr<Protobuf::Value> extracted_value = it.second.extractor->ExtractValue(message);
     if (!extracted_value.ok()) {
       return extracted_value.status();
     }
-
-    ENVOY_LOG_MISC(debug, "extracted the following resource values from the {} field: {}", it.first,
-                   extracted_value->DebugString());
+    ENVOY_LOG_MISC(debug, "extracted the following resource values from the {} field: {}",
+                   it.second.path, extracted_value->DebugString());
     result.push_back({it.first, std::move(*extracted_value)});
   }
 

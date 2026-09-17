@@ -154,7 +154,9 @@ TEST_F(ExecutionContextTest, InScopeTrackerScopeState) {
   EXPECT_EQ(context_->activationGenerations(), 1);
 
   setWithoutContext();
-  { ScopeTrackerScopeState scope(&tracked_object_, *dispatcher); }
+  {
+    ScopeTrackerScopeState scope(&tracked_object_, *dispatcher);
+  }
 }
 
 TEST_F(ExecutionContextTest, NoopScope) {

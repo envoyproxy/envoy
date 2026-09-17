@@ -212,9 +212,9 @@ static void bmRouteTableSize(benchmark::State& state, RouteMatch::PathSpecifierC
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config.
-  std::shared_ptr<ConfigImpl> config =
-      *ConfigImpl::create(genRouteConfig(state, match_type), factory_context,
-                          ProtobufMessage::getNullValidationVisitor(), true);
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      genRouteConfig(state, match_type), factory_context,
+      ProtobufMessage::getNullValidationVisitor(), factory_context.initManager(), true);
 
   for (auto _ : state) { // NOLINT
     // Do the actual timing here.
@@ -270,9 +270,9 @@ static void bmRouteTableSizeWithExactMatcherTree(benchmark::State& state) {
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config with matcher tree
-  std::shared_ptr<ConfigImpl> config =
-      *ConfigImpl::create(genMatcherTreeRouteConfig(state), factory_context,
-                          ProtobufMessage::getNullValidationVisitor(), true);
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      genMatcherTreeRouteConfig(state), factory_context,
+      ProtobufMessage::getNullValidationVisitor(), factory_context.initManager(), true);
 
   for (auto _ : state) {
     // Match against the last route in the config
@@ -299,9 +299,9 @@ static void bmRouteTableSizeWithPrefixMatcherTree(benchmark::State& state) {
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config with matcher tree
-  std::shared_ptr<ConfigImpl> config =
-      *ConfigImpl::create(genPrefixMatcherTreeRouteConfig(state), factory_context,
-                          ProtobufMessage::getNullValidationVisitor(), true);
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      genPrefixMatcherTreeRouteConfig(state), factory_context,
+      ProtobufMessage::getNullValidationVisitor(), factory_context.initManager(), true);
 
   for (auto _ : state) {
     // Match against the last route in the last shelf
@@ -366,7 +366,8 @@ static void bmPlainRoutes(benchmark::State& state) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
   std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
-      genPlainRouteConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(), true);
+      genPlainRouteConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(),
+      factory_context.initManager(), true);
   const std::string path = absl::StrCat("/api/v", n - 1, "/foo");
   Http::TestRequestHeaderMapImpl headers{{":authority", "www.example.com"},
                                          {":method", "GET"},
@@ -385,7 +386,8 @@ static void bmMixedRoutes(benchmark::State& state) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
   std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
-      genMixedRouteConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(), true);
+      genMixedRouteConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(),
+      factory_context.initManager(), true);
   Http::TestRequestHeaderMapImpl headers{{":authority", "www.example.com"},
                                          {":method", "GET"},
                                          {":path", "/api/foo?id=target"},
@@ -395,8 +397,50 @@ static void bmMixedRoutes(benchmark::State& state) {
   }
 }
 
+/**
+ * Route config with `n` virtual hosts, each keyed by a distinct exact lower-case FQDN domain. The
+ * benchmarked request authority matches the last virtual host, so route() exercises the
+ * findVirtualHost() host lower-casing path (unlike the wildcard-domain configs above, which take
+ * the default virtual host fast path and never lower-case the host).
+ */
+static RouteConfiguration genVirtualHostConfig(int n) {
+  RouteConfiguration route_config;
+  for (int i = 0; i < n; ++i) {
+    VirtualHost* v_host = route_config.add_virtual_hosts();
+    v_host->set_name(absl::StrCat("vhost_", i));
+    v_host->add_domains(absl::StrCat("service-", i, ".team.svc.cluster.local"));
+    Route* route = v_host->add_routes();
+    route->mutable_direct_response()->set_status(200);
+    route->mutable_match()->set_prefix("/");
+  }
+  return route_config;
+}
+
+// Benchmark virtual host lookup with an already-lower-case authority. The 30-plus byte authority
+// exceeds the std::string small-string-optimization capacity, so lower-casing it into a temporary
+// std::string was a heap allocation on every request before this optimization.
+static void bmVirtualHostLookup(benchmark::State& state) {
+  const int n = state.range(0);
+  Api::ApiPtr api = Api::createApiForTest();
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      genVirtualHostConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(),
+      factory_context.initManager(), true);
+  Http::TestRequestHeaderMapImpl headers{
+      {":authority", absl::StrCat("service-", n - 1, ".team.svc.cluster.local")},
+      {":method", "GET"},
+      {":path", "/"},
+      {"x-forwarded-proto", "http"}};
+  for (auto _ : state) { // NOLINT
+    config->route(headers, stream_info, 0);
+  }
+}
+
 BENCHMARK(bmPlainRoutes)->RangeMultiplier(2)->Ranges({{64, 2 << 10}});
 BENCHMARK(bmMixedRoutes)->RangeMultiplier(2)->Ranges({{64, 2 << 10}});
+BENCHMARK(bmVirtualHostLookup)->RangeMultiplier(2)->Ranges({{1, 2 << 9}});
 
 } // namespace
 } // namespace Router

@@ -27,7 +27,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = envoy_select_enable_http3(["integration_test.cc"]),
     extension_names = ["envoy.quic.connection_debug_visitor.quic_stats"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     deps = envoy_select_enable_http3([
         "//source/extensions/quic/connection_debug_visitor/quic_stats:config",
         "//test/integration:http_integration_lib",

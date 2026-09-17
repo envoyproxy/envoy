@@ -31,8 +31,12 @@ TEST_F(TestTimeSystemTest, SimThenRealConflict) {
 }
 
 TEST_F(TestTimeSystemTest, SimThenRealSerial) {
-  { SimulatedTimeSystem t1; }
-  { DangerousDeprecatedTestTime t2; }
+  {
+    SimulatedTimeSystem t1;
+  }
+  {
+    DangerousDeprecatedTestTime t2;
+  }
 }
 
 TEST_F(TestTimeSystemTest, RealThenSim) {
@@ -41,8 +45,12 @@ TEST_F(TestTimeSystemTest, RealThenSim) {
 }
 
 TEST_F(TestTimeSystemTest, RealThenSimSerial) {
-  { DangerousDeprecatedTestTime t2; }
-  { SimulatedTimeSystem t1; }
+  {
+    DangerousDeprecatedTestTime t2;
+  }
+  {
+    SimulatedTimeSystem t1;
+  }
 }
 
 } // namespace

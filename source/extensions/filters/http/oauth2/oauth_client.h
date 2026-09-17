@@ -66,6 +66,8 @@ public:
 
 class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::oauth2> {
 public:
+  // `uri` is owned by the filter config, which outlives the client, so it is referenced rather
+  // than copied: copying the proto message on every client creation is not free.
   OAuth2ClientImpl(Upstream::ClusterManager& cm, const HttpUri& uri,
                    Router::RetryPolicyConstSharedPtr retry_policy,
                    const std::chrono::seconds default_expires_in)
@@ -105,7 +107,7 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
 
   Upstream::ClusterManager& cm_;
-  const HttpUri uri_;
+  const HttpUri& uri_;
   const Router::RetryPolicyConstSharedPtr retry_policy_;
   const std::chrono::seconds default_expires_in_;
 

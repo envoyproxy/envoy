@@ -22,7 +22,7 @@ envoy_extension_cc_test(
         "envoy.compression.zstd.compressor",
         "envoy.compression.zstd.decompressor",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/compression/zstd/compressor:config",
         "//source/extensions/compression/zstd/decompressor:config",
@@ -30,6 +30,7 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

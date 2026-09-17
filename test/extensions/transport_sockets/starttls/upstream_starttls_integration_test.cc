@@ -12,11 +12,14 @@
 #include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.validate.h"
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/mocks/network/connection.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::NiceMock;
 
 // Simple filter for test purposes. This filter will be injected into the filter chain during
 // tests.
@@ -273,10 +276,9 @@ void StartTlsIntegrationTest::initialize() {
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
       downstream_tls_context, mock_factory_ctx, {}, false);
-  static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   tls_context_ = Network::DownstreamTransportSocketFactoryPtr{
       *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-          std::move(cfg), *tls_context_manager_, *client_stats_store->rootScope())};
+          std::move(cfg), *tls_context_manager_, server_factory_context_.serverScope())};
 
   BaseIntegrationTest::initialize();
 }

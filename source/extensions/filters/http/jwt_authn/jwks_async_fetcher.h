@@ -3,12 +3,13 @@
 #include <chrono>
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/init/manager.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/stats.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/init/target_impl.h"
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
-#include "source/extensions/filters/http/jwt_authn/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,16 +29,19 @@ using JwksDoneFetched = std::function<void(Envoy::JwtVerify::JwksPtr&& jwks)>;
 
 // This class handles fetching Jwks asynchronously.
 // It will be no-op if async_fetch is not enabled.
-// At its constructor, it will start to fetch Jwks, register with init_manager if not fast_listener.
-// and handle fetching response. When cache is expired, it will fetch again.
+// At its constructor, it will start to fetch Jwks, register with init_manager if one is provided
+// and fast_listener is not set, and handle fetching response. When cache is expired, it will
+// fetch again.
 // When a Jwks is fetched, done_fn is called to set the Jwks.
 class JwksAsyncFetcher : public Logger::Loggable<Logger::Id::jwt>,
                          public Common::JwksFetcher::JwksReceiver {
 public:
   JwksAsyncFetcher(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks,
                    Router::RetryPolicyConstSharedPtr retry_policy,
-                   Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
-                   JwtAuthnFilterStats& stats, JwksDoneFetched done_fn);
+                   Server::Configuration::ServerFactoryContext& context,
+                   OptRef<Init::Manager> init_manager, CreateJwksFetcherCb fetcher_fn,
+                   Stats::Counter& fetch_success, Stats::Counter& fetch_failed,
+                   JwksDoneFetched done_fn);
 
   // Get the remote Jwks cache duration.
   static std::chrono::seconds
@@ -58,11 +62,12 @@ private:
   // the parsed retry policy
   const Router::RetryPolicyConstSharedPtr retry_policy_;
   // the factory context
-  Server::Configuration::FactoryContext& context_;
+  Server::Configuration::ServerFactoryContext& context_;
   // the jwks fetcher creator function
   const CreateJwksFetcherCb create_fetcher_fn_;
-  // stats
-  JwtAuthnFilterStats& stats_;
+  // counters incremented on a successful and a failed fetch
+  Stats::Counter& fetch_success_;
+  Stats::Counter& fetch_failed_;
   // the Jwks done function.
   const JwksDoneFetched done_fn_;
 

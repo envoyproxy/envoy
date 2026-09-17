@@ -11,6 +11,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "benchmark/benchmark.h"
@@ -80,7 +81,7 @@ static void bmTlsInspector(benchmark::State& state) {
   Network::ListenerFilterBufferImpl buffer(
       socket.ioHandle(), dispatcher, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
       cfg->maxClientHelloSize() == 0, cfg->maxClientHelloSize());
-  EXPECT_TRUE(dispatcher.file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(dispatcher.file_event_callback_(Event::FileReadyType::Read));
 
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);

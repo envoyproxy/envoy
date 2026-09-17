@@ -55,7 +55,7 @@ absl::Duration SessionIdleList::MinTimeBeforeTerminationAllowed() const {
 
 void SessionIdleList::IdleSessions::AddSessionToList(MonotonicTime enqueue_time,
                                                      IdleSessionInterface& session) {
-  if (map_.find(&session) != map_.end()) {
+  if (map_.contains(&session)) {
     IS_ENVOY_BUG("Session is already on the idle list.");
     return;
   }

@@ -10,6 +10,13 @@
 namespace Envoy {
 namespace Thread {
 
+/**
+ * Returns the current thread's kernel thread ID (Linux) or pthread thread ID
+ * (Apple). The value is cached in a thread-local on first call, so subsequent
+ * calls are a pure TLS read.
+ */
+int64_t getCurrentThreadId();
+
 class ThreadHandle {
 public:
   ThreadHandle(std::function<void()> thread_routine, std::optional<int> thread_priority,

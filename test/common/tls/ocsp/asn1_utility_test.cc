@@ -2,6 +2,7 @@
 
 #include "source/common/tls/ocsp/asn1_utility.h"
 
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -14,6 +15,10 @@ namespace Tls {
 namespace Ocsp {
 
 namespace {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 class Asn1UtilityTest : public testing::Test {
 public:
@@ -41,7 +46,7 @@ public:
   void expectParseResultErrorOnWrongTag(std::function<absl::StatusOr<T>(CBS&)> parse) {
     CBS cbs;
     CBS_init(&cbs, asn1_true.data(), asn1_true.size());
-    EXPECT_FALSE(parse(cbs).status().ok());
+    EXPECT_THAT(parse(cbs).status(), Not(IsOk()));
   }
 
   const std::vector<uint8_t> asn1_true = {0x1u, 1, 0xff};
@@ -272,9 +277,8 @@ TEST_F(Asn1UtilityTest, ParseGeneralizedTimeWrongFormatErrorTest) {
   std::string invalid_time = "";
   CBS cbs;
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, invalid_time, CBS_ASN1_GENERALIZEDTIME));
-  EXPECT_FALSE(Asn1Utility::parseGeneralizedTime(cbs).status().ok());
-  EXPECT_EQ("Input is not a well-formed ASN.1 GENERALIZEDTIME",
-            Asn1Utility::parseGeneralizedTime(cbs).status().message());
+  EXPECT_THAT(Asn1Utility::parseGeneralizedTime(cbs),
+              HasStatusMessage("Error parsing string of GENERALIZEDTIME format"));
 }
 
 TEST_F(Asn1UtilityTest, ParseGeneralizedTimeTest) {

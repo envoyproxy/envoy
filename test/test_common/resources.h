@@ -21,6 +21,7 @@ public:
   const std::string RouteConfiguration{
       "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"};
   const std::string VirtualHost{"type.googleapis.com/envoy.config.route.v3.VirtualHost"};
+  const std::string FilterChain{"type.googleapis.com/envoy.config.listener.v3.FilterChain"};
   const std::string ScopedRouteConfiguration{
       "type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration"};
   const std::string Runtime{"type.googleapis.com/envoy.service.runtime.v3.Runtime"};

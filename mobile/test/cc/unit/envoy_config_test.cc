@@ -81,6 +81,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addDnsQueryTimeoutSeconds(321)
       .addH2ConnectionKeepaliveIdleIntervalMilliseconds(222)
       .addH2ConnectionKeepaliveTimeoutSeconds(333)
+      .setKeepAliveInitialIntervalMilliseconds(3500)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
       .addRuntimeGuard("quic_no_tcp_delay", true)
@@ -100,6 +101,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
       "connection_idle_interval { nanos: 222000000 }",
       "connection_keepalive { timeout { seconds: 333 }",
+      "initial_interval { seconds: 3 nanos: 500000000 }",
       "connection_options: \"AKDU,BWRS,5RTO,EVMB,10AF,MPQC\"",
       "client_connection_options: \"1RTT\"",
       "hostname: \"www.abc.com\"",
@@ -120,6 +122,15 @@ TEST(TestConfig, ConfigIsApplied) {
   for (const auto& string : must_contain) {
     EXPECT_THAT(config_str, HasSubstr(string)) << "'" << string << "' not found in " << config_str;
   }
+}
+
+TEST(TestConfig, SetKeepAliveInitialIntervalMilliseconds) {
+  EngineBuilder engine_builder;
+  engine_builder.setKeepAliveInitialIntervalMilliseconds(3000);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  const std::string config_str = bootstrap->ShortDebugString();
+  EXPECT_THAT(config_str, HasSubstr("initial_interval { seconds: 3 }"));
 }
 
 TEST(TestConfig, SameFlagMultiTimes) {

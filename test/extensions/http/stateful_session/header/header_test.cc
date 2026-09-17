@@ -13,7 +13,7 @@ namespace {
 
 TEST(HeaderBasedSessionStateFactoryTest, EmptyHeaderName) {
   HeaderBasedSessionStateProto config;
-  EXPECT_THROW_WITH_MESSAGE(std::make_shared<HeaderBasedSessionStateFactory>(config),
+  EXPECT_THROW_WITH_MESSAGE(std::ignore = std::make_shared<HeaderBasedSessionStateFactory>(config),
                             EnvoyException,
                             "Header name cannot be empty for header based stateful sessions")
 }

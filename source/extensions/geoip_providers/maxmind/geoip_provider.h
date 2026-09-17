@@ -1,18 +1,38 @@
 #pragma once
 
+#include <array>
+
 #include "envoy/common/platform.h"
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
 #include "envoy/geoip/geoip_provider_driver.h"
 
+#include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread_synchronizer.h"
 
+#include "absl/status/statusor.h"
 #include "maxminddb.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace GeoipProviders {
 namespace Maxmind {
+
+enum class GeoField {
+  Country,
+  City,
+  Region,
+  Asn,
+  AsnOrg,
+  Anon,
+  AnonVpn,
+  AnonHosting,
+  AnonTor,
+  AnonProxy,
+  Isp,
+  ApplePrivateRelay,
+  Count,
+};
 
 class GeoipProviderConfig {
 public:
@@ -25,27 +45,14 @@ public:
   const std::optional<std::string>& asnDbPath() const { return asn_db_path_; }
   const std::optional<std::string>& countryDbPath() const { return country_db_path_; }
 
-  bool isLookupEnabledForHeader(const std::optional<std::string>& header);
   bool isAsnDbPathSet() const { return asn_db_path_.has_value(); }
   bool isIspDbPathSet() const { return isp_db_path_.has_value(); }
   bool isCountryDbPathSet() const { return country_db_path_.has_value(); }
   bool isCityDbPathSet() const { return city_db_path_.has_value(); }
 
-  const std::optional<std::string>& countryHeader() const { return country_header_; }
-  const std::optional<std::string>& cityHeader() const { return city_header_; }
-  const std::optional<std::string>& regionHeader() const { return region_header_; }
-  const std::optional<std::string>& asnHeader() const { return asn_header_; }
-  const std::optional<std::string>& asnOrgHeader() const { return asn_org_header_; }
-
-  const std::optional<std::string>& anonHeader() const { return anon_header_; }
-  const std::optional<std::string>& anonVpnHeader() const { return anon_vpn_header_; }
-  const std::optional<std::string>& anonHostingHeader() const { return anon_hosting_header_; }
-  const std::optional<std::string>& anonTorHeader() const { return anon_tor_header_; }
-  const std::optional<std::string>& anonProxyHeader() const { return anon_proxy_header_; }
-
-  const std::optional<std::string>& ispHeader() const { return isp_header_; }
-  const std::optional<std::string>& applePrivateRelayHeader() const {
-    return apple_private_relay_header_;
+  // Returns the configured output key for the requested GeoIP field.
+  const std::optional<std::string>& fieldKey(GeoField field) const {
+    return field_keys_[enumToInt(field)];
   }
 
   void incLookupError(absl::string_view maxmind_db_type) {
@@ -88,24 +95,13 @@ private:
   std::optional<std::string> asn_db_path_;
   std::optional<std::string> country_db_path_;
 
-  std::optional<std::string> country_header_;
-  std::optional<std::string> city_header_;
-  std::optional<std::string> region_header_;
-  std::optional<std::string> asn_header_;
-  std::optional<std::string> asn_org_header_;
-
-  std::optional<std::string> anon_header_;
-  std::optional<std::string> anon_vpn_header_;
-  std::optional<std::string> anon_hosting_header_;
-  std::optional<std::string> anon_tor_header_;
-  std::optional<std::string> anon_proxy_header_;
-
-  std::optional<std::string> isp_header_;
-  std::optional<std::string> apple_private_relay_header_;
+  // Configured output key for each GeoField.
+  std::array<std::optional<std::string>, enumToInt(GeoField::Count)> field_keys_;
 
   Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName unknown_hit_;
+  void setFieldKey(GeoField field, const std::string& value);
   void incCounter(Stats::StatName name);
   void setGuage(Stats::StatName name, const uint64_t value);
 };
@@ -129,7 +125,7 @@ class GeoipProvider : public Envoy::Geolocation::Driver,
                       public Logger::Loggable<Logger::Id::geolocation> {
 
 public:
-  GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner,
+  GeoipProvider(Event::Dispatcher& dispatcher, Singleton::InstanceSharedPtr owner,
                 GeoipProviderConfigSharedPtr config);
 
   ~GeoipProvider() override;
@@ -147,11 +143,9 @@ private:
   MaxmindDbSharedPtr anon_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   MaxmindDbSharedPtr asn_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   MaxmindDbSharedPtr country_db_ ABSL_GUARDED_BY(mmdb_mutex_);
-  Thread::ThreadPtr mmdb_reload_thread_;
-  Event::DispatcherPtr mmdb_reload_dispatcher_;
   Filesystem::WatcherPtr mmdb_watcher_;
-  MaxmindDbSharedPtr initMaxmindDb(const std::string& db_path, const absl::string_view& db_type,
-                                   bool reload = false);
+  absl::StatusOr<MaxmindDbSharedPtr> initMaxmindDb(const std::string& db_path,
+                                                   absl::string_view db_type);
   void lookupInCityDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAsnDb(const Network::Address::InstanceConstSharedPtr& remote_address,
@@ -162,13 +156,9 @@ private:
                      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInCountryDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                          absl::flat_hash_map<std::string, std::string>& lookup_result) const;
-  absl::Status onMaxmindDbUpdate(const std::string& db_path, const absl::string_view& db_type);
-  absl::Status mmdbReload(const MaxmindDbSharedPtr reloaded_db, const absl::string_view& db_type)
+  absl::Status onMaxmindDbUpdate(const std::string& db_path, absl::string_view db_type);
+  absl::Status mmdbReload(MaxmindDbSharedPtr reloaded_db, absl::string_view db_type)
       ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-  template <typename... Params>
-  void populateGeoLookupResult(MMDB_lookup_result_s& mmdb_lookup_result,
-                               absl::flat_hash_map<std::string, std::string>& lookup_result,
-                               const std::string& result_key, Params... lookup_params) const;
   MaxmindDbSharedPtr getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);

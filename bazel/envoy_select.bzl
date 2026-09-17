@@ -148,40 +148,41 @@ def envoy_select_wasm_cpp_tests(xs):
 # and the ability to build tests using Proxy-Wasm Rust SDK on the current platform.
 def envoy_select_wasm_rust_tests(xs):
     return select({
-        "@envoy//bazel:wasm_disabled": [],
+        "@proxy-wasm-cpp-host//bazel:engine_disabled": [],
         "//conditions:default": xs,
     })
 
 # Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_v8(xs):
     return select({
-        "@envoy//bazel:wasm_v8": xs,
-        "@envoy//bazel:wasm_wamr": [],
-        "@envoy//bazel:wasm_wasmtime": [],
-        "@envoy//bazel:wasm_disabled": [],
-        "//conditions:default": xs,  # implicit default (v8)
+        "@proxy-wasm-cpp-host//bazel:engine_wamr_interp": [],
+        "@proxy-wasm-cpp-host//bazel:engine_wamr_jit": [],
+        "@proxy-wasm-cpp-host//bazel:engine_wasmtime": [],
+        "@proxy-wasm-cpp-host//bazel:engine_disabled": [],
+        "//conditions:default": xs,
     })
 
 # Selects True or False depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_v8_bool():
     return select({
-        "@envoy//bazel:wasm_v8": True,
-        "@envoy//bazel:wasm_wamr": False,
-        "@envoy//bazel:wasm_wasmtime": False,
-        "@envoy//bazel:wasm_disabled": False,
-        "//conditions:default": True,  # implicit default (v8)
+        "@proxy-wasm-cpp-host//bazel:engine_wamr_interp": False,
+        "@proxy-wasm-cpp-host//bazel:engine_wamr_jit": False,
+        "@proxy-wasm-cpp-host//bazel:engine_wasmtime": False,
+        "@proxy-wasm-cpp-host//bazel:engine_disabled": False,
+        "//conditions:default": True,
     })
 
 # Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_wamr(xs):
     return select({
-        "@envoy//bazel:wasm_wamr": xs,
+        "@proxy-wasm-cpp-host//bazel:engine_wamr_interp": xs,
+        "@proxy-wasm-cpp-host//bazel:engine_wamr_jit": xs,
         "//conditions:default": [],
     })
 
 # Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_wasmtime(xs):
     return select({
-        "@envoy//bazel:wasm_wasmtime": xs,
+        "@proxy-wasm-cpp-host//bazel:engine_wasmtime": xs,
         "//conditions:default": [],
     })

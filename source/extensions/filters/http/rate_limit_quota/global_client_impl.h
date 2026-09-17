@@ -37,7 +37,7 @@ using GrpcAsyncClient =
     Grpc::AsyncClient<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports,
                       envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
 using RateLimitQuotaResponsePtr =
-    std::unique_ptr<envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
+    Grpc::ResponsePtr<envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
 
 // Callbacks to trigger when the main thread finishes executing a queued
 // operation. Primarily used for testing.
@@ -63,7 +63,7 @@ public:
   // Note: rlqs_client is owned directly to ensure that it does not outlive the
   // GlobalRateLimitClientImpl (as the impl provides stream callbacks).
   GlobalRateLimitClientImpl(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                            Server::Configuration::FactoryContext& context,
+                            Server::Configuration::ServerFactoryContext& context,
                             absl::string_view domain_name,
                             std::chrono::milliseconds send_reports_interval,
                             ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
@@ -190,12 +190,12 @@ private:
  * thread via TLS.
  */
 inline absl::StatusOr<std::unique_ptr<GlobalRateLimitClientImpl>>
-createGlobalRateLimitClientImpl(Server::Configuration::FactoryContext& context,
+createGlobalRateLimitClientImpl(Server::Configuration::ServerFactoryContext& context,
                                 absl::string_view domain_name,
                                 std::chrono::milliseconds send_reports_interval,
                                 ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
                                 const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key) {
-  Envoy::Event::Dispatcher& main_dispatcher = context.serverFactoryContext().mainThreadDispatcher();
+  Envoy::Event::Dispatcher& main_dispatcher = context.mainThreadDispatcher();
   absl::Status creation_status = absl::OkStatus();
   auto client = std::make_unique<GlobalRateLimitClientImpl>(
       config_with_hash_key, context, domain_name, send_reports_interval, buckets_tls,

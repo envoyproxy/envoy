@@ -1,5 +1,6 @@
 #include <string>
 
+#include "source/common/stats/histogram_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/stat_sinks/dynamic_modules/flush_context.h"
 #include "source/extensions/stat_sinks/dynamic_modules/sink_config.h"
@@ -9,6 +10,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "circllhist.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -161,6 +163,150 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterOutOfRange) {
   EXPECT_EQ(999u, value_out);
   EXPECT_EQ(888u, delta_out);
   EXPECT_EQ('Z', name_buffer[0]);
+}
+
+// =============================================================================
+// Tag callbacks
+// =============================================================================
+
+TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterTagExtractedNameAndTags) {
+  c0_.name_ = "cluster.foo.rq_total";
+  c0_.setTagExtractedName("cluster.rq_total");
+  c0_.setTags({{"envoy.cluster_name", "foo"}, {"envoy.response_code", "200"}});
+  snapshot_.counters_.push_back({/*delta=*/1, c0_});
+
+  char name_buffer[256];
+  size_t name_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size));
+  EXPECT_EQ("cluster.rq_total", written(name_buffer, name_size, sizeof(name_buffer)));
+
+  size_t tag_count = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+      snapshotHandle(), 0, &tag_count));
+  EXPECT_EQ(2u, tag_count);
+
+  struct Expected {
+    const char* name;
+    const char* value;
+  } expected[] = {{"envoy.cluster_name", "foo"}, {"envoy.response_code", "200"}};
+  for (size_t i = 0; i < 2; i++) {
+    char tag_name[256];
+    char tag_value[256];
+    size_t tag_name_size = 0;
+    size_t tag_value_size = 0;
+    ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+        snapshotHandle(), 0, i, tag_name, sizeof(tag_name), &tag_name_size, tag_value,
+        sizeof(tag_value), &tag_value_size));
+    EXPECT_EQ(expected[i].name, written(tag_name, tag_name_size, sizeof(tag_name)));
+    EXPECT_EQ(expected[i].value, written(tag_value, tag_value_size, sizeof(tag_value)));
+  }
+}
+
+// A counter with no tags reports zero and no tag is readable.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterTagCountZero) {
+  c0_.name_ = "no_tags";
+  snapshot_.counters_.push_back({/*delta=*/1, c0_});
+
+  size_t tag_count = 12345;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+      snapshotHandle(), 0, &tag_count));
+  EXPECT_EQ(0u, tag_count);
+
+  char name_buffer[16];
+  char value_buffer[16];
+  size_t name_size = 0;
+  size_t value_size = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+      snapshotHandle(), 0, 0, name_buffer, sizeof(name_buffer), &name_size, value_buffer,
+      sizeof(value_buffer), &value_size));
+}
+
+// Out-of-range metric and tag indices return false without writing outputs.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterTagOutOfRange) {
+  c0_.name_ = "cluster.foo.rq_total";
+  c0_.setTags({{"envoy.cluster_name", "foo"}});
+  snapshot_.counters_.push_back({/*delta=*/1, c0_});
+
+  char name_buffer[256] = {'Z'};
+  char value_buffer[256] = {'Z'};
+  size_t name_size = 12345;
+  size_t value_size = 6789;
+  // Tag index past the end.
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+      snapshotHandle(), 0, 1, name_buffer, sizeof(name_buffer), &name_size, value_buffer,
+      sizeof(value_buffer), &value_size));
+  // Metric index past the end.
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+      snapshotHandle(), 5, 0, name_buffer, sizeof(name_buffer), &name_size, value_buffer,
+      sizeof(value_buffer), &value_size));
+  size_t tag_count = 42;
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+      snapshotHandle(), 5, &tag_count));
+  EXPECT_EQ(12345u, name_size);
+  EXPECT_EQ(6789u, value_size);
+  EXPECT_EQ(42u, tag_count);
+  EXPECT_EQ('Z', name_buffer[0]);
+}
+
+// Gauge and text-readout tag callbacks share the counter code path; a gauge spot check confirms
+// the wiring reaches the right snapshot collection.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetGaugeTagExtractedNameAndTags) {
+  g0_.name_ = "cluster.bar.cx_active";
+  g0_.setTagExtractedName("cluster.cx_active");
+  g0_.setTags({{"envoy.cluster_name", "bar"}});
+  snapshot_.gauges_.push_back(g0_);
+
+  char name_buffer[256];
+  size_t name_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size));
+  EXPECT_EQ("cluster.cx_active", written(name_buffer, name_size, sizeof(name_buffer)));
+
+  size_t tag_count = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(snapshotHandle(),
+                                                                                   0, &tag_count));
+  EXPECT_EQ(1u, tag_count);
+
+  char tag_name[256];
+  char tag_value[256];
+  size_t tag_name_size = 0;
+  size_t tag_value_size = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+      snapshotHandle(), 0, 0, tag_name, sizeof(tag_name), &tag_name_size, tag_value,
+      sizeof(tag_value), &tag_value_size));
+  EXPECT_EQ("envoy.cluster_name", written(tag_name, tag_name_size, sizeof(tag_name)));
+  EXPECT_EQ("bar", written(tag_value, tag_value_size, sizeof(tag_value)));
+}
+
+// The text-readout tag callbacks reach the third snapshot collection; a spot check confirms the
+// wiring, mirroring the gauge check above.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetTextReadoutTagExtractedNameAndTags) {
+  t0_.name_ = "control_plane.foo.identifier";
+  t0_.setTagExtractedName("control_plane.identifier");
+  t0_.setTags({{"envoy.control_plane", "foo"}});
+  snapshot_.text_readouts_.push_back(t0_);
+
+  char name_buffer[256];
+  size_t name_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size));
+  EXPECT_EQ("control_plane.identifier", written(name_buffer, name_size, sizeof(name_buffer)));
+
+  size_t tag_count = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+      snapshotHandle(), 0, &tag_count));
+  EXPECT_EQ(1u, tag_count);
+
+  char tag_name[256];
+  char tag_value[256];
+  size_t tag_name_size = 0;
+  size_t tag_value_size = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+      snapshotHandle(), 0, 0, tag_name, sizeof(tag_name), &tag_name_size, tag_value,
+      sizeof(tag_value), &tag_value_size));
+  EXPECT_EQ("envoy.control_plane", written(tag_name, tag_name_size, sizeof(tag_name)));
+  EXPECT_EQ("foo", written(tag_value, tag_value_size, sizeof(tag_value)));
 }
 
 // =============================================================================
@@ -373,6 +519,106 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetTextReadoutOutOfRange) {
   EXPECT_EQ(54321u, value_size);
   EXPECT_EQ('Z', name_buffer[0]);
   EXPECT_EQ('Y', value_buffer[0]);
+}
+
+// =============================================================================
+// Histogram callbacks
+// =============================================================================
+
+// Fixture that builds a histogram with known samples so its cumulative statistics (buckets, sum,
+// count) are populated the same way Envoy computes them for a flush.
+class DynamicModuleStatsSinkHistogramAbiTest : public DynamicModuleStatsSinkAbiTest {
+public:
+  DynamicModuleStatsSinkHistogramAbiTest() : histogram_(hist_alloc()) {}
+  ~DynamicModuleStatsSinkHistogramAbiTest() override { hist_free(histogram_); }
+
+  // Records samples and points the mock parent histogram's cumulative statistics at the resulting
+  // circllhist, then adds it to the snapshot under the given name.
+  void addHistogram(NiceMock<Stats::MockParentHistogram>& h, const std::string& name,
+                    const std::vector<uint64_t>& samples) {
+    for (uint64_t sample : samples) {
+      hist_insert_intscale(histogram_, sample, 0, 1);
+    }
+    stats_ = std::make_unique<Stats::HistogramStatisticsImpl>(histogram_);
+    h.name_ = name;
+    ON_CALL(h, cumulativeStatistics()).WillByDefault(ReturnRef(*stats_));
+    snapshot_.histograms_.push_back(h);
+  }
+
+  histogram_t* histogram_;
+  std::unique_ptr<Stats::HistogramStatisticsImpl> stats_;
+  NiceMock<Stats::MockParentHistogram> h0_;
+};
+
+TEST_F(DynamicModuleStatsSinkHistogramAbiTest, GetHistogramCountEmpty) {
+  EXPECT_EQ(0u,
+            envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(snapshotHandle()));
+}
+
+TEST_F(DynamicModuleStatsSinkHistogramAbiTest, GetHistogramValid) {
+  addHistogram(h0_, "latency", {1, 1, 3, 8});
+
+  EXPECT_EQ(1u,
+            envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(snapshotHandle()));
+
+  char name_buffer[256];
+  size_t name_size = 0;
+  uint64_t sample_count = 0;
+  double sample_sum = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size, &sample_count,
+      &sample_sum));
+  EXPECT_EQ("latency", written(name_buffer, name_size, sizeof(name_buffer)));
+  EXPECT_EQ(4u, sample_count);
+  // circllhist returns an approximate sum, so allow a small relative tolerance around 1+1+3+8.
+  EXPECT_NEAR(13.0, sample_sum, 0.5);
+}
+
+TEST_F(DynamicModuleStatsSinkHistogramAbiTest, GetHistogramBucketsAreCumulative) {
+  addHistogram(h0_, "latency", {1, 1, 3, 8});
+
+  const size_t bucket_count =
+      envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(snapshotHandle(),
+                                                                                  0);
+  EXPECT_EQ(Stats::HistogramSettingsImpl::defaultBuckets().size(), bucket_count);
+
+  // Cumulative counts are monotonic non-decreasing and the last bucket holds every sample.
+  uint64_t previous = 0;
+  uint64_t last = 0;
+  for (size_t i = 0; i < bucket_count; i++) {
+    double upper_bound = -1;
+    uint64_t cumulative_count = 0;
+    ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+        snapshotHandle(), 0, i, &upper_bound, &cumulative_count));
+    EXPECT_EQ(Stats::HistogramSettingsImpl::defaultBuckets()[i], upper_bound);
+    EXPECT_GE(cumulative_count, previous);
+    previous = cumulative_count;
+    last = cumulative_count;
+  }
+  EXPECT_EQ(4u, last);
+}
+
+TEST_F(DynamicModuleStatsSinkHistogramAbiTest, GetHistogramOutOfRange) {
+  addHistogram(h0_, "latency", {1});
+
+  char name_buffer[256] = {'Z'};
+  size_t name_size = 12345;
+  uint64_t sample_count = 999;
+  double sample_sum = 9.0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+      snapshotHandle(), 1, name_buffer, sizeof(name_buffer), &name_size, &sample_count,
+      &sample_sum));
+  EXPECT_EQ(12345u, name_size);
+
+  // An out-of-range histogram index yields no buckets, and a bucket read fails without writing.
+  EXPECT_EQ(0u, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
+                    snapshotHandle(), 1));
+  double upper_bound = -1;
+  uint64_t cumulative_count = 42;
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+      snapshotHandle(), 0, 99999, &upper_bound, &cumulative_count));
+  EXPECT_EQ(-1, upper_bound);
+  EXPECT_EQ(42u, cumulative_count);
 }
 
 // =============================================================================

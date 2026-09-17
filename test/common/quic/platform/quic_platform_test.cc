@@ -146,10 +146,14 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
-#if !defined(ENVOY_CONFIG_COVERAGE) && !defined(GCC_COMPILER)
+#if !defined(ENVOY_CONFIG_COVERAGE) && !defined(GCC_COMPILER) &&                                   \
+    !(defined(__s390x__) && defined(NDEBUG))
   // This doesn't work in coverage build because part of the stacktrace will be overwritten by
   // __llvm_coverage_mapping
   // Stack trace under gcc with optimizations on (-c opt) doesn't include the test name
+  // On s390x, backtrace_symbols in Clang optimized builds (-c opt, which sets NDEBUG) omits frame
+  // pointers, so QuicStackTrace() cannot resolve the test name. The test still runs in
+  // debug mode on s390x where frame information is preserved.
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 #endif
 }
@@ -186,7 +190,9 @@ TEST_F(QuicPlatformTest, DISABLED_QuicThread) {
   int value = 0;
 
   // A QuicThread that is never started, which is ok.
-  { AdderThread t0(&value, 1); }
+  {
+    AdderThread t0(&value, 1);
+  }
   EXPECT_EQ(0, value);
 
   // A QuicThread that is started and joined as usual.
@@ -478,7 +484,9 @@ protected:
   void addFiles(std::list<std::string> files) {
     for (const std::string& file_name : files) {
       const std::string full_path = dir_path_ + "/" + file_name;
-      { const std::ofstream file(full_path); }
+      {
+        const std::ofstream file(full_path);
+      }
       files_to_remove_.push(full_path);
     }
   }

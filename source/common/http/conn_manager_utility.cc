@@ -523,6 +523,14 @@ void appendXfccJsonObject(
         }
         break;
       }
+      case ClientCertDetailsType::Issuer: {
+        const std::string& issuer = connection.ssl()->issuerPeerCertificate();
+        if (!issuer.empty()) {
+          root->addKey("issuer");
+          root->addString(issuer);
+        }
+        break;
+      }
       }
     }
   }
@@ -641,6 +649,11 @@ void applyForwardClientCertConfig(
           }
           break;
         }
+        case ClientCertDetailsType::Issuer:
+          // The "Issuer" key still exists even if the issuer is empty.
+          client_cert_details.push_back(
+              absl::StrCat("Issuer=\"", connection.ssl()->issuerPeerCertificate(), "\""));
+          break;
         }
       }
       client_cert_details_str = absl::StrJoin(client_cert_details, ";");

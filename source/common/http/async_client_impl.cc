@@ -21,19 +21,11 @@ namespace Http {
 const absl::string_view AsyncClientImpl::ResponseBufferLimit = "http.async_response_buffer_limit";
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
-                                 Stats::Store& stats_store, Event::Dispatcher& dispatcher,
-                                 Upstream::ClusterManager& cm,
-                                 Server::Configuration::CommonFactoryContext& factory_context,
-                                 Router::ShadowWriterPtr&& shadow_writer,
-                                 Http::Context& http_context, Router::Context& router_context)
-    : factory_context_(factory_context), cluster_(cluster),
-      config_(std::make_shared<Router::FilterConfig>(
-          factory_context, http_context.asyncClientStatPrefix(), *stats_store.rootScope(), cm,
-          factory_context.runtime(), factory_context.api().randomGenerator(),
-          std::move(shadow_writer), true, false, false, false, false, false, false,
-          Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(), http_context,
-          router_context)),
-      dispatcher_(dispatcher), local_reply_(LocalReply::Factory::createDefault()) {}
+                                 Event::Dispatcher& dispatcher,
+                                 Router::FilterConfigSharedPtr config)
+    : factory_context_(config->factory_context_), cluster_(std::move(cluster)),
+      config_(std::move(config)), dispatcher_(dispatcher),
+      local_reply_(LocalReply::Factory::createDefault()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -108,15 +100,11 @@ createRetryPolicy(const AsyncClient::StreamOptions& options,
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options,
                                  absl::Status& creation_status)
-    : parent_(parent),
-
-      discard_response_body_(options.discard_response_body),
-      new_async_client_retry_logic_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_async_client_retry_respect_buffer_limits")),
+    : parent_(parent), discard_response_body_(options.discard_response_body),
       buffer_limit_(options.buffer_limit_), stream_callbacks_(callbacks),
       stream_id_(parent.config_->random_.random()),
       router_(options.filter_config_ ? options.filter_config_ : parent.config_,
-              parent.config_->async_stats_),
+              parent.config_->default_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr,
                    options.filter_state != nullptr
                        ? options.filter_state
@@ -264,21 +252,6 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
   // parallels handling in the main Http::ConnectionManagerImpl as well.
   if (local_closed_) {
     return;
-  }
-
-  if (!new_async_client_retry_logic_) {
-    if (buffered_body_ != nullptr) {
-      // TODO(shikugawa): Currently, data is dropped when the retry buffer overflows and there is no
-      // ability implement any error handling. We need to implement buffer overflow handling in the
-      // future. Options include configuring the max buffer size, or for use cases like gRPC
-      // streaming, deleting old data in the retry buffer.
-      if (buffered_body_->length() + data.length() > kDefaultDecoderBufferLimit) {
-        ENVOY_LOG_EVERY_POW_2(
-            warn, "the buffer size limit (64KB) for async client retries has been exceeded.");
-      } else {
-        buffered_body_->add(data);
-      }
-    }
   }
 
   if (router_.awaitingHost()) {

@@ -13,7 +13,7 @@ envoy_package()
 envoy_cc_test(
     name = "orca_load_metrics_test",
     srcs = ["orca_load_metrics_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/upstream:upstream_lib",
@@ -29,7 +29,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "orca_parser_test",
     srcs = ["orca_parser_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/orca:orca_parser",
@@ -55,7 +55,7 @@ envoy_cc_fuzz_test(
     name = "orca_parser_fuzz_test",
     srcs = ["orca_parser_fuzz_test.cc"],
     corpus = "orca_parser_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":orca_parser_fuzz_proto_cc_proto",
         "//source/common/common:base64_lib",

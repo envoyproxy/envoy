@@ -14,6 +14,7 @@
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -424,9 +425,9 @@ protected:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(factory_.server_context_.xds_manager_.subscription_factory_.callbacks_
-                    ->onConfigUpdate(decoded_resources.refvec_, {}, "")
-                    .ok());
+    EXPECT_OK(
+        factory_.server_context_.xds_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+            decoded_resources.refvec_, {}, ""));
   }
 
   void addEndpoint(envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment,

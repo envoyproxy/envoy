@@ -12,6 +12,8 @@
 namespace Envoy {
 namespace Ssl {
 
+struct TlsContext;
+
 using CertificateDetailsPtr = std::unique_ptr<envoy::admin::v3::CertificateDetails>;
 
 /**
@@ -45,7 +47,14 @@ public:
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 
-class ClientContext : public virtual Context {};
+class ClientContext : public virtual Context {
+public:
+  /**
+   * @return the TLS context, which holds the certificate material of this context. Client
+   * contexts always have exactly one TLS context.
+   */
+  virtual const TlsContext& getTlsContext() const PURE;
+};
 using ClientContextSharedPtr = std::shared_ptr<ClientContext>;
 
 class ServerContext : public virtual Context {};

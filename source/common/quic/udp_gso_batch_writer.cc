@@ -2,6 +2,7 @@
 
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -45,17 +46,35 @@ UdpGsoBatchWriter::UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope&
 Api::IoCallUint64Result
 UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
                                const Network::Address::Instance& peer_address) {
+  const size_t payload_len = static_cast<size_t>(buffer.length());
+
+  if (payload_len == 0 &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_send_zero_length_datagrams")) {
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  // A zero-length datagram cannot share a GSO batch: it contributes no segment bytes and would be
+  // consumed without being emitted. Flush older packets first to preserve datagram ordering.
+  if (payload_len == 0 && !buffered_writes().empty()) {
+    quic::WriteResult flush_result = Flush();
+    updateUdpGsoBatchWriterStats(flush_result);
+    if (flush_result.status != quic::WRITE_STATUS_OK) {
+      return convertQuicWriteResult(flush_result, /*payload_len=*/0);
+    }
+  }
+
   // Convert received parameters to relevant forms
   quic::QuicSocketAddress peer_addr = envoyIpAddressToQuicSocketAddress(peer_address.ip());
   quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(local_ip);
-  ASSERT(buffer.getRawSlices().size() == 1);
-  size_t payload_len = static_cast<size_t>(buffer.frontSlice().len_);
+  ASSERT(payload_len == 0 || buffer.getRawSlices().size() == 1);
+  char empty_payload = 0;
+  const char* payload =
+      payload_len == 0 ? &empty_payload : static_cast<char*>(buffer.frontSlice().mem_);
 
   // TODO(yugant): Currently we do not use PerPacketOptions with Quic, we may want to
   // specify this parameter here at a later stage.
   quic::QuicPacketWriterParams params;
-  quic::WriteResult quic_result = WritePacket(static_cast<char*>(buffer.frontSlice().mem_),
-                                              payload_len, self_addr.host(), peer_addr,
+  quic::WriteResult quic_result = WritePacket(payload, payload_len, self_addr.host(), peer_addr,
                                               /*quic::PerPacketOptions=*/nullptr, params);
   updateUdpGsoBatchWriterStats(quic_result);
 

@@ -46,9 +46,14 @@ using ValueType = envoy::extensions::filters::http::json_to_metadata::v3::JsonTo
  * Data structure to store one rule.
  */
 struct Rule {
-  Rule(const ProtoRule& rule);
+  static absl::StatusOr<Rule> create(const ProtoRule& rule);
+
+  Rule(Rule&&) = default;
   const ProtoRule rule_;
   std::vector<std::string> keys_;
+
+private:
+  Rule(const ProtoRule& rule);
 };
 
 using Rules = std::vector<Rule>;
@@ -79,7 +84,7 @@ private:
       absl::Status& creation_status);
 
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
-  Rules generateRules(const ProtobufRepeatedRule& proto_rule) const;
+  absl::StatusOr<Rules> generateRules(const ProtobufRepeatedRule& proto_rule) const;
   JsonToMetadataStats rqstats_;
   JsonToMetadataStats respstats_;
   const Rules request_rules_;

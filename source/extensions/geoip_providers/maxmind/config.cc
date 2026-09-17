@@ -7,6 +7,9 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/geoip_providers/maxmind/geoip_provider.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/synchronization/mutex.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace GeoipProviders {
@@ -25,21 +28,28 @@ public:
   std::shared_ptr<GeoipProvider> get(std::shared_ptr<DriverSingleton> singleton,
                                      const ConfigProto& proto_config,
                                      const std::string& stat_prefix,
-                                     Server::Configuration::FactoryContext& context) {
-    std::shared_ptr<GeoipProvider> driver;
+                                     Server::Configuration::ServerFactoryContext& context) {
     const uint64_t key = MessageUtil::hash(proto_config);
     absl::MutexLock lock(mu_);
     auto it = drivers_.find(key);
     if (it != drivers_.end()) {
-      driver = it->second.lock();
-    } else {
-      const auto& provider_config =
-          std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.scope());
-      driver = std::make_shared<GeoipProvider>(
-          context.serverFactoryContext().mainThreadDispatcher(),
-          context.serverFactoryContext().api(), singleton, provider_config);
-      drivers_[key] = driver;
+      // The map holds weak_ptrs, so a present entry may refer to a provider that has already been
+      // destroyed. Only reuse it if it is still alive; otherwise fall through and build a new one.
+      std::shared_ptr<GeoipProvider> driver = it->second.lock();
+      if (driver != nullptr) {
+        return driver;
+      }
     }
+    // Nothing prunes the map on provider destruction, so drop the expired entries before adding
+    // another one. Otherwise it grows without bound across config updates that change the provider
+    // config, since every distinct config hashes to a new key.
+    absl::erase_if(drivers_, [](const auto& entry) { return entry.second.expired(); });
+
+    const auto provider_config =
+        std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.scope());
+    std::shared_ptr<GeoipProvider> driver =
+        std::make_shared<GeoipProvider>(context.mainThreadDispatcher(), singleton, provider_config);
+    drivers_[key] = driver;
     return driver;
   }
 
@@ -58,11 +68,10 @@ MaxmindProviderFactory::MaxmindProviderFactory() : FactoryBase("envoy.geoip_prov
 
 DriverSharedPtr MaxmindProviderFactory::createGeoipProviderDriverTyped(
     const ConfigProto& proto_config, const std::string& stat_prefix,
-    Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<DriverSingleton> drivers =
-      context.serverFactoryContext().singletonManager().getTyped<DriverSingleton>(
-          SINGLETON_MANAGER_REGISTERED_NAME(maxmind_geolocation_provider_singleton),
-          [] { return std::make_shared<DriverSingleton>(); });
+    Server::Configuration::ServerFactoryContext& context) {
+  std::shared_ptr<DriverSingleton> drivers = context.singletonManager().getTyped<DriverSingleton>(
+      SINGLETON_MANAGER_REGISTERED_NAME(maxmind_geolocation_provider_singleton),
+      [] { return std::make_shared<DriverSingleton>(); });
   return drivers->get(drivers, proto_config, stat_prefix, context);
 }
 

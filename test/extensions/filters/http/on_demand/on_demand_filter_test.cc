@@ -242,34 +242,6 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStream) {
   filter_->onRouteConfigUpdateCompletion(true);
 }
 
-// Tests onRouteConfigUpdateCompletion() with the on_demand_track_end_stream flag disabled
-// (old behavior: stream recreation is gated on the absence of a decoding buffer).
-TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamOldBehavior) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.on_demand_track_end_stream", "false"}});
-  Http::TestRequestHeaderMapImpl headers;
-  filter_->decodeHeaders(headers, true);
-  // No decoding buffer, so the stream can be recreated.
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
-  filter_->onRouteConfigUpdateCompletion(true);
-}
-
-// Tests onClusterDiscoveryCompletion() with the on_demand_track_end_stream flag disabled
-// (old behavior: stream recreation is gated on the absence of a decoding buffer).
-TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundOldBehavior) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"},
-       {"envoy.reloadable_features.on_demand_track_end_stream", "false"}});
-  Http::TestRequestHeaderMapImpl headers;
-  filter_->decodeHeaders(headers, true);
-  // No decoding buffer, so the stream can be recreated.
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
-  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
-}
-
 // tests onClusterDiscoveryCompletion when a cluster is missing
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterNotFound) {
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);

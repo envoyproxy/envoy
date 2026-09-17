@@ -395,7 +395,7 @@ private:
   // the class will no longer need to extend the interface, and these can be removed.
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override { PANIC("not implemented"); }
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override { PANIC("not implemented"); }
-  void onReceiveMessage(std::unique_ptr<ResponseType>&&) override { PANIC("not implemented"); }
+  void onReceiveMessage(Grpc::ResponsePtr<ResponseType>&&) override { PANIC("not implemented"); }
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {
     PANIC("not implemented");
   }

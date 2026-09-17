@@ -8,18 +8,25 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ApiKeyAuth {
 
-absl::StatusOr<Http::FilterFactoryCb> ApiKeyAuthFilterFactory::createFilterFactoryFromProtoTyped(
-    const ApiKeyAuthProto& proto_config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-
+absl::StatusOr<Http::FilterFactoryCb>
+ApiKeyAuthFilterFactory::createFilterFactory(const ApiKeyAuthProto& proto_config,
+                                             const std::string& stats_prefix, Stats::Scope& scope) {
   absl::Status status = absl::OkStatus();
   FilterConfigSharedPtr config =
-      std::make_shared<FilterConfig>(proto_config, context.scope(), stats_prefix, status);
+      std::make_shared<FilterConfig>(proto_config, scope, stats_prefix, status);
   RETURN_IF_NOT_OK_REF(status);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<ApiKeyAuthFilter>(config));
   };
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+ApiKeyAuthFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const ApiKeyAuthProto& proto_config, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactory(proto_config, extra_context.stats_prefix,
+                             extra_context.scopeOr(context));
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

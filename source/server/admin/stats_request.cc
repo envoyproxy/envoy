@@ -206,11 +206,10 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
     // stat->name() takes a symbol table lock and builds a string, so we only
     // want to call it once.
     //
-    // This duplicates logic in shouldShowMetric in `StatsParams`, but
-    // differs in that Prometheus only uses stat->name() for filtering, not
-    // rendering, so it only grab the name if there's a filter.
+    // Differs in that Prometheus only uses stat->name() for filtering, not
+    // rendering, so it only grabs the name if there's a filter.
     std::string name = stat->name();
-    if (params_.re2_filter_ != nullptr && !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
+    if (params_.re2_filter_ && !params_.shouldShowMetricName(name)) {
       return true;
     }
     stat_map_[name] = stat;

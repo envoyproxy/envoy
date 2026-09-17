@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
     extension_names = ["envoy.filters.udp.session.ext_authz"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters/ext_authz:config",
@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/udp/udp_proxy:mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/session/ext_authz/v3:pkg_cc_proto",
     ],
 )
@@ -32,7 +33,7 @@ envoy_extension_cc_test(
     name = "ext_authz_integration_test",
     srcs = ["ext_authz_integration_test.cc"],
     extension_names = ["envoy.filters.udp.session.ext_authz"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/ext_authz:config",

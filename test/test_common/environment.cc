@@ -1,5 +1,7 @@
 #include "test/test_common/environment.h"
 
+#include <sys/stat.h>
+
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -34,6 +36,7 @@
 #include "absl/debugging/symbolize.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
@@ -94,6 +97,7 @@ std::string getTemporaryDirectory() {
 // Allow initializeOptions() to remember CLI args for getOptions().
 int argc_;
 char** argv_;
+std::string main_workspace_;
 
 } // namespace
 
@@ -298,18 +302,51 @@ const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
+namespace {
+// Returns the canonical repository name for Envoy's own runfiles. Resolution order:
+// 1. main_workspace_ if set via TestEnvironment::setMainWorkspace()
+// 2. BAZEL_CURRENT_REPOSITORY as expanded while compiling environment.cc
+// 3. the TEST_WORKSPACE env var, which names the root module/repository
+// 4. fall back to "envoy" for non-test contexts (e.g. bazel run)
+std::string resolveMainWorkspace() {
+  if (!main_workspace_.empty()) {
+    return main_workspace_;
+  }
+#ifdef BAZEL_CURRENT_REPOSITORY
+  if (BAZEL_CURRENT_REPOSITORY[0] != '\0') {
+    return BAZEL_CURRENT_REPOSITORY;
+  }
+#endif
+  const auto env_val = TestEnvironment::getOptionalEnvVar("TEST_WORKSPACE");
+  if (env_val.has_value() && !env_val->empty()) {
+    return *env_val;
+  }
+  return "envoy";
+}
+} // namespace
+
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
-  auto path = runfiles_->Rlocation(workspace);
+  // When workspace is empty the caller wants a main-repo path. Resolve the
+  // correct canonical name (e.g. "_main" under bzlmod, "envoy" under WORKSPACE)
+  // rather than hardcoding "envoy", which does not exist in the repo mapping
+  // when Envoy is the root bzlmod module. Explicit non-empty workspace values
+  // (e.g. external repo apparent names like "aws-c-auth-testdata") are passed
+  // through unchanged so that Bazel repo mapping can resolve them normally.
+  const std::string effective_workspace = workspace.empty() ? resolveMainWorkspace() : workspace;
+  auto path = runfiles_->Rlocation(effective_workspace);
+  RELEASE_ASSERT(!path.empty(),
+                 absl::StrCat("runfiles path not found for workspace: ", effective_workspace));
 #ifdef WIN32
-  path = std::regex_replace(path, std::regex("\\\\"), "/");
+  path = absl::StrReplaceAll(path, {{"\\", "/"}});
 #endif
   return path;
 }
 
 std::string TestEnvironment::runfilesPath(const std::string& path, const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
-  return runfiles_->Rlocation(absl::StrCat(workspace, "/", path));
+  const std::string effective_workspace = workspace.empty() ? resolveMainWorkspace() : workspace;
+  return runfiles_->Rlocation(absl::StrCat(effective_workspace, "/", path));
 }
 
 const std::string TestEnvironment::unixDomainSocketDirectory() {
@@ -489,6 +526,10 @@ void TestEnvironment::unsetEnvVar(const std::string& name) {
 }
 
 void TestEnvironment::setRunfiles(Runfiles* runfiles) { runfiles_ = runfiles; }
+
+void TestEnvironment::setMainWorkspace(absl::string_view workspace) {
+  main_workspace_ = std::string(workspace);
+}
 
 Runfiles* TestEnvironment::runfiles_{};
 

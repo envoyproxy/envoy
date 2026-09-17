@@ -55,7 +55,7 @@ public:
     }
   }
   bool allowed(const std::string& sha256_digest) const {
-    return allowed_sha256_digests_.count(sha256_digest) != 0;
+    return allowed_sha256_digests_.contains(sha256_digest);
   }
   size_t size() const { return allowed_sha256_digests_.size(); }
 
@@ -98,7 +98,7 @@ private:
   void onFetchComplete() override {}
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   std::unique_ptr<Network::Address::IpList> ip_allowlist_;
   GlobalStats stats_;
 };

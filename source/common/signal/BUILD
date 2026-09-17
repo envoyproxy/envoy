@@ -34,6 +34,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "non_fatal_signal_handler_lib",
+    srcs = ["non_fatal_signal_handler.cc"],
+    hdrs = ["non_fatal_signal_handler.h"],
+    tags = ["backtrace"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "fatal_action_lib",
     hdrs = ["fatal_action.h"],
     deps = [

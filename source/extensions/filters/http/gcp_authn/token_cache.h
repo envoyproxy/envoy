@@ -58,8 +58,8 @@ private:
 
 struct TokenCache {
   TokenCache(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& cache_config,
-             Envoy::Server::Configuration::FactoryContext& context)
-      : tls(context.serverFactoryContext().threadLocal()) {
+             Envoy::Server::Configuration::ServerFactoryContext& context)
+      : tls(context.threadLocal()) {
     tls.set([cache_config](Envoy::Event::Dispatcher& dispatcher) {
       return std::make_shared<ThreadLocalCache>(cache_config, dispatcher.timeSource());
     });

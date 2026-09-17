@@ -14,6 +14,7 @@
 #include "test/mocks/server/listener_manager.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -152,7 +153,7 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
   ;
   EXPECT_CALL(init_watcher_, ready());
 
-  EXPECT_TRUE(lds_callbacks_->onConfigUpdate({}, "").ok());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate({}, ""));
 }
 
 TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
@@ -246,8 +247,7 @@ TEST_F(LdsApiTest, Basic) {
   EXPECT_CALL(init_watcher_, ready());
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
-  EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
 
   EXPECT_EQ("0", lds_->versionInfo());
 
@@ -280,8 +280,7 @@ TEST_F(LdsApiTest, Basic) {
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
-  EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
   EXPECT_EQ("1", lds_->versionInfo());
 }
 
@@ -314,8 +313,7 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
   EXPECT_CALL(init_watcher_, ready());
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
-  EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
 
   EXPECT_EQ("0", lds_->versionInfo());
 
@@ -333,8 +331,7 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
-  EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
   EXPECT_EQ("1", lds_->versionInfo());
 }
 
@@ -366,8 +363,7 @@ resources:
   EXPECT_CALL(init_watcher_, ready());
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
-  EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
 
   constexpr absl::string_view response2_basic = R"EOF(
 version_info: '1'
@@ -406,8 +402,8 @@ resources:
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
-  EXPECT_NO_THROW(EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok()));
+  EXPECT_NO_THROW(EXPECT_OK(
+      lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info())));
 }
 
 // Validate behavior when the config fails delivery at the subscription level.
@@ -455,8 +451,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   EXPECT_CALL(init_watcher_, ready());
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
-  EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
 
   EXPECT_EQ("0", lds_->versionInfo());
 
@@ -489,8 +484,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
-  EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
 }
 
 } // namespace

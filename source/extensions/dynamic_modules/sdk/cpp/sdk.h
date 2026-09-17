@@ -8,10 +8,13 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <source_location>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "sdk_common.h"
 
 namespace Envoy {
 namespace DynamicModules {
@@ -246,7 +249,9 @@ enum class AttributeID : uint32_t {
   XdsVirtualHostMetadata,
   XdsUpstreamHostMetadata,
   XdsFilterChainName,
-  HealthCheck
+  HealthCheck,
+  UpstreamRequestedServerName,
+  XdsVirtualClusterName
 };
 
 enum class LogLevel : uint32_t { Trace, Debug, Info, Warn, Error, Critical, Off };
@@ -350,6 +355,11 @@ struct ClusterHostCounts {
 
 class ChildSpan;
 
+/**
+ * A tracing span for the current HTTP stream. The active span is owned by Envoy and must not be
+ * finished by the module. A span may be stored and used in a later event hook on the same worker
+ * thread. Do not use a span after the stream has ended or move it to another thread.
+ */
 class Span {
 public:
   virtual ~Span() = default;
@@ -365,6 +375,11 @@ public:
   virtual std::unique_ptr<ChildSpan> spawnChild(std::string_view operation) = 0;
 };
 
+/**
+ * A tracing span owned by the module. Call finish when done. A child span may be stored and
+ * finished in a later event hook on the same worker thread, for example to cover off-thread work
+ * that resumes in a scheduled callback.
+ */
 class ChildSpan : public Span {
 public:
   virtual void finish() = 0;
@@ -403,6 +418,12 @@ public:
 
 using MetricID = uint64_t;
 enum class MetricsResult : uint32_t { Success, NotFound, InvalidTags, Frozen };
+
+/**
+ * An opaque identifier for a generic secret subscribed to via
+ * HttpFilterConfigHandle::subscribeGenericSecret.
+ */
+using GenericSecretID = uint64_t;
 
 class HttpFilterHandle {
 public:
@@ -474,6 +495,24 @@ public:
   void setMetadata(std::string_view ns, std::string_view key, const char* value) {
     setMetadata(ns, key, std::string_view(value));
   }
+
+  /**
+   * Sets an entire metadata namespace from a serialized google.protobuf.Struct. The struct is
+   * merged into the namespace and existing entries with the same key are overwritten. A buffer
+   * that does not parse as a google.protobuf.Struct is a no-op.
+   * @param ns The metadata namespace.
+   * @param serialized_struct The serialized google.protobuf.Struct to set.
+   */
+  virtual void setMetadataStruct(std::string_view ns, std::string_view serialized_struct) = 0;
+
+  /**
+   * Sets an entire typed metadata namespace from a serialized google.protobuf.Any. The Any is
+   * merged into the namespace's typed_filter_metadata entry, preserving the exact message type via
+   * the Any type_url. A buffer that does not parse as a google.protobuf.Any is a no-op.
+   * @param ns The metadata namespace.
+   * @param serialized_any The serialized google.protobuf.Any to set.
+   */
+  virtual void setTypedMetadata(std::string_view ns, std::string_view serialized_any) = 0;
 
   /**
    * Appends a numeric value to the dynamic metadata list stored under the given namespace and key.
@@ -709,7 +748,8 @@ public:
                                                                SocketDirection direction) = 0;
 
   /**
-   * Retrieves the active tracing span for the current stream.
+   * Retrieves the active tracing span for the current stream. The returned span may be stored and
+   * used in a later event hook on the same worker thread.
    */
   virtual std::unique_ptr<Span> getActiveSpan() = 0;
 
@@ -739,7 +779,11 @@ public:
   virtual void sendGoAwayAndClose(bool graceful) = 0;
 
   /**
-   * Recreates the current stream, optionally with replacement headers.
+   * Recreates the current stream, optionally with replacement headers. Returns false if the
+   * recreation could not be initiated, for example when the request body has not been fully
+   * received. On success the filter chain is destroyed before the current event hook returns and
+   * the filter should stop iteration. The filter itself stays valid until the hook returns, and
+   * the callbacks it makes after the teardown are safe and do not affect the recreated stream.
    */
   virtual bool recreateStream(std::span<const HeaderView> headers = {}) = 0;
 
@@ -943,6 +987,22 @@ public:
                                               std::span<const BufferView> tags_values = {}) = 0;
 
   /**
+   * Returns the current value of a generic secret subscribed to by the filter config via
+   * HttpFilterConfigHandle::subscribeGenericSecret. An empty value means the secret has been
+   * subscribed to but not yet delivered by the SDS server, which is distinct from an absent
+   * optional.
+   *
+   * The returned view aliases Envoy memory and must not be retained across events: a secret
+   * rotation replaces the value in between events on this worker thread. Copy it if it needs to
+   * outlive the current callback.
+   *
+   * @param id The secret ID returned by subscribeGenericSecret.
+   * @return The current value, or std::nullopt if the id does not correspond to a subscribed
+   * secret.
+   */
+  virtual std::optional<std::string_view> getGenericSecret(GenericSecretID id) = 0;
+
+  /**
    * Checks if logging is enabled for the given log level.
    * @param level The log level to check.
    * @return True if logging is enabled, false otherwise.
@@ -953,13 +1013,15 @@ public:
    * Logs a message at the specified log level.
    * @param level The log level.
    * @param message The message to log.
+   * @param location The source location of the log statement, defaulted to the caller.
    */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
-class HttpFilterConfigHandle {
+class HttpFilterConfigHandle : public CommonHandle {
 public:
-  virtual ~HttpFilterConfigHandle();
+  ~HttpFilterConfigHandle() override;
 
   /**
    * Defines a histogram metric with a name and optional tag keys.
@@ -1049,6 +1111,42 @@ public:
                                               std::span<const BufferView> tags_values = {}) = 0;
 
   /**
+   * Subscribes to a generic secret so that its value can later be read via getGenericSecret, either
+   * here or on HttpFilterHandle.
+   *
+   * This can only be called while the filter config is being created, i.e. from
+   * HttpFilterConfigFactory::onConfigNew.
+   *
+   * @param name The name of the secret: for a static secret the name in the bootstrap
+   * configuration, and for a dynamic secret the resource name requested from the SDS server.
+   * @param sds_config_source The JSON serialized ``envoy.config.core.v3.ConfigSource`` describing
+   * where to fetch the secret from, so that the value is updated whenever the SDS server pushes a
+   * new version. Pass an empty string to look the name up among the statically configured secrets
+   * instead.
+   * @return The secret ID, or std::nullopt if the secret cannot be subscribed to, for example when
+   * the static secret does not exist or sds_config_source is not a valid ConfigSource.
+   */
+  virtual std::optional<GenericSecretID>
+  subscribeGenericSecret(std::string_view name, std::string_view sds_config_source = {}) = 0;
+
+  /**
+   * Returns the current value of a previously subscribed generic secret. An empty value means the
+   * secret has been subscribed to but not yet delivered by the SDS server, which is distinct from
+   * an absent optional.
+   *
+   * Unlike HttpFilterHandle::getGenericSecret, this does not require a per-stream filter and can be
+   * called outside of the request lifecycle, for example from a scheduled background task.
+   *
+   * The returned view aliases Envoy memory and must not be retained across events. Copy it if it
+   * needs to outlive the current callback.
+   *
+   * @param id The secret ID returned by subscribeGenericSecret.
+   * @return The current value, or std::nullopt if the id does not correspond to a subscribed
+   * secret.
+   */
+  virtual std::optional<std::string_view> getGenericSecret(GenericSecretID id) = 0;
+
+  /**
    * Checks if logging is enabled for the given log level.
    * @param level The log level to check.
    * @return True if logging is enabled, false otherwise.
@@ -1059,8 +1157,10 @@ public:
    * Logs a message at the specified log level.
    * @param level The log level.
    * @param message The message to log.
+   * @param location The source location of the log statement, defaulted to the caller.
    */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 
   /**
    * Initiates a one-shot HTTP callout to a cluster. The response will be delivered via
@@ -1322,7 +1422,8 @@ private:
 #define DYM_LOG(HANDLE, LEVEL, FORMAT_STRING, ...)                                                 \
   do {                                                                                             \
     if (HANDLE.logEnabled(LEVEL)) {                                                                \
-      HANDLE.log(LEVEL, std::format(FORMAT_STRING, ##__VA_ARGS__));                                \
+      HANDLE.log(LEVEL, std::format(FORMAT_STRING, ##__VA_ARGS__),                                 \
+                 std::source_location::current());                                                 \
     }                                                                                              \
   } while (0)
 

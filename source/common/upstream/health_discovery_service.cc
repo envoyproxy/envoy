@@ -232,7 +232,7 @@ HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster
 }
 
 absl::Status HdsDelegate::processMessage(
-    std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
+    Grpc::ResponsePtr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
   std::vector<HdsClusterPtr> hds_clusters;
@@ -292,7 +292,7 @@ absl::Status HdsDelegate::processMessage(
 }
 
 void HdsDelegate::onReceiveMessage(
-    std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
+    Grpc::ResponsePtr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
 

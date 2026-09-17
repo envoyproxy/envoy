@@ -12,13 +12,17 @@
 #include "source/extensions/filters/common/rbac/principals/mtls_authenticated/mtls_authenticated.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::Const;
 using testing::Return;
 using testing::ReturnRef;
@@ -1326,8 +1330,7 @@ TEST(IPMatcher, CreateWithInvalidCidrRange) {
   invalid_range->mutable_prefix_len()->set_value(24);
 
   auto result = IPMatcher::create(ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to create CIDR range"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to create CIDR range")));
 }
 
 TEST(IPMatcher, CreateWithEmptyRangeList) {
@@ -1335,8 +1338,7 @@ TEST(IPMatcher, CreateWithEmptyRangeList) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange> empty_ranges;
 
   auto result = IPMatcher::create(empty_ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Empty IP range list provided"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Empty IP range list provided")));
 }
 
 TEST(IPMatcher, MatchesWithNullIpAddress) {
@@ -1403,8 +1405,7 @@ TEST(IPMatcher, MultipleRangesCreateSuccess) {
   range3->mutable_prefix_len()->set_value(32);
 
   auto result = IPMatcher::create(ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_TRUE(result.ok());
-  EXPECT_NE(result.value(), nullptr);
+  EXPECT_THAT(result, IsOkAndHolds(::testing::NotNull()));
 
   // Test that the created matcher works
   NiceMock<Envoy::Network::MockConnection> conn;
@@ -1900,6 +1901,125 @@ TEST(PrincipalMatcher, MetadataCreation) {
 
   checkMatcher(*matcher, true, Envoy::Network::MockConnection(),
                Envoy::Http::TestRequestHeaderMapImpl(), info);
+}
+
+TEST(PathMatcher, PathParametersBypass) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  envoy::type::matcher::v3::PathMatcher matcher;
+  matcher.mutable_path()->set_exact("/exact/value");
+
+  // Case 1: ignore_path_parameters_in_path_matching = false (default)
+  // Request path: "/exact;foo=bar/value;ver=1"
+  // It should NOT match because the parameter is not ignored, so "/exact;foo=bar" != "/exact"
+  {
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(false));
+
+    headers.setPath("/exact;foo=bar/value;ver=1");
+    checkMatcher(PathMatcher(matcher, context), false, Envoy::Network::MockConnection(), headers,
+                 info);
+  }
+
+  // Case 2: ignore_path_parameters_in_path_matching = true
+  // Request path: "/exact;foo=bar/value;ver=1"
+  // It SHOULD match because the parameter is ignored, so it is sanitized to "/exact"
+  {
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(true));
+
+    headers.setPath("/exact;foo=bar/value;ver=1");
+    checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers,
+                 info);
+  }
+
+  // Case 3: ignore_path_parameters_in_path_matching = true, BUT rbac_respect_ignore_path_parameters
+  // is false (disabled) Request path: "/exact;foo=bar" It should NOT match because the runtime flag
+  // is disabled.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.rbac_respect_ignore_path_parameters", "false"}});
+
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(true));
+
+    headers.setPath("/exact;foo=bar/value;ver=1");
+    checkMatcher(PathMatcher(matcher, context), false, Envoy::Network::MockConnection(), headers,
+                 info);
+  }
+}
+
+TEST(UriTemplateMatcher, PathMatchingWithParameters) {
+  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig
+      uri_template_match_config;
+  uri_template_match_config.set_path_template("/bar/{lang}/target");
+  Router::PathMatcherSharedPtr raw_matcher =
+      std::make_shared<Envoy::Extensions::UriTemplate::Match::UriTemplateMatcher>(
+          uri_template_match_config);
+  UriTemplateMatcher matcher(raw_matcher);
+
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+
+  // Case 1: ignore_path_parameters_in_path_matching = false (default)
+  // Request path: "/bar/lang;ver=1/target;foo=bar"
+  // It should NOT match.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(false));
+
+    headers.setPath("/bar/lang;ver=1/target;foo=bar");
+    checkMatcher(matcher, false, Envoy::Network::MockConnection(), headers, info);
+  }
+
+  // Case 2: ignore_path_parameters_in_path_matching = true
+  // Request path: "/bar/lang;ver=1/target;foo=bar"
+  // It SHOULD match.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(true));
+
+    headers.setPath("/bar/lang;ver=1/target;foo=bar");
+    checkMatcher(matcher, true, Envoy::Network::MockConnection(), headers, info);
+  }
+
+  // Case 3: ignore_path_parameters_in_path_matching = true, BUT rbac_respect_ignore_path_parameters
+  // is false (disabled) Request path: "/bar/lang;ver=1/target;foo=bar" It should NOT match.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.rbac_respect_ignore_path_parameters", "false"}});
+
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(true));
+
+    headers.setPath("/bar/lang;ver=1/target;foo=bar");
+    checkMatcher(matcher, false, Envoy::Network::MockConnection(), headers, info);
+  }
 }
 
 } // namespace
