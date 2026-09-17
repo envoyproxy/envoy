@@ -41,6 +41,24 @@ struct RequestFilterManager::AsyncState
     }
   }
 
+  static Coroutine::Task<absl::StatusOr<AiRequestPtr>>
+  receiveRequestTask(std::weak_ptr<AsyncState> weak_state, size_t index) {
+    auto state = weak_state.lock();
+    if (!state || state->terminated_) {
+      co_return absl::CancelledError("filter manager cancelled or destroyed");
+    }
+    co_return co_await state->receiveRequest(index);
+  }
+
+  static Coroutine::Task<absl::Status> propagateRequestTask(std::weak_ptr<AsyncState> weak_state,
+                                                            size_t index, AiRequestPtr req) {
+    auto state = weak_state.lock();
+    if (!state || state->terminated_) {
+      co_return absl::CancelledError("filter manager cancelled or destroyed");
+    }
+    co_return co_await state->propagateRequest(index, std::move(req));
+  }
+
   Coroutine::Task<absl::StatusOr<AiRequestPtr>> receiveRequest(size_t index) {
     ASSIGN_OR_CO_RETURN(auto res, co_await filter_contexts_[index].handoff->pop());
     if (!res.has_value()) {
@@ -246,22 +264,12 @@ void RequestFilterManager::launchFilters() {
     }
     std::weak_ptr<AsyncState> weak_state = async_state_;
 
-    AiRequestReceiver receiver([weak_state, i]() -> Coroutine::Task<absl::StatusOr<AiRequestPtr>> {
-      auto state = weak_state.lock();
-      if (!state || state->terminated_) {
-        co_return absl::CancelledError("filter manager cancelled or destroyed");
-      }
-      co_return co_await state->receiveRequest(i);
-    });
+    AiRequestReceiver receiver(
+        [weak_state, i]() { return AsyncState::receiveRequestTask(weak_state, i); });
 
-    AiRequestPropagator propagator(
-        [weak_state, i](AiRequestPtr req) -> Coroutine::Task<absl::Status> {
-          auto state = weak_state.lock();
-          if (!state || state->terminated_) {
-            co_return absl::CancelledError("filter manager cancelled or destroyed");
-          }
-          co_return co_await state->propagateRequest(i, std::move(req));
-        });
+    AiRequestPropagator propagator([weak_state, i](AiRequestPtr req) {
+      return AsyncState::propagateRequestTask(weak_state, i, std::move(req));
+    });
 
     LocalReplier replier = [weak_state](Http::Code code, std::string details) {
       if (auto state = weak_state.lock()) {

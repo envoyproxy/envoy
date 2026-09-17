@@ -318,32 +318,38 @@ protected:
 
   Coroutine::Task<absl::Status> finishSerialize() override { co_return absl::OkStatus(); }
 
+  static Coroutine::Task<absl::StatusOr<std::optional<SseEventPtr>>>
+  receiveSseTask(std::weak_ptr<ChainState<SseEventPtr>> weak, size_t index) {
+    auto self = weak.lock();
+    if (self == nullptr) {
+      co_return absl::CancelledError("response pipeline destroyed");
+    }
+    co_return co_await self->receive(index);
+  }
+
+  static Coroutine::Task<absl::Status> propagateSseTask(std::weak_ptr<ChainState<SseEventPtr>> weak,
+                                                        size_t index, SseEventPtr event) {
+    auto self = weak.lock();
+    if (self == nullptr) {
+      co_return absl::CancelledError("response pipeline destroyed");
+    }
+    if (event == nullptr) {
+      // Checked here rather than trusted: the serializer would dereference it, so a filter
+      // with this bug would take the process down instead of the response.
+      IS_ENVOY_BUG("cannot propagate a null SseEventPtr");
+      co_return absl::InvalidArgumentError("cannot propagate a null SseEventPtr");
+    }
+    co_return co_await self->propagate(index, std::move(event));
+  }
+
   Coroutine::Task<absl::Status> runFilter(size_t index) override {
     // Weak, not strong: the filter's coroutine frame is owned by a handle this object holds, so a
     // strong reference here would be a cycle.
     std::weak_ptr<ChainState<SseEventPtr>> weak = this->weak_from_this();
-    SseStreamReceiver receiver(
-        [weak, index]() -> Coroutine::Task<absl::StatusOr<std::optional<SseEventPtr>>> {
-          auto self = weak.lock();
-          if (self == nullptr) {
-            co_return absl::CancelledError("response pipeline destroyed");
-          }
-          co_return co_await self->receive(index);
-        });
-    SseStreamPropagator propagator(
-        [weak, index](SseEventPtr event) -> Coroutine::Task<absl::Status> {
-          auto self = weak.lock();
-          if (self == nullptr) {
-            co_return absl::CancelledError("response pipeline destroyed");
-          }
-          if (event == nullptr) {
-            // Checked here rather than trusted: the serializer would dereference it, so a filter
-            // with this bug would take the process down instead of the response.
-            IS_ENVOY_BUG("cannot propagate a null SseEventPtr");
-            co_return absl::InvalidArgumentError("cannot propagate a null SseEventPtr");
-          }
-          co_return co_await self->propagate(index, std::move(event));
-        });
+    SseStreamReceiver receiver([weak, index]() { return receiveSseTask(weak, index); });
+    SseStreamPropagator propagator([weak, index](SseEventPtr event) {
+      return propagateSseTask(weak, index, std::move(event));
+    });
     co_return co_await filters_[index]->encodeSSE(std::move(receiver), std::move(propagator));
   }
 
