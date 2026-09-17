@@ -439,8 +439,8 @@ public:
     initializeFilter(BasicGeoipConfig);
     filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
         ->setRemoteAddress(remote_address);
-    // No lookup is attempted, so nothing is counted as a completed lookup either.
-    expectStatsTotalIncremented(0);
+    // No lookup is attempted, but the connection is still counted in the total alongside skipped.
+    expectStatsTotalIncremented();
     EXPECT_CALL(stats_, counter("prefix.geoip.skipped"));
     EXPECT_CALL(*dummy_driver_, lookup(_, _)).Times(0);
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());

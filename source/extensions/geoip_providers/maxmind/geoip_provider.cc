@@ -219,6 +219,8 @@ GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Singleton::InstanceS
       return nullptr;
     }
     absl::StatusOr<MaxmindDbSharedPtr> db_or_error = initMaxmindDb(db_path.value(), db_type);
+    ENVOY_BUG(!absl::IsResourceExhausted(db_or_error.status()),
+              "Cannot open Maxmind database due to resource exhaustion");
     THROW_IF_NOT_OK_REF(db_or_error.status());
     THROW_IF_NOT_OK(mmdb_watcher_->addWatch(db_path.value(), Filesystem::Watcher::Events::MovedTo,
                                             [this, path = db_path.value(), db_type](uint32_t) {
@@ -455,8 +457,10 @@ absl::StatusOr<MaxmindDbSharedPtr> GeoipProvider::initMaxmindDb(const std::strin
   MMDB_s maxmind_db;
   const int result_code = MMDB_open(db_path.c_str(), MMDB_MODE_MMAP, &maxmind_db);
   if (MMDB_SUCCESS != result_code) {
-    return absl::InvalidArgumentError(fmt::format(
-        "Unable to open Maxmind database file {}. Error {}", db_path, MMDB_strerror(result_code)));
+    const std::string error_msg = fmt::format("Unable to open Maxmind database file {}. Error {}",
+                                              db_path, MMDB_strerror(result_code));
+    return result_code == MMDB_OUT_OF_MEMORY_ERROR ? absl::ResourceExhaustedError(error_msg)
+                                                   : absl::InvalidArgumentError(error_msg);
   }
 
   config_->setDbBuildEpoch(db_type, maxmind_db.metadata.build_epoch);
