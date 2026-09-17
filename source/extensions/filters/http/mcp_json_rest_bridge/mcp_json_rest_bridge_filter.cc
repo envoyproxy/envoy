@@ -74,7 +74,7 @@ bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
 
 bool isStatelessProtocolRequest(const json& json_rpc,
                                 absl::string_view max_supported_protocol_version) {
-  if (max_supported_protocol_version != McpConstants::MCP_VERSION_2026_07_28) {
+  if (max_supported_protocol_version < McpConstants::MCP_VERSION_2026_07_28) {
     return false;
   }
 
