@@ -331,8 +331,23 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_pipeline_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "task_group_test",
+    srcs = ["task_group_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:status_macros_lib",
         "//source/extensions/filters/http/ai_protocol_manager:task_group_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",

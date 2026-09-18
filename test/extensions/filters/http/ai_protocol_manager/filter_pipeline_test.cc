@@ -1,11 +1,10 @@
 #include <memory>
-#include <string>
 #include <utility>
-#include <vector>
 
+#include "source/common/coroutine/dispatcher_executor.h"
+#include "source/common/coroutine/launch.h"
 #include "source/common/coroutine/status_macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_pipeline.h"
-#include "source/extensions/filters/http/ai_protocol_manager/task_group.h"
 
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -20,66 +19,18 @@ namespace {
 
 using ::Envoy::StatusHelpers::IsOk;
 
-class TestAsyncState : public TaskGroup {
-public:
-  using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
-
-  TestAsyncState(size_t num_filters, Event::Dispatcher& dispatcher,
-                 OnCompleteFn on_complete = nullptr)
-      : TaskGroup(dispatcher), on_complete_(std::move(on_complete)), pipeline_(num_filters) {}
-
-  ~TestAsyncState() override { cancel(); }
-
-  using TaskGroup::launchTask;
-
-  void complete(absl::Status status) {
-    if (terminated()) {
-      return;
-    }
-    markTerminated();
-    if (auto cb = std::move(on_complete_)) {
-      cb(std::move(status));
-    }
-  }
-
-  void fail(absl::Status status) {
-    if (terminated()) {
-      return;
-    }
-    auto cb = std::move(on_complete_);
-    cancel();
-    if (cb != nullptr) {
-      cb(std::move(status));
-    }
-  }
-
-  void cancel() {
-    if (terminated()) {
-      return;
-    }
-    on_complete_ = nullptr;
-    cancelHandles();
-    ++on_cancel_calls_;
-    if (external_on_cancel_counter_ != nullptr) {
-      ++(*external_on_cancel_counter_);
-    }
-    pipeline_.closeAndDrain();
-  }
-
-  FilterPipeline<int>& pipeline() { return pipeline_; }
-
-  int on_cancel_calls_{0};
-  int* external_on_cancel_counter_{nullptr};
-
-private:
-  OnCompleteFn on_complete_;
-  FilterPipeline<int> pipeline_;
-};
-
 class FilterPipelineTest : public testing::Test {
 public:
   FilterPipelineTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")) {}
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
+        executor_(std::make_shared<Coroutine::DispatcherExecutor>(*dispatcher_)) {}
+
+  Coroutine::DetachedHandle launch(
+      Coroutine::Task<absl::Status> task,
+      absl::AnyInvocable<void(absl::Status)> on_done = [](absl::Status) {}) {
+    return Coroutine::launch(std::move(task), executor_, std::move(on_done),
+                             Coroutine::StartMode::Inline);
+  }
 
   void drain() {
     for (int i = 0; i < 10; ++i) {
@@ -89,201 +40,67 @@ public:
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  std::shared_ptr<Coroutine::DispatcherExecutor> executor_;
 };
 
-TEST_F(FilterPipelineTest, StageHandoffAndCompletion) {
-  int completion_calls = 0;
-  absl::Status final_status = absl::UnknownError("not called");
+TEST_F(FilterPipelineTest, StageHandoffAndEof) {
+  FilterPipeline<int> pipeline(2);
 
-  TestAsyncState state(2, *dispatcher_, [&](absl::Status s) {
-    ++completion_calls;
-    final_status = std::move(s);
-  });
-
-  EXPECT_EQ(state.pipeline().numStages(), 3u);
-  EXPECT_FALSE(state.terminated());
+  EXPECT_EQ(pipeline.numStages(), 3u);
+  EXPECT_FALSE(pipeline.closed());
 
   // Stage 0 -> Stage 1 -> Stage 2 (sink)
-  state.launchTask(
-      [&]() -> Coroutine::Task<absl::Status> {
-        ASSIGN_OR_CO_RETURN(auto item, co_await state.pipeline().receive(0));
-        if (!item.has_value()) {
-          co_return absl::InternalError("unexpected EOF");
-        }
-        co_return co_await state.pipeline().propagate(0, *item + 10);
-      }(),
-      [](absl::Status) {});
+  auto h0 = launch([&]() -> Coroutine::Task<absl::Status> {
+    ASSIGN_OR_CO_RETURN(auto item, co_await pipeline.receive(0));
+    if (!item.has_value()) {
+      co_return absl::InternalError("unexpected EOF");
+    }
+    CO_RETURN_IF_ERROR(co_await pipeline.propagate(0, *item + 10));
+    ASSIGN_OR_CO_RETURN(auto eof, co_await pipeline.receive(0));
+    if (eof.has_value()) {
+      co_return absl::InternalError("expected EOF");
+    }
+    pipeline.stage(1)->close();
+    co_return absl::OkStatus();
+  }());
 
-  state.launchTask(
-      [&]() -> Coroutine::Task<absl::Status> {
-        ASSIGN_OR_CO_RETURN(auto item, co_await state.pipeline().receive(1));
-        if (!item.has_value()) {
-          co_return absl::InternalError("unexpected EOF");
-        }
-        co_return co_await state.pipeline().propagate(1, *item * 2);
-      }(),
-      [](absl::Status) {});
+  auto h1 = launch([&]() -> Coroutine::Task<absl::Status> {
+    ASSIGN_OR_CO_RETURN(auto item, co_await pipeline.receive(1));
+    if (!item.has_value()) {
+      co_return absl::InternalError("unexpected EOF");
+    }
+    CO_RETURN_IF_ERROR(co_await pipeline.propagate(1, *item * 2));
+    ASSIGN_OR_CO_RETURN(auto eof, co_await pipeline.receive(1));
+    if (eof.has_value()) {
+      co_return absl::InternalError("expected EOF");
+    }
+    pipeline.stage(2)->close();
+    co_return absl::OkStatus();
+  }());
 
   int sink_received = 0;
-  state.launchTask(
+  bool sink_saw_eof = false;
+  absl::Status sink_status = absl::UnknownError("not called");
+  auto h2 = launch(
       [&]() -> Coroutine::Task<absl::Status> {
-        ASSIGN_OR_CO_RETURN(auto item, co_await state.pipeline().receive(2));
+        ASSIGN_OR_CO_RETURN(auto item, co_await pipeline.receive(2));
         if (!item.has_value()) {
           co_return absl::InternalError("unexpected EOF");
         }
         sink_received = *item;
-        state.complete(absl::OkStatus());
+        ASSIGN_OR_CO_RETURN(auto eof, co_await pipeline.receive(2));
+        sink_saw_eof = !eof.has_value();
         co_return absl::OkStatus();
       }(),
-      [](absl::Status) {});
+      [&](absl::Status s) { sink_status = std::move(s); });
 
-  EXPECT_TRUE(state.pipeline().stage(0)->tryPush(5));
+  EXPECT_TRUE(pipeline.stage(0)->tryPush(5));
+  pipeline.stage(0)->close();
   drain();
 
-  EXPECT_TRUE(state.terminated());
   EXPECT_EQ(sink_received, 30);
-  EXPECT_EQ(completion_calls, 1);
-  EXPECT_THAT(final_status, IsOk());
-
-  // Second complete() is a no-op (single-invocation protection).
-  state.complete(absl::InternalError("ignored"));
-  EXPECT_EQ(completion_calls, 1);
-}
-
-TEST_F(FilterPipelineTest, CancelClearsOnCompleteAndClosesStages) {
-  int completion_calls = 0;
-  TestAsyncState state(1, *dispatcher_, [&](absl::Status) { ++completion_calls; });
-
-  bool saw_eof = false;
-  absl::Status task_done_status = absl::OkStatus();
-  state.launchTask(
-      [&]() -> Coroutine::Task<absl::Status> {
-        ASSIGN_OR_CO_RETURN(auto item, co_await state.pipeline().receive(0));
-        if (!item.has_value()) {
-          saw_eof = true;
-        }
-        co_return absl::OkStatus();
-      }(),
-      [&](absl::Status s) { task_done_status = std::move(s); });
-
-  state.cancel();
-  EXPECT_TRUE(state.terminated());
-  EXPECT_EQ(state.on_cancel_calls_, 1);
-  EXPECT_EQ(completion_calls, 0);
-  // Cancelled task must unwind with CancelledError, not normal EOF (nullopt).
-  EXPECT_FALSE(saw_eof);
-  EXPECT_TRUE(absl::IsCancelled(task_done_status));
-  EXPECT_TRUE(state.pipeline().stage(0)->closed());
-  EXPECT_TRUE(state.pipeline().stage(1)->closed());
-
-  // Calling launchTask() after cancel() does not launch the task.
-  bool task_ran_after_cancel = false;
-  state.launchTask(
-      [&]() -> Coroutine::Task<absl::Status> {
-        task_ran_after_cancel = true;
-        co_return absl::OkStatus();
-      }(),
-      [&](absl::Status) { task_ran_after_cancel = true; });
-  EXPECT_FALSE(task_ran_after_cancel);
-
-  // Calling receive() or propagate() on a closed pipeline immediately returns CancelledError.
-  TestAsyncState closed_pipeline_state(1, *dispatcher_);
-  closed_pipeline_state.pipeline().closeAndDrain();
-
-  absl::Status post_close_rx = absl::OkStatus();
-  closed_pipeline_state.launchTask(
-      [&]() -> Coroutine::Task<absl::Status> {
-        ASSIGN_OR_CO_RETURN(auto item, co_await closed_pipeline_state.pipeline().receive(0));
-        (void)item;
-        co_return absl::OkStatus();
-      }(),
-      [&](absl::Status s) { post_close_rx = std::move(s); });
-  EXPECT_TRUE(absl::IsCancelled(post_close_rx));
-
-  absl::Status post_close_tx = absl::OkStatus();
-  closed_pipeline_state.launchTask(
-      [&]() -> Coroutine::Task<absl::Status> {
-        co_return co_await closed_pipeline_state.pipeline().propagate(0, 42);
-      }(),
-      [&](absl::Status s) { post_close_tx = std::move(s); });
-  EXPECT_TRUE(absl::IsCancelled(post_close_tx));
-
-  // Idempotent cancel.
-  state.cancel();
-  EXPECT_EQ(state.on_cancel_calls_, 1);
-}
-
-TEST_F(FilterPipelineTest, FailCancelsAndInvokesCompletion) {
-  int completion_calls = 0;
-  absl::Status reported_status;
-
-  TestAsyncState state(1, *dispatcher_, [&](absl::Status s) {
-    ++completion_calls;
-    reported_status = std::move(s);
-  });
-
-  state.fail(absl::AbortedError("custom abort"));
-
-  EXPECT_TRUE(state.terminated());
-  EXPECT_EQ(state.on_cancel_calls_, 1);
-  EXPECT_EQ(completion_calls, 1);
-  EXPECT_EQ(reported_status.code(), absl::StatusCode::kAborted);
-}
-
-TEST_F(FilterPipelineTest, ReentrantCancelDuringCoroutineFrameDestructionIsSafe) {
-  auto state = std::make_shared<TestAsyncState>(2, *dispatcher_);
-
-  struct ReentrantGuard {
-    std::shared_ptr<TestAsyncState> state;
-    ~ReentrantGuard() {
-      // Triggered inside handle.cancel() when coroutine frame is destroyed.
-      // Must not corrupt handles_ or re-enter cancel/complete/launchTask unsafely.
-      state->cancel();
-      state->complete(absl::InternalError("from destructor"));
-      state->launchTask([]() -> Coroutine::Task<absl::Status> { co_return absl::OkStatus(); }(),
-                        [](absl::Status) {});
-    }
-  };
-
-  for (size_t i = 0; i < 2; ++i) {
-    state->launchTask(
-        [state, i]() -> Coroutine::Task<absl::Status> {
-          ReentrantGuard guard{state};
-          ASSIGN_OR_CO_RETURN(auto item, co_await state->pipeline().receive(i));
-          (void)item;
-          co_return absl::OkStatus();
-        }(),
-        [](absl::Status) {});
-  }
-
-  state->cancel();
-  EXPECT_TRUE(state->terminated());
-  EXPECT_EQ(state->on_cancel_calls_, 1);
-}
-
-TEST_F(FilterPipelineTest, DestructorCancelsUncancelledPipeline) {
-  bool destroyed_cleanly = false;
-  int external_cancel_count = 0;
-  struct ScopeTracker {
-    bool* flag;
-    ~ScopeTracker() { *flag = true; }
-  };
-
-  {
-    TestAsyncState state(1, *dispatcher_);
-    state.external_on_cancel_counter_ = &external_cancel_count;
-    state.launchTask(
-        [&]() -> Coroutine::Task<absl::Status> {
-          ScopeTracker tracker{&destroyed_cleanly};
-          ASSIGN_OR_CO_RETURN(auto item, co_await state.pipeline().receive(0));
-          (void)item;
-          co_return absl::OkStatus();
-        }(),
-        [](absl::Status) {});
-    EXPECT_FALSE(destroyed_cleanly);
-  }
-  EXPECT_TRUE(destroyed_cleanly);
-  EXPECT_EQ(external_cancel_count, 1);
+  EXPECT_TRUE(sink_saw_eof);
+  EXPECT_THAT(sink_status, IsOk());
 }
 
 TEST_F(FilterPipelineTest, CloseAndDrainDestroysBufferedItems) {
@@ -293,28 +110,32 @@ TEST_F(FilterPipelineTest, CloseAndDrainDestroysBufferedItems) {
   EXPECT_EQ(item.use_count(), 2);
 
   pipeline.closeAndDrain();
+  EXPECT_TRUE(pipeline.closed());
+  EXPECT_TRUE(pipeline.stage(0)->closed());
+  EXPECT_TRUE(pipeline.stage(1)->closed());
   EXPECT_EQ(item.use_count(), 1);
 }
 
-TEST_F(FilterPipelineTest, InlineLaunchSuspendingAfterTriggeringCancelIsCancelled) {
-  TestAsyncState state(1, *dispatcher_);
-  bool frame_destroyed = false;
-  struct FrameTracker {
-    bool* flag;
-    ~FrameTracker() { *flag = true; }
-  };
+TEST_F(FilterPipelineTest, ReceiveAndPropagateOnClosedPipelineReturnCancelled) {
+  FilterPipeline<int> pipeline(1);
+  pipeline.closeAndDrain();
+  EXPECT_TRUE(pipeline.closed());
 
-  state.launchTask(
+  absl::Status post_close_rx = absl::OkStatus();
+  auto h_rx = launch(
       [&]() -> Coroutine::Task<absl::Status> {
-        FrameTracker tracker{&frame_destroyed};
-        state.cancel();
-        ASSIGN_OR_CO_RETURN(auto item, co_await state.pipeline().receive(0));
+        ASSIGN_OR_CO_RETURN(auto item, co_await pipeline.receive(0));
         (void)item;
         co_return absl::OkStatus();
       }(),
-      [](absl::Status) {});
+      [&](absl::Status s) { post_close_rx = std::move(s); });
+  EXPECT_TRUE(absl::IsCancelled(post_close_rx));
 
-  EXPECT_TRUE(frame_destroyed);
+  absl::Status post_close_tx = absl::OkStatus();
+  auto h_tx = launch(
+      [&]() -> Coroutine::Task<absl::Status> { co_return co_await pipeline.propagate(0, 42); }(),
+      [&](absl::Status s) { post_close_tx = std::move(s); });
+  EXPECT_TRUE(absl::IsCancelled(post_close_tx));
 }
 
 } // namespace
