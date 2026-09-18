@@ -23,6 +23,10 @@ MockThreadLocalOverloadState::MockThreadLocalOverloadState()
 
 MockOverloadManager::MockOverloadManager() {
   ON_CALL(*this, getThreadLocalOverloadState()).WillByDefault(ReturnRef(overload_state_));
+  // No-op deleter: overload_state_ is owned by this mock, not by the shared_ptr.
+  ON_CALL(*this, getThreadLocalOverloadStateShared())
+      .WillByDefault(Return(std::shared_ptr<ThreadLocalOverloadState>(
+          &overload_state_, [](ThreadLocalOverloadState*) {})));
 }
 
 MockOverloadManager::~MockOverloadManager() = default;

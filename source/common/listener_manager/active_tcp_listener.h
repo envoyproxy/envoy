@@ -31,7 +31,7 @@ public:
                     Network::SocketSharedPtr&& socket,
                     Network::Address::InstanceConstSharedPtr& listen_address,
                     Network::ConnectionBalancer& connection_balancer,
-                    ThreadLocalOverloadStateOptRef overload_state);
+                    ThreadLocalOverloadStateSharedPtr overload_state);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
                     Network::Address::InstanceConstSharedPtr& listen_address,
                     Network::ListenerConfig& config,

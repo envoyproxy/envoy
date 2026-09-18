@@ -157,6 +157,12 @@ public:
   const OptRef<T> get() const { return getOpt(slot_->get()); }
 
   /**
+   * Like get(), but returns an owning shared_ptr instead of a reference. Use this if the result
+   * may be retained and used from a thread other than the one that called getShared().
+   */
+  std::shared_ptr<T> getShared() { return std::static_pointer_cast<T>(slot_->get()); }
+
+  /**
    * Helper function to call methods on T. The caller is responsible
    * for ensuring that get().has_value() is true.
    *

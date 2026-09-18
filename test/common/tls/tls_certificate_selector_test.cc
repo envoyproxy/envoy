@@ -182,7 +182,7 @@ Ssl::UpstreamTlsCertificateSelectorPtr TestTlsSelectorFactory::createUpstreamTls
 Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                     Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
                                     const Network::ListenerConfig& listener_config,
-                                    Server::ThreadLocalOverloadStateOptRef overload_state,
+                                    Server::ThreadLocalOverloadStateSharedPtr overload_state,
                                     Random::RandomGenerator& rng, Event::Dispatcher& dispatcher) {
   return std::make_unique<Network::TcpListenerImpl>(
       dispatcher, rng, runtime, std::move(socket), cb, listener_config.bindToPort(),
@@ -297,7 +297,7 @@ protected:
         Network::Test::getCanonicalLoopbackAddress(version_));
     Network::MockTcpListenerCallbacks callbacks;
     NiceMock<Network::MockListenerConfig> listener_config;
-    Server::ThreadLocalOverloadStateOptRef overload_state;
+    Server::ThreadLocalOverloadStateSharedPtr overload_state;
     Network::ListenerPtr listener =
         createListener(socket, callbacks, runtime, listener_config, overload_state,
                        server_api->randomGenerator(), *dispatcher);

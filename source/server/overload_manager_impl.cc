@@ -798,6 +798,10 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
 }
 
 ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() { return *tls_; }
+
+ThreadLocalOverloadStateSharedPtr OverloadManagerImpl::getThreadLocalOverloadStateShared() {
+  return tls_.getShared();
+}
 Event::ScaledRangeTimerManagerFactory OverloadManagerImpl::scaledTimerFactory() {
   return [this](Event::Dispatcher& dispatcher) -> Event::ScaledRangeTimerManagerPtr {
     auto main_manager = createScaledRangeTimerManager(dispatcher, timer_minimums_);

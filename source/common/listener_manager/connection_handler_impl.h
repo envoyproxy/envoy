@@ -74,7 +74,7 @@ public:
   createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
                  Runtime::Loader& runtime, Random::RandomGenerator& random,
                  const Network::ListenerConfig& listener_config,
-                 Server::ThreadLocalOverloadStateOptRef overload_state) override;
+                 Server::ThreadLocalOverloadStateSharedPtr overload_state) override;
 
   // Network::UdpConnectionHandler
   Network::UdpListenerCallbacksOptRef
