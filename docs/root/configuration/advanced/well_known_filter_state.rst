@@ -57,6 +57,13 @@ The following lists the filter state object keys used by the Envoy extensions to
   :ref:`Dynamic forward proxy <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>` upstream
   port override on a per-connection basis. Accepts a port number string as a constructor.
 
+``envoy.upstream.dynamic_host_candidates``
+  :ref:`Dynamic forward proxy HTTP filter <config_http_filters_dynamic_forward_proxy>` hosts to resolve before the
+  request continues, when :ref:`allow_dynamic_host_from_filter_state
+  <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>`
+  is set. Takes precedence over ``envoy.upstream.dynamic_host`` for the filter's DNS lookups. Accepts a comma-separated
+  list of ``host[:port]`` values, with bracketed IPv6 addresses, as a constructor.
+
 ``envoy.tcp_proxy.disable_tunneling``
   :ref:`TCP proxy tunneling override
   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>` to disable tunneling on a
