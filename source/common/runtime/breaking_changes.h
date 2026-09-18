@@ -12,7 +12,7 @@
 #include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 
-ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_breaking_change_observability_enabled);
+ABSL_DECLARE_FLAG(bool, breaking_change_observability_enabled);
 
 #define OBSERVED_BREAKING_CHANGE(name, filter_state)                                               \
   if (BreakingChangesTracker::IsEnabled()) {                                                       \
@@ -47,7 +47,7 @@ public:
   BreakingChangesTracker() = default;
 
   static bool IsEnabled() {
-    return absl::GetFlag(FLAGS_envoy_reloadable_features_breaking_change_observability_enabled);
+    return absl::GetFlag(FLAGS_breaking_change_observability_enabled);
   }
 
   static BreakingChangesTracker& fromFilterState(

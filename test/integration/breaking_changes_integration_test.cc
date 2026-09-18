@@ -1,8 +1,11 @@
 #include <string>
 
+#include "source/common/runtime/breaking_changes.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
+#include "absl/flags/flag.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -14,6 +17,8 @@ class Http1BreakingChangesTest : public testing::TestWithParam<Network::Address:
                                  public HttpIntegrationTest {
 public:
   Http1BreakingChangesTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void TearDown() override { absl::SetFlag(&FLAGS_breaking_change_observability_enabled, false); }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http1BreakingChangesTest,
@@ -21,8 +26,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http1BreakingChangesTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(Http1BreakingChangesTest, TestEnabledBreakingChange) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.breaking_change_observability_enabled", "true");
+  absl::SetFlag(&FLAGS_breaking_change_observability_enabled, true);
   useAccessLog("%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%");
   config_helper_.prependFilter(R"EOF(
 name: breaking-change-filter
@@ -49,8 +53,7 @@ typed_config:
 }
 
 TEST_P(Http1BreakingChangesTest, TestDisabledBreakingChange) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.breaking_change_observability_enabled", "true");
+  absl::SetFlag(&FLAGS_breaking_change_observability_enabled, true);
   useAccessLog("%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%");
   config_helper_.prependFilter(R"EOF(
 name: breaking-change-filter
@@ -78,8 +81,7 @@ typed_config:
 
 TEST_P(Http1BreakingChangesTest,
        TestDisabledBreakingChangeEnabledManuallyAndObservabilityDisabled) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.breaking_change_observability_enabled", "false");
+  absl::SetFlag(&FLAGS_breaking_change_observability_enabled, false);
   config_helper_.addRuntimeOverride("envoy.reloadable_features.test_disabled_breaking_change",
                                     "true");
   useAccessLog("%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%");
@@ -110,8 +112,7 @@ typed_config:
 }
 
 TEST_P(Http1BreakingChangesTest, ObservabilityDisabled) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.breaking_change_observability_enabled", "false");
+  absl::SetFlag(&FLAGS_breaking_change_observability_enabled, false);
   useAccessLog("%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%");
   config_helper_.prependFilter(R"EOF(
 name: breaking-change-filter

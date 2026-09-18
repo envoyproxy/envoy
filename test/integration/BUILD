@@ -871,8 +871,10 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/common/runtime:breaking_changes",
         "//test/integration/filters:breaking_change_filter_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/flags:flag",
     ],
 )
 
