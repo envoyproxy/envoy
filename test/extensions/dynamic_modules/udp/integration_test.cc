@@ -118,6 +118,7 @@ TEST_P(DynamicModulesUdpIntegrationTest, LargePayload) {
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()), port));
 
+  // Use a conservative payload size to avoid platform-specific UDP limits.
   std::string large_request(512, 'x');
   Network::Test::UdpSyncPeer client(GetParam());
   client.write(large_request, *listener_address);
@@ -136,6 +137,7 @@ TEST_P(DynamicModulesUdpIntegrationTest, MultipleDatagrams) {
 
   Network::Test::UdpSyncPeer client(GetParam());
 
+  // Send multiple datagrams.
   for (int i = 0; i < 5; i++) {
     std::string request = fmt::format("datagram_{}", i);
     client.write(request, *listener_address);
