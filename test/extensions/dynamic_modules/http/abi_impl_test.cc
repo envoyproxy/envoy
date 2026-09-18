@@ -3600,6 +3600,43 @@ TEST_F(DynamicModuleHttpFilterTest, SpanSetTag) {
                                                   {value.data(), value.size()});
 }
 
+TEST_F(DynamicModuleHttpFilterTest, SpanSetTagBatch) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  EXPECT_CALL(mock_span,
+              setTag(absl::string_view("batch.key1"), absl::string_view("batch.value1")));
+  EXPECT_CALL(mock_span,
+              setTag(absl::string_view("batch.key2"), absl::string_view("batch.value2")));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  std::string key1 = "batch.key1";
+  std::string value1 = "batch.value1";
+  std::string key2 = "batch.key2";
+  std::string value2 = "batch.value2";
+  envoy_dynamic_module_type_module_key_value_pair tags[] = {
+      {key1.data(), key1.size(), value1.data(), value1.size()},
+      {key2.data(), key2.size(), value2.data(), value2.size()},
+  };
+  envoy_dynamic_module_callback_http_span_set_tag_batch(span, tags, 2);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanSetTagBatchEmpty) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_callback_http_span_set_tag_batch(span, nullptr, 0);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanSetTagBatchNullSpan) {
+  envoy_dynamic_module_callback_http_span_set_tag_batch(nullptr, nullptr, 0);
+}
+
 TEST_F(DynamicModuleHttpFilterTest, SpanSetOperation) {
   NiceMock<Tracing::MockSpan> mock_span;
   EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));

@@ -3394,6 +3394,17 @@ void envoy_dynamic_module_callback_http_span_set_tag(envoy_dynamic_module_type_s
                                                      envoy_dynamic_module_type_module_buffer value);
 
 /**
+ * envoy_dynamic_module_callback_http_span_set_tag_batch sets multiple tags on the given span.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param tags is the array of key-value pairs to set as tags.
+ * @param tags_size is the number of entries in the tags array.
+ */
+void envoy_dynamic_module_callback_http_span_set_tag_batch(
+    envoy_dynamic_module_type_span_envoy_ptr span,
+    const envoy_dynamic_module_type_module_key_value_pair* tags, size_t tags_size);
+
+/**
  * envoy_dynamic_module_callback_http_span_set_operation sets the operation name on the given span.
  *
  * @param span is the pointer to the span (either active span or child span).
@@ -13380,6 +13391,16 @@ void envoy_dynamic_module_on_tracer_span_set_operation(
 void envoy_dynamic_module_on_tracer_span_set_tag(
     envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
     envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_reserve_tags is called to reserve capacity for tags that will
+ * be set via envoy_dynamic_module_on_tracer_span_set_tag.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param tags_size is the number of tags that will be set.
+ */
+void envoy_dynamic_module_on_tracer_span_reserve_tags(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr, size_t tags_size);
 
 /**
  * envoy_dynamic_module_on_tracer_span_log is called to record a log event on the span.

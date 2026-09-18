@@ -337,6 +337,9 @@ pub trait TracerSpan: Send {
   /// Set a tag on this span.
   fn set_tag(&mut self, key: &str, value: &str);
 
+  /// Reserve capacity for tags that will be set via [`set_tag`](Self::set_tag).
+  fn reserve_tags(&mut self, _size: usize) {}
+
   /// Record a log event on this span.
   fn log(&mut self, timestamp_ns: i64, event: &str);
 
@@ -673,6 +676,20 @@ ffi_export! {
     let k = unsafe { envoy_buffer_to_str(key) };
     let v = unsafe { envoy_buffer_to_str(value) };
     wrapper.inner.set_tag(k.as_ref(), v.as_ref());
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_reserve_tags(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    tags_size: usize,
+  ) {
+    let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
+    wrapper.inner.reserve_tags(tags_size);
   }
 }
 

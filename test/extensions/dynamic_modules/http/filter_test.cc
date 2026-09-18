@@ -919,6 +919,8 @@ TEST_P(DynamicModuleHttpLanguageTests, SpanCallbacks) {
   auto* child_span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(callbacks, activeSpan()).WillRepeatedly(testing::ReturnRef(span));
   EXPECT_CALL(span, setTag("key", "value"));
+  EXPECT_CALL(span, setTag("batch.key1", "batch.value1"));
+  EXPECT_CALL(span, setTag("batch.key2", "batch.value2"));
   EXPECT_CALL(span, setOperation("operation"));
   EXPECT_CALL(span, log(_, "event"));
   EXPECT_CALL(span, setSampled(true));

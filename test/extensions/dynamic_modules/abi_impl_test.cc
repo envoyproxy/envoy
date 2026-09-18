@@ -2092,6 +2092,8 @@ WEAK_STUB(HttpSetBufferLimit, envoy_dynamic_module_callback_http_set_buffer_limi
 WEAK_STUB(HttpGetActiveSpan, envoy_dynamic_module_callback_http_get_active_span(nullptr))
 WEAK_STUB(HttpSpanSetTag,
           envoy_dynamic_module_callback_http_span_set_tag(nullptr, {nullptr, 0}, {nullptr, 0}))
+WEAK_STUB(HttpSpanSetTagBatch,
+          envoy_dynamic_module_callback_http_span_set_tag_batch(nullptr, nullptr, 0))
 WEAK_STUB(HttpSpanSetOperation,
           envoy_dynamic_module_callback_http_span_set_operation(nullptr, {nullptr, 0}))
 WEAK_STUB(HttpSpanLog, envoy_dynamic_module_callback_http_span_log(nullptr, nullptr, {nullptr, 0}))

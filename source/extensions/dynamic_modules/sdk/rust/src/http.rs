@@ -2188,6 +2188,13 @@ pub trait EnvoySpan {
   /// Tags are key-value pairs that provide metadata about the span.
   fn set_tag(&self, key: &str, value: &str);
 
+  /// Set multiple tags on this span.
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    for (key, value) in tags {
+      self.set_tag(key, value);
+    }
+  }
+
   /// Set the operation name on this span.
   fn set_operation(&self, operation: &str);
 
@@ -2257,6 +2264,32 @@ impl EnvoySpan for EnvoySpanImpl {
         self.raw_ptr,
         str_to_module_buffer(key),
         str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    type TagPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: TagPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<TagPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag_batch(
+        self.raw_ptr,
+        tags.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
+        tags.len(),
       );
     }
   }
@@ -2396,6 +2429,13 @@ pub trait EnvoyChildSpan {
   /// Set a tag on this span.
   fn set_tag(&self, key: &str, value: &str);
 
+  /// Set multiple tags on this span.
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    for (key, value) in tags {
+      self.set_tag(key, value);
+    }
+  }
+
   /// Set the operation name on this span.
   fn set_operation(&self, operation: &str);
 
@@ -2433,6 +2473,32 @@ impl EnvoyChildSpan for EnvoyChildSpanImpl {
         self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
         str_to_module_buffer(key),
         str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    type TagPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: TagPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<TagPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag_batch(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        tags.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
+        tags.len(),
       );
     }
   }
@@ -2843,25 +2909,28 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
-    // `pairs` borrows the key/value bytes of `entries`, which outlive this call. Envoy copies the
-    // bytes into the metadata Struct synchronously, so the pointers never dangle. An empty
-    // `entries` yields an empty Vec paired with a zero length the callback treats as a no-op.
-    let mut pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> =
-      Vec::with_capacity(entries.len());
-    for (key, value) in entries {
-      pairs.push(abi::envoy_dynamic_module_type_module_key_value_pair {
-        key_ptr: key.as_ptr() as *const _,
-        key_length: key.len(),
-        value_ptr: value.as_ptr() as *const _,
-        value_length: value.len(),
-      });
-    }
+    type KvPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: KvPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<KvPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
         self.raw_ptr,
         str_to_module_buffer(namespace),
-        pairs.as_ptr(),
-        pairs.len(),
+        entries.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
+        entries.len(),
       )
     }
   }

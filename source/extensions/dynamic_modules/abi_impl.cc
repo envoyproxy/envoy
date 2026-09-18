@@ -3007,6 +3007,10 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_http_span_set_tag,
                envoy_dynamic_module_type_span_envoy_ptr, envoy_dynamic_module_type_module_buffer,
                envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_http_span_set_tag_batch,
+               envoy_dynamic_module_type_span_envoy_ptr,
+               const envoy_dynamic_module_type_module_key_value_pair*, size_t)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_span_set_operation,
                envoy_dynamic_module_type_span_envoy_ptr, envoy_dynamic_module_type_module_buffer)
 
