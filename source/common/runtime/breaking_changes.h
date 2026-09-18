@@ -46,9 +46,7 @@ class BreakingChangesTracker : public StreamInfo::FilterState::Object {
 public:
   BreakingChangesTracker() = default;
 
-  static bool IsEnabled() {
-    return absl::GetFlag(FLAGS_breaking_change_observability_enabled);
-  }
+  static bool IsEnabled() { return absl::GetFlag(FLAGS_breaking_change_observability_enabled); }
 
   static BreakingChangesTracker& fromFilterState(
       const StreamInfo::FilterStateSharedPtr& filter_state,
