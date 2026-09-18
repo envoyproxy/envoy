@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
@@ -172,6 +173,12 @@ public:
                                     const std::string& config_name,
                                     Server::Configuration::ServerFactoryContext& server_context,
                                     OptRef<Init::Manager> init_manager) PURE;
+
+  /**
+   * @return the names of the dynamic TLS certificate secrets that are currently active (delivered,
+   * not warming).
+   */
+  virtual std::vector<std::string> dynamicActiveTlsCertificateSecretNames() const PURE;
 };
 
 using SecretManagerPtr = std::unique_ptr<SecretManager>;

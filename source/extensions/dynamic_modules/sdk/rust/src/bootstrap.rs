@@ -8,6 +8,16 @@ use crate::{
 };
 use mockall::*;
 
+/// The kind of active resource to enumerate with
+/// [`EnvoyBootstrapExtensionConfig::active_resource_names`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActiveResourceKind {
+  FilterChain,
+  Cluster,
+  TransportSocketMatch,
+  Secret,
+}
+
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
 #[automock]
@@ -246,6 +256,11 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// This should be called at most once. Subsequent calls are no-ops and return `false`.
   fn enable_listener_lifecycle(&self) -> bool;
+
+  /// Returns the names of the currently active resources of the given kind: the active listeners'
+  /// filter chains, the clusters, their transport socket matches, or the active dynamic TLS
+  /// certificate secrets. This must be called on the main thread.
+  fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String>;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -1161,6 +1176,44 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(self.raw)
     }
+  }
+
+  fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String> {
+    extern "C" fn name_trampoline(
+      name: abi::envoy_dynamic_module_type_envoy_buffer,
+      user_data: *mut std::ffi::c_void,
+    ) {
+      let names = unsafe { &mut *(user_data as *mut Vec<String>) };
+      let name_slice =
+        unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
+      names.push(std::str::from_utf8(name_slice).unwrap_or("").to_owned());
+    }
+
+    let abi_kind = match kind {
+      ActiveResourceKind::FilterChain => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::FilterChain
+      },
+      ActiveResourceKind::Cluster => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::Cluster
+      },
+      ActiveResourceKind::TransportSocketMatch => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::TransportSocketMatch
+      },
+      ActiveResourceKind::Secret => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::Secret
+      },
+    };
+
+    let mut names: Vec<String> = Vec::new();
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+        self.raw,
+        abi_kind,
+        Some(name_trampoline),
+        &mut names as *mut _ as *mut std::ffi::c_void,
+      );
+    }
+    names
   }
 }
 

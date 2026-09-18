@@ -73,6 +73,8 @@ public:
                                     Server::Configuration::ServerFactoryContext& server_context,
                                     OptRef<Init::Manager> init_manager) override;
 
+  std::vector<std::string> dynamicActiveTlsCertificateSecretNames() const override;
+
 private:
   ProtobufTypes::MessagePtr dumpSecretConfigs(const Matchers::StringMatcher& name_matcher);
 
@@ -123,7 +125,7 @@ private:
       return secret_provider;
     }
 
-    std::vector<std::shared_ptr<SecretType>> allSecretProviders() {
+    std::vector<std::shared_ptr<SecretType>> allSecretProviders() const {
       std::vector<std::shared_ptr<SecretType>> providers;
       for (const auto& secret_entry : dynamic_secret_providers_) {
         std::shared_ptr<SecretType> secret_provider = secret_entry.second.lock();

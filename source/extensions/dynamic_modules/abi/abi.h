@@ -16316,6 +16316,57 @@ bool envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes(
     envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
+// ===== Bootstrap config name iteration =====
+//
+// Lets a bootstrap extension enumerate the names of live config objects (filter chains, clusters,
+// transport socket matches, TLS certificate secrets) directly from the server's managers, instead
+// of scraping the admin /config_dump endpoint.
+
+// ----- Types -----
+
+/**
+ * envoy_dynamic_module_type_bootstrap_active_resource_kind selects which kind of active resource
+ * envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names enumerates. New kinds
+ * may be appended as new values without changing the enumeration function's signature.
+ */
+typedef enum {
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_FilterChain = 0,
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster = 1,
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_TransportSocketMatch = 2,
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret = 3,
+} envoy_dynamic_module_type_bootstrap_active_resource_kind;
+
+/**
+ * The callback type invoked once per active resource name during enumeration.
+ *
+ * @param name is the name of the resource. The buffer is owned by Envoy and is valid only for the
+ * duration of this call.
+ * @param user_data is the user data passed to the enumeration function.
+ */
+typedef void (*envoy_dynamic_module_type_bootstrap_active_resource_name_fn)(
+    envoy_dynamic_module_type_envoy_buffer name, void* user_data);
+
+// ----- Callbacks -----
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names is called by the
+ * module to enumerate the names of the currently active resources of a single kind. Depending on
+ * kind, Envoy walks the active listeners' filter chains (inline and FCDS), the cluster manager's
+ * clusters, their transport socket matches, or the dynamic active TLS certificate secrets, invoking
+ * name_fn once per name. To read several kinds, call once per kind. Must be called on the main
+ * thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param kind selects which kind of active resource to enumerate.
+ * @param name_fn is the callback function to call for each resource name.
+ * @param user_data is the user data to pass to the callback function.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
+    envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data);
+
 #ifdef __cplusplus
 }
 #endif

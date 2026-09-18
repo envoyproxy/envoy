@@ -279,6 +279,11 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_iterate_counter
                envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
                envoy_dynamic_module_type_counter_iterator_fn, void*)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names,
+               envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+               envoy_dynamic_module_type_bootstrap_active_resource_kind,
+               envoy_dynamic_module_type_bootstrap_active_resource_name_fn, void*)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges,
                envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
                envoy_dynamic_module_type_gauge_iterator_fn, void*)

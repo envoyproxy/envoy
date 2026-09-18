@@ -85,6 +85,19 @@ public:
 
   bool usesFilterState() const override { return uses_filter_state_; }
 
+  std::vector<absl::string_view> matchNames() const override {
+    std::vector<absl::string_view> names;
+    names.reserve(matches_.size() + transport_sockets_by_name_.size());
+    for (const auto& match : matches_) {
+      names.push_back(match.name);
+    }
+    // Matcher-based selection keeps its transport sockets keyed by name.
+    for (const auto& [name, factory] : transport_sockets_by_name_) {
+      names.push_back(name);
+    }
+    return names;
+  }
+
 protected:
   TransportSocketMatcherImpl(
       const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
