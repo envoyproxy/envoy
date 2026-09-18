@@ -134,4 +134,30 @@ typed_config:
   EXPECT_THAT(log, Not(HasSubstr("test_disabled_breaking_change")));
 }
 
+TEST_P(Http1BreakingChangesTest, ObservabilityEnabledInBootstrap) {
+  absl::SetFlag(&FLAGS_breaking_change_observability_enabled, false);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.set_enable_breaking_changes_observability(true);
+  });
+  useAccessLog("%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%");
+  config_helper_.prependFilter(R"EOF(
+name: breaking-change-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.BreakingChangeFilterConfig
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.addCopy("test_enabled_breaking_change", "true");
+  default_request_headers_.addCopy("test_disabled_breaking_change", "true");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("test_enabled_breaking_change"));
+  EXPECT_THAT(log, HasSubstr("test_disabled_breaking_change"));
+}
+
 } // namespace Envoy
