@@ -279,6 +279,11 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_iterate_counter
                envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
                envoy_dynamic_module_type_counter_iterator_fn, void*)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names,
+               envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+               envoy_dynamic_module_type_bootstrap_active_resource_kind,
+               envoy_dynamic_module_type_bootstrap_active_resource_name_fn, void*)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges,
                envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
                envoy_dynamic_module_type_gauge_iterator_fn, void*)
@@ -419,6 +424,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_cluster
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
 // ---------------------- Cluster extension callbacks ------------------------

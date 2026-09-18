@@ -8,6 +8,16 @@ use crate::{
 };
 use mockall::*;
 
+/// The kind of active resource to enumerate with
+/// [`EnvoyBootstrapExtensionConfig::active_resource_names`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActiveResourceKind {
+  FilterChain,
+  Cluster,
+  TransportSocketMatch,
+  Secret,
+}
+
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
 #[automock]
@@ -246,6 +256,24 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// This should be called at most once. Subsequent calls are no-ops and return `false`.
   fn enable_listener_lifecycle(&self) -> bool;
+
+  /// Enable secret lifecycle event notifications. When enabled, the module will receive
+  /// [`BootstrapExtensionConfig::on_secret_add_or_update`] and
+  /// [`BootstrapExtensionConfig::on_secret_removal`] callbacks when dynamic TLS certificate secrets
+  /// become active, are rotated, or are removed. SDS secrets are independent xDS resources, so
+  /// these fire even when no cluster or listener is re-pushed. Secrets already active at enable time
+  /// are replayed immediately.
+  ///
+  /// This must be called on the main thread, typically during or after `on_server_initialized`,
+  /// since the SecretManager is not available until that point.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`.
+  fn enable_secret_lifecycle(&self) -> bool;
+
+  /// Returns the names of the currently active resources of the given kind: the active listeners'
+  /// filter chains, the clusters, their transport socket matches, or the active dynamic TLS
+  /// certificate secrets. This must be called on the main thread.
+  fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String>;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -432,6 +460,36 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _listener_name: &str,
+  ) {
+  }
+
+  /// This is called when a dynamic TLS certificate secret becomes active or is rotated.
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`]. The callback is invoked on the
+  /// main thread.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `secret_name` is the name of the secret that became active or was updated.
+  fn on_secret_add_or_update(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _secret_name: &str,
+  ) {
+  }
+
+  /// This is called when a dynamic TLS certificate secret is removed.
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`]. The callback is invoked on the
+  /// main thread.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `secret_name` is the name of the secret that was removed.
+  fn on_secret_removal(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _secret_name: &str,
   ) {
   }
 }
@@ -1162,6 +1220,50 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
       abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(self.raw)
     }
   }
+
+  fn enable_secret_lifecycle(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(self.raw)
+    }
+  }
+
+  fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String> {
+    extern "C" fn name_trampoline(
+      name: abi::envoy_dynamic_module_type_envoy_buffer,
+      user_data: *mut std::ffi::c_void,
+    ) {
+      let names = unsafe { &mut *(user_data as *mut Vec<String>) };
+      let name_slice =
+        unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
+      names.push(std::str::from_utf8(name_slice).unwrap_or("").to_owned());
+    }
+
+    let abi_kind = match kind {
+      ActiveResourceKind::FilterChain => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::FilterChain
+      },
+      ActiveResourceKind::Cluster => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::Cluster
+      },
+      ActiveResourceKind::TransportSocketMatch => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::TransportSocketMatch
+      },
+      ActiveResourceKind::Secret => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::Secret
+      },
+    };
+
+    let mut names: Vec<String> = Vec::new();
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+        self.raw,
+        abi_kind,
+        Some(name_trampoline),
+        &mut names as *mut _ as *mut std::ffi::c_void,
+      );
+    }
+    names
+  }
 }
 
 // Implementation of EnvoyBootstrapExtension
@@ -1709,6 +1811,58 @@ ffi_export! {
     extension_config.on_listener_removal(
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       listener_name_str.as_ref(),
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a dynamic TLS certificate secret becomes active or is rotated.
+  ///
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    secret_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let secret_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(secret_name.ptr as *const u8, secret_name.length)
+    };
+
+    extension_config.on_secret_add_or_update(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      secret_name_str.as_ref(),
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a dynamic TLS certificate secret is removed.
+  ///
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_secret_removal(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    secret_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let secret_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(secret_name.ptr as *const u8, secret_name.length)
+    };
+
+    extension_config.on_secret_removal(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      secret_name_str.as_ref(),
     );
   }
 }

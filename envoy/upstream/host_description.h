@@ -403,6 +403,12 @@ public:
    *         transport socket resolution must be done per-connection with transport_socket_options.
    */
   virtual bool usesFilterState() const PURE;
+
+  /**
+   * @return the names of the transport socket matches configured on this matcher. The returned
+   * views point at matcher-owned storage and are valid only for the duration of this call.
+   */
+  virtual std::vector<absl::string_view> matchNames() const PURE;
 };
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;

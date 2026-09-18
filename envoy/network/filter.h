@@ -704,6 +704,13 @@ public:
    */
   virtual const FilterChain* findFilterChain(const ConnectionSocket& socket,
                                              const StreamInfo::StreamInfo& info) const PURE;
+
+  /**
+   * @return the names of the filter chains this manager holds. Unnamed chains are omitted. The
+   * returned views point at manager-owned storage and are valid only for the duration of this call.
+   * The default returns empty for managers that do not index chains by name.
+   */
+  virtual std::vector<absl::string_view> filterChainNames() const { return {}; }
 };
 
 /**

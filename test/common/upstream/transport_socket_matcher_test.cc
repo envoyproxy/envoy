@@ -324,6 +324,9 @@ filter_metadata:
   auto& factory_raw = matcher_->resolve(&endpoint_metadata2, nullptr).factory_;
   const auto& foo_raw = dynamic_cast<const FakeTransportSocketFactory&>(factory_raw);
   EXPECT_EQ("raw_id", foo_raw.id());
+
+  // matchNames enumerates the matcher-based transport socket names as well.
+  EXPECT_THAT(matcher_->matchNames(), testing::IsSupersetOf({"tls", "raw"}));
 }
 
 TEST_F(TransportSocketMatcherTest, MultipleMatchFirstWin) {
@@ -783,6 +786,30 @@ transport_socket:
                  .value();
 
   EXPECT_FALSE(matcher_->usesFilterState());
+}
+
+TEST_F(TransportSocketMatcherTest, MatchNames) {
+  init({R"EOF(
+name: "match_a"
+match:
+  hasSidecar: "true"
+transport_socket:
+  name: "foo"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "a"
+ )EOF",
+        R"EOF(
+name: "match_b"
+match:
+  hasSidecar: "false"
+transport_socket:
+  name: "foo"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "b"
+ )EOF"});
+  EXPECT_THAT(matcher_->matchNames(), testing::UnorderedElementsAre("match_a", "match_b"));
 }
 
 } // namespace

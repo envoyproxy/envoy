@@ -1,3 +1,7 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
@@ -375,6 +379,266 @@ TEST_P(DynamicModulesBootstrapAwsSigningIntegrationTest, SignedCalloutGatingInit
   EXPECT_LOG_CONTAINS(
       "info", "Bootstrap signed callout test completed successfully!",
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_signed_callout_test"));
+}
+
+// Verifies a Rust bootstrap extension can enumerate active resource names by kind via
+// active_resource_names() and check that a set of expected names is present.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesRust) {
+  // Name the default listener's filter chain so the module observes it by name.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_filter_chains(0)->set_name("chain_0");
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // The static upstream cluster and the named filter chain are observed, and the subset check
+  // passes.
+  EXPECT_THAT(response->body(), testing::HasSubstr("cluster_0"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("chain_0"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("present=true"));
+}
+
+// Verifies the FilterChain accessor enumerates FCDS filter chains. The listener uses fcds_config,
+// so its filter chain (`fc_a`) is delivered as a standalone FilterChain xDS resource and lives in
+// the shared FCDS manager, not the listener's inline FilterChainManager. It must still be observed
+// (this fails when the accessor only reads inline chains).
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesFcdsRust) {
+  // A file-based FCDS resource carrying one filter chain named `fc_a` (HCM -> cluster_0).
+  const std::string fcds_yaml = R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.listener.v3.FilterChain
+  name: fc_a
+  filters:
+  - name: envoy.filters.network.http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      stat_prefix: fc_a
+      route_config:
+        name: fcds_route
+        virtual_hosts:
+        - name: fcds_vhost
+          domains: ["*"]
+          routes:
+          - match: {prefix: "/"}
+            route: {cluster: cluster_0}
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF";
+  const std::string fcds_path =
+      TestEnvironment::writeStringToFileForTest("fcds_fc_a.yaml", fcds_yaml);
+
+  config_helper_.addConfigModifier([fcds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    // Move the listener to FCDS: drop the inline chain, point fcds_config at the file, and select
+    // `fc_a` for every connection via the matcher's on_no_match.
+    listener->mutable_filter_chains()->Clear();
+    auto* config_source = listener->mutable_fcds_config()->mutable_config_source();
+    config_source->mutable_path_config_source()->set_path(fcds_path);
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    const std::string matcher_yaml = R"EOF(
+      on_no_match:
+        action:
+          name: filter-chain-name
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: fc_a
+    )EOF";
+    TestUtility::loadFromYaml(matcher_yaml, *listener->mutable_filter_chain_matcher());
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // The FCDS-delivered filter chain is observed under the FilterChain kind.
+  EXPECT_THAT(response->body(), testing::HasSubstr("fc_a"));
+}
+
+// Verifies the accessors reflect resource removal: a dynamic cluster delivered via file-based CDS
+// is observed, then removed by rewriting the CDS file. Once the cluster manager applies the removal
+// the module no longer reports it, while the static cluster remains. Guards the "drained resource
+// disappears from the getter" path.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesClusterRemovalRust) {
+  const std::string cds_with = R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster_dyn
+  connect_timeout: 0.25s
+  type: STATIC
+  load_assignment:
+    cluster_name: cluster_dyn
+    endpoints: []
+)EOF";
+  const std::string cds_empty = R"EOF(
+version_info: "2"
+resources: []
+)EOF";
+  const std::string cds_readd = R"EOF(
+version_info: "3"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster_dyn
+  connect_timeout: 0.25s
+  type: STATIC
+  load_assignment:
+    cluster_name: cluster_dyn
+    endpoints: []
+)EOF";
+  const std::string cds_path =
+      TestEnvironment::writeStringToFileForTest("config_names_cds.yaml", cds_with);
+  config_helper_.addConfigModifier([cds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+    cds->mutable_path_config_source()->set_path(cds_path);
+    cds->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  // The dynamic cluster is observed alongside the static one.
+  BufferingStreamDecoderPtr before = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", before->headers().getStatusValue());
+  EXPECT_THAT(before->body(), testing::HasSubstr("cluster_dyn"));
+  EXPECT_THAT(before->body(), testing::HasSubstr("cluster_0"));
+
+  // Remove the dynamic cluster by atomically replacing the CDS file, then wait for the cluster
+  // manager to apply the removal (deterministic, no sleep).
+  const std::string cds_empty_path =
+      TestEnvironment::writeStringToFileForTest("config_names_cds_empty.yaml", cds_empty);
+  TestEnvironment::renameFile(cds_empty_path, cds_path);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Ge(1));
+
+  // The drained cluster is gone from the accessor; the static cluster remains.
+  BufferingStreamDecoderPtr after = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", after->headers().getStatusValue());
+  EXPECT_THAT(after->body(), testing::Not(testing::HasSubstr("cluster_dyn")));
+  EXPECT_THAT(after->body(), testing::HasSubstr("cluster_0"));
+
+  // Re-add the dynamic cluster: the accessor observes it again, so the getter tracks churn both
+  // ways (added -> removed -> added), not just the initial state.
+  const std::string cds_readd_path =
+      TestEnvironment::writeStringToFileForTest("config_names_cds_readd.yaml", cds_readd);
+  TestEnvironment::renameFile(cds_readd_path, cds_path);
+  test_server_->waitForCounter("cluster_manager.cluster_added", testing::Ge(2));
+  BufferingStreamDecoderPtr readded = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", readded->headers().getStatusValue());
+  EXPECT_THAT(readded->body(), testing::HasSubstr("cluster_dyn"));
+}
+
+// Verifies a Rust bootstrap extension receives secret lifecycle events. The default listener is
+// given a file-based SDS TLS certificate, so a dynamic secret provider is created and active by the
+// time the module enables secret lifecycle; enabling replays the active secret, and the module
+// observes on_secret_add_or_update with the secret name.
+TEST_P(DynamicModulesBootstrapIntegrationTest, SecretLifecycleRust) {
+  const std::string sds_yaml =
+      fmt::format(R"EOF(
+---
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: "secret_0"
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+)EOF",
+                  TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+  const std::string sds_path =
+      TestEnvironment::writeStringToFileForTest("secret_0.sds.yaml", sds_yaml);
+
+  config_helper_.addConfigModifier([sds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* transport_socket = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains(0)
+                                 ->mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    auto* secret_config =
+        tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+    secret_config->set_name("secret_0");
+    auto* config_source = secret_config->mutable_sds_config();
+    config_source->mutable_path_config_source()->set_path(sds_path);
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(tls_context));
+  });
+
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Bootstrap secret lifecycle test: server initialized"},
+                                  {"info", "Secret lifecycle enabled: true"},
+                                  {"info", "Secret added or updated: secret_0"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_secret_lifecycle_test"));
+}
+
+// Verifies the module observes a secret rotation. After the initial add, rewriting the SDS file
+// with a different certificate delivers a provider update, and on_secret_add_or_update fires again
+// for secret_0.
+TEST_P(DynamicModulesBootstrapIntegrationTest, SecretRotationRust) {
+  auto sds_yaml = [](absl::string_view version, absl::string_view cert, absl::string_view key) {
+    return fmt::format(R"EOF(
+---
+version_info: "{}"
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: "secret_0"
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+)EOF",
+                       version, cert, key);
+  };
+  const std::string cert0 =
+      TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem");
+  const std::string key0 =
+      TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem");
+  const std::string cert1 =
+      TestEnvironment::runfilesPath("test/config/integration/certs/server2cert.pem");
+  const std::string key1 =
+      TestEnvironment::runfilesPath("test/config/integration/certs/server2key.pem");
+  const std::string sds_path =
+      TestEnvironment::writeStringToFileForTest("secret_0.sds.yaml", sds_yaml("0", cert0, key0));
+
+  config_helper_.addConfigModifier([sds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* transport_socket = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains(0)
+                                 ->mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    auto* secret_config =
+        tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+    secret_config->set_name("secret_0");
+    auto* config_source = secret_config->mutable_sds_config();
+    config_source->mutable_path_config_source()->set_path(sds_path);
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(tls_context));
+  });
+
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_secret_lifecycle_test");
+  test_server_->waitForCounter("sds.secret_0.update_success", testing::Ge(1));
+
+  // Rotate the certificate by rewriting the SDS file; the provider update fires and the module
+  // observes on_secret_add_or_update again for secret_0 (first delivery already logged during
+  // init).
+  EXPECT_LOG_CONTAINS("info", "Secret added or updated: secret_0", {
+    const std::string rotated_path = TestEnvironment::writeStringToFileForTest(
+        "secret_0_rotated.sds.yaml", sds_yaml("1", cert1, key1));
+    TestEnvironment::renameFile(rotated_path, sds_path);
+    test_server_->waitForCounter("sds.secret_0.update_success", testing::Ge(2));
+  });
 }
 
 } // namespace DynamicModules
