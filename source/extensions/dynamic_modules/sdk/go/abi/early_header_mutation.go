@@ -280,6 +280,8 @@ func (h *dymEarlyHeaderMutationHandle) IsLogLevelEnabled(level shared.LogLevel) 
 // header mutation exposes no config-scoped callbacks yet, so it only carries the Envoy-side
 // configuration pointer for future use.
 type dymEarlyHeaderMutationConfigHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr C.envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr
 }
 

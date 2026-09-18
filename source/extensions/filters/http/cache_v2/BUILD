@@ -188,6 +188,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/cache_v2/v3:pkg_cc_proto",
     ],
 )

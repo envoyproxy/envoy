@@ -1822,6 +1822,30 @@ TEST_F(OverloadManagerLoadShedPointImplTest, LoadShedPointShouldUseCurrentReadin
   EXPECT_EQ(overload_action_states[0], UnitFloat(1));
 }
 
+TEST(TriggerTest, EvaluateIsStateless) {
+  envoy::config::overload::v3::Trigger threshold_config;
+  threshold_config.set_name("test_threshold");
+  threshold_config.mutable_threshold()->set_value(0.8);
+  auto threshold_trigger = createTriggerFromConfig(threshold_config);
+  ASSERT_TRUE(threshold_trigger.ok());
+  EXPECT_EQ(OverloadActionState::inactive().value(), (*threshold_trigger)->actionState().value());
+  EXPECT_EQ(OverloadActionState::saturated().value(), (*threshold_trigger)->evaluate(0.85).value());
+  // Calling evaluate() does not mutate actionState().
+  EXPECT_EQ(OverloadActionState::inactive().value(), (*threshold_trigger)->actionState().value());
+
+  envoy::config::overload::v3::Trigger scaled_config;
+  scaled_config.set_name("test_scaled");
+  scaled_config.mutable_scaled()->set_scaling_threshold(0.5);
+  scaled_config.mutable_scaled()->set_saturation_threshold(0.9);
+  auto scaled_trigger = createTriggerFromConfig(scaled_config);
+  ASSERT_TRUE(scaled_trigger.ok());
+  EXPECT_EQ(OverloadActionState::inactive().value(), (*scaled_trigger)->actionState().value());
+  EXPECT_EQ(UnitFloat(0.5f), (*scaled_trigger)->evaluate(0.7).value());
+  EXPECT_EQ(OverloadActionState::saturated().value(), (*scaled_trigger)->evaluate(0.95).value());
+  // Calling evaluate() does not mutate actionState().
+  EXPECT_EQ(OverloadActionState::inactive().value(), (*scaled_trigger)->actionState().value());
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

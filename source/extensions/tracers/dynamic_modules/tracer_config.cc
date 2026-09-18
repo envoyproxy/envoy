@@ -39,8 +39,8 @@ DynamicModuleTracerConfig::DynamicModuleTracerConfig(
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope)
     : stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
-      stat_name_pool_(stats_scope_->symbolTable()), tracer_name_(tracer_name),
-      tracer_config_(tracer_config), dynamic_module_(std::move(dynamic_module)) {}
+      metrics_(*stats_scope_), tracer_name_(tracer_name), tracer_config_(tracer_config),
+      dynamic_module_(std::move(dynamic_module)) {}
 
 DynamicModuleTracerConfig::~DynamicModuleTracerConfig() {
   if (in_module_config_ != nullptr && on_config_destroy_ != nullptr) {

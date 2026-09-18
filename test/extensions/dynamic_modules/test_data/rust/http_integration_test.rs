@@ -190,6 +190,16 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       config_info_enabled: is_log_enabled(envoy_dynamic_module_type_log_level::Info),
       config_error_enabled: is_log_enabled(envoy_dynamic_module_type_log_level::Error),
     })),
+    // The runtime is only reachable from the main thread, which is where config creation runs,
+    // so every value is read here and cached on the config.
+    "runtime_values" => Some(Box::new(RuntimeValuesFilterConfig {
+      bool_value: get_runtime_bool("test.runtime_bool", false),
+      int_value: get_runtime_int("test.runtime_int", 7),
+      number_value: get_runtime_number("test.runtime_number", 0.5),
+      missing_bool: get_runtime_bool("test.runtime_missing_bool", true),
+      missing_int: get_runtime_int("test.runtime_missing_int", 1234),
+      missing_number: get_runtime_number("test.runtime_missing_number", 2.5),
+    })),
     _ => panic!("Unknown filter name: {name}"),
   }
 }
@@ -2490,6 +2500,61 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for GenericSecretCallbacksFilter {
       .get_generic_secret(EnvoyGenericSecretId(12345))
       .is_none());
 
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
+/// Reads every runtime type at config creation and echoes the values back as response headers, so
+/// the integration test can confirm both the configured-value and the fall-back-to-default paths.
+struct RuntimeValuesFilterConfig {
+  bool_value: bool,
+  int_value: u64,
+  number_value: f64,
+  missing_bool: bool,
+  missing_int: u64,
+  missing_number: f64,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for RuntimeValuesFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(RuntimeValuesFilter {
+      bool_value: self.bool_value,
+      int_value: self.int_value,
+      number_value: self.number_value,
+      missing_bool: self.missing_bool,
+      missing_int: self.missing_int,
+      missing_number: self.missing_number,
+    })
+  }
+}
+
+struct RuntimeValuesFilter {
+  bool_value: bool,
+  int_value: u64,
+  number_value: f64,
+  missing_bool: bool,
+  missing_int: u64,
+  missing_number: f64,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for RuntimeValuesFilter {
+  fn on_response_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let bool_value = self.bool_value.to_string();
+    envoy_filter.set_response_header("x-runtime-bool", bool_value.as_bytes());
+    let int_value = self.int_value.to_string();
+    envoy_filter.set_response_header("x-runtime-int", int_value.as_bytes());
+    let number_value = self.number_value.to_string();
+    envoy_filter.set_response_header("x-runtime-number", number_value.as_bytes());
+    let missing_bool = self.missing_bool.to_string();
+    envoy_filter.set_response_header("x-runtime-missing-bool", missing_bool.as_bytes());
+    let missing_int = self.missing_int.to_string();
+    envoy_filter.set_response_header("x-runtime-missing-int", missing_int.as_bytes());
+    let missing_number = self.missing_number.to_string();
+    envoy_filter.set_response_header("x-runtime-missing-number", missing_number.as_bytes());
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }

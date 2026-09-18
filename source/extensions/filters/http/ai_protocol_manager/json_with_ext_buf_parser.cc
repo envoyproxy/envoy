@@ -148,6 +148,7 @@ void JsonWithExtBufParser::closeStringCapture(absl::string_view, int, size_t tok
     setError(absl::InternalError("ai json: string token range is shorter than its quotes"));
     return;
   }
+  has_external_refs_ = true;
   setError(addValue(JsonWithExtBuf::makeExternalRef(
       {string_token_start_ + 1, token_end - string_token_start_ - 2})));
 }

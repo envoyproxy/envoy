@@ -14,6 +14,7 @@ cc_library(
     ],
     hdrs = [
         "sdk.h",
+        "sdk_common.h",
         "sdk_early_header_mutation.h",
         "sdk_header_formatter.h",
         "sdk_listener.h",
