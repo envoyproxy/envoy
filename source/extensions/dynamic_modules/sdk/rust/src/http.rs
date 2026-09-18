@@ -2271,12 +2271,14 @@ impl EnvoySpan for EnvoySpanImpl {
   fn set_tags(&self, tags: &[(&str, &str)]) {
     let pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> = tags
       .iter()
-      .map(|(key, value)| abi::envoy_dynamic_module_type_module_key_value_pair {
-        key_ptr: key.as_ptr() as *const _,
-        key_length: key.len(),
-        value_ptr: value.as_ptr() as *const _,
-        value_length: value.len(),
-      })
+      .map(
+        |(key, value)| abi::envoy_dynamic_module_type_module_key_value_pair {
+          key_ptr: key.as_ptr() as *const _,
+          key_length: key.len(),
+          value_ptr: value.as_ptr() as *const _,
+          value_length: value.len(),
+        },
+      )
       .collect();
     unsafe {
       abi::envoy_dynamic_module_callback_http_span_set_tag_batch(
@@ -2473,12 +2475,14 @@ impl EnvoyChildSpan for EnvoyChildSpanImpl {
   fn set_tags(&self, tags: &[(&str, &str)]) {
     let pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> = tags
       .iter()
-      .map(|(key, value)| abi::envoy_dynamic_module_type_module_key_value_pair {
-        key_ptr: key.as_ptr() as *const _,
-        key_length: key.len(),
-        value_ptr: value.as_ptr() as *const _,
-        value_length: value.len(),
-      })
+      .map(
+        |(key, value)| abi::envoy_dynamic_module_type_module_key_value_pair {
+          key_ptr: key.as_ptr() as *const _,
+          key_length: key.len(),
+          value_ptr: value.as_ptr() as *const _,
+          value_length: value.len(),
+        },
+      )
       .collect();
     unsafe {
       abi::envoy_dynamic_module_callback_http_span_set_tag_batch(

@@ -4587,7 +4587,9 @@ fn test_span_set_tags_batch() {
   let envoy_filter = http::EnvoyHttpFilterImpl {
     raw_ptr: std::ptr::null_mut(),
   };
-  let span = envoy_filter.get_active_span().expect("stub returns non-null");
+  let span = envoy_filter
+    .get_active_span()
+    .expect("stub returns non-null");
   span.set_tags(&[("k1", "v1"), ("k2", "v2"), ("k3", "v3")]);
 
   assert!(SET_TAG_BATCH_CALLED.load(Ordering::SeqCst));

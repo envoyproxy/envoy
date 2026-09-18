@@ -177,8 +177,7 @@ public:
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
-  void setTags(
-      std::initializer_list<std::pair<std::string_view, std::string_view>> tags) override {
+  void setTags(std::initializer_list<std::pair<std::string_view, std::string_view>> tags) override {
     std::vector<envoy_dynamic_module_type_module_key_value_pair> pairs;
     pairs.reserve(tags.size());
     for (const auto& [key, value] : tags) {
@@ -252,8 +251,7 @@ public:
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
-  void setTags(
-      std::initializer_list<std::pair<std::string_view, std::string_view>> tags) override {
+  void setTags(std::initializer_list<std::pair<std::string_view, std::string_view>> tags) override {
     std::vector<envoy_dynamic_module_type_module_key_value_pair> pairs;
     pairs.reserve(tags.size());
     for (const auto& [key, value] : tags) {
