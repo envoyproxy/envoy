@@ -743,6 +743,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SpanCallbacksFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     if let Some(span) = envoy_filter.get_active_span() {
       span.set_tag("key", "value");
+      span.set_tags(&[("batch.key1", "batch.value1"), ("batch.key2", "batch.value2")]);
       span.set_operation("operation");
       span.log("event");
       span.set_sampled(true);

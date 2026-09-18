@@ -337,6 +337,13 @@ pub trait TracerSpan: Send {
   /// Set a tag on this span.
   fn set_tag(&mut self, key: &str, value: &str);
 
+  /// Set multiple tags on this span.
+  fn set_tags(&mut self, tags: &[(&str, &str)]) {
+    for (key, value) in tags {
+      self.set_tag(key, value);
+    }
+  }
+
   /// Record a log event on this span.
   fn log(&mut self, timestamp_ns: i64, event: &str);
 
@@ -673,6 +680,31 @@ ffi_export! {
     let k = unsafe { envoy_buffer_to_str(key) };
     let v = unsafe { envoy_buffer_to_str(value) };
     wrapper.inner.set_tag(k.as_ref(), v.as_ref());
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_set_tag_batch(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    tags: *const abi::envoy_dynamic_module_type_envoy_key_value_pair,
+    tags_size: usize,
+  ) {
+    let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
+    let entries = unsafe { std::slice::from_raw_parts(tags, tags_size) };
+    let tag_pairs: Vec<(&str, &str)> = entries
+      .iter()
+      .map(|e| unsafe {
+        (
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(e.key_ptr as *const u8, e.key_length)),
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(e.value_ptr as *const u8, e.value_length)),
+        )
+      })
+      .collect();
+    wrapper.inner.set_tags(&tag_pairs);
   }
 }
 

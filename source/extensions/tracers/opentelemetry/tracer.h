@@ -92,6 +92,7 @@ public:
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
+  void setTags(absl::Span<const std::pair<absl::string_view, absl::string_view>> tags) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override;
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/,

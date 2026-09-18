@@ -127,6 +127,17 @@ TEST_F(DriverTest, SpanSetTag) {
   span->setTag("component", "proxy");
 }
 
+TEST_F(DriverTest, SpanSetTagBatch) {
+  Tracing::TestTraceContextImpl trace_context{};
+  Tracing::Decision decision{Tracing::Reason::Sampling, true};
+
+  auto span =
+      driver_->startSpan(tracing_config_, trace_context, stream_info_, "test_operation", decision);
+  std::vector<std::pair<absl::string_view, absl::string_view>> tags = {
+      {"batch.key1", "batch.value1"}, {"batch.key2", "batch.value2"}};
+  span->setTags(tags);
+}
+
 TEST_F(DriverTest, SpanLog) {
   Tracing::TestTraceContextImpl trace_context{};
   Tracing::Decision decision{Tracing::Reason::Sampling, true};

@@ -414,6 +414,27 @@ func (s *dymSpan) SetTag(key, value string) {
 	runtime.KeepAlive(value)
 }
 
+func (s *dymSpan) SetTags(tags [][2]string) {
+	if s == nil || s.spanPtr == nil || len(tags) == 0 {
+		return
+	}
+	pairs := make([]C.envoy_dynamic_module_type_module_key_value_pair, len(tags))
+	for i, tag := range tags {
+		pairs[i] = C.envoy_dynamic_module_type_module_key_value_pair{
+			key_ptr:      (*C.char)(unsafe.Pointer(unsafe.StringData(tag[0]))),
+			key_length:   C.size_t(len(tag[0])),
+			value_ptr:    (*C.char)(unsafe.Pointer(unsafe.StringData(tag[1]))),
+			value_length: C.size_t(len(tag[1])),
+		}
+	}
+	C.envoy_dynamic_module_callback_http_span_set_tag_batch(
+		s.spanPtr,
+		&pairs[0],
+		C.size_t(len(pairs)),
+	)
+	runtime.KeepAlive(tags)
+}
+
 func (s *dymSpan) SetOperation(operation string) {
 	if s == nil || s.spanPtr == nil {
 		return

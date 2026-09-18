@@ -2553,6 +2553,22 @@ void envoy_dynamic_module_callback_http_span_set_tag(
   span->setTag(key_view, value_view);
 }
 
+void envoy_dynamic_module_callback_http_span_set_tag_batch(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    const envoy_dynamic_module_type_module_key_value_pair* tags, size_t tags_size) {
+  if (span_ptr == nullptr || tags_size == 0) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  std::vector<std::pair<absl::string_view, absl::string_view>> pairs;
+  pairs.reserve(tags_size);
+  for (size_t i = 0; i < tags_size; i++) {
+    pairs.emplace_back(absl::string_view(tags[i].key_ptr, tags[i].key_length),
+                       absl::string_view(tags[i].value_ptr, tags[i].value_length));
+  }
+  span->setTags(pairs);
+}
+
 void envoy_dynamic_module_callback_http_span_set_operation(
     envoy_dynamic_module_type_span_envoy_ptr span_ptr,
     envoy_dynamic_module_type_module_buffer operation) {

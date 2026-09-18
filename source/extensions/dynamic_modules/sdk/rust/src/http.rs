@@ -2188,6 +2188,13 @@ pub trait EnvoySpan {
   /// Tags are key-value pairs that provide metadata about the span.
   fn set_tag(&self, key: &str, value: &str);
 
+  /// Set multiple tags on this span.
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    for (key, value) in tags {
+      self.set_tag(key, value);
+    }
+  }
+
   /// Set the operation name on this span.
   fn set_operation(&self, operation: &str);
 
@@ -2257,6 +2264,25 @@ impl EnvoySpan for EnvoySpanImpl {
         self.raw_ptr,
         str_to_module_buffer(key),
         str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    let pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> = tags
+      .iter()
+      .map(|(key, value)| abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: key.as_ptr() as *const _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *const _,
+        value_length: value.len(),
+      })
+      .collect();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag_batch(
+        self.raw_ptr,
+        pairs.as_ptr(),
+        pairs.len(),
       );
     }
   }
@@ -2396,6 +2422,13 @@ pub trait EnvoyChildSpan {
   /// Set a tag on this span.
   fn set_tag(&self, key: &str, value: &str);
 
+  /// Set multiple tags on this span.
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    for (key, value) in tags {
+      self.set_tag(key, value);
+    }
+  }
+
   /// Set the operation name on this span.
   fn set_operation(&self, operation: &str);
 
@@ -2433,6 +2466,25 @@ impl EnvoyChildSpan for EnvoyChildSpanImpl {
         self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
         str_to_module_buffer(key),
         str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    let pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> = tags
+      .iter()
+      .map(|(key, value)| abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: key.as_ptr() as *const _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *const _,
+        value_length: value.len(),
+      })
+      .collect();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag_batch(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        pairs.as_ptr(),
+        pairs.len(),
       );
     }
   }
