@@ -359,6 +359,12 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
     } else if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
                      err->getErrorDetails());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.quic_client_close_connection_on_read_error") &&
+          &connection_socket == connectionSocket().get()) {
+        CloseConnection(quic::QUIC_PACKET_READ_ERROR, err->getErrorDetails(),
+                        quic::ConnectionCloseBehavior::SILENT_CLOSE);
+      }
     }
   }
 }
