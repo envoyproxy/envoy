@@ -57,11 +57,9 @@ struct CpuPaths {
     static constexpr const char* const EFFECTIVE_CPUS = "/cpuset.cpus.effective";
   };
 
-  // Returns whether cgroup v2 CPU subsystem is available.
-  static bool isV2(Filesystem::Instance& fs) {
-    return fs.fileExists(V2::getStatPath()) && fs.fileExists(V2::getMaxPath()) &&
-           fs.fileExists(V2::getEffectiveCpusPath());
-  }
+  // Keyed only on cpu.stat: cpu.max and cpuset.cpus.effective are optional (often
+  // absent on Kubernetes v2 pods) and handled with fallbacks by the reader.
+  static bool isV2(Filesystem::Instance& fs) { return fs.fileExists(V2::getStatPath()); }
 
   // Returns whether cgroup v1 CPU subsystem is available.
   static bool isV1(Filesystem::Instance& fs) {
