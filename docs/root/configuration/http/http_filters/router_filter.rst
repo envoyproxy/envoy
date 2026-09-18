@@ -424,6 +424,34 @@ if a request was dropped due to either :ref:`maintenance mode
 <config_http_filters_router_runtime_maintenance_mode>` or upstream :ref:`circuit breaking
 <arch_overview_circuit_break>`.
 
+.. _config_http_filters_router_x-envoy-internal-redirect-on:
+
+x-envoy-internal-redirect-on
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Setting this header on a downstream request activates :ref:`internal redirect
+<arch_overview_http_routing_internal_redirects>` for that request without requiring a
+route-level :ref:`internal_redirect_policy
+<envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` to be configured.
+
+The header value is a comma-separated list of redirect status codes that Envoy should follow
+internally. Accepted values are ``301``, ``302``, ``303``, ``307``, ``308``, or the shorthand
+``3xx`` to enable all of the above. Unrecognized tokens are silently ignored.
+
+If the matched route already has an ``internal_redirect_policy`` enabled, the route-level policy
+takes precedence and this header is not consulted for that request.
+
+The header is treated as an internal header: it is stripped from external downstream requests
+in :ref:`clean_internal_headers
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
+processing and is removed from the request before it is forwarded to the upstream on the
+redirected pass.
+
+Example::
+
+  x-envoy-internal-redirect-on: 302,303
+  x-envoy-internal-redirect-on: 3xx
+
 .. _config_http_filters_router_stats:
 
 Statistics
