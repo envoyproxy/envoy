@@ -32,6 +32,8 @@ constexpr absl::string_view TYPE_FIELD = "type";
 constexpr absl::string_view TEXT_FIELD = "text";
 constexpr absl::string_view CONTENT_FIELD = "content";
 constexpr absl::string_view IS_ERROR_FIELD = "isError";
+constexpr absl::string_view RESULT_TYPE_FIELD = "resultType";
+constexpr absl::string_view RESULT_TYPE_COMPLETE = "complete";
 constexpr absl::string_view ERROR_FIELD = "error";
 
 // MCP Initialize constants
@@ -41,6 +43,9 @@ constexpr absl::string_view MCP_VERSION_2025_06_18 = "2025-06-18";
 constexpr absl::string_view MCP_VERSION_2025_11_25 = "2025-11-25";
 constexpr absl::string_view MCP_VERSION_2026_07_28 = "2026-07-28";
 constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
+constexpr absl::string_view META_FIELD = "_meta";
+constexpr absl::string_view MCP_META_PROTOCOL_VERSION_FIELD =
+    "io.modelcontextprotocol/protocolVersion";
 constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
 constexpr absl::string_view TOOLS_FIELD = "tools";
 constexpr absl::string_view LIST_CHANGED_FIELD = "listChanged";
