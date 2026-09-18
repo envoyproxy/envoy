@@ -408,9 +408,6 @@ absl::Status InstanceUtil::loadBootstrapConfig(
 }
 
 void InstanceUtil::raiseFileLimits() {
-  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
-    return;
-  }
   if (const auto result = Api::OsSysCallsSingleton::get().raiseFileLimits();
       result.return_value_ != 0) {
     ENVOY_LOG(warn, "Failed to raise file descriptor limit, error {}.",
@@ -494,6 +491,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     if (stats_config.stats_tags().empty() && use_all_default_tags &&
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stats_explicit_tags")) {
       stats_store_.setUseExplicitTags(true);
+      http_context_.setUseExplicitTags(true);
     }
   }
 

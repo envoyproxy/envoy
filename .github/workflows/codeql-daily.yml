@@ -28,7 +28,7 @@ jobs:
 
     steps:
 
-    - uses: envoyproxy/toolshed/actions/bind-mounts@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/bind-mounts@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       if: |
         ! github.event.repository.private
       with:
@@ -43,7 +43,7 @@ jobs:
       if: |
         env.BUILD_TARGETS != ''
         && github.event.repository.private
-      uses: envoyproxy/toolshed/actions/diskspace@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+      uses: envoyproxy/toolshed/actions/diskspace@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       with:
         to_remove: |
           /usr/local/.ghcup

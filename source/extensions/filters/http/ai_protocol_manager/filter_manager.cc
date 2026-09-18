@@ -93,8 +93,9 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
     // TODO(penguingao): condition the serialization on config. If we want to
     // normalize the json payload / protocol or the payload is modified, we
     // re-serialize, if not, we just passthrough the original body.
-    ASSIGN_OR_CO_RETURN(
-        std::ignore, co_await Serializer::serialize(final_req_->request_index(), buffer_manager_));
+    ASSIGN_OR_CO_RETURN(std::ignore,
+                        co_await Serializer::serialize(final_req_->request_index(), buffer_manager_,
+                                                       buffer_manager_));
 
     terminated_ = true;
     if (on_complete_ != nullptr) {
@@ -207,7 +208,7 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
   bool terminated_{false};
 };
 
-FilterManager::FilterManager(std::vector<AiFilterPtr> filters, JsonWithExtBuf payload_index,
+FilterManager::FilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
                              BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
                              StreamInfo::StreamInfo& stream_info,
                              Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn)
@@ -267,7 +268,8 @@ void FilterManager::launchFilters() {
     auto task = filters_[i]->decode(std::move(receiver), std::move(propagator), std::move(replier));
     auto handle = Coroutine::launch(
         std::move(task), executor_,
-        [weak_state, i](absl::Status status) {
+        // Holds the filter until its coroutine completes, which can be after ~FilterManager.
+        [weak_state, i, filter = filters_[i]](absl::Status status) {
           if (auto state = weak_state.lock()) {
             state->onFilterCompletion(i, std::move(status));
           }

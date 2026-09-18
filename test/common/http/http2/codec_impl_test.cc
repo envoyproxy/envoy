@@ -4556,6 +4556,61 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1, 3));
 }
 
+// Regression test for reentrant encoding during connection-level watermark callbacks. The callback
+// fanout must tolerate an encode operation reordering active_streams_ while still notifying every
+// stream exactly once in the original order.
+TEST_P(Http2CodecImplTest, LowWatermarkCallbackCanReorderActiveStreams) {
+  initialize();
+
+  RequestEncoder* request_encoder1 = request_encoder_;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder1->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder2->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  RequestEncoder* request_encoder3 = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder3->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(5, 3, 1));
+
+  MockStreamCallbacks callbacks1;
+  MockStreamCallbacks callbacks2;
+  MockStreamCallbacks callbacks3;
+  request_encoder1->getStream().addCallbacks(callbacks1);
+  request_encoder2->getStream().addCallbacks(callbacks2);
+  request_encoder3->getStream().addCallbacks(callbacks3);
+
+  Buffer::OwnedImpl high_watermark_data("a");
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  EXPECT_CALL(callbacks1, onAboveWriteBufferHighWatermark()).WillOnce([&]() {
+    request_encoder1->encodeData(high_watermark_data, false);
+  });
+  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(callbacks3, onAboveWriteBufferHighWatermark());
+  client_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 5, 3));
+  driveToCompletion();
+
+  Buffer::OwnedImpl low_watermark_data("a");
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).WillOnce([&]() {
+    request_encoder2->encodeData(low_watermark_data, false);
+  });
+  EXPECT_CALL(callbacks1, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
+  client_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(3, 1, 5));
+  driveToCompletion();
+}
+
 TEST_P(Http2CodecImplTest, ChunksLargeBodyDuringDeferredProcessing) {
   server_settings_.emplace(smallWindowHttp2Settings());
   // We must initialize before dtor, otherwise we'll touch uninitialized
@@ -4939,17 +4994,22 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
       1 /* 0xfc */, 1 /* 0xfd */, 1 /* 0xfe */, 1 /* 0xff */
   };
 
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.validate_upstream_headers", "false"}});
   stream_error_on_invalid_http_messaging_ = true;
 
   setupRequestDecoderMock(request_decoder_);
   initialize();
 
 #ifdef ENVOY_ENABLE_UHV
+  // With UHV the client codec does not validate the headers it encodes (UHV does it before
+  // encoding), so the invalid values reach the server codec, which rejects them.
+  constexpr bool kClientValidatesEncodedHeaders = false;
   // UHV does not appear to reject some header value chars.
   if (http2_implementation_ == Http2Impl::Oghttp2) {
     GTEST_SKIP();
   }
+#else
+  // The client codec rejects invalid header keys and values in encodeHeaders().
+  constexpr bool kClientValidatesEncodedHeaders = true;
 #endif
 
   // Change one character in the header value and verify that codec correctly
@@ -4976,6 +5036,15 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
     StreamEncoder* response_encoder;
     MockStreamCallbacks server_stream_callbacks;
     MockRequestDecoder request_decoder;
+
+    if (!ValidHeaderValueChars[i] && kClientValidatesEncodedHeaders) {
+      // The client codec rejects the invalid header value in encodeHeaders(), so nothing is
+      // written and the server never sees a new stream.
+      EXPECT_THAT(request_encoder->encodeHeaders(request_headers, true),
+                  HasStatusMessage(testing::HasSubstr("invalid header value for: foo")));
+      driveToCompletion();
+      continue;
+    }
 
     setupRequestDecoderMock(request_decoder);
     EXPECT_CALL(server_callbacks_, newStream(_, _))

@@ -13,5 +13,6 @@ envoy_cc_test(
         "//library/common/bridge:utility_lib",
         "//library/common/logger:logger_delegate_lib",
         "//library/common/types:c_types_lib",
+        "@envoy//envoy/common:logger",
     ],
 )

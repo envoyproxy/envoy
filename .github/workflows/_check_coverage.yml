@@ -34,7 +34,6 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name ||matrix.target }}
     with:
-      bazel-cache: true
       bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
@@ -51,8 +50,8 @@ jobs:
       steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
-      upload-name: ${{ matrix.target }}
-      upload-path: generated/${{ matrix.target }}/html
+      uploads: |
+        ${{ matrix.target }}: generated/${{ matrix.target }}/html
       trusted: ${{ inputs.trusted }}
     strategy:
       fail-fast: false
@@ -60,10 +59,8 @@ jobs:
         include:
         - target: coverage
           name: Coverage
-          upload-name: coverage
-          upload-path: generated/coverage/html
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+            - uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
               with:
                 output-path: generated/coverage/html/gcs-metadata.json
                 input-format: yaml
@@ -84,7 +81,7 @@ jobs:
         - target: fuzz_coverage
           name: Fuzz coverage
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+            - uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
               with:
                 output-path: generated/fuzz_coverage/html/gcs-metadata.json
                 input-format: yaml
@@ -113,3 +110,5 @@ jobs:
     with:
       artifacts: |
         ["coverage", "fuzz_coverage"]
+      request: ${{ inputs.request }}
+      trusted: ${{ inputs.trusted }}

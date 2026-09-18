@@ -45,10 +45,23 @@ public:
   calculateSerializedOffsets(const JsonWithExtBuf& doc);
 
   // Streaming serialization: replays JSON tokens and offloaded buffer slices directly through
-  // the BufferManager into the filter chain with watermark flow control, and returns a new
-  // JsonWithExtBuf with updated byte offsets reflecting the emitted serialization.
-  static Coroutine::Task<absl::StatusOr<JsonWithExtBuf>> serialize(const JsonWithExtBuf& doc,
-                                                                   BufferManager* buffer_manager);
+  // `out` into the filter chain with watermark flow control, and returns a new JsonWithExtBuf with
+  // updated byte offsets reflecting the emitted serialization.
+  //
+  // `ref_source` holds the bytes doc's ExternalRef nodes name, which is not necessarily `out`: an
+  // SSE frame's references point into the frame's own store while the output goes through the
+  // stream's. On the request path both are the same manager.
+  //
+  // When they differ they must still be on the same FilterChainBridge, since that bridge is what
+  // orders the emitted bytes. It holds one replay handler at a time, so this awaits each piece
+  // before starting the next rather than overlapping a write to `out` with a read from
+  // `ref_source`.
+  //
+  // TODO(penguingao): take a writer instead. BufferManager is both a byte store and the thing
+  // that writes into the filter chain, which is why this needs two of them; splitting the writer
+  // out would leave one sink and one optional source, and this bridge invariant would go with it.
+  static Coroutine::Task<absl::StatusOr<JsonWithExtBuf>>
+  serialize(const JsonWithExtBuf& doc, BufferManager* out, BufferManager* ref_source);
 };
 
 } // namespace AiProtocolManager

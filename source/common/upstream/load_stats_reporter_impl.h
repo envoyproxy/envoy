@@ -20,14 +20,12 @@ namespace Upstream {
  * The reporter sends load statistics for clusters as directed by the management server.
  * The frequency of reports is determined by the load_reporting_interval in the LoadStatsResponse.
  *
- * By default, if no runtime flags are set, load reports for a locality are sent only if the
- * sum of `rq_total_` latched values for hosts in the locality is non-zero during the reporting
- * interval.
+ * By default, load reports for a locality are sent if the sum of the latched `rq_total_` values
+ * or the sum of the current `rq_active_` values for hosts in the locality is non-zero during the
+ * reporting interval. Reporting on non-zero `rq_active_` is needed to report long-lived
+ * connections/requests (e.g., when web-sockets are used).
  *
- * The following runtime features control the behavior of the load reporter:
- * - envoy.reloadable_features.report_load_when_rq_active_is_non_zero: If true, load reports
- *   for a locality are sent if the sum of `rq_active_` values for hosts in the locality is
- * non-zero, even if no new requests were issued in the interval.
+ * The following runtime feature controls the behavior of the load reporter:
  * - envoy.reloadable_features.report_load_for_non_zero_stats: If true, load reports for a
  *   locality are sent if any of the following conditions are met for the sum of host stats in that
  *   locality:
@@ -36,8 +34,6 @@ namespace Upstream {
  *     - Current `rq_active_` is non-zero.
  *     - Latched `rq_total_` is non-zero.
  *     - Any custom load metrics are non-zero in `LoadMetricStats`.
- *
- * Only one of these runtime features should be enabled at a time.
  */
 class LoadStatsReporterImpl
     : public LoadStatsReporter,

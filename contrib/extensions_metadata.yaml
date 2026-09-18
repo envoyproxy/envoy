@@ -3,6 +3,13 @@ envoy.filters.http.checksum:
   - envoy.filters.http
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.http.client_cert:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.client_cert.v3alpha.ClientCertConfig
 envoy.filters.http.dynamo:
   categories:
   - envoy.filters.http

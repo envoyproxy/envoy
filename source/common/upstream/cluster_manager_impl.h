@@ -1072,6 +1072,10 @@ private:
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
   Router::Context& router_context_;
+  // The router filter config shared by the async clients of every cluster on every worker thread.
+  // It is constructed from server-wide state only (see the constructor) and is immutable after
+  // construction, so a single instance is enough.
+  Router::FilterConfigSharedPtr async_client_router_config_;
   ClusterTrafficStatNames cluster_stat_names_;
   ClusterConfigUpdateStatNames cluster_config_update_stat_names_;
   ClusterLbStatNames cluster_lb_stat_names_;
