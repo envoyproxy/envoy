@@ -79,7 +79,7 @@ public:
   }
 
   void setDbBuildEpoch(absl::string_view maxmind_db_type, const uint64_t value) {
-    setGuage(
+    setGauge(
         stat_name_set_->getBuiltin(absl::StrCat(maxmind_db_type, ".db_build_epoch"), unknown_hit_),
         value);
   }
@@ -103,7 +103,7 @@ private:
   const Stats::StatName unknown_hit_;
   void setFieldKey(GeoField field, const std::string& value);
   void incCounter(Stats::StatName name);
-  void setGuage(Stats::StatName name, const uint64_t value);
+  void setGauge(Stats::StatName name, const uint64_t value);
 };
 
 using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
@@ -112,7 +112,7 @@ using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
 // instance resources prior to its destruction.
 class MaxmindDb {
 public:
-  MaxmindDb(MMDB_s&& db) : db_(db) {}
+  explicit MaxmindDb(MMDB_s&& db) : db_(db) {}
   ~MaxmindDb() { MMDB_close(&db_); }
   const MMDB_s* mmdb() const { return &db_; }
 
