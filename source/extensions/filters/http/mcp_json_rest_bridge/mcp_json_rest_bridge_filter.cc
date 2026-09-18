@@ -1083,8 +1083,6 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
         {McpConstants::RESULT_FIELD, tools},
     };
 
-    addCompleteResultTypeIfStateless(ret, is_stateless_request_);
-
     response_body_str_ = ret.dump();
     setResponseMetadata(BridgeStatus::Ok, getResponseCode(response_headers));
     break;
