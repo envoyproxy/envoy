@@ -71,6 +71,7 @@ envoy_cc_dyn_module_test(
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:udp_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/go:udp_listener_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
