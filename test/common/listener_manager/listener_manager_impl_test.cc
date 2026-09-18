@@ -59,6 +59,7 @@ namespace {
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using testing::ByMove;
+using testing::HasSubstr;
 using testing::InSequence;
 using ::testing::Not;
 using testing::Return;
@@ -983,6 +984,100 @@ filter_chains:
   EXPECT_THAT(status, Not(IsOk()));
 #endif
 }
+
+#if defined(__linux__)
+// A listener in a network namespace whose path can no longer be opened still inherits its socket
+// from the hot restart parent: the parent's socket is already bound inside that namespace, so the
+// namespace is not entered when the parent has a socket to hand over.
+TEST_P(ListenerManagerImplTest, InheritParentListenSocketWithoutEnteringNetworkNamespace) {
+  ProdListenerComponentFactory real_listener_factory(server_);
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+    network_namespace_filepath: /var/run/netns/removed
+filter_chains:
+- filters: []
+  )EOF";
+
+  const int parent_fd = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0).return_value_;
+  ASSERT_GE(parent_fd, 0);
+  EXPECT_CALL(server_.hot_restart_,
+              duplicateParentListenSocket("tcp://127.0.0.1:1234", 0, "/var/run/netns/removed"))
+      .WillOnce(Return(parent_fd));
+  // The namespace file is never opened.
+  EXPECT_CALL(os_sys_calls_, open(_, _)).Times(0);
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, 0))
+      .WillOnce(Invoke(
+          [&real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+}
+
+// Without a parent socket to inherit, a network namespace path that cannot be opened still fails
+// the listener.
+TEST_P(ListenerManagerImplTest, MissingNetworkNamespaceWithoutParentListenSocketFails) {
+  ProdListenerComponentFactory real_listener_factory(server_);
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+    network_namespace_filepath: /var/run/netns/removed
+filter_chains:
+- filters: []
+  )EOF";
+
+  EXPECT_CALL(server_.hot_restart_,
+              duplicateParentListenSocket("tcp://127.0.0.1:1234", 0, "/var/run/netns/removed"))
+      .WillOnce(Return(-1));
+  // Opening the current namespace succeeds; opening the target namespace fails.
+  EXPECT_CALL(os_sys_calls_, open(_, _))
+      .WillRepeatedly(Invoke([](const char* pathname, int) -> Api::SysCallIntResult {
+        if (absl::EndsWith(pathname, "/ns/net")) {
+          return {3, 0};
+        }
+        return {-1, ENOENT};
+      }));
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, 0))
+      .WillOnce(Invoke(
+          [&real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_THAT(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true)
+                  .status()
+                  .message(),
+              HasSubstr("failed to open netns file /var/run/netns/removed"));
+  EXPECT_EQ(
+      1UL,
+      server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
+}
+#endif
 
 TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
   const std::string yaml = R"EOF(
