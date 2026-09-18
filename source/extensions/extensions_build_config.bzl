@@ -673,6 +673,7 @@ EXTENSIONS = {
     #
     # Queue policy
     #
+    "envoy.queue_policy.adaptive_lifo": "//source/extensions/queue_policy/adaptive_lifo:adaptive_lifo_queue_policy_impl",
     "envoy.queue_policy.fifo":   "//source/extensions/queue_policy/fifo:fifo_queue_policy_impl",
 }
 
