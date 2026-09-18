@@ -1097,7 +1097,9 @@ FilterDataStatus Filter::handleDataBufferedPartialMode(ProcessorState& state,
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
-  state.setBodyReceived(true);
+  if (data.length() != 0 || end_stream != false) {
+    state.setBodyReceived(true);
+  }
 
   if (config_->observabilityMode()) {
     return sendDataInObservabilityMode(data, state, end_stream);
