@@ -8,7 +8,7 @@ void RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
     RouteCache& route_cache, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
     std::optional<Router::ConfigConstSharedPtr> route_config, Event::Dispatcher& dispatcher,
     RequestHeaderMap& request_headers) {
-  if (route_config.has_value() && route_config.value()->usesVhds()) {
+  if (route_config.has_value() && route_config.value()->onDemandVhdsEnabled()) {
     ASSERT(!request_headers.Host()->value().empty());
     const auto& host_header = absl::AsciiStrToLower(request_headers.getHostValue());
     requestVhdsUpdate(host_header, dispatcher, std::move(route_config_updated_cb));
