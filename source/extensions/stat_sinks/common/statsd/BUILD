@@ -32,5 +32,6 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
