@@ -5,8 +5,10 @@
 #include "source/common/http/matching/inputs.h"
 #include "source/extensions/filters/http/match_delegate/config.h"
 
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -825,6 +827,295 @@ TEST(DelegatingFactoryCallbacks, DelegatingFactoryCallbacksTest) {
   delegating_factory_callbacks.streamInfo();
   delegating_factory_callbacks.requestHeaders();
   delegating_factory_callbacks.route();
+}
+
+// Tests for the lazy filter-creation path, gated by the
+// "envoy.reloadable_features.match_delegate_lazy_creation" runtime guard.
+
+// With the guard enabled, the factory registers a single LazyDelegatingStreamFilter as both a
+// stream filter and an access log handler, and does NOT eagerly invoke the nested filter factory.
+TEST(LazyMatchWrapper, RegistersStreamFilterAndAccessLogHandler) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.match_delegate_lazy_creation", "true"}});
+
+  TestFactory test_factory;
+  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+      inject_factory(test_factory);
+
+  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+
+  const auto config =
+      TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
+extension_config:
+  name: test
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+xds_matcher:
+  matcher_tree:
+    input:
+      name: request-headers
+      typed_config:
+        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+        header_name: default-matcher-header
+    exact_match_map:
+        map:
+            match:
+                action:
+                    name: skip
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  MatchDelegateConfig match_delegate_config;
+  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context).value();
+
+  Envoy::Http::MockFilterChainFactoryCallbacks factory_callbacks;
+  testing::InSequence s;
+
+  // A single lazy delegating filter is registered as both the stream filter and the access log
+  // handler. The nested filter factory is not invoked yet.
+  EXPECT_CALL(factory_callbacks, addStreamFilter(_))
+      .WillOnce(Invoke([](Envoy::Http::StreamFilterSharedPtr filter) {
+        EXPECT_NE(nullptr, dynamic_cast<LazyDelegatingStreamFilter*>(filter.get()));
+      }));
+  EXPECT_CALL(factory_callbacks, addAccessLogHandler(_))
+      .WillOnce(Invoke([](AccessLog::InstanceSharedPtr handler) {
+        EXPECT_NE(nullptr, dynamic_cast<LazyDelegatingStreamFilter*>(handler.get()));
+      }));
+  cb(factory_callbacks);
+}
+
+// When the match tree resolves to a skip, the nested filter is never created, no decode callbacks
+// are forwarded, and no access loggers run for the stream.
+TEST(LazyDelegatingFilterTest, SkipDoesNotCreateFilterOrLog) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.match_delegate_lazy_creation", "true"}});
+
+  std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
+      new Envoy::Http::MockStreamDecoderFilter());
+  auto access_logger = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
+
+  // The nested filter is never created, so none of its callbacks fire.
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeMetadata(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeTrailers(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeComplete()).Times(0);
+  // Access loggers of a skipped filter never run.
+  EXPECT_CALL(*access_logger, log(_, _)).Times(0);
+
+  bool factory_invoked = false;
+  Envoy::Http::FilterFactoryCb filter_factory =
+      [&](Envoy::Http::FilterChainFactoryCallbacks& creation_callbacks) {
+        factory_invoked = true;
+        creation_callbacks.addStreamDecoderFilter(decoder_filter);
+        creation_callbacks.addAccessLogHandler(access_logger);
+      };
+
+  auto match_tree =
+      createMatchingTree<Envoy::Http::Matching::HttpRequestHeadersDataInput, SkipAction>(
+          "match-header", "match");
+  auto delegating_filter = std::make_shared<LazyDelegatingStreamFilter>(match_tree, filter_factory);
+
+  Envoy::Http::RequestHeaderMapPtr request_headers{
+      new Envoy::Http::TestRequestHeaderMapImpl{{":authority", "host"},
+                                                {":path", "/"},
+                                                {":method", "GET"},
+                                                {"match-header", "match"},
+                                                {"content-type", "application/grpc"}}};
+  Envoy::Http::RequestTrailerMapPtr request_trailers{
+      new Envoy::Http::TestRequestTrailerMapImpl{{"test", "test"}}};
+  Envoy::Http::MetadataMap metadata_map;
+  Buffer::OwnedImpl buffer;
+
+  delegating_filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            delegating_filter->decodeHeaders(*request_headers, false));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->decodeData(buffer, false));
+  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::Continue,
+            delegating_filter->decodeMetadata(metadata_map));
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
+            delegating_filter->decodeTrailers(*request_trailers));
+  delegating_filter->decodeComplete();
+
+  // Simulate the stream end access log fan-out; nothing should be logged.
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Formatter::Context log_context;
+  delegating_filter->log(log_context, stream_info);
+
+  delegating_filter->onStreamComplete();
+  delegating_filter->onDestroy();
+  EXPECT_FALSE(factory_invoked);
+}
+
+// When the match tree resolves to a non-skip custom action, the nested filter is lazily created,
+// the pending action is dispatched via onMatchCallback, decode callbacks are forwarded, and the
+// nested filter's access loggers run at stream end.
+TEST(LazyDelegatingFilterTest, DelegatesAndDispatchesCustomAction) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.match_delegate_lazy_creation", "true"}});
+
+  std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
+      new Envoy::Http::MockStreamDecoderFilter());
+  auto access_logger = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
+
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, onMatchCallback(_));
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _));
+  EXPECT_CALL(*decoder_filter, decodeComplete());
+  EXPECT_CALL(*access_logger, log(_, _));
+
+  Envoy::Http::FilterFactoryCb filter_factory =
+      [&](Envoy::Http::FilterChainFactoryCallbacks& creation_callbacks) {
+        creation_callbacks.addStreamDecoderFilter(decoder_filter);
+        creation_callbacks.addAccessLogHandler(access_logger);
+      };
+
+  auto match_tree =
+      createMatchingTree<Envoy::Http::Matching::HttpRequestHeadersDataInput, TestAction>(
+          "match-header", "match");
+  auto delegating_filter = std::make_shared<LazyDelegatingStreamFilter>(match_tree, filter_factory);
+
+  Envoy::Http::RequestHeaderMapPtr request_headers{
+      new Envoy::Http::TestRequestHeaderMapImpl{{":authority", "host"},
+                                                {":path", "/"},
+                                                {":method", "GET"},
+                                                {"match-header", "match"},
+                                                {"content-type", "application/grpc"}}};
+
+  delegating_filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            delegating_filter->decodeHeaders(*request_headers, true));
+  delegating_filter->decodeComplete();
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Formatter::Context log_context;
+  delegating_filter->log(log_context, stream_info);
+}
+
+// The nested filter can be created lazily on request trailers, after the header evaluation was
+// incomplete, and the custom action is then dispatched to it.
+TEST(LazyDelegatingFilterTest, CustomActionDecodingTrailers) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.match_delegate_lazy_creation", "true"}});
+
+  std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
+      new Envoy::Http::MockStreamDecoderFilter());
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
+
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _));
+  EXPECT_CALL(*decoder_filter, decodeData(_, _));
+  EXPECT_CALL(*decoder_filter, decodeTrailers(_));
+  EXPECT_CALL(*decoder_filter, decodeComplete());
+
+  Envoy::Http::FilterFactoryCb filter_factory =
+      [&](Envoy::Http::FilterChainFactoryCallbacks& creation_callbacks) {
+        creation_callbacks.addStreamDecoderFilter(decoder_filter);
+      };
+
+  auto match_tree =
+      createMatchingTree<Envoy::Http::Matching::HttpRequestTrailersDataInput, TestAction>(
+          "match-trailer", "match");
+  auto delegating_filter = std::make_shared<LazyDelegatingStreamFilter>(match_tree, filter_factory);
+
+  Envoy::Http::RequestHeaderMapPtr request_headers{
+      new Envoy::Http::TestRequestHeaderMapImpl{{":authority", "host"},
+                                                {":path", "/"},
+                                                {":method", "GET"},
+                                                {"content-type", "application/grpc"}}};
+  Envoy::Http::RequestTrailerMapPtr request_trailers{
+      new Envoy::Http::TestRequestTrailerMapImpl{{"match-trailer", "match"}}};
+  Buffer::OwnedImpl buffer;
+
+  delegating_filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            delegating_filter->decodeHeaders(*request_headers, false));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->decodeData(buffer, false));
+
+  EXPECT_CALL(*decoder_filter, onMatchCallback(_));
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
+            delegating_filter->decodeTrailers(*request_trailers));
+  delegating_filter->decodeComplete();
+}
+
+// The encoder path skips the nested filter when the response matches a skip action.
+TEST(LazyDelegatingFilterTest, SkipActionEncodingHeaders) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.match_delegate_lazy_creation", "true"}});
+
+  std::shared_ptr<Envoy::Http::MockStreamEncoderFilter> encoder_filter(
+      new Envoy::Http::MockStreamEncoderFilter());
+  NiceMock<Envoy::Http::MockStreamEncoderFilterCallbacks> callbacks;
+
+  EXPECT_CALL(*encoder_filter, setEncoderFilterCallbacks(_)).Times(0);
+  EXPECT_CALL(*encoder_filter, encodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*encoder_filter, encode1xxHeaders(_)).Times(0);
+  EXPECT_CALL(*encoder_filter, encodeData(_, _)).Times(0);
+  EXPECT_CALL(*encoder_filter, encodeMetadata(_)).Times(0);
+  EXPECT_CALL(*encoder_filter, encodeTrailers(_)).Times(0);
+  EXPECT_CALL(*encoder_filter, encodeComplete()).Times(0);
+
+  Envoy::Http::FilterFactoryCb filter_factory =
+      [&](Envoy::Http::FilterChainFactoryCallbacks& creation_callbacks) {
+        creation_callbacks.addStreamEncoderFilter(encoder_filter);
+      };
+
+  auto match_tree =
+      createMatchingTree<Envoy::Http::Matching::HttpResponseHeadersDataInput, SkipAction>(
+          "match-header", "match");
+  auto delegating_filter = std::make_shared<LazyDelegatingStreamFilter>(match_tree, filter_factory);
+
+  Envoy::Http::ResponseHeaderMapPtr response_headers{new Envoy::Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"match-header", "match"}, {"content-type", "application/grpc"}}};
+  Envoy::Http::ResponseTrailerMapPtr response_trailers{
+      new Envoy::Http::TestResponseTrailerMapImpl{{"test", "test"}}};
+  Envoy::Http::MetadataMap metadata_map;
+  Buffer::OwnedImpl buffer;
+
+  delegating_filter->setEncoderFilterCallbacks(callbacks);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            delegating_filter->encodeHeaders(*response_headers, false));
+  EXPECT_EQ(Envoy::Http::Filter1xxHeadersStatus::Continue,
+            delegating_filter->encode1xxHeaders(*response_headers));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->encodeData(buffer, false));
+  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::Continue,
+            delegating_filter->encodeMetadata(metadata_map));
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
+            delegating_filter->encodeTrailers(*response_trailers));
+  delegating_filter->encodeComplete();
+}
+
+// When no match tree is configured, the lazy filter skips and never creates the nested filter.
+TEST(LazyDelegatingFilterTest, WithNoMatcher) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.match_delegate_lazy_creation", "true"}});
+
+  std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
+      new Envoy::Http::MockStreamDecoderFilter());
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
+
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeComplete()).Times(0);
+
+  Envoy::Http::FilterFactoryCb filter_factory =
+      [&](Envoy::Http::FilterChainFactoryCallbacks& creation_callbacks) {
+        creation_callbacks.addStreamDecoderFilter(decoder_filter);
+      };
+
+  auto delegating_filter = std::make_shared<LazyDelegatingStreamFilter>(nullptr, filter_factory);
+
+  Envoy::Http::RequestHeaderMapPtr request_headers{new Envoy::Http::TestRequestHeaderMapImpl{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+
+  delegating_filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            delegating_filter->decodeHeaders(*request_headers, false));
+  delegating_filter->decodeComplete();
 }
 
 } // namespace
