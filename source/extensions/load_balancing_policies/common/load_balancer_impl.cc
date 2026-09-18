@@ -1,5 +1,6 @@
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
+#include <algorithm>
 #include <atomic>
 #include <bitset>
 #include <cstdint>
@@ -1076,7 +1077,21 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   };
   // Populate EdfSchedulers for each valid HostsSource value for the host set at this priority.
   const auto& host_set = priority_set_.hostSetsPerPriority()[priority];
-  add_hosts_source(HostsSource(priority, HostsSource::SourceType::AllHosts), host_set->hosts());
+  // Populate AllHosts with hosts minus excluded hosts, so that panic mode
+  // does not route traffic to hosts that were excluded from the panic
+  // threshold calculation (e.g. EDS DRAINING endpoints).
+  {
+    const auto& hosts = host_set->hosts();
+    const auto& excluded = host_set->excludedHosts();
+    HostVector all_hosts;
+    all_hosts.reserve(hosts.size() - std::min(excluded.size(), hosts.size()));
+    for (const auto& host : hosts) {
+      if (std::find(excluded.begin(), excluded.end(), host) == excluded.end()) {
+        all_hosts.push_back(host);
+      }
+    }
+    add_hosts_source(HostsSource(priority, HostsSource::SourceType::AllHosts), all_hosts);
+  }
   add_hosts_source(HostsSource(priority, HostsSource::SourceType::HealthyHosts),
                    host_set->healthyHosts());
   add_hosts_source(HostsSource(priority, HostsSource::SourceType::DegradedHosts),
