@@ -641,6 +641,13 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
+    // For non-streaming unary requests, buffer until we have the complete HTTP/2 payload.
+    // This avoids a race in the underlying Transcoder parser where split JSON chunks 
+    // can cause it to prematurely evaluate the frame boundary and bypass translation.
+    if (!end_stream && !method_->descriptor_->client_streaming()) {
+      return Http::FilterDataStatus::StopIterationAndBuffer;
+    }
+
     if (end_stream) {
       request_in_.finish();
     }
