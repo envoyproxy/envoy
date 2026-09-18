@@ -37,8 +37,8 @@ final class LoggerTests: XCTestCase {
       }
       .addNativeFilter(
         name: "test_logger",
-        // swiftlint:disable:next line_length
-        typedConfig: "[type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger]{}")
+        typedConfigData: makeTestLoggerAnyProto()
+      )
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }
