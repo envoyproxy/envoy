@@ -136,20 +136,6 @@ void DynamicModuleSpan::setTag(absl::string_view name, absl::string_view value) 
   config_->on_span_set_tag_(in_module_span_, key_buf, val_buf);
 }
 
-void DynamicModuleSpan::setTags(
-    absl::Span<const std::pair<absl::string_view, absl::string_view>> tags) {
-  if (tags.empty()) {
-    return;
-  }
-  std::vector<envoy_dynamic_module_type_envoy_key_value_pair> pairs;
-  pairs.reserve(tags.size());
-  for (const auto& [name, value] : tags) {
-    pairs.push_back({const_cast<char*>(name.data()), name.size(), const_cast<char*>(value.data()),
-                     value.size()});
-  }
-  config_->on_span_set_tag_batch_(in_module_span_, pairs.data(), pairs.size());
-}
-
 void DynamicModuleSpan::log(SystemTime timestamp, const std::string& event) {
   const int64_t timestamp_ns =
       std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp.time_since_epoch()).count();

@@ -2559,13 +2559,12 @@ void envoy_dynamic_module_callback_http_span_set_tag_batch(
   if (span_ptr == nullptr || tags_size == 0) {
     return;
   }
-  // absl::string_view is {const char*, size_t}, so pair<string_view, string_view> has the same
-  // layout as the C struct {key_ptr, key_length, value_ptr, value_length}. No conversion needed.
-  static_assert(sizeof(std::pair<absl::string_view, absl::string_view>) ==
-                sizeof(envoy_dynamic_module_type_module_key_value_pair));
   auto* span = static_cast<Tracing::Span*>(span_ptr);
-  auto* pairs = reinterpret_cast<const std::pair<absl::string_view, absl::string_view>*>(tags);
-  span->setTags(absl::MakeConstSpan(pairs, tags_size));
+  span->reserveTags(tags_size);
+  for (size_t i = 0; i < tags_size; i++) {
+    span->setTag(absl::string_view(tags[i].key_ptr, tags[i].key_length),
+                 absl::string_view(tags[i].value_ptr, tags[i].value_length));
+  }
 }
 
 void envoy_dynamic_module_callback_http_span_set_operation(

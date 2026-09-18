@@ -2269,8 +2269,22 @@ impl EnvoySpan for EnvoySpanImpl {
   }
 
   fn set_tags(&self, tags: &[(&str, &str)]) {
-    // Safety: &str is a fat pointer (*const u8, usize), so (&str, &str) has the same layout as
-    // the C struct {key_ptr, key_length, value_ptr, value_length}. No conversion needed.
+    type TagPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: TagPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<TagPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
     unsafe {
       abi::envoy_dynamic_module_callback_http_span_set_tag_batch(
         self.raw_ptr,
@@ -2464,8 +2478,22 @@ impl EnvoyChildSpan for EnvoyChildSpanImpl {
   }
 
   fn set_tags(&self, tags: &[(&str, &str)]) {
-    // Safety: &str is a fat pointer (*const u8, usize), so (&str, &str) has the same layout as
-    // the C struct {key_ptr, key_length, value_ptr, value_length}. No conversion needed.
+    type TagPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: TagPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<TagPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
     unsafe {
       abi::envoy_dynamic_module_callback_http_span_set_tag_batch(
         self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,

@@ -133,9 +133,9 @@ TEST_F(DriverTest, SpanSetTagBatch) {
 
   auto span =
       driver_->startSpan(tracing_config_, trace_context, stream_info_, "test_operation", decision);
-  std::vector<std::pair<absl::string_view, absl::string_view>> tags = {
-      {"batch.key1", "batch.value1"}, {"batch.key2", "batch.value2"}};
-  span->setTags(tags);
+  span->reserveTags(2);
+  span->setTag("batch.key1", "batch.value1");
+  span->setTag("batch.key2", "batch.value2");
 }
 
 TEST_F(DriverTest, SpanLog) {

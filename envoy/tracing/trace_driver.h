@@ -76,14 +76,10 @@ public:
   virtual void setTag(absl::string_view name, absl::string_view value) PURE;
 
   /**
-   * Set multiple tags on this span.
-   * @param tags name-value pairs to set
+   * Reserve capacity for additional tags.
+   * @param size number of tags that will be set
    */
-  virtual void setTags(absl::Span<const std::pair<absl::string_view, absl::string_view>> tags) {
-    for (const auto& [name, value] : tags) {
-      setTag(name, value);
-    }
-  }
+  virtual void reserveTags(size_t /* size */) {}
 
   /**
    * Record an event associated with a span, to be handled in an implementation-dependent fashion.
