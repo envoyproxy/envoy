@@ -387,7 +387,8 @@ pub trait EnvoyCluster: Send + Sync {
   /// the overhead of updating the priority set per host.
   ///
   /// Returns the host pointers if all hosts were added successfully, or `None` if any host failed
-  /// (e.g., invalid address or weight). On failure, no hosts are added.
+  /// (e.g., invalid address or weight) or `addresses` and `weights` have different lengths. On
+  /// failure, no hosts are added.
   fn add_hosts(
     &self,
     addresses: &[String],
@@ -436,7 +437,8 @@ pub trait EnvoyCluster: Send + Sync {
   /// The number of triples per host must be the same for all hosts (pad with empty triples
   /// if needed) or the outer slice can be empty to skip metadata entirely.
   ///
-  /// Returns the host pointers on success, or `None` if any host failed.
+  /// Returns the host pointers on success, or `None` if any host failed or the per-host slice
+  /// lengths are inconsistent.
   fn add_hosts_with_locality(
     &self,
     addresses: &[String],
@@ -453,7 +455,8 @@ pub trait EnvoyCluster: Send + Sync {
   /// Each address must be in `ip:port` format (e.g., `127.0.0.1:8080`).
   /// Each weight must be between 1 and 128.
   ///
-  /// Returns the host pointers if all hosts were added successfully, or `None` if any host failed.
+  /// Returns the host pointers if all hosts were added successfully, or `None` if any host failed
+  /// or `addresses` and `weights` have different lengths.
   fn add_hosts_to_priority(
     &self,
     priority: u32,
@@ -469,7 +472,8 @@ pub trait EnvoyCluster: Send + Sync {
   ///
   /// Each address must be in `ip:port` format. Each weight must be between 1 and 128.
   ///
-  /// Returns the host pointers on success, or `None` if any host failed.
+  /// Returns the host pointers on success, or `None` if any host failed or the per-host slice
+  /// lengths are inconsistent.
   fn add_hosts_with_locality_to_priority(
     &self,
     priority: u32,
@@ -1149,8 +1153,19 @@ impl EnvoyClusterImpl {
     metadata: &[Vec<(String, String, String)>],
   ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
     let count = addresses.len();
+    // The host reads weights and localities up to count and expects a rectangular metadata block, so
+    // reject any inconsistent length before crossing the ABI to avoid an out of bounds read.
     if hostnames.is_some_and(|hostnames| hostnames.len() != count) {
       return None;
+    }
+    if weights.len() != count || localities.len() != count {
+      return None;
+    }
+    if !metadata.is_empty() {
+      let pairs_per_host = metadata[0].len();
+      if metadata.len() != count || metadata.iter().any(|host| host.len() != pairs_per_host) {
+        return None;
+      }
     }
     let address_buffers: Vec<abi::envoy_dynamic_module_type_module_buffer> =
       addresses.iter().map(|a| str_to_module_buffer(a)).collect();
@@ -3247,7 +3262,7 @@ mod tests {
   }
 
   #[test]
-  fn add_hosts_with_hostnames_dispatches_and_validates_lengths() {
+  fn add_hosts_dispatches_and_validates_slice_lengths() {
     use std::sync::atomic::Ordering;
 
     crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.store(0, Ordering::SeqCst);
@@ -3315,6 +3330,55 @@ mod tests {
     assert_eq!(
       crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
       1
+    );
+
+    // Mismatched non-hostname slice lengths must be rejected before the ABI call.
+    let localities = vec![
+      (
+        "region".to_owned(),
+        "zone".to_owned(),
+        "sub-zone".to_owned(),
+      ),
+      (
+        "region".to_owned(),
+        "zone".to_owned(),
+        "sub-zone".to_owned(),
+      ),
+    ];
+    assert!(cluster.add_hosts(&addresses, &weights[..1]).is_none());
+    assert!(cluster
+      .add_hosts_with_locality(&addresses, &weights, &localities[..1], &[])
+      .is_none());
+    let metadata_short = vec![vec![("f".to_owned(), "k".to_owned(), "v".to_owned())]];
+    assert!(cluster
+      .add_hosts_with_locality(&addresses, &weights, &localities, &metadata_short)
+      .is_none());
+    let metadata_ragged = vec![
+      vec![("f".to_owned(), "k".to_owned(), "v".to_owned())],
+      Vec::new(),
+    ];
+    assert!(cluster
+      .add_hosts_with_locality(&addresses, &weights, &localities, &metadata_ragged)
+      .is_none());
+
+    // The rejected calls must not reach the ABI, so the call count is unchanged.
+    assert_eq!(
+      crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
+      1
+    );
+
+    // A rectangular metadata block with matching lengths still dispatches.
+    let metadata_ok = vec![
+      vec![("f".to_owned(), "k".to_owned(), "v0".to_owned())],
+      vec![("f".to_owned(), "k".to_owned(), "v1".to_owned())],
+    ];
+    let hosts = cluster
+      .add_hosts_with_locality(&addresses, &weights, &localities, &metadata_ok)
+      .expect("matching rectangular slices must dispatch");
+    assert_eq!(hosts.len(), 2);
+    assert_eq!(
+      crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
+      2
     );
   }
 
