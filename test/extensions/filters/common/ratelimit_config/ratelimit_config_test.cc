@@ -496,6 +496,7 @@ filter_metadata:
     test:
       requests_per_unit: 42
       unit: HOUR
+      unit_multiplier: 5
   )EOF";
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
 
@@ -504,7 +505,7 @@ filter_metadata:
 
   std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
       {{{"generic_key", "limited_fake_key"}}}};
-  expected_descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR};
+  expected_descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR, 5};
   EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
 }
 
@@ -528,7 +529,7 @@ TEST_F(RateLimitConfigTest, StaticLimitOverrideApplied) {
 
   std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
       {{{"generic_key", "limited_fake_key"}}}};
-  expected_descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR};
+  expected_descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR, 1};
   EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
 }
 
@@ -572,6 +573,7 @@ filter_metadata:
   ASSERT_TRUE(descriptors[0].limit_.has_value());
   EXPECT_EQ(42, descriptors[0].limit_->requests_per_unit_);
   EXPECT_EQ(envoy::type::v3::RateLimitUnit::HOUR, descriptors[0].limit_->unit_);
+  EXPECT_EQ(1, descriptors[0].limit_->unit_multiplier_);
 }
 
 // When the override metadata is missing, the descriptor is still produced without a limit.

@@ -1328,6 +1328,7 @@ filter_metadata:
     test:
       requests_per_unit: 42
       unit: HOUR
+      unit_multiplier: 5
   )EOF";
 
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
@@ -1335,7 +1336,7 @@ filter_metadata:
 
   auto descriptors =
       std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "limited_fake_key"}}}});
-  descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR};
+  descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR, 5};
   EXPECT_THAT(descriptors, testing::ContainerEq(descriptors_));
 }
 
@@ -1424,6 +1425,66 @@ filter_metadata:
               testing::ContainerEq(descriptors_));
 }
 
+TEST_F(RateLimitPolicyEntryTest, DynamicMetadataRateLimitOverrideInvalidUnitMultiplier) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: limited_fake_key
+limit:
+ dynamic_metadata:
+   metadata_key:
+     key: test.filter.key
+     path:
+      - key: test
+  )EOF";
+
+  setupTest(yaml);
+
+  std::string metadata_yaml = R"EOF(
+filter_metadata:
+  test.filter.key:
+    test:
+      requests_per_unit: 42
+      unit: HOUR
+      unit_multiplier: invalid
+  )EOF";
+
+  TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "limited_fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, DynamicMetadataRateLimitOverrideZeroUnitMultiplier) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: limited_fake_key
+limit:
+ dynamic_metadata:
+   metadata_key:
+     key: test.filter.key
+     path:
+      - key: test
+  )EOF";
+
+  setupTest(yaml);
+
+  std::string metadata_yaml = R"EOF(
+filter_metadata:
+  test.filter.key:
+    test:
+      requests_per_unit: 42
+      unit: HOUR
+      unit_multiplier: 0
+  )EOF";
+
+  TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "limited_fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
 TEST_F(RateLimitPolicyEntryTest, StaticRateLimitOverride) {
   const std::string yaml = R"EOF(
 actions:
@@ -1433,6 +1494,7 @@ limit:
  rate_limit:
    requests_per_unit: 42
    unit: HOUR
+   unit_multiplier: 5
   )EOF";
 
   setupTest(yaml);
@@ -1441,7 +1503,7 @@ limit:
 
   auto descriptors =
       std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "limited_fake_key"}}}});
-  descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR};
+  descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR, 5};
   EXPECT_THAT(descriptors, testing::ContainerEq(descriptors_));
 }
 
