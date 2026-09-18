@@ -991,9 +991,8 @@ FilterDataStatus Filter::handleDataBufferedMode(ProcessorState& state, Buffer::I
 
 FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
                                                     bool end_stream) {
-
   // For empty data chunk with end_stream false, do not send it to the ext_proc server.
-  if (data.length() == 0 && end_stream == false) {
+  if (data.length() == 0 && !end_stream) {
     return state.getBodyCallbackResultInStreamedMode(end_stream);
   }
 
@@ -1097,7 +1096,8 @@ FilterDataStatus Filter::handleDataBufferedPartialMode(ProcessorState& state,
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
-  if (data.length() != 0 || end_stream != false) {
+  // Don't count empty body chunk with false end_stream.
+  if (data.length() != 0 || end_stream) {
     state.setBodyReceived(true);
   }
 
