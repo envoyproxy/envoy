@@ -60,11 +60,11 @@ std::string makeArrayChildPath(absl::string_view parent_path, size_t index) {
 
 } // namespace
 
-Schema::Property::Property(std::string n, Schema s)
-    : name(std::move(n)), schema(std::make_shared<Schema>(std::move(s))) {}
+Schema::Property::Property(std::string n, Schema s, std::vector<std::string> a)
+    : name(std::move(n)), schema(std::make_shared<Schema>(std::move(s))), aliases(std::move(a)) {}
 
-Schema::Property::Property(const char* n, Schema s)
-    : name(n), schema(std::make_shared<Schema>(std::move(s))) {}
+Schema::Property::Property(const char* n, Schema s, std::vector<std::string> a)
+    : name(n), schema(std::make_shared<Schema>(std::move(s))), aliases(std::move(a)) {}
 
 Schema Schema::string() { return Schema(Type::String); }
 
@@ -227,24 +227,72 @@ absl::Status Schema::validateObject(const nlohmann::json& json, absl::string_vie
         "field '", path, "' has invalid type: expected object, got ", jsonTypeName(json)));
   }
   for (const Property& prop : properties_) {
-    auto it = json.find(prop.name);
-    const std::string child_path = makeChildPath(path, prop.name);
-    if (it == json.end()) {
-      if (prop.schema != nullptr && prop.schema->isRequired()) {
-        return absl::InvalidArgumentError(absl::StrCat("missing required field: ", child_path));
+    bool found = false;
+    auto validate_key = [&](const std::string& key) -> absl::Status {
+      auto it = json.find(key);
+      if (it == json.end()) {
+        return absl::OkStatus();
       }
-    } else if (prop.schema != nullptr) {
-      auto status = prop.schema->validate(it.value(), child_path);
+      found = true;
+      if (prop.schema != nullptr) {
+        return prop.schema->validate(it.value(), makeChildPath(path, key));
+      }
+      return absl::OkStatus();
+    };
+
+    absl::Status status = validate_key(prop.name);
+    if (!status.ok()) {
+      return status;
+    }
+    for (const std::string& alias : prop.aliases) {
+      status = validate_key(alias);
       if (!status.ok()) {
         return status;
       }
+    }
+    if (!found && prop.schema != nullptr && prop.schema->isRequired()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required field: ", makeChildPath(path, prop.name)));
+    }
+  }
+  auto is_property_set = [&](absl::string_view prop_name) -> bool {
+    auto is_non_null = [&](const std::string& key) -> bool {
+      auto it = json.find(key);
+      return it != json.end() && !it->is_null();
+    };
+    for (const Property& prop : properties_) {
+      if (prop.name == prop_name) {
+        if (is_non_null(prop.name)) {
+          return true;
+        }
+        for (const std::string& alias : prop.aliases) {
+          if (is_non_null(alias)) {
+            return true;
+          }
+        }
+        return false;
+      }
+    }
+    return is_non_null(std::string(prop_name));
+  };
+  for (const auto& group : at_most_one_of_) {
+    std::vector<std::string> present;
+    for (const std::string& prop_name : group) {
+      if (is_property_set(prop_name)) {
+        present.push_back(prop_name);
+      }
+    }
+    if (present.size() > 1) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "field '", path, "' sets mutually exclusive fields: ", absl::StrJoin(present, ", ")));
     }
   }
   if (!allow_unknown_fields_) {
     for (auto it = json.begin(); it != json.end(); ++it) {
       bool found = false;
       for (const Property& prop : properties_) {
-        if (prop.name == it.key()) {
+        if (prop.name == it.key() ||
+            std::find(prop.aliases.begin(), prop.aliases.end(), it.key()) != prop.aliases.end()) {
           found = true;
           break;
         }
