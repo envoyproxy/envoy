@@ -19,6 +19,7 @@
 #include "source/server/config_validation/server.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/extensions/filters/http/ext_authz/callout_state_test_lb.h"
 #include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
@@ -61,6 +62,9 @@ struct GrpcInitializeConfigOpts {
   bool enforce_response_header_limits = false;
   uint32_t status_on_error_code = 0;
   bool shadow_mode = false;
+  // Install a custom load balancer on the ext_authz cluster that writes dynamic metadata and
+  // FilterState onto the Check-call stream, and configure the filter to propagate both downstream.
+  bool propagate_call_state = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -138,6 +142,21 @@ public:
       ext_authz_cluster->set_name("ext_authz_cluster");
       ConfigHelper::setHttp2(*ext_authz_cluster);
 
+      if (opts.propagate_call_state) {
+        // Route the Check call through a custom LB that stamps callout-stream state, mirroring a
+        // production custom callout-cluster load balancer.
+        ext_authz_cluster->set_lb_policy(
+            envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG);
+        TestUtility::loadFromYaml(R"EOF(
+        policies:
+        - typed_extension_config:
+            name: envoy.load_balancers.ext_authz_callout_state
+            typed_config:
+              "@type": type.googleapis.com/test.integration.custom_lb.CustomLbConfig
+        )EOF",
+                                  *ext_authz_cluster->mutable_load_balancing_policy());
+      }
+
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz_cluster",
                      fake_upstreams_.back()->localAddress());
@@ -184,6 +203,11 @@ public:
 
       if (opts.shadow_mode) {
         proto_config_.set_shadow_mode(true);
+      }
+
+      if (opts.propagate_call_state) {
+        proto_config_.add_propagate_call_metadata_namespaces(std::string(CalloutMetadataNamespace));
+        proto_config_.add_propagate_call_filter_state_keys(std::string(CalloutFilterStateKey));
       }
 
       if (opts.status_on_error_code > 0) {
@@ -3452,6 +3476,46 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedReachesUpstream) {
   const std::string log = waitForAccessLog(access_log_name_);
   EXPECT_THAT(log, testing::HasSubstr("DENIED"));
   EXPECT_THAT(log, testing::HasSubstr("403"));
+
+  cleanup();
+}
+
+// Verify that dynamic metadata and FilterState a custom callout-cluster load balancer writes on the
+// Check-call stream are copied onto the downstream request when propagate_call_metadata_namespaces
+// and propagate_call_filter_state_keys are set, so downstream access logs can observe them.
+TEST_P(ExtAuthzGrpcIntegrationTest, PropagatesCalloutStreamStateToDownstream) {
+  // Only the Envoy gRPC client routes the Check call through the cluster's load balancer; the
+  // Google gRPC client uses its own stack and exposes no Check-call stream to the filter.
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    GTEST_SKIP();
+  }
+
+  GrpcInitializeConfigOpts opts;
+  opts.propagate_call_state = true;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  useAccessLog(absl::StrCat("%DYNAMIC_METADATA(", CalloutMetadataNamespace,
+                            ":propagated_value)% %FILTER_STATE(", CalloutFilterStateKey,
+                            ":PLAIN)%"));
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  // Auth server allows the request.
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  waitForSuccessfulUpstreamResponse("200");
+
+  // Both the callout-stream dynamic metadata and FilterState reach the downstream access log.
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, testing::HasSubstr(std::string(CalloutMetadataValue)));
+  EXPECT_THAT(log, testing::HasSubstr(std::string(CalloutFilterStateValue)));
 
   cleanup();
 }
