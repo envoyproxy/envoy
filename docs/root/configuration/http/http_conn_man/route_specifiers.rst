@@ -115,7 +115,7 @@ Two constraints are worth calling out:
 * The request headers are read-only. Header mutations belong in the header transforms of the
   returned route, so that Envoy applies them at the right point of the request lifetime.
 
-The usual way to implement one is to return a ``DelegatingRoute`` (see
+The usual way to implement one is to return a ``DelegatingRoute`` or a ``DelegatingRouteEntry`` (see
 :repo:`source/common/router/delegating_route_impl.h`) that wraps the route the specifier was given
 and overrides the few methods it cares about. A ``nullptr`` route, or a route with no route entry
 behind it such as a redirect or a direct response, has nothing to wrap, and is typically returned
