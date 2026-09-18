@@ -25,6 +25,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
+    "filter_new_panic" => Some(Box::new(FilterNewPanicConfig {})),
     "local_reply_response_headers" => Some(Box::new(LocalReplyResponseHeadersConfig {})),
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
       headers_to_add: String::from_utf8(config.to_owned()).unwrap(),
@@ -541,6 +542,16 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PassthroughHttpFilterConfig
     envoy_log_error!("new_http_filter called");
     envoy_log_critical!("new_http_filter called");
     Box::new(PassthroughHttpFilter {})
+  }
+}
+
+/// A filter configuration whose filter constructor panics. The SDK catches the panic and returns a
+/// null filter, so Envoy must fail the request closed instead of crashing.
+struct FilterNewPanicConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FilterNewPanicConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    panic!("filter constructor failed on purpose");
   }
 }
 
