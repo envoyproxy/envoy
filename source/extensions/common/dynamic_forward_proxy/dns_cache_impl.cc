@@ -641,6 +641,22 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       primary_host_info->refresh_timer_->enableTimer(refresh_interval);
       ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', (failure) raw={} ms armed={} ms",
                 host, raw_backoff_ms.count(), refresh_interval.count());
+    } else if (current_address != nullptr) {
+      // This is a failed refresh for a host that had already resolved successfully in the
+      // past. resolutionStatus_ is intentionally left untouched above so that the last known
+      // good address keeps being served (see the comment above address_changed). However,
+      // since disable_dns_refresh_on_failure is set the refresh timer is *not* re-armed, so
+      // nothing will ever revisit this entry again: it would be served forever, well past its
+      // TTL, even after the authoritative DNS record changes to a different address (see
+      // https://github.com/envoyproxy/envoy/issues/46402). Mark the entry as failed so that
+      // the disable_dns_refresh_on_failure check in loadDnsCacheEntryWithForceRefresh() treats
+      // the next active lookup as a cache miss and forces a fresh resolution attempt.
+      primary_host_info->host_info_->setDetails(details_with_maybe_trace);
+      primary_host_info->host_info_->setResolutionStatus(status);
+      ENVOY_LOG(debug,
+                "host '{}' refresh failed with disable_dns_refresh_on_failure set; marking the "
+                "stale cache entry as failed so the next lookup forces re-resolution",
+                host);
     }
   }
 }
