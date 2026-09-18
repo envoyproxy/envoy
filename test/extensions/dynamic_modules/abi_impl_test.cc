@@ -175,8 +175,8 @@ TEST(CommonAbiImplTest, LogUsesModuleSuppliedSourceLocation) {
   uint32_t line = 10;
   for (const auto& [abi_level, spdlog_level] : cases) {
     sink.captured_ = false;
-    envoy_dynamic_module_callback_log(abi_level, {message.data(), message.size()},
-                                      {file.data(), file.size()}, line);
+    envoy_dynamic_module_callback_log_v2(abi_level, {message.data(), message.size()},
+                                         {file.data(), file.size()}, line);
     EXPECT_TRUE(sink.captured_);
     EXPECT_EQ(file, sink.filename_);
     EXPECT_EQ(static_cast<int>(line), sink.line_);
@@ -197,10 +197,45 @@ TEST(CommonAbiImplTest, LogHandlesEmptySourceFile) {
   SourceLocationCapturingSink sink(Logger::Registry::getSink());
 
   const std::string message = "no source file";
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
-                                    {message.data(), message.size()}, {nullptr, 0}, 0);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                       {message.data(), message.size()}, {nullptr, 0}, 0);
   EXPECT_TRUE(sink.captured_);
   EXPECT_EQ("", sink.filename_);
+
+  logger.set_level(original_level);
+}
+
+// Verifies that the reused source file buffer reflects only the bytes reported by each call, so a
+// shorter path never inherits stale trailing bytes from a longer one and the module-supplied
+// length is honored even when the module bytes are not null-terminated.
+TEST(CommonAbiImplTest, LogHonorsSourceFileLengthAcrossReusedBuffer) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "reuse buffer";
+  const std::string long_file = "a/very/long/module/source/path/handler.rs";
+  const std::string short_file = "a.rs";
+  // The trailing bytes past the reported length prove only the length is copied.
+  const std::string backing = "prefix.rs_TRAILING";
+  const std::pair<absl::string_view, absl::string_view> cases[] = {
+      {long_file, long_file},
+      {short_file, short_file},
+      {absl::string_view(backing.data(), 9), "prefix.rs"},
+      {absl::string_view(nullptr, 0), ""},
+  };
+  uint32_t line = 1;
+  for (const auto& [source_file, expected_filename] : cases) {
+    sink.captured_ = false;
+    envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                         {message.data(), message.size()},
+                                         {source_file.data(), source_file.size()}, line);
+    EXPECT_TRUE(sink.captured_);
+    EXPECT_EQ(expected_filename, sink.filename_);
+    EXPECT_EQ(static_cast<int>(line), sink.line_);
+    ++line;
+  }
 
   logger.set_level(original_level);
 }
@@ -214,16 +249,16 @@ TEST(CommonAbiImplTest, LogIgnoresOffAndOutOfRangeLevels) {
 
   const std::string message = "ignored";
   const std::string file = "my_module.rs";
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Off,
-                                    {message.data(), message.size()}, {file.data(), file.size()},
-                                    1);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Off,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       1);
   EXPECT_FALSE(sink.captured_);
   // A value further outside the enum range would be undefined behavior to load, so use one past
   // Off.
   const auto out_of_range =
       static_cast<envoy_dynamic_module_type_log_level>(envoy_dynamic_module_type_log_level_Off + 1);
-  envoy_dynamic_module_callback_log(out_of_range, {message.data(), message.size()},
-                                    {file.data(), file.size()}, 1);
+  envoy_dynamic_module_callback_log_v2(out_of_range, {message.data(), message.size()},
+                                       {file.data(), file.size()}, 1);
   EXPECT_FALSE(sink.captured_);
 
   logger.set_level(original_level);
@@ -239,16 +274,46 @@ TEST(CommonAbiImplTest, LogRespectsConfiguredLevel) {
 
   const std::string message = "level gated";
   const std::string file = "my_module.rs";
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
-                                    {message.data(), message.size()}, {file.data(), file.size()},
-                                    1);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       1);
   EXPECT_FALSE(sink.captured_);
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Error,
-                                    {message.data(), message.size()}, {file.data(), file.size()},
-                                    42);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Error,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       42);
   EXPECT_TRUE(sink.captured_);
   EXPECT_EQ(file, sink.filename_);
   EXPECT_EQ(42, sink.line_);
+
+  logger.set_level(original_level);
+}
+
+// Verifies that the deprecated two-argument callback still logs at every level and reports an empty
+// source location.
+TEST(CommonAbiImplTest, LogDeprecatedOverloadReportsEmptySourceLocation) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "deprecated overload message";
+  const std::pair<envoy_dynamic_module_type_log_level, spdlog::level::level_enum> cases[] = {
+      {envoy_dynamic_module_type_log_level_Trace, spdlog::level::trace},
+      {envoy_dynamic_module_type_log_level_Debug, spdlog::level::debug},
+      {envoy_dynamic_module_type_log_level_Info, spdlog::level::info},
+      {envoy_dynamic_module_type_log_level_Warn, spdlog::level::warn},
+      {envoy_dynamic_module_type_log_level_Error, spdlog::level::err},
+      {envoy_dynamic_module_type_log_level_Critical, spdlog::level::critical},
+  };
+  for (const auto& [abi_level, spdlog_level] : cases) {
+    sink.captured_ = false;
+    envoy_dynamic_module_callback_log(abi_level, {message.data(), message.size()});
+    EXPECT_TRUE(sink.captured_);
+    EXPECT_EQ("", sink.filename_);
+    EXPECT_EQ(0, sink.line_);
+    EXPECT_EQ(spdlog_level, sink.level_);
+    EXPECT_NE(std::string::npos, sink.formatted_.find(message));
+  }
 
   logger.set_level(original_level);
 }
@@ -409,6 +474,121 @@ TEST(CommonAbiImplTest, SharedDataRegistryMultipleKeys) {
 }
 
 // =============================================================================
+// Runtime Tests
+// =============================================================================
+
+TEST(CommonAbiImplTest, GetRuntimeBoolReturnsConfiguredValue) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.runtime_loader_.snapshot_, getBoolean(absl::string_view("some.flag"), false))
+      .WillOnce(Return(true));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"some.flag", 9};
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_runtime_bool(key, false));
+}
+
+TEST(CommonAbiImplTest, GetRuntimeIntReturnsConfiguredValue) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.runtime_loader_.snapshot_, getInteger(absl::string_view("some.limit"), 7))
+      .WillOnce(Return(42));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"some.limit", 10};
+  EXPECT_EQ(42u, envoy_dynamic_module_callback_get_runtime_int(key, 7));
+}
+
+TEST(CommonAbiImplTest, GetRuntimeNumberReturnsConfiguredValue) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.runtime_loader_.snapshot_, getDouble(absl::string_view("some.ratio"), 0.5))
+      .WillOnce(Return(0.25));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"some.ratio", 10};
+  EXPECT_DOUBLE_EQ(0.25, envoy_dynamic_module_callback_get_runtime_number(key, 0.5));
+}
+
+// Verifies that the number callback reads a negative value, which the integer callback stores no
+// integer for and would therefore answer with its default. This is the reason it exists alongside
+// the integer callback.
+TEST(CommonAbiImplTest, GetRuntimeNumberReadsNegativeValue) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.runtime_loader_.snapshot_, getDouble(absl::string_view("some.ratio"), 0))
+      .WillOnce(Return(-1.5));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"some.ratio", 10};
+  EXPECT_DOUBLE_EQ(-1.5, envoy_dynamic_module_callback_get_runtime_number(key, 0));
+}
+
+// Verifies that the key buffer is forwarded using its explicit length rather than being treated as
+// a null terminated string, since module buffers are not required to be null terminated.
+TEST(CommonAbiImplTest, GetRuntimeKeyHonorsBufferLength) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.runtime_loader_.snapshot_, getBoolean(absl::string_view("some.flag"), false))
+      .WillOnce(Return(true));
+  EXPECT_CALL(context.runtime_loader_.snapshot_, getInteger(absl::string_view("some.flag"), 0))
+      .WillOnce(Return(5));
+  EXPECT_CALL(context.runtime_loader_.snapshot_, getDouble(absl::string_view("some.flag"), 0))
+      .WillOnce(Return(1.5));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  // Only the first 9 bytes form the key; the trailing bytes must be ignored.
+  envoy_dynamic_module_type_module_buffer key = {"some.flag.and.then.some", 9};
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_runtime_bool(key, false));
+  EXPECT_EQ(5u, envoy_dynamic_module_callback_get_runtime_int(key, 0));
+  EXPECT_DOUBLE_EQ(1.5, envoy_dynamic_module_callback_get_runtime_number(key, 0));
+}
+
+// Verifies that a key the runtime does not know about yields the caller supplied default, which
+// the snapshot itself is responsible for returning.
+TEST(CommonAbiImplTest, GetRuntimeMissingKeyReturnsDefault) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.runtime_loader_.snapshot_, getBoolean(testing::_, testing::_))
+      .WillByDefault(testing::ReturnArg<1>());
+  ON_CALL(context.runtime_loader_.snapshot_, getInteger(testing::_, testing::_))
+      .WillByDefault(testing::ReturnArg<1>());
+  ON_CALL(context.runtime_loader_.snapshot_, getDouble(testing::_, testing::_))
+      .WillByDefault(testing::ReturnArg<1>());
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"missing.key", 11};
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_runtime_bool(key, true));
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_bool(key, false));
+  EXPECT_EQ(1234u, envoy_dynamic_module_callback_get_runtime_int(key, 1234));
+  EXPECT_DOUBLE_EQ(2.5, envoy_dynamic_module_callback_get_runtime_number(key, 2.5));
+}
+
+// Verifies that the callbacks fall back to the caller supplied default, rather than failing
+// closed on a fixed value, when the server context has not been installed.
+TEST(CommonAbiImplTest, GetRuntimeBeforeServerContextReturnsDefault) {
+  envoy_dynamic_module_type_module_buffer key = {"some.flag", 9};
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_runtime_bool(key, true));
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_bool(key, false));
+  EXPECT_EQ(99u, envoy_dynamic_module_callback_get_runtime_int(key, 99));
+  EXPECT_DOUBLE_EQ(9.5, envoy_dynamic_module_callback_get_runtime_number(key, 9.5));
+}
+
+// Verifies that calling off the main thread is legal and simply yields the default. The server
+// context is a thread local singleton installed only on the main thread, so a worker thread finds
+// no context; unlike the main-thread-only callbacks this must not trip an ENVOY_BUG.
+TEST(CommonAbiImplTest, GetRuntimeOffMainThreadReturnsDefaultWithoutEnvoyBug) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.runtime_loader_.snapshot_, getBoolean(testing::_, testing::_)).Times(0);
+  EXPECT_CALL(context.runtime_loader_.snapshot_, getInteger(testing::_, testing::_)).Times(0);
+  EXPECT_CALL(context.runtime_loader_.snapshot_, getDouble(testing::_, testing::_)).Times(0);
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  std::thread t([] {
+    envoy_dynamic_module_type_module_buffer key = {"some.flag", 9};
+    EXPECT_TRUE(envoy_dynamic_module_callback_get_runtime_bool(key, true));
+    EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_bool(key, false));
+    EXPECT_EQ(7u, envoy_dynamic_module_callback_get_runtime_int(key, 7));
+    EXPECT_DOUBLE_EQ(3.5, envoy_dynamic_module_callback_get_runtime_number(key, 3.5));
+  });
+  t.join();
+}
+
+// =============================================================================
 // Weak symbol stub tests for network filter, listener filter, access logger, and
 // UDP listener filter callbacks. These verify that the weak stubs installed in
 // abi_impl.cc trigger ENVOY_BUG when called from a context that does not compile
@@ -466,6 +646,13 @@ WEAK_STUB(BootstrapExtensionTimerEnabled,
 
 WEAK_STUB(BootstrapExtensionTimerDelete,
           envoy_dynamic_module_callback_bootstrap_extension_timer_delete(nullptr))
+WEAK_STUB(BootstrapExtensionFileWatcherAddWatch,
+          envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(nullptr,
+                                                                                   {nullptr, 0}, 0))
+WEAK_STUB(BootstrapExtensionEnableClusterLifecycle,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionEnableListenerLifecycle,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr))
 
 WEAK_STUB(BootstrapExtensionRegisterAdminHandler,
           envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
@@ -517,6 +704,12 @@ WEAK_STUB(CertValidatorSetFilterState,
 WEAK_STUB(CertValidatorGetFilterState,
           envoy_dynamic_module_callback_cert_validator_get_filter_state(nullptr, {nullptr, 0},
                                                                         nullptr))
+
+WEAK_STUB(ConfigValidatorSetRejectionMessage,
+          envoy_dynamic_module_callback_config_validator_set_rejection_message(nullptr,
+                                                                               {nullptr, 0}))
+WEAK_STUB(ConfigValidatorGetDynamicClusterCount,
+          envoy_dynamic_module_callback_config_validator_get_dynamic_cluster_count(nullptr))
 
 WEAK_STUB(ClusterAddHosts,
           envoy_dynamic_module_callback_cluster_add_hosts(nullptr, 0, nullptr, nullptr, nullptr,
@@ -573,6 +766,15 @@ WEAK_STUB(ClusterLbContextSetFilterStateTyped,
           envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(nullptr,
                                                                                   {nullptr, 0},
                                                                                   {nullptr, 0}))
+WEAK_STUB(ClusterLbContextGetHostStat,
+          envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+              nullptr, nullptr, envoy_dynamic_module_type_host_stat_RqTotal))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, 0))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataString,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
 WEAK_STUB(ClusterLbContextSetDynamicMetadataStringBatch,
           envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
               nullptr, {nullptr, 0}, nullptr, 0))
@@ -634,6 +836,12 @@ WEAK_STUB(ClusterLbAsyncHostSelectionComplete,
 WEAK_STUB(ClusterLbGetMemberUpdateHostAddress,
           envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(nullptr, 0, true,
                                                                                   nullptr))
+WEAK_STUB(ClusterLbGetMemberUpdateHost,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_host(nullptr, 0, true))
+WEAK_STUB(ClusterLbGetMemberUpdateHostPackedAddress,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(nullptr, 0,
+                                                                                         true,
+                                                                                         nullptr))
 WEAK_STUB(ClusterUpdateHostHealth,
           envoy_dynamic_module_callback_cluster_update_host_health(
               nullptr, nullptr, envoy_dynamic_module_type_host_health_Healthy))
@@ -646,6 +854,15 @@ WEAK_STUB(ClusterSchedulerNew, envoy_dynamic_module_callback_cluster_scheduler_n
 WEAK_STUB(ClusterSchedulerDelete, envoy_dynamic_module_callback_cluster_scheduler_delete(nullptr))
 WEAK_STUB(ClusterSchedulerCommit,
           envoy_dynamic_module_callback_cluster_scheduler_commit(nullptr, 0))
+WEAK_STUB(ClusterRunOnAllWorkers,
+          envoy_dynamic_module_callback_cluster_run_on_all_workers(nullptr, 0))
+WEAK_STUB(ClusterWorkerSlotSet,
+          envoy_dynamic_module_callback_cluster_worker_slot_set(nullptr, nullptr))
+WEAK_STUB(ClusterWorkerSlotGet, envoy_dynamic_module_callback_cluster_worker_slot_get(nullptr))
+WEAK_STUB(ClusterGetName, envoy_dynamic_module_callback_cluster_get_name(nullptr, nullptr))
+WEAK_STUB(ClusterHttpCallout,
+          envoy_dynamic_module_callback_cluster_http_callout(nullptr, nullptr, {nullptr, 0},
+                                                             nullptr, 0, {nullptr, 0}, 0))
 WEAK_STUB(ClusterConfigDefineCounter,
           envoy_dynamic_module_callback_cluster_config_define_counter(nullptr, {nullptr, 0},
                                                                       nullptr, 0, nullptr))
@@ -1737,6 +1954,9 @@ WEAK_STUB(HttpSetDynamicMetadataStringBatch,
 WEAK_STUB(HttpSetDynamicMetadataStruct,
           envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(nullptr, {nullptr, 0},
                                                                          {nullptr, 0}))
+WEAK_STUB(HttpSetDynamicTypedMetadata,
+          envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(nullptr, {nullptr, 0},
+                                                                        {nullptr, 0}))
 WEAK_STUB(HttpGetMetadataString, envoy_dynamic_module_callback_http_get_metadata_string(
                                      nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                      {nullptr, 0}, {nullptr, 0}, nullptr))

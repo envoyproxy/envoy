@@ -64,10 +64,10 @@ const Http::LowerCaseString& baggageHeader() {
 
 bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
   static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> supported_mcp_versions({
-      McpConstants::LATEST_SUPPORTED_MCP_VERSION,
-      McpConstants::FALLBACK_PROTOCOL_VERSION,
       McpConstants::MCP_VERSION_2024_11_05,
+      McpConstants::MCP_VERSION_2025_03_26,
       McpConstants::MCP_VERSION_2025_06_18,
+      McpConstants::MCP_VERSION_2025_11_25,
   });
   return supported_mcp_versions->contains(protocol_version);
 }
@@ -99,7 +99,7 @@ json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response,
 
 json generateInitializeResponse(const json& session_id, absl::string_view server_name,
                                 absl::string_view protocol_version) {
-  absl::string_view negotiated_protocol_version = McpConstants::LATEST_SUPPORTED_MCP_VERSION;
+  absl::string_view negotiated_protocol_version = McpConstants::MCP_VERSION_2025_11_25;
   if (isMcpProtocolVersionSupported(protocol_version)) {
     negotiated_protocol_version = protocol_version;
   }
@@ -204,7 +204,10 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
         proto_config)
     : proto_config_(proto_config), fallback_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                        proto_config_.server_info(), fallback_protocol_version,
-                                       std::string(McpConstants::FALLBACK_PROTOCOL_VERSION))),
+                                       std::string(McpConstants::MCP_VERSION_2025_03_26))),
+      max_supported_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto_config_.server_info(), max_supported_protocol_version,
+          std::string(McpConstants::MCP_VERSION_2025_11_25))),
       max_request_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_request_body_size,
                                                              DEFAULT_MAX_REQUEST_BODY_SIZE)),
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,

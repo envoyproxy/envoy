@@ -18,6 +18,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`bootstrap extension <envoy_v3_api_msg_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension>`
   (:ref:`configuration <config_bootstrap_extensions_dynamic_modules>`).
 * As a :ref:`cluster <envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig>`.
+* As an :ref:`xDS config validator <envoy_v3_api_msg_extensions.config.validators.dynamic_modules.v3.DynamicModuleConfigValidator>`.
 * As a :ref:`listener filter <envoy_v3_api_msg_extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter>`.
 * As a :ref:`UDP listener filter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`
   (:ref:`configuration <config_udp_listener_filters_dynamic_modules>`).
@@ -59,10 +60,47 @@ Envoy binary that loads it.
 Envoy's dynamic modules have stricter compatibility requirements than Envoy's other extension mechanisms, such as Lua, Wasm or External Processor.
 Stabilizing the ABI is challenging due to the way the ABI needs to be tightly coupled to Envoy's internals.
 
-Currently, we guarantee **forward compatibility within one version**: a dynamic module built with the SDK for Envoy version X.Y will work with Envoy versions X.Y and X.(Y+1).
-Breaking changes to the ABI may occur in later versions.
+The ABI therefore follows a strict no-breaking-change policy. The rules below are what you can rely
+on as a module author. The full version, including the process a contributor must follow when
+changing the ABI, is documented at the top of the
+:repo:`ABI header <source/extensions/dynamic_modules/abi/abi.h>`.
 
-To ensure compatibility, it is recommended to rebuild your dynamic modules with the SDK matching your target Envoy version in a timely manner.
+**Released ABI is frozen.**
+Once a function, type or struct in the ABI has shipped in an Envoy release, it never changes. That
+covers its name, its signature, its struct layout and enum numbering, and its documented semantics,
+including ownership, buffer lifetime, threading constraints, whether a value may be null, and the
+meaning of each return value. A module compiled against the old documentation stays correct.
+
+**The ABI grows by addition, not by mutation.**
+When an existing function or type needs a different signature or different behavior, a new one is
+added alongside it. This is usually the old name with a numeric suffix such as ``_v2`` or ``_v3``.
+It can instead be a different descriptive name where the concept itself changed and a suffix would
+be misleading. The original keeps working exactly as before.
+
+**Superseded ABI is deprecated for at least four Envoy release cycles.**
+The old entity is marked ``@deprecated`` in the ABI header, naming its replacement and the earliest
+version it may be removed in, and the corresponding SDK wrappers are deprecated too, so you get a
+compile-time warning rather than discovering the removal at runtime. It then keeps working,
+unchanged, for at least four Envoy release cycles, roughly one year, before it may be removed.
+Removals are announced in the release notes.
+
+**The one exception is ABI that has never been released.**
+An entity added to ``main`` since the last release branch was cut is still under development and may
+change, be renamed or disappear without notice until the release branch that first contains it is
+cut. Only entities that have shipped in a release carry the guarantees above.
+
+As a result, a dynamic module built with the SDK for Envoy version X.Y keeps working with later
+Envoy versions, and you have at least four release cycles to migrate away from anything that gets
+deprecated. Rebuilding your modules against a recent SDK is still recommended, since new
+functionality is only available through newly added ABI entities.
+
+.. note::
+
+  The ``ENVOY_DYNAMIC_MODULES_ABI_VERSION`` string in the ABI header is not part of the policy
+  above and is **not** a compatibility gate. It only reflects changes to the header itself, and
+  Envoy never strictly validates it. A module reports the value it was built against from
+  ``envoy_dynamic_module_on_program_init``, and if that differs from Envoy's own value Envoy logs
+  it and loads the module anyway. Neither Envoy nor your module should depend on it.
 
 Module discovery
 --------------------------
@@ -108,8 +146,9 @@ The repository is available at `envoyproxy/dynamic-modules-examples <https://git
 Statistics
 ---------------------------
 
-All dynamic-module extension types emit the following statistics in the shared ``dynamic_modules.`` namespace.
-These stats track failures encountered while loading the extension's configuration. Each one is tagged with
+Dynamic-module extension types that receive a factory context emit the following statistics in the shared ``dynamic_modules.`` namespace.
+These stats track failures encountered while loading the extension's configuration. Extension points created without a factory context, such
+as config validators and the upstream HTTP TCP bridge, cannot emit these shared counters. Each one is tagged with
 ``config_name``, set to the configured name of the dynamic-module extension instance — for example the
 :ref:`filter_name
 <envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_name>`
@@ -126,8 +165,8 @@ load-balancing policy, ``tracer_name`` for the tracer or ``cluster_name`` for th
   remote_fetch_error, Counter, "Total failures fetching or loading a remote module source, including rejected cache misses when ``nack_on_cache_miss`` is set. Only the HTTP filter supports remote module sources."
   per_route_config_error, Counter, "Total per-route configurations that failed to load or initialize. Only emitted by the HTTP filter."
 
-In addition to the counters above, a module may define its own custom metrics. These are emitted
-under the configurable :ref:`metrics_namespace
+In addition to the counters above, a module can define its own custom metrics when its extension
+type receives a factory context. These are emitted under the configurable :ref:`metrics_namespace
 <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>`
 (``dynamicmodulescustom`` by default), separately from the ``dynamic_modules.`` namespace above.
 

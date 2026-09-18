@@ -23,6 +23,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/router.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/client_ssl_socket.h"
@@ -404,9 +405,14 @@ public:
     }));
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
+    router_config_ = std::make_shared<Router::FilterConfig>(
+        server_factory_context_, http_context_.asyncClientStatPrefix(), *stats_store_.rootScope(),
+        cm_, server_factory_context_.runtime(), api_->randomGenerator(),
+        std::move(shadow_writer_ptr_), true, false, false, false, false, false, false,
+        Protobuf::RepeatedPtrField<std::string>{}, dispatcher_->timeSource(), http_context_,
+        router_context_);
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, cm_,
-        server_factory_context_, std::move(shadow_writer_ptr_), http_context_, router_context_);
+        cm_.thread_local_cluster_.cluster_.info_, *dispatcher_, router_config_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillRepeatedly(ReturnRef(*http_async_client_));
     envoy::config::core::v3::GrpcService config;
@@ -626,6 +632,7 @@ public:
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
+  Router::FilterConfigSharedPtr router_config_;
   envoy::config::core::v3::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =

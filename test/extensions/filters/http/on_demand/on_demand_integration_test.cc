@@ -343,6 +343,7 @@ key:
   test_server_->waitForCounter("http.config_test.rds.foo_route1.update_attempt", Ge(1));
   // Close the connection and destroy the active stream.
   cleanupUpstreamAndDownstream();
+  test_server_->waitForWorkerThreads();
   // Push rds update, on demand updated callback is post to worker thread.
   // There is no exception thrown even when active stream is dead because weak_ptr can't be
   // locked.

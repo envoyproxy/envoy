@@ -1,6 +1,6 @@
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, str_to_module_buffer,
+  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
   strs_to_module_buffers, wrap_into_c_void_ptr, CompletionCallback, EnvoyCounterId,
   EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
   NEW_CLUSTER_CONFIG_FUNCTION,
@@ -2727,17 +2727,16 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
 
 // Cluster Event Hook Implementations
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_new(
-  config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> abi::envoy_dynamic_module_type_cluster_config_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_config_new(
+    config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_cluster_config_module_ptr {
     // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
     // The helpers additionally tolerate `(nullptr, 0)` empty inputs, and `str_lossy_from_raw`
     // substitutes `U+FFFD` for any malformed UTF-8 rather than triggering UB.
@@ -2756,85 +2755,66 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_new(
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_config_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_destroy(
-  config_module_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_config_destroy(
+    config_module_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(config_module_ptr, ClusterConfig);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_config_destroy", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_new(
-  config_module_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
-  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_cluster_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_new(
+    config_module_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
+    cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  ) -> abi::envoy_dynamic_module_type_cluster_module_ptr {
     let config = config_module_ptr as *const *const dyn ClusterConfig;
     let config = &**config;
     let envoy_cluster = EnvoyClusterImpl::new(cluster_envoy_ptr);
     let cluster = config.new_cluster(&envoy_cluster);
     wrap_into_c_void_ptr!(cluster)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_init(
-  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_init(
+    cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+    cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  ) {
     let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
     let cluster = &mut *cluster;
     let envoy_cluster = EnvoyClusterImpl::new(cluster_envoy_ptr);
     cluster.on_init(&envoy_cluster);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_init", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_destroy(
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_destroy(
+    cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(cluster_module_ptr, Cluster);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_destroy", panic);
-  });
+  }
 }
 
 /// Wrapper that pairs a module-side load balancer with the Envoy-side LB pointer.
@@ -2848,16 +2828,15 @@ struct ClusterLbWrapper {
   lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
-  lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_cluster_lb_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_lb_new(
+    cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+    lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  ) -> abi::envoy_dynamic_module_type_cluster_lb_module_ptr {
     let cluster = cluster_module_ptr as *const *const dyn Cluster;
     let cluster = &**cluster;
     let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
@@ -2871,28 +2850,21 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
         std::ptr::null()
       },
     }
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_lb_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_destroy(
-  lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_lb_destroy(
+    lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
+  ) {
     let wrapper = lb_module_ptr as *mut ClusterLbWrapper;
     let _ = Box::from_raw(wrapper);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_lb_destroy", panic);
-  });
+  }
 }
 
 /// # Safety
@@ -2956,215 +2928,169 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
   });
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
-  _lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
-  async_handle_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
+    _lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
+    async_handle_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr,
+  ) {
     let handle = async_handle_module_ptr as *mut Box<dyn AsyncHostSelectionHandle>;
     let mut handle = Box::from_raw(handle);
     handle.cancel();
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_cluster_lb_cancel_host_selection",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_on_host_membership_update(
-  lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
-  lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
-  num_hosts_added: usize,
-  num_hosts_removed: usize,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_lb_on_host_membership_update(
+    lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+    lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
+    num_hosts_added: usize,
+    num_hosts_removed: usize,
+  ) {
     let wrapper = &mut *(lb_module_ptr as *mut ClusterLbWrapper);
     let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
     wrapper
       .lb
       .on_host_membership_update(&envoy_lb, num_hosts_added, num_hosts_removed);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_cluster_lb_on_host_membership_update",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_timer_fired(
-  lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
-  lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
-  timer_ptr: abi::envoy_dynamic_module_type_cluster_worker_timer_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_worker_timer_fired(
+    lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+    lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
+    timer_ptr: abi::envoy_dynamic_module_type_cluster_worker_timer_module_ptr,
+  ) {
     let wrapper = &mut *(lb_module_ptr as *mut ClusterLbWrapper);
     let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
     // Non-owning reference so the module can re-arm the timer it already owns.
     let timer_ref = EnvoyClusterWorkerTimerRef { raw_ptr: timer_ptr };
     wrapper.lb.on_worker_timer_fired(&envoy_lb, &timer_ref);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_worker_timer_fired", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_scheduled(
-  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
-  event_id: u64,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_scheduled(
+    cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+    cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+    event_id: u64,
+  ) {
     let cluster = cluster_module_ptr as *const *const dyn Cluster;
     let cluster = &**cluster;
     cluster.on_scheduled(&EnvoyClusterImpl::new(cluster_envoy_ptr), event_id);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_scheduled", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_event(
-  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
-  event_id: u64,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_worker_event(
+    cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+    cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+    event_id: u64,
+  ) {
     let cluster = cluster_module_ptr as *const *const dyn Cluster;
     let cluster = &**cluster;
     cluster.on_worker_event(&EnvoyClusterImpl::new(cluster_envoy_ptr), event_id);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_worker_event", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_slot_data_destroy(
-  data_module_ptr: abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_worker_slot_data_destroy(
+    data_module_ptr: abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr,
+  ) {
     if data_module_ptr.is_null() {
       return;
     }
     // Reclaim the outer Box; dropping it drops the inner Arc<T> via vtable dispatch.
     let _: Box<WorkerSlotPayload> = Box::from_raw(data_module_ptr as *mut WorkerSlotPayload);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_cluster_worker_slot_data_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_server_initialized(
-  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_server_initialized(
+    cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+    cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  ) {
     let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
     let cluster = &mut *cluster;
     cluster.on_server_initialized(&EnvoyClusterImpl::new(cluster_envoy_ptr));
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_server_initialized", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_drain_started(
-  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_drain_started(
+    cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+    cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  ) {
     let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
     let cluster = &mut *cluster;
     cluster.on_drain_started(&EnvoyClusterImpl::new(cluster_envoy_ptr));
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_drain_started", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_shutdown(
-  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
-  completion_callback: abi::envoy_dynamic_module_type_event_cb,
-  completion_context: *mut std::os::raw::c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_shutdown(
+    cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+    cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+    completion_callback: abi::envoy_dynamic_module_type_event_cb,
+    completion_context: *mut std::os::raw::c_void,
+  ) {
     let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
     let cluster = &mut *cluster;
     let completion = CompletionCallback::new(completion_callback, completion_context);
     cluster.on_shutdown(&EnvoyClusterImpl::new(cluster_envoy_ptr), completion);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_shutdown", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
-  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
-  callout_id: u64,
-  result: abi::envoy_dynamic_module_type_http_callout_result,
-  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
-  headers_size: usize,
-  body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
-  body_chunks_size: usize,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_http_callout_done(
+    cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+    cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+    callout_id: u64,
+    result: abi::envoy_dynamic_module_type_http_callout_result,
+    headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+    headers_size: usize,
+    body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+    body_chunks_size: usize,
+  ) {
     let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
     let cluster = &mut *cluster;
 
@@ -3192,10 +3118,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
       headers,
       body,
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_http_callout_done", panic);
-  });
+  }
 }
 
 #[cfg(test)]

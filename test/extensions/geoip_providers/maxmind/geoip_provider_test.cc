@@ -148,7 +148,6 @@ public:
   void initializeProvider(const std::string& yaml,
                           std::optional<ConditionalInitializer>& conditional) {
     EXPECT_CALL(server_factory_context_, scope()).WillRepeatedly(ReturnRef(*scope_));
-    EXPECT_CALL(server_factory_context_, api()).WillRepeatedly(ReturnRef(*api_));
     EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
         .WillRepeatedly(Invoke([this, &conditional] {
           Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
@@ -942,17 +941,16 @@ TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndNoFallback) {
       "Maxmind country database must be initialised for performing lookups");
 }
 
-using GeoipProviderDeathTest = GeoipProviderTest;
-
-TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
+// A database that cannot be opened at startup rejects the configuration rather than crashing.
+TEST_F(GeoipProviderTest, GeoDbPathDoesNotExist) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_field_keys:
         city: "x-geo-city"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data_atc/GeoLite2-City-Test.mmdb"
   )EOF";
-  EXPECT_DEATH(initializeProvider(config_yaml, cb_added_nullopt),
-               ".*Unable to open Maxmind database file.*");
+  EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
+                          "Unable to open Maxmind database file");
 }
 
 struct GeoipProviderGeoDbNotSetTestCase {
@@ -1208,7 +1206,11 @@ TEST_P(MmdbReloadErrorImplTest, MmdbReloadErrorUsesPreviousDb) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
+    // The reload failure is reported back to the filesystem watcher.
+    EXPECT_THAT(
+        on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo),
+        StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                 testing::HasSubstr("Unable to open Maxmind database file")));
   }
   // On reload error the old db instance should be used for subsequent lookup requests.
   expectReloadStats(test_case.db_type_, 0, 1);
@@ -1446,6 +1448,34 @@ TEST_F(GeoipProviderTest,
   EXPECT_EQ("false", apple_it->second);
   expectStats("isp_db");
 }
+
+#if !defined(NDEBUG)
+class GeoipProviderNonIpAddressDeathTest : public testing::Test, public GeoipProviderTestBase {
+protected:
+  void expectLookupAsserts(Network::Address::InstanceConstSharedPtr remote_address) {
+    initializeProvider(default_city_config_yaml, cb_added_nullopt);
+    Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+    testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+    auto lookup_cb_std = lookup_cb.AsStdFunction();
+    EXPECT_CALL(lookup_cb, Call(_)).Times(0);
+    EXPECT_DEBUG_DEATH(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
+                       "geolocation lookup requires an IP address");
+  }
+};
+
+TEST_F(GeoipProviderNonIpAddressDeathTest, PipeAddress) {
+  auto pipe_or_error = Network::Address::PipeInstance::create("/tmp/envoy_geoip_test.sock");
+  ASSERT_TRUE(pipe_or_error.ok());
+  expectLookupAsserts(std::move(*pipe_or_error));
+}
+
+TEST_F(GeoipProviderNonIpAddressDeathTest, EnvoyInternalAddress) {
+  expectLookupAsserts(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_address_for_test"));
+}
+
+TEST_F(GeoipProviderNonIpAddressDeathTest, NullAddress) { expectLookupAsserts(nullptr); }
+#endif
 
 } // namespace Maxmind
 } // namespace GeoipProviders

@@ -1759,7 +1759,11 @@ void FilterManager::callHighWatermarkCallbacks() {
 }
 
 void FilterManager::callLowWatermarkCallbacks() {
-  ASSERT(high_watermark_count_ > 0);
+  if (high_watermark_count_ == 0) {
+    IS_ENVOY_BUG("HTTP filter manager low watermark callback without a preceding high watermark "
+                 "callback");
+    return;
+  }
   --high_watermark_count_;
   for (auto watermark_callbacks : watermark_callbacks_) {
     watermark_callbacks->onBelowWriteBufferLowWatermark();

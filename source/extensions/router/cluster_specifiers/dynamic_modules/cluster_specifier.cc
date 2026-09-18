@@ -73,9 +73,8 @@ DynamicModuleClusterSpecifierConfig::DynamicModuleClusterSpecifierConfig(
     RouteActionOverrideMap route_action_overrides, Upstream::ClusterManager& cluster_manager,
     Stats::Scope& stats_scope, absl::string_view metrics_namespace)
     : stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
-      stat_name_pool_(stats_scope_->symbolTable()), specifier_name_(specifier_name),
-      specifier_config_(specifier_config), dynamic_module_(std::move(dynamic_module)),
-      cluster_manager_(cluster_manager),
+      metrics_(*stats_scope_), specifier_name_(specifier_name), specifier_config_(specifier_config),
+      dynamic_module_(std::move(dynamic_module)), cluster_manager_(cluster_manager),
       route_action_overrides_(std::move(route_action_overrides)) {}
 
 DynamicModuleClusterSpecifierConfig::~DynamicModuleClusterSpecifierConfig() {

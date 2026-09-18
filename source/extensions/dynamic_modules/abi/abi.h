@@ -26,14 +26,80 @@
 // by nature. For example, we assume that modules will not try to pass invalid pointers to Envoy
 // intentionally.
 
-// This is the ABI version that we bump the minor version at least once for any ABI changes in same
-// Envoy release cycle to indicate the ABI change.
+// =============================================================================
+// =========================== ABI Compatibility Policy ========================
+// =============================================================================
 //
-// Until we reach v1.0, the ABI is experimental and any version change may be breaking, so a module
-// must be rebuilt against the exact Envoy version it runs with.
+// Modules may be built and shipped independently of the Envoy binary that loads them, so there is
+// no recompilation step that would surface an incompatibility. A mismatch instead shows up as a
+// failed symbol resolution at config load time, or, worse, as undefined behavior at request time.
+// Everything declared in this file is an ABI entity. That covers types
+// (envoy_dynamic_module_type_*), event hooks (envoy_dynamic_module_on_*) and callbacks
+// (envoy_dynamic_module_callback_*), and all of them are governed by the following rules. See also
+// the user-facing summary in docs/root/intro/arch_overview/advanced/dynamic_modules.rst.
 //
-// This is used only for tracking the ABI version of dynamic modules and emitting warnings when
-// there's a mismatch.
+// 1. A released ABI entity is never changed in place.
+//
+//    An entity is "released" once it is present in this file on a cut Envoy release branch, that
+//    is, once it has shipped in any Envoy vX.Y.0.
+//
+//    From then on none of the following may change. The name of a function, type, struct field or
+//    enum value stays fixed. A function keeps its parameter count, order, types and return type. A
+//    struct keeps its layout, so no field may be added, removed, reordered, resized or given a new
+//    meaning. An enum keeps its numbering and the meaning of every existing enumerator. The
+//    documented semantics also stay fixed, including ownership, buffer lifetime, threading and
+//    reentrancy constraints, which values may be null, and the meaning of each return value.
+//
+// 2. An ABI entity that has never been released may be changed freely.
+//
+//    An entity added to main since the last release branch was cut may be modified, renamed or
+//    removed outright, with no suffix, no deprecation period and no release note, because no
+//    released SDK or module can depend on it.
+//
+// 3. Iterate by adding, never by mutating.
+//
+//    When a released entity needs a different signature or different semantics, add a new entity
+//    alongside it and deprecate the old one. There are two naming schemes.
+//
+//    a. Append a _v2 suffix to the existing name, then _v3, and so on. This is the default for a
+//       new entity that is the same operation with a changed signature or semantics, so the name
+//       still describes it accurately. The original unsuffixed name is implicitly _v1 and must
+//       never be renamed to _v1, which would itself be a breaking change. Suffixes are monotonic
+//       and never reused, even if an intermediate version is later removed.
+//
+//    b. Give the replacement an entirely new, descriptive name when the concept itself changed.
+//
+//    Prefer (a) when in doubt, because a numeric suffix needs no naming debate and makes the
+//    lineage obvious.
+//
+//    Adding a brand new callback or type is always additive and needs none of the above. Adding a
+//    new event hook to an existing extension point needs care. A module built against an older SDK
+//    does not export a hook that was added later, so every newly added hook must be resolved
+//    optionally on the Envoy side, treating an unresolved symbol as "the module does not implement
+//    this hook" rather than as a config failure. A new hook resolved as mandatory is a breaking
+//    change. Appending an enumerator is likewise safe only for enums that flow from a module into
+//    Envoy, because an older module never returns the new value. Appending to an enum that Envoy
+//    passes into a module breaks modules built before the value existed.
+//
+// 4. Deprecate for at least four Envoy release cycles before removing.
+//
+//    Four cycles is a floor, not a target. A widely used entity, or one whose replacement is
+//    awkward to migrate to, should stay longer, and never removing a deprecated entity is an
+//    acceptable outcome.
+//
+// Compatibility follows from these four rules together with symbol resolution.
+
+// =============================================================================
+// ======================= End of ABI Compatibility Policy =====================
+// =============================================================================
+
+// ENVOY_DYNAMIC_MODULES_ABI_VERSION is a diagnostic marker. It is deliberately not part of the
+// compatibility policy above, and nothing in Envoy or in a module should depend on it.
+//
+// It records which revision of this file a binary was built against, but Envoy never strictly
+// validates it. A module reports the value it was built against from
+// envoy_dynamic_module_on_program_init, and a value that differs from Envoy's own is logged and
+// otherwise ignored, so the module still loads and runs.
 //
 // Note(internal): We could use the Envoy's version such as "v1.38.0" here, there are several
 // reasons as to why we use a static version string instead:
@@ -69,8 +135,10 @@ const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
 
 /**
  * envoy_dynamic_module_type_abi_version_module_ptr represents a null-terminated string that
- * contains the ABI version of the dynamic module. This is used to ensure that the dynamic module is
- * built against the compatible version of the ABI.
+ * contains the ABI version the dynamic module was built against. Envoy logs it and does not
+ * otherwise act on it. It is a diagnostic marker, not a compatibility gate, and a value that
+ * differs from Envoy's own does not prevent the module from loading. See the ABI compatibility
+ * policy at the top of this file.
  *
  * OWNERSHIP: Module owns the pointer. The string must remain valid until the end of
  * envoy_dynamic_module_on_program_init function.
@@ -385,6 +453,8 @@ typedef enum envoy_dynamic_module_type_attribute_id {
   envoy_dynamic_module_type_attribute_id_HealthCheck,
   // upstream.server_name
   envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
+  // xds.virtual_cluster_name
+  envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName,
 } envoy_dynamic_module_type_attribute_id;
 
 /**
@@ -452,7 +522,9 @@ typedef enum envoy_dynamic_module_type_socket_direction {
  * loaded. The function returns the ABI version of the dynamic module. If null is returned, the
  * module will be unloaded immediately.
  *
- * For Envoy, the return value will be used to check the compatibility of the dynamic module.
+ * For Envoy, the return value is recorded and logged for diagnostics only. Envoy does not
+ * validate it against its own ABI version, so returning a version that differs from Envoy's does
+ * not fail the load. Only returning null does.
  *
  * For dynamic modules, this is useful when they need to perform some process-wide
  * initialization or check if the module is compatible with the platform, such as CPU features.
@@ -461,8 +533,8 @@ typedef enum envoy_dynamic_module_type_socket_direction {
  * to check compatibility and gracefully fail the initialization because there is no way to
  * report an error to Envoy.
  *
- * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version of the dynamic
- * module. Null means the error and the module will be unloaded immediately.
+ * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version the dynamic module
+ * was built against. Null means the error and the module will be unloaded immediately.
  */
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
 
@@ -473,8 +545,23 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 // --------------------------------- Logging -----------------------------------
 
 /**
+ * @deprecated Use envoy_dynamic_module_callback_log_v2 instead, which additionally reports the
+ * module source location of the log statement.
+ *
  * envoy_dynamic_module_callback_log is called by the module to log a message as part
  * of the standard Envoy logging stream under [dynamic_modules] Id.
+ *
+ * @param level is the log level of the message.
+ * @param message is the log message to be logged. The buffer is only read during the call.
+ *
+ */
+void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
+                                       envoy_dynamic_module_type_module_buffer message);
+
+/**
+ * envoy_dynamic_module_callback_log_v2 is called by the module to log a message as part of the
+ * standard Envoy logging stream under [dynamic_modules] Id, reporting the module source location of
+ * the log statement instead of a location inside Envoy.
  *
  * @param level is the log level of the message.
  * @param message is the log message to be logged. The buffer is only read during the call.
@@ -483,10 +570,10 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
  * @param source_line is the line number of the log statement within source_file.
  *
  */
-void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
-                                       envoy_dynamic_module_type_module_buffer message,
-                                       envoy_dynamic_module_type_module_buffer source_file,
-                                       uint32_t source_line);
+void envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level level,
+                                          envoy_dynamic_module_type_module_buffer message,
+                                          envoy_dynamic_module_type_module_buffer source_file,
+                                          uint32_t source_line);
 
 /**
  * envoy_dynamic_module_callback_log_enabled is called by the module to check if the log level is
@@ -531,6 +618,71 @@ uint32_t envoy_dynamic_module_callback_get_concurrency();
  * @return true if the server is in validation mode, false otherwise.
  */
 bool envoy_dynamic_module_callback_is_validation_mode();
+
+// ----------------------------- Runtime -----------------------------------
+//
+// The callbacks in this section each read a single value from the Envoy runtime, i.e. the layered
+// key/value configuration described by the `layered_runtime` bootstrap option, including RTDS
+// layers and values set through the admin `/runtime_modify` endpoint. They differ only in the type
+// they read the value as, and all share the following semantics.
+//
+//  * They may be called from any thread.
+//  * key is only read during the call.
+//  * default_value is returned whenever the key does not exist, the stored value cannot be read as
+//    the requested type, or the runtime is not reachable from the calling thread.
+//
+// Envoy stores every numeric runtime value as a double, so the _int and _number callbacks read the
+// same stored value through different conversions. For both of them key must not name one of
+// Envoy's own `envoy.reloadable_features.*` or `envoy.restart_features.*` guards: those are
+// boolean guards and Envoy asserts against reading them as a number in debug builds, so read them
+// with envoy_dynamic_module_callback_get_runtime_bool instead.
+
+/**
+ * envoy_dynamic_module_callback_get_runtime_bool is called by the module to read a runtime value
+ * as a boolean.
+ *
+ * @param key is the runtime key to look up.
+ * @param default_value is the value to return if the key does not exist, the stored value is not a
+ * boolean, or the runtime is not reachable from the calling thread.
+ * @return the runtime value as a boolean, or default_value.
+ */
+bool envoy_dynamic_module_callback_get_runtime_bool(envoy_dynamic_module_type_module_buffer key,
+                                                    bool default_value);
+
+/**
+ * envoy_dynamic_module_callback_get_runtime_int is called by the module to read a runtime value as
+ * an unsigned integer.
+ *
+ * Because the value is stored as a double, this conversion is lossy at both ends. A value above
+ * 2^53 loses precision and is rounded to the nearest representable value, and a fractional value
+ * is truncated toward zero; in both cases the converted value is returned rather than
+ * default_value. Only a negative value, or one beyond the range of a 64-bit unsigned integer,
+ * stores no integer at all and therefore yields default_value. Use
+ * envoy_dynamic_module_callback_get_runtime_number to read the value without either conversion.
+ *
+ * @param key is the runtime key to look up.
+ * @param default_value is the value to return if the key does not exist, the stored value is not
+ * an integer, or the runtime is not reachable from the calling thread.
+ * @return the runtime value as an unsigned integer, or default_value.
+ */
+uint64_t envoy_dynamic_module_callback_get_runtime_int(envoy_dynamic_module_type_module_buffer key,
+                                                       uint64_t default_value);
+
+/**
+ * envoy_dynamic_module_callback_get_runtime_number is called by the module to read a runtime value
+ * as a double.
+ *
+ * This is the lossless counterpart to envoy_dynamic_module_callback_get_runtime_int: it returns
+ * the value exactly as Envoy stores it, so it neither rounds nor truncates, and it reads negative
+ * values, which the integer callback answers with default_value.
+ *
+ * @param key is the runtime key to look up.
+ * @param default_value is the value to return if the key does not exist, the stored value is not a
+ * number, or the runtime is not reachable from the calling thread.
+ * @return the runtime value as a double, or default_value.
+ */
+double envoy_dynamic_module_callback_get_runtime_number(envoy_dynamic_module_type_module_buffer key,
+                                                        double default_value);
 
 // ----------------------------- Function Registry -----------------------------
 
@@ -7211,7 +7363,7 @@ bool envoy_dynamic_module_callback_access_logger_get_route_name(
 
 /**
  * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
- * envoy_dynamic_module_type_attribute_id_XdsVirtualHostName instead.
+ * envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName instead.
  *
  * Get the virtual cluster name.
  *
@@ -12555,6 +12707,197 @@ bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
 bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
     envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+// =============================================================================
+// =========================== Config Validator ================================
+// =============================================================================
+//
+// This extension enables xDS config validation via dynamic modules. During a State-of-the-World or
+// delta xDS update, the module receives the xDS resource type URL and the decoded resources, each
+// carrying its name, version, aliases, TTL, and serialized protobuf payload. The module can also
+// read current server state, such as the dynamic cluster count, through the validation context.
+// Returning false from a validation hook rejects the xDS update, and Envoy sends a normal xDS NACK.
+
+// =============================================================================
+// Config Validator Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_config_validator_config_envoy_ptr is a pointer to the
+ * DynamicModuleConfigValidatorConfig object in Envoy passed to the module during config creation.
+ *
+ * OWNERSHIP: Envoy owns this object. The pointer remains stable until
+ * envoy_dynamic_module_on_config_validator_config_destroy returns for the corresponding in-module
+ * config.
+ */
+typedef void* envoy_dynamic_module_type_config_validator_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_config_validator_config_module_ptr is a pointer to the in-module config
+ * validator configuration created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_config_validator_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_config_validator_context_envoy_ptr is a pointer to the per-call
+ * validation context in Envoy. It is passed to a validation event hook and to the callbacks the
+ * module invokes from within that hook, giving access to the rejection message and current server
+ * state.
+ *
+ * OWNERSHIP: Envoy owns this object. The pointer is valid only for the duration of the validation
+ * event hook call. Modules must not retain it.
+ */
+typedef void* envoy_dynamic_module_type_config_validator_context_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_config_validator_resource is a decoded xDS resource passed to a config
+ * validator.
+ *
+ * All buffers and arrays referenced by this struct are owned by Envoy and are valid only for the
+ * duration of the validation event hook call. Modules must copy any data they need to retain after
+ * returning. When has_resource is false, serialized_resource is {NULL, 0} while the other fields
+ * remain valid. A payload-less entry can represent a State-of-the-World heartbeat resource or a
+ * delta unresolved alias.
+ */
+typedef struct envoy_dynamic_module_type_config_validator_resource {
+  // Resource name from Config::DecodedResource::name().
+  envoy_dynamic_module_type_envoy_buffer name;
+  // Resource version from Config::DecodedResource::version().
+  envoy_dynamic_module_type_envoy_buffer version;
+  // Resource aliases from Config::DecodedResource::aliases(). aliases is NULL when aliases_count is
+  // zero.
+  const envoy_dynamic_module_type_envoy_buffer* aliases;
+  // The number of aliases in the aliases array.
+  size_t aliases_count;
+  // Whether the resource carries a TTL, from Config::DecodedResource::ttl().
+  bool has_ttl;
+  // The resource TTL in milliseconds. Only meaningful when has_ttl is true.
+  uint64_t ttl_milliseconds;
+  // Whether the xDS resource envelope contains a resource payload.
+  bool has_resource;
+  // Serialized protobuf bytes for Config::DecodedResource::resource().
+  envoy_dynamic_module_type_envoy_buffer serialized_resource;
+} envoy_dynamic_module_type_config_validator_resource;
+
+// =============================================================================
+// Config Validator Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_config_validator_config_new is called by the main thread when the config
+ * validator configuration is loaded.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleConfigValidatorConfig object.
+ * @param name is the extension name owned by Envoy and valid only for the duration of this call.
+ * @param config is the extension configuration bytes owned by Envoy and valid only for the duration
+ * of this call.
+ * @return a pointer to the in-module config validator configuration. Returning nullptr indicates a
+ * failure to initialize the module, and the Envoy configuration is rejected.
+ */
+envoy_dynamic_module_type_config_validator_config_module_ptr
+envoy_dynamic_module_on_config_validator_config_new(
+    envoy_dynamic_module_type_config_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_config_validator_config_destroy is called when the config validator
+ * configuration is destroyed in Envoy. The module should release any resources associated with the
+ * in-module config validator configuration.
+ *
+ * @param config_module_ptr is the pointer to the in-module config validator configuration.
+ */
+void envoy_dynamic_module_on_config_validator_config_destroy(
+    envoy_dynamic_module_type_config_validator_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_config_validator_validate is called for State-of-the-World xDS updates
+ * before Envoy accepts the update.
+ *
+ * The resources array and all buffers it references are owned by Envoy and are valid only for the
+ * duration of this call. Modules must copy any data they need to retain. The resources pointer may
+ * be NULL when resources_count is zero.
+ *
+ * @param context_envoy_ptr is the pointer to the per-call validation context.
+ * @param config_module_ptr is the pointer to the in-module config validator configuration.
+ * @param type_url is the xDS resource type URL for the update.
+ * @param resources is an array of decoded resources, each carrying its name, version, aliases, TTL,
+ * and serialized protobuf payload.
+ * @param resources_count is the number of resources in the array.
+ * @return true if the update is accepted, false if the update is rejected. A rejection reason may
+ * be set with envoy_dynamic_module_callback_config_validator_set_rejection_message before
+ * returning. If no reason is set, or it is empty, Envoy uses a generic rejection message.
+ */
+bool envoy_dynamic_module_on_config_validator_validate(
+    envoy_dynamic_module_type_config_validator_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_config_validator_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer type_url,
+    const envoy_dynamic_module_type_config_validator_resource* resources, size_t resources_count);
+
+/**
+ * envoy_dynamic_module_on_config_validator_validate_delta is called for delta xDS updates before
+ * Envoy accepts the update.
+ *
+ * The added_resources array, removed_resources array, and all buffers they reference are owned by
+ * Envoy and are valid only for the duration of this call. Modules must copy any data they need to
+ * retain. Either array pointer may be NULL when its count is zero. Envoy can also invoke this delta
+ * hook when a resource TTL expires, including for a State-of-the-World subscription.
+ *
+ * @param context_envoy_ptr is the pointer to the per-call validation context.
+ * @param config_module_ptr is the pointer to the in-module config validator configuration.
+ * @param type_url is the xDS resource type URL for the update.
+ * @param added_resources is an array of added or modified resources, each carrying its name,
+ * version, aliases, TTL, and serialized protobuf payload.
+ * @param added_resources_count is the number of added or modified resources in the array.
+ * @param removed_resources is an array of removed resource names.
+ * @param removed_resources_count is the number of removed resource names in the array.
+ * @return true if the update is accepted, false if the update is rejected. A rejection reason may
+ * be set with envoy_dynamic_module_callback_config_validator_set_rejection_message before
+ * returning. If no reason is set, or it is empty, Envoy uses a generic rejection message.
+ */
+bool envoy_dynamic_module_on_config_validator_validate_delta(
+    envoy_dynamic_module_type_config_validator_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_config_validator_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer type_url,
+    const envoy_dynamic_module_type_config_validator_resource* added_resources,
+    size_t added_resources_count, const envoy_dynamic_module_type_envoy_buffer* removed_resources,
+    size_t removed_resources_count);
+
+// =============================================================================
+// Config Validator Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_config_validator_set_rejection_message is called by the module
+ * during a validation event hook to set the rejection message for a failed validation. Envoy copies
+ * the buffer immediately, so the module does not need to keep it alive after this call returns.
+ *
+ * This must only be called from within a config validator validation event hook, which runs on
+ * Envoy's main thread, so this callback must also be called on the main thread.
+ *
+ * @param context_envoy_ptr is the pointer to the per-call validation context.
+ * @param rejection_message is the rejection details string owned by the module. An empty message is
+ * treated the same as not setting a rejection message.
+ */
+void envoy_dynamic_module_callback_config_validator_set_rejection_message(
+    envoy_dynamic_module_type_config_validator_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer rejection_message);
+
+/**
+ * envoy_dynamic_module_callback_config_validator_get_dynamic_cluster_count returns the number of
+ * clusters currently added via the xDS API (dynamic clusters, as opposed to statically configured
+ * ones). This matches the count Envoy's built-in config validation uses for CDS, so a module can
+ * reject a CDS update that would drop the dynamic cluster count below a threshold.
+ *
+ * This must only be called from within a config validator validation event hook, which runs on
+ * Envoy's main thread, so this callback must also be called on the main thread.
+ *
+ * @param context_envoy_ptr is the pointer to the per-call validation context.
+ * @return the number of clusters currently added via the xDS API, or 0 if the context is invalid.
+ */
+uint64_t envoy_dynamic_module_callback_config_validator_get_dynamic_cluster_count(
+    envoy_dynamic_module_type_config_validator_context_envoy_ptr context_envoy_ptr);
 
 // =============================================================================
 // ========================= Upstream HTTP TCP Bridge ===========================
