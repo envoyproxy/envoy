@@ -588,6 +588,35 @@ int StreamHandleWrapper::luaHeaders(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaRequestHeaders(lua_State* state) {
+  ASSERT(state_ == State::Running);
+
+  if (request_headers_wrapper_.get() != nullptr) {
+    request_headers_wrapper_.pushStack();
+    return 1;
+  }
+
+  Http::RequestHeaderMapOptRef request_headers = callbacks_.requestHeaders();
+  if (!request_headers.has_value()) {
+    // Push nil rather than returning no values. A lua_CFunction that returns 0 yields *nothing*,
+    // which is not the same as nil: `tostring(handle:requestHeaders())` then raises "value
+    // expected" instead of evaluating, and because scriptError() continues the filter chain the
+    // script silently stops running. Returning a real nil keeps the documented contract usable in
+    // an argument position, and matches luaBase64Decode above.
+    lua_pushnil(state);
+    return 1;
+  }
+
+  // Always modifiable. Request headers stay on the stream for the whole encode path, so unlike the
+  // response headers there is no point at which they are continued on and the write window closes.
+  // Writing to them on the response path is what makes this useful for logging and tracing, and is
+  // what native C++ encode-path filters already do through
+  // StreamEncoderFilterCallbacks::requestHeaders().
+  request_headers_wrapper_.reset(
+      HeaderMapWrapper::create(state, request_headers.value().get(), [] { return true; }), true);
+  return 1;
+}
+
 int StreamHandleWrapper::luaBody(lua_State* state) {
   ASSERT(state_ == State::Running);
 
