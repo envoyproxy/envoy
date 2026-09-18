@@ -5444,6 +5444,27 @@ TEST_P(Http2CodecImplTest, StreamResetRateLimitConfigurable) {
   }
 }
 
+TEST_P(Http2CodecImplTest, TrackCodecConnections) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.track_h2_codec_connections", "true"}});
+  initialize();
+
+  std::string active_impl = (http2_implementation_ == Http2Impl::Oghttp2) ? "oghttp2" : "nghttp2";
+  std::string inactive_impl = (http2_implementation_ == Http2Impl::Oghttp2) ? "nghttp2" : "oghttp2";
+
+  // Client stats store: Envoy acts as client, so only upstream should have counts for active_impl.
+  EXPECT_EQ(1,
+            client_stats_store_.counter("http2." + active_impl + "_upstream_connections").value());
+  EXPECT_EQ(
+      0, client_stats_store_.counter("http2." + inactive_impl + "_upstream_connections").value());
+
+  // Server stats store: Envoy acts as server, so only downstream should have counts for
+  // active_impl.
+  EXPECT_EQ(
+      1, server_stats_store_.counter("http2." + active_impl + "_downstream_connections").value());
+  EXPECT_EQ(
+      0, server_stats_store_.counter("http2." + inactive_impl + "_downstream_connections").value());
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

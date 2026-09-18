@@ -311,6 +311,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
 // Enable histograms of HTTP/2 header sizes, including cookie size.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 
+// Track HTTP/2 codec connections.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_track_h2_codec_connections);
+
 // TODO: Flip back to true once TLS certificate compression with brotli (RFC 8879) has been
 // validated in production. When disabled, QUIC retains zlib-only compression while TCP TLS has
 // no certificate compression.
