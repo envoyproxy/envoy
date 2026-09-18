@@ -204,18 +204,6 @@ typedef struct envoy_dynamic_module_type_module_key_value_pair {
 } envoy_dynamic_module_type_module_key_value_pair;
 
 /**
- * envoy_dynamic_module_type_envoy_key_value_pair represents a string key-value pair owned by Envoy.
- * It is used to pass multiple key-value pairs from Envoy to the module via
- * envoy_dynamic_module_on_tracer_span_set_tag_batch.
- */
-typedef struct envoy_dynamic_module_type_envoy_key_value_pair {
-  envoy_dynamic_module_type_buffer_envoy_ptr key_ptr;
-  size_t key_length;
-  envoy_dynamic_module_type_buffer_envoy_ptr value_ptr;
-  size_t value_length;
-} envoy_dynamic_module_type_envoy_key_value_pair;
-
-/**
  * envoy_dynamic_module_type_envoy_http_header represents a key-value pair of an HTTP header owned
  * by Envoy's HeaderMap.
  */
@@ -13403,15 +13391,14 @@ void envoy_dynamic_module_on_tracer_span_set_tag(
     envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value);
 
 /**
- * envoy_dynamic_module_on_tracer_span_set_tag_batch is called to set multiple tags on the span.
+ * envoy_dynamic_module_on_tracer_span_reserve_tags is called to reserve capacity for tags that will
+ * be set via envoy_dynamic_module_on_tracer_span_set_tag.
  *
  * @param span_module_ptr is the pointer to the in-module span instance.
- * @param tags is the array of key-value pairs to set as tags.
- * @param tags_size is the number of entries in the tags array.
+ * @param tags_size is the number of tags that will be set.
  */
-void envoy_dynamic_module_on_tracer_span_set_tag_batch(
-    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
-    const envoy_dynamic_module_type_envoy_key_value_pair* tags, size_t tags_size);
+void envoy_dynamic_module_on_tracer_span_reserve_tags(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr, size_t tags_size);
 
 /**
  * envoy_dynamic_module_on_tracer_span_log is called to record a log event on the span.

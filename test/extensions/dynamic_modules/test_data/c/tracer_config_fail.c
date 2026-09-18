@@ -46,11 +46,9 @@ void envoy_dynamic_module_on_tracer_span_set_tag(
   (void)value;
 }
 
-void envoy_dynamic_module_on_tracer_span_set_tag_batch(
-    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
-    const envoy_dynamic_module_type_envoy_key_value_pair* tags, size_t tags_size) {
+void envoy_dynamic_module_on_tracer_span_reserve_tags(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr, size_t tags_size) {
   (void)span_module_ptr;
-  (void)tags;
   (void)tags_size;
 }
 

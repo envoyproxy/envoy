@@ -19,7 +19,7 @@ using OnTracerConfigDestroyType = decltype(&envoy_dynamic_module_on_tracer_confi
 using OnTracerStartSpanType = decltype(&envoy_dynamic_module_on_tracer_start_span);
 using OnTracerSpanSetOperationType = decltype(&envoy_dynamic_module_on_tracer_span_set_operation);
 using OnTracerSpanSetTagType = decltype(&envoy_dynamic_module_on_tracer_span_set_tag);
-using OnTracerSpanSetTagBatchType = decltype(&envoy_dynamic_module_on_tracer_span_set_tag_batch);
+using OnTracerSpanReserveTagsType = decltype(&envoy_dynamic_module_on_tracer_span_reserve_tags);
 using OnTracerSpanLogType = decltype(&envoy_dynamic_module_on_tracer_span_log);
 using OnTracerSpanFinishType = decltype(&envoy_dynamic_module_on_tracer_span_finish);
 using OnTracerSpanInjectContextType = decltype(&envoy_dynamic_module_on_tracer_span_inject_context);
@@ -64,7 +64,7 @@ public:
   OnTracerStartSpanType on_start_span_{nullptr};
   OnTracerSpanSetOperationType on_span_set_operation_{nullptr};
   OnTracerSpanSetTagType on_span_set_tag_{nullptr};
-  OnTracerSpanSetTagBatchType on_span_set_tag_batch_{nullptr};
+  OnTracerSpanReserveTagsType on_span_reserve_tags_{nullptr};
   OnTracerSpanLogType on_span_log_{nullptr};
   OnTracerSpanFinishType on_span_finish_{nullptr};
   OnTracerSpanInjectContextType on_span_inject_context_{nullptr};
@@ -133,6 +133,7 @@ public:
   // Tracing::Span interface.
   void setOperation(absl::string_view operation) override;
   void setTag(absl::string_view name, absl::string_view value) override;
+  void reserveTags(size_t size) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Tracing::TraceContext& trace_context,

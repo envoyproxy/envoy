@@ -75,7 +75,7 @@ absl::StatusOr<DynamicModuleTracerConfigSharedPtr> newDynamicModuleTracerConfig(
   RESOLVE_OR_RETURN(on_start_span_, "envoy_dynamic_module_on_tracer_start_span");
   RESOLVE_OR_RETURN(on_span_set_operation_, "envoy_dynamic_module_on_tracer_span_set_operation");
   RESOLVE_OR_RETURN(on_span_set_tag_, "envoy_dynamic_module_on_tracer_span_set_tag");
-  RESOLVE_OR_RETURN(on_span_set_tag_batch_, "envoy_dynamic_module_on_tracer_span_set_tag_batch");
+  RESOLVE_OR_RETURN(on_span_reserve_tags_, "envoy_dynamic_module_on_tracer_span_reserve_tags");
   RESOLVE_OR_RETURN(on_span_log_, "envoy_dynamic_module_on_tracer_span_log");
   RESOLVE_OR_RETURN(on_span_finish_, "envoy_dynamic_module_on_tracer_span_finish");
   RESOLVE_OR_RETURN(on_span_inject_context_, "envoy_dynamic_module_on_tracer_span_inject_context");
@@ -134,6 +134,10 @@ void DynamicModuleSpan::setTag(absl::string_view name, absl::string_view value) 
   envoy_dynamic_module_type_envoy_buffer val_buf = {.ptr = const_cast<char*>(value.data()),
                                                     .length = value.size()};
   config_->on_span_set_tag_(in_module_span_, key_buf, val_buf);
+}
+
+void DynamicModuleSpan::reserveTags(size_t size) {
+  config_->on_span_reserve_tags_(in_module_span_, size);
 }
 
 void DynamicModuleSpan::log(SystemTime timestamp, const std::string& event) {
