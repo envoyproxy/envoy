@@ -10275,6 +10275,10 @@ fn test_attribute_id_ordering() {
     69,
     abi::envoy_dynamic_module_type_attribute_id::XdsVirtualClusterName as u32
   );
+  assert_eq!(
+    70,
+    abi::envoy_dynamic_module_type_attribute_id::UpstreamProtocol as u32
+  );
 }
 
 #[test]

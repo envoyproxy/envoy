@@ -2424,6 +2424,7 @@ TEST(ABIImpl, GetAttributes) {
   filter.setDecoderFilterCallbacks(callbacks);
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(testing::Return(Http::Protocol::Http11));
   EXPECT_CALL(stream_info, upstreamInfo()).Times(testing::AtLeast(1));
+  stream_info.upstream_info_->setUpstreamProtocol(Http::Protocol::Http2);
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(testing::Return(200));
   StreamInfo::StreamIdProviderImpl id_provider("ffffffff-0012-0110-00ff-0c00400600ff");
   EXPECT_CALL(stream_info, getStreamIdProvider())
@@ -2475,6 +2476,11 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_RequestProtocol, &result_buffer));
   EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), "HTTP/1.1");
+
+  // envoy_dynamic_module_type_attribute_id_UpstreamProtocol
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &result_buffer));
+  EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), "HTTP/2");
 
   // envoy_dynamic_module_type_attribute_id_UpstreamAddress
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
