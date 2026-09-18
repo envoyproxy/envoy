@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ai_protocol_manager/response_filter_manager.h"
 
+#include <deque>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -14,7 +15,6 @@
 #include "source/extensions/filters/http/ai_protocol_manager/task_group.h"
 
 #include "absl/status/statusor.h"
-#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,10 +33,6 @@ public:
 
 namespace {
 
-// Wakes the source coroutine. Carries nothing: the payload is whatever has accumulated in the
-// pending input buffer by the time the source looks.
-using Signal = absl::monostate;
-
 // Async state machinery, independent of what flows through it. `Item` is one unit of work passed
 // between filters -- an SSE frame here; the unary mode adds a second instantiation carrying
 // batches of response fields, which is why the item type is a parameter rather than fixed.
@@ -54,16 +50,15 @@ public:
                      ResponseFilterManager::OnCompleteFn on_complete)
       : ResponseFilterManager::AsyncState(bridge.dispatcher()), filters_(std::move(filters)),
         pipeline_(filters_.size()), bridge_(bridge), out_buffer_manager_(out_buffer_manager),
-        on_complete_(std::move(on_complete)),
-        signal_(std::make_shared<Coroutine::AsyncQueue<Signal>>(/*max_size=*/1)) {}
+        on_complete_(std::move(on_complete)) {}
 
   ~ResponseAsyncState() override { cancel(); }
 
   void start() override {
     auto self = shared_from_this();
     std::weak_ptr<ResponseAsyncState> weak = weak_from_this();
-    // Consumers first: every stage must be parked on its pop() before the source pushes, or the
-    // first item would have nowhere to go and the source would block needlessly.
+    // Consumers first: every stage must be parked on its pop() before items are pushed, or the
+    // first item would have nowhere to go and would buffer needlessly.
     for (size_t i = 0; i < filters_.size(); ++i) {
       launchTask(runFilter(i), [weak, i, filter = filters_[i]](absl::Status status) {
         if (auto s = weak.lock()) {
@@ -78,31 +73,59 @@ public:
         }
       }
     });
-    launchTask(runSource(), [weak](absl::Status status) {
-      if (auto s = weak.lock()) {
-        if (!status.ok()) {
-          s->fail(std::move(status));
-        }
-      }
-    });
   }
 
   void onData(Buffer::Instance& data, bool end_stream) override {
     auto self = shared_from_this();
     if (terminated()) {
+      data.drain(data.length());
       return;
     }
-    const uint64_t len = data.length();
-    pending_input_.move(data);
-    if (len > 0) {
-      bridge_.addUnacked(len);
+
+    std::vector<Item> decoded;
+    if (data.length() > 0) {
+      absl::Status status = decode(data, decoded);
+      data.drain(data.length());
+      if (!status.ok()) {
+        fail(std::move(status));
+        return;
+      }
     }
+
     if (end_stream) {
       input_ended_ = true;
+      absl::Status status = finishDecode(decoded);
+      if (!status.ok()) {
+        fail(std::move(status));
+        return;
+      }
     }
-    // One slot: a signal already queued means the source has not caught up yet, and a second
-    // would tell it nothing new.
-    signal_->tryPush(Signal{});
+
+    for (Item& item : decoded) {
+      if (!draining_pending_items_ && pending_items_.empty() &&
+          pipeline_.stage(0)->tryPush(std::move(item))) {
+        continue;
+      }
+      const uint64_t size = itemSize(item);
+      pending_items_.push_back(PendingItem{std::move(item), {bridge_, size}});
+    }
+
+    if (!pending_items_.empty() && !draining_pending_items_) {
+      draining_pending_items_ = true;
+      std::weak_ptr<ResponseAsyncState> weak = weak_from_this();
+      launchTask(drainPendingItems(), [weak](absl::Status status) {
+        if (auto s = weak.lock()) {
+          if (!status.ok()) {
+            s->fail(std::move(status));
+          }
+        }
+      });
+      return;
+    }
+
+    if (input_ended_ && !draining_pending_items_ && !terminated()) {
+      pipeline_.stage(0)->close();
+    }
   }
 
   void cancel() override {
@@ -129,16 +152,15 @@ protected:
   using std::enable_shared_from_this<ResponseAsyncState<Item>>::weak_from_this;
 
   void cleanupInput() {
-    const uint64_t pending_len = pending_input_.length();
-    pending_input_.drain(pending_len);
-    if (pending_len > 0) {
-      bridge_.releaseUnacked(pending_len);
-    }
-    signal_->close();
+    draining_pending_items_ = false;
+    pending_items_.clear();
   }
 
   // Mode-specific hooks.
 
+  // Returns the estimated byte size of `item` for watermark accounting when buffered in
+  // pending_items_.
+  virtual uint64_t itemSize(const Item& item) const = 0;
   // Decodes `data`, appending completed items to `out`.
   virtual absl::Status decode(const Buffer::Instance& data, std::vector<Item>& out) = 0;
   // Finishes decoding at end of stream, appending any trailing item to `out`.
@@ -156,54 +178,26 @@ protected:
   BufferManager& out_buffer_manager_;
 
 private:
-  // Decodes input and feeds the head of the chain. The only place that awaits on the input side,
-  // which is what lets onData() stay non-blocking.
-  Coroutine::Task<absl::Status> runSource() {
-    while (true) {
-      ASSIGN_OR_CO_RETURN(auto signal, co_await signal_->pop());
-      if (!signal.has_value() || terminated()) {
-        // Cancelled.
-        co_return absl::OkStatus();
-      }
+  struct PendingItem {
+    Item item;
+    FilterChainBridge::ScopedUnacked unacked;
+  };
 
-      // More input may arrive while a push below is blocked, so drain until actually empty
-      // rather than once per signal.
-      while (pending_input_.length() > 0) {
-        if (terminated()) {
-          co_return absl::CancelledError("response pipeline cancelled");
-        }
-        Buffer::OwnedImpl chunk;
-        const uint64_t chunk_len = pending_input_.length();
-        chunk.move(pending_input_);
-
-        std::vector<Item> items;
-        const absl::Status decode_status = decode(chunk, items);
-        bridge_.releaseUnacked(chunk_len);
-        CO_RETURN_IF_ERROR(decode_status);
-        CO_RETURN_IF_ERROR(co_await pushAll(items));
-      }
-
-      if (input_ended_) {
-        if (terminated()) {
-          co_return absl::CancelledError("response pipeline cancelled");
-        }
-        std::vector<Item> items;
-        CO_RETURN_IF_ERROR(finishDecode(items));
-        CO_RETURN_IF_ERROR(co_await pushAll(items));
-        // Closing cascades: each stage's pop returns nullopt, the stage finishes, and the bypass
-        // launched in its place closes the stage after it.
-        pipeline_.stage(0)->close();
-        co_return absl::OkStatus();
-      }
-    }
-  }
-
-  Coroutine::Task<absl::Status> pushAll(std::vector<Item>& items) {
-    for (Item& item : items) {
-      CO_RETURN_IF_ERROR(co_await pipeline_.stage(0)->push(std::move(item)));
+  // Drains overflow items that could not be pushed synchronously by onData(), uncharging the bridge
+  // as each item enters stage(0).
+  Coroutine::Task<absl::Status> drainPendingItems() {
+    auto self = shared_from_this();
+    while (!pending_items_.empty()) {
       if (terminated()) {
         co_return absl::CancelledError("response pipeline cancelled");
       }
+      PendingItem pending = std::move(pending_items_.front());
+      pending_items_.pop_front();
+      CO_RETURN_IF_ERROR(co_await pipeline_.stage(0)->push(std::move(pending.item)));
+    }
+    draining_pending_items_ = false;
+    if (input_ended_ && !terminated()) {
+      pipeline_.stage(0)->close();
     }
     co_return absl::OkStatus();
   }
@@ -277,8 +271,8 @@ private:
   }
 
   ResponseFilterManager::OnCompleteFn on_complete_;
-  std::shared_ptr<Coroutine::AsyncQueue<Signal>> signal_;
-  Buffer::OwnedImpl pending_input_;
+  std::deque<PendingItem> pending_items_;
+  bool draining_pending_items_{false};
   bool input_ended_{false};
 };
 
@@ -299,6 +293,10 @@ public:
   ~SseAsyncState() override { cancel(); }
 
 protected:
+  uint64_t itemSize(const SseEventPtr& item) const override {
+    return item != nullptr ? item->byteSize() : 0;
+  }
+
   absl::Status decode(const Buffer::Instance& data, std::vector<SseEventPtr>& out) override {
     return decoder_.onData(data, out);
   }

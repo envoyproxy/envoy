@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/coroutine/async_queue.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
@@ -436,21 +437,90 @@ TEST_F(ResponseFilterManagerTest, CancelIsIdempotent) {
   drain();
 }
 
-// Input that outruns the pipeline has to stop at the source rather than pile up in the manager:
-// the pending buffer is accounted against the path's FilterChainBridge watermarks.
-TEST_F(ResponseFilterManagerTest, SourceIsPausedWhilePendingInputIsOverTheLimit) {
-  makeManager({}, ResponseFilterManager::Config{}, /*buffer_limit=*/8);
+// Suspends on a gate queue before forwarding the first frame, simulating a filter backed up on
+// async work.
+class SuspendingSseFilter : public AiFilter {
+public:
+  explicit SuspendingSseFilter(std::shared_ptr<Coroutine::AsyncQueue<bool>> gate)
+      : gate_(std::move(gate)) {}
 
-  Buffer::OwnedImpl buf;
-  buf.add(absl::StrCat("data: ", std::string(64, 'x'), "\n\n"));
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> encodeSSE(SseStreamReceiver receive,
+                                          SseStreamPropagator propagate) override {
+    bool first = true;
+    while (true) {
+      ASSIGN_OR_CO_RETURN(auto event, co_await receive());
+      if (!event.has_value()) {
+        co_return absl::OkStatus();
+      }
+      if (first) {
+        first = false;
+        ASSIGN_OR_CO_RETURN(auto unblock, co_await gate_->pop());
+        (void)unblock;
+      }
+      CO_RETURN_IF_ERROR(co_await propagate(std::move(*event)));
+    }
+  }
+
+private:
+  std::shared_ptr<Coroutine::AsyncQueue<bool>> gate_;
+};
+
+// When the pipeline is backed up (e.g. a filter is suspended on async work), tryPush() fails and
+// items buffered in pending_items_ charge their byteSize() to the bridge, pausing the filter chain
+// once high_watermark_ is crossed and resuming once drainPendingItems() uncharges them.
+TEST_F(ResponseFilterManagerTest, SourceIsPausedWhenPipelineIsBackedUp) {
+  auto gate = std::make_shared<Coroutine::AsyncQueue<bool>>(/*max_size=*/1);
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_unique<SuspendingSseFilter>(gate));
+  makeManager(std::move(filters), ResponseFilterManager::Config{}, /*buffer_limit=*/64);
+
+  // Feed 3 frames at once:
+  // - Frame 1 is handed off to SuspendingSseFilter, which suspends on `gate`.
+  // - Frame 2 fills stage(0)'s single-slot queue.
+  // - Frame 3 fails tryPush(), enters pending_items_, and charges bridge_.addUnacked(byteSize())
+  //   which exceeds buffer_limit (64 bytes) and pauses the source.
+  Buffer::OwnedImpl buf("data: 1\n\ndata: 2\n\ndata: 3\n\n");
   manager_->onData(buf, /*end_stream=*/true);
-  // The pause is raised before the signal is pushed, and the source -- parked on that signal --
-  // resumes inline, drains the backlog and lifts the pause again, all within this call.
   EXPECT_EQ(bridge_->pause_source_calls_, 1);
-  EXPECT_EQ(bridge_->resume_source_calls_, 1);
+  EXPECT_EQ(bridge_->resume_source_calls_, 0);
 
+  // Unblock the filter; stage(0) drains pending_items_, uncharging bridge_ and resuming the source.
+  gate->tryPush(true);
   drain();
+
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
   EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(output(), "data: 1\n\ndata: 2\n\ndata: 3\n\n");
+}
+
+TEST_F(ResponseFilterManagerTest, SourceAccumulatesAndDrainsWhilePipelinePaused) {
+  auto gate = std::make_shared<Coroutine::AsyncQueue<bool>>(/*max_size=*/1);
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_unique<SuspendingSseFilter>(gate));
+  makeManager(std::move(filters), ResponseFilterManager::Config{}, /*buffer_limit=*/64);
+
+  Buffer::OwnedImpl buf1("data: 1\n\ndata: 2\n\ndata: 3\n\n");
+  manager_->onData(buf1, /*end_stream=*/false);
+  EXPECT_EQ(bridge_->pause_source_calls_, 1);
+  EXPECT_EQ(bridge_->resume_source_calls_, 0);
+
+  // Another chunk arrives before the socket pause takes effect.
+  Buffer::OwnedImpl buf2("data: 4\n\n");
+  manager_->onData(buf2, /*end_stream=*/true);
+  EXPECT_EQ(bridge_->pause_source_calls_, 1);
+  EXPECT_EQ(bridge_->resume_source_calls_, 0);
+
+  gate->tryPush(true);
+  drain();
+
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(output(), "data: 1\n\ndata: 2\n\ndata: 3\n\ndata: 4\n\n");
 }
 
 // An oversized frame whose payload spills to a per-frame external buffer store still allows a

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <utility>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
@@ -77,6 +78,43 @@ public:
   // Reports bytes that have since become durable, resuming the data source once the total falls
   // to low_watermark_.
   void releaseUnacked(uint64_t bytes);
+
+  // Move-only RAII token that charges `bytes` to `addUnacked()` on construction and releases them
+  // via `releaseUnacked()` on destruction or `reset()`.
+  class ScopedUnacked {
+  public:
+    ScopedUnacked() = default;
+    ScopedUnacked(FilterChainBridge& bridge, uint64_t bytes) : bridge_(&bridge), bytes_(bytes) {
+      if (bytes_ > 0) {
+        bridge_->addUnacked(bytes_);
+      }
+    }
+    ScopedUnacked(ScopedUnacked&& other) noexcept
+        : bridge_(std::exchange(other.bridge_, nullptr)), bytes_(std::exchange(other.bytes_, 0)) {}
+    ScopedUnacked& operator=(ScopedUnacked&& other) noexcept {
+      if (this != &other) {
+        reset();
+        bridge_ = std::exchange(other.bridge_, nullptr);
+        bytes_ = std::exchange(other.bytes_, 0);
+      }
+      return *this;
+    }
+    ScopedUnacked(const ScopedUnacked&) = delete;
+    ScopedUnacked& operator=(const ScopedUnacked&) = delete;
+    ~ScopedUnacked() { reset(); }
+
+    void reset() {
+      FilterChainBridge* bridge = std::exchange(bridge_, nullptr);
+      const uint64_t bytes = std::exchange(bytes_, 0);
+      if (bridge != nullptr && bytes > 0) {
+        bridge->releaseUnacked(bytes);
+      }
+    }
+
+  private:
+    FilterChainBridge* bridge_{nullptr};
+    uint64_t bytes_{0};
+  };
 
   // True while the data source is paused.
   bool ingestPaused() const { return source_paused_; }
