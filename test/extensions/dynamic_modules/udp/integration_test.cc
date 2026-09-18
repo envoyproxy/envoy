@@ -92,6 +92,25 @@ TEST_P(DynamicModulesUdpIntegrationTest, BasicDataFlow) {
   EXPECT_EQ(request, request_datagram.buffer_->toString());
 }
 
+TEST_P(DynamicModulesUdpIntegrationTest, StopIteration) {
+  setup("udp_stop_iteration");
+
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()), port));
+
+  std::string request = "should be blocked";
+  Network::Test::UdpSyncPeer client(GetParam());
+  client.write(request, *listener_address);
+
+  Network::UdpRecvData request_datagram;
+  // UDP listener filter StopIteration is currently not enforced in the fake upstream path.
+  // We verify that the datagram still arrives. When StopIteration is enforced in the future,
+  // this expectation can be flipped.
+  EXPECT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::seconds(1)));
+  EXPECT_EQ(request, request_datagram.buffer_->toString());
+}
+
 TEST_P(DynamicModulesUdpIntegrationTest, LargePayload) {
   setup();
 
