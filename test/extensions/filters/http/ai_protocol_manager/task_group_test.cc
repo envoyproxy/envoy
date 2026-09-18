@@ -50,12 +50,12 @@ TEST_F(TaskGroupTest, LaunchAndMarkTerminated) {
 
     // Launch a task that stays suspended across ~TestTaskGroup() after markTerminated().
     group.launchTask(
-        [&]() -> Coroutine::Task<absl::Status> {
-          ASSIGN_OR_CO_RETURN(auto item, co_await queue.pop());
+        [](Coroutine::AsyncQueue<int>& q, bool& completed) -> Coroutine::Task<absl::Status> {
+          ASSIGN_OR_CO_RETURN(auto item, co_await q.pop());
           (void)item;
-          post_terminated_task_completed = true;
+          completed = true;
           co_return absl::OkStatus();
-        }(),
+        }(queue, post_terminated_task_completed),
         [](absl::Status) {});
 
     group.markTerminated();
@@ -64,10 +64,10 @@ TEST_F(TaskGroupTest, LaunchAndMarkTerminated) {
     // Launching after markTerminated() is a no-op.
     bool ran_after_terminate = false;
     group.launchTask(
-        [&]() -> Coroutine::Task<absl::Status> {
-          ran_after_terminate = true;
+        [](bool& ran) -> Coroutine::Task<absl::Status> {
+          ran = true;
           co_return absl::OkStatus();
-        }(),
+        }(ran_after_terminate),
         [&](absl::Status) { ran_after_terminate = true; });
     EXPECT_FALSE(ran_after_terminate);
   }
@@ -86,13 +86,13 @@ TEST_F(TaskGroupTest, CancelHandlesUnwindsSuspendedTasks) {
   bool saw_eof = false;
   absl::Status task_done_status = absl::OkStatus();
   group.launchTask(
-      [&]() -> Coroutine::Task<absl::Status> {
-        ASSIGN_OR_CO_RETURN(auto item, co_await queue.pop());
+      [](Coroutine::AsyncQueue<int>& q, bool& eof) -> Coroutine::Task<absl::Status> {
+        ASSIGN_OR_CO_RETURN(auto item, co_await q.pop());
         if (!item.has_value()) {
-          saw_eof = true;
+          eof = true;
         }
         co_return absl::OkStatus();
-      }(),
+      }(queue, saw_eof),
       [&](absl::Status s) { task_done_status = std::move(s); });
 
   group.cancelHandles();
@@ -103,10 +103,10 @@ TEST_F(TaskGroupTest, CancelHandlesUnwindsSuspendedTasks) {
   // Launching after cancelHandles() is a no-op.
   bool task_ran_after_cancel = false;
   group.launchTask(
-      [&]() -> Coroutine::Task<absl::Status> {
-        task_ran_after_cancel = true;
+      [](bool& ran) -> Coroutine::Task<absl::Status> {
+        ran = true;
         co_return absl::OkStatus();
-      }(),
+      }(task_ran_after_cancel),
       [&](absl::Status) { task_ran_after_cancel = true; });
   EXPECT_FALSE(task_ran_after_cancel);
 }
@@ -129,21 +129,23 @@ TEST_F(TaskGroupTest, ReentrantCancelDuringCoroutineFrameDestructionIsSafe) {
   };
 
   group->launchTask(
-      [group, &q0]() -> Coroutine::Task<absl::Status> {
-        ReentrantGuard guard{group};
-        ASSIGN_OR_CO_RETURN(auto item, co_await q0.pop());
+      [](std::shared_ptr<TestTaskGroup> g,
+         Coroutine::AsyncQueue<int>& q) -> Coroutine::Task<absl::Status> {
+        ReentrantGuard guard{std::move(g)};
+        ASSIGN_OR_CO_RETURN(auto item, co_await q.pop());
         (void)item;
         co_return absl::OkStatus();
-      }(),
+      }(group, q0),
       [](absl::Status) {});
 
   group->launchTask(
-      [group, &q1]() -> Coroutine::Task<absl::Status> {
-        ReentrantGuard guard{group};
-        ASSIGN_OR_CO_RETURN(auto item, co_await q1.pop());
+      [](std::shared_ptr<TestTaskGroup> g,
+         Coroutine::AsyncQueue<int>& q) -> Coroutine::Task<absl::Status> {
+        ReentrantGuard guard{std::move(g)};
+        ASSIGN_OR_CO_RETURN(auto item, co_await q.pop());
         (void)item;
         co_return absl::OkStatus();
-      }(),
+      }(group, q1),
       [](absl::Status) {});
 
   group->cancelHandles();
@@ -161,12 +163,12 @@ TEST_F(TaskGroupTest, DestructorCancelsUnterminatedTasks) {
   {
     TestTaskGroup group(*dispatcher_);
     group.launchTask(
-        [&]() -> Coroutine::Task<absl::Status> {
-          ScopeTracker tracker{&destroyed_cleanly};
-          ASSIGN_OR_CO_RETURN(auto item, co_await queue.pop());
+        [](Coroutine::AsyncQueue<int>& q, bool* flag) -> Coroutine::Task<absl::Status> {
+          ScopeTracker tracker{flag};
+          ASSIGN_OR_CO_RETURN(auto item, co_await q.pop());
           (void)item;
           co_return absl::OkStatus();
-        }(),
+        }(queue, &destroyed_cleanly),
         [](absl::Status) {});
     EXPECT_FALSE(destroyed_cleanly);
   }
@@ -183,13 +185,14 @@ TEST_F(TaskGroupTest, InlineLaunchSuspendingAfterTriggeringCancelIsCancelled) {
   };
 
   group.launchTask(
-      [&]() -> Coroutine::Task<absl::Status> {
-        FrameTracker tracker{&frame_destroyed};
-        group.cancelHandles();
-        ASSIGN_OR_CO_RETURN(auto item, co_await queue.pop());
+      [](TestTaskGroup& g, Coroutine::AsyncQueue<int>& q,
+         bool* flag) -> Coroutine::Task<absl::Status> {
+        FrameTracker tracker{flag};
+        g.cancelHandles();
+        ASSIGN_OR_CO_RETURN(auto item, co_await q.pop());
         (void)item;
         co_return absl::OkStatus();
-      }(),
+      }(group, queue, &frame_destroyed),
       [](absl::Status) {});
 
   EXPECT_TRUE(frame_destroyed);

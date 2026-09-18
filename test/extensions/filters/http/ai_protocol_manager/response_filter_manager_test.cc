@@ -271,7 +271,7 @@ TEST_F(ResponseFilterManagerTest, SseMutationsReachTheWire) {
   EXPECT_EQ(output(), "data: {\"a\":1,\"tagged\":true}\n\n");
 }
 
-// The chain decodes and reserializes rather than forwarding bytes, so a field it does not model
+// The chain decodes and re-serializes rather than forwarding bytes, so a field it does not model
 // only reaches the client if it is carried deliberately.
 TEST_F(ResponseFilterManagerTest, SseUnknownFieldsSurviveTheChain) {
   std::vector<AiFilterSharedPtr> filters;

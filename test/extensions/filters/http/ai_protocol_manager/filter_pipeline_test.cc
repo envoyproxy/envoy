@@ -50,48 +50,48 @@ TEST_F(FilterPipelineTest, StageHandoffAndEof) {
   EXPECT_FALSE(pipeline.closed());
 
   // Stage 0 -> Stage 1 -> Stage 2 (sink)
-  auto h0 = launch([&]() -> Coroutine::Task<absl::Status> {
-    ASSIGN_OR_CO_RETURN(auto item, co_await pipeline.receive(0));
+  auto h0 = launch([](FilterPipeline<int>& p) -> Coroutine::Task<absl::Status> {
+    ASSIGN_OR_CO_RETURN(auto item, co_await p.receive(0));
     if (!item.has_value()) {
       co_return absl::InternalError("unexpected EOF");
     }
-    CO_RETURN_IF_ERROR(co_await pipeline.propagate(0, *item + 10));
-    ASSIGN_OR_CO_RETURN(auto eof, co_await pipeline.receive(0));
+    CO_RETURN_IF_ERROR(co_await p.propagate(0, *item + 10));
+    ASSIGN_OR_CO_RETURN(auto eof, co_await p.receive(0));
     if (eof.has_value()) {
       co_return absl::InternalError("expected EOF");
     }
-    pipeline.stage(1)->close();
+    p.stage(1)->close();
     co_return absl::OkStatus();
-  }());
+  }(pipeline));
 
-  auto h1 = launch([&]() -> Coroutine::Task<absl::Status> {
-    ASSIGN_OR_CO_RETURN(auto item, co_await pipeline.receive(1));
+  auto h1 = launch([](FilterPipeline<int>& p) -> Coroutine::Task<absl::Status> {
+    ASSIGN_OR_CO_RETURN(auto item, co_await p.receive(1));
     if (!item.has_value()) {
       co_return absl::InternalError("unexpected EOF");
     }
-    CO_RETURN_IF_ERROR(co_await pipeline.propagate(1, *item * 2));
-    ASSIGN_OR_CO_RETURN(auto eof, co_await pipeline.receive(1));
+    CO_RETURN_IF_ERROR(co_await p.propagate(1, *item * 2));
+    ASSIGN_OR_CO_RETURN(auto eof, co_await p.receive(1));
     if (eof.has_value()) {
       co_return absl::InternalError("expected EOF");
     }
-    pipeline.stage(2)->close();
+    p.stage(2)->close();
     co_return absl::OkStatus();
-  }());
+  }(pipeline));
 
   int sink_received = 0;
   bool sink_saw_eof = false;
   absl::Status sink_status = absl::UnknownError("not called");
   auto h2 = launch(
-      [&]() -> Coroutine::Task<absl::Status> {
-        ASSIGN_OR_CO_RETURN(auto item, co_await pipeline.receive(2));
+      [](FilterPipeline<int>& p, int& received, bool& saw_eof) -> Coroutine::Task<absl::Status> {
+        ASSIGN_OR_CO_RETURN(auto item, co_await p.receive(2));
         if (!item.has_value()) {
           co_return absl::InternalError("unexpected EOF");
         }
-        sink_received = *item;
-        ASSIGN_OR_CO_RETURN(auto eof, co_await pipeline.receive(2));
-        sink_saw_eof = !eof.has_value();
+        received = *item;
+        ASSIGN_OR_CO_RETURN(auto eof, co_await p.receive(2));
+        saw_eof = !eof.has_value();
         co_return absl::OkStatus();
-      }(),
+      }(pipeline, sink_received, sink_saw_eof),
       [&](absl::Status s) { sink_status = std::move(s); });
 
   EXPECT_TRUE(pipeline.stage(0)->tryPush(5));
@@ -123,17 +123,19 @@ TEST_F(FilterPipelineTest, ReceiveAndPropagateOnClosedPipelineReturnCancelled) {
 
   absl::Status post_close_rx = absl::OkStatus();
   auto h_rx = launch(
-      [&]() -> Coroutine::Task<absl::Status> {
-        ASSIGN_OR_CO_RETURN(auto item, co_await pipeline.receive(0));
+      [](FilterPipeline<int>& p) -> Coroutine::Task<absl::Status> {
+        ASSIGN_OR_CO_RETURN(auto item, co_await p.receive(0));
         (void)item;
         co_return absl::OkStatus();
-      }(),
+      }(pipeline),
       [&](absl::Status s) { post_close_rx = std::move(s); });
   EXPECT_TRUE(absl::IsCancelled(post_close_rx));
 
   absl::Status post_close_tx = absl::OkStatus();
   auto h_tx = launch(
-      [&]() -> Coroutine::Task<absl::Status> { co_return co_await pipeline.propagate(0, 42); }(),
+      [](FilterPipeline<int>& p) -> Coroutine::Task<absl::Status> {
+        co_return co_await p.propagate(0, 42);
+      }(pipeline),
       [&](absl::Status s) { post_close_tx = std::move(s); });
   EXPECT_TRUE(absl::IsCancelled(post_close_tx));
 }

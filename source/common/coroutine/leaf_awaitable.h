@@ -206,7 +206,7 @@ protected:
     });
   }
 
-  // `post()` cannot be recalled from the dispatcher queue; nulling `*self_` turns
+  // `post()` cannot be recalled from the dispatcher queue; clearing `*self_` turns
   // the queued callback into a no-op once the cancel path has resumed and destroyed
   // this leaf.
   void onCancel() override { *self_ = nullptr; }

@@ -184,7 +184,7 @@ private:
     FilterChainBridge::ScopedUnacked unacked;
   };
 
-  // Drains overflow items that could not be pushed synchronously by onData(), uncharging the bridge
+  // Drains overflow items that could not be pushed synchronously by onData(), releasing the bridge
   // as each item enters stage(0).
   Coroutine::Task<absl::Status> drainPendingItems() {
     auto self = shared_from_this();
@@ -225,7 +225,7 @@ private:
       CO_RETURN_IF_ERROR(co_await serializeItem(std::move(*item)));
     }
     CO_RETURN_IF_ERROR(co_await finishSerialize());
-    // Yield to the dispatcher before firing on_complete_ so completion never runs re-entrantly
+    // Yield to the dispatcher before firing on_complete_ so completion never runs reentrantly
     // inside a filter's encodeData/encodeTrailers callback.
     CO_RETURN_IF_ERROR(co_await Coroutine::yield());
     auto self = shared_from_this();
