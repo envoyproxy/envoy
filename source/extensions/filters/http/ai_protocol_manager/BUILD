@@ -199,6 +199,28 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "flattening_json_codec_lib",
+    srcs = ["flattening_json_codec.cc"],
+    hdrs = ["flattening_json_codec.h"],
+    deps = [
+        ":buffer_manager_lib",
+        ":replay_awaitable_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+        "@abseil-cpp//absl/types:variant",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
     name = "serializer_lib",
     srcs = ["serializer.cc"],
     hdrs = ["serializer.h"],
