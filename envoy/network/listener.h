@@ -68,8 +68,13 @@ public:
 
   /**
    * Clone this socket factory so it can be used by a new listener (e.g., if the address is shared).
+   * @param tcp_backlog_size supplies the tcp_backlog_size of the new listener. This is passed
+   *        explicitly (rather than read off the existing factory) because it is the one listener
+   *        option that can be re-applied to an already-listening socket via a second listen()
+   *        call, so a change to it does not by itself force full socket recreation; the cloned
+   *        factory must carry the new listener's value rather than the one it is cloned from.
    */
-  virtual ListenSocketFactoryPtr clone() const PURE;
+  virtual ListenSocketFactoryPtr clone(uint32_t tcp_backlog_size) const PURE;
 
   /**
    * Close all sockets. This is used during draining scenarios.
