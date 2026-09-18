@@ -40,6 +40,7 @@ filegroup(
             "root/**/envoy-dynamic-filesystem-demo.yaml",
             "root/operations/_include/traffic_tapping_*.yaml",
             "root/configuration/http/http_filters/_include/checksum_filter.yaml",
+            "root/configuration/http/http_filters/_include/client_cert_filter.yaml",
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/configuration/http/http_filters/_include/geoip-filter.yaml",
             "root/configuration/listeners/network_filters/_include/geoip-network-filter.yaml",
@@ -70,6 +71,7 @@ filegroup(
     name = "contrib_configs",
     srcs = [
         "root/configuration/http/http_filters/_include/checksum_filter.yaml",
+        "root/configuration/http/http_filters/_include/client_cert_filter.yaml",
         "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
     ] + select({
         "@envoy//bazel:windows_x86_64": [],

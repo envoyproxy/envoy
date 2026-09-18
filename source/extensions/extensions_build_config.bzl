@@ -50,6 +50,7 @@ EXTENSIONS = {
     # Config validators
     #
 
+    "envoy.config.validators.dynamic_modules":                "//source/extensions/config/validators/dynamic_modules:config",
     "envoy.config.validators.minimum_clusters_validator":     "//source/extensions/config/validators/minimum_clusters:config",
 
     #
@@ -457,6 +458,7 @@ EXTENSIONS = {
     # HTTP header formatters
     #
 
+    "envoy.http.stateful_header_formatters.dynamic_modules":    "//source/extensions/http/header_formatters/dynamic_modules:config",
     "envoy.http.stateful_header_formatters.preserve_case":       "//source/extensions/http/header_formatters/preserve_case:config",
 
     #

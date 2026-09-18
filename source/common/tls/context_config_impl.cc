@@ -12,6 +12,7 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
@@ -376,10 +377,17 @@ const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES_FIPS =
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
     "ECDHE-RSA-AES256-GCM-SHA384:";
 
-const std::string ClientContextConfigImpl::DEFAULT_CURVES = "X25519:"
+const std::string ClientContextConfigImpl::DEFAULT_CURVES = "X25519MLKEM768:"
+                                                            "X25519:"
                                                             "P-256";
 
-const std::string ClientContextConfigImpl::DEFAULT_CURVES_FIPS = "P-256";
+const std::string ClientContextConfigImpl::DEFAULT_CURVES_NO_PQC = "X25519:"
+                                                                   "P-256";
+
+const std::string ClientContextConfigImpl::DEFAULT_CURVES_FIPS = "X25519MLKEM768:"
+                                                                 "P-256";
+
+const std::string ClientContextConfigImpl::DEFAULT_CURVES_FIPS_NO_PQC = "P-256";
 
 absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>> ClientContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
@@ -398,7 +406,10 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     : ContextConfigImpl(
           config.common_tls_context(), config.auto_sni_san_validation(), DEFAULT_MIN_VERSION,
           DEFAULT_MAX_VERSION, FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
-          FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES, factory_context, creation_status),
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.pqc_default_ecdh_curves")
+              ? (FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES)
+              : (FIPS_mode() ? DEFAULT_CURVES_FIPS_NO_PQC : DEFAULT_CURVES_NO_PQC),
+          factory_context, creation_status),
       server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
       allow_renegotiation_(config.allow_renegotiation()),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {

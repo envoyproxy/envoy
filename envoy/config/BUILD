@@ -41,6 +41,7 @@ envoy_cc_library(
         "//envoy/protobuf:message_validator_interface",
         "//envoy/server:instance_interface",
         "//source/common/protobuf",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

@@ -1,10 +1,8 @@
 #include "source/extensions/filters/http/ai_protocol_manager/schema/gemini_generate_content.h"
 
 #include "absl/status/status.h"
-#include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,51 +13,11 @@ namespace Gemini {
 // Being proto-generated, Gemini takes every field in more than one form
 // (https://protobuf.dev/programming-guides/json/): numbers and enums each have two, so both
 // take a `oneOf`; null is valid anywhere, so optional fields are nullable and array elements
-// are not; and every name has a JSON and a proto spelling, so the properties below are keyed
-// on the JSON one and `isSet()` resolves both. Bounds appear only where Gemini's proto
-// carries a validator predicate. `model` and streaming are URL parameters, so not here.
+// are not; and every multi-word name has a JSON and a proto spelling, so properties declare
+// their `snake_case` alias inline. Bounds appear only where Gemini's proto carries a
+// validator predicate. `model` and streaming are URL parameters, so not here.
 
 namespace {
-
-// The proto name for a JSON field name: `inlineData` becomes `inline_data`. A name that is
-// already a single lowercase word is returned unchanged, and both spellings are then the
-// same string.
-std::string protoNameOf(const char* json_name) {
-  std::string proto_name;
-  for (const char* c = json_name; *c != '\0'; ++c) {
-    if (absl::ascii_isupper(*c)) {
-      proto_name.push_back('_');
-      proto_name.push_back(absl::ascii_tolower(*c));
-    } else {
-      proto_name.push_back(*c);
-    }
-  }
-  return proto_name;
-}
-
-bool isSetUnder(const nlohmann::json& object, const std::string& name) {
-  const auto it = object.find(name);
-  return it != object.end() && !it->is_null();
-}
-
-// Returns true if `object` has `name` set to something other than null, under either
-// spelling ProtoJSON accepts for it. A null does not count as present: ProtoJSON treats it
-// as leaving the field unset.
-bool isSet(const nlohmann::json& object, const char* name) {
-  if (isSetUnder(object, name)) {
-    return true;
-  }
-  const std::string proto_name = protoNameOf(name);
-  return proto_name != name && isSetUnder(object, proto_name);
-}
-
-absl::Status rejectIfBothSet(const nlohmann::json& object, const char* first, const char* second) {
-  if (isSet(object, first) && isSet(object, second)) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("'", first, "' and '", second, "' are mutually exclusive"));
-  }
-  return absl::OkStatus();
-}
 
 // The string form of a number still has to parse as one. `SimpleAtod` also accepts the
 // "NaN" and "Infinity" spellings ProtoJSON permits for floating point fields.
@@ -71,31 +29,6 @@ absl::Status validateNumericString(const nlohmann::json& value) {
   double parsed = 0;
   if (!absl::SimpleAtod(text, &parsed)) {
     return absl::InvalidArgumentError(absl::StrCat("expected a number, got '", text, "'"));
-  }
-  return absl::OkStatus();
-}
-
-absl::Status validateFunctionDeclarationExclusions(const nlohmann::json& declaration) {
-  absl::Status status = rejectIfBothSet(declaration, "parameters", "parametersJsonSchema");
-  if (!status.ok()) {
-    return status;
-  }
-  return rejectIfBothSet(declaration, "response", "responseJsonSchema");
-}
-
-absl::Status validateGenerationConfigExclusions(const nlohmann::json& config) {
-  return rejectIfBothSet(config, "responseSchema", "responseJsonSchema");
-}
-
-absl::Status validateThinkingConfigExclusions(const nlohmann::json& config) {
-  return rejectIfBothSet(config, "thinkingBudget", "thinkingLevel");
-}
-
-// `fileUri` is required, but `required()` looks for that one spelling and would reject a
-// request that sends `file_uri`. Checking presence here accepts both spellings.
-absl::Status validateFileDataRequired(const nlohmann::json& file_data) {
-  if (!isSet(file_data, "fileUri")) {
-    return absl::InvalidArgumentError("missing required field: 'fileUri'");
   }
   return absl::OkStatus();
 }
@@ -130,26 +63,8 @@ Schema asNullable(const Schema& schema) {
   return copy;
 }
 
-absl::Status validatePartDataOneOf(const nlohmann::json& part) {
-  static const char* kDataMembers[] = {
-      "text",     "inlineData",     "functionCall",       "functionResponse",
-      "fileData", "executableCode", "codeExecutionResult"};
-
-  std::vector<std::string> present;
-  for (const char* member : kDataMembers) {
-    if (isSet(part, member)) {
-      present.emplace_back(member);
-    }
-  }
-  if (present.size() > 1) {
-    return absl::InvalidArgumentError(absl::StrCat(
-        "a Part may set at most one of its data members, got: ", absl::StrJoin(present, ", ")));
-  }
-  return absl::OkStatus();
-}
-
-// A single Part. The data members form a proto `oneof`, so each is declared optional and a
-// custom validator enforces that at most one is set. Zero is allowed: a Part may carry only
+// A single Part. The data members form a proto `oneof`, so each is declared optional and
+// `atMostOneOf` enforces that at most one is set. Zero is allowed: a Part may carry only
 // `thought` or `partMetadata`.
 const Schema& partSchema() {
   static const Schema schema =
@@ -157,17 +72,21 @@ const Schema& partSchema() {
           {
               {"text", Schema::string().offloadable().nullable()},
               // `data` is `bytes` on the wire: base64, routinely megabytes.
-              {"inlineData", Schema::object({
-                                                {"mimeType", Schema::string().nullable()},
-                                                {"data", Schema::string().offloadable().nullable()},
-                                            })
-                                 .nullable()},
-              {"functionCall", Schema::object({
-                                                  {"id", Schema::string().nullable()},
-                                                  {"name", Schema::string().required()},
-                                                  {"args", Schema::object({}).nullable()},
-                                              })
-                                   .nullable()},
+              {"inlineData",
+               Schema::object({
+                                  {"mimeType", Schema::string().nullable(), {"mime_type"}},
+                                  {"data", Schema::string().offloadable().nullable()},
+                              })
+                   .nullable(),
+               {"inline_data"}},
+              {"functionCall",
+               Schema::object({
+                                  {"id", Schema::string().nullable()},
+                                  {"name", Schema::string().required()},
+                                  {"args", Schema::object({}).nullable()},
+                              })
+                   .nullable(),
+               {"function_call"}},
               {"functionResponse",
                Schema::object({
                                   {"id", Schema::string().nullable()},
@@ -177,43 +96,53 @@ const Schema& partSchema() {
                                   // inline blob, and `any` accepts an offloaded value at
                                   // any depth.
                                   {"parts", Schema::array(Schema::any()).nullable()},
-                                  {"willContinue", Schema::boolean().nullable()},
+                                  {"willContinue", Schema::boolean().nullable(), {"will_continue"}},
                                   {"scheduling", enumNameOrNumber().nullable()},
                               })
-                   .nullable()},
-              // `fileUri` is a URI, comfortably below the offload threshold. It is required;
-              // the check sits on the object so it can accept `file_uri` too.
-              {"fileData", Schema::object({
-                                              {"mimeType", Schema::string().nullable()},
-                                              {"fileUri", Schema::string().nullable()},
-                                          })
-                               .customValidator(validateFileDataRequired)
-                               .nullable()},
+                   .nullable(),
+               {"function_response"}},
+              {"fileData",
+               Schema::object(
+                   {
+                       {"mimeType", Schema::string().nullable(), {"mime_type"}},
+                       // `fileUri` can exceed the inline threshold (e.g. long pre-signed URLs),
+                       // so it is marked offloadable; revisit if a tighter upper bound is chosen.
+                       {"fileUri", Schema::string().offloadable().required(), {"file_uri"}},
+                   })
+                   .nullable(),
+               {"file_data"}},
               {"executableCode",
                Schema::object({
                                   {"language", enumNameOrNumber().required()},
                                   {"code", Schema::string().offloadable().required()},
                               })
-                   .nullable()},
+                   .nullable(),
+               {"executable_code"}},
               {"codeExecutionResult",
                Schema::object({
                                   {"outcome", enumNameOrNumber().required()},
                                   {"output", Schema::string().offloadable().nullable()},
                               })
-                   .nullable()},
+                   .nullable(),
+               {"code_execution_result"}},
               // The offsets are `Duration`, which ProtoJSON renders as a string like "3.5s".
-              {"videoMetadata", Schema::object({
-                                                   {"startOffset", Schema::string().nullable()},
-                                                   {"endOffset", Schema::string().nullable()},
-                                                   {"fps", numberOrString().nullable()},
-                                               })
-                                    .nullable()},
+              {"videoMetadata",
+               Schema::object({
+                                  {"startOffset", Schema::string().nullable(), {"start_offset"}},
+                                  {"endOffset", Schema::string().nullable(), {"end_offset"}},
+                                  {"fps", numberOrString().nullable()},
+                              })
+                   .nullable(),
+               {"video_metadata"}},
               {"thought", Schema::boolean().nullable()},
               // An opaque signature, `bytes` on the wire, with no documented size bound.
-              {"thoughtSignature", Schema::string().offloadable().nullable()},
-              {"partMetadata", Schema::object({}).nullable()},
+              {"thoughtSignature",
+               Schema::string().offloadable().nullable(),
+               {"thought_signature"}},
+              {"partMetadata", Schema::object({}).nullable(), {"part_metadata"}},
           })
-          .customValidator(validatePartDataOneOf);
+          .atMostOneOf({"text", "inlineData", "functionCall", "functionResponse", "fileData",
+                        "executableCode", "codeExecutionResult"});
   return schema;
 }
 
@@ -234,18 +163,20 @@ const Schema& functionDeclarationSchema() {
   static const Schema schema =
       Schema::object({
                          {"name", Schema::string().required()},
-                         // Required by the proto, and the one tool field large enough to be worth
-                         // offloading.
-                         {"description", Schema::string().offloadable().required()},
+                         // The Gemini Developer API documents this as required, but Vertex
+                         // documents it as optional, so requiring it would reject valid Vertex
+                         // traffic. It is the one tool field large enough to be worth offloading.
+                         {"description", Schema::string().offloadable().nullable()},
                          // Contents unchecked, as for `responseSchema` below. Each pair is mutually
                          // exclusive, checked below.
                          {"parameters", Schema::object({}).nullable()},
-                         {"parametersJsonSchema", Schema::any()},
+                         {"parametersJsonSchema", Schema::any(), {"parameters_json_schema"}},
                          {"response", Schema::object({}).nullable()},
-                         {"responseJsonSchema", Schema::any()},
+                         {"responseJsonSchema", Schema::any(), {"response_json_schema"}},
                          {"behavior", enumNameOrNumber().nullable()},
                      })
-          .customValidator(validateFunctionDeclarationExclusions);
+          .atMostOneOf({"parameters", "parametersJsonSchema"})
+          .atMostOneOf({"response", "responseJsonSchema"});
   return schema;
 }
 
@@ -253,14 +184,16 @@ const Schema& functionDeclarationSchema() {
 // beyond their being objects.
 const Schema& toolSchema() {
   static const Schema schema = Schema::object({
-      {"functionDeclarations", Schema::array(functionDeclarationSchema()).nullable()},
-      {"googleSearch", Schema::object({}).nullable()},
-      {"googleSearchRetrieval", Schema::object({}).nullable()},
-      {"codeExecution", Schema::object({}).nullable()},
-      {"computerUse", Schema::object({}).nullable()},
-      {"urlContext", Schema::object({}).nullable()},
-      {"fileSearch", Schema::object({}).nullable()},
-      {"googleMaps", Schema::object({}).nullable()},
+      {"functionDeclarations",
+       Schema::array(functionDeclarationSchema()).nullable(),
+       {"function_declarations"}},
+      {"googleSearch", Schema::object({}).nullable(), {"google_search"}},
+      {"googleSearchRetrieval", Schema::object({}).nullable(), {"google_search_retrieval"}},
+      {"codeExecution", Schema::object({}).nullable(), {"code_execution"}},
+      {"computerUse", Schema::object({}).nullable(), {"computer_use"}},
+      {"urlContext", Schema::object({}).nullable(), {"url_context"}},
+      {"fileSearch", Schema::object({}).nullable(), {"file_search"}},
+      {"googleMaps", Schema::object({}).nullable(), {"google_maps"}},
   });
   return schema;
 }
@@ -271,10 +204,13 @@ const Schema& toolConfigSchema() {
       {"functionCallingConfig",
        Schema::object({
                           {"mode", enumNameOrNumber().nullable()},
-                          {"allowedFunctionNames", Schema::array(Schema::string()).nullable()},
+                          {"allowedFunctionNames",
+                           Schema::array(Schema::string()).nullable(),
+                           {"allowed_function_names"}},
                       })
-           .nullable()},
-      {"retrievalConfig", Schema::object({}).nullable()},
+           .nullable(),
+       {"function_calling_config"}},
+      {"retrievalConfig", Schema::object({}).nullable(), {"retrieval_config"}},
   });
   return schema;
 }
@@ -293,60 +229,73 @@ const Schema& generationConfigSchema() {
   static const Schema schema =
       Schema::object(
           {
-              {"candidateCount", numberOrString(1, 8).nullable()},
-              {"stopSequences", Schema::array(Schema::string()).max(5).nullable()},
-              {"maxOutputTokens", numberOrString().nullable()},
+              {"candidateCount", numberOrString(1, 8).nullable(), {"candidate_count"}},
+              {"stopSequences",
+               Schema::array(Schema::string()).max(5).nullable(),
+               {"stop_sequences"}},
+              {"maxOutputTokens", numberOrString().nullable(), {"max_output_tokens"}},
               {"temperature", numberOrString(0.0, 2.0).nullable()},
-              {"topP", numberOrString(0.0, 1.0).nullable()},
-              {"topK", numberOrString().nullable()},
+              {"topP", numberOrString(0.0, 1.0).nullable(), {"top_p"}},
+              {"topK", numberOrString().nullable(), {"top_k"}},
               {"seed", numberOrString().nullable()},
-              {"responseMimeType", Schema::string().nullable()},
+              {"responseMimeType", Schema::string().nullable(), {"response_mime_type"}},
               // Contents unchecked: an OpenAPI schema nests itself, and a schema here cannot
               // refer to itself. `responseJsonSchema` may be any JSON type. The two are
               // mutually exclusive, checked below.
-              {"responseSchema", Schema::object({}).nullable()},
-              {"responseJsonSchema", Schema::any()},
-              {"presencePenalty", numberOrString(-2.0, 2.0).nullable()},
-              {"frequencyPenalty", numberOrString(-2.0, 2.0).nullable()},
-              {"responseLogprobs", Schema::boolean().nullable()},
+              {"responseSchema", Schema::object({}).nullable(), {"response_schema"}},
+              {"responseJsonSchema", Schema::any(), {"response_json_schema"}},
+              {"presencePenalty", numberOrString(-2.0, 2.0).nullable(), {"presence_penalty"}},
+              {"frequencyPenalty", numberOrString(-2.0, 2.0).nullable(), {"frequency_penalty"}},
+              {"responseLogprobs", Schema::boolean().nullable(), {"response_logprobs"}},
               {"logprobs", numberOrString(0, 20).nullable()},
-              {"enableEnhancedCivicAnswers", Schema::boolean().nullable()},
-              {"responseModalities", Schema::array(enumNameOrNumber()).nullable()},
-              {"speechConfig", Schema::object({}).nullable()},
+              {"enableEnhancedCivicAnswers",
+               Schema::boolean().nullable(),
+               {"enable_enhanced_civic_answers"}},
+              {"responseModalities",
+               Schema::array(enumNameOrNumber()).nullable(),
+               {"response_modalities"}},
+              {"speechConfig", Schema::object({}).nullable(), {"speech_config"}},
               {"thinkingConfig",
-               Schema::object({
-                                  {"includeThoughts", Schema::boolean().nullable()},
-                                  // -1 selects dynamic thinking, so the range starts below 0.
-                                  {"thinkingBudget", numberOrString(-1, 65535).nullable()},
-                                  // Says the same thing as `thinkingBudget` in words rather
-                                  // than tokens, so only one of the two may be set.
-                                  {"thinkingLevel", enumNameOrNumber().nullable()},
-                              })
-                   .customValidator(validateThinkingConfigExclusions)
-                   .nullable()},
-              {"imageConfig", Schema::object({}).nullable()},
-              {"mediaResolution", enumNameOrNumber().nullable()},
+               Schema::object(
+                   {
+                       {"includeThoughts", Schema::boolean().nullable(), {"include_thoughts"}},
+                       // -1 selects dynamic thinking, so the range starts below 0.
+                       {"thinkingBudget",
+                        numberOrString(-1, 65535).nullable(),
+                        {"thinking_budget"}},
+                       // Says the same thing as `thinkingBudget` in words rather
+                       // than tokens, so only one of the two may be set.
+                       {"thinkingLevel", enumNameOrNumber().nullable(), {"thinking_level"}},
+                   })
+                   .atMostOneOf({"thinkingBudget", "thinkingLevel"})
+                   .nullable(),
+               {"thinking_config"}},
+              {"imageConfig", Schema::object({}).nullable(), {"image_config"}},
+              {"mediaResolution", enumNameOrNumber().nullable(), {"media_resolution"}},
           })
-          .customValidator(validateGenerationConfigExclusions);
+          .atMostOneOf({"responseSchema", "responseJsonSchema"});
   return schema;
 }
 
 PayloadSchema createPayloadSchema() {
   return PayloadSchema{
       /*request_schema=*/RequestSchema{
-          Schema::object({
-                             // Not nullable: a null would unset the one field the API requires.
-                             {"contents", Schema::array(contentSchema()).min(1).required()},
-                             {"systemInstruction", asNullable(contentSchema())},
-                             {"tools", Schema::array(toolSchema()).nullable()},
-                             {"toolConfig", asNullable(toolConfigSchema())},
-                             {"safetySettings", Schema::array(safetySettingSchema()).nullable()},
-                             {"generationConfig", asNullable(generationConfigSchema())},
-                             // A resource name, e.g. `cachedContents/1234`.
-                             {"cachedContent", Schema::string().nullable()},
-                             {"serviceTier", enumNameOrNumber().nullable()},
-                             {"store", Schema::boolean().nullable()},
-                         })
+          Schema::object(
+              {
+                  // Not nullable: a null would unset the one field the API requires.
+                  {"contents", Schema::array(contentSchema()).min(1).required()},
+                  {"systemInstruction", asNullable(contentSchema()), {"system_instruction"}},
+                  {"tools", Schema::array(toolSchema()).nullable()},
+                  {"toolConfig", asNullable(toolConfigSchema()), {"tool_config"}},
+                  {"safetySettings",
+                   Schema::array(safetySettingSchema()).nullable(),
+                   {"safety_settings"}},
+                  {"generationConfig", asNullable(generationConfigSchema()), {"generation_config"}},
+                  // A resource name, e.g. `cachedContents/1234`.
+                  {"cachedContent", Schema::string().nullable(), {"cached_content"}},
+                  {"serviceTier", enumNameOrNumber().nullable(), {"service_tier"}},
+                  {"store", Schema::boolean().nullable()},
+              })
               // Gemini names the unknown field in its own error, which beats anything we
               // could say here. Rejecting instead would mean every field it gains fails at
               // this filter until someone edits this list.
@@ -355,11 +304,13 @@ PayloadSchema createPayloadSchema() {
           {
               "contents[].parts[].text",
               "contents[].parts[].inlineData.data",
+              "contents[].parts[].fileData.fileUri",
               "contents[].parts[].executableCode.code",
               "contents[].parts[].codeExecutionResult.output",
               "contents[].parts[].thoughtSignature",
               "systemInstruction.parts[].text",
               "systemInstruction.parts[].inlineData.data",
+              "systemInstruction.parts[].fileData.fileUri",
               "systemInstruction.parts[].executableCode.code",
               "systemInstruction.parts[].codeExecutionResult.output",
               "systemInstruction.parts[].thoughtSignature",

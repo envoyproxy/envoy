@@ -21,10 +21,6 @@ Schema enumNameOrNumber();
 // does not.
 Schema asNullable(const Schema& schema);
 
-// Enforces the `Part.data` oneof: at most one data member may be set. A null counts as
-// unset. Declared here so it can be exercised directly in tests.
-absl::Status validatePartDataOneOf(const nlohmann::json& part);
-
 // Reusable sub-schemas and complete payload schema definition for the Gemini
 // generateContent API.
 const Schema& partSchema();

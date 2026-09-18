@@ -12,6 +12,7 @@ pub mod catch_unwind;
 pub mod cert_validator;
 pub mod cluster;
 pub mod cluster_specifier;
+pub mod config_validator;
 pub mod dns_resolver;
 pub mod early_header_mutation;
 // Implementation detail. Public so SDK-provided macros (for example, `declare_matcher!`) that
@@ -20,6 +21,7 @@ pub mod early_header_mutation;
 #[doc(hidden)]
 pub mod ffi_helpers;
 pub mod formatter;
+pub mod header_formatter;
 pub mod health_checker;
 pub mod http;
 pub mod listener;
@@ -38,6 +40,7 @@ pub use buffer::*;
 pub use catch_unwind::*;
 pub use cert_validator::*;
 pub use cluster::*;
+pub use config_validator::*;
 pub use dns_resolver::*;
 pub use http::*;
 pub use listener::*;
@@ -562,9 +565,14 @@ pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_mo
   }
 }
 
+/// Converts label name or value strings to module buffers for a labeled metric call.
+///
+/// The result is a `SmallVec` inlined for the common case of a few labels, so the typical one to
+/// four labels need no heap allocation. Callers must take `as_ptr` or `as_mut_ptr` on the bound
+/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that pointer.
 pub(crate) fn strs_to_module_buffers(
   strs: &[&str],
-) -> Vec<abi::envoy_dynamic_module_type_module_buffer> {
+) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_buffer; 4]> {
   strs.iter().map(|s| str_to_module_buffer(s)).collect()
 }
 
@@ -786,6 +794,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `http_per_route:` — [`NewHttpFilterPerRouteConfigFunction`] for HTTP per-route configs
 /// - `load_balancer:` — [`NewLoadBalancerConfigFunction`] for load balancer policies
 /// - `cluster:` — [`NewClusterConfigFunction`] for custom clusters
+/// - `config_validator:` — [`NewConfigValidatorConfigFunction`] for xDS config validators
 /// - `tracer:` — [`NewTracerConfigFunction`] for tracers
 /// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
 /// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
@@ -796,6 +805,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
 /// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
 ///   mutations
+/// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
 ///
 /// # Examples
 ///
@@ -960,6 +970,13 @@ macro_rules! declare_all_init_functions {
       "NEW_CERT_VALIDATOR_CONFIG_FUNCTION"
     );
   };
+  (@register config_validator : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION"
+    );
+  };
   (@register upstream_http_tcp_bridge : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
       envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
@@ -1028,6 +1045,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION,
       $fn,
       "NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION"
+    );
+  };
+  (@register header_formatter : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HEADER_FORMATTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HEADER_FORMATTER_CONFIG_FUNCTION"
     );
   };
 }
@@ -1540,6 +1564,25 @@ pub static NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION: OnceLock<
 > = OnceLock::new();
 
 // =================================================================================================
+// Header Formatter Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new HTTP/1 header formatter configuration.
+///
+/// The `name` is the value of `header_formatter_name` from the `dynamic_modules` header formatter
+/// configuration, allowing a single module to dispatch to different implementations. The `config`
+/// is the raw configuration bytes. Returning `None` causes Envoy to reject the header formatter
+/// configuration.
+pub type NewHeaderFormatterConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn header_formatter::HeaderFormatterConfig>>;
+
+/// The global factory function for header formatter configurations. This is set via the
+/// `header_formatter:` arm of [`declare_all_init_functions!`] and is not intended to be set
+/// directly.
+pub static NEW_HEADER_FORMATTER_CONFIG_FUNCTION: OnceLock<NewHeaderFormatterConfigFunction> =
+  OnceLock::new();
+
+// =================================================================================================
 // Cluster Dynamic Module
 // =================================================================================================
 
@@ -1831,6 +1874,92 @@ macro_rules! declare_cert_validator_init_functions {
         }
       }
       on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =============================================================================
+// Config Validator
+// =============================================================================
+
+/// The function signature for creating a new xDS config validator configuration.
+pub type NewConfigValidatorConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn config_validator::ConfigValidatorConfig>>;
+
+/// Global function for creating xDS config validator configurations.
+pub static NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewConfigValidatorConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a config validator dynamic module.
+///
+/// This macro generates the necessary `extern "C"` functions for the config validator module.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::config_validator::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_config_validator_config(
+///   name: &str,
+///   config: &[u8],
+/// ) -> Option<Box<dyn ConfigValidatorConfig>> {
+///   Some(Box::new(MyConfigValidatorConfig {}))
+/// }
+///
+/// declare_config_validator_init_functions!(program_init, new_config_validator_config);
+///
+/// struct MyConfigValidatorConfig {}
+///
+/// impl ConfigValidatorConfig for MyConfigValidatorConfig {
+///   fn validate(
+///     &self,
+///     _context: &ConfigValidatorContext,
+///     _type_url: &str,
+///     _resources: &[ConfigValidatorResource],
+///   ) -> Result<(), String> {
+///     Ok(())
+///   }
+///
+///   fn validate_delta(
+///     &self,
+///     _context: &ConfigValidatorContext,
+///     _type_url: &str,
+///     _added_resources: &[ConfigValidatorResource],
+///     _removed_resources: &[&str],
+///   ) -> Result<(), String> {
+///     Ok(())
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_config_validator_init_functions {
+  ($f:ident, $new_config_validator_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION,
+          $new_config_validator_config_fn,
+          "NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
+      }
     }
   };
 }

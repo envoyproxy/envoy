@@ -481,6 +481,9 @@ TEST(GeminiGenerateContentTest, OffloadedValuesAccepted) {
                  {{"inlineData",
                    {{"data",
                      JsonWithExtBuf::makeExternalRef(JsonWithExtBuf::ExternalRef{100, 900000})}}}},
+                 {{"fileData",
+                   {{"fileUri",
+                     JsonWithExtBuf::makeExternalRef(JsonWithExtBuf::ExternalRef{150, 2000})}}}},
                  {{"executableCode",
                    {{"language", "PYTHON"},
                     {"code",
@@ -520,16 +523,17 @@ TEST(GeminiGenerateContentTest, NonOffloadableFieldsRejectExternalRefs) {
   EXPECT_THAT(payload_schema.validateRequest(offloaded_role),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 
-  nlohmann::json offloaded_file_uri = {
+  nlohmann::json offloaded_mime_type = {
       {"contents", nlohmann::json::array({
                        {{"parts", nlohmann::json::array({
                                       {{"fileData",
-                                        {{"fileUri", JsonWithExtBuf::makeExternalRef(
-                                                         JsonWithExtBuf::ExternalRef{0, 2000})}}}},
+                                        {{"mimeType", JsonWithExtBuf::makeExternalRef(
+                                                          JsonWithExtBuf::ExternalRef{0, 2000})},
+                                         {"fileUri", "gs://bucket/obj"}}}},
                                   })}},
                    })},
   };
-  EXPECT_THAT(payload_schema.validateRequest(offloaded_file_uri),
+  EXPECT_THAT(payload_schema.validateRequest(offloaded_mime_type),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
@@ -638,7 +642,18 @@ TEST(GeminiGenerateContentTest, MissingRequiredNestedFields) {
   EXPECT_THAT(payload_schema.validateRequest(missing_threshold),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 
-  // tools[].functionDeclarations[].name and .description
+  // tools[].functionDeclarations[].name (description is optional for Vertex compatibility).
+  nlohmann::json missing_function_name = {
+      {"contents", nlohmann::json::array({
+                       {{"parts", nlohmann::json::array({{{"text", "Hi"}}})}},
+                   })},
+      {"tools", nlohmann::json::array({
+                    {{"functionDeclarations", nlohmann::json::array({{{"description", "d"}}})}},
+                })},
+  };
+  EXPECT_THAT(payload_schema.validateRequest(missing_function_name),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
   nlohmann::json missing_description = {
       {"contents", nlohmann::json::array({
                        {{"parts", nlohmann::json::array({{{"text", "Hi"}}})}},
@@ -647,12 +662,12 @@ TEST(GeminiGenerateContentTest, MissingRequiredNestedFields) {
                     {{"functionDeclarations", nlohmann::json::array({{{"name", "f"}}})}},
                 })},
   };
-  EXPECT_THAT(payload_schema.validateRequest(missing_description),
-              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(payload_schema.validateRequest(missing_description), IsOk());
 }
 
 // ProtoJSON accepts a field under its JSON name or its proto name, so a payload spelled the
-// proto way is as valid as the camelCase one and must not be rejected.
+// proto way is validated identically to the camelCase one: valid values pass, and invalid
+// values or missing required fields under snake_case (including parent objects) are rejected.
 TEST(GeminiGenerateContentTest, ProtoFieldNamesAccepted) {
   PayloadSchema payload_schema = createPayloadSchema();
 
@@ -667,10 +682,31 @@ TEST(GeminiGenerateContentTest, ProtoFieldNamesAccepted) {
       {"cached_content", "cachedContents/1234"},
   };
   EXPECT_THAT(payload_schema.validateRequest(proto_named), IsOk());
+
+  // Out-of-bounds value inside snake_case `generation_config` / `max_output_tokens`.
+  nlohmann::json bad_proto_config = {
+      {"contents", nlohmann::json::array({
+                       {{"parts", nlohmann::json::array({{{"text", "Hi"}}})}},
+                   })},
+      {"generation_config", {{"temperature", 5.0}}},
+  };
+  EXPECT_THAT(payload_schema.validateRequest(bad_proto_config),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Missing required `threshold` inside snake_case `safety_settings`.
+  nlohmann::json bad_proto_safety = {
+      {"contents", nlohmann::json::array({
+                       {{"parts", nlohmann::json::array({{{"text", "Hi"}}})}},
+                   })},
+      {"safety_settings", nlohmann::json::array({{{"category", "HARM_CATEGORY_HARASSMENT"}}})},
+  };
+  EXPECT_THAT(payload_schema.validateRequest(bad_proto_safety),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
-// `fileUri` is required, and `file_uri` names the same field. Requiring the JSON spelling
-// alone would reject a request Gemini serves.
+// `fileUri` is required, and `file_uri` names the same field. Both spellings -- and both
+// spellings of the parent `fileData` / `file_data` object -- undergo the same presence,
+// null, and type checks.
 TEST(GeminiGenerateContentTest, FileDataAcceptsEitherSpellingOfFileUri) {
   PayloadSchema payload_schema = createPayloadSchema();
 
@@ -688,14 +724,34 @@ TEST(GeminiGenerateContentTest, FileDataAcceptsEitherSpellingOfFileUri) {
   EXPECT_THAT(payload_schema.validateRequest(with_part(
                   {{"fileData", {{"mime_type", "video/mp4"}, {"file_uri", "gs://bucket/v.mp4"}}}})),
               IsOk());
+  EXPECT_THAT(
+      payload_schema.validateRequest(with_part(
+          {{"file_data", {{"mime_type", "video/mp4"}, {"file_uri", "gs://bucket/v.mp4"}}}})),
+      IsOk());
 
-  // Neither spelling present is still a missing required field.
+  // Neither spelling present is a missing required field under either parent spelling.
   EXPECT_THAT(
       payload_schema.validateRequest(with_part({{"fileData", {{"mimeType", "video/mp4"}}}})),
       StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      payload_schema.validateRequest(with_part({{"file_data", {{"mime_type", "video/mp4"}}}})),
+      StatusCodeIs(absl::StatusCode::kInvalidArgument));
 
-  // An explicit null leaves the field unset, so it does not satisfy the requirement.
+  // An explicit null leaves the field unset under either spelling.
   EXPECT_THAT(payload_schema.validateRequest(with_part({{"fileData", {{"fileUri", nullptr}}}})),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(payload_schema.validateRequest(with_part({{"fileData", {{"file_uri", nullptr}}}})),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(payload_schema.validateRequest(with_part({{"file_data", {{"file_uri", nullptr}}}})),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Wrong value type is rejected for both `fileUri` and `file_uri`, under both `fileData` and
+  // `file_data`.
+  EXPECT_THAT(payload_schema.validateRequest(with_part({{"fileData", {{"fileUri", 123}}}})),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(payload_schema.validateRequest(with_part({{"fileData", {{"file_uri", 123}}}})),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(payload_schema.validateRequest(with_part({{"file_data", {{"file_uri", 123}}}})),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
@@ -814,11 +870,13 @@ TEST(GeminiGenerateContentTest, CanonicalStreamableFieldOrder) {
   const std::vector<std::string> expected_order = {
       "contents[].parts[].text",
       "contents[].parts[].inlineData.data",
+      "contents[].parts[].fileData.fileUri",
       "contents[].parts[].executableCode.code",
       "contents[].parts[].codeExecutionResult.output",
       "contents[].parts[].thoughtSignature",
       "systemInstruction.parts[].text",
       "systemInstruction.parts[].inlineData.data",
+      "systemInstruction.parts[].fileData.fileUri",
       "systemInstruction.parts[].executableCode.code",
       "systemInstruction.parts[].codeExecutionResult.output",
       "systemInstruction.parts[].thoughtSignature",

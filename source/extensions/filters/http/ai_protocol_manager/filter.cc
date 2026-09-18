@@ -189,19 +189,16 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
 }
 
 void AiProtocolManagerFilter::onDestroy() {
-  if (filter_manager_ != nullptr) {
-    filter_manager_->cancel();
+  if (decode_bridge_ != nullptr) {
+    // Detach the bridge first so all registered BufferManagers on this path are detached and
+    // their callbacks disarmed before cancelling coroutines in filter_manager_.
+    decode_bridge_->detachFromFilterChain();
   }
   if (decode_manager_ != nullptr) {
-    // Detach the manager (releases the external buffer and unsubscribes from
-    // watermarks) but do NOT free it here. onDestroy() can run synchronously while
-    // the manager is mid-replay -- a downstream filter answering an injected frame
-    // with a local reply reaches destroyFilters() on this very stack -- and freeing
-    // the manager then would pull it out from under its own injectData()/read()
-    // reentrancy. The manager is owned by unique_ptr and freed when this filter is
-    // (deferred-)destroyed, by which point the replay stack has unwound. This honors
-    // BufferManager's onDestroy()-before-destruction contract (see buffer_manager.h).
     decode_manager_->onDestroy();
+  }
+  if (filter_manager_ != nullptr) {
+    filter_manager_->cancel();
   }
 }
 
@@ -251,9 +248,14 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
   // for none of it: constructing it subscribes to upstream watermarks and claims
   // a schedulable callback.
-  decode_manager_ = std::make_unique<BufferManager>(
-      buffer_factory_,
-      std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_, config_->stats()));
+  decode_bridge_ =
+      std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_, config_->stats());
+  // A request small enough that the chain would have buffered it anyway is held in memory and
+  // replayed from there, so it costs no storage IO at all. Past that the chain would have pushed
+  // back, which is exactly the point at which offloading starts to pay for itself.
+  decode_manager_ = std::make_shared<BufferManager>(
+      BufferManager::Config{decoder_callbacks_->decoderBufferLimit()}, buffer_factory_,
+      *decode_bridge_);
 
   // Pin the headers so routing and admission filters do not act on them before
   // the payload is offloaded. decodeData() still fires while iteration is stopped
