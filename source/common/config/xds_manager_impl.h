@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Config {
 
-class XdsManagerImpl : public XdsManager {
+class XdsManagerImpl : public XdsManager, public ScopedBatchFactory {
 public:
   XdsManagerImpl(Event::Dispatcher& main_thread_dispatcher, Api::Api& api, Stats::Store& stats,
                  const LocalInfo::LocalInfo& local_info,
@@ -17,6 +17,9 @@ public:
       : server_(server), main_thread_dispatcher_(main_thread_dispatcher), api_(api),
         random_(api.randomGenerator()), stats_(stats), local_info_(local_info),
         validation_context_(validation_context) {}
+
+  // Config::ScopedBatchFactory
+  ScopedBatchPtr createScopedBatch(absl::string_view type_url) override;
 
   // Config::XdsManager
   absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,

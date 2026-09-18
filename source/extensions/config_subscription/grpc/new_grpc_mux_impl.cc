@@ -55,7 +55,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node")),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
-      cluster_manager_(grpc_mux_context.cluster_manager_) {
+      scoped_batch_factory_(grpc_mux_context.scoped_batch_factory_) {
   AllMuxes::get().insert(this);
 }
 
@@ -180,14 +180,11 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     }
   }
 
-  // For EDS (ClusterLoadAssignment) updates, create an RAII batch to coalesce all
-  // subsequent cluster endpoint thread-local updates and load balancer rebuilds into
-  // a single TLS dispatch upon response processing completion.
-  Upstream::ClusterUpdateBatchPtr batch;
-  if (cluster_manager_.has_value() &&
-      message->type_url() ==
-          Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()) {
-    batch = cluster_manager_->createSourceBatch();
+  // Scopes an RAII batch during response processing (e.g. EDS cluster updates) to defer and
+  // coalesce thread-local updates across worker threads.
+  ScopedBatchPtr batch;
+  if (scoped_batch_factory_.has_value()) {
+    batch = scoped_batch_factory_->createScopedBatch(message->type_url());
   }
 
   auto ack = sub->second->sub_state_.handleResponse(*message);
@@ -491,7 +488,7 @@ public:
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          OptRef<XdsResourcesDelegate>,
          std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory,
-         OptRef<Upstream::ClusterManager> cluster_manager) override {
+         OptRef<ScopedBatchFactory> scoped_batch_factory) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -513,7 +510,7 @@ public:
         /*eds_resources_cache_=*/std::make_unique<EdsResourcesCacheImpl>(dispatcher),
         /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only(),
         /*load_stats_reporter_factory_=*/load_stats_reporter_factory,
-        /*cluster_manager_=*/cluster_manager};
+        /*scoped_batch_factory_=*/scoped_batch_factory};
     return std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context);
   }
 };

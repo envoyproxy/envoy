@@ -16,12 +16,12 @@
 #include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"
+#include "test/mocks/common.h"
 #include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
@@ -232,7 +232,6 @@ public:
   std::string version_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;
-  NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Random::MockRandomGenerator random_;
   Event::MockTimer* timer_;

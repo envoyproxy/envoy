@@ -24,7 +24,8 @@ public:
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                           const Server::Instance& server,
                           XdsResourcesDelegateOptRef xds_resources_delegate,
-                          XdsConfigTrackerOptRef xds_config_tracker);
+                          XdsConfigTrackerOptRef xds_config_tracker,
+                          ScopedBatchFactoryOptRef scoped_batch_factory = std::nullopt);
 
   // Config::SubscriptionFactory
   absl::StatusOr<SubscriptionPtr> subscriptionFromConfigSource(
@@ -51,6 +52,7 @@ private:
   const Server::Instance& server_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   XdsConfigTrackerOptRef xds_config_tracker_;
+  ScopedBatchFactoryOptRef scoped_batch_factory_;
 };
 
 } // namespace Config

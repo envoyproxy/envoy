@@ -134,9 +134,9 @@ using ClusterDiscoveryCallbackHandlePtr = std::unique_ptr<ClusterDiscoveryCallba
  * Destroying the outermost ClusterUpdateBatch will flush all queued thread-local cluster actions
  * across worker threads in a single broadcast.
  */
-class [[nodiscard]] ClusterUpdateBatch {
+class [[nodiscard]] ClusterUpdateBatch : public Config::ScopedBatch {
 public:
-  virtual ~ClusterUpdateBatch() = default;
+  ~ClusterUpdateBatch() override = default;
 };
 
 using ClusterUpdateBatchPtr = std::unique_ptr<ClusterUpdateBatch>;

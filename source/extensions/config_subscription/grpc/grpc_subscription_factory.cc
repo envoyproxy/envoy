@@ -62,7 +62,7 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
       /*eds_resources_cache_=*/nullptr, // EDS cache is only used for ADS.
       /*skip_subsequent_node_=*/api_config_source.set_node_on_first_message_only(),
       /*load_stats_reporter_factory_=*/lrs_factory,
-      /*cluster_manager_=*/data.cm_};
+      /*scoped_batch_factory_=*/data.scoped_batch_factory_};
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
     mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context);
@@ -124,7 +124,7 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
       /*eds_resources_cache_=*/nullptr, // EDS cache is only used for ADS.
       /*skip_subsequent_node_=*/api_config_source.set_node_on_first_message_only(),
       /*load_stats_reporter_factory_=*/lrs_factory,
-      /*cluster_manager_=*/data.cm_};
+      /*scoped_batch_factory_=*/data.scoped_batch_factory_};
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
     mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(grpc_mux_context);

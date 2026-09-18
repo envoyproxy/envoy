@@ -118,6 +118,7 @@ public:
     const Server::Instance& server_;
     OptRef<XdsResourcesDelegate> xds_resources_delegate_;
     OptRef<XdsConfigTracker> xds_config_tracker_;
+    OptRef<ScopedBatchFactory> scoped_batch_factory_{};
 
     const envoy::config::core::v3::ConfigSource& config_;
     absl::string_view type_url_;
@@ -150,7 +151,7 @@ public:
          BackOffStrategyPtr&& backoff_strategy, OptRef<XdsConfigTracker> xds_config_tracker,
          OptRef<XdsResourcesDelegate> xds_resources_delegate,
          std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory,
-         OptRef<Upstream::ClusterManager> cluster_manager) PURE;
+         OptRef<Config::ScopedBatchFactory> scoped_batch_factory) PURE;
 };
 
 } // namespace Config
