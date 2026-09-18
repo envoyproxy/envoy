@@ -7,6 +7,7 @@
 #include "source/extensions/tracers/datadog/tracer.h"
 
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
@@ -163,6 +164,89 @@ TEST_F(DatadogTracerTest, SpanProperties) {
   EXPECT_EQ(int(datadog::tracing::SamplingPriority::USER_DROP),
             dd_span.trace_segment().sampling_decision()->priority);
   EXPECT_EQ(start, dd_span.start_time().wall);
+}
+
+
+TEST_F(DatadogTracerTest, SpanKindIngress) {
+  // Verify that span.kind=server is set for ingress traffic.
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+  config.report_traces = false;
+  config.telemetry.enabled = false;
+  config.trace_sampler.sample_rate = 1.0;
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  Tracing::TestTraceContextImpl context{};
+  Tracing::Decision decision;
+  decision.reason = Tracing::Reason::Sampling;
+  decision.traced = true;
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
+  NiceMock<Tracing::MockConfig> config_mock;
+  ON_CALL(config_mock, operationName())
+      .WillByDefault(testing::Return(Tracing::OperationName::Ingress));
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(config_mock, context, stream_info_, operation_name, decision);
+  ASSERT_TRUE(span);
+  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
+  EXPECT_NE(nullptr, as_dd_span_wrapper);
+
+  const datadog::tracing::Optional<datadog::tracing::Span>& maybe_dd_span =
+      as_dd_span_wrapper->impl();
+  ASSERT_TRUE(maybe_dd_span);
+  const datadog::tracing::Span& dd_span = *maybe_dd_span;
+
+  // Ingress traffic must produce span.kind=server.
+  auto tag = dd_span.lookup_tag("span.kind");
+  ASSERT_TRUE(tag);
+  EXPECT_EQ("server", *tag);
+}
+
+TEST_F(DatadogTracerTest, SpanKindEgress) {
+  // Verify that span.kind=client is set for egress traffic.
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+  config.report_traces = false;
+  config.telemetry.enabled = false;
+  config.trace_sampler.sample_rate = 1.0;
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  Tracing::TestTraceContextImpl context{};
+  Tracing::Decision decision;
+  decision.reason = Tracing::Reason::Sampling;
+  decision.traced = true;
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
+  NiceMock<Tracing::MockConfig> config_mock;
+  ON_CALL(config_mock, operationName())
+      .WillByDefault(testing::Return(Tracing::OperationName::Egress));
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(config_mock, context, stream_info_, operation_name, decision);
+  ASSERT_TRUE(span);
+  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
+  EXPECT_NE(nullptr, as_dd_span_wrapper);
+
+  const datadog::tracing::Optional<datadog::tracing::Span>& maybe_dd_span =
+      as_dd_span_wrapper->impl();
+  ASSERT_TRUE(maybe_dd_span);
+  const datadog::tracing::Span& dd_span = *maybe_dd_span;
+
+  // Egress traffic must produce span.kind=client.
+  auto tag = dd_span.lookup_tag("span.kind");
+  ASSERT_TRUE(tag);
+  EXPECT_EQ("client", *tag);
 }
 
 TEST_F(DatadogTracerTest, ExtractionSuccess) {
