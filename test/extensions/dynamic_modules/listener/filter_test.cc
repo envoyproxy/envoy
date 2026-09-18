@@ -1,3 +1,6 @@
+#include <functional>
+
+#include "source/common/http/message_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
@@ -5,9 +8,11 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -60,6 +65,42 @@ public:
     filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
+  }
+
+  // Runs the reentrancy probe with an inline callout completion and returns how many times the
+  // module observed on_http_callout_done. The gate must keep this at zero for inline completions.
+  uint64_t runInlineCalloutProbe(
+      std::function<void(Http::AsyncClient::Callbacks&, Http::AsyncClient::Request&)> complete) {
+    auto dynamic_module =
+        newDynamicModule(testSharedObjectPath("listener_integration_test", "rust"), false);
+    EXPECT_OK(dynamic_module);
+    auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+        "http_callout_reentrancy_probe", "", DefaultMetricsNamespace,
+        std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
+        main_thread_dispatcher_);
+    EXPECT_OK(filter_config_or_status);
+
+    auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+    EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"callout_cluster"}))
+        .WillOnce(testing::Return(cluster.get()));
+    EXPECT_CALL(cluster->async_client_, send_(testing::_, testing::_, testing::_))
+        .WillOnce(testing::Invoke(
+            [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+              testing::NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
+              complete(callbacks, req);
+              return nullptr;
+            }));
+
+    // The callout path calls shared_from_this, so the filter must be held by a shared_ptr.
+    // Production wraps it in the forwarding adapter that the listener manager owns as a unique_ptr.
+    auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_or_status.value());
+    auto adapter = std::make_unique<SharedListenerFilterAdapter>(filter);
+    EXPECT_EQ(Network::FilterStatus::Continue, adapter->onAccept(callbacks_));
+
+    auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.callout_done_total");
+    EXPECT_NE(counter, nullptr);
+    return counter == nullptr ? 0 : counter->value();
   }
 
   Stats::IsolatedStoreImpl stats_;
@@ -435,6 +476,28 @@ TEST_F(DynamicModuleListenerFilterTest, AdapterForwardsAndOwnsFilter) {
   EXPECT_FALSE(weak.expired());
   adapter.reset();
   EXPECT_TRUE(weak.expired());
+}
+
+// The async client can complete a callout inline, before send returns a request handle, while the
+// module is still inside the hook that issued the callout. The filter must not call back into the
+// module in that window. An inline reset exercises the onFailure gate.
+TEST_F(DynamicModuleListenerFilterTest, HttpCalloutInlineFailureDoesNotReenterModule) {
+  EXPECT_EQ(0, runInlineCalloutProbe(
+                   [](Http::AsyncClient::Callbacks& callbacks, Http::AsyncClient::Request& req) {
+                     callbacks.onFailure(req, Http::AsyncClient::FailureReason::Reset);
+                   }));
+}
+
+// An inline response, such as a local reply from a cluster with no healthy hosts, exercises the
+// onSuccess gate on the same inline window.
+TEST_F(DynamicModuleListenerFilterTest, HttpCalloutInlineSuccessDoesNotReenterModule) {
+  EXPECT_EQ(
+      0, runInlineCalloutProbe([](Http::AsyncClient::Callbacks& callbacks,
+                                  Http::AsyncClient::Request& req) {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+        callbacks.onSuccess(req, std::move(response));
+      }));
 }
 
 } // namespace ListenerFilters
