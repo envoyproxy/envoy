@@ -353,7 +353,13 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
-  const FilterState& filterState() const override { return *filter_state_; }
+  const FilterState& filterState() const override {
+    if (filter_state_ == nullptr) {
+      static const FilterStateImpl empty_filter_state(FilterState::LifeSpan::Request);
+      return empty_filter_state;
+    }
+    return *filter_state_;
+  }
 
   void setRequestHeaders(const Http::RequestHeaderMap& headers) override {
     request_headers_ = &headers;
