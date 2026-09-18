@@ -80,6 +80,50 @@ public:
           replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_, cb);
           return replay_cb_;
         }));
+    ON_CALL(encoder_callbacks_.dispatcher_, post(testing::_))
+        .WillByDefault(Invoke([this](Event::PostCb cb) { posted_.push_back(std::move(cb)); }));
+    ON_CALL(encoder_callbacks_.dispatcher_, createSchedulableCallback_(testing::_))
+        .WillByDefault(Invoke([this](std::function<void()> cb) -> Event::SchedulableCallback* {
+          auto* scb =
+              new NiceMock<Event::MockSchedulableCallback>(&encoder_callbacks_.dispatcher_, cb);
+          ON_CALL(*scb, scheduleCallbackCurrentIteration()).WillByDefault(Invoke([this, scb, cb]() {
+            scb->enabled_ = true;
+            posted_.push_back([scb, cb]() {
+              if (scb->enabled_) {
+                scb->enabled_ = false;
+                cb();
+              }
+            });
+          }));
+          ON_CALL(*scb, scheduleCallbackNextIteration()).WillByDefault(Invoke([this, scb, cb]() {
+            scb->enabled_ = true;
+            posted_.push_back([scb, cb]() {
+              if (scb->enabled_) {
+                scb->enabled_ = false;
+                cb();
+              }
+            });
+          }));
+          return scb;
+        }));
+    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(testing::_, testing::_))
+        .WillByDefault(Invoke([this](Buffer::Instance& data, bool end_stream) {
+          encoded_injected_.add(data);
+          encoded_injected_end_stream_ = end_stream;
+          ++encoded_inject_calls_;
+        }));
+    ON_CALL(encoder_callbacks_, continueEncoding()).WillByDefault(Invoke([this]() {
+      ++encode_continue_calls_;
+    }));
+    ON_CALL(encoder_callbacks_,
+            sendLocalReply(testing::_, testing::_, testing::_, testing::_, testing::_))
+        .WillByDefault(
+            Invoke([this](Http::Code code, absl::string_view,
+                          std::function<void(Http::ResponseHeaderMap&)>,
+                          const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+              encode_local_reply_code_ = code;
+              ++encode_local_reply_calls_;
+            }));
   }
 
   // Run at trace so debug/trace-log argument expressions execute too.
@@ -104,6 +148,7 @@ public:
         factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
                                                        AiFilterFactories{}));
     filter_->setDecoderFilterCallbacks(callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   // Parses unconfigured routes too, so a test can show the chain is not run there.
@@ -117,6 +162,7 @@ public:
         factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
                                                        std::move(ai_filter_factories)));
     filter_->setDecoderFilterCallbacks(callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   // decodeHeaders() for a stream the filter is expected to engage on.
@@ -145,6 +191,8 @@ public:
     proto.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
     route_config_ = std::make_unique<RouteConfig>(proto);
     ON_CALL(callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(testing::Return(route_config_.get()));
+    ON_CALL(encoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(testing::Return(route_config_.get()));
   }
 
@@ -187,6 +235,7 @@ public:
   InMemoryExternalBufferFactory factory_;
   FilterConfigSharedPtr config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Http::UpstreamWatermarkCallbacks* watermark_cb_{};
   // Owned by the manager the filter builds; present so createSchedulableCallback()
   // returns a usable callback during construction.
@@ -203,6 +252,13 @@ public:
   int local_reply_calls_{0};
   std::optional<Http::Code> local_reply_code_;
   std::string local_reply_details_;
+
+  Buffer::OwnedImpl encoded_injected_;
+  bool encoded_injected_end_stream_{false};
+  int encoded_inject_calls_{0};
+  int encode_continue_calls_{0};
+  int encode_local_reply_calls_{0};
+  std::optional<Http::Code> encode_local_reply_code_;
 };
 
 // With a payload to inspect, iteration pauses so the rest of the chain does not
@@ -1910,6 +1966,121 @@ TEST_F(AiProtocolManagerFilterTest, TrailersDroppedAfterPayloadRejection) {
   // Send trailers on the dying stream.
   Http::TestRequestTrailerMapImpl trailers;
   EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
+}
+
+class SseTaggingAiFilter : public AiFilter {
+public:
+  explicit SseTaggingAiFilter(std::string tag, bool fail = false)
+      : tag_(std::move(tag)), fail_(fail) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+
+  Coroutine::Task<absl::Status> encodeSSE(SseStreamReceiver receive_event,
+                                          SseStreamPropagator propagate_event) override {
+    while (true) {
+      ASSIGN_OR_CO_RETURN(auto event, co_await receive_event());
+      if (!event.has_value()) {
+        co_return absl::OkStatus();
+      }
+      if (fail_) {
+        co_return absl::InternalError("sse filter error");
+      }
+      if ((*event)->is_json()) {
+        (*event)->json().json()[tag_] = true;
+      }
+      CO_RETURN_IF_ERROR(co_await propagate_event(std::move(*event)));
+    }
+  }
+
+private:
+  std::string tag_;
+  bool fail_;
+};
+
+TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverSseResponse) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+                               return std::make_shared<SseTaggingAiFilter>("first");
+                             },
+                             [](const AiFilterContext&) -> AiFilterSharedPtr {
+                               return std::make_shared<SseTaggingAiFilter>("second");
+                             }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{
+      {":status", "200"}, {"content-type", "text/event-stream"}, {"content-length", "100"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_TRUE(resp_headers.getContentLengthValue().empty());
+
+  Buffer::OwnedImpl sse_chunk("data: {\"a\":1}\n\ndata: [DONE]\n\n");
+  EXPECT_EQ(filter_->encodeData(sse_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_TRUE(encoded_injected_end_stream_);
+  EXPECT_EQ(encoded_injected_.toString(),
+            "data: {\"a\":1,\"first\":true,\"second\":true}\n\ndata: [DONE]\n\n");
+}
+
+TEST_F(AiProtocolManagerFilterTest, SseResponseEndedByTrailersContinuesEncoding) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<SseTaggingAiFilter>("tagged");
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "text/event-stream"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl sse_chunk("data: {\"a\":1}\n\n");
+  EXPECT_EQ(filter_->encodeData(sse_chunk, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Http::TestResponseTrailerMapImpl resp_trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_->encodeTrailers(resp_trailers), Http::FilterTrailersStatus::StopIteration);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_EQ(encode_continue_calls_, 1);
+  EXPECT_EQ(encoded_injected_.toString(), "data: {\"a\":1,\"tagged\":true}\n\n");
+}
+
+TEST_F(AiProtocolManagerFilterTest, SseResponseFilterErrorSendsBadGatewayLocalReply) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<SseTaggingAiFilter>("tagged", /*fail=*/true);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "text/event-stream"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl sse_chunk("data: {\"a\":1}\n\n");
+  EXPECT_EQ(filter_->encodeData(sse_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 1);
+  EXPECT_EQ(encode_local_reply_code_, Http::Code::BadGateway);
 }
 
 } // namespace

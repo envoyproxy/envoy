@@ -237,6 +237,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
         "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_codec_lib",

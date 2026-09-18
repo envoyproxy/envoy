@@ -10,6 +10,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/coroutine/async_queue.h"
+#include "source/common/coroutine/leaf_awaitable.h"
 #include "source/common/coroutine/status_macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_pipeline.h"
 #include "source/extensions/filters/http/ai_protocol_manager/task_group.h"
@@ -224,6 +225,9 @@ private:
       CO_RETURN_IF_ERROR(co_await serializeItem(std::move(*item)));
     }
     CO_RETURN_IF_ERROR(co_await finishSerialize());
+    // Yield to the dispatcher before firing on_complete_ so completion never runs re-entrantly
+    // inside a filter's encodeData/encodeTrailers callback.
+    CO_RETURN_IF_ERROR(co_await Coroutine::yield());
     auto self = shared_from_this();
     markTerminated();
     if (ResponseFilterManager::OnCompleteFn callback = std::move(on_complete_)) {
