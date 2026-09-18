@@ -104,12 +104,18 @@ Cluster::~Cluster() {
   }
   // Should remove all sub clusters, otherwise, might be memory leaking.
   // This lock is useless, just make compiler happy.
-  absl::WriterMutexLock lock{cluster_map_lock_};
-  for (auto it = cluster_map_.cbegin(); it != cluster_map_.cend();) {
-    auto cluster_name = it->first;
-    ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
-    cluster_map_.erase(it++);
-    cm_.removeCluster(cluster_name, true);
+  std::vector<std::string> clusters_to_remove;
+  {
+    absl::WriterMutexLock lock{cluster_map_lock_};
+    for (auto it = cluster_map_.cbegin(); it != cluster_map_.cend();) {
+      auto cluster_name = it->first;
+      ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
+      clusters_to_remove.push_back(cluster_name);
+      cluster_map_.erase(it++);
+    }
+  }
+  if (!clusters_to_remove.empty()) {
+    cm_.removeClusters(clusters_to_remove, true);
   }
 }
 
@@ -142,6 +148,7 @@ bool Cluster::touch(const std::string& cluster_name) {
 
 void Cluster::checkIdleSubCluster() {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
+  std::vector<std::string> clusters_to_remove;
   {
     // TODO: try read lock first.
     absl::WriterMutexLock lock{cluster_map_lock_};
@@ -149,12 +156,15 @@ void Cluster::checkIdleSubCluster() {
       if (it->second->checkIdle()) {
         auto cluster_name = it->first;
         ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
+        clusters_to_remove.push_back(cluster_name);
         cluster_map_.erase(it++);
-        cm_.removeCluster(cluster_name, true);
       } else {
         ++it;
       }
     }
+  }
+  if (!clusters_to_remove.empty()) {
+    cm_.removeClusters(clusters_to_remove, true);
   }
   idle_timer_->enableTimer(sub_cluster_ttl_);
 }
