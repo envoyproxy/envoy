@@ -455,6 +455,8 @@ typedef enum envoy_dynamic_module_type_attribute_id {
   envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
   // xds.virtual_cluster_name
   envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName,
+  // upstream.protocol
+  envoy_dynamic_module_type_attribute_id_UpstreamProtocol,
 } envoy_dynamic_module_type_attribute_id;
 
 /**

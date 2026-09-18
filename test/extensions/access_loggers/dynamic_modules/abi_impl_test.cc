@@ -2037,6 +2037,15 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocol) {
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
   EXPECT_EQ("HTTP/2", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &result));
+  EXPECT_EQ("HTTP/2", std::string(result.ptr, result.length));
+  uint64_t int_result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &int_result));
+  bool bool_result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &bool_result));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolHttp11) {
@@ -2048,6 +2057,9 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolHttp11) {
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
   EXPECT_EQ("HTTP/1.1", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &result));
+  EXPECT_EQ("HTTP/1.1", std::string(result.ptr, result.length));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolMissing) {
@@ -2056,6 +2068,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolMissing) {
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &result));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolMissingUpstreamInfo) {
@@ -2070,6 +2084,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolMissingUpstreamInfo) {
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &result));
 }
 
 // =============================================================================

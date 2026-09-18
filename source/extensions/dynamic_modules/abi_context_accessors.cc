@@ -153,6 +153,17 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
     ok = true;
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_UpstreamProtocol: {
+    const auto upstream = stream_info.upstreamInfo();
+    if (!upstream.has_value() || !upstream->upstreamProtocol().has_value()) {
+      break;
+    }
+    const auto& protocol_str =
+        Http::Utility::getProtocolString(upstream->upstreamProtocol().value());
+    *result = {const_cast<char*>(protocol_str.data()), protocol_str.size()};
+    ok = true;
+    break;
+  }
   case envoy_dynamic_module_type_attribute_id_ResponseCodeDetails: {
     if (!stream_info.responseCodeDetails().has_value()) {
       break;
