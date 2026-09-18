@@ -15,6 +15,7 @@ const (
 // UdpListenerFilterHandle exposes the current datagram and the UDP listener's state.
 type UdpListenerFilterHandle interface {
 	// GetDatagramChunks returns the current datagram payload as Envoy-owned chunks.
+	// valid only during OnData; copy the data if it must be retained after the callback returns.
 	GetDatagramChunks() (chunks []UnsafeEnvoyBuffer)
 	// GetDatagramSize returns the total size of the current datagram payload in bytes.
 	GetDatagramSize() (size uint64)
