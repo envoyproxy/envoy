@@ -1053,8 +1053,22 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
   }
 
   fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
-    // Safety: &str is a fat pointer (*const u8, usize), so (&str, &str) has the same layout as
-    // the C struct {key_ptr, key_length, value_ptr, value_length}. No conversion needed.
+    type KvPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: KvPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<KvPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
     unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
         self.raw,
