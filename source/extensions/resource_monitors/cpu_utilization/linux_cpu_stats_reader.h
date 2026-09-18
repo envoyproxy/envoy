@@ -98,6 +98,10 @@ class CgroupV2CpuStatsReader : public LinuxContainerCpuStatsReader,
 public:
   explicit CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source);
 
+  // Constructor reading the cgroup interface files from a specific cgroup directory.
+  CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source,
+                         absl::string_view base_path);
+
   // Test-friendly constructor that accepts custom file paths
   CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source,
                          const std::string& stat_path, const std::string& max_path,
@@ -111,6 +115,17 @@ private:
   const std::string max_path_;
   const std::string effective_path_;
   CpuTimesV2 previous_cpu_times_{false, 0, 0, 0};
+};
+
+// Fail-open reader used when no supported cgroup CPU implementation is found. It
+// always succeeds and reports zero utilization, so this optional overload input
+// neither blocks startup nor triggers any CPU-based overload action.
+class UnsupportedCgroupCpuStatsReader : public LinuxContainerCpuStatsReader,
+                                        private Logger::Loggable<Logger::Id::main> {
+public:
+  UnsupportedCgroupCpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source);
+
+  absl::StatusOr<double> getUtilization() override;
 };
 
 } // namespace CpuUtilizationMonitor
