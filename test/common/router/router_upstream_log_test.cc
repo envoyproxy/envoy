@@ -154,11 +154,12 @@ public:
     EXPECT_CALL(*per_try_timeout_, disableTimer());
   }
 
-  void
-  run(uint64_t response_code,
-      const std::initializer_list<std::pair<std::string, std::string>>& request_headers_init,
-      const std::initializer_list<std::pair<std::string, std::string>>& response_headers_init,
-      const std::initializer_list<std::pair<std::string, std::string>>& response_trailers_init) {
+  void run(uint64_t response_code,
+           const std::initializer_list<std::pair<std::string, std::string>>& request_headers_init,
+           const std::initializer_list<std::pair<std::string, std::string>>& response_headers_init,
+           const std::initializer_list<std::pair<std::string, std::string>>& response_trailers_init,
+           const std::initializer_list<std::pair<std::string, std::string>>& request_trailers_init =
+               {}) {
     NiceMock<Http::MockRequestEncoder> encoder;
     Http::ResponseDecoder* response_decoder = nullptr;
 
@@ -180,8 +181,12 @@ public:
     expectResponseTimerCreate();
 
     Http::TestRequestHeaderMapImpl headers(request_headers_init);
+    Http::TestRequestTrailerMapImpl request_trailers(request_trailers_init);
     HttpTestUtility::addDefaultHeaders(headers);
-    router_->decodeHeaders(headers, true);
+    router_->decodeHeaders(headers, request_trailers_init.size() == 0);
+    if (request_trailers_init.size() != 0) {
+      router_->decodeTrailers(request_trailers);
+    }
 
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
         .WillOnce(Return(RetryStatus::No));
@@ -342,6 +347,20 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
   EXPECT_EQ(output_.size(), 1U);
   EXPECT_EQ(output_.front(),
             "GET /foo HTTP/1.0 200 - 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10211 abcdef value\n");
+}
+
+TEST_F(RouterUpstreamLogTest, LogRequestTrailers) {
+  init(std::nullopt);
+  EXPECT_CALL(*mock_upstream_log_, log(_, _))
+      .WillOnce(Invoke([](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
+        ASSERT_TRUE(log_context.requestTrailers().has_value());
+        const auto trailers =
+            log_context.requestTrailers()->get(Http::LowerCaseString("x-request-trailer"));
+        ASSERT_EQ(1, trailers.size());
+        EXPECT_EQ("value", trailers[0]->value().getStringView());
+      }));
+
+  run(200, {}, {}, {}, {{"x-request-trailer", "value"}});
 }
 
 // Test timestamps and durations are emitted.
