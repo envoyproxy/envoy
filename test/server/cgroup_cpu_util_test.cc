@@ -823,6 +823,16 @@ TEST_F(CgroupCpuUtilTest, ConstructCgroupPath_NonRootMountRootItself) {
   EXPECT_EQ(cgroup_info.value().version, "v2");
 }
 
+TEST_F(CgroupCpuUtilTest, ConstructCgroupPath_PathOutsideCgroupNamespaceRoot) {
+  fs_.setFileContents("/proc/self/cgroup", "0::/../container_id2\n");
+  CgroupMount mount;
+  mount.mount_point = "/sys/fs/cgroup";
+  mount.root = "/";
+
+  auto cgroup_info = CgroupCpuUtil::TestUtil::constructCgroupPath(mount, fs_);
+  EXPECT_FALSE(cgroup_info.has_value());
+}
+
 TEST_F(CgroupCpuUtilTest, DetectorImpl_V1DetectedLimit) {
   fs_.setFileContents("/proc/self/mountinfo",
                       "56 22 0:40 / /sys/fs/cgroup/cpu rw - cgroup cgroup rw,cpu,cpuacct\n");

@@ -153,7 +153,7 @@ private:
   /**
    * Parses a single line from `/proc/self/mountinfo` to extract cgroup mount point.
    * Format: `mountID parentID major:minor root mountPoint options - fsType source superOptions`
-   * This helper extracts field 5 (mount point) for `cgroup`/`cgroup2` filesystems.
+   * This helper extracts field 5 (mount point) for `cgroup`/`cgroup2` file systems.
    * @param line Single line from `/proc/self/mountinfo`
    * @return Mount point string if line contains `cgroup` filesystem, nullopt if not a `cgroup`
    * line.

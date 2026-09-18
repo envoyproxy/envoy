@@ -33,6 +33,29 @@ bool containsToken(absl::string_view value, absl::string_view token) {
   }
   return false;
 }
+
+// Converts a cgroup hierarchy path to a path relative to the mount root. Rejects paths that could
+// escape the mount point when appended to it.
+std::optional<std::string> cgroupPathRelativeToMountRoot(absl::string_view cgroup_path,
+                                                         absl::string_view mount_root) {
+  for (absl::string_view component : absl::StrSplit(cgroup_path, '/')) {
+    if (component == "..") {
+      return std::nullopt;
+    }
+  }
+
+  if (mount_root == "/") {
+    return std::string(cgroup_path);
+  }
+  if (cgroup_path == mount_root) {
+    return std::string();
+  }
+  if (absl::StartsWith(cgroup_path, mount_root) && cgroup_path.size() > mount_root.size() &&
+      cgroup_path[mount_root.size()] == '/') {
+    return std::string(cgroup_path.substr(mount_root.size()));
+  }
+  return std::nullopt;
+}
 } // namespace
 
 // Implementation of CgroupDetector interface
@@ -215,18 +238,10 @@ std::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const CgroupMount& 
   const CgroupPathInfo& path_info = path_info_opt.value();
   const std::string& version = path_info.version;
 
-  // /proc/self/cgroup reports a path relative to the cgroup hierarchy root, while mountinfo's
-  // root may identify a subdirectory of that hierarchy. Only strip a complete path component.
   const std::string& cgroup_path = path_info.relative_path;
-  std::string relative_path;
-  if (mount.root == "/") {
-    relative_path = cgroup_path;
-  } else if (cgroup_path == mount.root) {
-    relative_path.clear();
-  } else if (absl::StartsWith(cgroup_path, mount.root) && cgroup_path.size() > mount.root.size() &&
-             cgroup_path[mount.root.size()] == '/') {
-    relative_path = cgroup_path.substr(mount.root.size());
-  } else {
+  const std::optional<std::string> relative_path =
+      cgroupPathRelativeToMountRoot(cgroup_path, mount.root);
+  if (!relative_path.has_value()) {
     ENVOY_LOG_MISC(warn, "Cgroup path {} is outside mount root {}", cgroup_path, mount.root);
     return std::nullopt;
   }
@@ -235,10 +250,10 @@ std::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const CgroupMount& 
   CgroupInfo info;
 
   // Construct full path using absl::StrCat (efficient concatenation)
-  if (!relative_path.empty() && relative_path[0] != '/') {
-    info.full_path = absl::StrCat(mount.mount_point, "/", relative_path);
+  if (!relative_path->empty() && (*relative_path)[0] != '/') {
+    info.full_path = absl::StrCat(mount.mount_point, "/", *relative_path);
   } else {
-    info.full_path = absl::StrCat(mount.mount_point, relative_path);
+    info.full_path = absl::StrCat(mount.mount_point, *relative_path);
   }
 
   // Version determination from getCurrentCgroupPath
