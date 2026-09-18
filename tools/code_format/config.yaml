@@ -220,6 +220,7 @@ paths:
     - source/common/protobuf/protobuf.h
     - source/common/protobuf/yaml_utility.cc
     - source/extensions/filters/http/proto_message_extraction/extraction_util/extraction_util.cc
+    - test/common/json/proto_streamer_fuzz_test.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
 
   namespace_check:
@@ -306,6 +307,8 @@ paths:
     - source/extensions/http/cache_v2/file_system_http_cache/cache_file_header_proto_util.cc
     - test/common/grpc/codec_fuzz_test.cc
     - test/common/grpc/codec_test.cc
+    - test/common/json/proto_streamer_fuzz_test.cc
+    - test/common/json/proto_streamer_test.cc
     - test/common/protobuf/utility_test.cc
     - source/extensions/common/tap/tap_config_base.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc

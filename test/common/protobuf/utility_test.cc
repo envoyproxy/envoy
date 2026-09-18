@@ -10,8 +10,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
 #include "source/common/config/api_version.h"
+#include "source/common/json/proto_streamer.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -477,6 +479,26 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
                                 "\" as a text protobuf (type envoy.config.bootstrap.v3.Bootstrap)");
 }
 
+void expectStreamedRedactionMatches(const Protobuf::Message& message,
+                                    const Protobuf::Message& redacted) {
+  Buffer::OwnedImpl buffer;
+  {
+    Json::BufferStreamer streamer(buffer);
+    // The streamer needs a level expecting a value, so the message lands inside an array.
+    Json::BufferStreamer::ArrayPtr array = streamer.makeRootArray();
+    Json::MessageStreamer message_streamer(
+        message, *array, {.preserve_proto_field_names_ = true, .redact_sensitive_fields_ = true});
+    while (message_streamer.next()) {
+    }
+  }
+
+  const std::string streamed = buffer.toString();
+  ASSERT_GE(streamed.size(), 2);
+  const ProtobufTypes::MessagePtr parsed(redacted.New());
+  TestUtility::loadFromJson(streamed.substr(1, streamed.size() - 2), *parsed);
+  EXPECT_TRUE(TestUtility::protoEqual(redacted, *parsed)) << streamed;
+}
+
 // String fields annotated as sensitive should be converted to the string "[redacted]". String
 // fields that are neither annotated as sensitive nor contained in a sensitive message should be
 // left alone.
@@ -506,8 +528,51 @@ insensitive_repeated_string:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
+}
+
+// redactAll() redacts every field, annotated or not, as redact() does under a sensitive field.
+TEST_F(ProtobufUtilityTest, RedactAll) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string: This field should be redacted.
+insensitive_string: This field should be redacted too.
+insensitive_int: 1
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string: '[redacted]'
+insensitive_string: '[redacted]'
+)EOF",
+                            expected);
+
+  MessageUtil::redactAll(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, IsSensitiveField) {
+  const Protobuf::Descriptor& descriptor = *envoy::test::Sensitive::descriptor();
+  EXPECT_TRUE(MessageUtil::isSensitiveField(*descriptor.FindFieldByName("sensitive_string")));
+  EXPECT_FALSE(MessageUtil::isSensitiveField(*descriptor.FindFieldByName("insensitive_string")));
+}
+
+TEST_F(ProtobufUtilityTest, RedactValue) {
+  Protobuf::Struct structured;
+  (*structured.mutable_fields())["number"].set_number_value(1.5);
+  (*structured.mutable_fields())["text"].set_string_value("This field should be redacted.");
+  envoy::test::Sensitive actual;
+  std::ignore = actual.mutable_sensitive_any()->PackFrom(structured);
+
+  MessageUtil::redact(actual);
+
+  Protobuf::Struct redacted;
+  ASSERT_TRUE(actual.sensitive_any().UnpackTo(&redacted));
+  EXPECT_EQ(Protobuf::Value::kNullValue, redacted.fields().at("number").kind_case());
+  EXPECT_EQ("[redacted]", redacted.fields().at("text").string_value());
 }
 
 // Fields that are values in a sensitive map should be redacted.
@@ -537,8 +602,10 @@ insensitive_int_map:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Bytes fields annotated as sensitive should be converted to the ASCII / UTF-8 encoding of the
@@ -570,8 +637,10 @@ insensitive_repeated_bytes:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Ints annotated as sensitive should be cleared. Ints that are neither annotated as sensitive nor
@@ -599,8 +668,10 @@ insensitive_repeated_int:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Messages annotated as sensitive should have all their fields redacted recursively. Messages that
@@ -707,8 +778,10 @@ insensitive_repeated_message:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Messages packed into `Any` should be treated the same as normal messages.
@@ -862,8 +935,10 @@ insensitive_repeated_any:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Empty `Any` can be trivially redacted.
@@ -894,6 +969,41 @@ sensitive_string: This field is sensitive, but we have no way of knowing.
   Protobuf::Any expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, RedactSensitiveOpaqueWithEmptyPayload) {
+  envoy::test::Sensitive actual;
+  actual.mutable_sensitive_any()->set_type_url("type.googleapis.com/envoy.test.Sensitive");
+  actual.mutable_sensitive_typed_struct()->set_type_url("type.googleapis.com/envoy.test.Sensitive");
+
+  const envoy::test::Sensitive expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  EXPECT_TRUE(MessageUtil::getJsonStringFromMessage(actual).ok());
+  expectStreamedRedactionMatches(expected, actual);
+}
+
+TEST_F(ProtobufUtilityTest, RedactSensitiveTypedStructWithUnknownTypeUrl) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.unknown.Message
+  value:
+    text: This is sensitive, but we have no way of knowing.
+)EOF",
+                            actual);
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.unknown.Message
+  value:
+    text: '[redacted]'
+)EOF",
+                            expected);
+
+  const envoy::test::Sensitive original = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Messages packed into `TypedStruct` should be treated the same as normal messages. Note that
@@ -1060,14 +1170,34 @@ insensitive_repeated_typed_struct:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 template <typename T> class TypedStructUtilityTest : public ProtobufUtilityTest {};
 
 using TypedStructTypes = ::testing::Types<xds::type::v3::TypedStruct, udpa::type::v1::TypedStruct>;
 TYPED_TEST_SUITE(TypedStructUtilityTest, TypedStructTypes);
+
+TYPED_TEST(TypedStructUtilityTest, RedactSensitiveAnyHoldingTypedStruct) {
+  TypeParam typed_struct;
+  typed_struct.set_type_url("type.googleapis.com/envoy.unknown.Message");
+  (*typed_struct.mutable_value()->mutable_fields())["text"].set_string_value("sensitive");
+
+  envoy::test::Sensitive actual;
+  std::ignore = actual.mutable_sensitive_any()->PackFrom(typed_struct);
+
+  const envoy::test::Sensitive original = actual;
+  MessageUtil::redact(actual);
+
+  TypeParam redacted;
+  ASSERT_TRUE(actual.sensitive_any().UnpackTo(&redacted));
+  EXPECT_EQ("type.googleapis.com/envoy.unknown.Message", redacted.type_url());
+  EXPECT_EQ("[redacted]", redacted.value().fields().at("text").string_value());
+  expectStreamedRedactionMatches(original, actual);
+}
 
 // Empty `TypedStruct` can be trivially redacted.
 TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypedStruct) {
@@ -1123,7 +1253,9 @@ insensitive_typed_struct:
 )EOF",
                             actual);
 
+  const envoy::test::Sensitive original = actual;
   EXPECT_NO_THROW(MessageUtil::redact(actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypeUrlTypedStruct) {
@@ -1188,8 +1320,10 @@ insensitive_typed_struct:
         sensitive_string: '[redacted]'
 )EOF",
                             expected);
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 TEST_F(ProtobufUtilityTest, SanitizeUTF8) {
