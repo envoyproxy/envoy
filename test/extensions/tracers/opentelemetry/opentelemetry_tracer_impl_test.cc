@@ -1173,9 +1173,9 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBatchAttributes) {
                                              operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
-  std::vector<std::pair<absl::string_view, absl::string_view>> tags = {
-      {"first_tag_name", "first_tag_value"}, {"second_tag_name", "second_tag_value"}};
-  span->setTags(tags);
+  span->reserveTags(2);
+  span->setTag("first_tag_name", "first_tag_value");
+  span->setTag("second_tag_name", "second_tag_value");
 
   constexpr absl::string_view request_yaml = R"(
 resource_spans:
