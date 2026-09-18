@@ -8,6 +8,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/network/connection.h"
+#include "envoy/server/overload/load_shed_point.h"
 
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/http/session_idle_list.h"
@@ -142,6 +143,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       listener_config_->perConnectionBufferLimitBytes(), quic_stat_names_,
       listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info),
       connection_stats_, debug_visitor_factory_, session_idle_list_.get());
+  quic_session->setH3GoAwayLoadShedPoints(h3_go_away_and_close_on_dispatch_,
+                                          h3_go_away_on_dispatch_);
   if (filter_chain != nullptr) {
     // Setup filter chain before Initialize().
     const bool has_filter_initialized =
@@ -275,6 +278,31 @@ void EnvoyQuicDispatcher::closeIdleQuicConnections(bool is_saturated) {
   // Overload Manager.
   ASSERT(session_idle_list_ != nullptr);
   session_idle_list_->MaybeTerminateIdleSessions(is_saturated);
+}
+
+void EnvoyQuicDispatcher::configureLoadShedPoints(
+    Server::LoadShedPointProvider& load_shed_point_provider) {
+  h3_go_away_and_close_on_dispatch_ = load_shed_point_provider.getLoadShedPoint(
+      Server::LoadShedPointName::get().H3ServerGoAwayAndCloseOnDispatch);
+  h3_go_away_on_dispatch_ = load_shed_point_provider.getLoadShedPoint(
+      Server::LoadShedPointName::get().H3ServerGoAwayOnDispatch);
+}
+
+quic::QuicDispatcher::QuicPacketFate
+EnvoyQuicDispatcher::ValidityChecksOnFullChlo(const quic::ReceivedPacketInfo& packet_info,
+                                              const quic::ParsedClientHello& parsed_chlo) const {
+  if (quic::QuicDispatcher::QuicPacketFate fate =
+          quic::QuicDispatcher::ValidityChecksOnFullChlo(packet_info, parsed_chlo);
+      fate != quic::QuicDispatcher::kFateProcess) {
+    return fate;
+  }
+  if ((h3_go_away_and_close_on_dispatch_ != nullptr &&
+       h3_go_away_and_close_on_dispatch_->shouldShedLoad()) ||
+      (h3_go_away_on_dispatch_ != nullptr && h3_go_away_on_dispatch_->shouldShedLoad())) {
+    listener_stats_.downstream_cx_overload_reject_.inc();
+    return quic::QuicDispatcher::kFateTimeWait;
+  }
+  return quic::QuicDispatcher::kFateProcess;
 }
 
 } // namespace Quic

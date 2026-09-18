@@ -1749,6 +1749,39 @@ TEST_P(LoadShedPointIntegrationTest, Http3ServerDispatchSendsGoAwayCompletingPen
       Eq(0));
 }
 
+TEST_P(LoadShedPointIntegrationTest, Http3ServerDispatchRejectsNewConnectionWhenOverloaded) {
+  // Test only applies to HTTP3.
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http3_server_go_away_on_dispatch"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state before any connection attempts.
+  updateResource(0.95);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http3_server_go_away_on_dispatch.scale_"
+      "percent",
+      Eq(100));
+
+  // Attempt to establish a new connection. The CHLO should be rejected early.
+  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt);
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_overload_reject", Eq(1));
+  } else {
+    test_server_->waitForCounter("listener.[__1]_0.downstream_cx_overload_reject", Eq(1));
+  }
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_FALSE(codec_client_->connected());
+}
+
 // Verifies that worker thread watchdog configuration is correctly applied and triggers megamiss
 // events when a worker thread is non-responsive.
 TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMiss) {
