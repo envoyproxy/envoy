@@ -34,15 +34,17 @@ enabling the change. Operators can assess the impact via access logs before olde
 or removed.
 
 Observability for breaking changes is disabled by default. It can be enabled by setting the
-``envoy.reloadable_features.breaking_change_observability_enabled`` runtime flag. Envoy emits observability data for
-all breaking changes encountered in the traffic. Envoy stops emmitting observability data when a breaking change flag
+:ref:`enable_breaking_changes_observability
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_breaking_changes_observability>` flag in
+:ref:`Bootstrap <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>`. Envoy emits observability data for
+all breaking changes encountered in the traffic. Envoy stops emitting observability data when a breaking change flag
 is decommissioned.
 
 Breaking changes are subject to the
 `deprecation policy <https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md#breaking-change-policy>`_ and are
 removed after deprecation window ends.
 
-Adding a breaking change flag introduces Envoy reloadabale flag with the ``envoy.reloadable_features.<flag_name>``
+Adding a breaking change flag introduces Envoy reloadable flag with the ``envoy.reloadable_features.<flag_name>``
 name and puts tracking state in the ``BreakingChangesTracker`` class. Breaking changes are enabled by setting
 the ``envoy.reloadable_features.<flag_name>`` flag in Envoy Runtime.
 
@@ -91,17 +93,13 @@ traffic. Observability for breaking changes is disabled by default.
 
 To enable observability:
 
-1. Enable the ``envoy.reloadable_features.breaking_change_observability_enabled`` runtime flag via
-   :ref:`runtime configuration <config_runtime>` (for example, in the static bootstrap layer or
-   dynamically via RTDS):
+1. Enable the :ref:`enable_breaking_changes_observability
+   <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_breaking_changes_observability>` flag in
+   the :ref:`Bootstrap <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` configuration:
 
    .. code-block:: yaml
 
-      layered_runtime:
-        layers:
-          - name: static_layer
-            static_layer:
-              envoy.reloadable_features.breaking_change_observability_enabled: true
+      enable_breaking_changes_observability: true
 
 2. Configure access logging to include the ``envoy.breaking_changes_tracker`` filter state using
    ``%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%``:
@@ -117,8 +115,10 @@ To enable observability:
               text_format_source:
                 inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% breaking_changes=\"%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%\"\n"
 
-When the ``envoy.reloadable_features.breaking_change_observability_enabled`` runtime flag is enabled,
-breaking changes encountered during request processing will be recorded in the
-``envoy.breaking_changes_tracker`` filter state and included in the access log. If the runtime flag
-is disabled, no breaking changes are recorded in filter state.
+When the :ref:`enable_breaking_changes_observability
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_breaking_changes_observability>` flag in
+:ref:`Bootstrap <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` is enabled, breaking changes
+encountered during request processing will be recorded in the ``envoy.breaking_changes_tracker``
+filter state and included in the access log. If the flag is disabled, no breaking changes are
+recorded in filter state.
 
