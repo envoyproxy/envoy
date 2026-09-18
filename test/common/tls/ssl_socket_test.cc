@@ -109,7 +109,12 @@ public:
     return std::dynamic_pointer_cast<ClientContextImpl>(client_ssl_socket_factory.sslCtx());
   }
 
-  static SSL_SESSION* newSession(SSL* ssl) { return SSL_SESSION_new(SSL_get_SSL_CTX(ssl)); }
+  static SSL_SESSION* newSession(SSL* ssl) {
+    SSL_SESSION* session = SSL_SESSION_new(SSL_get_SSL_CTX(ssl));
+    RELEASE_ASSERT(session != nullptr, "");
+    RELEASE_ASSERT(SSL_SESSION_set_protocol_version(session, TLS1_2_VERSION) == 1, "");
+    return session;
+  }
 
   static int newSessionKey(ClientContextImpl& context, SSL* ssl, SSL_SESSION* session) {
     return context.newSessionKey(ssl, session);
@@ -146,7 +151,42 @@ public:
 
   static size_t cachedSniSessionCount(ClientContextImpl& context) {
     absl::WriterMutexLock lock(context.session_keys_mu_);
-    return context.sni_session_keys_lru_.size();
+    return context.session_keys_lru_.size();
+  }
+
+  static bool hasCachedEndpoint(ClientContextImpl& context, absl::string_view sni,
+                                absl::string_view endpoint) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    auto sni_it = context.session_keys_by_sni_.find(sni);
+    return sni_it != context.session_keys_by_sni_.end() &&
+           sni_it->second.sessions_by_endpoint.contains(endpoint);
+  }
+
+  static size_t cachedEndpointSessionCount(ClientContextImpl& context, absl::string_view sni,
+                                           absl::string_view endpoint) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    auto sni_it = context.session_keys_by_sni_.find(sni);
+    if (sni_it == context.session_keys_by_sni_.end()) {
+      return 0;
+    }
+    auto endpoint_it = sni_it->second.sessions_by_endpoint.find(endpoint);
+    return endpoint_it == sni_it->second.sessions_by_endpoint.end()
+               ? 0
+               : endpoint_it->second.sessions.size();
+  }
+
+  static SSL_SESSION* cachedEndpointSession(ClientContextImpl& context, absl::string_view sni,
+                                            absl::string_view endpoint) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    auto sni_it = context.session_keys_by_sni_.find(sni);
+    if (sni_it == context.session_keys_by_sni_.end()) {
+      return nullptr;
+    }
+    auto endpoint_it = sni_it->second.sessions_by_endpoint.find(endpoint);
+    return endpoint_it != sni_it->second.sessions_by_endpoint.end() &&
+                   !endpoint_it->second.sessions.empty()
+               ? endpoint_it->second.sessions.front()->session.get()
+               : nullptr;
   }
 
   static size_t cachedContextSessionCount(ClientContextImpl& context) {
@@ -1410,6 +1450,11 @@ protected:
                                               const std::string& client_ctx_yaml,
                                               const std::vector<uint64_t>& expected_reuse_counts,
                                               const Network::Address::IpVersion version);
+  void testClientSessionResumptionEndpointSequence(const std::string& server_a_ctx_yaml,
+                                                   const std::string& server_b_ctx_yaml,
+                                                   const std::string& client_ctx_yaml,
+                                                   bool expect_cross_endpoint_reuse,
+                                                   const Network::Address::IpVersion version);
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
@@ -6470,6 +6515,122 @@ void SslSocketTest::testClientSessionResumptionSniSequence(
   connect("a.example.com", expected_reuse_counts[2]);
 }
 
+void SslSocketTest::testClientSessionResumptionEndpointSequence(
+    const std::string& server_a_ctx_yaml, const std::string& server_b_ctx_yaml,
+    const std::string& client_ctx_yaml, bool expect_cross_endpoint_reuse,
+    const Network::Address::IpVersion version) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  ContextManagerImpl manager(server_factory_context);
+
+  Stats::TestUtil::TestStore server_a_stats_store;
+  Api::ApiPtr server_api = Api::createApiForTest(server_a_stats_store, time_system_);
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context;
+  ON_CALL(transport_socket_factory_context.server_context_, api())
+      .WillByDefault(ReturnRef(*server_api));
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_a_ctx_proto;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_a_ctx_yaml), server_a_ctx_proto);
+  auto server_a_cfg = *ServerContextConfigImpl::create(server_a_ctx_proto,
+                                                       transport_socket_factory_context, {}, false);
+  auto server_a_ssl_socket_factory = *ServerSslSocketFactory::create(
+      std::move(server_a_cfg), manager, *server_a_stats_store.rootScope());
+
+  Stats::TestUtil::TestStore server_b_stats_store;
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_b_ctx_proto;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_b_ctx_yaml), server_b_ctx_proto);
+  auto server_b_cfg = *ServerContextConfigImpl::create(server_b_ctx_proto,
+                                                       transport_socket_factory_context, {}, false);
+  auto server_b_ssl_socket_factory = *ServerSslSocketFactory::create(
+      std::move(server_b_cfg), manager, *server_b_stats_store.rootScope());
+
+  auto socket_a = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version));
+  auto socket_b = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version));
+  NiceMock<Network::MockTcpListenerCallbacks> callbacks_a;
+  NiceMock<Network::MockTcpListenerCallbacks> callbacks_b;
+  NiceMock<Network::MockListenerConfig> listener_config;
+  Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener_a =
+      createListener(socket_a, callbacks_a, runtime_, listener_config, overload_state, *dispatcher);
+  Network::ListenerPtr listener_b =
+      createListener(socket_b, callbacks_b, runtime_, listener_config, overload_state, *dispatcher);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx_proto;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_ctx_proto);
+
+  Stats::TestUtil::TestStore client_stats_store;
+  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system_);
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> client_factory_context;
+  ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+
+  auto client_cfg = *ClientContextConfigImpl::create(client_ctx_proto, client_factory_context);
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
+                                                                   *client_stats_store.rootScope());
+
+  auto connect = [&](Network::Test::TcpListenSocketImmediateListen& socket,
+                     Network::MockTcpListenerCallbacks& callbacks,
+                     ServerSslSocketFactory& server_ssl_socket_factory,
+                     Stats::TestUtil::TestStore& server_stats_store,
+                     uint64_t expected_server_reuse_count, uint64_t expected_client_reuse_count) {
+    auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    host->address_ = socket.connectionInfoProvider().localAddress();
+    ON_CALL(*host, address()).WillByDefault(Return(host->address_));
+
+    Network::ConnectionPtr server_connection;
+    NiceMock<Network::MockConnectionCallbacks> server_connection_callbacks;
+    NiceMock<Network::MockConnectionCallbacks> client_connection_callbacks;
+
+    Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
+        host->address(), Network::Address::InstanceConstSharedPtr(),
+        client_ssl_socket_factory->createTransportSocket(nullptr, host), nullptr, nullptr);
+    client_connection->addConnectionCallbacks(client_connection_callbacks);
+    client_connection->connect();
+
+    size_t connect_count = 0;
+    auto connection_complete = [&]() {
+      if (++connect_count == 2) {
+        EXPECT_EQ(expected_server_reuse_count,
+                  server_stats_store.counter("ssl.session_reused").value());
+        EXPECT_EQ(expected_client_reuse_count,
+                  client_stats_store.counter("ssl.session_reused").value());
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+        client_connection->close(Network::ConnectionCloseType::NoFlush);
+        dispatcher->exit();
+      }
+    };
+
+    EXPECT_CALL(callbacks, onAccept_(_))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+          server_connection = dispatcher->createServerConnection(
+              std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
+              stream_info_);
+          server_connection->addConnectionCallbacks(server_connection_callbacks);
+        }));
+    EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+    EXPECT_CALL(server_connection_callbacks, onEvent(_)).Times(testing::AnyNumber());
+    EXPECT_CALL(client_connection_callbacks, onEvent(_)).Times(testing::AnyNumber());
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connection_complete(); }));
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connection_complete(); }));
+
+    dispatcher->run(Event::Dispatcher::RunType::Block);
+  };
+
+  const uint64_t cross_endpoint_reuse_count = expect_cross_endpoint_reuse ? 1 : 0;
+  connect(*socket_a, callbacks_a, *server_a_ssl_socket_factory, server_a_stats_store, 0, 0);
+  connect(*socket_b, callbacks_b, *server_b_ssl_socket_factory, server_b_stats_store,
+          cross_endpoint_reuse_count, cross_endpoint_reuse_count);
+  connect(*socket_a, callbacks_a, *server_a_ssl_socket_factory, server_a_stats_store, 1,
+          cross_endpoint_reuse_count + 1);
+  connect(*socket_b, callbacks_b, *server_b_ssl_socket_factory, server_b_stats_store,
+          cross_endpoint_reuse_count + 1, cross_endpoint_reuse_count + 2);
+}
+
 TEST_P(SslSocketTest, ClientSessionCacheDoesNotCrossSni) {
   ClientSessionCacheTestContext context(R"EOF(
 common_tls_context:
@@ -6603,6 +6764,305 @@ max_session_keys: 3
   EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "static.example.com"));
   EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "host.example.com"));
   EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "override.example.com"));
+}
+
+TEST_P(SslSocketTest, ClientSessionCachePrefersExactEndpoint) {
+  ClientSessionCacheTestContext context(R"EOF(
+sni: service.example.com
+common_tls_context:
+max_session_keys: 2
+)EOF");
+
+  auto host_a = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  host_a->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 9000);
+  ON_CALL(*host_a, address()).WillByDefault(Return(host_a->address_));
+  auto host_b = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  host_b->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2", 9000);
+  ON_CALL(*host_b, address()).WillByDefault(Return(host_b->address_));
+
+  auto ssl_a_or_error = context.clientContext().newSsl(nullptr, host_a);
+  ASSERT_TRUE(ssl_a_or_error.ok()) << ssl_a_or_error.status();
+  auto ssl_a = std::move(ssl_a_or_error.value());
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_a.get(),
+                                                 ClientContextImplPeer::newSession(ssl_a.get())));
+  SSL_SESSION* session_a = ClientContextImplPeer::cachedEndpointSession(
+      context.clientContext(), "service.example.com", "10.0.0.1:9000");
+  ASSERT_NE(nullptr, session_a);
+
+  auto ssl_b_or_error = context.clientContext().newSsl(nullptr, host_b);
+  ASSERT_TRUE(ssl_b_or_error.ok()) << ssl_b_or_error.status();
+  auto ssl_b = std::move(ssl_b_or_error.value());
+  EXPECT_EQ(session_a, SSL_get_session(ssl_b.get()));
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_b.get(),
+                                                 ClientContextImplPeer::newSession(ssl_b.get())));
+  SSL_SESSION* session_b = ClientContextImplPeer::cachedEndpointSession(
+      context.clientContext(), "service.example.com", "10.0.0.2:9000");
+  ASSERT_NE(nullptr, session_b);
+  EXPECT_NE(session_a, session_b);
+
+  auto ssl_a_again_or_error = context.clientContext().newSsl(nullptr, host_a);
+  ASSERT_TRUE(ssl_a_again_or_error.ok()) << ssl_a_again_or_error.status();
+  EXPECT_EQ(session_a, SSL_get_session(ssl_a_again_or_error.value().get()));
+
+  auto ssl_b_again_or_error = context.clientContext().newSsl(nullptr, host_b);
+  ASSERT_TRUE(ssl_b_again_or_error.ok()) << ssl_b_again_or_error.status();
+  EXPECT_EQ(session_b, SSL_get_session(ssl_b_again_or_error.value().get()));
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheResumesAcrossIndependentEndpoints) {
+  // Some CI/build hosts do not have IPv6 loopback enabled.
+  if (version_ == Network::Address::IpVersion::v6) {
+    return;
+  }
+
+  const std::string server_a_ctx_yaml = R"EOF(
+common_tls_context:
+  tls_params:
+    tls_minimum_protocol_version: TLSv1_0
+    tls_maximum_protocol_version: TLSv1_2
+  tls_certificates:
+    certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+session_ticket_keys:
+  keys:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
+)EOF";
+
+  const std::string server_b_ctx_yaml = R"EOF(
+common_tls_context:
+  tls_params:
+    tls_minimum_protocol_version: TLSv1_0
+    tls_maximum_protocol_version: TLSv1_2
+  tls_certificates:
+    certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+session_ticket_keys:
+  keys:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_b"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+sni: service.example.com
+common_tls_context:
+  tls_params:
+    tls_minimum_protocol_version: TLSv1_0
+    tls_maximum_protocol_version: TLSv1_2
+max_session_keys: 2
+)EOF";
+
+  testClientSessionResumptionEndpointSequence(server_a_ctx_yaml, server_b_ctx_yaml, client_ctx_yaml,
+                                              false, version_);
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheFallsBackAcrossEndpointsWithSharedTicketKeys) {
+  // Some CI/build hosts do not have IPv6 loopback enabled.
+  if (version_ == Network::Address::IpVersion::v6) {
+    return;
+  }
+
+  const std::string server_ctx_yaml = R"EOF(
+common_tls_context:
+  tls_params:
+    tls_minimum_protocol_version: TLSv1_0
+    tls_maximum_protocol_version: TLSv1_2
+  tls_certificates:
+    certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+session_ticket_keys:
+  keys:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+sni: service.example.com
+common_tls_context:
+  tls_params:
+    tls_minimum_protocol_version: TLSv1_0
+    tls_maximum_protocol_version: TLSv1_2
+max_session_keys: 2
+)EOF";
+
+  testClientSessionResumptionEndpointSequence(server_ctx_yaml, server_ctx_yaml, client_ctx_yaml,
+                                              true, version_);
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheEndpointIdentityIncludesAddressAndPort) {
+  ClientSessionCacheTestContext context(R"EOF(
+sni: service.example.com
+common_tls_context:
+max_session_keys: 3
+)EOF");
+
+  auto add_session = [&](Network::Address::InstanceConstSharedPtr address) {
+    auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    host->address_ = std::move(address);
+    ON_CALL(*host, address()).WillByDefault(Return(host->address_));
+    auto ssl_or_error = context.clientContext().newSsl(nullptr, host);
+    ASSERT_TRUE(ssl_or_error.ok()) << ssl_or_error.status();
+    auto ssl = std::move(ssl_or_error.value());
+    EXPECT_EQ(1,
+              ClientContextImplPeer::newSessionKey(context.clientContext(), ssl.get(),
+                                                   ClientContextImplPeer::newSession(ssl.get())));
+  };
+
+  add_session(std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 9000));
+  add_session(std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 9001));
+  add_session(std::make_shared<Network::Address::Ipv6Instance>("2001:db8::1", 9000));
+
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedEndpoint(context.clientContext(),
+                                                       "service.example.com", "10.0.0.1:9000"));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedEndpoint(context.clientContext(),
+                                                       "service.example.com", "10.0.0.1:9001"));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedEndpoint(
+      context.clientContext(), "service.example.com", "[2001:db8::1]:9000"));
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheEndpointScopeHandlesEmptySni) {
+  ClientSessionCacheTestContext context(R"EOF(
+common_tls_context:
+max_session_keys: 2
+)EOF");
+
+  auto host_a = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  host_a->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 9000);
+  ON_CALL(*host_a, address()).WillByDefault(Return(host_a->address_));
+  auto host_b = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  host_b->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2", 9000);
+  ON_CALL(*host_b, address()).WillByDefault(Return(host_b->address_));
+
+  auto ssl_a_or_error = context.clientContext().newSsl(nullptr, host_a);
+  ASSERT_TRUE(ssl_a_or_error.ok()) << ssl_a_or_error.status();
+  auto ssl_a = std::move(ssl_a_or_error.value());
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_a.get(),
+                                                 ClientContextImplPeer::newSession(ssl_a.get())));
+
+  auto ssl_b_or_error = context.clientContext().newSsl(nullptr, host_b);
+  ASSERT_TRUE(ssl_b_or_error.ok()) << ssl_b_or_error.status();
+  auto ssl_b = std::move(ssl_b_or_error.value());
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_b.get(),
+                                                 ClientContextImplPeer::newSession(ssl_b.get())));
+
+  EXPECT_EQ(1, ClientContextImplPeer::cachedEndpointSessionCount(context.clientContext(), "",
+                                                                 "10.0.0.1:9000"));
+  EXPECT_EQ(1, ClientContextImplPeer::cachedEndpointSessionCount(context.clientContext(), "",
+                                                                 "10.0.0.2:9000"));
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheWithoutHostUsesSniFallback) {
+  ClientSessionCacheTestContext context(R"EOF(
+sni: service.example.com
+common_tls_context:
+max_session_keys: 1
+)EOF");
+
+  auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  host->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 9000);
+  ON_CALL(*host, address()).WillByDefault(Return(host->address_));
+  auto ssl_with_host_or_error = context.clientContext().newSsl(nullptr, host);
+  ASSERT_TRUE(ssl_with_host_or_error.ok()) << ssl_with_host_or_error.status();
+  auto ssl_with_host = std::move(ssl_with_host_or_error.value());
+  ASSERT_EQ(1, ClientContextImplPeer::newSessionKey(
+                   context.clientContext(), ssl_with_host.get(),
+                   ClientContextImplPeer::newSession(ssl_with_host.get())));
+  SSL_SESSION* cached_session =
+      ClientContextImplPeer::cachedSession(context.clientContext(), "service.example.com");
+
+  auto ssl_without_host_or_error = context.clientContext().newSsl(nullptr, nullptr);
+  ASSERT_TRUE(ssl_without_host_or_error.ok()) << ssl_without_host_or_error.status();
+  EXPECT_EQ(cached_session, SSL_get_session(ssl_without_host_or_error.value().get()));
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheRemovesEmptyEndpointBucketAfterGlobalEviction) {
+  ClientSessionCacheTestContext context(R"EOF(
+sni: service.example.com
+common_tls_context:
+max_session_keys: 2
+)EOF");
+
+  auto add_session = [&](absl::string_view address) -> Upstream::HostDescriptionConstSharedPtr {
+    auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    host->address_ = *Network::Utility::resolveUrl(absl::StrCat("tcp://", address));
+    ON_CALL(*host, address()).WillByDefault(Return(host->address_));
+    auto ssl_or_error = context.clientContext().newSsl(nullptr, host);
+    EXPECT_TRUE(ssl_or_error.ok()) << ssl_or_error.status();
+    if (!ssl_or_error.ok()) {
+      return nullptr;
+    }
+    auto ssl = std::move(ssl_or_error.value());
+    EXPECT_EQ(1,
+              ClientContextImplPeer::newSessionKey(context.clientContext(), ssl.get(),
+                                                   ClientContextImplPeer::newSession(ssl.get())));
+    return host;
+  };
+
+  auto host_a = add_session("10.0.0.1:9000");
+  ASSERT_NE(nullptr, host_a);
+  ASSERT_NE(nullptr, add_session("10.0.0.2:9000"));
+
+  auto use_a_or_error = context.clientContext().newSsl(nullptr, host_a);
+  ASSERT_TRUE(use_a_or_error.ok()) << use_a_or_error.status();
+
+  add_session("10.0.0.3:9000");
+
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedEndpoint(context.clientContext(),
+                                                       "service.example.com", "10.0.0.1:9000"));
+  EXPECT_FALSE(ClientContextImplPeer::hasCachedEndpoint(context.clientContext(),
+                                                        "service.example.com", "10.0.0.2:9000"));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedEndpoint(context.clientContext(),
+                                                       "service.example.com", "10.0.0.3:9000"));
+  EXPECT_EQ(2, ClientContextImplPeer::cachedSniSessionCount(context.clientContext()));
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheUsesSniScopeWhenEndpointScopeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.scope_upstream_tls_session_cache_by_endpoint", "false"}});
+
+  ClientSessionCacheTestContext context(R"EOF(
+sni: service.example.com
+common_tls_context:
+max_session_keys: 2
+)EOF");
+
+  auto host_a = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  host_a->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 9000);
+  ON_CALL(*host_a, address()).WillByDefault(Return(host_a->address_));
+  auto host_b = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  host_b->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2", 9000);
+  ON_CALL(*host_b, address()).WillByDefault(Return(host_b->address_));
+
+  auto ssl_a_or_error = context.clientContext().newSsl(nullptr, host_a);
+  ASSERT_TRUE(ssl_a_or_error.ok()) << ssl_a_or_error.status();
+  auto ssl_a = std::move(ssl_a_or_error.value());
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_a.get(),
+                                                 ClientContextImplPeer::newSession(ssl_a.get())));
+  SSL_SESSION* session_a = ClientContextImplPeer::cachedEndpointSession(
+      context.clientContext(), "service.example.com", "10.0.0.1:9000");
+
+  auto ssl_b_or_error = context.clientContext().newSsl(nullptr, host_b);
+  ASSERT_TRUE(ssl_b_or_error.ok()) << ssl_b_or_error.status();
+  auto ssl_b = std::move(ssl_b_or_error.value());
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_b.get(),
+                                                 ClientContextImplPeer::newSession(ssl_b.get())));
+  SSL_SESSION* session_b = ClientContextImplPeer::cachedEndpointSession(
+      context.clientContext(), "service.example.com", "10.0.0.2:9000");
+  ASSERT_NE(session_a, session_b);
+
+  auto ssl_a_again_or_error = context.clientContext().newSsl(nullptr, host_a);
+  ASSERT_TRUE(ssl_a_again_or_error.ok()) << ssl_a_again_or_error.status();
+  EXPECT_EQ(session_b, SSL_get_session(ssl_a_again_or_error.value().get()));
 }
 
 TEST_P(SslSocketTest, ClientSessionCacheEvictsGloballyLeastRecentlyUsedSession) {
