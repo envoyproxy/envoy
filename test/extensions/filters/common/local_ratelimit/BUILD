@@ -15,7 +15,10 @@ envoy_cc_test(
     deps = [
         "//source/common/singleton:manager_impl_lib",
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/test_common:test_runtime_lib",
