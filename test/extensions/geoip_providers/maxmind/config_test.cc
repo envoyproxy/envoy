@@ -27,18 +27,6 @@ using MaxmindProviderConfig = envoy::extensions::geoip_providers::maxmind::v3::M
 
 class GeoipProviderPeer {
 public:
-  static const std::optional<std::string>& cityDbPath(const GeoipProvider& provider) {
-    return provider.config_->cityDbPath();
-  }
-  static const std::optional<std::string>& ispDbPath(const GeoipProvider& provider) {
-    return provider.config_->ispDbPath();
-  }
-  static const std::optional<std::string>& anonDbPath(const GeoipProvider& provider) {
-    return provider.config_->anonDbPath();
-  }
-  static const std::optional<std::string>& countryDbPath(const GeoipProvider& provider) {
-    return provider.config_->countryDbPath();
-  }
   static const std::optional<std::string>& countryHeader(const GeoipProvider& provider) {
     return provider.config_->fieldKey(GeoField::Country);
   }
@@ -69,62 +57,22 @@ public:
   static const std::optional<std::string>& ispHeader(const GeoipProvider& provider) {
     return provider.config_->fieldKey(GeoField::Isp);
   }
-  static bool isCityDbPathSet(const GeoipProvider& provider) {
-    return provider.config_->isCityDbPathSet();
+  static const DbFilesProviderSharedPtr& dbFilesProvider(const GeoipProvider& provider) {
+    return provider.db_files_provider_;
   }
 };
 
-MATCHER_P(HasCityDbPath, expected_db_path, "") {
-  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
-  auto city_db_path = GeoipProviderPeer::cityDbPath(*provider);
-  if (city_db_path && testing::Matches(expected_db_path)(city_db_path.value())) {
-    return true;
-  }
-  *result_listener << "expected city_db_path=" << expected_db_path
-                   << " but city_db_path was not found in provider config";
-  return false;
+const DbFilesProvider& dbFilesProviderOf(const Geolocation::DriverSharedPtr& driver) {
+  return *GeoipProviderPeer::dbFilesProvider(*std::static_pointer_cast<GeoipProvider>(driver));
 }
 
-MATCHER_P(IsCityDbPathSet, expected, "") {
-  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
-  bool is_set = GeoipProviderPeer::isCityDbPathSet(*provider);
+MATCHER_P2(HasDbSet, db_type, expected, "") {
+  const bool is_set = dbFilesProviderOf(arg).hasDbSet(db_type);
   if (is_set == expected) {
     return true;
   }
-  *result_listener << "expected isCityDbPathSet()=" << expected << " but got " << is_set;
-  return false;
-}
-
-MATCHER_P(HasIspDbPath, expected_db_path, "") {
-  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
-  auto isp_db_path = GeoipProviderPeer::ispDbPath(*provider);
-  if (isp_db_path && testing::Matches(expected_db_path)(isp_db_path.value())) {
-    return true;
-  }
-  *result_listener << "expected isp_db_path=" << expected_db_path
-                   << " but isp_db_path was not found in provider config";
-  return false;
-}
-
-MATCHER_P(HasAnonDbPath, expected_db_path, "") {
-  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
-  auto anon_db_path = GeoipProviderPeer::anonDbPath(*provider);
-  if (anon_db_path && testing::Matches(expected_db_path)(anon_db_path.value())) {
-    return true;
-  }
-  *result_listener << "expected anon_db_path=" << expected_db_path
-                   << " but anon_db_path was not found in provider config";
-  return false;
-}
-
-MATCHER_P(HasCountryDbPath, expected_db_path, "") {
-  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
-  auto country_db_path = GeoipProviderPeer::countryDbPath(*provider);
-  if (country_db_path && testing::Matches(expected_db_path)(country_db_path.value())) {
-    return true;
-  }
-  *result_listener << "expected country_db_path=" << expected_db_path
-                   << " but country_db_path was not found in provider config";
+  *result_listener << "expected hasDbSet(" << dbTypeName(db_type) << ")=" << expected << " but got "
+                   << is_set;
   return false;
 }
 
@@ -288,8 +236,8 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver =
       factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
-  EXPECT_THAT(driver, AllOf(HasCityDbPath(city_db_path), HasIspDbPath(isp_db_path),
-                            HasAnonDbPath(anon_db_path), HasCountryHeader("x-geo-country"),
+  EXPECT_THAT(driver, AllOf(HasDbSet(GeoDbType::City, true), HasDbSet(GeoDbType::Isp, true),
+                            HasDbSet(GeoDbType::Anon, true), HasCountryHeader("x-geo-country"),
                             HasCityHeader("x-geo-city"), HasRegionHeader("x-geo-region"),
                             HasAsnHeader("x-geo-asn"), HasAnonVpnHeader("x-anon-vpn"),
                             HasAnonTorHeader("x-anon-tor"), HasAnonProxyHeader("x-anon-proxy"),
@@ -443,9 +391,9 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbPath) {
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver =
       factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
-  // City DB is not configured, so isCityDbPathSet() should return false.
-  EXPECT_THAT(driver, AllOf(HasCountryDbPath(country_db_path), HasCountryHeader("x-geo-country"),
-                            IsCityDbPathSet(false)));
+  // City DB is not configured.
+  EXPECT_THAT(driver, AllOf(HasDbSet(GeoDbType::Country, true), HasCountryHeader("x-geo-country"),
+                            HasDbSet(GeoDbType::City, false)));
 }
 
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbAndCityDbPaths) {
@@ -467,9 +415,8 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbAndCityDbPaths) {
   Geolocation::DriverSharedPtr driver =
       factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
   // Both Country DB and City DB are configured.
-  EXPECT_THAT(driver, AllOf(HasCountryDbPath(country_db_path), HasCityDbPath(city_db_path),
-                            HasCountryHeader("x-geo-country"), HasCityHeader("x-geo-city"),
-                            IsCityDbPathSet(true)));
+  EXPECT_THAT(driver, AllOf(HasDbSet(GeoDbType::Country, true), HasDbSet(GeoDbType::City, true),
+                            HasCountryHeader("x-geo-country"), HasCityHeader("x-geo-city")));
 }
 
 // Tests for geo_headers_to_add field which is deprecated in favor of geo_field_keys.
@@ -506,8 +453,8 @@ TEST_F(MaxmindProviderConfigTest,
       Geolocation::DriverSharedPtr driver =
           factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
       EXPECT_THAT(driver,
-                  AllOf(HasCityDbPath(city_db_path), HasIspDbPath(isp_db_path),
-                        HasAnonDbPath(anon_db_path), HasCountryHeader("x-geo-country"),
+                  AllOf(HasDbSet(GeoDbType::City, true), HasDbSet(GeoDbType::Isp, true),
+                        HasDbSet(GeoDbType::Anon, true), HasCountryHeader("x-geo-country"),
                         HasCityHeader("x-geo-city"), HasRegionHeader("x-geo-region"),
                         HasAsnHeader("x-geo-asn"), HasAnonVpnHeader("x-anon-vpn"),
                         HasAnonTorHeader("x-anon-tor"), HasAnonProxyHeader("x-anon-proxy"),
@@ -633,8 +580,9 @@ TEST_F(MaxmindProviderConfigTest, RebuildsProviderWhenCachedEntryHasExpired) {
   // The original provider is destroyed, so a non-null driver here is necessarily a new instance.
   ASSERT_NE(rebuilt_driver, nullptr);
   EXPECT_TRUE(released_driver.expired());
-  EXPECT_THAT(rebuilt_driver, AllOf(HasCityDbPath(city_db_path), HasCountryHeader("x-geo-country"),
-                                    HasCityHeader("x-geo-city")));
+  EXPECT_THAT(rebuilt_driver,
+              AllOf(HasDbSet(GeoDbType::City, true), HasCountryHeader("x-geo-country"),
+                    HasCityHeader("x-geo-city")));
 
   // The rebuilt provider replaces the expired entry under the same key.
   EXPECT_EQ(
@@ -644,6 +592,167 @@ TEST_F(MaxmindProviderConfigTest, RebuildsProviderWhenCachedEntryHasExpired) {
   EXPECT_EQ(
       factory.createGeoipProviderDriver(keepalive_config, "maxmind", server_factory_context_).get(),
       keepalive_driver.get());
+}
+
+TEST_F(MaxmindProviderConfigTest, DbFilePathsKeyDistinguishesPathsContainingSeparator) {
+  // The paths are encoded before being joined, so a path that contains the separator cannot
+  // collide with a different set of database files.
+  const DbFilePaths ambiguous_city_path{"a|b", "", "", "", ""};
+  const DbFilePaths split_across_fields{"a", "b", "", "", ""};
+  EXPECT_NE(ambiguous_city_path.key(), split_across_fields.key());
+  // The same set of files always maps to the same key.
+  EXPECT_EQ(ambiguous_city_path.key(), (DbFilePaths{"a|b", "", "", "", ""}).key());
+  // The same paths under different databases are a different set of files.
+  EXPECT_NE(split_across_fields.key(), (DbFilePaths{"b", "a", "", "", ""}).key());
+}
+
+TEST_F(MaxmindProviderConfigTest, ReusesDbFilesProviderForSameDbPaths) {
+  // Maxmind databases are large, so two providers that differ in everything but their database
+  // file paths must still share a single set of loaded databases.
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        city: "x-geo-city"
+    city_db_path: %s
+  )EOF";
+  const auto other_provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country-other"
+    city_db_path: %s
+  )EOF";
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  MaxmindProviderConfig provider_config;
+  TestUtility::loadFromYaml(absl::StrFormat(provider_config_yaml, city_db_path), provider_config);
+  MaxmindProviderConfig other_provider_config;
+  TestUtility::loadFromYaml(absl::StrFormat(other_provider_config_yaml, city_db_path),
+                            other_provider_config);
+
+  MaxmindProviderFactory factory;
+  Geolocation::DriverSharedPtr driver =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
+  Geolocation::DriverSharedPtr other_driver = factory.createGeoipProviderDriver(
+      other_provider_config, "other_prefix", server_factory_context_);
+  ASSERT_NE(driver, nullptr);
+  ASSERT_NE(other_driver, nullptr);
+  // Distinct provider configs, so distinct providers.
+  EXPECT_NE(driver.get(), other_driver.get());
+  // But a single set of database files behind them.
+  EXPECT_EQ(&dbFilesProviderOf(driver), &dbFilesProviderOf(other_driver));
+}
+
+TEST_F(MaxmindProviderConfigTest, DifferentDbFilesProvidersForDifferentDbPaths) {
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+    city_db_path: %s
+  )EOF";
+  const auto other_provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+    country_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  TestUtility::loadFromYaml(
+      absl::StrFormat(provider_config_yaml, genGeoDbFilePath("GeoLite2-City-Test.mmdb")),
+      provider_config);
+  MaxmindProviderConfig other_provider_config;
+  TestUtility::loadFromYaml(
+      absl::StrFormat(other_provider_config_yaml, genGeoDbFilePath("GeoIP2-Country-Test.mmdb")),
+      other_provider_config);
+
+  MaxmindProviderFactory factory;
+  Geolocation::DriverSharedPtr driver =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
+  Geolocation::DriverSharedPtr other_driver =
+      factory.createGeoipProviderDriver(other_provider_config, "maxmind", server_factory_context_);
+  ASSERT_NE(driver, nullptr);
+  ASSERT_NE(other_driver, nullptr);
+  EXPECT_NE(&dbFilesProviderOf(driver), &dbFilesProviderOf(other_driver));
+}
+
+TEST_F(MaxmindProviderConfigTest, RebuildsDbFilesProviderWhenCachedEntryHasExpired) {
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        city: "x-geo-city"
+    city_db_path: %s
+  )EOF";
+  // See RebuildsProviderWhenCachedEntryHasExpired: a second, distinct config keeps the driver
+  // singleton - and with it the map of weak_ptrs - alive once the first provider is released.
+  const auto keepalive_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+    country_db_path: %s
+  )EOF";
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  MaxmindProviderConfig provider_config;
+  TestUtility::loadFromYaml(absl::StrFormat(provider_config_yaml, city_db_path), provider_config);
+  MaxmindProviderConfig keepalive_config;
+  TestUtility::loadFromYaml(
+      absl::StrFormat(keepalive_config_yaml, genGeoDbFilePath("GeoIP2-Country-Test.mmdb")),
+      keepalive_config);
+
+  MaxmindProviderFactory factory;
+  Geolocation::DriverSharedPtr driver =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
+  Geolocation::DriverSharedPtr keepalive_driver =
+      factory.createGeoipProviderDriver(keepalive_config, "maxmind", server_factory_context_);
+  ASSERT_NE(driver, nullptr);
+  ASSERT_NE(keepalive_driver, nullptr);
+  const DbFilesProvider* keepalive_db_files_provider = &dbFilesProviderOf(keepalive_driver);
+
+  // Releasing the only provider that references the database files releases the files too, leaving
+  // an expired entry behind in the singleton's map.
+  std::weak_ptr<DbFilesProvider> released_files =
+      GeoipProviderPeer::dbFilesProvider(*std::static_pointer_cast<GeoipProvider>(driver));
+  driver.reset();
+  ASSERT_TRUE(released_files.expired());
+
+  Geolocation::DriverSharedPtr rebuilt_driver =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
+  ASSERT_NE(rebuilt_driver, nullptr);
+  EXPECT_TRUE(released_files.expired());
+  // A fresh set of database files replaces the expired entry under the same key.
+  EXPECT_EQ(&dbFilesProviderOf(rebuilt_driver),
+            &dbFilesProviderOf(factory.createGeoipProviderDriver(provider_config, "maxmind",
+                                                                 server_factory_context_)));
+  // Pruning the expired entry must not disturb the still live one.
+  EXPECT_EQ(keepalive_db_files_provider, &dbFilesProviderOf(keepalive_driver));
+}
+
+TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentStatPrefix) {
+  // The same provider config used by two listeners emits its lookup stats into two different
+  // namespaces, so the two listeners need their own providers - but they still share the databases.
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        city: "x-geo-city"
+    city_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  TestUtility::loadFromYaml(
+      absl::StrFormat(provider_config_yaml, genGeoDbFilePath("GeoLite2-City-Test.mmdb")),
+      provider_config);
+
+  MaxmindProviderFactory factory;
+  Geolocation::DriverSharedPtr driver =
+      factory.createGeoipProviderDriver(provider_config, "listener_a.", server_factory_context_);
+  Geolocation::DriverSharedPtr other_driver =
+      factory.createGeoipProviderDriver(provider_config, "listener_b.", server_factory_context_);
+  ASSERT_NE(driver, nullptr);
+  ASSERT_NE(other_driver, nullptr);
+  EXPECT_NE(driver.get(), other_driver.get());
+  EXPECT_EQ(&dbFilesProviderOf(driver), &dbFilesProviderOf(other_driver));
+
+  // The same config from the same stat namespace still resolves to the one provider.
+  EXPECT_EQ(
+      factory.createGeoipProviderDriver(provider_config, "listener_a.", server_factory_context_)
+          .get(),
+      driver.get());
 }
 
 } // namespace Maxmind

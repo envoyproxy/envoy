@@ -33,14 +33,19 @@ public:
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
     return provider->config_->getStatsScopeForTest();
   }
+  static Stats::Scope& dbFilesProviderScope(const DriverSharedPtr& driver) {
+    auto provider = std::static_pointer_cast<GeoipProvider>(driver);
+    return provider->db_files_provider_->getStatsScopeForTest();
+  }
   static Thread::ThreadSynchronizer& synchronizer(const DriverSharedPtr& driver) {
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
     return provider->synchronizer_;
   }
   static void setCountryDbToNull(const DriverSharedPtr& driver) {
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
-    absl::MutexLock lock(provider->mmdb_mutex_);
-    provider->country_db_.reset();
+    auto& db_files_provider = *provider->db_files_provider_;
+    absl::MutexLock lock(db_files_provider.mmdb_mutex_);
+    db_files_provider.country_db_.reset();
   }
 };
 
@@ -185,7 +190,9 @@ public:
               error_count);
 
     if (build_epoch > 0) {
-      EXPECT_EQ(provider_scope
+      // Database file level stats live in the shared DbFilesProvider scope, which carries no
+      // listener stat prefix.
+      EXPECT_EQ(GeoipProviderPeer::dbFilesProviderScope(provider_)
                     .gaugeFromString(absl::StrCat(db_type, ".db_build_epoch"),
                                      Stats::Gauge::ImportMode::Accumulate)
                     .value(),
@@ -195,10 +202,10 @@ public:
 
   void expectReloadStats(const absl::string_view& db_type, const uint32_t reload_success_count = 0,
                          const uint32_t reload_error_count = 0) {
-    auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
-    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".db_reload_success")).value(),
+    auto& db_files_scope = GeoipProviderPeer::dbFilesProviderScope(provider_);
+    EXPECT_EQ(db_files_scope.counterFromString(absl::StrCat(db_type, ".db_reload_success")).value(),
               reload_success_count);
-    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".db_reload_error")).value(),
+    EXPECT_EQ(db_files_scope.counterFromString(absl::StrCat(db_type, ".db_reload_error")).value(),
               reload_error_count);
   }
 
@@ -398,7 +405,7 @@ TEST_F(GeoipProviderTest, AsnDbAndIspDbNotSetCausesEnvoyBug) {
   // Configuration that exposes the logical bug:
   // 1. ASN header is requested (triggers lookupInAsnDb call)
   // 2. No ASN database path configured (asn_db_ptr will be null)
-  // 3. No ISP database path configured (isIspDbPathSet() returns false)
+  // 3. No ISP database path configured (hasDbSet(GeoDbType::Isp) returns false)
   // This should trigger IS_ENVOY_BUG.
   const std::string config_yaml = R"EOF(
     common_provider_config:
@@ -906,7 +913,7 @@ TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndCityFallback) {
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
 
   // Country header should be missing because the country DB is null and the city DB
-  // skipped the country lookup because isCountryDbPathSet() is true.
+  // skipped the country lookup because hasDbSet(GeoDbType::Country) is true.
   const auto& country_it = captured_lookup_response_.find("x-geo-country");
   EXPECT_EQ(captured_lookup_response_.end(), country_it);
 

@@ -488,8 +488,9 @@ TEST_P(GeoipFilterIntegrationTest, OnlyApplePrivateRelayHeaderIsPopulated) {
 TEST_P(GeoipFilterIntegrationTest, MetricForDbBuildEpochIsEmitted) {
   config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithXff));
   initialize();
-  EXPECT_EQ(1671567063,
-            test_server_->gauge("http.config_test.maxmind.city_db.db_build_epoch")->value());
+  // The database files are shared between listeners, so their stats are rooted at the server scope
+  // rather than at the listener's stat prefix.
+  EXPECT_EQ(1671567063, test_server_->gauge("maxmind.city_db.db_build_epoch")->value());
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseCountryDb) {
