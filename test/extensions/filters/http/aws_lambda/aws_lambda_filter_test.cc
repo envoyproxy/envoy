@@ -110,6 +110,24 @@ TEST_F(AwsLambdaFilterTest, SigningFailureDecodeHeadersPassthrough) {
 }
 
 /**
+ * Signing skipped in decodeHeaders passthrough, because no credentials were available. The request
+ * is still forwarded, and this is not reported as a signing failure.
+ */
+TEST_F(AwsLambdaFilterTest, SigningSkippedDecodeHeadersPassthrough) {
+  auto filter_settings_ =
+      setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
+  EXPECT_CALL(*(filter_settings_->signer_),
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
+        return absl::FailedPreconditionError("no credentials available, request left unsigned");
+      }));
+
+  Http::TestRequestHeaderMapImpl input_headers;
+  const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
+}
+
+/**
  * Signing failure in decodeHeaders no passthrough
  */
 TEST_F(AwsLambdaFilterTest, SigningFailureDecodeHeadersNoPassthrough) {

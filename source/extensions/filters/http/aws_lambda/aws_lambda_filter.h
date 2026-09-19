@@ -147,6 +147,12 @@ private:
   void continueDecodeHeaders(FilterSettings& settings);
   void continueDecodeData(FilterSettings& settings);
 
+  /**
+   * Logs the outcome of a signing attempt. A FailedPrecondition status means no credentials were
+   * available and the request was deliberately left unsigned, which is not a signing failure.
+   */
+  void logSigningStatus(const absl::Status& status) const;
+
   FilterSettingsSharedPtr settings_;
   FilterStats stats_;
   Http::RequestHeaderMap* request_headers_ = nullptr;
