@@ -14,6 +14,7 @@
 #include "source/common/common/random_generator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 
@@ -99,6 +100,12 @@ public:
   void markSocketDead(const int fd);
 
   /**
+   * Exclude a socket from new stream selection without changing its lifetime or ownership.
+   * @param fd the FD for the socket that is draining.
+   */
+  void markSocketDraining(int fd);
+
+  /**
    * @return lifecycle metadata for a tracked reverse-tunnel socket, or nullptr if none exists.
    */
   const ReverseTunnelLifecycleInfo* getLifecycleInfo(int fd) const;
@@ -163,12 +170,13 @@ public:
   ReverseTunnelAcceptorExtension* getUpstreamExtension() const { return extension_; }
 
   /**
-   * Get a node that has a socket (idle or used) for the given key.
-   * If the key is found in the cluster_to_node_info_map_, assume it is the cluster ID and return a
-   * node in that cluster in a round-robin manner. If the key is not found in the
-   * cluster_to_node_info_map_, assume it is the node ID and return it as-is.
+   * Get a node that has a non-draining socket (idle or used) for the given key.
+   * If the key is found in the cluster_to_node_info_map_, assume it is the cluster ID and return an
+   * eligible node in that cluster in a round-robin manner. Otherwise, treat the key as a node ID
+   * and check its eligibility if it is known to this worker.
    * @param key the cluster ID or node ID to lookup.
-   * @return the node ID, or the key itself if it cannot be resolved.
+   * @return the node ID, empty if the known node or cluster has no non-draining sockets, or the key
+   * itself if it cannot be resolved.
    */
   std::string getNodeWithSocket(const std::string& key);
 
@@ -201,6 +209,8 @@ private:
    * @return true if the node has any sockets, false otherwise.
    */
   bool hasAnySocketsForNode(const std::string& node_id);
+
+  bool hasSelectableSocketsForNode(const std::string& node_id) const;
 
   /**
    * Compute the ping interval in milliseconds with 15% jitter applied.
@@ -277,6 +287,10 @@ private:
 
   // Per node counter for total active FDs.
   absl::flat_hash_map<std::string, uint32_t> node_to_active_fd_count_;
+
+  // Draining sockets remain live for existing streams but cannot receive new streams.
+  absl::flat_hash_set<int> draining_fds_;
+  absl::flat_hash_map<std::string, uint32_t> node_to_selectable_fd_count_;
 
   // Upstream extension for stats integration.
   ReverseTunnelAcceptorExtension* extension_;
