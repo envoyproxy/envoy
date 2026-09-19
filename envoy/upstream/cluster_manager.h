@@ -130,6 +130,18 @@ public:
 using ClusterDiscoveryCallbackHandlePtr = std::unique_ptr<ClusterDiscoveryCallbackHandle>;
 
 /**
+ * ClusterUpdateBatch is an RAII wrapper for batching cluster additions, updates, and removals.
+ * Destroying the outermost ClusterUpdateBatch will flush all queued thread-local cluster actions
+ * across worker threads in a single broadcast.
+ */
+class [[nodiscard]] ClusterUpdateBatch {
+public:
+  virtual ~ClusterUpdateBatch() = default;
+};
+
+using ClusterUpdateBatchPtr = std::unique_ptr<ClusterUpdateBatch>;
+
+/**
  * A handle to an on-demand CDS.
  */
 class OdCdsApiHandle {
@@ -418,6 +430,14 @@ public:
    * @return true if the action results in the removal of a cluster.
    */
   virtual bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) PURE;
+
+  /**
+   * Create an RAII batch handle for batching cluster additions, updates, and removals.
+   * While an active batch handle is alive, thread-local worker broadcasts are queued and
+   * flushed together in a single cross-thread dispatch upon destruction of the outermost batch.
+   * @return a ClusterUpdateBatch handle.
+   */
+  virtual ClusterUpdateBatchPtr createSourceBatch() PURE;
 
   /**
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.
