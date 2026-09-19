@@ -61,7 +61,7 @@ public:
     decoder_callbacks_ = &callbacks;
   }
 
-  void onDestroy() override {};
+  void onDestroy() override{};
   Http::StreamEncoderFilterCallbacks* decoder_callbacks_;
 };
 
@@ -914,17 +914,25 @@ typed_config:
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
 
-    auto encoder_decoder = codec_client_->startRequest(request_headers);
-    Http::RequestEncoder& request_encoder = encoder_decoder.first;
-    auto response = std::move(encoder_decoder.second);
-
-    if (!bad_host) {
+    IntegrationStreamDecoderPtr response;
+    if (!bad_host && expected_status_code == "200") {
+      // For the 200 path the upstream interaction is needed, so use split header+body send.
+      auto encoder_decoder = codec_client_->startRequest(request_headers);
+      Http::RequestEncoder& request_encoder = encoder_decoder.first;
+      response = std::move(encoder_decoder.second);
       codec_client_->sendData(request_encoder, "helloworld", true);
-      if (expected_status_code == "200") {
-        waitForNextUpstreamRequest(0, std::chrono::milliseconds(100000));
-        Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-        upstream_request_->encodeHeaders(response_headers, true);
-      }
+      waitForNextUpstreamRequest(0, std::chrono::milliseconds(100000));
+      Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+      upstream_request_->encodeHeaders(response_headers, true);
+    } else if (bad_host) {
+      // bad_host: filter produces an immediate local reply on headers; no body needed.
+      auto encoder_decoder = codec_client_->startRequest(request_headers);
+      response = std::move(encoder_decoder.second);
+    } else {
+      // Non-200 non-bad_host: filter produces an immediate local reply (e.g. 503). Send the
+      // complete request in one shot so there is no window where a dangling RequestEncoder& could
+      // be used after the stream/connection is reset.
+      response = codec_client_->makeRequestWithBody(request_headers, "helloworld");
     }
 
     ASSERT_TRUE(response->waitForEndStream(std::chrono::milliseconds(100000)));
