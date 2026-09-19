@@ -146,5 +146,5 @@ message McpRouter {
   // that mode the ``ENFORCE`` subject check compares two values that are both ultimately
   // client-controlled, so it does not bind the session to the authenticated identity and should
   // only be relied on as a consistency check.
-  envoy.config.core.v3.DataSource session_signing_key = 4;
+  config.core.v3.DataSource session_signing_key = 4;
 }
