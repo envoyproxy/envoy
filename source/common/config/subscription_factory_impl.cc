@@ -19,10 +19,12 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
     Api::Api& api, const Server::Instance& server,
-    XdsResourcesDelegateOptRef xds_resources_delegate, XdsConfigTrackerOptRef xds_config_tracker)
+    XdsResourcesDelegateOptRef xds_resources_delegate, XdsConfigTrackerOptRef xds_config_tracker,
+    ScopedBatchFactoryOptRef scoped_batch_factory)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
       validation_visitor_(validation_visitor), api_(api), server_(server),
-      xds_resources_delegate_(xds_resources_delegate), xds_config_tracker_(xds_config_tracker) {}
+      xds_resources_delegate_(xds_resources_delegate), xds_config_tracker_(xds_config_tracker),
+      scoped_batch_factory_(scoped_batch_factory) {}
 
 absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -39,6 +41,7 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
                                                    server_,
                                                    xds_resources_delegate_,
                                                    xds_config_tracker_,
+                                                   scoped_batch_factory_,
                                                    config,
                                                    type_url,
                                                    scope,
@@ -139,6 +142,7 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpc
                                                    server_,
                                                    xds_resources_delegate_,
                                                    xds_config_tracker_,
+                                                   scoped_batch_factory_,
                                                    config,
                                                    type_url,
                                                    scope,
@@ -174,6 +178,7 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionF
                                                    server_,
                                                    xds_resources_delegate_,
                                                    xds_config_tracker_,
+                                                   scoped_batch_factory_,
                                                    factory_config,
                                                    "",
                                                    scope,

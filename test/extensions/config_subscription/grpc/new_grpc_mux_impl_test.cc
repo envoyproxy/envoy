@@ -1097,7 +1097,7 @@ TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               std::nullopt, std::nullopt, nullptr),
+                               std::nullopt, std::nullopt, nullptr, std::nullopt),
                EnvoyException);
 }
 
@@ -1193,6 +1193,57 @@ TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnConfigRejected) {
                                              "match the message-wide type URL foo"));
       }));
 
+  onDiscoveryResponse(std::move(response));
+
+  shutdownMux();
+}
+
+TEST_P(NewGrpcMuxImplTest, ScopedBatchCreation) {
+  MockScopedBatchFactory scoped_batch_factory;
+  auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+      SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/OptRef<XdsResourcesDelegate>(),
+      /*xds_config_tracker_=*/OptRef<XdsConfigTracker>(),
+      /*backoff_strategy_=*/std::move(backoff_strategy),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/skip_subsequent_node_,
+      /*load_stats_reporter_factory_=*/nullptr,
+      /*scoped_batch_factory_=*/scoped_batch_factory};
+
+  if (isUnifiedMuxTest()) {
+    grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context);
+  } else {
+    grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(grpc_mux_context);
+  }
+
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}, .with_node = true});
+  grpc_mux_->start();
+
+  EXPECT_CALL(scoped_batch_factory, createScopedBatch(type_url))
+      .WillOnce(Invoke([](absl::string_view) { return std::make_unique<MockScopedBatch>(); }));
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_nonce("1");
+  response->set_system_version_info("1");
+
+  expectSendMessage({.type_url = type_url, .nonce = "1"});
   onDiscoveryResponse(std::move(response));
 
   shutdownMux();

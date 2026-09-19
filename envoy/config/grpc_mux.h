@@ -26,6 +26,26 @@ namespace Envoy {
 namespace Config {
 
 using ScopedResume = std::unique_ptr<Cleanup>;
+
+/**
+ * Abstract RAII batch interface.
+ */
+class ScopedBatch {
+public:
+  virtual ~ScopedBatch() = default;
+};
+using ScopedBatchPtr = std::unique_ptr<ScopedBatch>;
+
+/**
+ * Factory for creating scoped batches for specific xDS resource type URLs.
+ */
+class ScopedBatchFactory {
+public:
+  virtual ~ScopedBatchFactory() = default;
+  virtual ScopedBatchPtr createScopedBatch(absl::string_view type_url) PURE;
+};
+using ScopedBatchFactoryOptRef = OptRef<ScopedBatchFactory>;
+
 /**
  * All control plane related stats. @see stats_macros.h
  */

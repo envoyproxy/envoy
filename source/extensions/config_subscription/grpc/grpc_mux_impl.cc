@@ -75,6 +75,7 @@ GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
       target_xds_authority_(grpc_mux_context.target_xds_authority_),
       load_stats_reporter_factory_(grpc_mux_context.load_stats_reporter_factory_),
+      scoped_batch_factory_(grpc_mux_context.scoped_batch_factory_),
       dynamic_update_callback_handle_(
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
@@ -411,6 +412,13 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // see https://github.com/envoyproxy/envoy/issues/11477.
   same_type_resume = pause(type_url);
   TRY_ASSERT_MAIN_THREAD {
+    // When handling responses, create an RAII batch (if a batch factory is provided)
+    // to defer and coalesce updates across worker threads.
+    ScopedBatchPtr batch;
+    if (scoped_batch_factory_.has_value()) {
+      batch = scoped_batch_factory_->createScopedBatch(type_url);
+    }
+
     std::vector<DecodedResourcePtr> resources;
     OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
 
@@ -696,8 +704,8 @@ public:
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          XdsResourcesDelegateOptRef xds_resources_delegate,
-         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
-      override {
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory,
+         OptRef<ScopedBatchFactory> scoped_batch_factory) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -718,7 +726,8 @@ public:
         /*target_xds_authority_=*/Config::Utility::getGrpcControlPlane(ads_config).value_or(""),
         /*eds_resources_cache_=*/std::make_unique<EdsResourcesCacheImpl>(dispatcher),
         /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only(),
-        /*load_stats_reporter_factory_=*/load_stats_reporter_factory};
+        /*load_stats_reporter_factory_=*/load_stats_reporter_factory,
+        /*scoped_batch_factory_=*/scoped_batch_factory};
     return std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context);
   }
 };

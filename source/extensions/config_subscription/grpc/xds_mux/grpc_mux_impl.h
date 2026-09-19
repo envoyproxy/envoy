@@ -15,7 +15,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
@@ -249,6 +248,7 @@ private:
   XdsConfigTrackerOptRef xds_config_tracker_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   EdsResourcesCachePtr eds_resources_cache_;
+  OptRef<ScopedBatchFactory> scoped_batch_factory_;
   const std::string target_xds_authority_;
 
   // Used to track whether initial_resource_versions should be populated on the

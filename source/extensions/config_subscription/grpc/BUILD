@@ -15,9 +15,9 @@ envoy_cc_library(
     deps = [
         "//envoy/config:custom_config_validators_interface",
         "//envoy/config:eds_resources_cache_interface",
+        "//envoy/config:grpc_mux_interface",
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
-        "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:utility_lib",
     ],
 )
@@ -37,7 +37,6 @@ envoy_cc_extension(
         "//envoy/config:subscription_interface",
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
-        "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:load_stats_reporter_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",

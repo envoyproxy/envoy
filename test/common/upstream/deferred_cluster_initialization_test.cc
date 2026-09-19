@@ -840,6 +840,144 @@ TEST_P(EdsTest, ActiveClusterGetsUpdated) {
       hostsInHostsVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts(), {1000, 4000}));
 }
 
+// Verifies that multiple deferred clusters added in a batch and removed before inline inflation
+// are safely cleaned up without inflating or corrupting thread-local cluster tables.
+TEST_P(StaticClusterTest, BatchAddAndPreInflationRemoval) {
+  auto bootstrap = parseBootstrapFromV3YamlEnableDeferredCluster("static_resources:\n");
+  create(bootstrap);
+
+  auto c1 = defaultStaticCluster("cluster_1");
+  setClusterType(c1, getStaticClusterType());
+  auto c2 = defaultStaticCluster("cluster_2");
+  setClusterType(c2, getStaticClusterType());
+
+  // Start a batch and add two deferred clusters.
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(c1, "1"));
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(c2, "1"));
+
+    // Remove cluster_2 within the same batch before it was ever inflated or looked up.
+    EXPECT_TRUE(cluster_manager_->removeCluster("cluster_2"));
+  }
+
+  // Active clusters should contain cluster_1 but not cluster_2.
+  EXPECT_TRUE(cluster_manager_->activeClusters().contains("cluster_1"));
+  EXPECT_FALSE(cluster_manager_->activeClusters().contains("cluster_2"));
+
+  // Inflation gauge should still be 0 since cluster_1 hasn't been accessed yet.
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
+
+  // Looking up cluster_1 now should inflate it cleanly.
+  EXPECT_LOG_CONTAINS("debug", "initializing TLS cluster cluster_1 inline",
+                      cluster_manager_->getThreadLocalCluster("cluster_1"));
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
+
+  // Looking up removed cluster_2 should return nullptr.
+  EXPECT_EQ(cluster_manager_->getThreadLocalCluster("cluster_2"), nullptr);
+}
+
+// Verifies that multiple updates to deferred clusters within a batch correctly update
+// priority set endpoints and only inflate on subsequent thread-local lookup.
+TEST_P(EdsTest, BatchMultipleDeferredUpdatesAndInlineInflation) {
+  const std::string bootstrap_yaml = R"EOF(
+    static_resources:
+      clusters:
+      - name: eds
+        connect_timeout: 0.250s
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: bootstrap_cluster
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 60000
+    )EOF";
+
+  auto bootstrap = parseBootstrapFromV3YamlEnableDeferredCluster(bootstrap_yaml);
+  create(bootstrap);
+
+  const std::string eds_cluster_yaml = R"EOF(
+      name: cluster_1
+      connect_timeout: 0.25s
+      lb_policy: ROUND_ROBIN
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            api_type: REST
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+    )EOF";
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+        parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
+  }
+
+  // Warming clusters contains cluster_1 (deferred).
+  EXPECT_TRUE(cluster_manager_->clusters().warming_clusters_.contains("cluster_1"));
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
+
+  // Perform a batch of endpoint updates.
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+    cluster_load_assignment.set_cluster_name("fare");
+    addEndpoint(cluster_load_assignment, 8000);
+    addEndpoint(cluster_load_assignment, 9000);
+    doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  }
+
+  // Active clusters now contains cluster_1 after endpoint update.
+  EXPECT_TRUE(cluster_manager_->activeClusters().contains("cluster_1"));
+  // Still uninflated before first access.
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
+
+  // Now inflate cluster_1.
+  EXPECT_LOG_CONTAINS("debug", "initializing TLS cluster cluster_1 inline",
+                      cluster_manager_->getThreadLocalCluster("cluster_1"));
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
+
+  Cluster& cluster = cluster_manager_->activeClusters().find("cluster_1")->second;
+  EXPECT_TRUE(
+      hostsInHostsVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts(), {8000, 9000}));
+}
+
+// Verifies that removing a deferred cluster before it has ever been inflated removes it from
+// both active and deferred cluster maps without leaving orphaned state.
+TEST_P(StaticClusterTest, BatchDeferredClusterRemovalBeforeInflation) {
+  auto bootstrap = parseBootstrapFromV3YamlEnableDeferredCluster("static_resources:\n");
+  create(bootstrap);
+
+  auto cluster_to_remove = defaultStaticCluster("deferred_to_remove");
+  setClusterType(cluster_to_remove, getStaticClusterType());
+
+  // Add deferred cluster in a batch
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster_to_remove, "v1"));
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("deferred_to_remove"));
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
+
+  // Remove deferred cluster in a batch before inflation
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(cluster_manager_->removeCluster("deferred_to_remove"));
+  }
+
+  EXPECT_FALSE(cluster_manager_->hasCluster("deferred_to_remove"));
+  EXPECT_EQ(cluster_manager_->getThreadLocalCluster("deferred_to_remove"), nullptr);
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

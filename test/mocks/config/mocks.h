@@ -268,6 +268,20 @@ public:
   Common::CallbackManager<absl::Status, absl::string_view> update_cb_handler_;
 };
 
+class MockScopedBatch : public ScopedBatch {
+public:
+  MockScopedBatch();
+  ~MockScopedBatch() override;
+};
+
+class MockScopedBatchFactory : public ScopedBatchFactory {
+public:
+  MockScopedBatchFactory();
+  ~MockScopedBatchFactory() override;
+
+  MOCK_METHOD(ScopedBatchPtr, createScopedBatch, (absl::string_view type_url), (override));
+};
+
 template <class FactoryCallback>
 class TestExtensionConfigProvider : public Config::ExtensionConfigProvider<FactoryCallback> {
 public:

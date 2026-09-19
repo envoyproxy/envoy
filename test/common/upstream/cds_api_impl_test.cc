@@ -472,6 +472,103 @@ resources:
   EXPECT_EQ("1", cds_->versionInfo());
 }
 
+// Verifies that CdsApiHelper requests an RAII ClusterUpdateBatch from ClusterManager
+// when processing a CDS config update, batching all cluster additions/updates in the response.
+TEST_F(CdsApiImplTest, BatchClusterUpdatesOnCds) {
+  setup();
+
+  const auto decoded_resources = TestUtility::decodeResources(
+      {defaultStaticCluster("cluster_1"), defaultStaticCluster("cluster_2")});
+  EXPECT_CALL(cm_, createSourceBatch()).WillOnce(Return(nullptr));
+  expectAdd("cluster_1");
+  expectAdd("cluster_2");
+  EXPECT_CALL(initialized_, ready());
+
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "1"));
+}
+
+// Verifies that CdsApiHelper correctly records rejection error messages when addOrUpdateCluster
+// fails or when duplicate clusters are present in the update response, all within a batch scope.
+TEST_F(CdsApiImplTest, CdsApiHelperRejectionReportingAndDuplicateHandling) {
+  setup();
+
+  const auto decoded_resources = TestUtility::decodeResources(
+      {defaultStaticCluster("duplicate_cluster"), defaultStaticCluster("duplicate_cluster"),
+       defaultStaticCluster("failing_cluster")});
+
+  EXPECT_CALL(cm_, createSourceBatch()).WillOnce(Return(nullptr));
+  expectAdd("duplicate_cluster");
+  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("failing_cluster"), "", false))
+      .WillOnce(Return(absl::InvalidArgumentError("invalid cluster config")));
+
+  EXPECT_CALL(initialized_, ready());
+
+  const auto status = cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "1");
+  EXPECT_THAT(status, StatusHelpers::StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(status.message(), testing::HasSubstr("duplicate cluster duplicate_cluster found"));
+  EXPECT_THAT(status.message(), testing::HasSubstr("failing_cluster: invalid cluster config"));
+}
+
+// Verifies that CDS updates properly batch interleaved additions, updates, and removals
+// under an RAII batch scope.
+TEST_F(CdsApiImplTest, BatchInterleavedAddUpdateRemove) {
+  setup();
+
+  // First establish an active cluster to remove in the subsequent update.
+  const auto decoded_resources1 =
+      TestUtility::decodeResources({defaultStaticCluster("cluster_to_remove")});
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
+  EXPECT_CALL(cm_, createSourceBatch()).WillOnce(Return(nullptr));
+  expectAdd("cluster_to_remove");
+  EXPECT_CALL(initialized_, ready());
+
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources1.refvec_, "1"));
+
+  // Second update: simultaneously add cluster_new and remove cluster_to_remove.
+  const auto decoded_resources2 =
+      TestUtility::decodeResources({defaultStaticCluster("cluster_new")});
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({"cluster_to_remove"})));
+  EXPECT_CALL(cm_, createSourceBatch()).WillOnce(Return(nullptr));
+  expectAdd("cluster_new");
+  EXPECT_CALL(cm_, removeCluster(StrEq("cluster_to_remove"), false)).WillOnce(Return(true));
+
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources2.refvec_, "2"));
+  EXPECT_EQ("2", cds_->versionInfo());
+}
+
+// Verifies that CdsApiHelper catches EnvoyException when adding/updating clusters in CDS responses,
+// records the rejection reason, and returns an InvalidArgument error while maintaining the batch
+// scope.
+TEST_F(CdsApiImplTest, CdsApiHelperExceptionHandling) {
+  setup();
+
+  const auto decoded_resources =
+      TestUtility::decodeResources({defaultStaticCluster("exception_cluster")});
+  EXPECT_CALL(cm_, createSourceBatch()).WillOnce(Return(nullptr));
+  expectAddToThrow("exception_cluster", "syntax error in cluster configuration");
+  EXPECT_CALL(initialized_, ready());
+
+  const auto status = cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "1");
+  EXPECT_THAT(status, StatusHelpers::StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(status.message(),
+              testing::HasSubstr("exception_cluster: syntax error in cluster configuration"));
+}
+
+// Verifies that an empty CDS response under an active batch executes cleanly without errors.
+TEST_F(CdsApiImplTest, BatchEmptyCdsResponse) {
+  setup();
+
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>({});
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
+  EXPECT_CALL(cm_, createSourceBatch()).WillOnce(Return(nullptr));
+  EXPECT_CALL(initialized_, ready());
+
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "1"));
+  EXPECT_EQ("", cds_->versionInfo());
+  EXPECT_EQ(0UL, scope_.counter("cluster_manager.cds.config_reload").value());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

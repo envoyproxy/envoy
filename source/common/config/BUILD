@@ -329,5 +329,6 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/upstream:load_stats_reporter_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )

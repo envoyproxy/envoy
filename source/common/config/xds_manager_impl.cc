@@ -12,6 +12,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/config_source.pb.validate.h"
 #include "envoy/config/custom_config_validators.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
@@ -163,8 +164,16 @@ absl::Status XdsManagerImpl::initialize(const envoy::config::bootstrap::v3::Boot
 
   subscription_factory_ = std::make_unique<SubscriptionFactoryImpl>(
       local_info_, main_thread_dispatcher_, *cm_, validation_context_.dynamicValidationVisitor(),
-      api_, server_, xds_resources_delegate, xds_config_tracker);
+      api_, server_, xds_resources_delegate, xds_config_tracker, *this);
   return absl::OkStatus();
+}
+
+ScopedBatchPtr XdsManagerImpl::createScopedBatch(absl::string_view type_url) {
+  if (cm_ != nullptr &&
+      type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()) {
+    return cm_->createSourceBatch();
+  }
+  return nullptr;
 }
 
 absl::Status
@@ -240,7 +249,7 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
                                  main_thread_dispatcher_, random_, *stats_.rootScope(),
                                  dyn_resources.ads_config(), local_info_,
                                  std::move(custom_config_validators), std::move(backoff_strategy),
-                                 xds_config_tracker, {}, lrs_factory);
+                                 xds_config_tracker, {}, lrs_factory, *this);
     } else {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
@@ -274,7 +283,7 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
                                  main_thread_dispatcher_, random_, *stats_.rootScope(),
                                  dyn_resources.ads_config(), local_info_,
                                  std::move(custom_config_validators), std::move(backoff_strategy),
-                                 xds_config_tracker, xds_resources_delegate, lrs_factory);
+                                 xds_config_tracker, xds_resources_delegate, lrs_factory, *this);
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
@@ -473,7 +482,7 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
     authority_mux = factory->create(
         std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
         *stats_.rootScope(), api_config_source, local_info_, std::move(custom_config_validators),
-        std::move(backoff_strategy), xds_config_tracker, {}, lrs_factory);
+        std::move(backoff_strategy), xds_config_tracker, {}, lrs_factory, *this);
   } else {
     ASSERT(api_config_source.api_type() ==
            envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
@@ -508,7 +517,8 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
     authority_mux = factory->create(
         std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
         *stats_.rootScope(), api_config_source, local_info_, std::move(custom_config_validators),
-        std::move(backoff_strategy), xds_config_tracker, xds_resources_delegate, lrs_factory);
+        std::move(backoff_strategy), xds_config_tracker, xds_resources_delegate, lrs_factory,
+        *this);
   }
   ASSERT(authority_mux != nullptr);
 

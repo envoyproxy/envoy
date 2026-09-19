@@ -1623,6 +1623,52 @@ TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporterRuntimeDisabled) {
   EXPECT_EQ(nullptr, grpc_mux_->maybeCreateLoadStatsReporter());
 }
 
+TEST_P(GrpcMuxImplTest, ScopedBatchCreation) {
+  MockScopedBatchFactory scoped_batch_factory;
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+      /*backoff_strategy_=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/true,
+      /*load_stats_reporter_factory_=*/nullptr,
+      /*scoped_batch_factory_=*/scoped_batch_factory};
+  grpc_mux_ = std::make_unique<GrpcMuxImpl>(grpc_mux_context);
+
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {}, "", true);
+  grpc_mux_->start();
+
+  EXPECT_CALL(scoped_batch_factory, createScopedBatch(type_url))
+      .WillOnce(Invoke([](absl::string_view) { return std::make_unique<MockScopedBatch>(); }));
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_version_info("1");
+  response->set_nonce("nonce");
+  ControlPlaneStats control_plane_stats{Utility::generateControlPlaneStats(*stats_.rootScope())};
+
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, "1")).WillOnce(Return(absl::OkStatus()));
+  expectSendMessage(type_url, {}, "1", false, "nonce");
+  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats);
+}
+
 /**
  * Tests the NullGrpcMuxImpl object to increase code-coverage.
  */
@@ -1698,7 +1744,7 @@ TEST(GrpcMuxFactoryTest, InvalidRateLimit) {
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               std::nullopt, std::nullopt, nullptr),
+                               std::nullopt, std::nullopt, nullptr, std::nullopt),
                EnvoyException);
 }
 

@@ -88,5 +88,11 @@ MockXdsConfigTracker::~MockXdsConfigTracker() = default;
 MockXdsResourcesDelegate::MockXdsResourcesDelegate() = default;
 MockXdsResourcesDelegate::~MockXdsResourcesDelegate() = default;
 
+MockScopedBatch::MockScopedBatch() = default;
+MockScopedBatch::~MockScopedBatch() = default;
+
+MockScopedBatchFactory::MockScopedBatchFactory() = default;
+MockScopedBatchFactory::~MockScopedBatchFactory() = default;
+
 } // namespace Config
 } // namespace Envoy

@@ -3,6 +3,7 @@
 #include "envoy/common/backoff_strategy.h"
 #include "envoy/config/custom_config_validators.h"
 #include "envoy/config/eds_resources_cache.h"
+#include "envoy/config/grpc_mux.h"
 #include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/dispatcher.h"
@@ -34,6 +35,7 @@ struct GrpcMuxContext {
   // A factory method that allows a GrpcMux lazily create a Load-Stats-Reporter
   // if needed.
   std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory_;
+  OptRef<ScopedBatchFactory> scoped_batch_factory_{};
 };
 
 } // namespace Config

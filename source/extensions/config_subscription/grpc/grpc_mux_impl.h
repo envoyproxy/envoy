@@ -15,7 +15,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
@@ -336,6 +335,7 @@ private:
   // The load stats reporter, lazily created.
   std::unique_ptr<Upstream::LoadStatsReporter> lrs_server_;
   bool first_stream_request_{true};
+  OptRef<ScopedBatchFactory> scoped_batch_factory_;
 
   // Helper function for looking up and potentially allocating a new ApiState.
   ApiState& apiStateFor(absl::string_view type_url);
