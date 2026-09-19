@@ -2041,8 +2041,8 @@ pub static NEW_DNS_RESOLVER_CONFIG_FUNCTION: OnceLock<NewDnsResolverConfigFuncti
 ///   fn new_resolver(
 ///     &self,
 ///     envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
-///   ) -> Box<dyn DnsResolverInstance> {
-///     Box::new(MyDnsResolver { envoy_callback })
+///   ) -> Option<Box<dyn DnsResolverInstance>> {
+///     Some(Box::new(MyDnsResolver { envoy_callback }))
 ///   }
 /// }
 ///
