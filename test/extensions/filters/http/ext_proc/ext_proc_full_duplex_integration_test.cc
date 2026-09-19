@@ -1175,6 +1175,80 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTra
   EXPECT_THAT(response->headers(), ContainsHeader("x-new-header_1", "new_1"));
 }
 
+// When FULL_DUPLEX_STREAMED body mode is used with a retry policy, the upstream
+// must receive the request body exactly once.
+TEST_P(ExtProcIntegrationTest, FullDuplexStreamedNoDuplicateBodyOnRetry) {
+  // Enable retry policy on the route.
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+    auto* retry_policy = route->mutable_retry_policy();
+    retry_policy->set_retry_on("5xx");
+    retry_policy->mutable_num_retries()->set_value(1);
+  });
+
+  const std::string body_sent = "hello world";
+  // Send body with end_of_stream=false, then send trailers separately.
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, false);
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-test-trailer", "yes"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  // ext_proc server receives request headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request);
+
+  // ext_proc server receives request body chunks and loop until trailer seen.
+  std::string body_received;
+  uint32_t total_req_body_msg = 0;
+  bool trailer_seen = false;
+  while (!trailer_seen) {
+    ProcessingRequest req;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, req));
+    if (req.has_request_trailers()) {
+      trailer_seen = true;
+    } else {
+      ASSERT_TRUE(req.has_request_body());
+      absl::StrAppend(&body_received, req.request_body().body());
+      total_req_body_msg++;
+    }
+  }
+  EXPECT_GT(total_req_body_msg, 0);
+  EXPECT_EQ(body_received, body_sent);
+
+  // ext_proc server sends back header response, body responses, then trailer response.
+  serverSendHeaderResp();
+  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_, false, false, body_sent);
+  serverSendTrailerRespDuplexStreamed(processor_stream_);
+
+  // First upstream attempt, return 503 to trigger retry.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Verify upstream received the body exactly once.
+  const std::string expected_body = [&]() {
+    std::string s;
+    for (uint32_t i = 0; i < total_req_body_msg; ++i) {
+      s += body_sent;
+    }
+    return s;
+  }();
+  EXPECT_EQ(upstream_request_->body().toString(), expected_body);
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+
+  // Second upstream attempt after retry, body must arrive exactly once again.
+  FakeStreamPtr upstream_request2;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
+  ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ(upstream_request2->body().toString(), expected_body);
+
+  upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, ModeOverrideEmptyBodyBeforeHeadersResponse) {
   // Set default mode to STREAMED for request body.
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
