@@ -23,10 +23,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "header_forwarding_utils_lib",
+    srcs = ["header_forwarding_utils.cc"],
+    hdrs = ["header_forwarding_utils.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//source/common/common:matchers_lib",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_config_lib",
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
+        ":header_forwarding_utils_lib",
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",

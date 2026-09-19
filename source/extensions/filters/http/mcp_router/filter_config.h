@@ -11,6 +11,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/extensions/filters/http/mcp_router/header_forwarding_utils.h"
+
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -27,6 +29,7 @@ struct McpBackendConfig {
   std::string path;
   std::chrono::milliseconds timeout{5000};
   std::string host_rewrite_literal;
+  HeaderForwardingPolicy header_forwarding;
 };
 
 // Subject extraction from request header.
