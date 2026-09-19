@@ -224,9 +224,6 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
         spiffe_data_->ca_certs_.push_back(bssl::UniquePtr<X509>(item->x509));
         X509_up_ref(item->x509);
         if (!ca_loaded) {
-          // TODO: With the current interface, we cannot return the multiple
-          // cert information on getCaCertInformation method.
-          // So temporarily we return the first CA's info here.
           ca_loaded = true;
           ca_file_name_ = absl::StrCat(domain.name(), ": ",
                                        domain.trust_bundle().filename().empty()
@@ -544,15 +541,13 @@ std::optional<uint32_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
   return ret;
 }
 
-Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const {
+std::vector<Envoy::Ssl::CertificateDetailsPtr> SPIFFEValidator::getCaCertInformation() const {
   auto spiffe_data = getSpiffeData();
-  if (spiffe_data->ca_certs_.empty()) {
-    return nullptr;
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> ca_details;
+  for (const auto& cert : spiffe_data->ca_certs_) {
+    ca_details.push_back(Utility::certificateDetails(cert.get(), getCaFileName(), time_source_));
   }
-  // TODO(mathetake): With the current interface, we cannot pass the multiple cert information.
-  // So temporarily we return the first CA's info here.
-  return Utility::certificateDetails(spiffe_data->ca_certs_[0].get(), getCaFileName(),
-                                     time_source_);
+  return ca_details;
 };
 
 class SPIFFEValidatorFactory : public CertValidatorFactory {

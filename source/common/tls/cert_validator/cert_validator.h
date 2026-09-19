@@ -117,7 +117,7 @@ public:
 
   virtual std::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
   virtual std::string getCaFileName() const PURE;
-  virtual Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const PURE;
+  virtual std::vector<Envoy::Ssl::CertificateDetailsPtr> getCaCertInformation() const PURE;
 };
 
 using CertValidatorPtr = std::unique_ptr<CertValidator>;
