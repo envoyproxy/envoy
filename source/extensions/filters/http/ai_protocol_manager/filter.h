@@ -213,16 +213,23 @@ private:
   // Sets endStream on decode_manager_ and executes the AI filter chain or replays the body.
   void finalizeDecode(bool has_trailers);
 
+  // Invoked when the SSE response filter pipeline completes or fails.
+  void onEncodeComplete(absl::Status status);
+
   ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
 
-  // Declared before decode_manager_ so it outlives the manager that references it.
+  // Declared before decode_manager_, encode_manager_, and filter_manager_ so they outlive the
+  // managers and coroutines that reference them.
   FilterChainBridgePtr decode_bridge_;
 
   // Non-null exactly when decodeHeaders() decided to inspect this stream, so it
   // doubles as the engaged flag. Outlives request_parser_, which is released as
   // soon as parsing is done with.
   BufferManagerPtr decode_manager_;
+
+  FilterChainBridgePtr encode_bridge_;
+  BufferManagerPtr encode_manager_;
 
   // Copied out of the route configuration rather than held by pointer: the route
   // can be re-resolved mid-stream, which would leave a cached pointer dangling,
@@ -244,9 +251,12 @@ private:
   // FilterManager orchestrating the AI filter chain.
   std::unique_ptr<FilterManager> filter_manager_;
 
-  // Encode-path (response token-usage) state.
+  // Encode-path state.
   ResponseHandlerPtr response_handler_;
   bool response_finalized_{false};
+  bool encode_input_ended_{false};
+  bool encode_has_trailers_{false};
+  bool encode_rejected_{false};
 };
 
 } // namespace AiProtocolManager

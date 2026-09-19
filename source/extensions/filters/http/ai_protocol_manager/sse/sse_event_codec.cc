@@ -343,7 +343,7 @@ void SseEventDecoder::finishFrame(std::vector<SseEventPtr>& out,
     bool keeps_references = false;
     if (json_parser_ != nullptr && json_parser_->feed("", true).ok()) {
       keeps_references = json_parser_->hasExternalRefs();
-      event->set_json(json_parser_->takeDocument());
+      event->set_json(json_parser_->takeDocument(), payload_len_);
     } else if (in_memory != nullptr) {
       // Not JSON, and small enough that it never left memory: hand the bytes to the event.
       auto raw = std::make_unique<Buffer::OwnedImpl>();

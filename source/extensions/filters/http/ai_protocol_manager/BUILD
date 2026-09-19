@@ -187,6 +187,69 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ai_response_lib",
+    hdrs = ["ai_response.h"],
+    deps = [
+        "//source/common/coroutine:task_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "task_group_lib",
+    hdrs = ["task_group.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_pipeline_lib",
+    hdrs = ["filter_pipeline.h"],
+    deps = [
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "response_filter_manager_lib",
+    srcs = ["response_filter_manager.cc"],
+    hdrs = ["response_filter_manager.h"],
+    deps = [
+        ":ai_filter_lib",
+        ":ai_response_lib",
+        ":buffer_manager_lib",
+        ":external_buffer_interface",
+        ":filter_pipeline_lib",
+        ":task_group_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_codec_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:variant",
+    ],
+)
+
+envoy_cc_library(
     name = "replay_awaitable_lib",
     hdrs = ["replay_awaitable.h"],
     deps = [
@@ -225,6 +288,7 @@ envoy_cc_library(
     hdrs = ["ai_filter.h"],
     deps = [
         ":ai_request_lib",
+        ":ai_response_lib",
         ":token_usage_lib",
         "//envoy/common:pure_lib",
         "//envoy/config:typed_config_interface",
@@ -243,29 +307,49 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filter_manager_lib",
-    srcs = ["filter_manager.cc"],
-    hdrs = ["filter_manager.h"],
+    name = "request_filter_manager_lib",
+    srcs = ["request_filter_manager.cc"],
+    hdrs = ["request_filter_manager.h"],
     deps = [
         ":ai_filter_lib",
         ":ai_request_lib",
         ":buffer_manager_lib",
+        ":filter_pipeline_lib",
         ":json_with_ext_buf_lib",
         ":serializer_lib",
+        ":task_group_lib",
+        "//envoy/event:dispatcher_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
-        "//source/common/coroutine:async_queue_lib",
-        "//source/common/coroutine:dispatcher_executor_lib",
-        "//source/common/coroutine:launch_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_manager_lib",
+    srcs = ["filter_manager.cc"],
+    hdrs = ["filter_manager.h"],
+    deps = [
+        ":ai_filter_lib",
+        ":buffer_manager_lib",
+        ":external_buffer_interface",
+        ":json_with_ext_buf_lib",
+        ":request_filter_manager_lib",
+        ":response_filter_manager_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
     ],
 )
 

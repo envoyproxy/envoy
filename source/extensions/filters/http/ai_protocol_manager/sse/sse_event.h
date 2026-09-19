@@ -182,8 +182,9 @@ public:
   // Adopts `json` as the frame's payload, marking it JSON-valued. Exactly one of json(),
   // raw_data() and raw_data_ext_refs() is ever populated, so a serializer can switch on is_json()
   // and the refs' emptiness without ambiguity.
-  void set_json(JsonWithExtBuf json) {
+  void set_json(JsonWithExtBuf json, uint64_t payload_bytes = 0) {
     json_ = std::move(json);
+    json_payload_bytes_ = payload_bytes;
     is_json_ = true;
     has_data_ = true;
     raw_data_->drain(raw_data_->length());
@@ -217,6 +218,7 @@ public:
   }
   void set_raw_data_ext_refs(std::vector<JsonWithExtBuf::ExternalRef> refs) {
     raw_data_ext_refs_ = std::move(refs);
+    json_payload_bytes_ = 0;
     is_json_ = false;
     has_data_ = true;
   }
@@ -252,12 +254,32 @@ public:
   // Convenience helper returning true when termination() == Termination::BlankLine.
   bool blank_line_terminated() const { return termination_ == Termination::BlankLine; }
 
+  // Estimated byte size of this event for watermark accounting.
+  uint64_t byteSize() const {
+    uint64_t size = sizeof(SseEvent);
+    for (const auto& field : metadata_) {
+      size += sizeof(MetadataField) + field.value.size();
+    }
+    if (extras_store_ != nullptr) {
+      size += extras_store_->length();
+    }
+    if (payload_store_ != nullptr) {
+      size += payload_store_->length();
+    } else if (!is_json_) {
+      size += raw_data_->length();
+    } else {
+      size += json_payload_bytes_;
+    }
+    return size;
+  }
+
 private:
   std::vector<MetadataField> metadata_;
   bool has_data_{false};
   bool is_json_{false};
   Termination termination_{Termination::BlankLine};
   JsonWithExtBuf json_;
+  uint64_t json_payload_bytes_{0};
   // Never null; replaced wholesale by set_raw_data().
   Buffer::InstancePtr raw_data_;
   std::vector<JsonWithExtBuf::ExternalRef> raw_data_ext_refs_;
