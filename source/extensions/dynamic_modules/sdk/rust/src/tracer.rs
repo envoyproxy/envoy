@@ -87,7 +87,10 @@ impl TracerConfigContext {
     name: &str,
     label_names: &[&str],
   ) -> Result<TracerCounterVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_names: Vec<_> = label_names.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_counter(
@@ -129,7 +132,10 @@ impl TracerConfigContext {
     name: &str,
     label_names: &[&str],
   ) -> Result<TracerGaugeVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_names: Vec<_> = label_names.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_gauge(
@@ -171,7 +177,10 @@ impl TracerConfigContext {
     name: &str,
     label_names: &[&str],
   ) -> Result<TracerHistogramVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_names: Vec<_> = label_names.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_histogram(
@@ -209,7 +218,10 @@ impl TracerConfigContext {
     label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_values: Vec<_> = label_values.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_increment_counter(
         self.envoy_ptr,
@@ -245,7 +257,10 @@ impl TracerConfigContext {
     label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_values: Vec<_> = label_values.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_set_gauge(
         self.envoy_ptr,
@@ -281,7 +296,10 @@ impl TracerConfigContext {
     label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_values: Vec<_> = label_values.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_record_histogram_value(
         self.envoy_ptr,
