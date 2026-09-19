@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.extensions.queue_policy.adaptive_lifo.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.queue_policy.adaptive_lifo.v3";
+option java_outer_classname = "AdaptiveLifoProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/queue_policy/adaptive_lifo/v3;adaptive_lifov3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Adaptive LIFO Queue Policy]
+// [#extension: envoy.queue_policy.adaptive_lifo]
+
+// Configuration for the adaptive LIFO pending requests queue policy. Requests are dequeued in
+// FIFO order while the queue size is below the configured threshold. When the queue size reaches
+// the threshold, requests are dequeued in LIFO order until the queue size falls below it again.
+message AdaptiveLifoQueuePolicyConfig {
+  // Number of pending requests at which the queue switches from FIFO to LIFO ordering.
+  uint32 lifo_switch_threshold = 1 [(validate.rules).uint32 = {gt: 0}];
+}
