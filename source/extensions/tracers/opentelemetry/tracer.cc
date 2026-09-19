@@ -102,8 +102,14 @@ void Span::finishSpan() {
     flags |= TraceFlagsSampledMask;
   }
   span_.set_flags(flags);
+  ENVOY_LOG(debug, "Span finished: name={}, trace_id={}, span_id={}, sampled={}, duration_us={}",
+            span_.name(), getTraceId(), getSpanId(), sampled(),
+            (span_.end_time_unix_nano() - span_.start_time_unix_nano()) / 1000);
   if (sampled()) {
     parent_tracer_.sendSpan(span_);
+  } else {
+    ENVOY_LOG(debug, "Span not sampled, skipping export: trace_id={}, span_id={}", getTraceId(),
+              getSpanId());
   }
 }
 
@@ -292,9 +298,11 @@ void Tracer::flushSpans() {
     (*scope_span->add_spans()) = pending_span;
   }
   tracing_stats_.spans_sent_.add(span_buffer_.size());
+  ENVOY_LOG(debug, "Exporting {} span(s) to OpenTelemetry trace collector", span_buffer_.size());
   if (!exporter_->log(request)) {
     // TODO: should there be any sort of retry or reporting here?
-    ENVOY_LOG(trace, "Unsuccessful log request to OpenTelemetry trace collector.");
+    ENVOY_LOG(warn, "Unsuccessful log request to OpenTelemetry trace collector; {} span(s) lost",
+              span_buffer_.size());
   }
   span_buffer_.clear();
 }
@@ -312,6 +320,8 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
   span_buffer_.push_back(span);
   const uint64_t min_flush_spans =
       runtime_.snapshot().getInteger("tracing.opentelemetry.min_flush_spans", 5U);
+  ENVOY_LOG(debug, "Span buffered for export: name={}, buffered={}, min_flush_spans={}",
+            span.name(), span_buffer_.size(), min_flush_spans);
   if (span_buffer_.size() >= min_flush_spans) {
     flushSpans();
   }
@@ -340,6 +350,11 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   } else {
     new_span->setSampled(tracing_decision.traced);
   }
+  ENVOY_LOG(debug,
+            "Span created (new trace): name={}, trace_id={}, span_id={}, kind={}, sampled={}, "
+            "sampler={}",
+            operation_name, new_span->getTraceId(), new_span->getSpanId(),
+            static_cast<int>(span_kind), new_span->sampled(), sampler_ ? "custom" : "local");
   return new_span;
 }
 
@@ -372,6 +387,12 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
       new_span->setTracestate(parent_context.tracestate());
     }
   }
+  ENVOY_LOG(debug,
+            "Span created (from parent context): name={}, trace_id={}, span_id={}, "
+            "parent_span_id={}, parent_is_remote={}, kind={}, sampled={}, sampler={}",
+            operation_name, new_span->getTraceId(), new_span->getSpanId(), parent_context.spanId(),
+            parent_context.isRemote(), static_cast<int>(span_kind), new_span->sampled(),
+            sampler_ ? "custom" : "local");
   return new_span;
 }
 
