@@ -35,6 +35,8 @@ protected:
   };
 
   AdminStreamingTest() : AdminRequestTestBase(Network::Address::IpVersion::v4) {
+    addArg("--config-yaml");
+    addArg("admin: {allow_paths: [{exact: '/stats?format=prometheus'}]}");
     startEnvoy();
     started_.WaitForNotification();
     Server::Admin& admin = *main_common_->server()->admin();
@@ -156,6 +158,51 @@ TEST_F(AdminStreamingTest, RequestGetStatsAndQuit) {
   EXPECT_EQ(Http::Code::OK, response_data.code_);
   EXPECT_EQ("text/plain; charset=UTF-8", response_data.content_type_);
   EXPECT_TRUE(quitAndWait());
+}
+
+TEST_F(AdminStreamingTest, CompletedPrometheusResponseCanOutliveServer) {
+  auto response = streamingResponse("/stats?format=prometheus");
+  const auto data = runStreamingRequest(response);
+  EXPECT_EQ(Http::Code::OK, data.code_);
+  EXPECT_GT(data.num_bytes_, 0);
+
+  // Keep the response alive until after the server and its stats store are destroyed.
+  EXPECT_TRUE(quitAndWait());
+  response.reset();
+}
+
+TEST_F(AdminStreamingTest, UnreadPrometheusResponseCanOutliveServer) {
+  auto response = streamingResponse("/stats?format=prometheus");
+  absl::Notification headers_notify;
+  response->getHeaders([&headers_notify](Http::Code code, Http::ResponseHeaderMap&) {
+    EXPECT_EQ(Http::Code::OK, code);
+    headers_notify.Notify();
+  });
+  headers_notify.WaitForNotification();
+
+  EXPECT_TRUE(quitAndWait());
+  bool chunk_called = false;
+  response->nextChunk([&chunk_called](Buffer::Instance& chunk, bool more) {
+    EXPECT_EQ(0, chunk.length());
+    EXPECT_FALSE(more);
+    chunk_called = true;
+  });
+  EXPECT_TRUE(chunk_called);
+  response.reset();
+}
+
+TEST_F(AdminStreamingTest, CancelledPrometheusResponseCanOutliveServer) {
+  auto response = streamingResponse("/stats?format=prometheus");
+  absl::Notification headers_notify;
+  response->getHeaders([&headers_notify](Http::Code code, Http::ResponseHeaderMap&) {
+    EXPECT_EQ(Http::Code::OK, code);
+    headers_notify.Notify();
+  });
+  headers_notify.WaitForNotification();
+  response->cancel();
+
+  EXPECT_TRUE(quitAndWait());
+  response.reset();
 }
 
 TEST_F(AdminStreamingTest, RequestForNotAllowedPath) {

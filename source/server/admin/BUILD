@@ -222,6 +222,7 @@ envoy_cc_library(
     deps = [
         ":stats_params_lib",
         ":utils_lib",
+        "//envoy/server:admin_interface",
         "//envoy/stats:custom_stat_namespaces_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/stats:histogram_lib",

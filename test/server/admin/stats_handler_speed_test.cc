@@ -5,12 +5,14 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/common/stats/thread_local_store.h"
+#include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/stats_handler.h"
 
 #include "test/benchmark/main.h"
 #include "test/common/stats/real_thread_test_base.h"
 #include "test/mocks/upstream/cluster_manager.h"
 
+#include "absl/synchronization/notification.h"
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -198,16 +200,25 @@ public:
   /**
    * Issues an admin request against the stats saved in store_.
    */
-  uint64_t handlerStats(const StatsParams& params) {
+  uint64_t handlerStats(const StatsParams& params, bool buffered_prometheus = false) {
     Buffer::OwnedImpl data;
     auto request_headers = Http::RequestHeaderMapImpl::create();
     auto response_headers = Http::ResponseHeaderMapImpl::create();
-    if (params.format_ == StatsFormat::Prometheus) {
+    if (params.format_ == StatsFormat::Prometheus &&
+        (buffered_prometheus ||
+         PrometheusStatsFormatter::useProtobufFormat(params, *request_headers))) {
       StatsHandler::prometheusRender(*store_, custom_namespaces_, cm_, params, *request_headers,
                                      *response_headers, data);
       return data.length();
     }
-    Admin::RequestPtr request = StatsHandler::makeRequest(*store_, params, cm_);
+    Admin::RequestPtr request =
+        params.format_ == StatsFormat::Prometheus
+            ? PrometheusStatsFormatter::makeTextRequest(
+                  store_->counters(), store_->gauges(), store_->histograms(),
+                  params.prometheus_text_readouts_ ? store_->textReadouts()
+                                                   : std::vector<Stats::TextReadoutSharedPtr>{},
+                  cm_, params, custom_namespaces_)
+            : StatsHandler::makeRequest(*store_, params, cm_);
     request->start(*response_headers);
     uint64_t count = 0;
     bool more = true;
@@ -225,6 +236,111 @@ public:
   bool endpoint_stats_initialized_{false};
 };
 
+// Unlike the existing many-family fixture, these benchmarks put all labeled instances in one
+// family per stat type. Run each mode in a separate process when measuring peak memory.
+class PrometheusCardinalityFixture : public Stats::ThreadLocalRealThreadsMixin {
+public:
+  PrometheusCardinalityFixture(uint64_t counters, uint64_t histograms)
+      : ThreadLocalRealThreadsMixin(1), counter_instances_(counters),
+        histogram_instances_(histograms) {
+    absl::Notification merged;
+    runOnMainBlocking([&]() {
+      Stats::StatNameTagVector tags{
+          {makeStatName("instance"), {}},
+          {makeStatName("service"), makeStatName("example_service")},
+          {makeStatName("method"), makeStatName("GET")},
+          {makeStatName("route"), makeStatName("/api/v1/resources/{resource_id}/operations")}};
+      for (const bool histograms : {false, true}) {
+        const auto family = makeStatName(histograms ? "benchmark.request_duration_ms"
+                                                    : "benchmark.requests_completed");
+        const uint64_t instances = histograms ? histogram_instances_ : counter_instances_;
+        for (uint64_t i = 0; i < instances; ++i) {
+          Stats::StatNameManagedStorage instance(fmt::format("{:07d}", i), symbol_table_);
+          tags[0].second = instance.statName();
+          if (histograms) {
+            auto& histogram = scope_.histogramFromTaggedName(
+                family, Stats::StatNameTagSpan(tags), {}, Stats::Histogram::Unit::Milliseconds);
+            for (const uint64_t value : {1, 5, 20, 50, 100, 500, 1000, 5000}) {
+              histogram.recordValue(value + i % 7);
+            }
+          } else {
+            scope_.counterFromTaggedName(family, Stats::StatNameTagSpan(tags), {})
+                .add(1 + i % 1000);
+          }
+        }
+      }
+      store_->mergeHistograms([&]() { merged.Notify(); });
+    });
+    merged.WaitForNotification();
+    if (histogram_instances_ != 0) {
+      finite_buckets_ =
+          store_->histograms().front()->cumulativeStatistics().supportedBuckets().size();
+    }
+  }
+
+  // This checksum is independent of chunk boundaries and is only for output comparison.
+  // Computing it in a separate untimed render avoids charging hashing to serialization time.
+  struct OutputDigest {
+    uint64_t bytes_{0};
+    uint64_t checksum_{14695981039346656037ULL};
+
+    void consume(Buffer::Instance& buffer) {
+      bytes_ += buffer.length();
+      while (buffer.length() != 0) {
+        const auto slice = buffer.frontSlice();
+        const auto* data = static_cast<const uint8_t*>(slice.mem_);
+        for (size_t i = 0; i < slice.len_; ++i) {
+          checksum_ = (checksum_ ^ data[i]) * 1099511628211ULL;
+        }
+        buffer.drain(slice.len_);
+      }
+    }
+  };
+
+  uint64_t render(bool buffered, OutputDigest* digest = nullptr) {
+    StatsParams params;
+    params.format_ = StatsFormat::Prometheus;
+    Buffer::OwnedImpl data;
+    if (buffered) {
+      PrometheusStatsFormatter::statsAsPrometheusText(store_->counters(), {}, store_->histograms(),
+                                                      {}, cm_, data, params, custom_namespaces_);
+      const uint64_t bytes = data.length();
+      if (digest != nullptr) {
+        digest->consume(data);
+      }
+      return bytes;
+    }
+    auto request = PrometheusStatsFormatter::makeTextRequest(
+        store_->counters(), {}, store_->histograms(), {}, cm_, params, custom_namespaces_);
+    auto headers = Http::ResponseHeaderMapImpl::create();
+    RELEASE_ASSERT(request->start(*headers) == Http::Code::OK, "unexpected response status");
+    uint64_t bytes = 0;
+    bool more;
+    do {
+      more = request->nextChunk(data);
+      RELEASE_ASSERT(data.length() <= 64 * 1024, "response chunk exceeded budget");
+      bytes += data.length();
+      if (digest != nullptr) {
+        digest->consume(data);
+      } else {
+        data.drain(data.length());
+      }
+    } while (more);
+    return bytes;
+  }
+
+  uint64_t exportedSeries() const {
+    // Classic histograms export finite buckets, the +Inf bucket, sum, and count.
+    return counter_instances_ + histogram_instances_ * (finite_buckets_ + 3);
+  }
+
+  const uint64_t counter_instances_;
+  const uint64_t histogram_instances_;
+  uint64_t finite_buckets_{0};
+  Stats::CustomStatNamespacesImpl custom_namespaces_;
+  FastMockClusterManager cm_;
+};
+
 } // namespace Server
 } // namespace Envoy
 
@@ -238,6 +354,59 @@ Envoy::Server::StatsHandlerTest& testContext(bool per_endpoint_enabled) {
   context.setPerEndpointStats(per_endpoint_enabled);
   return context;
 }
+
+static void bmPrometheusCardinality(benchmark::State& state, bool buffered) {
+  const uint64_t counters = state.range(0);
+  const uint64_t histograms = state.range(1);
+  if (Envoy::benchmark::skipExpensiveBenchmarks() && (counters > 100 || histograms > 10)) {
+    state.SkipWithMessage("large cardinality fixture skipped in smoke tests");
+    return;
+  }
+  Envoy::Event::Libevent::Global::initialize();
+  // Construction, histogram merging, validation, and destruction are outside the timed loop.
+  Envoy::Server::PrometheusCardinalityFixture fixture(counters, histograms);
+  uint64_t bytes = 0;
+  for (auto _ : state) { // NOLINT
+    bytes = fixture.render(buffered);
+    benchmark::DoNotOptimize(bytes);
+  }
+  Envoy::Server::PrometheusCardinalityFixture::OutputDigest digest;
+  fixture.render(buffered, &digest);
+  RELEASE_ASSERT(digest.bytes_ == bytes, "output length changed between renders");
+  state.counters["families"] = (counters != 0 ? 1 : 0) + (histograms != 0 ? 1 : 0);
+  state.counters["counter_instances"] = counters;
+  state.counters["histogram_instances"] = histograms;
+  state.counters["finite_buckets_per_histogram"] = fixture.finite_buckets_;
+  state.counters["exported_series"] = fixture.exportedSeries();
+  state.counters["output_bytes"] = bytes;
+  state.SetBytesProcessed(state.iterations() * bytes);
+  state.SetLabel(fmt::format("fnv1a64={:016x}", digest.checksum_));
+}
+
+BENCHMARK_CAPTURE(bmPrometheusCardinality, buffered, true)
+    ->ArgNames({"counters", "histograms"})
+    ->Args({100, 10})
+    ->Args({1000000, 0})
+    ->Args({2000000, 0})
+    ->Args({3000000, 0})
+    ->Args({0, 10000})
+    ->Args({0, 50000})
+    ->Args({0, 500000})
+    ->Args({3000000, 500000})
+    ->Iterations(1)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(bmPrometheusCardinality, streaming, false)
+    ->ArgNames({"counters", "histograms"})
+    ->Args({100, 10})
+    ->Args({1000000, 0})
+    ->Args({2000000, 0})
+    ->Args({3000000, 0})
+    ->Args({0, 10000})
+    ->Args({0, 50000})
+    ->Args({0, 500000})
+    ->Args({3000000, 500000})
+    ->Iterations(1)
+    ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AllCountersText(benchmark::State& state, bool per_endpoint_stats) {
@@ -370,7 +539,8 @@ BENCHMARK_CAPTURE(BM_FilteredCountersJson, per_endpoint_stats_enabled, true)
     ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_AllCountersPrometheus(benchmark::State& state, bool per_endpoint_stats) {
+static void BM_AllCountersPrometheus(benchmark::State& state, bool per_endpoint_stats,
+                                     bool buffered_prometheus) {
   Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
@@ -378,16 +548,20 @@ static void BM_AllCountersPrometheus(benchmark::State& state, bool per_endpoint_
 
   uint64_t count;
   for (auto _ : state) { // NOLINT
-    count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params, buffered_prometheus);
     RELEASE_ASSERT(count > 250 * 1000 * 1000, "expected count > 250M"); // actual = 261,578,000
   }
 
   auto label = absl::StrCat("output per iteration: ", count);
   state.SetLabel(label);
 }
-BENCHMARK_CAPTURE(BM_AllCountersPrometheus, per_endpoint_stats_disabled, false)
+BENCHMARK_CAPTURE(BM_AllCountersPrometheus, streaming_per_endpoint_stats_disabled, false, false)
     ->Unit(benchmark::kMillisecond);
-BENCHMARK_CAPTURE(BM_AllCountersPrometheus, per_endpoint_stats_enabled, true)
+BENCHMARK_CAPTURE(BM_AllCountersPrometheus, streaming_per_endpoint_stats_enabled, true, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_AllCountersPrometheus, buffered_per_endpoint_stats_disabled, false, true)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_AllCountersPrometheus, buffered_per_endpoint_stats_enabled, true, true)
     ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
