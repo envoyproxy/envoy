@@ -4,11 +4,12 @@
 
 #include "envoy/data/ai/v3/request_info.pb.h"
 
-#include "source/common/coroutine/status_macros.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_conversion.h"
 #include "source/extensions/http/ai_filters/request_info/extractor.h"
 
+#include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -17,9 +18,7 @@ namespace AiFilters {
 namespace RequestInfo {
 
 using HttpFilters::AiProtocolManager::AiFilterContext;
-using HttpFilters::AiProtocolManager::AiRequestPropagator;
-using HttpFilters::AiProtocolManager::AiRequestPtr;
-using HttpFilters::AiProtocolManager::AiRequestReceiver;
+using HttpFilters::AiProtocolManager::AiRequest;
 using HttpFilters::AiProtocolManager::LocalReplier;
 
 namespace {
@@ -59,12 +58,9 @@ RequestInfoFilter::RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
                                      const AiFilterContext& context)
     : config_(std::move(config)), context_(context) {}
 
-Coroutine::Task<absl::Status> RequestInfoFilter::decode(AiRequestReceiver receive_request,
-                                                        AiRequestPropagator propagate_request,
-                                                        LocalReplier) {
-  ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
-  publish(request->json());
-  co_return co_await std::move(propagate_request)(std::move(request));
+absl::Status RequestInfoFilter::decodeSync(AiRequest& request, LocalReplier) {
+  publish(request.json());
+  return absl::OkStatus();
 }
 
 void RequestInfoFilter::publish(const nlohmann::json& json) {
