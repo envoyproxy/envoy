@@ -41,6 +41,7 @@ constexpr absl::string_view MCP_VERSION_2025_06_18 = "2025-06-18";
 constexpr absl::string_view MCP_VERSION_2025_11_25 = "2025-11-25";
 constexpr absl::string_view MCP_VERSION_2026_07_28 = "2026-07-28";
 constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
+constexpr absl::string_view PROTOCOL_VERSION_META_KEY = "io.modelcontextprotocol/protocolVersion";
 constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
 constexpr absl::string_view TOOLS_FIELD = "tools";
 constexpr absl::string_view LIST_CHANGED_FIELD = "listChanged";
