@@ -56,9 +56,12 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
 
   if (!credentials.hasCredentials()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
-    // This behavior matches what the AWS SDK would do.
+    // This behavior matches what the AWS SDK would do, so the request is still forwarded, just
+    // unsigned. FailedPrecondition is returned rather than OK so that callers can tell this apart
+    // from a request that really was signed - it is not a request failure and must not be treated
+    // as one.
     ENVOY_LOG(debug, "Sign exiting early - no credentials found");
-    return absl::OkStatus();
+    return absl::FailedPreconditionError(std::string(SignatureConstants::NoCredentialsMessage));
   }
 
   if (headers.Method() == nullptr) {

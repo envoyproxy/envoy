@@ -166,14 +166,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 }
 
+void Filter::logSigningStatus(const absl::Status& status) const {
+  if (status.ok()) {
+    return;
+  }
+  if (absl::IsFailedPrecondition(status)) {
+    // No credentials were available, so the request is forwarded unsigned on purpose.
+    ENVOY_LOG(debug, "signing skipped: {}", status.message());
+    return;
+  }
+  ENVOY_LOG(debug, "signing failed: {}", status.message());
+}
+
 void Filter::continueDecodeHeaders(FilterSettings& settings) {
   if (settings.payloadPassthrough()) {
     setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(),
                      settings.hostRewrite());
-    auto status = settings.signer().signEmptyPayload(*request_headers_, settings.arn().region());
-    if (!status.ok()) {
-      ENVOY_LOG(debug, "signing failed: {}", status.message());
-    }
+    logSigningStatus(
+        settings.signer().signEmptyPayload(*request_headers_, settings.arn().region()));
     return;
   }
 
@@ -188,10 +198,7 @@ void Filter::continueDecodeHeaders(FilterSettings& settings) {
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hash = Hex::encode(hashing_util.getSha256Digest(json_buf));
 
-  auto status = settings.signer().sign(*request_headers_, hash, settings.arn().region());
-  if (!status.ok()) {
-    ENVOY_LOG(debug, "signing failed: {}", status.message());
-  }
+  logSigningStatus(settings.signer().sign(*request_headers_, hash, settings.arn().region()));
   decoder_callbacks_->addDecodedData(json_buf, false);
 }
 
@@ -275,10 +282,7 @@ void Filter::continueDecodeData(FilterSettings& settings) {
 
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
 
-  auto status = settings.signer().sign(*request_headers_, hash, settings.arn().region());
-  if (!status.ok()) {
-    ENVOY_LOG(debug, "signing failed: {}", status.message());
-  }
+  logSigningStatus(settings.signer().sign(*request_headers_, hash, settings.arn().region()));
   stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());
 }
 

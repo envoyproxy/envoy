@@ -21,8 +21,10 @@ namespace AwsRequestSigningFilter {
 #define ALL_AWS_REQUEST_SIGNING_FILTER_STATS(COUNTER)                                              \
   COUNTER(signing_added)                                                                           \
   COUNTER(signing_failed)                                                                          \
+  COUNTER(signing_skipped)                                                                         \
   COUNTER(payload_signing_added)                                                                   \
-  COUNTER(payload_signing_failed)
+  COUNTER(payload_signing_failed)                                                                  \
+  COUNTER(payload_signing_skipped)
 // clang-format on
 
 /**

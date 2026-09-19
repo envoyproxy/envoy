@@ -5,6 +5,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -85,6 +86,15 @@ void Filter::continueDecodeHeaders(FilterConfig& config) {
 void Filter::addSigningStats(FilterConfig& config, absl::Status status) const {
   if (status.ok()) {
     config.stats().signing_added_.inc();
+  } else if (absl::IsFailedPrecondition(status)) {
+    // No credentials were available, so the request is forwarded unsigned on purpose. This is
+    // neither a success nor a failure, so it gets a counter of its own.
+    ENVOY_LOG(debug, "signing skipped: {}", status.message());
+    config.stats().signing_skipped_.inc();
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.aws_request_signing_count_skipped_separately")) {
+      config.stats().signing_added_.inc();
+    }
   } else {
     ENVOY_LOG(debug, "signing failed: {}", status.message());
     config.stats().signing_failed_.inc();
@@ -143,6 +153,12 @@ void Filter::continueDecodeData(FilterConfig& config, const std::string hash) {
 void Filter::addSigningPayloadStats(FilterConfig& config, absl::Status status) const {
   if (status.ok()) {
     config.stats().payload_signing_added_.inc();
+  } else if (absl::IsFailedPrecondition(status)) {
+    config.stats().payload_signing_skipped_.inc();
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.aws_request_signing_count_skipped_separately")) {
+      config.stats().payload_signing_added_.inc();
+    }
   } else {
     ENVOY_LOG(debug, "payload signing failed: {}", status.message());
     config.stats().payload_signing_failed_.inc();

@@ -47,6 +47,10 @@ public:
   static constexpr absl::string_view ShortDateFormat = "%Y%m%d";
   static constexpr absl::string_view UnsignedPayload = "UNSIGNED-PAYLOAD";
   static constexpr absl::string_view AuthorizationCredentialFormat = "{}/{}";
+  // Message accompanying the absl::FailedPreconditionError returned when the credentials provider
+  // chain resolves to nothing and the request is deliberately left unsigned.
+  static constexpr absl::string_view NoCredentialsMessage =
+      "no credentials available, request left unsigned";
 };
 
 using AwsSigningHeaderMatcherVector = std::vector<envoy::type::matcher::v3::StringMatcher>;

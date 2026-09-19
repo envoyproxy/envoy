@@ -10,6 +10,20 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
+/**
+ * Signs AWS requests.
+ *
+ * Note on the "no credentials" outcome: when the credentials source resolves to nothing, the
+ * signing methods deliberately leave the request unsigned rather than failing it, because
+ * anonymous requests are a valid use-case and this matches what the AWS SDK does. That outcome is
+ * reported as absl::FailedPreconditionError so that it stays distinguishable from a request that
+ * was actually signed and from a genuine signing error. It is not a request failure: callers that
+ * are happy to forward unsigned requests must not reject on it.
+ *
+ * The distinction cannot be recovered by inspecting the request afterwards - with query string
+ * signing the signature goes into the path rather than into an Authorization header, and an
+ * unsigned request may still carry an Authorization header supplied by the downstream client.
+ */
 class Signer {
 public:
   virtual ~Signer() = default;
@@ -20,6 +34,8 @@ public:
    * @param sign_body include the message body in the signature. The body must be fully buffered.
    * @param override_region override the default region that has to be used to sign the request
    * @return absl::Status::OK if the request was signed successfully.
+   * @return absl::FailedPreconditionError if no credentials were available. The request is
+   * deliberately left unsigned and is still safe to forward; see the note above.
    * @return absl::NotFoundError if credentials are pending.
    */
   virtual absl::Status sign(Http::RequestMessage& message, bool sign_body,
@@ -30,6 +46,8 @@ public:
    * @param headers AWS API request headers.
    * @param override_region override the default region that has to be used to sign the request
    * @return absl::Status::OK if the request was signed successfully.
+   * @return absl::FailedPreconditionError if no credentials were available. The request is
+   * deliberately left unsigned and is still safe to forward; see the note above.
    * @return absl::NotFoundError if credentials are pending.
    */
   virtual absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
@@ -40,6 +58,8 @@ public:
    * @param headers AWS API request headers.
    * @param override_region override the default region that has to be used to sign the request
    * @return absl::Status::OK if the request was signed successfully.
+   * @return absl::FailedPreconditionError if no credentials were available. The request is
+   * deliberately left unsigned and is still safe to forward; see the note above.
    * @return absl::NotFoundError if credentials are pending.
    */
   virtual absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
@@ -51,6 +71,8 @@ public:
    * @param content_hash The Hex encoded SHA-256 of the body of the AWS API request.
    * @param override_region override the default region that has to be used to sign the request
    * @return absl::Status::OK if the request was signed successfully.
+   * @return absl::FailedPreconditionError if no credentials were available. The request is
+   * deliberately left unsigned and is still safe to forward; see the note above.
    * @return absl::NotFoundError if credentials are pending.
    */
   virtual absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
