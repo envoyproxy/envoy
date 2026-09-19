@@ -33,6 +33,8 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(void, setEventLogger, (Upstream::HealthCheckEventLoggerPtr));
   MOCK_METHOD(Server::Configuration::ServerFactoryContext&, serverFactoryContext, ());
+  MOCK_METHOD(Stats::Scope&, statsScope, ());
+  MOCK_METHOD(Upstream::HealthFlagCallbacks, healthFlagCallbacks, (), (const));
 
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     if (!event_logger_) {
