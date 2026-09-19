@@ -1,14 +1,12 @@
 #include "source/extensions/geoip_providers/maxmind/geoip_provider.h"
 
-#include <algorithm>
+#include <iterator>
 #include <span>
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
-
-#include "absl/strings/escaping.h"
-#include "absl/strings/str_join.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -76,8 +74,8 @@ static constexpr absl::string_view DB_TYPE_NAMES[] = {CITY_DB_TYPE, ISP_DB_TYPE,
                                                       ASN_DB_TYPE, COUNTRY_DB_TYPE};
 static_assert(std::size(DB_TYPE_NAMES) == enumToInt(GeoDbType::Count));
 
-// Separator between the encoded database file paths that make up a DbFilesProvider key.
-static constexpr absl::string_view DB_FILE_PATHS_KEY_SEPARATOR = "|";
+// Tag naming the database file a stat describes.
+static constexpr absl::string_view DB_NAME_TAG = "db_name";
 
 // Helper to get optional string from config field, returns nullopt if empty.
 std::optional<std::string> getOptionalString(const std::string& value) {
@@ -138,13 +136,6 @@ void populateGeoLookupResults(const GeoipProviderConfig& config,
 
 absl::string_view dbTypeName(GeoDbType db_type) { return DB_TYPE_NAMES[enumToInt(db_type)]; }
 
-std::string DbFilePaths::key() const {
-  const auto encode = [](const std::string& db_path) { return absl::Base64Escape(db_path); };
-  return absl::StrJoin({encode(city_db_path_), encode(isp_db_path_), encode(anon_db_path_),
-                        encode(asn_db_path_), encode(country_db_path_)},
-                       DB_FILE_PATHS_KEY_SEPARATOR);
-}
-
 GeoipProviderConfig::GeoipProviderConfig(
     const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& config,
     const std::string& stat_prefix, Stats::Scope& scope)
@@ -204,66 +195,53 @@ void GeoipProviderConfig::incCounter(Stats::StatName name) {
   stats_scope_->counterFromStatName(name).inc();
 }
 
-DbFilesProvider::DbFilesProvider(Singleton::InstanceSharedPtr owner, Event::Dispatcher& dispatcher,
-                                 Stats::Scope& scope, const DbFilePaths& db_file_paths)
-    // The database files are shared by every provider that references them, so their stats are
-    // rooted at the server scope and carry no listener specific stat prefix.
-    : stats_scope_(scope.createScope("maxmind.")),
-      stat_name_set_(stats_scope_->symbolTable().makeSet("Maxmind")), owner_(std::move(owner)) {
-  // An empty path means that database is not configured.
-  db_set_[enumToInt(GeoDbType::City)] = !db_file_paths.city_db_path_.empty();
-  db_set_[enumToInt(GeoDbType::Isp)] = !db_file_paths.isp_db_path_.empty();
-  db_set_[enumToInt(GeoDbType::Anon)] = !db_file_paths.anon_db_path_.empty();
-  db_set_[enumToInt(GeoDbType::Asn)] = !db_file_paths.asn_db_path_.empty();
-  db_set_[enumToInt(GeoDbType::Country)] = !db_file_paths.country_db_path_.empty();
+namespace {
 
-  if (std::none_of(db_set_.begin(), db_set_.end(), [](bool db_set) { return db_set; })) {
-    throw EnvoyException("At least one geolocation database path needs to be configured: "
-                         "city_db_path, isp_db_path, asn_db_path, anon_db_path or country_db_path");
-  }
+// Stats for one database file, named ``<db_type>.<stat>`` within the provider singleton's
+// ``maxmind.`` scope, with a ``db_name`` tag naming the file. The tag value is interleaved into
+// the flat name so that two files of the same type keep separate stats.
+DbFileStats generateDbFileStats(Stats::Scope& scope, GeoDbType db_type,
+                                const std::string& db_path) {
+  const std::string db_name = Stats::Utility::sanitizeStatsName(db_path);
+  const absl::string_view base_prefix = dbTypeName(db_type);
+  const Stats::TaggedStatName prefix(scope.symbolTable(), base_prefix, {{DB_NAME_TAG, db_name}},
+                                     absl::StrCat(base_prefix, ".", db_name));
+  return {ALL_MAXMIND_DB_FILE_STATS(POOL_COUNTER_TAGGED(scope, prefix),
+                                    POOL_GAUGE_TAGGED(scope, prefix))};
+}
 
-  mmdb_watcher_ = dispatcher.createFilesystemWatcher();
+} // namespace
+
+DbFileProvider::DbFileProvider(Event::Dispatcher& dispatcher, Stats::ScopeSharedPtr scope,
+                               GeoDbType db_type, const std::string& db_path)
+    : stats_scope_(std::move(scope)), db_type_(db_type),
+      stats_(generateDbFileStats(*stats_scope_, db_type, db_path)) {
+  ASSERT(!db_path.empty());
   // A database that cannot be opened at startup is a configuration error: the provider would have
   // nothing to serve lookups from. Reject the configuration rather than run without it.
-  const auto load_db = [this](const std::string& db_path, GeoDbType db_type) -> MaxmindDbSharedPtr {
-    if (!hasDbSet(db_type)) {
-      return nullptr;
-    }
-    registerGeoDbStats(db_type);
-    absl::StatusOr<MaxmindDbSharedPtr> db_or_error = initMaxmindDb(db_path, db_type);
-    ENVOY_BUG(!absl::IsResourceExhausted(db_or_error.status()),
-              "Cannot open Maxmind database due to resource exhaustion");
-    THROW_IF_NOT_OK_REF(db_or_error.status());
-    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-        db_path, Filesystem::Watcher::Events::MovedTo,
-        [this, path = db_path, db_type](uint32_t) { return onMaxmindDbUpdate(path, db_type); }));
-    return std::move(db_or_error.value());
-  };
+  absl::StatusOr<MaxmindDbSharedPtr> db_or_error = initMaxmindDb(db_path);
+  ENVOY_BUG(!absl::IsResourceExhausted(db_or_error.status()),
+            "Cannot open Maxmind database due to resource exhaustion");
+  THROW_IF_NOT_OK_REF(db_or_error.status());
+  db_ = std::move(db_or_error.value());
 
-  city_db_ = load_db(db_file_paths.city_db_path_, GeoDbType::City);
-  isp_db_ = load_db(db_file_paths.isp_db_path_, GeoDbType::Isp);
-  anon_db_ = load_db(db_file_paths.anon_db_path_, GeoDbType::Anon);
-  asn_db_ = load_db(db_file_paths.asn_db_path_, GeoDbType::Asn);
-  country_db_ = load_db(db_file_paths.country_db_path_, GeoDbType::Country);
+  mmdb_watcher_ = dispatcher.createFilesystemWatcher();
+  THROW_IF_NOT_OK(
+      mmdb_watcher_->addWatch(db_path, Filesystem::Watcher::Events::MovedTo,
+                              [this, db_path](uint32_t) { return onMaxmindDbUpdate(db_path); }));
 }
 
-void DbFilesProvider::registerGeoDbStats(GeoDbType db_type) {
-  const absl::string_view db_type_name = dbTypeName(db_type);
-  stat_name_set_->rememberBuiltin(absl::StrCat(db_type_name, ".db_reload_error"));
-  stat_name_set_->rememberBuiltin(absl::StrCat(db_type_name, ".db_reload_success"));
-  stat_name_set_->rememberBuiltin(absl::StrCat(db_type_name, ".db_build_epoch"));
+MaxmindDbSharedPtr DbFileProvider::db() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
+  absl::ReaderMutexLock lock(mmdb_mutex_);
+  return db_;
 }
 
-void DbFilesProvider::incCounter(Stats::StatName name) {
-  stats_scope_->counterFromStatName(name).inc();
+void DbFileProvider::updateDb(MaxmindDbSharedPtr db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
+  absl::MutexLock lock(mmdb_mutex_);
+  db_ = std::move(db);
 }
 
-void DbFilesProvider::setGauge(Stats::StatName name, const uint64_t value) {
-  stats_scope_->gaugeFromStatName(name, Stats::Gauge::ImportMode::Accumulate).set(value);
-}
-
-absl::StatusOr<MaxmindDbSharedPtr> DbFilesProvider::initMaxmindDb(const std::string& db_path,
-                                                                  GeoDbType db_type) {
+absl::StatusOr<MaxmindDbSharedPtr> DbFileProvider::initMaxmindDb(const std::string& db_path) {
   MMDB_s maxmind_db;
   const int result_code = MMDB_open(db_path.c_str(), MMDB_MODE_MMAP, &maxmind_db);
   if (MMDB_SUCCESS != result_code) {
@@ -273,112 +251,31 @@ absl::StatusOr<MaxmindDbSharedPtr> DbFilesProvider::initMaxmindDb(const std::str
                                                    : absl::InvalidArgumentError(error_msg);
   }
 
-  setDbBuildEpoch(db_type, maxmind_db.metadata.build_epoch);
+  setDbBuildEpoch(maxmind_db.metadata.build_epoch);
 
-  ENVOY_LOG(info, "Loaded Maxmind database {} from file {}.", dbTypeName(db_type), db_path);
+  ENVOY_LOG(info, "Loaded Maxmind database {} from file {}.", dbTypeName(db_type_), db_path);
   return std::make_shared<MaxmindDb>(std::move(maxmind_db));
 }
 
-absl::Status DbFilesProvider::mmdbReload(MaxmindDbSharedPtr reloaded_db, GeoDbType db_type) {
-  ASSERT(reloaded_db != nullptr);
-  switch (db_type) {
-  case GeoDbType::City:
-    updateCityDb(std::move(reloaded_db));
-    break;
-  case GeoDbType::Isp:
-    updateIspDb(std::move(reloaded_db));
-    break;
-  case GeoDbType::Anon:
-    updateAnonDb(std::move(reloaded_db));
-    break;
-  case GeoDbType::Asn:
-    updateAsnDb(std::move(reloaded_db));
-    break;
-  case GeoDbType::Country:
-    updateCountryDb(std::move(reloaded_db));
-    break;
-  case GeoDbType::Count:
-    IS_ENVOY_BUG("Unsupported maxmind db type");
-    return absl::InvalidArgumentError("Unsupported maxmind db type");
+absl::Status DbFileProvider::onMaxmindDbUpdate(const std::string& db_path) {
+  absl::StatusOr<MaxmindDbSharedPtr> reloaded_db = initMaxmindDb(db_path);
+  if (!reloaded_db.ok()) {
+    // A failed reload is not fatal: the previously loaded database stays in place and keeps
+    // serving lookups.
+    ENVOY_LOG(error, "Failed to reload Maxmind database {}: {}", dbTypeName(db_type_),
+              reloaded_db.status().message());
+    incDbReloadError();
+    return reloaded_db.status();
   }
-  incDbReloadSuccess(db_type);
+  ASSERT(reloaded_db.value() != nullptr);
+  updateDb(std::move(reloaded_db.value()));
+  incDbReloadSuccess();
   return absl::OkStatus();
 }
 
-MaxmindDbSharedPtr DbFilesProvider::getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(mmdb_mutex_);
-  return city_db_;
-}
-
-void DbFilesProvider::updateCityDb(MaxmindDbSharedPtr city_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(mmdb_mutex_);
-  city_db_ = std::move(city_db);
-}
-
-MaxmindDbSharedPtr DbFilesProvider::getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(mmdb_mutex_);
-  return isp_db_;
-}
-
-void DbFilesProvider::updateIspDb(MaxmindDbSharedPtr isp_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(mmdb_mutex_);
-  isp_db_ = std::move(isp_db);
-}
-
-MaxmindDbSharedPtr DbFilesProvider::getAsnDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(mmdb_mutex_);
-  return asn_db_;
-}
-
-void DbFilesProvider::updateAsnDb(MaxmindDbSharedPtr asn_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(mmdb_mutex_);
-  asn_db_ = std::move(asn_db);
-}
-
-MaxmindDbSharedPtr DbFilesProvider::getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(mmdb_mutex_);
-  return anon_db_;
-}
-
-void DbFilesProvider::updateAnonDb(MaxmindDbSharedPtr anon_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(mmdb_mutex_);
-  anon_db_ = std::move(anon_db);
-}
-
-MaxmindDbSharedPtr DbFilesProvider::getCountryDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(mmdb_mutex_);
-  return country_db_;
-}
-
-void DbFilesProvider::updateCountryDb(MaxmindDbSharedPtr country_db)
-    ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(mmdb_mutex_);
-  country_db_ = std::move(country_db);
-}
-
-absl::Status DbFilesProvider::onMaxmindDbUpdate(const std::string& db_path, GeoDbType db_type) {
-  absl::StatusOr<MaxmindDbSharedPtr> reloaded_db = initMaxmindDb(db_path, db_type);
-  absl::Status status = absl::OkStatus();
-  if (reloaded_db.ok()) {
-    status = mmdbReload(std::move(reloaded_db.value()), db_type);
-  } else {
-    status = reloaded_db.status();
-  }
-
-  if (!status.ok()) {
-    // A failed reload is not fatal: the previously loaded database stays in place and keeps
-    // serving lookups.
-    ENVOY_LOG(error, "Failed to reload Maxmind database {}: {}", dbTypeName(db_type),
-              status.message());
-    incDbReloadError(db_type);
-  }
-  return status;
-}
-
 GeoipProvider::GeoipProvider(Singleton::InstanceSharedPtr owner,
-                             GeoipProviderConfigSharedPtr config,
-                             DbFilesProviderSharedPtr db_files_provider)
-    : config_(std::move(config)), db_files_provider_(std::move(db_files_provider)),
+                             GeoipProviderConfigSharedPtr config, DbFileProviders db_file_providers)
+    : config_(std::move(config)), db_file_providers_(std::move(db_file_providers)),
       owner_(std::move(owner)) {}
 
 GeoipProvider::~GeoipProvider() { ENVOY_LOG(debug, "Shutting down Maxmind geolocation provider"); }
@@ -402,11 +299,10 @@ void GeoipProvider::lookupInCityDb(
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   // Country lookup falls back to City DB only if Country DB is not configured.
   const bool should_lookup_country_from_city_db =
-      !db_files_provider_->hasDbSet(GeoDbType::Country) &&
-      hasConfiguredField(*config_, COUNTRY_LOOKUP_FIELDS);
+      !isCountryDbSet() && hasConfiguredField(*config_, COUNTRY_LOOKUP_FIELDS);
   if (hasConfiguredField(*config_, CITY_LOOKUP_FIELDS) || should_lookup_country_from_city_db) {
     int mmdb_error = MMDB_SUCCESS;
-    auto city_db_ptr = db_files_provider_->getCityDb();
+    auto city_db_ptr = getCityDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(CITY_DB_TYPE).append("_lookup_pre_complete"));
     if (!city_db_ptr) {
@@ -445,11 +341,11 @@ void GeoipProvider::lookupInAsnDb(
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (hasConfiguredField(*config_, ASN_LOOKUP_FIELDS)) {
     int mmdb_error = MMDB_SUCCESS;
-    auto asn_db_ptr = db_files_provider_->getAsnDb();
+    auto asn_db_ptr = getAsnDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(ASN_DB_TYPE).append("_lookup_pre_complete"));
     if (!asn_db_ptr) {
-      if (db_files_provider_->hasDbSet(GeoDbType::Isp)) {
+      if (isIspDbSet()) {
         // ASN information can be looked up from ISP database as well, so we don't need to
         // throw an error if is not set.
         return;
@@ -483,7 +379,7 @@ void GeoipProvider::lookupInAnonDb(
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (hasConfiguredField(*config_, ANON_LOOKUP_FIELDS)) {
     int mmdb_error = MMDB_SUCCESS;
-    auto anon_db_ptr = db_files_provider_->getAnonDb();
+    auto anon_db_ptr = getAnonDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(ANON_DB_TYPE).append("_lookup_pre_complete"));
     if (!anon_db_ptr) {
@@ -514,11 +410,11 @@ void GeoipProvider::lookupInAnonDb(
 void GeoipProvider::lookupInIspDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-  const bool should_lookup_asn_from_isp_db = !db_files_provider_->hasDbSet(GeoDbType::Asn) &&
-                                             hasConfiguredField(*config_, ISP_ASN_LOOKUP_FIELDS);
+  const bool should_lookup_asn_from_isp_db =
+      !isAsnDbSet() && hasConfiguredField(*config_, ISP_ASN_LOOKUP_FIELDS);
   if (hasConfiguredField(*config_, ISP_LOOKUP_FIELDS) || should_lookup_asn_from_isp_db) {
     int mmdb_error = MMDB_SUCCESS;
-    auto isp_db_ptr = db_files_provider_->getIspDb();
+    auto isp_db_ptr = getIspDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(ISP_DB_TYPE).append("_lookup_pre_complete"));
     if (!isp_db_ptr) {
@@ -555,16 +451,16 @@ void GeoipProvider::lookupInCountryDb(
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (hasConfiguredField(*config_, COUNTRY_LOOKUP_FIELDS)) {
     // Country DB takes precedence if configured, otherwise fall back to City DB.
-    if (!db_files_provider_->hasDbSet(GeoDbType::Country)) {
+    if (!isCountryDbSet()) {
       // Country lookup will be handled by lookupInCityDb.
       return;
     }
     int mmdb_error = MMDB_SUCCESS;
-    auto country_db_ptr = db_files_provider_->getCountryDb();
+    auto country_db_ptr = getCountryDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(COUNTRY_DB_TYPE).append("_lookup_pre_complete"));
     if (!country_db_ptr) {
-      if (db_files_provider_->hasDbSet(GeoDbType::City)) {
+      if (isCityDbSet()) {
         // Country information can be looked up from City database as well, so we don't need to
         // throw an error if it is not set.
         return;

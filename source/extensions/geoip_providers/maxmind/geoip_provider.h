@@ -5,6 +5,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
 #include "envoy/geoip/geoip_provider_driver.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
@@ -46,22 +47,6 @@ enum class GeoDbType {
 
 // Name of a database type as it appears in stat names and log messages, for example "city_db".
 absl::string_view dbTypeName(GeoDbType db_type);
-
-// The set of Maxmind database files a provider reads from. An empty path means that database is
-// not configured.
-struct DbFilePaths {
-  std::string city_db_path_;
-  std::string isp_db_path_;
-  std::string anon_db_path_;
-  std::string asn_db_path_;
-  std::string country_db_path_;
-
-  // Key that identifies this set of files. Maxmind databases are large, so every provider
-  // configured with the same set of files shares a single DbFilesProvider looked up by this key.
-  // Each path is encoded before being joined, so a path that contains the separator cannot be
-  // confused with a different set of files.
-  std::string key() const;
-};
 
 class GeoipProviderConfig {
 public:
@@ -117,90 +102,71 @@ private:
 
 using MaxmindDbSharedPtr = std::shared_ptr<MaxmindDb>;
 
-// Owns the Maxmind databases loaded from one set of files and keeps them up to date by watching
-// the files for changes. Maxmind databases are large, so a single instance is shared by every
-// GeoipProvider configured with the same set of files, regardless of the rest of their config.
-//
-// The database file level stats this emits (db_build_epoch, db_reload_success, db_reload_error)
-// are rooted at the server scope rather than at a provider's stat prefix, since the files are not
-// owned by any one listener.
-class DbFilesProvider : public Logger::Loggable<Logger::Id::geolocation> {
+/**
+ * All stats describing a single Maxmind database file. @see stats_macros.h
+ */
+#define ALL_MAXMIND_DB_FILE_STATS(COUNTER, GAUGE)                                                  \
+  COUNTER(db_reload_error)                                                                         \
+  COUNTER(db_reload_success)                                                                       \
+  GAUGE(db_build_epoch, Accumulate)
+
+struct DbFileStats {
+  ALL_MAXMIND_DB_FILE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+// Owns one Maxmind database file: the database parsed from it, the watcher that reloads it when
+// the file changes, and the stats describing it.
+class DbFileProvider : public Logger::Loggable<Logger::Id::geolocation> {
 public:
-  DbFilesProvider(Singleton::InstanceSharedPtr owner, Event::Dispatcher& dispatcher,
-                  Stats::Scope& scope, const DbFilePaths& db_file_paths);
+  DbFileProvider(Event::Dispatcher& dispatcher, Stats::ScopeSharedPtr scope, GeoDbType db_type,
+                 const std::string& db_path);
 
-  // Whether the given database was configured, and so is loaded and available for lookups.
-  bool hasDbSet(GeoDbType db_type) const { return db_set_[enumToInt(db_type)]; }
+  // The database type this file was configured as.
+  GeoDbType dbType() const { return db_type_; }
 
-  MaxmindDbSharedPtr getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-  MaxmindDbSharedPtr getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-  MaxmindDbSharedPtr getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-  MaxmindDbSharedPtr getAsnDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-  MaxmindDbSharedPtr getCountryDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-
-  Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }
+  // The currently loaded database. Null only if the file failed to load, which cannot happen
+  // before the constructor returns.
+  MaxmindDbSharedPtr db() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
 
 private:
   // Allow the unit test to have access to private members.
   friend class GeoipProviderPeer;
 
-  absl::StatusOr<MaxmindDbSharedPtr> initMaxmindDb(const std::string& db_path, GeoDbType db_type);
-  absl::Status onMaxmindDbUpdate(const std::string& db_path, GeoDbType db_type);
-  absl::Status mmdbReload(MaxmindDbSharedPtr reloaded_db, GeoDbType db_type)
-      ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-  void updateCityDb(MaxmindDbSharedPtr city_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-  void updateIspDb(MaxmindDbSharedPtr isp_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-  void updateAnonDb(MaxmindDbSharedPtr anon_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-  void updateAsnDb(MaxmindDbSharedPtr asn_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
-  void updateCountryDb(MaxmindDbSharedPtr country_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
+  absl::StatusOr<MaxmindDbSharedPtr> initMaxmindDb(const std::string& db_path);
+  absl::Status onMaxmindDbUpdate(const std::string& db_path);
+  void updateDb(MaxmindDbSharedPtr db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
 
-  void registerGeoDbStats(GeoDbType db_type);
+  void incDbReloadSuccess() { stats_.db_reload_success_.inc(); }
+  void incDbReloadError() { stats_.db_reload_error_.inc(); }
+  void setDbBuildEpoch(const uint64_t value) { stats_.db_build_epoch_.set(value); }
 
-  void incDbReloadSuccess(GeoDbType db_type) {
-    incCounter(stat_name_set_->getBuiltin(absl::StrCat(dbTypeName(db_type), ".db_reload_success"),
-                                          unknown_hit_));
-  }
-
-  void incDbReloadError(GeoDbType db_type) {
-    incCounter(stat_name_set_->getBuiltin(absl::StrCat(dbTypeName(db_type), ".db_reload_error"),
-                                          unknown_hit_));
-  }
-
-  void setDbBuildEpoch(GeoDbType db_type, const uint64_t value) {
-    setGauge(stat_name_set_->getBuiltin(absl::StrCat(dbTypeName(db_type), ".db_build_epoch"),
-                                        unknown_hit_),
-             value);
-  }
-
-  void incCounter(Stats::StatName name);
-  void setGauge(Stats::StatName name, const uint64_t value);
-
-  // Whether each database was configured, indexed by GeoDbType.
-  std::array<bool, enumToInt(GeoDbType::Count)> db_set_{};
-
-  Stats::ScopeSharedPtr stats_scope_;
-  Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName unknown_hit_;
+  // Declared first so that it outlives the stats that reference it.
+  const Stats::ScopeSharedPtr stats_scope_;
+  const GeoDbType db_type_;
+  DbFileStats stats_;
   mutable absl::Mutex mmdb_mutex_;
-  MaxmindDbSharedPtr city_db_ ABSL_GUARDED_BY(mmdb_mutex_);
-  MaxmindDbSharedPtr isp_db_ ABSL_GUARDED_BY(mmdb_mutex_);
-  MaxmindDbSharedPtr anon_db_ ABSL_GUARDED_BY(mmdb_mutex_);
-  MaxmindDbSharedPtr asn_db_ ABSL_GUARDED_BY(mmdb_mutex_);
-  MaxmindDbSharedPtr country_db_ ABSL_GUARDED_BY(mmdb_mutex_);
+  MaxmindDbSharedPtr db_ ABSL_GUARDED_BY(mmdb_mutex_);
   Filesystem::WatcherPtr mmdb_watcher_;
-  // A shared_ptr to keep the provider singleton alive as long as any of these databases are in
-  // use, since the singleton is what hands them out.
-  const Singleton::InstanceSharedPtr owner_;
 };
 
-using DbFilesProviderSharedPtr = std::shared_ptr<DbFilesProvider>;
+using DbFileProviderSharedPtr = std::shared_ptr<DbFileProvider>;
+
+// The database file a provider reads each database type from. A null member means that database
+// is not configured.
+struct DbFileProviders {
+  DbFileProviderSharedPtr city_db_;
+  DbFileProviderSharedPtr isp_db_;
+  DbFileProviderSharedPtr anon_db_;
+  DbFileProviderSharedPtr asn_db_;
+  DbFileProviderSharedPtr country_db_;
+};
 
 class GeoipProvider : public Envoy::Geolocation::Driver,
                       public Logger::Loggable<Logger::Id::geolocation> {
 
 public:
   GeoipProvider(Singleton::InstanceSharedPtr owner, GeoipProviderConfigSharedPtr config,
-                DbFilesProviderSharedPtr db_files_provider);
+                DbFileProviders db_file_providers);
 
   ~GeoipProvider() override;
 
@@ -210,10 +176,34 @@ public:
 private:
   // Allow the unit test to have access to private members.
   friend class GeoipProviderPeer;
+
+  MaxmindDbSharedPtr getCityDb() const {
+    return db_file_providers_.city_db_ != nullptr ? db_file_providers_.city_db_->db() : nullptr;
+  }
+  MaxmindDbSharedPtr getIspDb() const {
+    return db_file_providers_.isp_db_ != nullptr ? db_file_providers_.isp_db_->db() : nullptr;
+  }
+  MaxmindDbSharedPtr getAnonDb() const {
+    return db_file_providers_.anon_db_ != nullptr ? db_file_providers_.anon_db_->db() : nullptr;
+  }
+  MaxmindDbSharedPtr getAsnDb() const {
+    return db_file_providers_.asn_db_ != nullptr ? db_file_providers_.asn_db_->db() : nullptr;
+  }
+  MaxmindDbSharedPtr getCountryDb() const {
+    return db_file_providers_.country_db_ != nullptr ? db_file_providers_.country_db_->db()
+                                                     : nullptr;
+  }
+
+  // Whether each database was configured for this provider.
+  bool isCityDbSet() const { return db_file_providers_.city_db_ != nullptr; }
+  bool isIspDbSet() const { return db_file_providers_.isp_db_ != nullptr; }
+  bool isAsnDbSet() const { return db_file_providers_.asn_db_ != nullptr; }
+  bool isCountryDbSet() const { return db_file_providers_.country_db_ != nullptr; }
+
   GeoipProviderConfigSharedPtr config_;
-  // The databases this provider looks up in. Shared with every other provider configured with the
-  // same set of database files.
-  DbFilesProviderSharedPtr db_files_provider_;
+  // The database files this provider looks up in. Each is shared with every other provider
+  // configured with the same database type and path.
+  DbFileProviders db_file_providers_;
   void lookupInCityDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAsnDb(const Network::Address::InstanceConstSharedPtr& remote_address,

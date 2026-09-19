@@ -147,14 +147,16 @@ Database type can be one of `city_db <https://www.maxmind.com/en/geoip2-city>`_,
    ``<db_type>.hit``, Counter, Total number of successful lookups (with non empty lookup result) performed for a given geolocation database file.
    ``<db_type>.lookup_error``, Counter, Total number of errors that occurred during lookups for a given geolocation database file.
 
-The database files themselves are loaded once and shared by every provider configured with the same
-set of files, so the statistics describing them are rooted at ``maxmind.`` in the server wide stats
-namespace instead of at ``<stat_prefix>.maxmind.``.
+Each geolocation database file is loaded once and shared by every provider configured with that
+file, so the statistics describing a file belong to no single listener. They are rooted at
+``maxmind.`` instead of at ``<stat_prefix>.maxmind.``, and they identify the file they describe
+both by a ``db_name`` tag and by including its path in the statistic name, so two files of the same
+database type remain distinguishable. ``<db_name>`` below is the path of the database file.
 
 .. csv-table::
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   ``<db_type>.db_reload_success``, Counter, Total number of times when the geolocation database file was reloaded successfully.
-   ``<db_type>.db_reload_error``, Counter, Total number of times when the geolocation database file failed to reload.
-   ``<db_type>.db_build_epoch``, Gauge, The build timestamp of the geolocation database file represented as a Unix epoch value.
+   ``<db_type>.<db_name>.db_reload_success``, Counter, Total number of times when the geolocation database file was reloaded successfully.
+   ``<db_type>.<db_name>.db_reload_error``, Counter, Total number of times when the geolocation database file failed to reload.
+   ``<db_type>.<db_name>.db_build_epoch``, Gauge, The build timestamp of the geolocation database file represented as a Unix epoch value.

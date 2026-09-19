@@ -1,5 +1,6 @@
 #include "source/extensions/geoip_providers/maxmind/config.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
 #include "envoy/registry/registry.h"
 
@@ -29,6 +30,12 @@ std::string driverKey(const ConfigProto& proto_config, const std::string& stat_p
                       absl::Base64Escape(stat_prefix), "|", MessageUtil::hash(proto_config));
 }
 
+// Key that identifies one database file. The type is one of a fixed set of tokens that contain no
+// separator, so the first separator always ends it and no path can be confused with another.
+std::string dbFileKey(GeoDbType db_type, const std::string& db_path) {
+  return absl::StrCat(dbTypeName(db_type), "|", db_path);
+}
+
 } // namespace
 
 /**
@@ -39,6 +46,8 @@ std::string driverKey(const ConfigProto& proto_config, const std::string& stat_p
  */
 class DriverSingleton : public Envoy::Singleton::Instance {
 public:
+  DriverSingleton(Stats::Scope& scope) : db_file_stats_scope_(scope.createScope("maxmind.")) {}
+
   std::shared_ptr<GeoipProvider> get(std::shared_ptr<DriverSingleton> singleton,
                                      const ConfigProto& proto_config,
                                      const std::string& stat_prefix,
@@ -61,51 +70,72 @@ public:
     // config, since every distinct config keys to a new entry.
     absl::erase_if(drivers_, [](const auto& entry) { return entry.second.expired(); });
 
+    // Load the database files first, so that a configuration that names none of them, or names
+    // one that cannot be opened, is rejected before anything is cached.
+    DbFileProviders db_file_providers = getDbFileProviders(proto_config, context);
     const auto provider_config =
         std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.scope());
-    std::shared_ptr<GeoipProvider> driver = std::make_shared<GeoipProvider>(
-        singleton, provider_config,
-        getDbFilesProvider(singleton,
-                           DbFilePaths{proto_config.city_db_path(), proto_config.isp_db_path(),
-                                       proto_config.anon_db_path(), proto_config.asn_db_path(),
-                                       proto_config.country_db_path()},
-                           context));
+    std::shared_ptr<GeoipProvider> driver =
+        std::make_shared<GeoipProvider>(singleton, provider_config, std::move(db_file_providers));
     drivers_[key] = driver;
     return driver;
   }
 
 private:
-  // Maxmind databases are large, so all providers that reference the same set of database files
-  // share a single DbFilesProvider that owns and watches them, regardless of how the rest of their
-  // configuration differs.
-  DbFilesProviderSharedPtr
-  getDbFilesProvider(std::shared_ptr<DriverSingleton> singleton, const DbFilePaths& db_file_paths,
-                     Server::Configuration::ServerFactoryContext& context) {
-    const std::string key = db_file_paths.key();
-    auto it = db_files_providers_.find(key);
-    if (it != db_files_providers_.end()) {
-      DbFilesProviderSharedPtr db_files_provider = it->second.lock();
-      if (db_files_provider != nullptr) {
-        return db_files_provider;
+  DbFileProviders getDbFileProviders(const ConfigProto& proto_config,
+                                     Server::Configuration::ServerFactoryContext& context) {
+    // An empty path means that database is not configured.
+    if (proto_config.city_db_path().empty() && proto_config.isp_db_path().empty() &&
+        proto_config.anon_db_path().empty() && proto_config.asn_db_path().empty() &&
+        proto_config.country_db_path().empty()) {
+      throw EnvoyException("At least one geolocation database path needs to be configured: "
+                           "city_db_path, isp_db_path, asn_db_path, anon_db_path or "
+                           "country_db_path");
+    }
+
+    DbFileProviders db_file_providers;
+    db_file_providers.city_db_ =
+        getDbFileProvider(GeoDbType::City, proto_config.city_db_path(), context);
+    db_file_providers.isp_db_ =
+        getDbFileProvider(GeoDbType::Isp, proto_config.isp_db_path(), context);
+    db_file_providers.anon_db_ =
+        getDbFileProvider(GeoDbType::Anon, proto_config.anon_db_path(), context);
+    db_file_providers.asn_db_ =
+        getDbFileProvider(GeoDbType::Asn, proto_config.asn_db_path(), context);
+    db_file_providers.country_db_ =
+        getDbFileProvider(GeoDbType::Country, proto_config.country_db_path(), context);
+    return db_file_providers;
+  }
+
+  DbFileProviderSharedPtr getDbFileProvider(GeoDbType db_type, const std::string& db_path,
+                                            Server::Configuration::ServerFactoryContext& context) {
+    if (db_path.empty()) {
+      return nullptr;
+    }
+    const std::string key = dbFileKey(db_type, db_path);
+    auto it = db_file_providers_.find(key);
+    if (it != db_file_providers_.end()) {
+      DbFileProviderSharedPtr db_file_provider = it->second.lock();
+      if (db_file_provider != nullptr) {
+        return db_file_provider;
       }
     }
-    // As with drivers_, nothing prunes the map when the last provider referencing a set of files
-    // goes away, so drop the expired entries before adding another one.
-    absl::erase_if(db_files_providers_, [](const auto& entry) { return entry.second.expired(); });
+    // As with drivers_, nothing prunes the map when the last provider referencing a file goes
+    // away, so drop the expired entries before adding another one.
+    absl::erase_if(db_file_providers_, [](const auto& entry) { return entry.second.expired(); });
 
-    // The database files are not owned by any single listener, so their stats are rooted at the
-    // server scope.
-    DbFilesProviderSharedPtr db_files_provider = std::make_shared<DbFilesProvider>(
-        std::move(singleton), context.mainThreadDispatcher(), context.scope(), db_file_paths);
-    db_files_providers_[key] = db_files_provider;
-    return db_files_provider;
+    DbFileProviderSharedPtr db_file_provider = std::make_shared<DbFileProvider>(
+        context.mainThreadDispatcher(), db_file_stats_scope_, db_type, db_path);
+    db_file_providers_[key] = db_file_provider;
+    return db_file_provider;
   }
 
   // We keep weak_ptr here so the providers can be destroyed if the config is updated to stop using
   // that config of the provider. Each provider stores shared_ptrs to this singleton, which keeps
   // the singleton from being destroyed unless it's no longer keeping track of any providers.
   absl::flat_hash_map<std::string, std::weak_ptr<GeoipProvider>> drivers_;
-  absl::flat_hash_map<std::string, std::weak_ptr<DbFilesProvider>> db_files_providers_;
+  absl::flat_hash_map<std::string, std::weak_ptr<DbFileProvider>> db_file_providers_;
+  const Stats::ScopeSharedPtr db_file_stats_scope_;
 };
 
 SINGLETON_MANAGER_REGISTRATION(maxmind_geolocation_provider_singleton);
@@ -117,7 +147,7 @@ DriverSharedPtr MaxmindProviderFactory::createGeoipProviderDriverTyped(
     Server::Configuration::ServerFactoryContext& context) {
   std::shared_ptr<DriverSingleton> drivers = context.singletonManager().getTyped<DriverSingleton>(
       SINGLETON_MANAGER_REGISTERED_NAME(maxmind_geolocation_provider_singleton),
-      [] { return std::make_shared<DriverSingleton>(); });
+      [&context] { return std::make_shared<DriverSingleton>(context.scope()); });
   return drivers->get(drivers, proto_config, stat_prefix, context);
 }
 
