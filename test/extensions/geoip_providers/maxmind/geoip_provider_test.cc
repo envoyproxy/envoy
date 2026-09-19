@@ -1494,8 +1494,9 @@ TEST_F(GeoipProviderTest, DbFileStatsLiveInTheProviderScopeAndNameTheFile) {
 
   // A database file is shared between listeners, so the stats describing it are rooted at the
   // provider singleton's "maxmind." scope rather than at this provider's "prefix.maxmind."
-  // namespace, and they name the file both in the stat name and in a db_name tag so that two
-  // files of the same type stay distinguishable.
+  // namespace, and the file's path is part of the stat name so that two files of the same type
+  // stay distinguishable. The path is supplied as a db_name tag too, which this store honors;
+  // a store running in legacy (non explicit-tags) mode keeps the name but drops the tag.
   const std::string db_name =
       Stats::Utility::sanitizeStatsName(TestEnvironment::substitute(default_city_db_path));
   const Stats::GaugeSharedPtr build_epoch = TestUtility::findGauge(

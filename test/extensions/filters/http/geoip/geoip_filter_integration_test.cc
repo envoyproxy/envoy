@@ -500,7 +500,6 @@ TEST_P(GeoipFilterIntegrationTest, MetricForDbBuildEpochIsEmitted) {
       test_server_->gauge(absl::StrCat("maxmind.city_db.", db_name, ".db_build_epoch"));
   ASSERT_NE(build_epoch, nullptr);
   EXPECT_EQ(1671567063, build_epoch->value());
-  EXPECT_EQ("maxmind.city_db.db_build_epoch", build_epoch->tagExtractedName());
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseCountryDb) {

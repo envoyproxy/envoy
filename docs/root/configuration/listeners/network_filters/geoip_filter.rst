@@ -149,9 +149,9 @@ Database type can be one of `city_db <https://www.maxmind.com/en/geoip2-city>`_,
 
 Each geolocation database file is loaded once and shared by every provider configured with that
 file, so the statistics describing a file belong to no single listener. They are rooted at
-``maxmind.`` instead of at ``<stat_prefix>.maxmind.``, and they identify the file they describe
-both by a ``db_name`` tag and by including its path in the statistic name, so two files of the same
-database type remain distinguishable. ``<db_name>`` below is the path of the database file.
+``maxmind.`` instead of at ``<stat_prefix>.maxmind.``, and they include the path of the file they
+describe in the statistic name, so two files of the same database type remain distinguishable.
+``<db_name>`` below is the path of the database file.
 
 .. csv-table::
    :header: Name, Type, Description
