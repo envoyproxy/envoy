@@ -139,6 +139,14 @@ envoy_dependency_reachability(
 )
 
 py_test(
+    name = "registry_reconcile_test",
+    srcs = [
+        "registry_reconcile.py",
+        "registry_reconcile_test.py",
+    ],
+)
+
+py_test(
     name = "validate_reachability_test",
     srcs = ["validate_reachability_test.py"],
     data = [

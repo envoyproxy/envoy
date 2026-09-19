@@ -19,6 +19,8 @@ on:
         - registry
       version:
         description: Version to set (optional)
+      module-overrides:
+        description: Whitespace or newline separated name=version module overrides (optional)
       skip-check:
         description: Skip registry hash validation (for testing with an arbitrary hash)
         type: boolean
@@ -221,6 +223,7 @@ jobs:
         token: ${{ steps.appauth.outputs.token }}
     - run: ./ci/run_envoy_docker.sh './ci/do_ci.sh registry'
       env:
+        ENVOY_MODULE_OVERRIDES: ${{ inputs.module-overrides }}
         ENVOY_DOCKER_CI: "true"
         ENVOY_REGISTRY_HASH: ${{ inputs.version }}
         ENVOY_REGISTRY_CHECK_SKIP: ${{ inputs.skip-check && '1' || '' }}
@@ -228,20 +231,49 @@ jobs:
       name: Update registry
       working-directory: envoy
     - run: |
-        hash="$(
-            sed -n -E \
-                's#^common --registry=https://raw\.githubusercontent\.com/envoyproxy/bazel-registry/([0-9a-f]+)$#\1#p' \
-                .bazelrc
-        )"
-        if [[ -z "$hash" ]]; then
-            echo "ERROR: Failed to determine registry hash from .bazelrc" >&2
+        build_dir="${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}"
+        changes_path="${build_dir}/registry-changes.json"
+        if [[ ! -e "${changes_path}" ]]; then
+            echo "ERROR: Missing registry changes report: ${changes_path}" >&2
+            exit 1
+        fi
+        hash="$(jq -r '.registry.new' "${changes_path}")"
+        if [[ -z "$hash" || "$hash" == "null" ]]; then
+            echo "ERROR: Failed to determine registry hash from ${changes_path}" >&2
             exit 1
         fi
         echo "hash=${hash}" >> "$GITHUB_OUTPUT"
         echo "hash_short=${hash:0:7}" >> "$GITHUB_OUTPUT"
+        {
+            echo "module_summary<<EOF"
+            jq -r '
+                if (.modules | length) == 0 then
+                    "No registry-hosted module pins changed."
+                else
+                    .modules
+                    | map("- `\(.name)` `\(.from)` -> `\(.to)` (\(.files | join(\", \")))")
+                    | join("\n")
+                end' "${changes_path}"
+            echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+        {
+            echo "## Registry update"
+            echo
+            echo "- Old hash: \`$(jq -r '.registry.old' "${changes_path}")\`"
+            echo "- New hash: \`${hash}\`"
+            echo
+            echo "### Module changes"
+            jq -r '
+                if (.modules | length) == 0 then
+                    "- No registry-hosted module pins changed."
+                else
+                    .modules
+                    | map("- `\(.name)` `\(.from)` -> `\(.to)` (\(.files | join(\", \")))")
+                    | join("\n")
+                end' "${changes_path}"
+        } >> "$GITHUB_STEP_SUMMARY"
       id: registry
-      name: Read registry hash
-      working-directory: envoy
+      name: Read registry changes
     - uses: envoyproxy/toolshed/actions/upload/diff@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       name: Upload diff
       with:
@@ -256,6 +288,8 @@ jobs:
           Created by Envoy dependency bot for @${{ github.actor }}
 
           This bumps `envoyproxy/bazel-registry` to `${{ steps.registry.outputs.hash }}`.
+
+          ${{ steps.registry.outputs.module_summary }}
 
           ${{ inputs.pr-message }}
         branch: dependency/registry/${{ steps.registry.outputs.hash_short }}

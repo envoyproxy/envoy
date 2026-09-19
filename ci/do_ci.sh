@@ -43,12 +43,21 @@ _realpath() {
 ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
 ENVOY_DOCS_PATH="$(_realpath "$ENVOY_DOCS_PATH")"
 LOCKFILES_DIFF_OUTPUT="${LOCKFILES_DIFF_OUTPUT:-/build/fix_lockfiles.diff}"
+REGISTRY_CHANGES_OUTPUT="${REGISTRY_CHANGES_OUTPUT:-/build/registry-changes.json}"
 readonly LOCKFILE_PATHSPEC=':(glob)**/MODULE.bazel.lock'
 readonly -a REGISTRY_BAZELRC_FILES=(
     ".bazelrc"
     "api/.bazelrc"
     "bazel/tests/external/.bazelrc"
 )
+readonly -a REGISTRY_MODULE_DIRS=(
+    "."
+    "${ENVOY_DOCS_PATH}"
+    "api/"
+    "mobile/"
+    "bazel/tests/external/"
+)
+REGISTRY_CLONE_DIR=""
 
 lockfiles_check() {
     lockfiles_generate
@@ -67,11 +76,74 @@ lockfiles_check() {
 
 lockfiles_generate() {
     local module_dir
-    for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/external/; do
+    for module_dir in "${REGISTRY_MODULE_DIRS[@]}"; do
         pushd "$module_dir" > /dev/null
         bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
         popd > /dev/null
     done
+}
+
+registry_module_files() {
+    local module_dir
+    local module_file
+    for module_dir in "${REGISTRY_MODULE_DIRS[@]}"; do
+        if [[ "${module_dir}" == "." ]]; then
+            module_file="MODULE.bazel"
+        else
+            module_file="${module_dir%/}/MODULE.bazel"
+        fi
+        module_file="$(_realpath "${module_file}")"
+        if [[ "${module_file}" == "${SRCDIR%/}/"* ]]; then
+            echo "${module_file#${SRCDIR%/}/}"
+        else
+            echo "${module_file}"
+        fi
+    done
+}
+
+registry_clone_cleanup() {
+    if [[ -n "${REGISTRY_CLONE_DIR}" && -d "${REGISTRY_CLONE_DIR}" ]]; then
+        rm -rf "${REGISTRY_CLONE_DIR}"
+        REGISTRY_CLONE_DIR=""
+    fi
+}
+
+registry_clone() {
+    local registry_repo="${ENVOY_REGISTRY_REPO:-https://github.com/envoyproxy/bazel-registry}"
+
+    if [[ -n "${REGISTRY_CLONE_DIR}" && -d "${REGISTRY_CLONE_DIR}" ]]; then
+        return 0
+    fi
+
+    REGISTRY_CLONE_DIR="$(mktemp -d)"
+    trap registry_clone_cleanup EXIT
+    git clone --quiet --bare --filter=blob:none "${registry_repo}" "${REGISTRY_CLONE_DIR}"
+}
+
+registry_module_exists() {
+    local registry_hash="$1"
+    local module_name="$2"
+
+    git -c safe.bareRepository=all -C "${REGISTRY_CLONE_DIR}" \
+        cat-file -e "${registry_hash}:modules/${module_name}/metadata.json" 2>/dev/null
+}
+
+registry_module_version_exists() {
+    local registry_hash="$1"
+    local module_name="$2"
+    local version="$3"
+
+    git -c safe.bareRepository=all -C "${REGISTRY_CLONE_DIR}" \
+        cat-file -e "${registry_hash}:modules/${module_name}/${version}/MODULE.bazel" 2>/dev/null
+}
+
+registry_module_latest_version() {
+    local registry_hash="$1"
+    local module_name="$2"
+
+    git -c safe.bareRepository=all -C "${REGISTRY_CLONE_DIR}" \
+        show "${registry_hash}:modules/${module_name}/metadata.json" \
+        | jq -r '.versions[-1] // empty'
 }
 
 registry_current_hash() {
@@ -101,32 +173,28 @@ registry_check() {
     local registry_repo="${ENVOY_REGISTRY_REPO:-https://github.com/envoyproxy/bazel-registry}"
     local registry_branch="${ENVOY_REGISTRY_BRANCH:-main}"
     local registry_hash
-    local registry_dir
     local tags
     local version
 
     registry_hash="$(registry_current_hash)"
     version="$(cat VERSION.txt)"
 
-    registry_dir="$(mktemp -d)"
-    # shellcheck disable=SC2064
-    trap "rm -rf '${registry_dir}'" RETURN
-    # Blobless bare clone: history/tags without file contents.
-    git clone --quiet --bare --filter=blob:none "${registry_repo}" "${registry_dir}"
+    registry_clone
 
-    if ! git -c safe.bareRepository=all -C "${registry_dir}" \
+    if ! git -c safe.bareRepository=all -C "${REGISTRY_CLONE_DIR}" \
         cat-file -e "${registry_hash}^{commit}" 2>/dev/null; then
         echo "FAIL: Registry commit ${registry_hash} not found in ${registry_repo}" >&2
         return 1
     fi
-    if ! git -c safe.bareRepository=all -C "${registry_dir}" \
+    if ! git -c safe.bareRepository=all -C "${REGISTRY_CLONE_DIR}" \
         merge-base --is-ancestor "${registry_hash}" "${registry_branch}"; then
         echo "FAIL: Registry commit ${registry_hash} is not an ancestor of ${registry_branch}" >&2
         return 1
     fi
     echo "Registry commit ${registry_hash} is an ancestor of ${registry_branch}"
 
-    tags="$(git -c safe.bareRepository=all -C "${registry_dir}" tag --points-at "${registry_hash}")"
+    tags="$(git -c safe.bareRepository=all -C "${REGISTRY_CLONE_DIR}" \
+        tag --points-at "${registry_hash}")"
     if [[ -n "${tags}" ]]; then
         echo "Registry commit ${registry_hash} is tagged: ${tags//$'\n'/ }"
         return 0
@@ -157,6 +225,148 @@ registry_bump() {
             "$bazelrc"
         echo "${bazelrc}: ${old_hash} -> ${registry_hash}"
     done
+}
+
+registry_reconcile() {
+    local old_registry_hash="$1"
+    local registry_hash="$2"
+    local pin_json
+    local rewrite_json='{"modules":[]}'
+    local latest_version
+    local module_name
+    local needs_replacement
+    local override_entry
+    local override_version
+    local pin_version
+    local -a module_files
+    local -a replacements=()
+    local -a rewrite_args=()
+    local -a update_rows=()
+    declare -A overrides=()
+    declare -A override_seen=()
+
+    registry_clone
+    if ! git -c safe.bareRepository=all -C "${REGISTRY_CLONE_DIR}" \
+        cat-file -e "${registry_hash}^{commit}" 2>/dev/null; then
+        echo "FAIL: Registry commit ${registry_hash} not found in " \
+            "${ENVOY_REGISTRY_REPO:-https://github.com/envoyproxy/bazel-registry}" >&2
+        return 1
+    fi
+
+    mapfile -t module_files < <(registry_module_files)
+    pin_json="$(python3 "${ENVOY_SRCDIR}/tools/dependency/registry_reconcile.py" \
+        scan "${module_files[@]}")"
+
+    while IFS= read -r override_entry; do
+        [[ -z "${override_entry}" ]] && continue
+        if [[ "${override_entry}" != *=* ]]; then
+            echo "FAIL: Invalid ENVOY_MODULE_OVERRIDES entry: ${override_entry}" >&2
+            return 1
+        fi
+        module_name="${override_entry%%=*}"
+        override_version="${override_entry#*=}"
+        if [[ -z "${module_name}" || -z "${override_version}" ]]; then
+            echo "FAIL: Invalid ENVOY_MODULE_OVERRIDES entry: ${override_entry}" >&2
+            return 1
+        fi
+        overrides["${module_name}"]="${override_version}"
+    done < <(printf '%s' "${ENVOY_MODULE_OVERRIDES:-}" | tr '[:space:]' '\n' | sed '/^$/d')
+
+    while IFS= read -r module_name; do
+        if registry_module_exists "${registry_hash}" "${module_name}"; then
+            if [[ -n "${overrides[${module_name}]+x}" ]]; then
+                override_seen["${module_name}"]=1
+                override_version="${overrides[${module_name}]}"
+                if ! registry_module_version_exists \
+                    "${registry_hash}" "${module_name}" "${override_version}"; then
+                    echo "FAIL: Override ${module_name}=${override_version} not found in " \
+                        "envoy registry at ${registry_hash}" >&2
+                    return 1
+                fi
+                needs_replacement=0
+                while IFS= read -r pin_version; do
+                    if [[ "${pin_version}" != "${override_version}" ]]; then
+                        needs_replacement=1
+                        break
+                    fi
+                done < <(jq -r --arg module "${module_name}" \
+                    '.modules[] | select(.name == $module) | .versions[]' \
+                    <<< "${pin_json}")
+                if [[ "${needs_replacement}" -eq 1 ]]; then
+                    replacements+=("${module_name}=${override_version}")
+                fi
+                continue
+            fi
+            needs_replacement=0
+            while IFS= read -r pin_version; do
+                if ! registry_module_version_exists \
+                    "${registry_hash}" "${module_name}" "${pin_version}"; then
+                    needs_replacement=1
+                    break
+                fi
+            done < <(jq -r --arg module "${module_name}" \
+                '.modules[] | select(.name == $module) | .versions[]' <<< "${pin_json}")
+            if [[ "${needs_replacement}" -eq 0 ]]; then
+                continue
+            fi
+            latest_version="$(registry_module_latest_version "${registry_hash}" "${module_name}")"
+            if [[ -z "${latest_version}" ]]; then
+                echo "FAIL: No versions published for envoy registry module ${module_name} " \
+                    "at ${registry_hash}" >&2
+                return 1
+            fi
+            replacements+=("${module_name}=${latest_version}")
+            continue
+        fi
+        if [[ -n "${overrides[${module_name}]+x}" ]]; then
+            echo "FAIL: Override ${module_name}=${overrides[${module_name}]} targets a module " \
+                "not served by envoy registry at ${registry_hash}" >&2
+            return 1
+        fi
+    done < <(jq -r '.modules[].name' <<< "${pin_json}")
+
+    for module_name in "${!overrides[@]}"; do
+        if [[ -z "${override_seen[${module_name}]+x}" ]]; then
+            echo "FAIL: Override ${module_name}=${overrides[${module_name}]} did not match a " \
+                "pinned envoy registry module" >&2
+            return 1
+        fi
+    done
+
+    if [[ "${#replacements[@]}" -gt 0 ]]; then
+        for override_entry in "${replacements[@]}"; do
+            rewrite_args+=("--replace" "${override_entry}")
+        done
+        rewrite_json="$(python3 "${ENVOY_SRCDIR}/tools/dependency/registry_reconcile.py" \
+            rewrite "${module_files[@]}" \
+            "${rewrite_args[@]}")"
+    fi
+
+    echo "Registry modules updated:"
+    while IFS= read -r module_name; do
+        [[ -z "${module_name}" ]] && continue
+        pin_version="$(jq -r --arg module "${module_name}" \
+            '.modules[] | select(.name == $module) | .from' <<< "${rewrite_json}")"
+        latest_version="$(jq -r --arg module "${module_name}" \
+            '.modules[] | select(.name == $module) | .to' <<< "${rewrite_json}")"
+        update_rows+=("  ${module_name}  ${pin_version} -> ${latest_version}  ($(jq -r \
+            --arg module "${module_name}" \
+            '.modules[] | select(.name == $module) | .files | join(\", \")' \
+            <<< "${rewrite_json}"))")
+    done < <(jq -r '.modules[].name' <<< "${rewrite_json}")
+    if [[ "${#update_rows[@]}" -eq 0 ]]; then
+        echo "  (none)"
+    else
+        printf '%s\n' "${update_rows[@]}"
+    fi
+
+    mkdir -p "$(dirname "${REGISTRY_CHANGES_OUTPUT}")"
+    jq -n \
+        --arg old "${old_registry_hash}" \
+        --arg new "${registry_hash}" \
+        --argjson modules "$(jq '.modules' <<< "${rewrite_json}")" \
+        '{registry: {old: $old, new: $new}, modules: $modules}' \
+        > "${REGISTRY_CHANGES_OUTPUT}"
 }
 
 setup_clang_toolchain() {
@@ -1093,6 +1303,12 @@ case $CI_TARGET in
             echo "WARNING: skipping registry check for ${registry_hash} (ENVOY_REGISTRY_CHECK_SKIP set)" >&2
         elif ! registry_check; then
             echo "FAIL: registry hash ${registry_hash} rejected, restoring ${old_registry_hash}" >&2
+            registry_bump "$old_registry_hash"
+            exit 1
+        fi
+        if ! registry_reconcile "${old_registry_hash}" "${registry_hash}"; then
+            echo "FAIL: registry reconcile failed for ${registry_hash}, restoring " \
+                "${old_registry_hash}" >&2
             registry_bump "$old_registry_hash"
             exit 1
         fi
