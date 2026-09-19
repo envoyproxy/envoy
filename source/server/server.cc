@@ -42,6 +42,7 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/breaking_changes.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
@@ -58,6 +59,8 @@
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/utils.h"
+
+#include "absl/flags/flag.h"
 
 namespace Envoy {
 namespace Server {
@@ -404,6 +407,9 @@ absl::Status InstanceUtil::loadBootstrapConfig(
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
+  if (bootstrap.enable_breaking_changes_observability()) {
+    absl::SetFlag(&FLAGS_breaking_change_observability_enabled, true);
+  }
   return absl::OkStatus();
 }
 

@@ -2,6 +2,7 @@
 
 #include "envoy/http/codec_runtime_overrides.h"
 
+#include "source/common/runtime/breaking_changes_flags.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/flags/commandlineflag.h"
@@ -324,6 +325,12 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
           std::numeric_limits<uint32_t>::max(), "");            // NOLINT
+
+// Define all breaking changes flags as Envoy reloadable features.
+#define ENABLED_BREAKING_CHANGE_TO_RUNTIME(name) RUNTIME_GUARD(envoy_reloadable_features_##name)
+#define DISABLED_BREAKING_CHANGE_TO_RUNTIME(name)                                                  \
+  FALSE_RUNTIME_GUARD(envoy_reloadable_features_##name)
+ALL_BREAKING_CHANGES(ENABLED_BREAKING_CHANGE_TO_RUNTIME, DISABLED_BREAKING_CHANGE_TO_RUNTIME);
 
 namespace Envoy {
 namespace Runtime {
