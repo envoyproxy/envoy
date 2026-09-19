@@ -12396,6 +12396,17 @@ bool envoy_dynamic_module_callback_matcher_get_header_value(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out);
 
+/**
+ * Report that the module could not complete a match evaluation, for example because the match hook
+ * panicked. The matcher then applies its configured on_error policy for this evaluation instead of
+ * treating the failure as a no match. The SDK panic barrier invokes this when a match hook panics,
+ * so a hook that returns normally does not trigger it.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ */
+void envoy_dynamic_module_callback_matcher_set_error(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr);
+
 // =============================================================================
 // Matcher Data Input Types
 // =============================================================================

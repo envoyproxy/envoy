@@ -7738,6 +7738,53 @@ pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers(
   true
 }
 
+// Records whether the panic barrier reported a matcher error, so the barrier test below can assert
+// the reporting callback ran.
+static MATCHER_SET_ERROR_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_matcher_set_error(
+  _matcher_input_envoy_ptr: abi::envoy_dynamic_module_type_matcher_input_envoy_ptr,
+) {
+  MATCHER_SET_ERROR_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+// A matcher whose match hook panics, used to exercise the panic barrier that declare_matcher!
+// generates.
+struct PanicMatcherConfig;
+
+impl crate::matcher::MatcherConfig for PanicMatcherConfig {
+  fn new(_name: &str, _config: &[u8]) -> Result<Self, String> {
+    Ok(Self)
+  }
+
+  fn on_matcher_match(&self, _ctx: &crate::matcher::MatchContext) -> bool {
+    panic!("matcher hook panicked on purpose");
+  }
+}
+
+crate::declare_matcher!(PanicMatcherConfig);
+
+#[test]
+fn test_matcher_panic_reports_error_and_returns_false() {
+  use std::sync::atomic::Ordering;
+  MATCHER_SET_ERROR_CALLED.store(false, Ordering::SeqCst);
+
+  let empty = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: std::ptr::null_mut(),
+    length: 0,
+  };
+  let config = envoy_dynamic_module_on_matcher_config_new(std::ptr::null_mut(), empty, empty);
+  assert!(!config.is_null());
+
+  // The hook panics, so the barrier must report the error and return false rather than unwind.
+  let matched = envoy_dynamic_module_on_matcher_match(config, std::ptr::null_mut());
+  assert!(!matched);
+  assert!(MATCHER_SET_ERROR_CALLED.load(Ordering::SeqCst));
+
+  envoy_dynamic_module_on_matcher_config_destroy(config);
+}
+
 #[test]
 fn test_matcher_get_all_headers() {
   let ctx = crate::matcher::MatchContext::new(std::ptr::null_mut());

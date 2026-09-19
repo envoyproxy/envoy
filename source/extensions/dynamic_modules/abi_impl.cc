@@ -950,6 +950,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_matcher_get_header_value, false,
           envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_module_buffer,
           envoy_dynamic_module_type_envoy_buffer*, size_t, size_t*)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_matcher_set_error,
+               envoy_dynamic_module_type_matcher_input_envoy_ptr)
+
 // ---------------------- Matcher data input callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the matcher data input extension abi_impl.cc when the extension is used.
