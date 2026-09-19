@@ -233,6 +233,8 @@ class ClusterManagerImpl : public ClusterManager,
                            public MissingClusterNotifier,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
+  static constexpr uint32_t DefaultMaxClusterUpdateBatchSize = 32;
+
   absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
   bool initialized() override { return initialized_; }
@@ -1043,6 +1045,7 @@ private:
       UnitFloat drop_overload, absl::string_view drop_category);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
+  void queuePendingThreadLocalAction(PendingThreadLocalAction&& action);
 
   Server::Configuration::ServerFactoryContext& context_;
   ClusterManagerFactory& factory_;
@@ -1054,6 +1057,7 @@ private:
   Config::XdsManager& xds_manager_;
   Random::RandomGenerator& random_;
   const bool deferred_cluster_creation_;
+  const uint32_t max_cluster_update_batch_size_;
   std::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;

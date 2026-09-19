@@ -499,7 +499,7 @@ message Admin {
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ClusterManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.ClusterManager";
@@ -545,6 +545,12 @@ message ClusterManager {
   // inline during requests. This will save memory and CPU cycles in cases where
   // there are lots of inactive clusters and ``> 1`` worker thread.
   bool enable_deferred_cluster_creation = 5;
+
+  // Optional maximum number of cluster additions, updates, or removals to batch together
+  // before dispatching to worker threads. If a batch contains more items than this limit,
+  // it is flushed in chunks of this size to avoid blocking worker thread event loops.
+  // If not specified, the default is 32.
+  google.protobuf.UInt32Value max_cluster_update_batch_size = 6 [(validate.rules).uint32 = {gt: 0}];
 }
 
 // Allows you to specify different watchdog configs for different subsystems.

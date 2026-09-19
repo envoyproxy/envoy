@@ -3296,6 +3296,104 @@ TEST_F(ClusterManagerImplTest, BatchClusterUpdatesDeferredMultipleCallbacksInlin
   EXPECT_EQ(callback_order, expected_order);
 }
 
+// Verifies that when max_cluster_update_batch_size is configured, batches that exceed the threshold
+// perform intermediate flushes and flush any remaining actions upon batch destruction.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesMaxBatchSizeIntermediateFlush) {
+  const std::string bootstrap_yaml = R"EOF(
+  cluster_manager:
+    max_cluster_update_batch_size: 2
+  static_resources:
+    clusters:
+    - name: initial_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: initial_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11000
+  )EOF";
+  create(parseBootstrapFromV3Yaml(bootstrap_yaml));
+
+  // Add an API-added cluster so that it can be removed later in the test.
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("cluster_to_remove", 11010),
+                                                    "v1", true));
+  EXPECT_TRUE(cluster_manager_->hasCluster("cluster_to_remove"));
+
+  std::vector<std::string> callback_events;
+  MockClusterUpdateCallbacks callbacks;
+  EXPECT_CALL(callbacks, onClusterAddOrUpdate(_, _))
+      .WillRepeatedly(
+          Invoke([&callback_events](absl::string_view cluster_name, ThreadLocalClusterCommand&) {
+            callback_events.push_back(fmt::format("add/update:{}", cluster_name));
+          }));
+  EXPECT_CALL(callbacks, onClusterRemoval(_))
+      .WillRepeatedly(Invoke([&callback_events](absl::string_view cluster_name) {
+        callback_events.push_back(fmt::format("remove:{}", cluster_name));
+      }));
+
+  auto handle = cluster_manager_->addThreadLocalClusterUpdateCallbacks(callbacks);
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    ASSERT_NE(nullptr, batch);
+
+    // 1st update: queued (1 item, threshold is 2). No intermediate flush yet.
+    EXPECT_TRUE(
+        *cluster_manager_->addOrUpdateCluster(makeStaticCluster("batch_c1", 11001), "v1", true));
+    EXPECT_TRUE(callback_events.empty());
+    EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("batch_c1"));
+
+    // 2nd update: reaches threshold (2 items). Intermediate flush triggers immediately.
+    EXPECT_TRUE(
+        *cluster_manager_->addOrUpdateCluster(makeStaticCluster("batch_c2", 11002), "v1", true));
+    const std::vector<std::string> expected_first_flush = {
+        "add/update:batch_c1",
+        "add/update:batch_c2",
+    };
+    EXPECT_EQ(callback_events, expected_first_flush);
+    EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("batch_c1"));
+    EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("batch_c2"));
+
+    // 3rd update: queued (1 item in new batch chunk, threshold is 2). No flush yet.
+    EXPECT_TRUE(
+        *cluster_manager_->addOrUpdateCluster(makeStaticCluster("batch_c3", 11003), "v1", true));
+    EXPECT_EQ(callback_events, expected_first_flush);
+    EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("batch_c3"));
+
+    // 4th update (removal): reaches threshold (2 items). Intermediate flush triggers.
+    EXPECT_TRUE(cluster_manager_->removeCluster("cluster_to_remove", true));
+    const std::vector<std::string> expected_second_flush = {
+        "add/update:batch_c1",
+        "add/update:batch_c2",
+        "add/update:batch_c3",
+        "remove:cluster_to_remove",
+    };
+    EXPECT_EQ(callback_events, expected_second_flush);
+    EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("batch_c3"));
+    EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_to_remove"));
+
+    // 5th update: queued (1 item in next chunk). Not flushed yet.
+    EXPECT_TRUE(
+        *cluster_manager_->addOrUpdateCluster(makeStaticCluster("batch_c4", 11004), "v1", true));
+    EXPECT_EQ(callback_events, expected_second_flush);
+    EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("batch_c4"));
+  }
+
+  // Batch destruction flushes any remaining items (the 5th update).
+  const std::vector<std::string> expected_final = {
+      "add/update:batch_c1",      "add/update:batch_c2", "add/update:batch_c3",
+      "remove:cluster_to_remove", "add/update:batch_c4",
+  };
+  EXPECT_EQ(callback_events, expected_final);
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("batch_c4"));
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

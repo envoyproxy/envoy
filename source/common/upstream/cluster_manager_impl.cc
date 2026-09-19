@@ -312,6 +312,9 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
       stats_(context.serverScope().store()), tls_(context.threadLocal()),
       xds_manager_(context.xdsManager()), random_(context.api().randomGenerator()),
       deferred_cluster_creation_(bootstrap.cluster_manager().enable_deferred_cluster_creation()),
+      max_cluster_update_batch_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          bootstrap.cluster_manager(), max_cluster_update_batch_size,
+          DefaultMaxClusterUpdateBatchSize)),
       bind_config_(bootstrap.cluster_manager().has_upstream_bind_config()
                        ? std::make_optional(bootstrap.cluster_manager().upstream_bind_config())
                        : std::nullopt),
@@ -376,6 +379,13 @@ ClusterUpdateBatchPtr ClusterManagerImpl::createSourceBatch() {
     return std::make_unique<ClusterUpdateBatchImpl>(*this);
   }
   return nullptr;
+}
+
+void ClusterManagerImpl::queuePendingThreadLocalAction(PendingThreadLocalAction&& action) {
+  pending_thread_local_actions_.push_back(std::move(action));
+  if (pending_thread_local_actions_.size() >= max_cluster_update_batch_size_) {
+    applyPendingThreadLocalUpdates();
+  }
 }
 
 void ClusterManagerImpl::startBatch() { active_batches_++; }
@@ -1057,7 +1067,7 @@ bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const boo
       PendingThreadLocalAction action;
       action.type_ = PendingThreadLocalAction::Type::Removal;
       action.removal_cluster_name_ = std::string(cluster_name);
-      pending_thread_local_actions_.push_back(std::move(action));
+      queuePendingThreadLocalAction(std::move(action));
     } else {
       // Fallback path: immediately broadcast cluster removal to all worker threads.
       tls_.runOnAllThreads([cluster_name = std::string(cluster_name)](
@@ -1467,7 +1477,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     action.drop_overload_ = drop_overload;
     action.drop_category_ = std::move(drop_category);
     action.enable_batch_aware_update_ = enable_batch_aware_update;
-    pending_thread_local_actions_.push_back(std::move(action));
+    queuePendingThreadLocalAction(std::move(action));
   } else {
     tls_.runOnAllThreads([info = cm_cluster.cluster().info(), params = std::move(params),
                           add_or_update_cluster, load_balancer_factory, map = std::move(host_map),
