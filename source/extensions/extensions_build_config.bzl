@@ -15,6 +15,7 @@ EXTENSIONS = {
     "envoy.access_loggers.stats":                       "//source/extensions/access_loggers/stats:config",
     "envoy.access_loggers.stdout":                      "//source/extensions/access_loggers/stream:config",
     "envoy.access_loggers.stderr":                      "//source/extensions/access_loggers/stream:config",
+    "envoy.access_loggers.syslog":                     "//source/extensions/access_loggers/syslog:config",
     "envoy.access_loggers.wasm":                        "//source/extensions/access_loggers/wasm:config",
 
     #
