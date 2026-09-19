@@ -509,19 +509,18 @@ protected:
    */
   struct PendingThreadLocalAction {
     enum class Type { Update, Removal };
-    Type type_{Type::Update};
 
-    ClusterInfoConstSharedPtr info_;
+    std::string drop_category_;
+    std::string removal_cluster_name_;
     ThreadLocalClusterUpdateParams params_;
-    bool add_or_update_cluster_{false};
+    ClusterInfoConstSharedPtr info_;
     LoadBalancerFactorySharedPtr load_balancer_factory_;
     HostMapConstSharedPtr host_map_;
     ClusterInitializationObjectConstSharedPtr cluster_initialization_object_;
+    Type type_{Type::Update};
     UnitFloat drop_overload_{0};
-    std::string drop_category_;
+    bool add_or_update_cluster_{false};
     bool enable_batch_aware_update_{false};
-
-    std::string removal_cluster_name_;
   };
 
   /**

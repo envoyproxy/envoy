@@ -88,7 +88,7 @@ private:
   // The cm_ will only be valid after the cluster-manager is initialized.
   // Note that this implies that the xDS-manager must be shut down properly
   // prior to the cluster-manager deletion.
-  Upstream::ClusterManager* cm_;
+  Upstream::ClusterManager* cm_{nullptr};
   GrpcMuxSharedPtr ads_mux_;
 
   // Stores all authorities as configured in the bootstrap under config_sources.
