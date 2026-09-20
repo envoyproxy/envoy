@@ -1,8 +1,8 @@
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
-    "envoy_cc_binary",
     "envoy_cc_benchmark_binary",
+    "envoy_cc_binary",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_cc_mock",
@@ -19,20 +19,20 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "select_enable_exceptions_dep",
-    hdrs = ["select_enable_exceptions_dep.h"],
     srcs = ["select_enable_exceptions_dep.cc"],
+    hdrs = ["select_enable_exceptions_dep.h"],
 )
 
 envoy_cc_library(
     name = "select_hot_restart_dep",
-    hdrs = ["select_hot_restart_dep.h"],
     srcs = ["select_hot_restart_dep.cc"],
+    hdrs = ["select_hot_restart_dep.h"],
 )
 
 envoy_cc_library(
     name = "external_lib",
-    hdrs = ["external_lib.h"],
     srcs = ["external_lib.cc"],
+    hdrs = ["external_lib.h"],
     deps = envoy_select_enable_exceptions(
         [":select_enable_exceptions_dep"],
     ) + envoy_select_hot_restart(
@@ -42,8 +42,8 @@ envoy_cc_library(
 
 envoy_cc_extension(
     name = "external_extension",
-    hdrs = ["external_extension.h"],
     srcs = ["external_extension.cc"],
+    hdrs = ["external_extension.h"],
     deps = [":external_lib"],
 )
 
@@ -55,8 +55,8 @@ envoy_cc_binary(
 
 envoy_cc_test_library(
     name = "external_test_lib",
-    hdrs = ["external_test_lib.h"],
     srcs = ["external_test_lib.cc"],
+    hdrs = ["external_test_lib.h"],
     deps = [":external_lib"],
 )
 

@@ -4,12 +4,14 @@ bazel_dep(name = "envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
 bazel_dep(name = "envoy-docs", version = "1.40.0-dev")
 bazel_dep(name = "envoy_toolshed", version = "0.4.15.envoy")
+
 bazel_dep(
     name = "google_benchmark",
     version = "1.9.5",
     dev_dependency = True,
     repo_name = "benchmark",
 )
+
 bazel_dep(name = "protobuf", version = "35.1.bcr.envoy")
 bazel_dep(name = "quiche", version = "0.0.0-260831-5c9cc6b.envoy")
 bazel_dep(name = "rules_python", version = "2.2.0")

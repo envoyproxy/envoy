@@ -68,6 +68,7 @@ def envoy_copts(test = False):
         "-Wno-deprecated-declarations",
         "-Wreturn-type",
     ]
+
     # Windows options for cleanest service compilation;
     #   General MSVC C++ options for Envoy current expectations.
     #   Target windows.h for all Windows 10 (0x0A) API prototypes (ntohll etc)
@@ -94,7 +95,7 @@ def envoy_copts(test = False):
     ]
 
     return select({
-              _WINDOWS_X86_64: msvc_options,
+               _WINDOWS_X86_64: msvc_options,
                "//conditions:default": posix_options,
            }) + select({
                # Simplify the amount of symbolic debug info for test binaries, since

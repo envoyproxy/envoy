@@ -1,6 +1,5 @@
 #include "external_mock.h"
 #include "external_test_lib.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
