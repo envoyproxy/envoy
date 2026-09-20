@@ -292,6 +292,8 @@ test_program(name = "upstream_bridge_headers_end_stream")
 
 test_program(name = "upstream_bridge_headers_end_stream_no_body")
 
+test_program(name = "upstream_bridge_terminal_response")
+
 test_program(name = "tracer_no_op")
 
 test_program(name = "tracer_config_fail")
