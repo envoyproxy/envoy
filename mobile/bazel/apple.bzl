@@ -10,7 +10,7 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
         srcs = srcs,
         hdrs = hdrs,
         copts = ["-ObjC++", "-std=c++20", "-Wno-shorten-64-to-32"],
-        defines = envoy_mobile_defines("@envoy"),
+        defines = envoy_mobile_defines(),
         module_name = module_name,
         sdk_frameworks = sdk_frameworks,
         visibility = visibility,
@@ -42,7 +42,7 @@ def envoy_mobile_swift_test(name, srcs, size = None, data = [], deps = [], tags 
         srcs = srcs,
         data = data,
         deps = [
-            repository + "//library/swift:ios_lib",
+            Label("//library/swift:ios_lib"),
         ] + deps,
         linkopts = ["-lresolv.9"],
         testonly = True,

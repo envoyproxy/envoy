@@ -11,6 +11,16 @@ load(
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
+load(":envoy_select.bzl", "deprecate_repository")
+
+_APPLE = Label("//bazel:apple")
+_COVERAGE_BUILD = Label("//bazel:coverage_build")
+_ENGFLOW_RBE_X86_64 = Label("//bazel:engflow_rbe_x86_64")
+_FIPS_BUILD = Label("//bazel:fips_build")
+_GNU_BUILD_ID = Label("//bazel:gnu_build_id.ldscript")
+_RAW_BUILD_ID = Label("//bazel:raw_build_id.ldscript")
+_WINDOWS_OPT_BUILD = Label("//bazel:windows_opt_build")
+_WINDOWS_X86_64 = Label("//bazel:windows_x86_64")
 
 # Envoy C++ binary targets should be specified with this function.
 def envoy_cc_binary(
@@ -30,8 +40,9 @@ def envoy_cc_binary(
         tags = [],
         features = [],
         linkstatic = True):
+    deprecate_repository("envoy_cc_binary", repository)
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
+        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     linker_inputs = envoy_exported_symbols_input()
@@ -48,13 +59,13 @@ def envoy_cc_binary(
         srcs = srcs,
         data = data,
         additional_linker_inputs = linker_inputs,
-        copts = envoy_copts(repository),
+        copts = envoy_copts(),
         exec_properties = exec_properties,
         linkopts = linkopts,
         testonly = testonly,
         linkstatic = linkstatic,
         visibility = visibility,
-        malloc = tcmalloc_external_dep(repository),
+        malloc = tcmalloc_external_dep(),
         stamp = stamp,
         deps = deps,
         tags = tags,
@@ -64,20 +75,20 @@ def envoy_cc_binary(
 # Compute the final linkopts based on various options.
 def _envoy_linkopts():
     return select({
-        "@envoy//bazel:apple": [
+        _APPLE: [
             # https://github.com/envoyproxy/envoy/issues/24782
             "-Wl,-framework,CoreFoundation",
             # https://github.com/bazelbuild/bazel/pull/16414
             "-Wl,-undefined,error",
         ],
-        "@envoy//bazel:windows_opt_build": [
+        _WINDOWS_OPT_BUILD: [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",
             "-DEFAULTLIB:shell32.lib",
             "-DEBUG:FULL",
             "-WX",
         ],
-        "@envoy//bazel:windows_x86_64": [
+        _WINDOWS_X86_64: [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",
             "-DEFAULTLIB:shell32.lib",
@@ -91,20 +102,20 @@ def _envoy_linkopts():
             "-Wl,--hash-style=gnu",
         ],
     }) + select({
-        "@envoy//bazel:apple": [],
-        "@envoy//bazel:fips_build": [],
-        "@envoy//bazel:windows_x86_64": [],
+        _APPLE: [],
+        _FIPS_BUILD: [],
+        _WINDOWS_X86_64: [],
         "//conditions:default": ["-pie"],
     }) + envoy_select_exported_symbols(["-Wl,-E"])
 
 def _envoy_stamped_deps():
     return select({
-        "@envoy//bazel:windows_x86_64": [],
-        "@envoy//bazel:apple": [
-            "@envoy//bazel:raw_build_id.ldscript",
+        _WINDOWS_X86_64: [],
+        _APPLE: [
+            _RAW_BUILD_ID,
         ],
         "//conditions:default": [
-            "@envoy//bazel:gnu_build_id.ldscript",
+            _GNU_BUILD_ID,
         ],
     })
 
@@ -113,18 +124,18 @@ def _envoy_stamped_linkopts():
         # Coverage builds in CI are failing to link when setting a build ID.
         #
         # /usr/bin/ld.gold: internal error in write_build_id, at ../../gold/layout.cc:5419
-        "@envoy//bazel:coverage_build": [],
-        "@envoy//bazel:windows_x86_64": [],
+        _COVERAGE_BUILD: [],
+        _WINDOWS_X86_64: [],
 
         # macOS doesn't have an official equivalent to the `.note.gnu.build-id`
         # ELF section, so just stuff the raw ID into a new text section.
-        "@envoy//bazel:apple": [
+        _APPLE: [
             "-sectcreate __TEXT __build_id",
-            "$(location @envoy//bazel:raw_build_id.ldscript)",
+            "$(location %s)" % str(_RAW_BUILD_ID),
         ],
 
         # Note: assumes GNU GCC (or compatible) handling of `--build-id` flag.
         "//conditions:default": [
-            "-Wl,@$(location @envoy//bazel:gnu_build_id.ldscript)",
+            "-Wl,@$(location %s)" % str(_GNU_BUILD_ID),
         ],
     })

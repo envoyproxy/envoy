@@ -978,6 +978,7 @@ case $CI_TARGET in
         pushd "${ENVOY_SRCDIR}/bazel/tests/external"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" @envoy//source/common/common:assert_lib
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" @envoy-docs
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" //...
         popd
         ;;
 
