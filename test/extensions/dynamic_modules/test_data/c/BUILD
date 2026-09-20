@@ -250,6 +250,8 @@ test_program(name = "matcher_missing_config_destroy")
 
 test_program(name = "matcher_check_headers")
 
+test_program(name = "matcher_error")
+
 test_program(name = "matcher_string_input_echo")
 
 test_program(name = "matcher_string_input_config_new_fail")
