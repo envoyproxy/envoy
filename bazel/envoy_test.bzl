@@ -305,17 +305,30 @@ def envoy_cc_test_binary(
         **kargs
     )
 
+def _append_unique(items, extra):
+    result = list(items)
+    for item in extra:
+        if item not in result:
+            result.append(item)
+    return result
+
 # Envoy benchmark binaries should be specified with this function. bazel run
 # these targets to measure performance.
 def envoy_cc_benchmark_binary(
         name,
+        srcs = [],
         deps = [],
-        repository = "",
         **kargs):
     envoy_cc_test_binary(
         name,
-        deps = deps + [repository + "//test/benchmark:main"],
-        repository = repository,
+        srcs = _append_unique(srcs, [Label("//test/benchmark:main.cc")]),
+        deps = _append_unique(deps, [
+            Label("//test/benchmark:main_lib"),
+            # These intentionally resolve in the caller's repo mapping so downstream
+            # bzlmod consumers must declare benchmark dependencies in their MODULE.bazel.
+            "@benchmark",
+            "@tclap",
+        ]),
         **kargs
     )
 
@@ -323,13 +336,19 @@ def envoy_cc_benchmark_binary(
 # these targets to measure performance.
 def envoy_cc_benchmark_dyn_module_binary(
         name,
+        srcs = [],
         deps = [],
-        repository = "",
         **kargs):
     envoy_cc_test_binary(
         name,
-        deps = deps + [repository + "//test/benchmark:main"],
-        repository = repository,
+        srcs = _append_unique(srcs, [Label("//test/benchmark:main.cc")]),
+        deps = _append_unique(deps, [
+            Label("//test/benchmark:main_lib"),
+            # These intentionally resolve in the caller's repo mapping so downstream
+            # bzlmod consumers must declare benchmark dependencies in their MODULE.bazel.
+            "@benchmark",
+            "@tclap",
+        ]),
         linkopts = _envoy_test_default_exported_symbols(),
         **kargs
     )
