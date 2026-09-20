@@ -189,6 +189,7 @@ message RouteConfiguration {
   //   and return no route. Then Envoy will treat it as route not found and result in 404 response.
   //
   // See :ref:`route specifiers <config_http_conn_man_route_specifiers>` for more details.
+  // [#extension-category: envoy.router.route_specifiers]
   repeated core.v3.TypedExtensionConfig route_specifiers = 19;
 }
 

@@ -29,6 +29,7 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
 pub mod network;
+pub mod route_specifier;
 pub mod stats_sink;
 pub mod tracer;
 pub mod transport_socket;
@@ -801,6 +802,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `access_logger:` — [`NewAccessLoggerConfigFunction`] for access loggers
 /// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
 /// - `cluster_specifier:` — [`NewClusterSpecifierConfigFunction`] for cluster specifiers
+/// - `route_specifier:` — [`NewRouteSpecifierConfigFunction`] for route specifiers
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 /// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
 /// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
@@ -1024,6 +1026,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
       $fn,
       "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
+    );
+  };
+  (@register route_specifier : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION"
     );
   };
   (@register stat_sink : $fn:expr) => {
@@ -1433,6 +1442,89 @@ macro_rules! declare_cluster_specifier_init_functions {
           envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
           $new_cluster_specifier_config_fn,
           "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =================================================================================================
+// Route Specifier Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new route specifier configuration.
+///
+/// The `name` is the value of `specifier_name` from the `dynamic_modules` route specifier
+/// configuration, allowing a single module to dispatch to different route specifier
+/// implementations. The `config` is the raw bytes from the `specifier_config` field. The
+/// `envoy_config` handle reports what the route specifier configuration declares and defines
+/// metrics. Returning `None` causes Envoy to reject the route specifier configuration.
+pub type NewRouteSpecifierConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    envoy_config: std::sync::Arc<dyn route_specifier::EnvoyRouteSpecifierConfig>,
+  ) -> Option<Box<dyn route_specifier::RouteSpecifierConfig>>;
+
+/// The global factory function for route specifiers. This is set via the `route_specifier:` arm of
+/// [`declare_all_init_functions!`] (or the [`declare_route_specifier_init_functions!`] shim) and is
+/// not intended to be set directly.
+pub static NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION: OnceLock<NewRouteSpecifierConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a route specifier dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewRouteSpecifierConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::route_specifier::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_route_specifier_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _envoy_config: std::sync::Arc<dyn EnvoyRouteSpecifierConfig>,
+/// ) -> Option<Box<dyn RouteSpecifierConfig>> {
+///   Some(Box::new(MyRouteSpecifierConfig {}))
+/// }
+///
+/// struct MyRouteSpecifierConfig {}
+///
+/// impl RouteSpecifierConfig for MyRouteSpecifierConfig {
+///   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision {
+///     if ctx.select_template("canary") {
+///       RouteDecision::SelectTemplate
+///     } else {
+///       RouteDecision::PassThrough
+///     }
+///   }
+/// }
+///
+/// declare_route_specifier_init_functions!(program_init, new_route_specifier_config);
+/// ```
+#[macro_export]
+macro_rules! declare_route_specifier_init_functions {
+  ($f:ident, $new_route_specifier_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION,
+          $new_route_specifier_config_fn,
+          "NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION"
         );
         if ($f()) {
           envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()

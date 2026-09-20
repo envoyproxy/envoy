@@ -216,12 +216,13 @@ class TestRouteSpecifierFactory : public RouteSpecifierFactory {
 public:
   absl::StatusOr<RouteSpecifierSharedPtr>
   createRouteSpecifier(const Protobuf::Message& config,
-                       Server::Configuration::ServerFactoryContext&) override {
+                       RouteSpecifierFactoryContext& context) override {
     const std::string& key = dynamic_cast<const Protobuf::StringValue&>(config).value();
     auto it = specifiers_.find(key);
     if (it == specifiers_.end()) {
       return absl::InvalidArgumentError(absl::StrCat("no test route specifier named ", key));
     }
+    route_builders_[key] = context.routeBuilder().ptr();
     return it->second;
   }
 
@@ -233,6 +234,8 @@ public:
   // The specifiers this factory can hand back, by config key. Owned by the factory, so each test
   // fixture starts with an empty one.
   absl::flat_hash_map<std::string, RouteSpecifierSharedPtr> specifiers_;
+  // The route builder each specifier was created with, to check which levels can build routes.
+  absl::flat_hash_map<std::string, RouteBuilder*> route_builders_;
 };
 
 envoy::config::core::v3::TypedExtensionConfig testSpecifierConfig(const std::string& key) {
@@ -255,31 +258,36 @@ protected:
     return configs;
   }
 
+  RouteSpecifierFactoryContextImpl specifierContext() { return {context_, {}}; }
+
   TestRouteSpecifierFactory factory_;
   Registry::InjectFactory<RouteSpecifierFactory> registered_{factory_};
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
 
 TEST_F(CreateRouteSpecifiersTest, CreatesSpecifiersInConfiguredOrder) {
+  RouteSpecifierFactoryContextImpl specifier_context = specifierContext();
   auto first = std::make_shared<NiceMock<MockRouteSpecifier>>();
   auto second = std::make_shared<NiceMock<MockRouteSpecifier>>();
   factory_.specifiers_["first"] = first;
   factory_.specifiers_["second"] = second;
 
-  auto specifiers = createRouteSpecifiers(configs({"second", "first"}), context_);
+  auto specifiers = createRouteSpecifiers(configs({"second", "first"}), specifier_context);
 
   ASSERT_TRUE(specifiers.ok());
   EXPECT_THAT(*specifiers, ElementsAre(second, first));
 }
 
 TEST_F(CreateRouteSpecifiersTest, EmptyConfigCreatesNoSpecifiers) {
-  auto specifiers = createRouteSpecifiers(configs({}), context_);
+  RouteSpecifierFactoryContextImpl specifier_context = specifierContext();
+  auto specifiers = createRouteSpecifiers(configs({}), specifier_context);
 
   ASSERT_TRUE(specifiers.ok());
   EXPECT_TRUE(specifiers->empty());
 }
 
 TEST_F(CreateRouteSpecifiersTest, UnknownSpecifierIsRejected) {
+  RouteSpecifierFactoryContextImpl specifier_context = specifierContext();
   envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.test.not_registered");
   Protobuf::UInt32Value value;
@@ -288,21 +296,23 @@ TEST_F(CreateRouteSpecifiersTest, UnknownSpecifierIsRejected) {
   *configs.Add() = config;
 
   EXPECT_THAT(
-      createRouteSpecifiers(configs, context_).status(),
+      createRouteSpecifiers(configs, specifier_context).status(),
       HasStatusMessage(HasSubstr("Didn't find a registered route specifier implementation for "
                                  "'envoy.test.not_registered'")));
 }
 
 TEST_F(CreateRouteSpecifiersTest, FactoryErrorIsPropagated) {
-  EXPECT_THAT(createRouteSpecifiers(configs({"missing"}), context_).status(),
+  RouteSpecifierFactoryContextImpl specifier_context = specifierContext();
+  EXPECT_THAT(createRouteSpecifiers(configs({"missing"}), specifier_context).status(),
               HasStatusMessage("no test route specifier named missing"));
 }
 
 // A factory that reports success but hands back nothing would silently drop configuration.
 TEST_F(CreateRouteSpecifiersTest, NullSpecifierIsRejected) {
+  RouteSpecifierFactoryContextImpl specifier_context = specifierContext();
   factory_.specifiers_["null"] = nullptr;
 
-  EXPECT_THAT(createRouteSpecifiers(configs({"null"}), context_).status(),
+  EXPECT_THAT(createRouteSpecifiers(configs({"null"}), specifier_context).status(),
               HasStatusMessage(HasSubstr("produced a null specifier")));
 }
 

@@ -1,0 +1,317 @@
+syntax = "proto3";
+
+package envoy.extensions.router.route_specifiers.dynamic_modules.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+import "envoy/type/matcher/v3/string.proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.router.route_specifiers.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/router/route_specifiers/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic modules route specifier]
+//
+// A :ref:`route specifier <config_http_conn_man_route_specifiers>` implemented by a
+// :ref:`dynamic module <arch_overview_dynamic_modules>`. For each request the module keeps the
+// route that route matching resolved, refines it, replaces it with one of the route templates
+// declared here, or drops it. Envoy builds every route from validated configuration, so a module
+// can never produce a malformed route.
+//
+// See :ref:`the dynamic modules route specifier
+// <config_http_route_specifiers_dynamic_modules>` for more details.
+// [#extension: envoy.router.route_specifiers.dynamic_modules]
+
+// What Envoy does when the decision of the module cannot be honored.
+//
+// This covers a module that reports an error, which is what the SDK does when the module panics, a
+// decision that selects no template or an unknown one, a template whose ``match`` does not hold for
+// the request, an override of a route that route matching did not resolve, route entry overrides
+// recorded for a direct response, and route metadata a typed metadata factory rejects.
+enum FailurePolicy {
+  // Must be set explicitly unless the specifier runs in shadow mode.
+  FAILURE_POLICY_UNSPECIFIED = 0;
+
+  // Use the route the specifier was given, unchanged, and carry on with the chain. This keeps the
+  // routing of the route table the module replaces in effect while it is being rolled out. If the
+  // specifier was given no route, the request has no route.
+  PASS_THROUGH = 1;
+
+  // Use no route, so the request is handled as if nothing had matched, and end the chain. Prefer
+  // this once the module owns the routing of the virtual host, so that a failure never falls back
+  // to the routes that are left.
+  NO_ROUTE = 2;
+}
+
+// A named route the module may select for a request.
+//
+// A template is built and validated once, when the specifier is configured, so an invalid template
+// is rejected at configuration load. It inherits from the virtual host and the route configuration
+// the specifier is configured on, exactly like a configured route does. When the module selects a
+// template, Envoy evaluates it against the request like a configured route: the
+// :ref:`match <envoy_v3_api_field_config.route.v3.Route.match>` must hold, otherwise the
+// ``failure_policy`` applies, and the action is resolved the usual way, including
+// :ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>` and
+// :ref:`cluster specifier plugins
+// <envoy_v3_api_field_config.route.v3.RouteAction.cluster_specifier_plugin>`.
+message RouteTemplate {
+  // The identifier the module selects this template with. Must be unique within the specifier.
+  string template_id = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The route. ``route_specifiers`` must be empty, since a template is not run through the
+  // specifier chains.
+  config.route.v3.Route route = 2 [(validate.rules).message = {required: true}];
+}
+
+// Route action properties the module may select by name for a request.
+//
+// These properties are built from other extensions, so they are declared here and built once at
+// configuration load rather than constructed on the request path. An entry that replaces no
+// property is rejected. A property an entry leaves unset keeps the value of the route the decision
+// produced, so an entry can never remove a property that route configures.
+// [#next-free-field: 8]
+message RouteActionOverride {
+  // Retry policy replacing the retry policy of the produced route.
+  config.route.v3.RetryPolicy retry_policy = 1;
+
+  // Metadata match criteria replacing those of the produced route, used by subset load balancing.
+  // Only the ``envoy.lb`` entry of :ref:`filter_metadata
+  // <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` is used, matching the behavior of
+  // :ref:`RouteAction.metadata_match
+  // <envoy_v3_api_field_config.route.v3.RouteAction.metadata_match>`. An entry whose only property
+  // is a ``metadata_match`` without an ``envoy.lb`` entry replaces nothing and is rejected.
+  config.core.v3.Metadata metadata_match = 2;
+
+  // Request mirroring policies replacing those of the produced route. Statically named mirror
+  // clusters are checked against the cluster manager when ``validate_clusters`` is enabled.
+  repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 3;
+
+  // Hash policy replacing the hash policy of the produced route, used when the upstream cluster
+  // employs a hashing load balancer. A cluster level and a load balancer level hash policy, when
+  // configured, take precedence over this route level policy.
+  repeated config.route.v3.RouteAction.HashPolicy hash_policy = 4;
+
+  // Hedge policy replacing the hedge policy of the produced route.
+  config.route.v3.HedgePolicy hedge_policy = 5;
+
+  // Rate limits replacing the rate limits of the produced route.
+  repeated config.route.v3.RateLimit rate_limits = 6;
+
+  // CORS policy replacing the CORS policy of the produced route. The CORS filter reads it only when
+  // CORS is not configured through per filter configuration.
+  config.route.v3.CorsPolicy cors = 7;
+}
+
+// Shadow mode configuration.
+//
+// The specifier computes the route the module asks for, compares it with the route it was given,
+// emits statistics, reports the result to the module, and then returns the route it was given
+// unchanged without ending the chain. This is how a module is validated against the route table it
+// replaces before it serves traffic.
+//
+// The comparison covers the route decision as observable through Envoy's route interfaces,
+// including the request headers as the route finalizes them. Because it runs while the route is
+// resolved, that finalization approximates what the router sends: the router adds
+// ``x-envoy-expected-rq-timeout-ms`` and ``x-envoy-attempt-count`` first, and finalizes with the
+// active tracing span. Header mutations whose formatters read those are evaluated with the same
+// incomplete context on both sides, so they can agree here and differ once live. The comparison
+// does not prove equivalence of those formatters, of per filter configuration values other than
+// whether a filter is disabled, of decorators, of virtual host level behavior, of the internals of
+// extension backed retry predicates, header matchers, CORS origin matchers and tracing custom
+// tags, which are compared by count and presence only, or of response header mutations that read
+// the actual response.
+message ShadowMode {
+  // A property of the route that is compared. The mismatching properties are reported to the module
+  // as a bit set, so values must stay below 64.
+  enum CompareField {
+    COMPARE_FIELD_UNSPECIFIED = 0;
+
+    // Whether both routes are of the same kind. Always compared, and the other properties are only
+    // compared when the kinds are equal.
+    ROUTE_KIND = 1;
+
+    CLUSTER_NAME = 2;
+
+    TIMEOUT = 3;
+
+    IDLE_TIMEOUT = 4;
+
+    MAX_STREAM_DURATION = 5;
+
+    PRIORITY = 6;
+
+    REQUEST_BODY_BUFFER_LIMIT = 7;
+
+    CLUSTER_NOT_FOUND_RESPONSE_CODE = 8;
+
+    // The retry policy, plus the counts of its retriable header matchers, reset headers, host
+    // predicates and options predicates, and whether it configures a retry priority.
+    RETRY_POLICY = 9;
+
+    HEDGE_POLICY = 10;
+
+    // The subset load balancing metadata match criteria.
+    METADATA_MATCH = 11;
+
+    // Whether a hash policy is configured and the hash it generates for the request.
+    HASH_POLICY = 12;
+
+    // The request mirroring policies, plus the headers each of them adds to a mirrored request.
+    REQUEST_MIRROR_POLICIES = 13;
+
+    // ``:path`` and ``x-envoy-original-path`` of the finalized request headers.
+    REQUEST_PATH = 14;
+
+    // ``:authority``, ``x-envoy-original-host`` and ``x-forwarded-host`` of the finalized request
+    // headers.
+    REQUEST_AUTHORITY = 15;
+
+    // The other finalized request headers.
+    REQUEST_HEADERS = 16;
+
+    // The response header mutations, evaluated against an empty response.
+    RESPONSE_HEADERS = 17;
+
+    // Whether the filters named by ``filter_names``, and the filters the module disabled or
+    // enabled, are disabled.
+    FILTER_DISABLED = 18;
+
+    // The status code of direct responses and redirects.
+    RESPONSE_CODE = 19;
+
+    // The location a redirect answers with. Empty for a direct response that is not a redirect.
+    REDIRECT_LOCATION = 20;
+
+    // The name of the virtual host the route belongs to.
+    VIRTUAL_HOST_NAME = 21;
+
+    // The route metadata.
+    ROUTE_METADATA = 22;
+
+    // The body and content type of direct responses. Formats the body of every shadowed direct
+    // response, so it is not compared by default.
+    DIRECT_RESPONSE_BODY = 23;
+
+    // The route name. Template identifiers and configured route names usually differ, so it is not
+    // compared by default.
+    ROUTE_NAME = 24;
+
+    // The rate limits, compared by the descriptors and limit overrides they generate for the
+    // request.
+    RATE_LIMIT_POLICY = 25;
+
+    // The CORS policy. Origin matchers are compared by count.
+    CORS = 26;
+
+    // The tracing configuration, its sampling and the count of its custom tags.
+    TRACING = 27;
+  }
+
+  // The properties that are compared. Duplicates are ignored. If not specified, defaults to every
+  // property except ``DIRECT_RESPONSE_BODY`` and ``ROUTE_NAME``.
+  repeated CompareField compare_fields = 1
+      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
+
+  // HTTP filter names whose disabled state ``FILTER_DISABLED`` compares, for example the
+  // authorization and rate limit filters of the listener. The filters the module disables or
+  // enables for a request are always compared.
+  repeated string filter_names = 2 [(validate.rules).repeated = {items {string {min_len: 1}}}];
+}
+
+// Configuration for the dynamic modules route specifier.
+// [#next-free-field: 14]
+message DynamicModuleRouteSpecifier {
+  // Specifies the shared object level configuration. This field is required.
+  //
+  // .. note::
+  //   This extension loads the module while the route configuration is built, so it cannot wait
+  //   for an asynchronous fetch. A remote :ref:`module
+  //   <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>` is therefore
+  //   accepted only when the module is already cached on disk, and is otherwise rejected. Setting
+  //   :ref:`nack_on_cache_miss
+  //   <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.nack_on_cache_miss>` to
+  //   ``true`` makes the rejection start a background fetch so that a later update succeeds. Prefer
+  //   ``name`` or a local data source.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name for this route specifier configuration, used to select an implementation within the
+  // module. If not specified, defaults to an empty string.
+  string specifier_name = 2;
+
+  // The configuration for the route specifier chosen by ``specifier_name``. If not specified,
+  // defaults to an empty configuration.
+  google.protobuf.Any specifier_config = 3;
+
+  // Prefix for the statistics of this specifier, emitted as
+  // ``route_specifier.dynamic_modules.<stat_prefix>.*``. Specifiers that share a prefix share
+  // counters, so the prefix must be unique within the Envoy process.
+  string stat_prefix = 4 [(validate.rules).string = {min_len: 1}];
+
+  // The route templates the module may select. The ``template_id`` values must be unique.
+  repeated RouteTemplate route_templates = 5;
+
+  // Route action overrides the module may select by name with ``set_route_action_override``.
+  map<string, RouteActionOverride> route_action_overrides = 6
+      [(validate.rules).map = {keys {string {min_len: 1}}}];
+
+  // If specified, the specifier runs in shadow mode and never changes the routing of a request.
+  ShadowMode shadow_mode = 7;
+
+  // Fraction of requests the module is invoked for. A request outside the fraction is passed
+  // through untouched and counted in ``runtime_skipped``. The stable random value of the request is
+  // used, so the choice holds when the route of a request is recomputed. If not specified,
+  // defaults to every request.
+  //
+  // .. attention::
+  //   A request outside the fraction is routed by ``routes`` or ``matcher`` alone, so a fraction
+  //   below 100% is only safe, as a canary or as an emergency switch with the runtime key set to
+  //   ``0``, while the route table the module replaces is still complete. Once that table has been
+  //   shrunk, lowering the fraction turns the affected requests into 404s or routes them wrongly, and
+  //   the way back is a route configuration rollback that restores the table.
+  config.core.v3.RuntimeFractionalPercent runtime_fraction = 8;
+
+  // What Envoy does when the decision of the module cannot be honored. Must be set unless
+  // ``shadow_mode`` is set, where the route the specifier was given is always used.
+  FailurePolicy failure_policy = 9 [(validate.rules).enum = {defined_only: true}];
+
+  // Whether the clusters the route templates and the route action overrides name are checked
+  // against the cluster manager while the specifier is configured. If not specified, defaults to
+  // ``false``, because the clusters a route names may be delivered after the route configuration
+  // that references them. An unknown cluster then fails the request with the
+  // ``cluster_not_found_response_code`` of the route instead.
+  google.protobuf.BoolValue validate_clusters = 10;
+
+  // The clusters the module may select with ``set_cluster_name``. A name that matches none of these
+  // matchers is rejected, and the cluster of the produced route stays in effect. If not specified,
+  // any cluster name is accepted.
+  //
+  // .. attention::
+  //   Without this list a module that derives cluster names from the request can route to any
+  //   configured cluster, including ones no route exposes. Configure it, or have the module map the
+  //   request onto a closed set of names from its own configuration.
+  repeated type.matcher.v3.StringMatcher allowed_cluster_names = 11;
+
+  // Metadata namespaces the module may write with ``set_route_metadata_*``. A namespace that
+  // matches none of these matchers is rejected. If not specified, any namespace is accepted.
+  repeated type.matcher.v3.StringMatcher allowed_metadata_namespaces = 12;
+
+  // The HTTP filters the module may disable or enable with ``set_filter_disabled``. A name that
+  // matches none of these matchers is rejected, and the filter keeps the state the produced route
+  // gives it. If not specified, any filter name is accepted.
+  //
+  // .. attention::
+  //   Without this list a module that derives filter names from the request can disable any filter
+  //   of the chain, including the authorization and rate limit filters. Configure it whenever the
+  //   module needs to disable a filter at all.
+  repeated type.matcher.v3.StringMatcher allowed_filter_names = 13;
+}

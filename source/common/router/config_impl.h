@@ -221,6 +221,53 @@ public:
 class CommonVirtualHostImpl;
 using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
 
+/**
+ * Creates the route entries of a virtual host from their configuration.
+ */
+class RouteCreator {
+public:
+  /**
+   * @param route_config the route configuration.
+   * @param vhost the virtual host the route belongs to.
+   * @param factory_context the server factory context.
+   * @param validator the validation visitor used to translate nested configuration.
+   * @param init_manager the init manager the resources of the route warm up with. Only valid while
+   *        the route configuration is being constructed and must never be stored.
+   * @param validate_clusters whether the clusters the route names are looked up in the cluster
+   *        manager.
+   * @return the route entry, or an error status if the configuration is invalid.
+   * @throw EnvoyException if the configuration of a nested extension is invalid.
+   */
+  static absl::StatusOr<RouteEntryImplBaseConstSharedPtr>
+  createAndValidateRoute(const envoy::config::route::v3::Route& route_config,
+                         const CommonVirtualHostSharedPtr& vhost,
+                         Server::Configuration::ServerFactoryContext& factory_context,
+                         ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                         bool validate_clusters);
+};
+
+/**
+ * Builds routes of a virtual host for the route specifiers configured on it.
+ */
+class RouteBuilderImpl : public RouteBuilder {
+public:
+  RouteBuilderImpl(const CommonVirtualHostSharedPtr& vhost,
+                   Server::Configuration::ServerFactoryContext& factory_context,
+                   ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager)
+      : vhost_(vhost), factory_context_(factory_context), validator_(validator),
+        init_manager_(init_manager) {}
+
+  // Router::RouteBuilder
+  absl::StatusOr<MatchableRouteConstSharedPtr> build(const envoy::config::route::v3::Route& route,
+                                                     bool validate_clusters) override;
+
+private:
+  const CommonVirtualHostSharedPtr vhost_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validator_;
+  Init::Manager& init_manager_;
+};
+
 class SslRedirectRoute : public Route {
 public:
   SslRedirectRoute(VirtualHostConstSharedPtr virtual_host)
@@ -363,7 +410,6 @@ public:
     return HeaderParser::defaultParser();
   }
   std::optional<bool> filterDisabled(absl::string_view config_name) const;
-  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -461,7 +507,6 @@ private:
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   RouteMetadataPackPtr metadata_;
-  RouteSpecifierList route_specifiers_;
   const std::optional<uint32_t> per_request_buffer_limit_;
   const std::optional<uint64_t> request_body_buffer_limit_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
@@ -507,12 +552,14 @@ public:
                      absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
   VirtualHostConstSharedPtr virtualHost() const { return shared_virtual_host_; }
-  RouteSpecifierSpan routeSpecifiers() const { return shared_virtual_host_->routeSpecifiers(); }
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
   CommonVirtualHostSharedPtr shared_virtual_host_;
+  // Created after the shared virtual host so that the specifiers can build routes in it.
+  RouteSpecifierList route_specifiers_;
 
   std::shared_ptr<const SslRedirectRoute> ssl_redirect_route_;
   SslRequirements ssl_requirements_;

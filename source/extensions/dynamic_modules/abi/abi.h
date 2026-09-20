@@ -16065,6 +16065,1231 @@ envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
     uint64_t value);
 
 // =============================================================================
+// ============================= Route Specifier ===============================
+// =============================================================================
+
+// =============================================================================
+// Route Specifier Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_route_specifier_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleRouteSpecifierConfig class in Envoy. This is passed to the module when creating a
+ * new in-module route specifier configuration and stays valid until
+ * envoy_dynamic_module_on_route_specifier_config_destroy returns for that configuration.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_route_specifier_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_route_specifier_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_config_module_ptr is a pointer to an in-module route
+ * specifier configuration created by envoy_dynamic_module_on_route_specifier_config_new. A single
+ * configuration is shared by every request the route specifier resolves a route for.
+ *
+ * This has 1:1 correspondence with the DynamicModuleRouteSpecifierConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_route_specifier_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_route_specifier_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_context_envoy_ptr is a raw pointer to the Envoy context
+ * of a single route decision. It provides read access to the request, to the stream info and to the
+ * route that route matching resolved, and it is the target of the setter callbacks that record the
+ * decision.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ *
+ * THREADING: This pointer is only valid on the worker thread handling the request, for the duration
+ * of a single envoy_dynamic_module_on_route_specifier_on_route or
+ * envoy_dynamic_module_on_route_specifier_shadow_result call, and it refers to storage that Envoy
+ * reuses once the call returns. Route resolution runs concurrently on multiple worker threads, so
+ * the module must not store this pointer, share it across threads, or use it after the hook
+ * returns. Every envoy_dynamic_module_callback_route_specifier_* callback that takes it must be
+ * called with this pointer from inside that hook.
+ */
+typedef void* envoy_dynamic_module_type_route_specifier_context_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_decision is the decision a route specifier returns for
+ * a request. It selects how Envoy builds the route.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_decision {
+  // Use the route the specifier was given, unchanged. Recorded overrides are ignored.
+  envoy_dynamic_module_type_route_specifier_decision_PassThrough = 0,
+  // Use the route the specifier was given with the recorded overrides applied.
+  envoy_dynamic_module_type_route_specifier_decision_Override = 1,
+  // Use the template recorded with envoy_dynamic_module_callback_route_specifier_set_template,
+  // evaluated against the request like a configured route, with the recorded overrides applied.
+  envoy_dynamic_module_type_route_specifier_decision_SelectTemplate = 2,
+  // Use no route, so the request is handled as if nothing had matched.
+  envoy_dynamic_module_type_route_specifier_decision_NoRoute = 3,
+  // The module could not reach a decision, and Envoy applies the configured failure policy.
+  envoy_dynamic_module_type_route_specifier_decision_Error = 4,
+} envoy_dynamic_module_type_route_specifier_decision;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_chain_status controls whether the route specifiers
+ * configured after this one run for the request.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_chain_status {
+  // Envoy decides: the chain continues for the PassThrough and Override decisions and stops for the
+  // SelectTemplate and NoRoute decisions.
+  envoy_dynamic_module_type_route_specifier_chain_status_Default = 0,
+  // The chain continues.
+  envoy_dynamic_module_type_route_specifier_chain_status_Continue = 1,
+  // The chain stops and the result of this specifier is the final route.
+  envoy_dynamic_module_type_route_specifier_chain_status_StopIteration = 2,
+} envoy_dynamic_module_type_route_specifier_chain_status;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_route_kind is the kind of a route. A route is exactly
+ * one of these. Whether a direct response is a redirect is a per request property reported by
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_redirect_location.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_route_kind {
+  // There is no route.
+  envoy_dynamic_module_type_route_specifier_route_kind_None = 0,
+  // The route forwards the request to a cluster.
+  envoy_dynamic_module_type_route_specifier_route_kind_RouteEntry = 1,
+  // The route answers the request directly, either with a redirect or with a direct response.
+  envoy_dynamic_module_type_route_specifier_route_kind_DirectResponse = 2,
+} envoy_dynamic_module_type_route_specifier_route_kind;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_header_append_action selects how a header a module adds
+ * combines with a header of the same name that is already present. This has 1:1 correspondence with
+ * envoy::config::core::v3::HeaderValueOption::HeaderAppendAction.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_header_append_action {
+  envoy_dynamic_module_type_route_specifier_header_append_action_AppendIfExistsOrAdd = 0,
+  envoy_dynamic_module_type_route_specifier_header_append_action_AddIfAbsent = 1,
+  envoy_dynamic_module_type_route_specifier_header_append_action_OverwriteIfExistsOrAdd = 2,
+  envoy_dynamic_module_type_route_specifier_header_append_action_OverwriteIfExists = 3,
+} envoy_dynamic_module_type_route_specifier_header_append_action;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_failure is why Envoy could not honor the decision of a
+ * module. It has one value per failure statistic of the route specifier.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_failure {
+  // The decision was honored.
+  envoy_dynamic_module_type_route_specifier_failure_None = 0,
+  // The module returned the Error decision.
+  envoy_dynamic_module_type_route_specifier_failure_ModuleError = 1,
+  // The decision was SelectTemplate without a successful set_template.
+  envoy_dynamic_module_type_route_specifier_failure_TemplateNotSelected = 2,
+  // The match of the selected template does not hold for the request.
+  envoy_dynamic_module_type_route_specifier_failure_TemplateMatchFailed = 3,
+  // The decision was Override while route matching resolved no route.
+  envoy_dynamic_module_type_route_specifier_failure_OverrideWithoutRoute = 4,
+  // Route entry overrides were recorded for a route that answers the request directly.
+  envoy_dynamic_module_type_route_specifier_failure_OverrideOnNonRouteEntry = 5,
+  // The recorded route metadata was rejected by a typed metadata factory.
+  envoy_dynamic_module_type_route_specifier_failure_RouteMetadata = 6,
+} envoy_dynamic_module_type_route_specifier_failure;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_compare_field identifies one property that shadow mode
+ * compares. This has 1:1 correspondence with the CompareField enum of the route specifier
+ * configuration. Bit (1 << value) of the mismatch mask passed to
+ * envoy_dynamic_module_on_route_specifier_shadow_result is set when the property differed, so
+ * values stay below 64 and a module must ignore the bits it does not know.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_compare_field {
+  envoy_dynamic_module_type_route_specifier_compare_field_RouteKind = 1,
+  envoy_dynamic_module_type_route_specifier_compare_field_ClusterName = 2,
+  envoy_dynamic_module_type_route_specifier_compare_field_Timeout = 3,
+  envoy_dynamic_module_type_route_specifier_compare_field_IdleTimeout = 4,
+  envoy_dynamic_module_type_route_specifier_compare_field_MaxStreamDuration = 5,
+  envoy_dynamic_module_type_route_specifier_compare_field_Priority = 6,
+  envoy_dynamic_module_type_route_specifier_compare_field_RequestBodyBufferLimit = 7,
+  envoy_dynamic_module_type_route_specifier_compare_field_ClusterNotFoundResponseCode = 8,
+  envoy_dynamic_module_type_route_specifier_compare_field_RetryPolicy = 9,
+  envoy_dynamic_module_type_route_specifier_compare_field_HedgePolicy = 10,
+  envoy_dynamic_module_type_route_specifier_compare_field_MetadataMatch = 11,
+  envoy_dynamic_module_type_route_specifier_compare_field_HashPolicy = 12,
+  envoy_dynamic_module_type_route_specifier_compare_field_RequestMirrorPolicies = 13,
+  envoy_dynamic_module_type_route_specifier_compare_field_RequestPath = 14,
+  envoy_dynamic_module_type_route_specifier_compare_field_RequestAuthority = 15,
+  envoy_dynamic_module_type_route_specifier_compare_field_RequestHeaders = 16,
+  envoy_dynamic_module_type_route_specifier_compare_field_ResponseHeaders = 17,
+  envoy_dynamic_module_type_route_specifier_compare_field_FilterDisabled = 18,
+  envoy_dynamic_module_type_route_specifier_compare_field_ResponseCode = 19,
+  envoy_dynamic_module_type_route_specifier_compare_field_RedirectLocation = 20,
+  envoy_dynamic_module_type_route_specifier_compare_field_VirtualHostName = 21,
+  envoy_dynamic_module_type_route_specifier_compare_field_RouteMetadata = 22,
+  envoy_dynamic_module_type_route_specifier_compare_field_DirectResponseBody = 23,
+  envoy_dynamic_module_type_route_specifier_compare_field_RouteName = 24,
+  envoy_dynamic_module_type_route_specifier_compare_field_RateLimitPolicy = 25,
+  envoy_dynamic_module_type_route_specifier_compare_field_Cors = 26,
+  envoy_dynamic_module_type_route_specifier_compare_field_Tracing = 27,
+} envoy_dynamic_module_type_route_specifier_compare_field;
+
+// =============================================================================
+// Route Specifier Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_route_specifier_config_new is called on the main thread when a route
+ * specifier referencing this module is configured. The module should parse the configuration and
+ * return a pointer to the in-module route specifier configuration. The
+ * envoy_dynamic_module_callback_route_specifier_config_define_* callbacks that define metrics may
+ * only be called from inside this hook. The callbacks that read the declared templates, route
+ * action overrides and shadow mode may be called from here or from the request path.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig object for the
+ * corresponding config.
+ * @param name is the specifier name used to select an implementation within the module. The buffer
+ * is owned by Envoy and is valid only during this call.
+ * @param config is the configuration bytes for the route specifier. The buffer is owned by Envoy
+ * and is valid only during this call.
+ * @return a pointer to the in-module route specifier configuration. Returning nullptr indicates a
+ * failure to initialize, and the route configuration will be rejected.
+ */
+envoy_dynamic_module_type_route_specifier_config_module_ptr
+envoy_dynamic_module_on_route_specifier_config_new(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_route_specifier_config_destroy is called when the route specifier
+ * configuration is destroyed.
+ *
+ * This may be called on any thread. The configuration is kept alive by the routes referencing it,
+ * so the last reference may be released on a worker thread after the route configuration is
+ * replaced. The module must not assume the main thread here.
+ *
+ * @param config_module_ptr is the pointer to the in-module route specifier configuration.
+ */
+void envoy_dynamic_module_on_route_specifier_config_destroy(
+    envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_route_specifier_on_route is called while the route is being resolved for
+ * a request, and again whenever the route is recomputed, for example after a filter clears the
+ * route cache. The module reads the request and the route that route matching resolved with the
+ * getter callbacks, records a template and overrides with the setter callbacks, and returns the
+ * decision that tells Envoy how to build the route.
+ *
+ * This may be called concurrently on multiple worker threads with the same in-module configuration,
+ * so the module must treat the configuration as read-only and avoid shared mutable state. The call
+ * is synchronous and cannot be time boxed, so the module must not block or perform I/O.
+ *
+ * Recorded overrides take effect only for the Override and SelectTemplate decisions. In shadow mode
+ * the decision is compared with the route that route matching resolved and reported through
+ * statistics and envoy_dynamic_module_on_route_specifier_shadow_result, but never used.
+ *
+ * @param config_module_ptr is the pointer to the in-module route specifier configuration.
+ * @param context_envoy_ptr is the pointer to the Envoy route decision context, valid only during
+ * this call.
+ * @return the decision for the request.
+ */
+envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route_specifier_on_route(
+    envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_route_specifier_shadow_result is called in shadow mode right after
+ * envoy_dynamic_module_on_route_specifier_on_route with the outcome of comparing the route of the
+ * module with the route that route matching resolved. It lets a module report mismatches with the
+ * request at hand. Envoy resolves this hook when the module is loaded and skips the call when the
+ * module does not export it.
+ *
+ * The threading contract is the one of envoy_dynamic_module_on_route_specifier_on_route. The getter
+ * callbacks may be used with the context and the setter callbacks do nothing.
+ *
+ * @param config_module_ptr is the pointer to the in-module route specifier configuration.
+ * @param context_envoy_ptr is the pointer to the same route decision context, valid only during
+ * this call.
+ * @param decision is the decision the module returned.
+ * @param failure is None when the decision was honored, and otherwise why it was not.
+ * @param mismatch_mask has bit (1 << envoy_dynamic_module_type_route_specifier_compare_field) set
+ * for every compared property that differed, so zero means the two routes were equivalent. It is
+ * zero for the PassThrough decision, which has nothing to compare.
+ */
+void envoy_dynamic_module_on_route_specifier_shadow_result(
+    envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_decision decision,
+    envoy_dynamic_module_type_route_specifier_failure failure, uint64_t mismatch_mask);
+
+// =============================================================================
+// Route Specifier Callbacks
+// =============================================================================
+
+// ------------------- Route Specifier Callbacks - Configuration ---------------
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_get_template_count returns the number of
+ * route templates the route specifier configuration declares. This may be called from the config
+ * hook or from the request path, since the declarations are immutable after configuration load.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @return the number of route templates.
+ */
+size_t envoy_dynamic_module_callback_route_specifier_config_get_template_count(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_get_template_id is called by the module to
+ * get the identifier of a route template by index, in configuration order. This may be called from
+ * the config hook or from the request path.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @param index is the index of the template.
+ * @param result is the output buffer for the identifier. The buffer is owned by Envoy and is valid
+ * for the lifetime of the configuration.
+ * @return true if the index is in range, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_config_get_template_id(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_get_template_kind is called by the module to
+ * get the kind of a route template. A template that resolves its cluster per request, such as one
+ * using weighted clusters, is a route entry. This may be called from the config hook or from the
+ * request path.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @param template_id is the identifier of the template. The buffer is owned by the module.
+ * @return the kind of the template, or None when the identifier is not declared.
+ */
+envoy_dynamic_module_type_route_specifier_route_kind
+envoy_dynamic_module_callback_route_specifier_config_get_template_kind(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer template_id);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_has_route_action_override is called by the
+ * module to check whether a route action override is declared. This may be called from the config
+ * hook or from the request path.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @param name is the name of the entry in the route_action_overrides map. The buffer is owned by
+ * the module.
+ * @return true if the name is declared, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_config_has_route_action_override(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_is_shadow_mode is called by the module to
+ * check whether the route specifier runs in shadow mode. This may be called from the config hook or
+ * from the request path.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @return true if the specifier runs in shadow mode, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_config_is_shadow_mode(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_register_route_template registers a route
+ * template from a serialized envoy.config.route.v3.Route, so that a module can declare the routes
+ * it produces from its own configuration rather than only from the ones the route specifier
+ * declares. Envoy builds and validates the route on the main thread while the configuration is
+ * created, and the module selects it later with
+ * envoy_dynamic_module_callback_route_specifier_set_template. This may only be called from inside
+ * envoy_dynamic_module_on_route_specifier_config_new, because a route can only be built while the
+ * configuration is created.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @param template_id is the identifier the module selects the template with. The buffer is owned by
+ * the module. It must be non-empty and must not already be used by a declared or registered
+ * template.
+ * @param serialized_route is the serialized Route. The buffer is owned by the module. Its
+ * route_specifiers must be empty, since a built route is not run through the specifier chains.
+ * @return true if the route was built and registered, false when called outside the config hook,
+ * when the route specifier is configured on a route configuration that has no virtual host to build
+ * routes in, when the identifier is empty or already used, when the bytes do not parse as a Route,
+ * or when the route is invalid.
+ */
+bool envoy_dynamic_module_callback_route_specifier_config_register_route_template(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer template_id,
+    envoy_dynamic_module_type_module_buffer serialized_route);
+
+// ------------------- Route Specifier Callbacks - Metrics ---------------------
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_define_counter is called by the module
+ * during initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label_names must be non-null unless label_names_length is 0, otherwise the result is
+ * InvalidLabels. The array and the buffers it holds are owned by the module.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_route_specifier_config_increment_counter together
+ * with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_define_counter(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_increment_counter is called by the module to
+ * increment the value of a previously defined counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * counter was defined.
+ * @param id is the opaque ID of the counter.
+ * @param label_values is the label values of the counter.
+ * NOTE: label_values must be non-null unless label_values_length is 0, and its length must match
+ * the labels of the definition, otherwise the result is InvalidLabels. The array and the buffers it
+ * holds are owned by the module.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_increment_counter(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_define_gauge is called by the module during
+ * initialization to create a template for generating Stats::Gauges with the given name and labels
+ * during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label_names must be non-null unless label_names_length is 0, otherwise the result is
+ * InvalidLabels. The array and the buffers it holds are owned by the module.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
+ * be passed to envoy_dynamic_module_callback_route_specifier_config_set_gauge together with
+ * config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_define_gauge(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_set_gauge is called by the module to set the
+ * value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * gauge was defined.
+ * @param id is the opaque ID of the gauge.
+ * @param label_values is the label values of the gauge.
+ * NOTE: label_values must be non-null unless label_values_length is 0, and its length must match
+ * the labels of the definition, otherwise the result is InvalidLabels. The array and the buffers it
+ * holds are owned by the module.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_set_gauge(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * gauge was defined.
+ * @param id is the opaque ID of the gauge.
+ * @param label_values is the label values of the gauge.
+ * NOTE: label_values must be non-null unless label_values_length is 0, and its length must match
+ * the labels of the definition, otherwise the result is InvalidLabels. The array and the buffers it
+ * holds are owned by the module.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_increment_gauge(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * gauge was defined.
+ * @param id is the opaque ID of the gauge.
+ * @param label_values is the label values of the gauge.
+ * NOTE: label_values must be non-null unless label_values_length is 0, and its length must match
+ * the labels of the definition, otherwise the result is InvalidLabels. The array and the buffers it
+ * holds are owned by the module.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_decrement_gauge(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_define_histogram is called by the module
+ * during initialization to create a template for generating Stats::Histograms with the given name
+ * and labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label_names must be non-null unless label_names_length is 0, otherwise the result is
+ * InvalidLabels. The array and the buffers it holds are owned by the module.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_route_specifier_config_record_histogram_value
+ * together with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_define_histogram(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_record_histogram_value is called by the
+ * module to record a value for a previously defined histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * histogram was defined.
+ * @param id is the opaque ID of the histogram.
+ * @param label_values is the label values of the histogram.
+ * NOTE: label_values must be non-null unless label_values_length is 0, and its length must match
+ * the labels of the definition, otherwise the result is InvalidLabels. The array and the buffers it
+ * holds are owned by the module.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels.
+ * @param value is the value to record.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_record_histogram_value(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// ------------------- Route Specifier Callbacks - Request State ---------------
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_request_headers_size returns the number of
+ * request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @return the number of request headers.
+ */
+size_t envoy_dynamic_module_callback_route_specifier_get_request_headers_size(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_request_headers is called by the module to get
+ * all request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result_headers is the output array. The module must pre-allocate at least
+ * envoy_dynamic_module_callback_route_specifier_get_request_headers_size entries. Envoy does not
+ * bounds check the array, so passing a shorter one is undefined behavior. The buffers in the
+ * entries are owned by Envoy and are valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_request_headers(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_request_header_value is called by the module to
+ * get a request header value by key.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the header key to look up. The buffer is owned by the module.
+ * @param result is the output buffer for the header value. The buffer is owned by Envoy and is
+ * valid until the end of the current event hook.
+ * @param index is the index for multi-value headers, 0 for the first value.
+ * @param total_count_out receives the total number of values for the key when non-null.
+ * @return true if the header exists at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_request_header_value(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_attribute_string is called by the module to get
+ * the string value of an attribute of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param attribute_id is the ID of the attribute to get.
+ * @param result is the output buffer for the value. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if the attribute is available and is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_attribute_string(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_attribute_int is called by the module to get
+ * the integer value of an attribute of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param attribute_id is the ID of the attribute to get.
+ * @param result is the output pointer for the value.
+ * @return true if the attribute is available and is an integer, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_attribute_int(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_attribute_bool is called by the module to get
+ * the boolean value of an attribute of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param attribute_id is the ID of the attribute to get.
+ * @param result is the output pointer for the value.
+ * @return true if the attribute is available and is a boolean, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_attribute_bool(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata is called by the module to get
+ * the string value of a dynamic metadata entry of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param filter_name is the namespace of the metadata. The buffer is owned by the module.
+ * @param path is the dotted key path within the namespace. The buffer is owned by the module.
+ * @param result is the output buffer for the value. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if the entry exists and is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata_number is called by the module
+ * to get the number value of a dynamic metadata entry of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param filter_name is the namespace of the metadata. The buffer is owned by the module.
+ * @param path is the dotted key path within the namespace. The buffer is owned by the module.
+ * @param result is the output pointer for the value.
+ * @return true if the entry exists and is a number, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata_bool is called by the module
+ * to get the boolean value of a dynamic metadata entry of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param filter_name is the namespace of the metadata. The buffer is owned by the module.
+ * @param path is the dotted key path within the namespace. The buffer is owned by the module.
+ * @param result is the output pointer for the value.
+ * @return true if the entry exists and is a boolean, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_filter_state_bytes is called by the module to
+ * get a filter state value by key. Only objects stored as Router::StringAccessor, which is what the
+ * HTTP filter callback envoy_dynamic_module_callback_http_set_filter_state_bytes creates, are
+ * readable. Together with the dynamic metadata getters this is how a decision an earlier filter
+ * made asynchronously reaches the module when the route is recomputed.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the filter state key. The buffer is owned by the module.
+ * @param result is the output buffer for the value. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if the key exists and holds such an object, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_filter_state_bytes(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_random_value returns the stable random value
+ * Envoy generated for the request. It is the same when the route of a request is recomputed,
+ * so a weighted choice a module makes with it holds for the request.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @return the random value for the request.
+ */
+uint64_t envoy_dynamic_module_callback_route_specifier_get_random_value(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_cluster_host_count retrieves the host counts
+ * for a cluster by name. This lets a module check whether a cluster is routable from the current
+ * worker before naming it with set_cluster_name.
+ *
+ * The lookup uses getThreadLocalCluster(), so false is returned when the cluster is not routable
+ * from this worker at the moment, which can happen even when the cluster is configured but not yet
+ * warmed or propagated. Healthy and degraded host counts are eventually consistent.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param cluster_name is the name of the cluster to query owned by the module.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., cluster not
+ * routable from this worker).
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_cluster_host_count(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count);
+
+// ------------------- Route Specifier Callbacks - Input Route -----------------
+// These read the route the module is resolving, which is the route that route matching and any
+// earlier specifier resolved, or the template selected with set_template once one is selected.
+
+/**
+ * envoy_dynamic_module_type_route_specifier_input_route holds the properties of the route the
+ * module is resolving that are free to read, so that a module can take all of them in one call
+ * instead of one call each. After a template is selected with
+ * envoy_dynamic_module_callback_route_specifier_set_template it holds the properties of that
+ * template.
+ *
+ * A property the kind of the route does not carry is zero. The route entry properties are zero for
+ * a route that answers the request directly, and response_code is zero for a route entry. A boolean
+ * flag reports whether a route action property is configured, and the full value is read through
+ * the route templates and route action overrides rather than on the request path. The buffers point
+ * at storage Envoy owns which is valid for the duration of the event hook.
+ */
+typedef struct envoy_dynamic_module_type_route_specifier_input_route {
+  envoy_dynamic_module_type_route_specifier_route_kind kind;
+  envoy_dynamic_module_type_envoy_buffer name;
+  envoy_dynamic_module_type_envoy_buffer virtual_host_name;
+  // Whether the route carries metadata, read per namespace and key with get_input_route_metadata.
+  bool has_metadata;
+  // Route entry properties.
+  envoy_dynamic_module_type_envoy_buffer cluster_name;
+  uint64_t timeout_ms;
+  // idle_timeout_ms is valid only when has_idle_timeout is true.
+  bool has_idle_timeout;
+  uint64_t idle_timeout_ms;
+  // max_stream_duration_ms is valid only when has_max_stream_duration is true.
+  bool has_max_stream_duration;
+  uint64_t max_stream_duration_ms;
+  envoy_dynamic_module_type_resource_priority priority;
+  uint64_t request_body_buffer_limit;
+  uint32_t cluster_not_found_response_code;
+  bool has_metadata_match;
+  bool has_hash_policy;
+  bool has_rate_limits;
+  size_t request_mirror_policies_count;
+  // Direct response property.
+  uint32_t response_code;
+} envoy_dynamic_module_type_route_specifier_input_route;
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route is called by the module to get the
+ * properties of the route it is resolving that are free to read, in one call. After a template is
+ * selected the properties are those of the template.
+ *
+ * Prefer this over the individual getters when the module reads more than one of them, for example
+ * to compare the route of the module with the one it replaces. The properties that are not free to
+ * read, such as the redirect location and the route metadata, have no bulk form.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is where the properties are stored. It is only written when this returns true.
+ * @return true if a route was resolved for the request, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_input_route* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_kind returns the kind of the route
+ * that route matching, and any route specifier that ran before this one, resolved for the request.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @return the kind of the route, or None when no route was resolved.
+ */
+envoy_dynamic_module_type_route_specifier_route_kind
+envoy_dynamic_module_callback_route_specifier_get_input_route_kind(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_name is called by the module to get
+ * the name of the resolved route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is the output buffer for the name. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if a route was resolved, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_virtual_host_name is called by the
+ * module to get the name of the virtual host the resolved route belongs to.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is the output buffer for the name. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if a route was resolved, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_virtual_host_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_cluster_name is called by the
+ * module to get the upstream cluster of the resolved route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is the output buffer for the cluster name. The buffer is owned by Envoy and is
+ * valid until the end of the current event hook.
+ * @return true if the resolved route forwards the request to a cluster, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_cluster_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_timeout is called by the module to
+ * get the route timeout of the resolved route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param timeout_ms is the output pointer for the timeout in milliseconds, where zero means the
+ * timeout is disabled.
+ * @return true if the resolved route forwards the request to a cluster, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_timeout(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t* timeout_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_response_code is called by the
+ * module to get the status code the resolved route answers the request with.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param status_code is the output pointer for the status code.
+ * @return true if the resolved route answers the request directly, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_response_code(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint32_t* status_code);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_redirect_location is called by the
+ * module to get the location the resolved route redirects the request to. A non-empty result
+ * identifies a redirect, and a direct response that is not a redirect yields an empty result.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is the output buffer for the location. The buffer is owned by Envoy and stays valid
+ * until the end of the current event hook, including after the current route changes. The location
+ * is built once per route, so repeated reads for the same route return the same buffer.
+ * @return true if the resolved route answers the request directly, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_redirect_location(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_metadata is called by the module to
+ * get the string value of a route metadata entry of the resolved route. A route the module replaces
+ * can carry the identifier of the template that replaces it, so that a module can check its own
+ * decision against the route table it is being validated against.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param result is the output buffer for the value. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if the entry exists and is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_metadata(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_metadata_number is called by the
+ * module to get the number value of a route metadata entry of the resolved route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param result is the output pointer for the value.
+ * @return true if the entry exists and is a number, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_metadata_number(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_selected_template_id is called by the module to
+ * get the identifier recorded by envoy_dynamic_module_callback_route_specifier_set_template.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is the output buffer for the identifier. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if a template was selected for the request, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_selected_template_id(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+// ------------------- Route Specifier Callbacks - Decision --------------------
+
+// The setter callbacks record the decision of the module. They validate their arguments and record
+// nothing when an argument is rejected. Envoy copies every module buffer. They do nothing during
+// envoy_dynamic_module_on_route_specifier_shadow_result.
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_template selects the route template the
+ * SelectTemplate decision uses. Envoy evaluates the match of the template against the request when
+ * this is called, like it does for a configured route, and applies the failure policy when the
+ * match does not hold. After a successful selection the input route getters reflect the template.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param template_id is the identifier of the template. The buffer is owned by the module.
+ * @return true if the identifier is declared, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_template(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer template_id);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_chain_status selects whether the route
+ * specifiers configured after this one run for the request.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param status is the chain status to record.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_chain_status(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_chain_status status);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_cluster_name records the upstream cluster the
+ * request should use. When the cluster does not exist, the request is failed with the
+ * cluster-not-found response code of the route. Use get_cluster_host_count to check whether the
+ * cluster can be reached from the current worker first.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param cluster_name is the name of the cluster. The buffer is owned by the module.
+ * @return true if the name is a valid header value and is allowed by the allowed_cluster_names of
+ * the route specifier configuration, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_timeout records the route timeout for the
+ * request, replacing the timeout of the route. Zero disables the timeout.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param timeout_ms is the timeout in milliseconds. Values above the ceiling that the timer
+ * implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_timeout(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t timeout_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_idle_timeout records the stream idle timeout
+ * for the request, replacing the idle timeout of the route. Zero disables the idle timeout rather
+ * than deferring to the connection manager timeout. There is no way to select deference to the
+ * connection manager idle timeout, so leave this unset to keep the idle timeout of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param idle_timeout_ms is the idle timeout in milliseconds. Values above the ceiling that the
+ * timer implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_idle_timeout(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t idle_timeout_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_max_stream_duration records the maximum stream
+ * duration for the request, replacing the one of the route. Zero disables it.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param max_stream_duration_ms is the maximum stream duration in milliseconds. Values above the
+ * ceiling that the timer implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_max_stream_duration(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t max_stream_duration_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_request_body_buffer_limit records the request
+ * body buffer limit for the request, replacing the limit of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param limit_bytes is the buffer limit in bytes. Zero disables body buffering rather than
+ * removing the limit, and the maximum value of uint64_t means that no limit is configured. Envoy
+ * only raises the buffer limit of the stream, so a value below the limit already in effect does not
+ * shrink it, but it does cap the body buffered for retries.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_request_body_buffer_limit(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t limit_bytes);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_priority records the upstream resource priority
+ * for the request, replacing the priority of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param priority is the resource priority to use. Any value other than
+ * envoy_dynamic_module_type_resource_priority_High is treated as
+ * envoy_dynamic_module_type_resource_priority_Default.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_priority(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_resource_priority priority);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_response_code records the
+ * status code Envoy replies with when the selected cluster does not exist, replacing the one of the
+ * route. A module that derives cluster names from the request can use this to distinguish a name
+ * that resolves to nothing from an upstream that is unavailable.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param status_code is the HTTP status code to reply with. Only codes in the range [200, 600) are
+ * accepted, because the code is used to terminate the request.
+ * @return true if the status code was accepted, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_response_code(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint32_t status_code);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_action_override selects a named route
+ * action override declared in the route specifier configuration. It replaces the retry policy, the
+ * metadata match criteria, the request mirroring policies, the hash policy and the hedge policy of
+ * the route with the ones the override builds, for the properties that it sets.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param name is the name of the entry in the route_action_overrides map. The buffer is owned by
+ * the module.
+ * @return true if the name is declared, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_action_override(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_metadata_string records the string value
+ * of a route metadata entry. The entry is layered onto the metadata of the route, so consumers that
+ * read route metadata, such as the rate limit ROUTE_ENTRY action or the METADATA(ROUTE) formatter,
+ * observe it. An existing entry with the same namespace and key is overwritten, while the other
+ * entries stay in effect.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param value is the value to set. The buffer is owned by the module.
+ * @return true if the namespace is allowed by the allowed_metadata_namespaces of the route
+ * specifier configuration, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_metadata_string(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_metadata_number behaves like
+ * envoy_dynamic_module_callback_route_specifier_set_route_metadata_string but records a number.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param value is the value to set.
+ * @return true if the namespace is allowed, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_metadata_number(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool behaves like
+ * envoy_dynamic_module_callback_route_specifier_set_route_metadata_string but records a boolean.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param value is the value to set.
+ * @return true if the namespace is allowed, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_typed_metadata records the typed route
+ * metadata of a namespace from a serialized google.protobuf.Any, replacing an existing entry, so
+ * that a typed metadata factory registered for the namespace can parse it out of typedMetadata().
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param serialized_any is the serialized google.protobuf.Any value. The buffer is owned by the
+ * module.
+ * @return true if the namespace is allowed and the buffer parses as a google.protobuf.Any, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_typed_metadata(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_filter_disabled records whether an HTTP filter
+ * is disabled for the request, replacing what the route configures for it.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param filter_name is the name of the filter configuration. The buffer is owned by the module.
+ * @param disabled is whether the filter is disabled.
+ * @return true if the name is not empty and is allowed by the route specifier configuration, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_filter_disabled(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name, bool disabled);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_path records the path, including any query
+ * string, of the request sent upstream. It is applied after the rewrites of the route, so it takes
+ * precedence over them.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param path is the path to send upstream. The buffer is owned by the module.
+ * @return true if the path starts with '/' and is a valid header value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_path(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_host records the authority of the request sent
+ * upstream. It is applied after the host rewrite of the route, so it takes precedence over it, and
+ * it records the original authority the same way a host rewrite of a route does.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param host is the authority to send upstream. The buffer is owned by the module.
+ * @return true if the authority is valid, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_host(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer host);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_add_request_header records a header added to the
+ * request sent upstream, after the header mutations of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the header key. The buffer is owned by the module.
+ * @param value is the header value. The buffer is owned by the module.
+ * @param action selects how the header combines with one of the same name that is already present.
+ * @return true if the action is known, the key is a valid header name that is not a pseudo header,
+ * set_path and set_host being the way to replace those, and the value is a valid header value,
+ * false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_add_request_header(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_route_specifier_header_append_action action);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_remove_request_header records a header removed from
+ * the request sent upstream, after the header mutations of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the header key. The buffer is owned by the module.
+ * @return true if the key is a valid header name that is not a pseudo header, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_remove_request_header(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_add_response_header records a header added to the
+ * response, after the header mutations of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the header key. The buffer is owned by the module.
+ * @param value is the header value. The buffer is owned by the module.
+ * @param action selects how the header combines with one of the same name that is already present.
+ * @return true if the action is known, the key is a valid header name that is not a pseudo header
+ * and the value is a valid header value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_add_response_header(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_route_specifier_header_append_action action);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_remove_response_header records a header removed
+ * from the response, after the header mutations of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the header key. The buffer is owned by the module.
+ * @return true if the key is a valid header name that is not a pseudo header, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_remove_response_header(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+// =============================================================================
 // ========================= Early Header Mutation =============================
 // =============================================================================
 
