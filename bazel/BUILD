@@ -527,12 +527,24 @@ config_setting(
 # SSL library selection using label_flag and bool_flag
 label_flag(
     name = "ssl",
-    build_setting_default = "@boringssl//:ssl",
+    build_setting_default = Label("@boringssl//:ssl"),
 )
 
 label_flag(
     name = "crypto",
-    build_setting_default = "@boringssl//:crypto",
+    build_setting_default = Label("@boringssl//:crypto"),
+)
+
+label_flag(
+    name = "test_main",
+    build_setting_default = Label("//test:main"),
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "test_pch",
+    build_setting_default = Label("//test:test_pch"),
+    visibility = ["//visibility:public"],
 )
 
 # wee8 engine: envoy_toolshed prebuilt by default, source for configs the
@@ -600,7 +612,7 @@ check_removed_wasm_defines(
 
 label_flag(
     name = "zlib",
-    build_setting_default = "@zlib-ng",
+    build_setting_default = Label("@zlib-ng"),
 )
 
 # Wasm engine config settings. The single source of truth for engine selection

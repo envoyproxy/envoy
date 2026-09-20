@@ -263,13 +263,13 @@ genrule(
     name = "project",
     outs = ["project.json"],
     cmd = """
-    $(location :get_project_json) $$(dirname $(location @envoy//:VERSION.txt)) > $@
-    """,
+    $(location :get_project_json) $$(dirname $(location %s)) > $@
+    """ % str(Label("//:VERSION.txt")),
     tools = [
         ":get_project_json",
         ":release-hash",
-        "@envoy//:VERSION.txt",
-        "@envoy//changelogs",
+        Label("//:VERSION.txt"),
+        Label("//changelogs"),
     ],
     visibility = ["//visibility:public"],
 )
@@ -279,11 +279,11 @@ py_console_script_binary(
     args = [
         "release",
         PATH,
-        "--release-message-path=$(location @envoy//changelogs:summary)",
+        "--release-message-path=$(location %s)" % str(Label("//changelogs:summary")),
     ],
     data = [
         ":envoy_repo.py",
-        "@envoy//changelogs:summary",
+        Label("//changelogs:summary"),
     ],
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
@@ -338,9 +338,9 @@ py_console_script_binary(
 _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
     attrs = {
-        "envoy_version": attr.label(default = "@envoy//:VERSION.txt"),
-        "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
-        "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
+        "envoy_version": attr.label(default = Label("//:VERSION.txt")),
+        "envoy_api_version": attr.label(default = Label("//:API_VERSION.txt")),
+        "envoy_ci_config": attr.label(default = Label("//:.github/config.yml")),
     },
     environ = ["BAZEL_LLVM_PATH", "BAZEL_USE_HOST_SYSROOT", "BAZEL_USE_LIBSTDCPP"],
 )
