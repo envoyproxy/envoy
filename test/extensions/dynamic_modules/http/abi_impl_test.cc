@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <set>
 #include <thread>
@@ -615,6 +616,27 @@ TEST_F(DynamicModuleHttpFilterTest, SetAndGetSocketOptionInt) {
       filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
       envoy_dynamic_module_type_socket_direction_Upstream, &result));
   EXPECT_EQ(value, result);
+}
+
+// A level, name, or value outside the int range is rejected rather than truncated into a different
+// option that would then be applied while reporting success.
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionRejectsOutOfRange) {
+  const int64_t too_large = static_cast<int64_t>(std::numeric_limits<int>::max()) + 1;
+  const int64_t too_small = static_cast<int64_t>(std::numeric_limits<int>::min()) - 1;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), too_large, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, 123));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), 1, too_small, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, 123));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, too_large));
+
+  const std::string bytes = "x";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), too_large, 2, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, {bytes.data(), bytes.size()}));
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SetAndGetSocketOptionBytes) {

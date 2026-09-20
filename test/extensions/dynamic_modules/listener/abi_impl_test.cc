@@ -1,4 +1,6 @@
 #include <chrono>
+#include <cstdint>
+#include <limits>
 #include <thread>
 #include <vector>
 
@@ -2388,6 +2390,36 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntFailure) {
   bool result =
       envoy_dynamic_module_callback_listener_filter_set_socket_option_int(filterPtr(), 1, 2, 123);
   EXPECT_FALSE(result);
+}
+
+// A level, name, or value outside the int range is rejected before the socket is touched, so a
+// truncated option is never applied or read.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SocketOptionRejectsOutOfRange) {
+  EXPECT_CALL(callbacks_.socket_, setSocketOption(testing::_, testing::_, testing::_, testing::_))
+      .Times(0);
+  EXPECT_CALL(callbacks_.socket_, getSocketOption(testing::_, testing::_, testing::_, testing::_))
+      .Times(0);
+  const int64_t too_large = static_cast<int64_t>(std::numeric_limits<int>::max()) + 1;
+  const int64_t too_small = static_cast<int64_t>(std::numeric_limits<int>::min()) - 1;
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+      filterPtr(), too_large, 2, 123));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_socket_option_int(filterPtr(), 1,
+                                                                                   2, too_large));
+
+  char bytes[] = "x";
+  envoy_dynamic_module_type_module_buffer bytes_buf = {bytes, 1};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+      filterPtr(), too_small, 2, bytes_buf));
+
+  int64_t int_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+      filterPtr(), too_large, 2, &int_out));
+
+  char buf[8];
+  size_t actual = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+      filterPtr(), 1, too_large, buf, sizeof(buf), &actual));
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntNullCallbacks) {

@@ -66,7 +66,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "abi_context_accessors_lib",
     srcs = ["abi_context_accessors.cc"],
-    hdrs = ["abi_context_accessors.h"],
+    hdrs = [
+        "abi_context_accessors.h",
+        "abi_conversions.h",
+    ],
     deps = [
         "//envoy/common:optref_lib",
         "//envoy/formatter:http_formatter_context_interface",
