@@ -1,3 +1,5 @@
+#include <cstdint>
+#include <limits>
 #include <thread>
 #include <vector>
 
@@ -1608,6 +1610,24 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetSocketOptionInt) {
   EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_int(
       filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, &result));
   EXPECT_EQ(value, result);
+}
+
+// A level, name, or value outside the int range is skipped so a truncated option is never applied
+// or stored.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetSocketOptionSkipsOutOfRange) {
+  const int64_t too_large = static_cast<int64_t>(std::numeric_limits<int>::max()) + 1;
+  const int64_t too_small = static_cast<int64_t>(std::numeric_limits<int>::min()) - 1;
+  envoy_dynamic_module_callback_network_set_socket_option_int(
+      filterPtr(), too_large, 2, envoy_dynamic_module_type_socket_option_state_Prebind, 123);
+  envoy_dynamic_module_callback_network_set_socket_option_int(
+      filterPtr(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind, too_large);
+
+  const std::string bytes = "x";
+  envoy_dynamic_module_callback_network_set_socket_option_bytes(
+      filterPtr(), too_small, 2, envoy_dynamic_module_type_socket_option_state_Bound,
+      {bytes.data(), bytes.size()});
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_network_get_socket_options_size(filterPtr()));
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetSocketOptionBytes) {

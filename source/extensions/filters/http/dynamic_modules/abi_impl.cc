@@ -14,6 +14,7 @@
 #include "source/common/tracing/tracer_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
+#include "source/extensions/dynamic_modules/abi_conversions.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 namespace Envoy {
@@ -2147,15 +2148,22 @@ bool envoy_dynamic_module_callback_http_set_socket_option_int(
     return false;
   }
 
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  const auto value_int = narrowToInt(value);
+  if (!level_int.has_value() || !name_int.has_value() || !value_int.has_value()) {
+    return false;
+  }
+
   if (direction == envoy_dynamic_module_type_socket_direction_Downstream) {
     // For downstream, apply directly to the existing connection socket
     auto connection = filter->decoder_callbacks_->connection();
     if (!connection.has_value()) {
       return false;
     }
-    int int_value = static_cast<int>(value);
+    int int_value = *value_int;
     auto value_span = absl::MakeSpan(reinterpret_cast<uint8_t*>(&int_value), sizeof(int_value));
-    Network::SocketOptionName option_name(static_cast<int>(level), static_cast<int>(name), "");
+    Network::SocketOptionName option_name(*level_int, *name_int, "");
     // const_cast is safe here because setSocketOption modifies the underlying socket,
     // not the Connection object's logical state.
     if (!const_cast<Network::Connection&>(*connection).setSocketOption(option_name, value_span)) {
@@ -2164,9 +2172,8 @@ bool envoy_dynamic_module_callback_http_set_socket_option_int(
   } else {
     // For upstream, add to upstream socket options (applied when connection is established)
     auto option = std::make_shared<Network::SocketOptionImpl>(
-        mapHttpSocketState(state),
-        Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""),
-        static_cast<int>(value));
+        mapHttpSocketState(state), Network::SocketOptionName(*level_int, *name_int, ""),
+        *value_int);
     Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
     option_list->push_back(option);
     filter->decoder_callbacks_->addUpstreamSocketOptions(option_list);
@@ -2190,6 +2197,12 @@ bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
     return false;
   }
 
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  if (!level_int.has_value() || !name_int.has_value()) {
+    return false;
+  }
+
   absl::string_view value_view(value.ptr, value.length);
 
   if (direction == envoy_dynamic_module_type_socket_direction_Downstream) {
@@ -2201,7 +2214,7 @@ bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
     // Need to copy to a mutable buffer since setSocketOption takes non-const span
     std::vector<uint8_t> mutable_value(value.ptr, value.ptr + value.length);
     auto value_span = absl::MakeSpan(mutable_value);
-    Network::SocketOptionName option_name(static_cast<int>(level), static_cast<int>(name), "");
+    Network::SocketOptionName option_name(*level_int, *name_int, "");
     // const_cast is safe here because setSocketOption modifies the underlying socket,
     // not the Connection object's logical state.
     if (!const_cast<Network::Connection&>(*connection).setSocketOption(option_name, value_span)) {
@@ -2210,8 +2223,8 @@ bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
   } else {
     // For upstream, add to upstream socket options (applied when connection is established)
     auto option = std::make_shared<Network::SocketOptionImpl>(
-        mapHttpSocketState(state),
-        Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""), value_view);
+        mapHttpSocketState(state), Network::SocketOptionName(*level_int, *name_int, ""),
+        value_view);
     Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
     option_list->push_back(option);
     filter->decoder_callbacks_->addUpstreamSocketOptions(option_list);
