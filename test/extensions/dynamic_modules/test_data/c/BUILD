@@ -316,6 +316,8 @@ test_program(name = "stat_sink_integration_test")
 
 test_program(name = "dns_resolver_config_new_fail")
 
+test_program(name = "dns_resolver_new_fail")
+
 test_program(name = "health_checker_no_op")
 
 test_program(name = "health_checker_missing_config_new")

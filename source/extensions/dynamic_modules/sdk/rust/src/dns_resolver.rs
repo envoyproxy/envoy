@@ -51,10 +51,14 @@ pub trait DnsResolverConfig: Send + Sync {
   ///
   /// The `envoy_callback` is used by the resolver to deliver resolution results back to Envoy.
   /// It is safe to call from any thread.
+  ///
+  /// Returns `None` if the resolver could not be created, for example when a runtime or socket
+  /// resource cannot be acquired. Envoy then rejects the configuration rather than aborting, so
+  /// implementations must return `None` instead of panicking on a recoverable failure.
   fn new_resolver(
     &self,
     envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
-  ) -> Box<dyn DnsResolverInstance>;
+  ) -> Option<Box<dyn DnsResolverInstance>>;
 }
 
 /// The module-side DNS resolver instance.
@@ -660,9 +664,15 @@ ffi_export! {
     let config = unsafe { &**config };
     let envoy_callback: Arc<dyn EnvoyDnsResolverCallback> =
       Arc::new(EnvoyDnsResolverCallbackImpl { resolver_envoy_ptr });
-    let resolver = config.new_resolver(envoy_callback);
-    let wrapper = Box::new(DnsResolverWrapper { resolver });
-    Box::into_raw(wrapper) as abi::envoy_dynamic_module_type_dns_resolver_module_ptr
+    // A None result means the module could not create the resolver. Return null so the host rejects
+    // the configuration instead of treating it as a fatal error.
+    match config.new_resolver(envoy_callback) {
+      Some(resolver) => {
+        let wrapper = Box::new(DnsResolverWrapper { resolver });
+        Box::into_raw(wrapper) as abi::envoy_dynamic_module_type_dns_resolver_module_ptr
+      },
+      None => std::ptr::null(),
+    }
   }
   on_panic = std::ptr::null()
 }
