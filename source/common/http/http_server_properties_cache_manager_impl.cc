@@ -4,9 +4,12 @@
 #include "envoy/config/common/key_value/v3/config.pb.h"
 #include "envoy/config/common/key_value/v3/config.pb.validate.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -36,12 +39,14 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
 
   std::unique_ptr<KeyValueStore> store;
   if (options.has_key_value_store_config()) {
+    // This runs on worker threads and the validation visitor is not thread safe, so the
+    // configuration is only unpacked here: validateOptions() already validated it on the main
+    // thread.
     envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;
-    MessageUtil::anyConvertAndValidate(options.key_value_store_config().typed_config(), kv_config,
-                                       data_.validation_visitor_);
+    MessageUtil::anyConvert(options.key_value_store_config().typed_config(), kv_config);
     auto& factory = Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(kv_config.config());
-    store =
-        factory.createStore(kv_config, data_.validation_visitor_, dispatcher, data_.file_system_);
+    store = factory.createStore(kv_config, ProtobufMessage::getNullValidationVisitor(), dispatcher,
+                                data_.file_system_);
   }
 
   std::vector<std::string> canonical_suffixes;
@@ -71,6 +76,24 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
 
   (*slot_).caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
   return new_cache;
+}
+
+absl::Status HttpServerPropertiesCacheManagerImpl::validateOptions(
+    const envoy::config::core::v3::AlternateProtocolsCacheOptions& options) {
+  if (!options.has_key_value_store_config()) {
+    return absl::OkStatus();
+  }
+  TRY_ASSERT_MAIN_THREAD {
+    envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;
+    MessageUtil::anyConvert(options.key_value_store_config().typed_config(), kv_config);
+    Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(kv_config.config());
+    // Recurse into the store specific configuration so that every check the store factory would
+    // otherwise perform when the cache is created on a worker thread happens here instead.
+    MessageUtil::validate(kv_config, data_.validation_visitor_, /*recurse_into_any=*/true);
+  }
+  END_TRY
+  CATCH(const EnvoyException& e, { return absl::InvalidArgumentError(e.what()); });
+  return absl::OkStatus();
 }
 
 void HttpServerPropertiesCacheManagerImpl::forEachThreadLocalCache(CacheFn cache_fn) {
