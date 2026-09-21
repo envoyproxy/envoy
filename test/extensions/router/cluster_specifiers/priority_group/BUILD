@@ -32,10 +32,12 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.router.cluster_specifier_plugin.priority_group",
         "envoy.filters.http.lua",
+        "envoy.filters.http.set_metadata",
     ],
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/lua:config",
+        "//source/extensions/filters/http/set_metadata:config",
         "//source/extensions/router/cluster_specifiers/priority_group:config",
         "//test/integration:autonomous_upstream_lib",
         "//test/integration:http_integration_lib",

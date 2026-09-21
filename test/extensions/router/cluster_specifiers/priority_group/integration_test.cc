@@ -105,6 +105,35 @@ typed_config:
          {"CLEAR_ROUTE_CACHE", clear_route_cache ? "request_handle:clearRouteCache()" : ""}}));
   }
 
+  // Sets the typed dynamic metadata that overrides the priority groups of every request.
+  // ``groups_yaml`` is the YAML of the overriding ``PriorityGroupsOverride`` message. The Lua
+  // filter is only there to clear the route cache, because the route, and with it the cluster of
+  // the initial attempt, is resolved before the filter chain runs.
+  void setupTypedGroupOverrideMetadata(absl::string_view groups_yaml) {
+    config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        request_handle:clearRouteCache()
+      end
+)EOF");
+    config_helper_.prependFilter(absl::StrReplaceAll(
+        R"EOF(
+name: envoy.filters.http.set_metadata
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+  metadata:
+  - metadata_namespace: envoy.test
+    typed_value:
+      "@type": type.googleapis.com/envoy.extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupsOverride
+      GROUPS
+)EOF",
+        {{"GROUPS", groups_yaml}}));
+  }
+
   // Makes the cluster served by the given fake upstream answer every request with the given
   // status, so that a test can decide which attempts of a request fail.
   void setUpstreamStatus(uint64_t upstream_index, const std::string& status) {
@@ -205,9 +234,9 @@ TEST_P(PriorityGroupIntegrationTest, RepeatedGroupSpendsSeveralAttempts) {
   EXPECT_EQ(1, requestsTo(ClusterB));
 }
 
-// The group list wraps around, so a request with more attempts than groups walks the chain again
-// from its beginning rather than staying in the last group.
-TEST_P(PriorityGroupIntegrationTest, AttemptsWrapAroundTheGroups) {
+// Once the attempts go past the end of the group list, the request stays on the last group rather
+// than walking the chain again from its beginning.
+TEST_P(PriorityGroupIntegrationTest, AttemptsStayOnTheLastGroup) {
   setupClusters();
   setupRoute(groupPerCluster({ClusterA, ClusterB}), retryPolicy(2));
   initialize();
@@ -222,10 +251,10 @@ TEST_P(PriorityGroupIntegrationTest, AttemptsWrapAroundTheGroups) {
 
   // Both groups failed, so the failure of the last attempt reaches the downstream.
   EXPECT_EQ("503", response->headers().getStatusValue());
-  // The third attempt wrapped around to the first group.
-  EXPECT_EQ(2, requestsTo(ClusterA));
-  EXPECT_EQ(1, requestsTo(ClusterB));
-  EXPECT_EQ(ClusterA, servedBy(response->headers()));
+  // The third attempt stayed on the last group.
+  EXPECT_EQ(1, requestsTo(ClusterA));
+  EXPECT_EQ(2, requestsTo(ClusterB));
+  EXPECT_EQ(ClusterB, servedBy(response->headers()));
 }
 
 // Without refresh_cluster_on_retry the router keeps the cluster of the initial attempt.
@@ -292,10 +321,7 @@ TEST_P(PriorityGroupIntegrationTest, MetadataOverridesTheOrderOfTheGroups) {
   setupClusters();
   setupGroupOverrideMetadata(R"({{name = "cluster_c"}, {name = "cluster_a"}})");
   setupRoute(absl::StrCat(R"EOF(
-group_override_metadata:
-  key: envoy.test
-  path:
-  - key: priority_groups
+override_metadata_namespace: envoy.test
 )EOF",
                           groupPerCluster({ClusterA, ClusterB, ClusterC})),
              retryPolicy(1));
@@ -324,10 +350,7 @@ TEST_P(PriorityGroupIntegrationTest, MetadataOverridesTheClustersOfAGroup) {
   setupGroupOverrideMetadata(
       R"({{name = "overridden", clusters = {{cluster_name = "cluster_c", weight = 100}}}})");
   setupRoute(absl::StrCat(R"EOF(
-group_override_metadata:
-  key: envoy.test
-  path:
-  - key: priority_groups
+override_metadata_namespace: envoy.test
 )EOF",
                           groupPerCluster({ClusterA, ClusterB})),
              retryPolicy(1));
@@ -353,10 +376,7 @@ TEST_P(PriorityGroupIntegrationTest, UnknownClusterFromMetadataFailsRequest) {
       R"({{name = "overridden", clusters = {{cluster_name = "cluster_does_not_exist", )"
       R"(weight = 100}}}})");
   setupRoute(absl::StrCat(R"EOF(
-group_override_metadata:
-  key: envoy.test
-  path:
-  - key: priority_groups
+override_metadata_namespace: envoy.test
 )EOF",
                           groupPerCluster({ClusterA})),
              retryPolicy(1));
@@ -380,10 +400,7 @@ TEST_P(PriorityGroupIntegrationTest, InvalidMetadataFallsBackToConfiguredGroups)
   setupClusters();
   setupGroupOverrideMetadata(R"("not-a-list-of-groups")");
   setupRoute(absl::StrCat(R"EOF(
-group_override_metadata:
-  key: envoy.test
-  path:
-  - key: priority_groups
+override_metadata_namespace: envoy.test
 )EOF",
                           groupPerCluster({ClusterA, ClusterB})),
              retryPolicy(1));
@@ -400,6 +417,36 @@ group_override_metadata:
   EXPECT_EQ(ClusterB, servedBy(response->headers()));
   EXPECT_EQ(1, requestsTo(ClusterA));
   EXPECT_EQ(1, requestsTo(ClusterB));
+}
+
+// The group override may also be published as typed dynamic metadata, which carries the
+// PriorityGroupsOverride message itself rather than a struct of the same shape.
+TEST_P(PriorityGroupIntegrationTest, TypedMetadataOverridesTheOrderOfTheGroups) {
+  setupClusters();
+  setupTypedGroupOverrideMetadata(R"EOF(priority_groups:
+      - name: cluster_c
+      - name: cluster_a)EOF");
+  setupRoute(absl::StrCat(R"EOF(
+override_metadata_namespace: envoy.test
+)EOF",
+                          groupPerCluster({ClusterA, ClusterB, ClusterC})),
+             retryPolicy(1));
+  initialize();
+
+  setUpstreamStatus(2, "503");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(requestHeaders());
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // The typed metadata put cluster_c first and cluster_a second, so the configured order, which
+  // starts with cluster_a, was not used.
+  EXPECT_EQ(ClusterA, servedBy(response->headers()));
+  EXPECT_EQ(1, requestsTo(ClusterC));
+  EXPECT_EQ(1, requestsTo(ClusterA));
+  EXPECT_EQ(0, requestsTo(ClusterB));
 }
 
 } // namespace

@@ -1,5 +1,6 @@
 #include <limits>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -31,11 +32,20 @@ public:
     plugin_ = factory.createClusterSpecifierPlugin(proto_config, server_factory_context_);
   }
 
-  // Set the dynamic metadata that provides the per-request group override.
+  // Set the untyped dynamic metadata that provides the per-request group override.
   void setGroupOverrideMetadata(const std::string& value_yaml) {
     Protobuf::Struct value;
     TestUtility::loadFromYaml(value_yaml, value);
     (*stream_info_.metadata_.mutable_filter_metadata())["envoy.test"] = value;
+  }
+
+  // Set the typed dynamic metadata that provides the per-request group override.
+  void setTypedGroupOverrideMetadata(const std::string& value_yaml) {
+    PriorityGroupsOverrideProto value;
+    TestUtility::loadFromYaml(value_yaml, value);
+    Protobuf::Any any;
+    std::ignore = any.PackFrom(value);
+    (*stream_info_.metadata_.mutable_typed_filter_metadata())["envoy.test"] = any;
   }
 
   // Set the dynamic metadata that overrides the clusters of a single group with the given raw
@@ -44,7 +54,7 @@ public:
   void setClusterOverrideMetadata(const std::string& group_name,
                                   const std::vector<std::pair<std::string, double>>& clusters) {
     Protobuf::Struct value;
-    auto& group = *(*value.mutable_fields())["groups"]
+    auto& group = *(*value.mutable_fields())["priority_groups"]
                        .mutable_list_value()
                        ->add_values()
                        ->mutable_struct_value();
@@ -82,10 +92,7 @@ priority_groups:
   clusters:
   - cluster_name: remote_primary
     weight: 100
-group_override_metadata:
-  key: envoy.test
-  path:
-  - key: groups
+override_metadata_namespace: envoy.test
   )EOF";
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
@@ -149,11 +156,15 @@ TEST_F(PriorityGroupClusterSpecifierPluginTest, SelectGroupByAttempt) {
     EXPECT_EQ("remote_primary", route->routeEntry()->clusterName());
   }
 
-  // The attempt count exceeds the number of the groups and the selection wraps around.
+  // The attempt count exceeds the number of the groups and the request stays on the last group.
   {
     stream_info_.setAttemptCount(3);
     auto route = plugin_->route(mock_route, headers_, stream_info_, 0);
-    EXPECT_EQ("local_primary", route->routeEntry()->clusterName());
+    EXPECT_EQ("remote_primary", route->routeEntry()->clusterName());
+
+    stream_info_.setAttemptCount(10);
+    route = plugin_->route(mock_route, headers_, stream_info_, 0);
+    EXPECT_EQ("remote_primary", route->routeEntry()->clusterName());
   }
 }
 
@@ -181,14 +192,14 @@ TEST_F(PriorityGroupClusterSpecifierPluginTest, NoGroupOverrideMetadataInRequest
   EXPECT_EQ("local_primary",
             plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
 
-  // The dynamic metadata of another filter is ignored.
+  // The dynamic metadata of another namespace is ignored.
   Protobuf::Struct value;
-  TestUtility::loadFromYaml("groups: [{name: remote}]", value);
+  TestUtility::loadFromYaml("priority_groups: [{name: remote}]", value);
   (*stream_info_.metadata_.mutable_filter_metadata())["envoy.other"] = value;
   EXPECT_EQ("local_primary",
             plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
 
-  // The expected key exists but the expected path is missing.
+  // The expected namespace exists but the priority_groups field is missing.
   TestUtility::loadFromYaml("other_groups: [{name: remote}]", value);
   (*stream_info_.metadata_.mutable_filter_metadata())["envoy.test"] = value;
   EXPECT_EQ("local_primary",
@@ -201,7 +212,7 @@ TEST_F(PriorityGroupClusterSpecifierPluginTest, GroupOverrideMetadata) {
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
 
   setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: remote
 - name: local
   )EOF");
@@ -220,17 +231,18 @@ groups:
     EXPECT_EQ("local_primary", route->routeEntry()->clusterName());
   }
 
-  // The attempt count exceeds the size of the metadata list and the selection wraps around.
+  // The attempt count exceeds the size of the metadata list and the request stays on the last
+  // group override.
   {
     stream_info_.setAttemptCount(3);
     auto route = plugin_->route(mock_route, headers_, stream_info_, 0);
-    EXPECT_EQ("remote_primary", route->routeEntry()->clusterName());
+    EXPECT_EQ("local_primary", route->routeEntry()->clusterName());
   }
 
   // Unknown group name in the metadata falls back to the configured group order.
   {
     setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: unknown
   )EOF");
     stream_info_.setAttemptCount(1);
@@ -245,7 +257,7 @@ TEST_F(PriorityGroupClusterSpecifierPluginTest, ClusterOverrideMetadata) {
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
 
   setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: remote
   clusters:
   - cluster_name: remote_override_primary
@@ -287,7 +299,7 @@ groups:
   // The clusters of a group that is not configured at all could also be overridden.
   {
     setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: unknown
   clusters:
   - cluster_name: unknown_primary
@@ -301,7 +313,7 @@ groups:
   // An empty cluster list is treated as a name only override.
   {
     setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: remote
   clusters: []
   )EOF");
@@ -325,7 +337,7 @@ groups:
   // The overridden clusters are also used for the retries of the request.
   {
     setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: remote
   clusters:
   - cluster_name: remote_override_primary
@@ -335,8 +347,8 @@ groups:
     auto route = plugin_->route(mock_route, headers_, stream_info_, 0);
     EXPECT_EQ("remote_override_primary", route->routeEntry()->clusterName());
 
-    // Simulate a retry. The metadata has a single group override, so the selection wraps around to
-    // the same group override again.
+    // Simulate a retry. The metadata has a single group override, so the request stays on that
+    // group override.
     stream_info_.setAttemptCount(2);
     route->routeEntry()->refreshRouteCluster(headers_, stream_info_);
     EXPECT_EQ("remote_override_primary", route->routeEntry()->clusterName());
@@ -360,20 +372,20 @@ TEST_F(PriorityGroupClusterSpecifierPluginTest, MalformedGroupOverrideMetadata) 
 
   // The metadata value is not a list.
   setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
   name: remote
   )EOF");
   expectDefaultGroupOrder();
 
   // The metadata value is an empty list.
   setGroupOverrideMetadata(R"EOF(
-groups: []
+priority_groups: []
   )EOF");
   expectDefaultGroupOrder();
 
   // The element of the list is not a struct.
   setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - remote
 - local
   )EOF");
@@ -381,7 +393,7 @@ groups:
 
   // The group name is missing, is not a string, or is empty.
   setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - clusters:
   - cluster_name: remote_primary
     weight: 100
@@ -389,13 +401,14 @@ groups:
 - name: ""
   )EOF");
   expectDefaultGroupOrder();
+  // The third attempt falls back to the configured groups, which stay on the last group.
   stream_info_.setAttemptCount(3);
-  EXPECT_EQ("local_primary",
+  EXPECT_EQ("remote_primary",
             plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
 
   // The clusters are not a list.
   setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: remote
   clusters:
     cluster_name: remote_primary
@@ -404,7 +417,7 @@ groups:
 
   // The element of the clusters is not a struct.
   setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: remote
   clusters:
   - remote_primary
@@ -413,7 +426,7 @@ groups:
 
   // The cluster name is missing, is not a string, or is empty.
   setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: remote
   clusters:
   - weight: 100
@@ -427,13 +440,14 @@ groups:
     weight: 100
   )EOF");
   expectDefaultGroupOrder();
+  // The third attempt falls back to the configured groups, which stay on the last group.
   stream_info_.setAttemptCount(3);
-  EXPECT_EQ("local_primary",
+  EXPECT_EQ("remote_primary",
             plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
 
   // The cluster weight is missing, is not a number, or is not a positive integer.
   setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: remote
   clusters:
   - cluster_name: remote_primary
@@ -445,7 +459,7 @@ groups:
   expectDefaultGroupOrder();
 
   setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: remote
   clusters:
   - cluster_name: remote_primary
@@ -487,10 +501,7 @@ priority_groups:
   clusters:
   - cluster_name: local_secondary
     weight: 100
-group_override_metadata:
-  key: envoy.test
-  path:
-  - key: groups
+override_metadata_namespace: envoy.test
   )EOF");
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
 
@@ -503,7 +514,7 @@ group_override_metadata:
   // The name always resolves to the first group of the duplicate names.
   {
     setGroupOverrideMetadata(R"EOF(
-groups:
+priority_groups:
 - name: local
   )EOF");
     auto route = plugin_->route(mock_route, headers_, stream_info_, 0);
@@ -643,6 +654,139 @@ TEST(SenselessTestForCoverage, SenselessTestForCoverage) {
   PriorityGroupClusterSpecifierPluginFactoryConfig factory;
   EXPECT_EQ("envoy.router.cluster_specifier_plugin.priority_group", factory.name());
   EXPECT_NE(nullptr, factory.createEmptyConfigProto());
+}
+
+// The typed dynamic metadata carries the group overrides as a PriorityGroupsOverride message.
+TEST_F(PriorityGroupClusterSpecifierPluginTest, TypedGroupOverrideMetadata) {
+  setUpTest(config_yaml_with_metadata);
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+
+  setTypedGroupOverrideMetadata(R"EOF(
+priority_groups:
+- name: remote
+  clusters:
+  - cluster_name: remote_override_primary
+    weight: 20
+  - cluster_name: remote_override_secondary
+    weight: 80
+- name: local
+  )EOF");
+
+  // The initial attempt uses the clusters and the weights of the first group override.
+  {
+    stream_info_.setAttemptCount(1);
+    EXPECT_EQ("remote_override_primary",
+              plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
+    EXPECT_EQ("remote_override_secondary",
+              plugin_->route(mock_route, headers_, stream_info_, 20)->routeEntry()->clusterName());
+  }
+
+  // The second group override only overrides the name, so the configured clusters of the group
+  // 'local' are used for the first retry.
+  {
+    stream_info_.setAttemptCount(2);
+    EXPECT_EQ("local_primary",
+              plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
+  }
+
+  // The attempt count exceeds the size of the metadata list and the request stays on the last
+  // group override.
+  {
+    stream_info_.setAttemptCount(3);
+    EXPECT_EQ("local_primary",
+              plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
+  }
+
+  // An unknown group name without any cluster falls back to the configured group order.
+  {
+    setTypedGroupOverrideMetadata(R"EOF(
+priority_groups:
+- name: unknown
+  )EOF");
+    stream_info_.setAttemptCount(1);
+    EXPECT_EQ("local_primary",
+              plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
+  }
+}
+
+// The typed dynamic metadata is preferred over the untyped one of the same namespace.
+TEST_F(PriorityGroupClusterSpecifierPluginTest, TypedGroupOverrideMetadataTakesPrecedence) {
+  setUpTest(config_yaml_with_metadata);
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  stream_info_.setAttemptCount(1);
+
+  setGroupOverrideMetadata(R"EOF(
+priority_groups:
+- name: local
+  )EOF");
+  setTypedGroupOverrideMetadata(R"EOF(
+priority_groups:
+- name: remote
+  )EOF");
+  EXPECT_EQ("remote_primary",
+            plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
+
+  // A typed metadata entry that cannot be used does not fall back to the untyped one either.
+  Protobuf::Any any;
+  std::ignore = any.PackFrom(Protobuf::Struct());
+  (*stream_info_.metadata_.mutable_typed_filter_metadata())["envoy.test"] = any;
+  EXPECT_EQ("local_primary",
+            plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
+}
+
+// Malformed group overrides in the typed dynamic metadata fall back to the configured group order.
+TEST_F(PriorityGroupClusterSpecifierPluginTest, MalformedTypedGroupOverrideMetadata) {
+  setUpTest(config_yaml_with_metadata);
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  stream_info_.setAttemptCount(1);
+
+  // The typed metadata holds no group at all.
+  setTypedGroupOverrideMetadata("{}");
+  EXPECT_EQ("local_primary",
+            plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
+
+  // The group name is empty.
+  setTypedGroupOverrideMetadata(R"EOF(
+priority_groups:
+- clusters:
+  - cluster_name: remote_override_primary
+    weight: 100
+  )EOF");
+  EXPECT_EQ("local_primary",
+            plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
+
+  // The cluster name is empty.
+  setTypedGroupOverrideMetadata(R"EOF(
+priority_groups:
+- name: remote
+  clusters:
+  - weight: 100
+  )EOF");
+  EXPECT_EQ("local_primary",
+            plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
+
+  // The cluster weight is missing or is zero. One malformed cluster invalidates the whole group
+  // override to avoid an unexpected traffic distribution.
+  setTypedGroupOverrideMetadata(R"EOF(
+priority_groups:
+- name: remote
+  clusters:
+  - cluster_name: remote_override_primary
+  )EOF");
+  EXPECT_EQ("local_primary",
+            plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
+
+  setTypedGroupOverrideMetadata(R"EOF(
+priority_groups:
+- name: remote
+  clusters:
+  - cluster_name: remote_override_primary
+    weight: 100
+  - cluster_name: remote_override_secondary
+    weight: 0
+  )EOF");
+  EXPECT_EQ("local_primary",
+            plugin_->route(mock_route, headers_, stream_info_, 0)->routeEntry()->clusterName());
 }
 
 } // namespace

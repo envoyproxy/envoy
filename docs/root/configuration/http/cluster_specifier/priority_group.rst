@@ -48,10 +48,11 @@ minus one (the attempt count is 1 for the initial attempt, 2 for the first retry
 
 .. code-block:: text
 
-  group = priority_groups[(attempt_count - 1) % len(priority_groups)]
+  group = priority_groups[min(attempt_count - 1, len(priority_groups) - 1)]
 
 so the initial attempt uses ``priority_groups[0]``, the first retry uses ``priority_groups[1]``, and
-so on.
+so on. Once the attempts go past the end of the list, the request stays on the last group for all
+the remaining attempts.
 
 And it's possible to repeat a group in the list to make it receive multiple attempts consecutively.
 That is how a "try the primary provider twice, then fall back" policy is expressed in the priority
@@ -77,13 +78,20 @@ the retries of a request keep a consistent position in the weight intervals of e
 Per-request groups
 ~~~~~~~~~~~~~~~~~~
 
-The group list can be overridden per request by an optional dynamic metadata entry, see
-:ref:`group_override_metadata
-<envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.group_override_metadata>`.
-An override element that only carries a group ``name`` selects one of the configured groups by name
-and keeps its configured clusters and weights; an element that also carries ``clusters`` replaces
-them for the current request. This makes the fallback chain a per-request decision that an earlier
-filter computes from the request, while the clusters themselves stay in the static configuration.
+The group list can be overridden per request by an optional dynamic metadata namespace, see
+:ref:`override_metadata_namespace
+<envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.override_metadata_namespace>`.
+The value of the namespace is a :ref:`PriorityGroupsOverride
+<envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupsOverride>`
+message: it is read from the :ref:`typed dynamic metadata
+<envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` first and from the
+:ref:`untyped one <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`, as a struct of the
+same shape, if the namespace is not present there.
+
+An overriding group that only carries a ``name`` selects one of the configured groups by name and
+keeps its configured clusters and weights; a group that also carries ``clusters`` replaces them for
+the current request. This makes the fallback chain a per-request decision that an earlier filter
+computes from the request, while the clusters themselves stay in the static configuration.
 
 .. note::
 
@@ -216,10 +224,7 @@ specifier is configured to read it:
 .. code-block:: yaml
 
   "@type": type.googleapis.com/envoy.extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier
-  group_override_metadata:
-    key: envoy.my_filter
-    path:
-    - key: priority_groups
+  override_metadata_namespace: envoy.my_filter
   priority_groups:
   - name: provider_a
     clusters:
@@ -245,6 +250,23 @@ split over two of its clusters and fall back to the configured ``provider_a`` gr
         weight: 80
     - name: provider_a
 
-If the metadata is missing, is not a list, is empty, or its element for the current attempt is not a
-valid group override, the configured ``priority_groups`` are used instead, so a filter failure
-degrades to the static chain rather than to a failed request.
+The same override can be published as typed dynamic metadata instead, which carries the
+``PriorityGroupsOverride`` message itself:
+
+.. code-block:: yaml
+
+  envoy.my_filter:
+    "@type": type.googleapis.com/envoy.extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupsOverride
+    priority_groups:
+    - name: provider_b
+      clusters:
+      - cluster_name: provider_b
+        weight: 20
+      - cluster_name: provider_b_backup
+        weight: 80
+    - name: provider_a
+
+If the metadata namespace is missing, cannot be parsed as a ``PriorityGroupsOverride`` message,
+holds no group at all, or its group for the current attempt is not a valid override, the configured
+``priority_groups`` are used instead, so a filter failure degrades to the static chain rather than
+to a failed request.

@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.router.cluster_specifiers.priority_group.v3;
 
-import "envoy/type/metadata/v3/metadata.proto";
-
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -32,9 +30,8 @@ message ClusterWeight {
 // A named group of weighted clusters. All the clusters of a group are considered to have the
 // same priority and the target cluster is selected from the group based on the weights.
 message PriorityGroup {
-  // Name of the group. The name is used to reference the group from the :ref:`group override
-  // metadata
-  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.group_override_metadata>`
+  // Name of the group. The name is used to reference the group from the :ref:`override metadata
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.override_metadata_namespace>`
   // and should be unique across all the groups of the same cluster specifier. If multiple groups
   // share the same name, then the first one of them is used when the group is referenced by name.
   string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -50,8 +47,8 @@ message PriorityGroup {
 //
 // The group is selected by the attempt count of the request: the initial attempt uses the first
 // group of the list, the first retry uses the second group, and so on. If the attempt count
-// exceeds the number of the available groups, the selection wraps around to the beginning of the
-// list.
+// exceeds the number of the available groups, then the last group of the list is used for all
+// the remaining attempts.
 //
 // This plugin must be used together with the :ref:`refresh cluster on retry
 // <envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>` option of the retry
@@ -78,40 +75,44 @@ message PriorityGroup {
 //       weight: 100
 //
 // With the configuration above, the initial attempt will be routed to ``local_primary`` or
-// ``local_secondary`` (80/20), and the first retry will be routed to ``remote_primary``.
+// ``local_secondary`` (80/20), and the first retry and every attempt after it will be routed to
+// ``remote_primary``.
 //
 message PriorityGroupClusterSpecifier {
   // The list of the priority groups. The order of the groups is the default selection order that
-  // is used when the :ref:`group override metadata
-  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.group_override_metadata>`
+  // is used when the :ref:`override metadata
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.override_metadata_namespace>`
   // is not configured or not available in the request.
   repeated PriorityGroup priority_groups = 1 [(validate.rules).repeated = {min_items: 1}];
 
-  // Optional dynamic metadata key that is used to override the priority groups on a per-request
-  // basis. If this is configured and the referenced dynamic metadata value is a non-empty list,
-  // then the priority group of the current attempt is read from that list: the initial attempt
-  // uses the first element of the list, the first retry uses the second element, and so on,
-  // wrapping around when the attempt count exceeds the size of the list.
+  // Optional dynamic metadata namespace that is used to override the priority groups on a
+  // per-request basis. If this is configured and the dynamic metadata of the request has a value
+  // under this namespace, then the priority groups of that value replace the configured
+  // :ref:`priority_groups
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.priority_groups>`
+  // for the request.
   //
-  // Every element of the list must be a struct that overrides one priority group and that has the
-  // same shape as a :ref:`priority group
-  // <envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup>`:
+  // The value of the namespace is read from the :ref:`typed dynamic metadata
+  // <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` first, where it must be a
+  // :ref:`PriorityGroupsOverride
+  // <envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupsOverride>`
+  // message. If the namespace is not present there, then it is read from the :ref:`untyped
+  // dynamic metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`, where it must
+  // be a struct with the same shape as the ``PriorityGroupsOverride`` message.
   //
-  // * The ``name`` field is required and must be a non-empty string.
-  // * The ``clusters`` field is optional and, if it is a non-empty list, then every element of it
-  //   must be a struct with a non-empty string ``cluster_name`` field and a numeric ``weight``
-  //   field in the range [1, 4294967295]. The ``weight`` is interpreted as an integer by truncating.
+  // The group of the current attempt is read from the overriding list in the same way as from the
+  // configured list: the initial attempt uses the first group, the first retry uses the second
+  // group, and so on, and the last group is used once the attempts go past the end of the list.
   //
-  // If the ``clusters`` of an element are provided, then they replace the :ref:`clusters
+  // An overriding group whose :ref:`clusters
   // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup.clusters>`
-  // of the group and the target cluster is selected from them based on their weights. Note these
+  // are set replaces the clusters and the weights of the group for the request. Note these
   // clusters are not validated when the configuration is loaded and the request fails with a
-  // ``no cluster`` response if the selected cluster does not exist.
-  //
-  // If the ``clusters`` of an element are omitted or empty, then the ``name`` selects the
-  // configured priority group with the same :ref:`name
+  // ``no cluster`` response if the selected cluster does not exist. An overriding group whose
+  // clusters are omitted or empty instead selects the configured priority group with the same
+  // :ref:`name
   // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup.name>`
-  // and the configured clusters and weights of that group are used.
+  // and uses the configured clusters and weights of that group.
   //
   // The dynamic metadata is typically set by a filter that runs before the router filter, for
   // example the :ref:`Lua filter <config_http_filters_lua>` or the :ref:`external processing
@@ -121,7 +122,7 @@ message PriorityGroupClusterSpecifier {
   //   The route, and with it the cluster of the initial attempt, is resolved before the HTTP
   //   filter chain runs, so the filter that sets the metadata must also clear the route cache.
   //
-  // Example of a matching dynamic metadata value:
+  // Example of a matching untyped dynamic metadata value:
   //
   // .. code-block:: yaml
   //
@@ -139,11 +140,10 @@ message PriorityGroupClusterSpecifier {
   // and the weights of the metadata, and the first retry uses the configured group ``local`` with
   // its configured clusters and weights.
   //
-  // If the metadata is missing, is not a list, is an empty list, or the element of the current
-  // attempt is not a valid group override, then the default order of :ref:`priority_groups
-  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.priority_groups>`
-  // is used instead.
-  type.metadata.v3.MetadataKey group_override_metadata = 2;
+  // If the metadata namespace is missing, cannot be parsed as a ``PriorityGroupsOverride``
+  // message, holds no group at all, or the group of the current attempt is not a valid override,
+  // then the configured ``priority_groups`` are used instead.
+  string override_metadata_namespace = 2;
 
   // The source of the random value that is used to select the target cluster of the selected
   // priority group based on the cluster weights. If this is not configured, the internally
@@ -166,4 +166,28 @@ message PriorityGroupClusterSpecifier {
     // Envoy will fall back to use the internally generated random value.
     google.protobuf.BoolValue use_hash_policy = 4;
   }
+}
+
+// The value of the :ref:`override metadata
+// <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.override_metadata_namespace>`
+// that replaces the configured :ref:`priority_groups
+// <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.priority_groups>`
+// for a single request.
+//
+// This message is never part of the cluster specifier configuration, so it is not checked by the
+// proto validation rules. A value that cannot be used, or a single group of it that cannot be
+// used, is ignored and the configured priority groups are used instead.
+message PriorityGroupsOverride {
+  // The ordered list of the overriding priority groups. The initial attempt of the request uses
+  // the first group, the first retry uses the second group, and so on. Once the attempts go past
+  // the end of the list, the last group is used for all the remaining attempts.
+  //
+  // Unlike a configured :ref:`priority group
+  // <envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup>`, an
+  // overriding group may omit its :ref:`clusters
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup.clusters>`
+  // to reuse the clusters and the weights of the configured group with the same :ref:`name
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup.name>`.
+  // An empty list means that there is no override at all.
+  repeated PriorityGroup priority_groups = 1;
 }

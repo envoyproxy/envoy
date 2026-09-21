@@ -10,6 +10,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/delegating_route_impl.h"
 
 #include "absl/strings/numbers.h"
@@ -20,6 +21,7 @@ namespace Router {
 namespace PriorityGroup {
 namespace {
 
+constexpr absl::string_view PriorityGroupsField = "priority_groups";
 constexpr absl::string_view NameField = "name";
 constexpr absl::string_view ClustersField = "clusters";
 constexpr absl::string_view ClusterNameField = "cluster_name";
@@ -35,6 +37,13 @@ std::optional<std::string> stringField(const Protobuf::Map<std::string, Protobuf
     return std::nullopt;
   }
   return iter->second.string_value();
+}
+
+// Get the index of the group that is used for the given attempt. Once the attempts go past the
+// end of the group list, the request stays on the last group of the list.
+uint64_t groupIndexForAttempt(uint64_t attempt_index, uint64_t group_size) {
+  ASSERT(group_size > 0);
+  return std::min(attempt_index, group_size - 1);
 }
 
 } // namespace
@@ -59,7 +68,30 @@ PriorityGroupEntry::PriorityGroupEntry(std::string name,
 }
 
 std::optional<PriorityGroupEntry>
-PriorityGroupEntry::parseFromMetadata(const Protobuf::Value& value) {
+PriorityGroupEntry::parseFromProto(const PriorityGroupProto& proto) {
+  // The group name is always required. It is used to select the configured group that provides
+  // the clusters if the clusters are not overridden by the metadata.
+  if (proto.name().empty()) {
+    return std::nullopt;
+  }
+
+  std::vector<std::pair<std::string, uint64_t>> clusters;
+  clusters.reserve(proto.clusters().size());
+  for (const ClusterWeightProto& cluster : proto.clusters()) {
+    // The metadata is not validated by the proto validation rules, so the same constraints as
+    // the ones of the configured clusters are enforced here.
+    if (cluster.cluster_name().empty() || cluster.weight().value() < 1) {
+      return std::nullopt;
+    }
+    clusters.emplace_back(cluster.cluster_name(), cluster.weight().value());
+  }
+
+  // An empty cluster list means that only the group name is overridden by the metadata.
+  return PriorityGroupEntry(proto.name(), std::move(clusters));
+}
+
+std::optional<PriorityGroupEntry>
+PriorityGroupEntry::parseFromStruct(const Protobuf::Value& value) {
   if (value.kind_case() != Protobuf::Value::kStructValue) {
     return std::nullopt;
   }
@@ -145,7 +177,8 @@ const std::string& PriorityGroupEntry::selectCluster(uint64_t random_value) cons
 
 PriorityGroupClusterSpecifierPlugin::PriorityGroupClusterSpecifierPlugin(
     const PriorityGroupClusterSpecifierConfigProto& proto)
-    : random_value_header_(proto.header_name()),
+    : override_metadata_namespace_(proto.override_metadata_namespace()),
+      random_value_header_(proto.header_name()),
       use_hash_policy_(proto.random_value_specifier_case() ==
                                PriorityGroupClusterSpecifierConfigProto::kUseHashPolicy
                            ? proto.use_hash_policy().value()
@@ -155,11 +188,8 @@ PriorityGroupClusterSpecifierPlugin::PriorityGroupClusterSpecifierPlugin(
   for (const PriorityGroupProto& group_proto : proto.priority_groups()) {
     groups_.push_back(std::make_unique<PriorityGroupEntry>(group_proto));
     // If multiple groups share the same name, then only the first one of them could be
-    // referenced by the group override metadata.
+    // referenced by the override metadata.
     groups_by_name_.emplace(groups_.back()->name(), groups_.back().get());
-  }
-  if (proto.has_group_override_metadata()) {
-    group_override_metadata_.emplace(proto.group_override_metadata());
   }
 }
 
@@ -204,19 +234,47 @@ uint64_t PriorityGroupClusterSpecifierPlugin::randomValue(
 
 std::optional<PriorityGroupEntry> PriorityGroupClusterSpecifierPlugin::groupOverrideForAttempt(
     const StreamInfo::StreamInfo& stream_info, uint64_t attempt_index) const {
-  const auto& value = Envoy::Config::Metadata::metadataValue(&stream_info.dynamicMetadata(),
-                                                             *group_override_metadata_);
-  if (value.kind_case() != Protobuf::Value::kListValue) {
+  const auto& metadata = stream_info.dynamicMetadata();
+
+  // The typed metadata carries the overriding groups as a PriorityGroupsOverride message and is
+  // preferred over the untyped one.
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  if (const auto iter = typed_metadata.find(override_metadata_namespace_);
+      iter != typed_metadata.end()) {
+    PriorityGroupsOverrideProto overrides;
+    if (!MessageUtil::unpackTo(iter->second, overrides).ok()) {
+      ENVOY_LOG(debug,
+                "priority group cluster specifier: the typed metadata of the namespace '{}' is "
+                "not a PriorityGroupsOverride message; falling back to the configured group order",
+                override_metadata_namespace_);
+      return std::nullopt;
+    }
+    if (overrides.priority_groups().empty()) {
+      return std::nullopt;
+    }
+    return PriorityGroupEntry::parseFromProto(overrides.priority_groups().at(
+        groupIndexForAttempt(attempt_index, overrides.priority_groups().size())));
+  }
+
+  // The untyped metadata carries a struct that has the same shape as a PriorityGroupsOverride
+  // message.
+  const auto& untyped_metadata = metadata.filter_metadata();
+  const auto iter = untyped_metadata.find(override_metadata_namespace_);
+  if (iter == untyped_metadata.end()) {
+    return std::nullopt;
+  }
+  const auto groups_iter = iter->second.fields().find(PriorityGroupsField);
+  if (groups_iter == iter->second.fields().end() ||
+      groups_iter->second.kind_case() != Protobuf::Value::kListValue) {
     return std::nullopt;
   }
 
-  const auto& overrides = value.list_value().values();
+  const auto& overrides = groups_iter->second.list_value().values();
   if (overrides.empty()) {
     return std::nullopt;
   }
-
-  // Wrap around if there are more attempts than the group overrides in the metadata.
-  return PriorityGroupEntry::parseFromMetadata(overrides.at(attempt_index % overrides.size()));
+  return PriorityGroupEntry::parseFromStruct(
+      overrides.at(groupIndexForAttempt(attempt_index, overrides.size())));
 }
 
 const PriorityGroupEntry*
@@ -235,7 +293,7 @@ PriorityGroupClusterSpecifierPlugin::selectCluster(const StreamInfo::StreamInfo&
   const uint64_t attempt_index = attempt_count - 1;
 
   // The groups may be overridden by the dynamic metadata on a per-request basis.
-  if (group_override_metadata_.has_value()) {
+  if (!override_metadata_namespace_.empty()) {
     const auto group_override = groupOverrideForAttempt(stream_info, attempt_index);
     if (group_override.has_value()) {
       // The metadata also overrides the clusters of the group, so the clusters and the weights of
@@ -251,14 +309,14 @@ PriorityGroupClusterSpecifierPlugin::selectCluster(const StreamInfo::StreamInfo&
         return group->selectCluster(random_value);
       }
       ENVOY_LOG(debug,
-                "priority group cluster specifier: unknown group '{}' in the group override "
+                "priority group cluster specifier: unknown group '{}' in the override "
                 "metadata; falling back to the configured group order",
                 group_override->name());
     }
   }
 
-  // Wrap around if there are more attempts than the configured groups.
-  return groups_[attempt_index % groups_.size()]->selectCluster(random_value);
+  // Stay on the last group if there are more attempts than the configured groups.
+  return groups_[groupIndexForAttempt(attempt_index, groups_.size())]->selectCluster(random_value);
 }
 
 /**

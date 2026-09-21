@@ -12,7 +12,6 @@
 #include "envoy/router/cluster_specifier_plugin.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/config/metadata.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -24,6 +23,8 @@ namespace PriorityGroup {
 
 using PriorityGroupClusterSpecifierConfigProto = envoy::extensions::router::cluster_specifiers::
     priority_group::v3::PriorityGroupClusterSpecifier;
+using PriorityGroupsOverrideProto =
+    envoy::extensions::router::cluster_specifiers::priority_group::v3::PriorityGroupsOverride;
 using PriorityGroupProto =
     envoy::extensions::router::cluster_specifiers::priority_group::v3::PriorityGroup;
 using ClusterWeightProto =
@@ -39,12 +40,21 @@ public:
   PriorityGroupEntry(std::string name, std::vector<std::pair<std::string, uint64_t>> clusters);
 
   /**
-   * Parse one element of the group override metadata list into a group entry. The returned entry
-   * may have no cluster at all if the metadata only overrides the group name.
-   * @param value one element of the group override metadata list.
+   * Parse one group of the typed override metadata into a group entry. The returned entry may
+   * have no cluster at all if the metadata only overrides the group name.
+   * @param proto one group of the override metadata.
+   * @return the parsed group entry or nullopt if the given group is not a valid group override.
+   */
+  static std::optional<PriorityGroupEntry> parseFromProto(const PriorityGroupProto& proto);
+
+  /**
+   * Parse one group of the untyped override metadata into a group entry. The given value must
+   * have the same shape as a PriorityGroup message. The returned entry may have no cluster at all
+   * if the metadata only overrides the group name.
+   * @param value one group of the override metadata.
    * @return the parsed group entry or nullopt if the given value is not a valid group override.
    */
-  static std::optional<PriorityGroupEntry> parseFromMetadata(const Protobuf::Value& value);
+  static std::optional<PriorityGroupEntry> parseFromStruct(const Protobuf::Value& value);
 
   const std::string& name() const { return name_; }
 
@@ -106,9 +116,9 @@ private:
                        const Http::RequestHeaderMap& headers,
                        const StreamInfo::StreamInfo& stream_info, uint64_t random) const;
 
-  // Get the priority group override of the given attempt from the group override metadata. Returns
-  // nullopt if the metadata is not available or the override of the attempt is not valid. The
-  // returned entry may have no cluster at all if the metadata only overrides the group name.
+  // Get the priority group override of the given attempt from the override metadata namespace.
+  // Returns nullopt if the metadata is not available or the override of the attempt is not valid.
+  // The returned entry may have no cluster at all if the metadata only overrides the group name.
   std::optional<PriorityGroupEntry>
   groupOverrideForAttempt(const StreamInfo::StreamInfo& stream_info, uint64_t attempt_index) const;
 
@@ -118,8 +128,8 @@ private:
   std::vector<PriorityGroupEntryPtr> groups_;
   // Index of the groups by the group name. The values point to the entries owned by groups_.
   absl::flat_hash_map<std::string, const PriorityGroupEntry*> groups_by_name_;
-  // Optional dynamic metadata key that provides the per-request group override.
-  std::optional<Envoy::Config::MetadataKey> group_override_metadata_;
+  // Optional dynamic metadata namespace that provides the per-request group override.
+  const std::string override_metadata_namespace_;
   // Optional request header that provides the random value of the weighted cluster selection.
   const Http::LowerCaseString random_value_header_;
   // True if the hash policies of the route are used to generate the random value of the weighted
