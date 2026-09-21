@@ -39,7 +39,7 @@ bazel_dep(name = "zipkin-api", version = "1.0.0.envoy")
 # deps: Dev
 ####################################################################################
 
-bazel_dep(name = "googletest", version = "1.17.0.bcr.2", dev_dependency = True)
+bazel_dep(name = "googletest", version = "1.18.0.bcr.1", dev_dependency = True)
 bazel_dep(name = "protoc-gen-jsonschema", version = "0.0.0-20230530-7680e49.envoy", dev_dependency = True)
 
 
