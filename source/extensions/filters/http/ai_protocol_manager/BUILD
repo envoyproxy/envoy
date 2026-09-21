@@ -191,6 +191,7 @@ envoy_cc_library(
     name = "ai_response_lib",
     hdrs = ["ai_response.h"],
     deps = [
+        ":flattening_json_codec_lib",
         "//source/common/coroutine:task_lib",
         "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_lib",
         "@abseil-cpp//absl/functional:any_invocable",
@@ -234,6 +235,7 @@ envoy_cc_library(
         ":buffer_manager_lib",
         ":external_buffer_interface",
         ":filter_pipeline_lib",
+        ":flattening_json_codec_lib",
         ":task_group_lib",
         "//envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_lib",

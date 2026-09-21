@@ -148,6 +148,8 @@ public:
     return pipeline_.propagate(index, std::move(item));
   }
 
+  void closeNextStage(size_t index) { pipeline_.stage(index + 1)->close(); }
+
 protected:
   using std::enable_shared_from_this<ResponseAsyncState<Item>>::shared_from_this;
   using std::enable_shared_from_this<ResponseAsyncState<Item>>::weak_from_this;
@@ -210,6 +212,11 @@ private:
       if (!item.has_value()) {
         pipeline_.stage(index + 1)->close();
         co_return absl::OkStatus();
+      }
+      if (pipeline_.stage(index + 1)->closed()) {
+        // The filter ended the downstream stream early; drain remaining upstream items without
+        // forwarding them to the closed stage.
+        continue;
       }
       CO_RETURN_IF_ERROR(co_await pipeline_.propagate(index, std::move(*item)));
     }
@@ -355,16 +362,128 @@ private:
   SseEventDecoder decoder_;
 };
 
+// Unary JSON response pipeline implementation (`Item = std::vector<FlattenJsonField>`).
+//
+// Incoming JSON bytes are incrementally flattened into batches of `FlattenJsonField` leaf fields
+// by `FlatteningJsonDecoder`, streamed through `AiFilter::encodeUnary()`, and re-serialized into
+// compact JSON by `FlatteningJsonSerializer` in the sink.
+class UnaryAsyncState : public ResponseAsyncState<std::vector<FlattenJsonField>> {
+public:
+  UnaryAsyncState(std::vector<AiFilterSharedPtr> filters, FilterChainBridge& bridge,
+                  BufferManager& out_buffer_manager,
+                  ResponseFilterManager::OnCompleteFn on_complete)
+      : ResponseAsyncState(std::move(filters), bridge, out_buffer_manager, std::move(on_complete)),
+        serializer_(out_buffer_manager) {}
+
+  ~UnaryAsyncState() override { cancel(); }
+
+protected:
+  uint64_t itemSize(const std::vector<FlattenJsonField>& item) const override {
+    uint64_t total = 0;
+    for (const FlattenJsonField& field : item) {
+      total += field.byteSize();
+    }
+    return total;
+  }
+
+  absl::Status decode(const Buffer::Instance& data,
+                      std::vector<std::vector<FlattenJsonField>>& out) override {
+    absl::StatusOr<std::vector<FlattenJsonField>> fields =
+        decoder_.onData(data, /*end_stream=*/false);
+    if (!fields.ok()) {
+      return fields.status();
+    }
+    if (!fields->empty()) {
+      out.push_back(std::move(*fields));
+    }
+    return absl::OkStatus();
+  }
+
+  absl::Status finishDecode(std::vector<std::vector<FlattenJsonField>>& out) override {
+    Buffer::OwnedImpl empty;
+    absl::StatusOr<std::vector<FlattenJsonField>> fields =
+        decoder_.onData(empty, /*end_stream=*/true);
+    if (!fields.ok()) {
+      return fields.status();
+    }
+    if (!fields->empty()) {
+      if (out.empty()) {
+        out.push_back(std::move(*fields));
+      } else {
+        out.back().insert(out.back().end(), std::make_move_iterator(fields->begin()),
+                          std::make_move_iterator(fields->end()));
+      }
+    }
+    return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> serializeItem(std::vector<FlattenJsonField> item) override {
+    co_return co_await serializer_.serializeBatch(item);
+  }
+
+  Coroutine::Task<absl::Status> finishSerialize() override {
+    co_return co_await serializer_.finish();
+  }
+
+  static Coroutine::Task<absl::StatusOr<std::vector<FlattenJsonField>>>
+  receiveUnaryTask(std::weak_ptr<ResponseAsyncState<std::vector<FlattenJsonField>>> weak,
+                   size_t index) {
+    auto self = weak.lock();
+    if (self == nullptr || self->terminated()) {
+      co_return absl::CancelledError("response pipeline cancelled or destroyed");
+    }
+    ASSIGN_OR_CO_RETURN(std::optional<std::vector<FlattenJsonField>> batch,
+                        co_await self->receive(index));
+    if (!batch.has_value()) {
+      co_return std::vector<FlattenJsonField>{};
+    }
+    co_return std::move(*batch);
+  }
+
+  static Coroutine::Task<absl::Status>
+  propagateUnaryTask(std::weak_ptr<ResponseAsyncState<std::vector<FlattenJsonField>>> weak,
+                     size_t index, std::vector<FlattenJsonField> fields) {
+    auto self = weak.lock();
+    if (self == nullptr || self->terminated()) {
+      co_return absl::CancelledError("response pipeline cancelled or destroyed");
+    }
+    if (fields.empty()) {
+      self->closeNextStage(index);
+      co_return absl::OkStatus();
+    }
+    co_return co_await self->propagate(index, std::move(fields));
+  }
+
+  Coroutine::Task<absl::Status> runFilter(size_t index) override {
+    std::weak_ptr<ResponseAsyncState<std::vector<FlattenJsonField>>> weak = weak_from_this();
+    AiResponseStreamReceiver receiver([weak, index]() { return receiveUnaryTask(weak, index); });
+    AiResponseStreamPropagator propagator([weak, index](std::vector<FlattenJsonField> fields) {
+      return propagateUnaryTask(weak, index, std::move(fields));
+    });
+    co_return co_await filters_[index]->encodeUnary(std::move(receiver), std::move(propagator));
+  }
+
+private:
+  FlatteningJsonDecoder decoder_;
+  FlatteningJsonSerializer serializer_;
+};
+
 } // namespace
 
 ResponseFilterManager::ResponseFilterManager(std::vector<AiFilterSharedPtr> filters,
                                              ExternalBufferFactory& buffer_factory,
                                              FilterChainBridge& bridge,
                                              BufferManager& out_buffer_manager,
-                                             OnCompleteFn on_complete, Config config)
-    : async_state_(std::make_shared<SseAsyncState>(std::move(filters), buffer_factory, bridge,
-                                                   out_buffer_manager, std::move(on_complete),
-                                                   config.sse)) {}
+                                             OnCompleteFn on_complete, Config config) {
+  if (config.mode == Mode::Unary) {
+    async_state_ = std::make_shared<UnaryAsyncState>(std::move(filters), bridge, out_buffer_manager,
+                                                     std::move(on_complete));
+  } else {
+    async_state_ =
+        std::make_shared<SseAsyncState>(std::move(filters), buffer_factory, bridge,
+                                        out_buffer_manager, std::move(on_complete), config.sse);
+  }
+}
 
 ResponseFilterManager::~ResponseFilterManager() { cancel(); }
 
