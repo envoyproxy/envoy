@@ -70,9 +70,14 @@ typedef DWORD signal_t;            // NOLINT(modernize-use-using)
 typedef unsigned int sa_family_t;
 
 // Posix structure for scatter/gather I/O, not present on Windows.
-#ifndef _IOVEC_DEFINED_
+// QUICHE (quiche_iovec_impl.h) and gRPC (gsec.h) also define an
+// identically-laid-out `struct iovec` on Windows, each guarded by a different
+// sentinel. Honour and set all of them so that whichever header is included
+// first wins and the others become no-ops regardless of include order.
+#if !defined(_IOVEC_DEFINED_) && !defined(_STRUCT_IOVEC) && !defined(__DEFINED_struct_iovec)
 #define _IOVEC_DEFINED_
 #define _STRUCT_IOVEC
+#define __DEFINED_struct_iovec
 struct iovec {
   void* iov_base;
   size_t iov_len;
