@@ -1820,3 +1820,14 @@ MLKEM
 PQC
 quantum
 X25519MLKEM768
+JIT
+checkint
+checkinteger
+checklstring
+checknumber
+checkstring
+checktype
+checkudata
+coercible
+optlstring
+optstring

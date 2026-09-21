@@ -47,17 +47,31 @@ namespace Lua {
  * cleanups, so error paths must not rely on it. Copying the message into one of these lets the
  * caller destroy every non-trivial object it owns before it raises. Messages longer than
  * MaxLength are truncated.
+ *
+ * There is one holder per thread rather than one per call, reached via threadLocal(). A holder is
+ * only written between the point a method reports failure and the luaL_error() that consumes the
+ * message a few statements later, and nothing in that window runs Lua or re-enters a thunk, so a
+ * nested call cannot clobber a message that has still to be read. Keeping it off the stack also
+ * keeps MaxLength bytes out of the frame of every successful call.
  */
 class LuaErrorMessage {
 public:
-  static constexpr size_t MaxLength = 512;
+  static constexpr size_t MaxLength = 1024;
 
-  // The buffer is deliberately left uninitialized apart from the terminator: the thunk generated
-  // by DECLARE_LUA_FUNCTION_EX() declares one of these on every Lua call, and clearing the whole
-  // buffer on the success path would be pure overhead.
-  LuaErrorMessage() { buffer_[0] = '\0'; }
-
-  void set(const absl::Status& status) { set(status.message()); }
+  /**
+   * @return the calling thread's holder. Its contents are only meaningful between a set() and the
+   *         raise that follows it; every caller sets before it reads.
+   */
+  static LuaErrorMessage& threadLocal() {
+    // Trivial default construction and destruction make this a plain zero-initialized block of
+    // thread-local storage: no initialization guard is checked on the way in, nothing is
+    // registered to run at thread exit, and the buffer is not cleared on the success path.
+    static_assert(std::is_trivially_default_constructible<LuaErrorMessage>::value,
+                  "LuaErrorMessage must be trivially default constructible so that the thread "
+                  "local holder needs no initialization guard and starts out zeroed");
+    static thread_local LuaErrorMessage instance;
+    return instance;
+  }
 
   void set(absl::string_view message) {
     const size_t length = message.copy(buffer_, MaxLength - 1);
@@ -67,6 +81,8 @@ public:
   const char* c_str() const { return buffer_; }
 
 private:
+  LuaErrorMessage() = default;
+
   char buffer_[MaxLength];
 };
 
@@ -84,16 +100,15 @@ static_assert(std::is_trivially_destructible<LuaErrorMessage>::value,
  * The object method returns absl::StatusOr<int> rather than raising the Lua error itself: on
  * success the int is the number of values the method pushed onto the Lua stack, and on failure
  * the status message becomes the Lua error. Raising a Lua error unwinds the C++ stack (see
- * LuaErrorMessage above), so the thunk copies the message into a plain buffer and lets every C++
- * object in scope be destroyed *before* it calls luaL_error(). That way the error paths do not
- * depend on the unwinder running destructors for us.
+ * LuaErrorMessage above), so the thunk copies the message into the thread's plain buffer and lets
+ * every C++ object in scope be destroyed *before* it calls luaL_error(). That way the error paths
+ * do not depend on the unwinder running destructors for us.
  * @param Class supplies the owning class name.
  * @param Name supplies the function name.
  * @param Index supplies the stack index where "this" (Lua/C userdata) is found.
  */
 #define DECLARE_LUA_FUNCTION_EX(Class, Name, Index)                                                \
   static int static_##Name(lua_State* state) {                                                     \
-    ::Envoy::Extensions::Filters::Common::Lua::LuaErrorMessage error_message;                      \
     {                                                                                              \
       Class* object = ::Envoy::Extensions::Filters::Common::Lua::alignAndCast<Class>(              \
           luaL_checkudata(state, Index, typeid(Class).name()));                                    \
@@ -103,13 +118,17 @@ static_assert(std::is_trivially_destructible<LuaErrorMessage>::value,
         if (result.ok()) {                                                                         \
           return *result;                                                                          \
         }                                                                                          \
-        error_message.set(result.status());                                                        \
+        ::Envoy::Extensions::Filters::Common::Lua::LuaErrorMessage::threadLocal().set(             \
+            result.status().message());                                                            \
       } else {                                                                                     \
-        error_message.set(dead_status);                                                            \
+        ::Envoy::Extensions::Filters::Common::Lua::LuaErrorMessage::threadLocal().set(             \
+            dead_status.message());                                                                \
       }                                                                                            \
     }                                                                                              \
     /* Nothing with a destructor is live here, so it is safe for luaL_error() to unwind. */        \
-    return luaL_error(state, "%s", error_message.c_str());                                         \
+    return luaL_error(                                                                             \
+        state, "%s",                                                                               \
+        ::Envoy::Extensions::Filters::Common::Lua::LuaErrorMessage::threadLocal().c_str());        \
   }                                                                                                \
   absl::StatusOr<int> Name(lua_State* state);
 
@@ -144,25 +163,25 @@ static_assert(std::is_trivially_destructible<LuaErrorMessage>::value,
  * There are two families:
  *
  * 1) The "arg" family below reads a *function argument* at a positive stack index and reproduces
- *    LuaJIT's own message verbatim, e.g. "bad argument #1 to 'add' (string expected, got boolean)".
- *    Use it wherever luaL_check*()/luaL_opt*() was used, so the errors a script author sees are
- *    unchanged. Each takes the name the method is exported under, which the caller knows
+ *    the message LuaJIT itself would raise, e.g. "bad argument #1 to 'add' (string expected, got
+ *    boolean)". Use it wherever luaL_check*()/luaL_opt*() was used, so the errors a script author
+ *    sees are unchanged. Each takes the name the method is exported under, which the caller knows
  *    statically.
  *
  * 2) The stringOrError()/coercibleStringOrError()/integerOrError() family further down reads a
  *    value that is *not* an argument -- a table key or entry reached by lua_next(), say -- and
- *    takes a caller-supplied label, because "bad argument #2" would misdescribe it.
+ *    takes a caller-supplied label, because "bad argument #2" would be the wrong description.
  */
 
 /**
- * Build the message LuaJIT's own argument errors carry, without raising it.
+ * Build the message a LuaJIT argument error carries, without raising it.
  *
  * @param state the current Lua state.
  * @param index the stack index the argument was read from. Slot 1 holds the receiver of the
  *        method call, so real arguments start at 2 and the number reported is one less -- the
- *        same adjustment err_argmsg() in LuaJIT's lj_err.c makes for a method call. LuaJIT's
- *        separate "calling 'f' on bad self" wording is for an error on slot 1 itself, which the
- *        thunk's luaL_checkudata() has already rejected by the time any of this runs.
+ *        same adjustment LuaJIT itself makes when it reports an argument error for a method
+ *        call. The separate "calling 'f' on bad self" wording is for an error on slot 1 itself,
+ *        which the thunk's luaL_checkudata() has already rejected by the time any of this runs.
  * @param expected the type the caller wanted, e.g. "string".
  * @param function the name the method is exported under, e.g. "add".
  *
@@ -186,7 +205,7 @@ inline absl::Status argError(lua_State* state, int index, absl::string_view expe
 inline absl::StatusOr<absl::string_view> checkStringOrError(lua_State* state, int index,
                                                             absl::string_view function) {
   // Lua converts between strings and numbers automatically at run time
-  // (https://www.lua.org/manual/5.1/manual.html#2.2.1), and luaL_checklstring() honours that, so
+  // (https://www.lua.org/manual/5.1/manual.html#2.2.1), and luaL_checklstring() honors that, so
   // a number argument is accepted here too. Note the coercion rewrites the stack slot.
   if (lua_isstring(state, index) == 0) {
     return argError(state, index, "string", function);

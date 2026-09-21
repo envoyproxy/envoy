@@ -23,13 +23,13 @@ namespace {
 // the same way the DECLARE_LUA_FUNCTION_EX() thunk does: the status is destroyed before the call
 // that unwinds the C++ stack.
 int luaLoadValue(lua_State* state) {
-  LuaErrorMessage error_message;
+  LuaErrorMessage& error_message = LuaErrorMessage::threadLocal();
   {
     const absl::StatusOr<Protobuf::Value> value = MetadataMapHelper::loadValue(state);
     if (value.ok()) {
       return 0;
     }
-    error_message.set(value.status());
+    error_message.set(value.status().message());
   }
   return luaL_error(state, "%s", error_message.c_str());
 }

@@ -101,15 +101,12 @@ LuaClusterSpecifierConfig::LuaClusterSpecifierConfig(
   THROW_IF_NOT_OK_REF(creation_status);
 }
 
+// The config constructor fails unless the code parses and defines envoy_on_route(), so by the time
+// a plugin is built the setup exists and its function reference is valid.
 LuaClusterSpecifierPlugin::LuaClusterSpecifierPlugin(LuaClusterSpecifierConfigSharedPtr config)
-    : config_(config),
-      function_ref_(config_->perLuaCodeSetup() ? config_->perLuaCodeSetup()->clusterFunctionRef()
-                                               : LUA_REFNIL) {}
+    : config_(config), function_ref_(config_->perLuaCodeSetup()->clusterFunctionRef()) {}
 
 std::string LuaClusterSpecifierPlugin::startLua(const Http::HeaderMap& headers) const {
-  if (function_ref_ == LUA_REFNIL) {
-    return config_->defaultCluster();
-  }
   Filters::Common::Lua::CoroutinePtr coroutine = config_->perLuaCodeSetup()->createCoroutine();
 
   RouteHandleRef handle;
