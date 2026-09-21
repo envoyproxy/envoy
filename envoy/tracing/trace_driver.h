@@ -110,6 +110,12 @@ public:
   }
 
   /**
+   * Reserve capacity for additional tags.
+   * @param size number of tags that will be set
+   */
+  virtual void reserveTags(size_t /* size */) {}
+
+  /**
    * Record an event associated with a span, to be handled in an implementation-dependent fashion.
    * @param timestamp the time of the event.
    * @param event the name of the event.

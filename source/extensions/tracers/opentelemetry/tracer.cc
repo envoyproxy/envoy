@@ -214,6 +214,11 @@ void Span::setDoubleTag(absl::string_view name, double value) { setAttribute(nam
 
 void Span::setBoolTag(absl::string_view name, bool value) { setAttribute(name, value); }
 
+void Span::reserveTags(size_t size) {
+  auto* attributes = span_.mutable_attributes();
+  attributes->Reserve(attributes->size() + size);
+}
+
 void Span::log(SystemTime timestamp, const std::string& event) {
   if (event.empty()) {
     return;

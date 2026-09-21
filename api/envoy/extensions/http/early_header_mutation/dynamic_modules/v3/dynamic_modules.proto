@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package envoy.extensions.http.early_header_mutation.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.early_header_mutation.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/early_header_mutation/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Early Header Mutation]
+// [#extension: envoy.http.early_header_mutation.dynamic_modules]
+
+// Configuration for the Dynamic Modules Early Header Mutation. This extension allows loading shared
+// object files via ``dlopen`` to rewrite request headers before routing, tracing, request ID
+// generation and any HTTP filter runs.
+//
+// Exactly one instance is created per configured entry, on the main thread, and it is shared by
+// every worker thread for the lifetime of the connection manager configuration. The module is
+// therefore invoked concurrently and must treat its configuration as read-only.
+//
+// The module can read and rewrite the request headers, and read the stream info attributes, dynamic
+// metadata and filter state. Because the extension runs before routing and before the upstream
+// request, the route, the response and every upstream attribute are not yet populated. The stream
+// info is read-only at this point, so a module that needs to publish state for later extensions
+// should do so from an :ref:`HTTP filter
+// <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>` instead.
+//
+// When multiple early header mutation extensions are configured, they run in order and the module
+// controls whether the ones after it run: see
+// :ref:`early_header_mutation_extensions
+// <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.early_header_mutation_extensions>`.
+message DynamicModuleEarlyHeaderMutation {
+  // Specifies the shared-object level configuration. This field is required.
+  //
+  // Only sources that are available synchronously are supported, i.e. ``name``, ``module.local``,
+  // and a ``module.remote`` that is already present in the on-disk cache. A remote source that
+  // would need to be fetched is rejected, since the extension must be usable for the first request
+  // the connection manager serves.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name for this early header mutation configuration. If not specified, defaults to an empty
+  // string.
+  //
+  // This can be used to distinguish between different early header mutation implementations inside
+  // a dynamic module. When Envoy receives this configuration, it passes the
+  // ``early_header_mutation_name`` to the dynamic module's early header mutation config init
+  // function together with the ``early_header_mutation_config``. That way a module can decide which
+  // in-module implementation to use based on the name at load time.
+  //
+  // This is also used as the ``config_name`` tag of the ``dynamic_modules.module_load_error`` and
+  // ``dynamic_modules.config_init_error`` counters.
+  string early_header_mutation_name = 2;
+
+  // The configuration for the early header mutation chosen by ``early_header_mutation_name``. If
+  // not specified, an empty configuration is passed to the module.
+  //
+  // This is passed to the module's early header mutation initialization function. Together with the
+  // ``early_header_mutation_name``, the module can decide which in-module implementation to use and
+  // fine-tune its behavior.
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  // without the wrapper.
+  //
+  // .. code-block:: yaml
+  //
+  //  # Passing a JSON struct configuration
+  //  early_header_mutation_config:
+  //    "@type": "type.googleapis.com/google.protobuf.Struct"
+  //    value:
+  //      copy_headers:
+  //      - x-original-authority
+  //
+  //  # Passing a simple string configuration
+  //  early_header_mutation_config:
+  //    "@type": "type.googleapis.com/google.protobuf.StringValue"
+  //    value: "x-tenant-id"
+  //
+  google.protobuf.Any early_header_mutation_config = 3;
+}

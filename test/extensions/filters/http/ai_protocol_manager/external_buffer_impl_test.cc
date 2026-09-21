@@ -32,7 +32,7 @@ public:
 // Writes are asynchronous: nothing is durable until the event loop runs.
 TEST_F(InMemoryExternalBufferTest, WriteIsAsynchronous) {
   bool acked = false;
-  buffer_.write(std::make_unique<Buffer::OwnedImpl>("hello"),
+  buffer_.write(std::make_unique<Buffer::OwnedImpl>("hello"), false,
                 [&acked](ExternalBufferStatus status) {
                   EXPECT_EQ(status, ExternalBufferStatus::Ok);
                   acked = true;
@@ -51,7 +51,7 @@ TEST_F(InMemoryExternalBufferTest, WriteIsAsynchronous) {
 // Successive writes accumulate in order and read-back returns the bytes verbatim.
 TEST_F(InMemoryExternalBufferTest, WriteThenReadRoundTrips) {
   for (absl::string_view chunk : {"abc", "def", "ghij"}) {
-    buffer_.write(std::make_unique<Buffer::OwnedImpl>(chunk),
+    buffer_.write(std::make_unique<Buffer::OwnedImpl>(chunk), false,
                   [](ExternalBufferStatus status) { EXPECT_EQ(status, ExternalBufferStatus::Ok); });
   }
   drain();
@@ -69,7 +69,8 @@ TEST_F(InMemoryExternalBufferTest, WriteThenReadRoundTrips) {
 
 // Reads honor arbitrary byte offsets and are non-destructive (repeatable).
 TEST_F(InMemoryExternalBufferTest, ReadAtOffsetIsRepeatable) {
-  buffer_.write(std::make_unique<Buffer::OwnedImpl>("0123456789"), [](ExternalBufferStatus) {});
+  buffer_.write(std::make_unique<Buffer::OwnedImpl>("0123456789"), false,
+                [](ExternalBufferStatus) {});
   drain();
 
   std::vector<std::string> results;
@@ -92,7 +93,7 @@ TEST_F(InMemoryExternalBufferTest, PendingCallbacksCancelledOnDestruction) {
   bool acked = false;
   {
     InMemoryExternalBuffer scoped(*dispatcher_);
-    scoped.write(std::make_unique<Buffer::OwnedImpl>("data"),
+    scoped.write(std::make_unique<Buffer::OwnedImpl>("data"), false,
                  [&acked](ExternalBufferStatus) { acked = true; });
     // scoped goes out of scope before the dispatcher runs.
   }
@@ -107,7 +108,7 @@ TEST_F(InMemoryExternalBufferTest, AllPendingWritesCancelledOnDestruction) {
   {
     InMemoryExternalBuffer scoped(*dispatcher_);
     for (int i = 0; i < 3; ++i) {
-      scoped.write(std::make_unique<Buffer::OwnedImpl>("x"),
+      scoped.write(std::make_unique<Buffer::OwnedImpl>("x"), false,
                    [&acked](ExternalBufferStatus) { ++acked; });
     }
   }
@@ -118,7 +119,8 @@ TEST_F(InMemoryExternalBufferTest, AllPendingWritesCancelledOnDestruction) {
 // The read callback runs on-stack, before read() returns -- the synchronous
 // completion the BufferManager relies on for its re-entrant replay burst.
 TEST_F(InMemoryExternalBufferTest, ReadInvokesCallbackBeforeReturning) {
-  buffer_.write(std::make_unique<Buffer::OwnedImpl>("0123456789"), [](ExternalBufferStatus) {});
+  buffer_.write(std::make_unique<Buffer::OwnedImpl>("0123456789"), false,
+                [](ExternalBufferStatus) {});
   drain();
 
   bool ran = false;
@@ -143,7 +145,7 @@ TEST_F(InMemoryExternalBufferTest, ZeroLengthReadReturnsEmptyBuffer) {
   });
   EXPECT_TRUE(ran);
 
-  buffer_.write(std::make_unique<Buffer::OwnedImpl>("data"), [](ExternalBufferStatus) {});
+  buffer_.write(std::make_unique<Buffer::OwnedImpl>("data"), false, [](ExternalBufferStatus) {});
   drain();
   ran = false;
   buffer_.read(2, 0, [&ran](ExternalBufferStatus status, Buffer::InstancePtr data) {
@@ -158,10 +160,11 @@ TEST_F(InMemoryExternalBufferTest, ZeroLengthReadReturnsEmptyBuffer) {
 // An empty write still completes (asynchronously) with Ok and leaves length at 0.
 TEST_F(InMemoryExternalBufferTest, EmptyWriteIsAcknowledged) {
   bool acked = false;
-  buffer_.write(std::make_unique<Buffer::OwnedImpl>(), [&acked](ExternalBufferStatus status) {
-    EXPECT_EQ(status, ExternalBufferStatus::Ok);
-    acked = true;
-  });
+  buffer_.write(std::make_unique<Buffer::OwnedImpl>(), false,
+                [&acked](ExternalBufferStatus status) {
+                  EXPECT_EQ(status, ExternalBufferStatus::Ok);
+                  acked = true;
+                });
   EXPECT_FALSE(acked);
   drain();
   EXPECT_TRUE(acked);
@@ -173,7 +176,7 @@ TEST_F(InMemoryExternalBufferTest, EmptyWriteIsAcknowledged) {
 TEST_F(InMemoryExternalBufferTest, WriteCompletionsFireInOrder) {
   std::vector<int> order;
   for (int i = 0; i < 3; ++i) {
-    buffer_.write(std::make_unique<Buffer::OwnedImpl>(std::to_string(i)),
+    buffer_.write(std::make_unique<Buffer::OwnedImpl>(std::to_string(i)), false,
                   [&order, i](ExternalBufferStatus status) {
                     EXPECT_EQ(status, ExternalBufferStatus::Ok);
                     order.push_back(i);
@@ -193,12 +196,12 @@ TEST_F(InMemoryExternalBufferTest, WriteCompletionsFireInOrder) {
 // write does not count until the event loop runs. A read may then span writes and
 // reach the exact end boundary (offset + length == length()).
 TEST_F(InMemoryExternalBufferTest, LengthReflectsOnlyDurableWrites) {
-  buffer_.write(std::make_unique<Buffer::OwnedImpl>("aaaa"), [](ExternalBufferStatus) {});
+  buffer_.write(std::make_unique<Buffer::OwnedImpl>("aaaa"), false, [](ExternalBufferStatus) {});
   EXPECT_EQ(buffer_.length(), 0); // Not yet acknowledged.
   drain();
   EXPECT_EQ(buffer_.length(), 4);
 
-  buffer_.write(std::make_unique<Buffer::OwnedImpl>("bb"), [](ExternalBufferStatus) {});
+  buffer_.write(std::make_unique<Buffer::OwnedImpl>("bb"), false, [](ExternalBufferStatus) {});
   EXPECT_EQ(buffer_.length(), 4); // Second write still in flight.
   drain();
   EXPECT_EQ(buffer_.length(), 6);
@@ -214,7 +217,7 @@ TEST_F(InMemoryExternalBufferTest, LengthReflectsOnlyDurableWrites) {
 // Reading past the acknowledged length violates the precondition and trips the
 // debug assertion.
 TEST_F(InMemoryExternalBufferTest, ReadPastLengthIsDebugDeath) {
-  buffer_.write(std::make_unique<Buffer::OwnedImpl>("short"), [](ExternalBufferStatus) {});
+  buffer_.write(std::make_unique<Buffer::OwnedImpl>("short"), false, [](ExternalBufferStatus) {});
   drain();
   ASSERT_EQ(buffer_.length(), 5);
   EXPECT_DEBUG_DEATH(buffer_.read(0, 6, [](ExternalBufferStatus, Buffer::InstancePtr) {}),
@@ -227,7 +230,8 @@ TEST_F(InMemoryExternalBufferTest, FactoryCreatesUsableBuffer) {
   ExternalBufferPtr buffer = factory.createBuffer(*dispatcher_);
   ASSERT_NE(buffer, nullptr);
 
-  buffer->write(std::make_unique<Buffer::OwnedImpl>("via-factory"), [](ExternalBufferStatus) {});
+  buffer->write(std::make_unique<Buffer::OwnedImpl>("via-factory"), false,
+                [](ExternalBufferStatus) {});
   drain();
   EXPECT_EQ(buffer->length(), 11);
 
@@ -238,6 +242,19 @@ TEST_F(InMemoryExternalBufferTest, FactoryCreatesUsableBuffer) {
                  read_back = data->toString();
                });
   EXPECT_EQ(read_back, "via-factory");
+}
+
+// Writing with end_stream set to true succeeds and completes asynchronously.
+TEST_F(InMemoryExternalBufferTest, WriteWithEndStreamAcknowledged) {
+  bool acked = false;
+  buffer_.write(std::make_unique<Buffer::OwnedImpl>("final"), true,
+                [&acked](ExternalBufferStatus status) {
+                  EXPECT_EQ(status, ExternalBufferStatus::Ok);
+                  acked = true;
+                });
+  drain();
+  EXPECT_TRUE(acked);
+  EXPECT_EQ(buffer_.length(), 5);
 }
 
 } // namespace

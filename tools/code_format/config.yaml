@@ -2,7 +2,6 @@ suffixes:
   # Suffixes to include in checking
   included:
   - BUILD
-  - WORKSPACE
   - .bzl
   - .cc
   - .h
@@ -28,9 +27,6 @@ suffixes:
 
   proto:
   - .proto
-
-  repositories_bzl:
-  - bazel/repositories.bzl
 
 paths:
   # Path prefixes to exclude from checking
@@ -154,6 +150,9 @@ paths:
     - source/extensions/common/matcher
     - source/extensions/common/tap
     - source/extensions/common/wasm
+    # Config validator interfaces reject updates by throwing per interface documentation.
+    - source/extensions/config/validators/dynamic_modules/config.cc
+    - source/extensions/config/validators/dynamic_modules/config_validator.cc
     - source/extensions/config/validators/minimum_clusters/minimum_clusters_validator.cc
     - source/extensions/config_subscription
     - source/extensions/content_parsers/json/config.cc
@@ -183,6 +182,7 @@ paths:
     - source/extensions/http/cache/file_system_http_cache/config.cc
     - source/extensions/http/custom_response
     - source/extensions/http/early_header_mutation
+    - source/extensions/http/header_formatters/dynamic_modules
     - source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/mapped_attribute_builder_factory.cc
     - source/extensions/http/injected_credentials
     - source/extensions/http/stateful_session
@@ -357,6 +357,8 @@ paths:
     - test/extensions/bootstrap/wasm/wasm_speed_test.cc
     - test/extensions/bootstrap/wasm/wasm_test.cc
     - test/extensions/common/wasm/wasm_test.cc
+    - test/extensions/dynamic_modules/test_data/cpp/early_header_mutation_integration_test.cc
+    - test/extensions/dynamic_modules/test_data/cpp/header_formatter_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http.cc
     - test/extensions/dynamic_modules/test_data/cpp/listener_integration_test.cc

@@ -95,6 +95,7 @@ public:
   void setIntTag(absl::string_view name, int64_t value) override;
   void setDoubleTag(absl::string_view name, double value) override;
   void setBoolTag(absl::string_view name, bool value) override;
+  void reserveTags(size_t size) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override;
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/,

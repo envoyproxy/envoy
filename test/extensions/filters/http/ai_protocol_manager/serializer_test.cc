@@ -29,10 +29,7 @@ class SerializerTest : public testing::Test {
 public:
   SerializerTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")), factory_(),
-        bridge_raw_(new FakeBridge(*dispatcher_)),
-        buffer_manager_(factory_, std::unique_ptr<FakeBridge>(bridge_raw_)) {}
-
-  ~SerializerTest() override { buffer_manager_.onDestroy(); }
+        bridge_(*dispatcher_), buffer_manager_(BufferManager::Config{}, factory_, bridge_) {}
 
   void drain() {
     for (int i = 0; i < 10; ++i) {
@@ -42,12 +39,17 @@ public:
 
   absl::StatusOr<JsonWithExtBuf> runSerialize(const JsonWithExtBuf& doc,
                                               BufferManager* buffer_manager) {
+    return runSerialize(doc, buffer_manager, buffer_manager);
+  }
+
+  absl::StatusOr<JsonWithExtBuf> runSerialize(const JsonWithExtBuf& doc, BufferManager* out,
+                                              BufferManager* ref_source) {
     auto executor = std::make_shared<Coroutine::DispatcherExecutor>(*dispatcher_);
     absl::StatusOr<JsonWithExtBuf> final_result;
     bool completed = false;
 
     auto handle = Coroutine::launch(
-        Serializer::serialize(doc, buffer_manager), executor,
+        Serializer::serialize(doc, out, ref_source), executor,
         [&completed, &final_result](absl::StatusOr<JsonWithExtBuf> result) {
           final_result = std::move(result);
           completed = true;
@@ -80,7 +82,8 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   InMemoryExternalBufferFactory factory_;
-  FakeBridge* bridge_raw_{nullptr};
+  // Declared before buffer_manager_ so it outlives the manager that references it.
+  FakeBridge bridge_;
   BufferManager buffer_manager_;
 };
 
@@ -96,7 +99,7 @@ TEST_F(SerializerTest, PureJsonSerialization) {
 
   auto result_or = runSerialize(doc, &buffer_manager_);
   ASSERT_OK(result_or);
-  std::string output = bridge_raw_->injected_.toString();
+  std::string output = bridge_.injected_.toString();
 
   auto parsed = nlohmann::json::parse(output);
   EXPECT_EQ(parsed["model"], "gpt-4");
@@ -125,7 +128,7 @@ TEST_F(SerializerTest, ExternalRefSerializationAndOffsetRecalculation) {
 
   auto result_or = runSerialize(doc, &buffer_manager_);
   ASSERT_OK(result_or);
-  std::string output = bridge_raw_->injected_.toString();
+  std::string output = bridge_.injected_.toString();
 
   auto parsed = nlohmann::json::parse(output);
   EXPECT_EQ(parsed["model"], "claude-3");
@@ -152,6 +155,18 @@ TEST_F(SerializerTest, ExternalRefNullBufferFails) {
 
   auto result_or = runSerialize(doc, nullptr);
   EXPECT_THAT(result_or.status(), HasStatusCode(absl::StatusCode::kInvalidArgument));
+}
+
+// A reference names bytes in some BufferManager; without one to read them from there is nothing
+// to emit, so the serialization fails rather than putting a truncated payload on the wire.
+TEST_F(SerializerTest, ExternalRefWithNoRefSourceFails) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{
+      {"prompt", JsonWithExtBuf::makeExternalRef({0, 10})},
+  });
+
+  auto result_or = runSerialize(doc, &buffer_manager_, nullptr);
+  EXPECT_THAT(result_or.status(), HasStatusCode(absl::StatusCode::kInternal));
 }
 
 TEST_F(SerializerTest, ExternalRefOutOfBoundsFails) {
@@ -212,7 +227,7 @@ TEST_F(SerializerTest, NestedStructureWithMultipleRefs) {
 
   auto result_or = runSerialize(doc, &buffer_manager_);
   ASSERT_OK(result_or);
-  std::string output = bridge_raw_->injected_.toString();
+  std::string output = bridge_.injected_.toString();
 
   auto parsed = nlohmann::json::parse(output);
   ASSERT_TRUE(parsed["messages"].is_array());
@@ -245,7 +260,7 @@ TEST_F(SerializerTest, LargeExternalRefMultiChunk) {
   auto result_or = runSerialize(doc, &buffer_manager_);
   ASSERT_OK(result_or);
 
-  std::string output = bridge_raw_->injected_.toString();
+  std::string output = bridge_.injected_.toString();
   auto ref = *JsonWithExtBuf::externalRef(result_or->json()["large_field"]);
   EXPECT_EQ(ref.length, large_payload.size());
   EXPECT_EQ(output.substr(ref.offset, ref.length), large_payload);
@@ -259,7 +274,7 @@ TEST_F(SerializerTest, SpecialCharactersEscaping) {
 
   auto result_or = runSerialize(doc, &buffer_manager_);
   ASSERT_OK(result_or);
-  std::string output = bridge_raw_->injected_.toString();
+  std::string output = bridge_.injected_.toString();
 
   auto parsed = nlohmann::json::parse(output);
   EXPECT_EQ(parsed["quote\"key"],

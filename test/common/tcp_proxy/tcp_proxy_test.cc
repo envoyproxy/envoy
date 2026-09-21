@@ -2916,6 +2916,9 @@ TEST_P(TcpProxyTest, OnDataLoadShedPointCanCloseConnection) {
   EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
       .WillOnce(Return(&on_data_loadshed_point));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect))
+      .WillOnce(Return(nullptr));
 
   // Configure TCP Proxy
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
@@ -2949,6 +2952,9 @@ TEST_P(TcpProxyTest, OnDataLoadShedPointNotTriggeredWhenNotOverloaded) {
   EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
       .WillOnce(Return(&on_data_loadshed_point));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect))
+      .WillOnce(Return(nullptr));
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.set_upstream_connect_mode(
@@ -2989,6 +2995,9 @@ TEST_P(TcpProxyTest, OnDataLoadShedPointCanCloseConnectionWhenUpstreamConnected)
   EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
       .WillOnce(Return(&on_data_loadshed_point));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect))
+      .WillOnce(Return(nullptr));
 
   setup(1);
   raiseEventUpstreamConnected(0);
@@ -4063,6 +4072,52 @@ TEST_P(TcpProxyTest, AppendToDownstreamTlvsPreservesDuplicates) {
 
   EXPECT_EQ(0xF0, tlvs[4].type);
   EXPECT_EQ("tcp_proxy_f0", std::string(tlvs[4].value.begin(), tlvs[4].value.end()));
+}
+
+// Test load shedding in establishUpstreamConnection() during onNewConnection().
+TEST_P(TcpProxyTest, UpstreamConnectLoadShedPointCanCloseConnection) {
+  Server::MockLoadShedPoint upstream_connect_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect))
+      .WillOnce(Return(&upstream_connect_loadshed_point));
+
+  // Use setup(0) to instantiate and initialize filter_ without automatically calling
+  // onNewConnection(), preventing setup() from triggering the connection flow before mock
+  // expectations are configured and allowing this test to explicitly verify onNewConnection().
+  setup(0);
+
+  EXPECT_CALL(upstream_connect_loadshed_point, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().OverloadManagerClose));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_EQ(1U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+}
+
+// Test load shedding in establishUpstreamConnection() is bypassed when shouldShedLoad() returns
+// false.
+TEST_P(TcpProxyTest, UpstreamConnectLoadShedPointBypassedWhenFalse) {
+  Server::MockLoadShedPoint upstream_connect_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect))
+      .WillOnce(Return(&upstream_connect_loadshed_point));
+
+  EXPECT_CALL(upstream_connect_loadshed_point, shouldShedLoad()).WillOnce(Return(false));
+  setup(1);
+
+  EXPECT_EQ(0U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_FALSE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
 }
 
 } // namespace

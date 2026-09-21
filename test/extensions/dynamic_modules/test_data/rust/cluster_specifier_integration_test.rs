@@ -126,6 +126,12 @@ fn read_echoed_value(ctx: &ClusterSpecifierContext, name: &[u8]) -> String {
     b"attribute-int" => ctx
       .get_attribute_int(AttributeId::UpstreamRequestAttemptCount)
       .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
+    b"attribute-request-size" => ctx
+      .get_attribute_int(AttributeId::RequestSize)
+      .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
+    b"attribute-request-total-size" => ctx
+      .get_attribute_int(AttributeId::RequestTotalSize)
+      .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
     b"attribute-bool" => ctx
       .get_attribute_bool(AttributeId::HealthCheck)
       .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
