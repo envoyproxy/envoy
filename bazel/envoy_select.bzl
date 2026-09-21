@@ -21,7 +21,7 @@ _NOT_X86_OR_WASM_DISABLED = Label("//bazel:not_x86_or_wasm_disabled")
 _WINDOWS_X86_64 = Label("//bazel:windows_x86_64")
 
 _DEPRECATED_REPOSITORY_MESSAGE = """\
-The `repository` argument is deprecated and only accepts \"\" or \"@envoy\".
+The `repository` argument is deprecated and is currently ignored.
 Use the `@envoy//bazel` label_flag overrides instead, for example \
 `--@envoy//bazel:test_main=@your_repo//:custom_test_main`.
 """
