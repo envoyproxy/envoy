@@ -5107,10 +5107,6 @@ TEST_F(LuaHttpFilterTest, StatsApiWithPrefix) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.custom_prefix.requests").value());
 }
 
-// Fixture for the `shared_vm_id` tests. They build filter and route configurations directly and
-// never run a stream, so they do not need LuaHttpFilterTest's stream mocks. Each test gets its
-// own MockServerFactoryContext, and therefore its own singleton manager, so the registry of
-// shared VMs does not leak between tests.
 class LuaSharedVmTest : public testing::Test {
 public:
   LuaSharedVmTest() {
