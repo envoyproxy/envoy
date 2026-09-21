@@ -2498,6 +2498,131 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
 
+// requestHeaders() on the response path reads the request's headers, which envoy_on_response has
+// no other way to reach.
+TEST_F(LuaHttpFilterTest, RequestHeadersOnResponsePath) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      response_handle:logTrace(response_handle:requestHeaders():get(":path"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/request/path"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef{request_headers}));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "/request/path", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// On the request path requestHeaders() is the same map headers() returns, so a write through one
+// is visible through the other. This is what makes exposing the method on both handles coherent
+// rather than a second, subtly different accessor.
+TEST_F(LuaHttpFilterTest, RequestHeadersOnRequestPathIsTheSameMap) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:requestHeaders():add("x-added", "1")
+      request_handle:logTrace(request_handle:headers():get("x-added"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef{request_headers}));
+
+  EXPECT_LOG_CONTAINS("trace", "1", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+  EXPECT_EQ("1", request_headers.get_("x-added"));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// A second call returns the cached wrapper rather than building a new one, which is what keeps a
+// script that calls it in a loop from allocating per call.
+TEST_F(LuaHttpFilterTest, RequestHeadersWrapperIsCached) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local first = response_handle:requestHeaders()
+      first:add("x-marker", "set-on-first-handle")
+      response_handle:logTrace(response_handle:requestHeaders():get("x-marker"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef{request_headers}));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "set-on-first-handle", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// No request headers on the stream yields a real nil, not an absence of values, so a script can
+// pass the result straight to a function. Reached when a response is produced before the request
+// headers were fully received. This is the discriminating test for the push-nil implementation: a
+// lua_CFunction returning 0 makes `tostring(...)` raise "value expected", and because
+// scriptError() continues the chain the script would silently stop running.
+TEST_F(LuaHttpFilterTest, RequestHeadersAbsentIsNilInAnArgumentPosition) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      response_handle:logTrace(tostring(response_handle:requestHeaders()))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef{}));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "nil", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// The same absence read into a variable and compared, which is the shape a script that branches
+// on it actually uses.
+TEST_F(LuaHttpFilterTest, RequestHeadersAbsentComparesEqualToNil) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local request_headers = response_handle:requestHeaders()
+      if request_headers == nil then
+        response_handle:logTrace("no request headers")
+      else
+        response_handle:logTrace("unexpectedly present")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef{}));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "no request headers", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
 // Get the current protocol.
 TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
   const std::string SCRIPT{R"EOF(

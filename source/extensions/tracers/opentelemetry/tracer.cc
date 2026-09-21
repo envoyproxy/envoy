@@ -208,6 +208,11 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   setAttribute(name, value);
 }
 
+void Span::reserveTags(size_t size) {
+  auto* attributes = span_.mutable_attributes();
+  attributes->Reserve(attributes->size() + size);
+}
+
 void Span::log(SystemTime timestamp, const std::string& event) {
   if (event.empty()) {
     return;

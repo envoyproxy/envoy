@@ -25,6 +25,17 @@ pkg_files(
     strip_prefix = "envoy/opt",
 )
 
+# Test cert/key used by the google-vrp image.
+pkg_files(
+    name = "vrp_cert_files",
+    srcs = [
+        "certs-README.txt",
+        "//test/config/integration/certs:servercert.pem",
+        "//test/config/integration/certs:serverkey.pem",
+    ],
+    prefix = "certs",
+)
+
 pkg_files(
     name = "debug_files",
     srcs = [":envoy-debug"],
@@ -39,4 +50,15 @@ pkg_tar(
     compressor = "@zstd//:zstd_cli",
     compressor_args = "-T0",
     extension = "tar.zst",
+)
+
+pkg_tar(
+    name = "release_docker",
+    srcs = [
+        ":release_files",
+        ":vrp_cert_files",
+    ],
+    out = "release.docker.tar.zst",
+    compressor = "@zstd//:zstd_cli",
+    compressor_args = "-T0",
 )

@@ -25,6 +25,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
+    "filter_new_panic" => Some(Box::new(FilterNewPanicConfig {})),
     "local_reply_response_headers" => Some(Box::new(LocalReplyResponseHeadersConfig {})),
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
       headers_to_add: String::from_utf8(config.to_owned()).unwrap(),
@@ -43,6 +44,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
     "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
+    "span_across_callbacks" => Some(Box::new(SpanAcrossCallbacksConfig {})),
     "early_response_during_upload" => Some(Box::new(EarlyResponseDuringUploadConfig {
       response_pause_total: envoy_filter_config
         .define_counter("response_pause_total")
@@ -188,6 +190,16 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       config_log_level: get_log_level() as u32,
       config_info_enabled: is_log_enabled(envoy_dynamic_module_type_log_level::Info),
       config_error_enabled: is_log_enabled(envoy_dynamic_module_type_log_level::Error),
+    })),
+    // The runtime is only reachable from the main thread, which is where config creation runs,
+    // so every value is read here and cached on the config.
+    "runtime_values" => Some(Box::new(RuntimeValuesFilterConfig {
+      bool_value: get_runtime_bool("test.runtime_bool", false),
+      int_value: get_runtime_int("test.runtime_int", 7),
+      number_value: get_runtime_number("test.runtime_number", 0.5),
+      missing_bool: get_runtime_bool("test.runtime_missing_bool", true),
+      missing_int: get_runtime_int("test.runtime_missing_int", 1234),
+      missing_number: get_runtime_number("test.runtime_missing_number", 2.5),
     })),
     _ => panic!("Unknown filter name: {name}"),
   }
@@ -530,6 +542,16 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PassthroughHttpFilterConfig
     envoy_log_error!("new_http_filter called");
     envoy_log_critical!("new_http_filter called");
     Box::new(PassthroughHttpFilter {})
+  }
+}
+
+/// A filter configuration whose filter constructor panics. The SDK catches the panic and returns a
+/// null filter, so Envoy must fail the request closed instead of crashing.
+struct FilterNewPanicConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FilterNewPanicConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    panic!("filter constructor failed on purpose");
   }
 }
 
@@ -1309,6 +1331,58 @@ impl Drop for HttpFilterScheduler {
     assert_eq!(*self.event_ids.borrow(), vec![0, 1, 2, 3]);
     assert_eq!(self.thread_handles.borrow().len(), 2);
     for thread in self.thread_handles.borrow_mut().drain(..) {
+      thread.join().expect("Failed to join thread");
+    }
+  }
+}
+
+struct SpanAcrossCallbacksConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SpanAcrossCallbacksConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(SpanAcrossCallbacksFilter {
+      child_span: RefCell::new(None),
+      thread_handle: RefCell::new(None),
+    })
+  }
+}
+
+/// Spawns a child span in on_request_headers, starts off-thread work, and finishes the span from
+/// on_scheduled to show that a span can cover work that runs between event hooks.
+struct SpanAcrossCallbacksFilter {
+  child_span: RefCell<Option<Box<dyn EnvoyChildSpan>>>,
+  thread_handle: RefCell<Option<std::thread::JoinHandle<()>>>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SpanAcrossCallbacksFilter {
+  fn on_request_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    if let Some(span) = envoy_filter.get_active_span() {
+      *self.child_span.borrow_mut() = span.spawn_child("off_thread_work");
+    }
+    let scheduler = envoy_filter.new_scheduler();
+    let thread = std::thread::spawn(move || {
+      scheduler.commit(1);
+    });
+    *self.thread_handle.borrow_mut() = Some(thread);
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
+  fn on_scheduled(&self, envoy_filter: &mut EHF, _event_id: u64) {
+    if let Some(mut child) = self.child_span.borrow_mut().take() {
+      child.set_tag("completed", "true");
+      child.finish();
+    }
+    envoy_filter.continue_decoding();
+  }
+}
+
+impl Drop for SpanAcrossCallbacksFilter {
+  fn drop(&mut self) {
+    if let Some(thread) = self.thread_handle.borrow_mut().take() {
       thread.join().expect("Failed to join thread");
     }
   }
@@ -2437,6 +2511,61 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for GenericSecretCallbacksFilter {
       .get_generic_secret(EnvoyGenericSecretId(12345))
       .is_none());
 
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
+/// Reads every runtime type at config creation and echoes the values back as response headers, so
+/// the integration test can confirm both the configured-value and the fall-back-to-default paths.
+struct RuntimeValuesFilterConfig {
+  bool_value: bool,
+  int_value: u64,
+  number_value: f64,
+  missing_bool: bool,
+  missing_int: u64,
+  missing_number: f64,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for RuntimeValuesFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(RuntimeValuesFilter {
+      bool_value: self.bool_value,
+      int_value: self.int_value,
+      number_value: self.number_value,
+      missing_bool: self.missing_bool,
+      missing_int: self.missing_int,
+      missing_number: self.missing_number,
+    })
+  }
+}
+
+struct RuntimeValuesFilter {
+  bool_value: bool,
+  int_value: u64,
+  number_value: f64,
+  missing_bool: bool,
+  missing_int: u64,
+  missing_number: f64,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for RuntimeValuesFilter {
+  fn on_response_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let bool_value = self.bool_value.to_string();
+    envoy_filter.set_response_header("x-runtime-bool", bool_value.as_bytes());
+    let int_value = self.int_value.to_string();
+    envoy_filter.set_response_header("x-runtime-int", int_value.as_bytes());
+    let number_value = self.number_value.to_string();
+    envoy_filter.set_response_header("x-runtime-number", number_value.as_bytes());
+    let missing_bool = self.missing_bool.to_string();
+    envoy_filter.set_response_header("x-runtime-missing-bool", missing_bool.as_bytes());
+    let missing_int = self.missing_int.to_string();
+    envoy_filter.set_response_header("x-runtime-missing-int", missing_int.as_bytes());
+    let missing_number = self.missing_number.to_string();
+    envoy_filter.set_response_header("x-runtime-missing-number", missing_number.as_bytes());
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }

@@ -38,7 +38,7 @@ namespace {
 #if !(defined(__clang_analyzer__) ||                                                               \
       (defined(__has_feature) &&                                                                   \
        (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer) ||                     \
-        __has_feature(memory_sanitizer))))
+        __has_feature(hwaddress_sanitizer) || __has_feature(memory_sanitizer))))
 const std::string& outOfMemoryPattern() {
 #if defined(TCMALLOC)
   CONSTRUCT_ON_FIRST_USE(std::string, ".*Unable to allocate.*");
@@ -227,9 +227,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonDeathTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
-#if defined(__clang_analyzer__) || (defined(__has_feature) && (__has_feature(thread_sanitizer) ||  \
-                                                               __has_feature(address_sanitizer) || \
-                                                               __has_feature(memory_sanitizer)))
+#if defined(__clang_analyzer__) ||                                                                 \
+    (defined(__has_feature) &&                                                                     \
+     (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer) ||                       \
+      __has_feature(hwaddress_sanitizer) || __has_feature(memory_sanitizer)))
   ENVOY_LOG_MISC(critical,
                  "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
 #else

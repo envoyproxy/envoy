@@ -16,3 +16,12 @@ envoy_cc_library(
         "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "anthropic_messages_lib",
+    srcs = ["anthropic_messages.cc"],
+    hdrs = ["anthropic_messages.h"],
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
+    ],
+)

@@ -5,6 +5,8 @@
 
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 
+#include "nlohmann/json.hpp"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -24,9 +26,12 @@ public:
   AiRequest(AiRequest&&) = delete;
   AiRequest& operator=(AiRequest&&) = delete;
 
-  // Index access
+  // The payload DOM -- the request's only mutable surface.
+  const nlohmann::json& json() const { return request_index_.json(); }
+  nlohmann::json& json() { return request_index_.json(); }
+
+  // The whole index, external-buffer references included; only serialization needs it.
   const JsonWithExtBuf& request_index() const { return request_index_; }
-  JsonWithExtBuf& request_index() { return request_index_; }
 
   // TODO(penguingao): Implement field streaming (AiRequest::stream, FieldStreamingSpec,
   // and FieldStreamingSession).

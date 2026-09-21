@@ -44,7 +44,8 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::ext_authz> {
 public:
   GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                 const std::optional<std::chrono::milliseconds>& timeout);
+                 const std::optional<std::chrono::milliseconds>& timeout,
+                 bool emit_client_span = true);
   ~GrpcClientImpl() override;
 
   // ExtAuthz::Client
