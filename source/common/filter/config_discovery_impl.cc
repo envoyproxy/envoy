@@ -90,6 +90,7 @@ FilterConfigSubscription::FilterConfigSubscription(
       scope_(factory_context.scope().createScope(stat_prefix)),
       stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
       filter_config_provider_manager_(filter_config_provider_manager),
+      manager_is_alive_(filter_config_provider_manager.manager_is_alive_),
       subscription_id_(subscription_id) {
   const auto resource_name = resource_type_helper_.getResourceName();
   auto subscription_or_error = cluster_manager.subscriptionFactory().subscriptionFromConfigSource(
@@ -200,7 +201,9 @@ FilterConfigSubscription::~FilterConfigSubscription() {
   // If we get destroyed during initialization, make sure we signal that we "initialized".
   init_target_.ready();
   // Remove the subscription from the provider manager.
-  filter_config_provider_manager_.subscriptions_.erase(subscription_id_);
+  if (*manager_is_alive_) {
+    filter_config_provider_manager_.subscriptions_.erase(subscription_id_);
+  }
 }
 
 void FilterConfigSubscription::incrementConflictCounter() { stats_.config_conflict_.inc(); }

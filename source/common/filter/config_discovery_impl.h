@@ -494,6 +494,7 @@ private:
 
   // FilterConfigProviderManagerImplBase maintains active subscriptions in a map.
   FilterConfigProviderManagerImplBase& filter_config_provider_manager_;
+  std::shared_ptr<bool> manager_is_alive_;
   const std::string subscription_id_;
   absl::flat_hash_set<DynamicFilterConfigProviderImplBase*> filter_config_providers_;
   friend class DynamicFilterConfigProviderImplBase;
@@ -526,7 +527,8 @@ private:
  */
 class FilterConfigProviderManagerImplBase : Logger::Loggable<Logger::Id::filter> {
 public:
-  virtual ~FilterConfigProviderManagerImplBase() = default;
+  FilterConfigProviderManagerImplBase() : manager_is_alive_(std::make_shared<bool>(true)) {}
+  virtual ~FilterConfigProviderManagerImplBase() { *manager_is_alive_ = false; }
 
   virtual std::tuple<ProtobufTypes::MessagePtr, std::string>
   getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
@@ -566,6 +568,7 @@ private:
 
   absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  std::shared_ptr<bool> manager_is_alive_;
   friend class FilterConfigSubscription;
 };
 
