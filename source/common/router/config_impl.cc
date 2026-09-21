@@ -2203,7 +2203,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()),
       vhost_header_(route_config.vhost_header()) {
   const bool deferred_vhost_enabled =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.deferred_virtual_host_creation");
+      factory_context.bootstrap().has_route_manager() &&
+      factory_context.bootstrap().route_manager().enable_deferred_virtual_host_creation();
 
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     DomainEntrySharedPtr domain_entry;

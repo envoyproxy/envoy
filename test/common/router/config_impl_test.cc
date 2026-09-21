@@ -11781,9 +11781,8 @@ public:
 };
 
 TEST_F(PerFilterConfigsInitManagerTest, InitManagerIsPropagatedToEveryLevel) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "false"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      false);
   const std::string yaml = R"EOF(
 typed_per_filter_config:
   test.filter:
@@ -11831,9 +11830,8 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsInitManagerTest, InitManagerIsIsolatedDuringDeferredProbeValidation) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
   const std::string yaml = R"EOF(
 typed_per_filter_config:
   test.filter:
@@ -13003,9 +13001,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostCreationDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "false"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      false);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13043,9 +13040,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostCreationEnabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13087,9 +13083,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostWildcardPrecedence) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13179,9 +13174,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostConcurrentInflation) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13230,9 +13224,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostIdleEviction) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13271,9 +13264,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostWorkBudgetedIdleEviction) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13336,9 +13328,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostValidationRejectsInvalidRoute) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   // Virtual host with a missing/unknown cluster when validate_clusters is true
   const std::string yaml = R"EOF(
@@ -13365,9 +13356,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostValidationRejectsInvalidMatcher) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13385,9 +13375,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostValidationRejectsMissingClusterSpecifierPlugin) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13404,9 +13393,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostValidationIsolatesInitManagerAndStats) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13443,9 +13431,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostFastPathBypassesProbeValidation) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13474,9 +13461,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeRejectsInvalidPolicy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   // Virtual host with conflicting rewrite policies (should trigger probe validation and be
   // rejected)
@@ -13504,9 +13490,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeClusterValidation) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13533,9 +13518,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeRejectsNegativeTimeout) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13555,9 +13539,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeRejectsMissingGlobalShadowCluster) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 request_mirror_policies:
@@ -13580,9 +13563,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeLegacyInternalRedirect) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -13607,9 +13589,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostFastPathSafetyInvariant) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   factory_context_.cluster_manager_.initializeClusters(
       {"cluster_fast_path", "shadow_cluster_fast_path"}, {});
@@ -13721,9 +13702,8 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostArenaWrappedProto) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
