@@ -5,10 +5,37 @@
 #include <map>
 #include <mutex>
 
+#include "source/extensions/dynamic_modules/abi/abi.h"
+
 #include "sdk.h"
 
 namespace Envoy {
 namespace DynamicModules {
+
+/**
+ * Implements the CommonHandle process-wide callbacks against the C ABI, as a mixin over the
+ * handle interface being implemented. Each concrete config handle derives from
+ * CommonHandleImpl<ItsInterface> and so gains all of them without restating any.
+ *
+ * @tparam Base the config handle interface to implement, which must derive from CommonHandle.
+ */
+template <class Base> class CommonHandleImpl : public Base {
+public:
+  bool getRuntimeBool(std::string_view key, bool default_value) override {
+    return envoy_dynamic_module_callback_get_runtime_bool(
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, default_value);
+  }
+
+  uint64_t getRuntimeInt(std::string_view key, uint64_t default_value) override {
+    return envoy_dynamic_module_callback_get_runtime_int(
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, default_value);
+  }
+
+  double getRuntimeNumber(std::string_view key, double default_value) override {
+    return envoy_dynamic_module_callback_get_runtime_number(
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, default_value);
+  }
+};
 
 /**
  * Generic Scheduler implementation backed by a host-managed event dispatcher.

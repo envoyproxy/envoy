@@ -64,8 +64,7 @@ FilterConfig::FilterConfig(const FilterConfigProto& config,
                            Server::Configuration::ServerFactoryContext& context,
                            const std::string& stats_prefix, Stats::Scope& scope,
                            absl::Status& create_status)
-    : config_(config), context_(context),
-      stats_{ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))} {
+    : config_(config), context_(context), stats_(generateStats(stats_prefix, scope)) {
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.cache_config(), cache_size, 0) > 0) {
     token_cache_ = std::make_shared<TokenCache>(config.cache_config(), context);
   }
@@ -147,6 +146,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     if (filter_config_->accountFormatter() == nullptr ||
         filter_config_->authFormatter() == nullptr) {
       ENVOY_LOG(warn, "IAM access token requires audience configured in filter config.");
+      filter_config_->stats().iam_token_config_error_.inc();
       state_ = State::Complete;
       decoder_callbacks_->sendLocalReply(
           Http::Code::InternalServerError,
@@ -160,6 +160,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
         Formatter::Context(&hdrs), decoder_callbacks_->streamInfo());
     if (resolved_account.empty() || resolved_authorization.empty()) {
       ENVOY_LOG(warn, "Failed to resolve IAM access token account or authorization.");
+      filter_config_->stats().iam_token_resolution_failed_.inc();
       state_ = State::Complete;
       decoder_callbacks_->sendLocalReply(
           Http::Code::InternalServerError,
@@ -176,6 +177,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     if (!client_cert_fingerprint_.has_value()) {
       ENVOY_LOG(warn,
                 "Failed to fetch bound token: client certificate fingerprint is unavailable.");
+      filter_config_->stats().bound_token_fingerprint_unavailable_.inc();
       state_ = State::Complete;
       decoder_callbacks_->sendLocalReply(
           Http::Code::InternalServerError,
@@ -185,14 +187,17 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     }
   }
 
-  // Check cache first and reuse previously fetched token if possible.
+  // Check cache first and reuse previously fetched token if possible. The hit and miss counters
+  // are only incremented when the cache is configured, so that their sum is the number of lookups.
   if (jwt_token_cache_ != nullptr) {
     auto token = jwt_token_cache_->lookUp(audience_, client_cert_fingerprint_);
     if (token.has_value()) {
+      filter_config_->stats().token_cache_hit_.inc();
       addTokenToRequest(hdrs, token.value());
       state_ = State::Complete;
       return FilterHeadersStatus::Continue;
     }
+    filter_config_->stats().token_cache_miss_.inc();
   }
 
   request_header_map_ = &hdrs;
@@ -222,6 +227,14 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
 
 void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
   state_ = State::Complete;
+  // Count the outcome of every fetch, including the ones that complete synchronously while the
+  // call is still being initiated. A failed fetch is not fatal: the request continues upstream
+  // without a token, so the counter is the only signal that this happened.
+  if (token.ok()) {
+    filter_config_->stats().token_fetch_success_.inc();
+  } else {
+    filter_config_->stats().token_fetch_failed_.inc();
+  }
   if (!initiating_call_) {
     if (token.ok()) {
       // Modify the request header to include the ID token in a header (by default, the

@@ -29,7 +29,8 @@ namespace AiProtocolManager {
   COUNTER(sse_event_too_large)                                                                     \
   COUNTER(sse_incomplete_event)                                                                    \
   COUNTER(sse_event_budget_exhausted)                                                              \
-  COUNTER(unsupported_content_encoding)
+  COUNTER(unsupported_content_encoding)                                                            \
+  COUNTER(usage_trailers_synthesized)
 
 struct AiProtocolManagerStats {
   ALL_AI_PROTOCOL_MANAGER_STATS(GENERATE_COUNTER_STRUCT)

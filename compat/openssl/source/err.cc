@@ -119,7 +119,6 @@ extern "C" const char* ERR_reason_error_string(uint32_t packed_error) {
   static const std::map<std::string, std::string> ossl_2_bssl_error_string_map{
       {"sslv3 alert certificate expired", "SSLV3_ALERT_CERTIFICATE_EXPIRED"},
       {"sslv3 alert handshake failure", "SSLV3_ALERT_HANDSHAKE_FAILURE"},
-      {"tlsv1 alert protocol version", "TLSV1_ALERT_PROTOCOL_VERSION"},
       {"tlsv1 alert unknown ca", "TLSV1_ALERT_UNKNOWN_CA"},
       {"unsupported protocol", "UNSUPPORTED_PROTOCOL"},
       {"no shared cipher", "NO_SHARED_CIPHER"},

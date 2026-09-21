@@ -1,6 +1,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/common/logger.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/listener_managers/validation_listener_manager/validation_listener_manager.h"
@@ -363,7 +364,7 @@ TEST_P(JsonApplicationLogsValidationServerTest, JsonApplicationLogs) {
                             access_log_lock, component_factory_, Thread::threadFactoryForTest(),
                             Filesystem::fileSystemForTest());
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
@@ -423,7 +424,7 @@ TEST_P(TextApplicationLogsValidationServerTest, TextApplicationLogs) {
                             access_log_lock, component_factory_, Thread::threadFactoryForTest(),
                             Filesystem::fileSystemForTest());
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));

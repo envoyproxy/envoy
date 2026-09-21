@@ -40,6 +40,7 @@
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/per_filter_config.h"
 #include "source/common/router/retry_policy_impl.h"
+#include "source/common/router/route_specifier_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
@@ -363,6 +364,7 @@ public:
     return HeaderParser::defaultParser();
   }
   std::optional<bool> filterDisabled(absl::string_view config_name) const;
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -460,12 +462,28 @@ private:
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   RouteMetadataPackPtr metadata_;
+  RouteSpecifierList route_specifiers_;
   const std::optional<uint32_t> per_request_buffer_limit_;
   const std::optional<uint64_t> request_body_buffer_limit_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const bool include_attempt_count_in_request_ : 1;
   const bool include_attempt_count_in_response_ : 1;
   const bool include_is_timeout_retry_header_ : 1;
+};
+
+/**
+ * The outcome of route matching within a single virtual host: the matched route and the route
+ * level specifier chain of the entry that produced it. Both are empty when nothing matched, and
+ * `route_specifiers` alone is empty for the synthetic SSL redirect route, which has no configured
+ * route entry behind it.
+ *
+ * Borrowing the chain rather than holding its owner is safe: the route entries are owned by the
+ * virtual host, either through `routes_` or through the match tree, whose actions are built once
+ * at config time. Both outlive any request routed through the configuration.
+ */
+struct VirtualHostMatchResult {
+  RouteConstSharedPtr route;
+  RouteSpecifierSpan route_specifiers;
 };
 
 /**
@@ -479,17 +497,18 @@ public:
                   ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
                   bool validate_clusters, absl::Status& creation_status);
 
-  RouteConstSharedPtr getRouteFromEntries(const RouteCallback& cb,
-                                          const Http::RequestHeaderMap& headers,
-                                          const StreamInfo::StreamInfo& stream_info,
-                                          uint64_t random_value) const;
+  VirtualHostMatchResult getRouteFromEntries(const RouteCallback& cb,
+                                             const Http::RequestHeaderMap& headers,
+                                             const StreamInfo::StreamInfo& stream_info,
+                                             uint64_t random_value) const;
 
-  RouteConstSharedPtr
+  VirtualHostMatchResult
   getRouteFromRoutes(const RouteCallback& cb, const RouteMatchContext& route_match_context,
                      const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
                      absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
   VirtualHostConstSharedPtr virtualHost() const { return shared_virtual_host_; }
+  RouteSpecifierSpan routeSpecifiers() const { return shared_virtual_host_->routeSpecifiers(); }
 
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
@@ -892,6 +911,7 @@ public:
   bool matchRoute(const RouteMatchContext& route_match_context,
                   const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
   absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -1215,6 +1235,7 @@ private:
   Envoy::Config::DataSource::DataSourceProviderPtr<std::string> direct_response_body_provider_;
   Formatter::FormatterPtr direct_response_body_formatter_;
   std::string direct_response_content_type_;
+  RouteSpecifierList route_specifiers_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
@@ -1559,6 +1580,9 @@ private:
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
   TimeSource& time_source_;
+  // Keeps the shared part of the route config alive and gives access to the route configuration
+  // level extensions, which run even when no virtual host matches.
+  const CommonConfigSharedPtr global_route_config_;
   Stats::ScopeSharedPtr vhost_scope_;
   std::vector<DomainEntrySharedPtr> all_domain_entries_;
   absl::flat_hash_map<std::string, DomainEntrySharedPtr> exact_domain_entries_;
@@ -1599,6 +1623,7 @@ public:
   std::optional<bool> filterDisabled(absl::string_view config_name) const {
     return per_filter_configs_->disabled(config_name);
   }
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
   // Router::CommonConfig
   const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
@@ -1636,6 +1661,7 @@ private:
   absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   RouteMetadataPackPtr metadata_;
+  RouteSpecifierList route_specifiers_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_direct_response_body_size_bytes_;
   const bool uses_vhds_ : 1;

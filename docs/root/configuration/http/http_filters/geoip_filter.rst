@@ -50,6 +50,7 @@ comes from the owning HTTP connection manager.
    :widths: 1, 1, 2
 
    ``total``, Counter, Total number of requests for which geolocation filter was invoked.
+   ``skipped``, Counter, "Total number of requests for which no geolocation lookup was attempted because no IP address was available, for example when the downstream connection was accepted on an internal listener or a Unix domain socket."
 
 Besides Geolocation filter level statisctics, there is statistics emitted by the :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
 per geolocation database type (rooted at ``<stat_prefix>.maxmind.``). Database type can be one of `city_db <https://www.maxmind.com/en/geoip2-city>`_,

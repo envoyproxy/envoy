@@ -1,4 +1,6 @@
 #include <chrono>
+#include <cstdint>
+#include <limits>
 #include <thread>
 #include <vector>
 
@@ -2390,6 +2392,36 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntFailure) {
   EXPECT_FALSE(result);
 }
 
+// A level, name, or value outside the int range is rejected before the socket is touched, so a
+// truncated option is never applied or read.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SocketOptionRejectsOutOfRange) {
+  EXPECT_CALL(callbacks_.socket_, setSocketOption(testing::_, testing::_, testing::_, testing::_))
+      .Times(0);
+  EXPECT_CALL(callbacks_.socket_, getSocketOption(testing::_, testing::_, testing::_, testing::_))
+      .Times(0);
+  const int64_t too_large = static_cast<int64_t>(std::numeric_limits<int>::max()) + 1;
+  const int64_t too_small = static_cast<int64_t>(std::numeric_limits<int>::min()) - 1;
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+      filterPtr(), too_large, 2, 123));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_socket_option_int(filterPtr(), 1,
+                                                                                   2, too_large));
+
+  char bytes[] = "x";
+  envoy_dynamic_module_type_module_buffer bytes_buf = {bytes, 1};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+      filterPtr(), too_small, 2, bytes_buf));
+
+  int64_t int_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+      filterPtr(), too_large, 2, &int_out));
+
+  char buf[8];
+  size_t actual = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+      filterPtr(), 1, too_large, buf, sizeof(buf), &actual));
+}
+
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
   filter->onAccept(callbacks_);
@@ -3007,6 +3039,68 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, MetricsFrozenAfterInit) {
                 static_cast<void*>(filter_config_.get()), name, &out_id));
 }
 
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, PerFilterStatsOperateOnDefinedMetrics) {
+  void* config = static_cast<void*>(filter_config_.get());
+
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer counter_name = {const_cast<char*>("filter_counter"), 14};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_counter(
+                config, counter_name, &counter_id));
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("filter_gauge"), 12};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_gauge(config, gauge_name,
+                                                                              &gauge_id));
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer histogram_name = {const_cast<char*>("filter_histogram"),
+                                                            16};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+                config, histogram_name, &histogram_id));
+
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_listener_filter_increment_counter(filterPtr(), counter_id, 7));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_set_gauge(filterPtr(), gauge_id, 100));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_listener_filter_increment_gauge(filterPtr(), gauge_id, 10));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_listener_filter_decrement_gauge(filterPtr(), gauge_id, 5));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_record_histogram_value(filterPtr(),
+                                                                                 histogram_id, 42));
+
+  EXPECT_EQ(7, stats_.counterFromString("dynamicmodulescustom.filter_counter").value());
+  EXPECT_EQ(105, stats_
+                     .gaugeFromString("dynamicmodulescustom.filter_gauge",
+                                      Stats::Gauge::ImportMode::Accumulate)
+                     .value());
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       PerFilterStatsReturnMetricNotFoundForUnknownIds) {
+  const size_t unknown_metric_id = 9999;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_increment_counter(filterPtr(),
+                                                                            unknown_metric_id, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_listener_filter_set_gauge(filterPtr(), unknown_metric_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_increment_gauge(filterPtr(),
+                                                                          unknown_metric_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_decrement_gauge(filterPtr(),
+                                                                          unknown_metric_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_record_histogram_value(
+                filterPtr(), unknown_metric_id, 1));
+}
+
 // Verifies metrics can be operated from the filter config context (outside the connection
 // lifecycle), mirroring the per-filter operate callbacks.
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ConfigStatsOperate) {
@@ -3082,7 +3176,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeInt) {
 
   // A request attribute that is not backed by stream info returns false.
   EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_int(
-      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestSize, &result));
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeBool) {
@@ -3109,6 +3203,30 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeString) {
   // An int attribute requested as string returns false.
   EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_string(
       filterPtr(), envoy_dynamic_module_type_attribute_id_ResponseFlags, &result));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeXdsListenerValues) {
+  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  ON_CALL(*listener_info, direction())
+      .WillByDefault(testing::Return(envoy::config::core::v3::INBOUND));
+  callbacks_.stream_info_.downstream_connection_info_provider_->setListenerInfo(listener_info);
+  auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
+  filter_chain_info->filter_chain_name_ = "listener_filter_chain";
+  callbacks_.stream_info_.downstream_connection_info_provider_->setFilterChainInfo(
+      filter_chain_info);
+
+  uint64_t int_result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_XdsListenerDirection, &int_result));
+  EXPECT_EQ(static_cast<uint64_t>(envoy::config::core::v3::INBOUND), int_result);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_XdsFilterChainName, &string_result));
+  EXPECT_EQ("listener_filter_chain", absl::string_view(string_result.ptr, string_result.length));
+  callbacks_.stream_info_.downstream_connection_info_provider_->setFilterChainInfo(nullptr);
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_XdsFilterChainName, &string_result));
+  EXPECT_EQ(0, string_result.length);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeNullCallbacks) {

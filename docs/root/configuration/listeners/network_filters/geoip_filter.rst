@@ -133,6 +133,7 @@ The filter outputs statistics in the ``geoip.`` namespace.
   :widths: 1, 1, 2
 
   total, Counter, Total number of connections processed by the filter.
+  skipped, Counter, "Total number of connections for which no geolocation lookup was attempted because no IP address was available, for example when the connection was accepted on an internal listener or a Unix domain socket."
 
 The MaxMind provider emits additional statistics in the ``<stat_prefix>.maxmind.`` namespace per database type.
 Database type can be one of `city_db <https://www.maxmind.com/en/geoip2-city>`_,

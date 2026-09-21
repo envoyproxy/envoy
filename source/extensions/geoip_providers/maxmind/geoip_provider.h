@@ -10,6 +10,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/thread_synchronizer.h"
 
+#include "absl/status/statusor.h"
 #include "maxminddb.h"
 
 namespace Envoy {
@@ -78,7 +79,7 @@ public:
   }
 
   void setDbBuildEpoch(absl::string_view maxmind_db_type, const uint64_t value) {
-    setGuage(
+    setGauge(
         stat_name_set_->getBuiltin(absl::StrCat(maxmind_db_type, ".db_build_epoch"), unknown_hit_),
         value);
   }
@@ -102,7 +103,7 @@ private:
   const Stats::StatName unknown_hit_;
   void setFieldKey(GeoField field, const std::string& value);
   void incCounter(Stats::StatName name);
-  void setGuage(Stats::StatName name, const uint64_t value);
+  void setGauge(Stats::StatName name, const uint64_t value);
 };
 
 using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
@@ -111,7 +112,7 @@ using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
 // instance resources prior to its destruction.
 class MaxmindDb {
 public:
-  MaxmindDb(MMDB_s&& db) : db_(db) {}
+  explicit MaxmindDb(MMDB_s&& db) : db_(db) {}
   ~MaxmindDb() { MMDB_close(&db_); }
   const MMDB_s* mmdb() const { return &db_; }
 
@@ -124,7 +125,7 @@ class GeoipProvider : public Envoy::Geolocation::Driver,
                       public Logger::Loggable<Logger::Id::geolocation> {
 
 public:
-  GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner,
+  GeoipProvider(Event::Dispatcher& dispatcher, Singleton::InstanceSharedPtr owner,
                 GeoipProviderConfigSharedPtr config);
 
   ~GeoipProvider() override;
@@ -142,11 +143,9 @@ private:
   MaxmindDbSharedPtr anon_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   MaxmindDbSharedPtr asn_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   MaxmindDbSharedPtr country_db_ ABSL_GUARDED_BY(mmdb_mutex_);
-  Thread::ThreadPtr mmdb_reload_thread_;
-  Event::DispatcherPtr mmdb_reload_dispatcher_;
   Filesystem::WatcherPtr mmdb_watcher_;
-  MaxmindDbSharedPtr initMaxmindDb(const std::string& db_path, const absl::string_view& db_type,
-                                   bool reload = false);
+  absl::StatusOr<MaxmindDbSharedPtr> initMaxmindDb(const std::string& db_path,
+                                                   absl::string_view db_type);
   void lookupInCityDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAsnDb(const Network::Address::InstanceConstSharedPtr& remote_address,
@@ -157,8 +156,8 @@ private:
                      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInCountryDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                          absl::flat_hash_map<std::string, std::string>& lookup_result) const;
-  absl::Status onMaxmindDbUpdate(const std::string& db_path, const absl::string_view& db_type);
-  absl::Status mmdbReload(const MaxmindDbSharedPtr reloaded_db, const absl::string_view& db_type)
+  absl::Status onMaxmindDbUpdate(const std::string& db_path, absl::string_view db_type);
+  absl::Status mmdbReload(MaxmindDbSharedPtr reloaded_db, absl::string_view db_type)
       ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);

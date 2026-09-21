@@ -112,6 +112,17 @@ impl AccessLogger for TestAccessLogger {
     let _response_code = ctx.response_code();
     let _protocol = ctx.protocol();
     let _route_name = ctx.route_name();
+    assert_eq!(
+      ctx
+        .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsVirtualHostName)
+        .unwrap()
+        .as_slice(),
+      b"test_vhost"
+    );
+    assert_eq!(
+      ctx.virtual_cluster_name().unwrap().as_slice(),
+      b"test_vcluster"
+    );
     let _is_health_check = ctx.is_health_check();
     let _timing = ctx.timing_info();
     let _bytes = ctx.bytes_info();

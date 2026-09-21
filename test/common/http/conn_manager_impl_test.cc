@@ -2965,6 +2965,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
             // First call to log() is made when a new HTTP request has been received
             // On the first call it is expected that there is no response code.
             EXPECT_EQ(AccessLog::AccessLogType::DownstreamStart, log_context.accessLogType());
+            EXPECT_FALSE(log_context.requestTrailers().has_value());
             EXPECT_FALSE(stream_info.responseCode());
           }))
       .WillOnce(Invoke(
@@ -2978,6 +2979,11 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
             EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
             EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
             EXPECT_NE(nullptr, stream_info.routeSharedPtr());
+            ASSERT_TRUE(log_context.requestTrailers().has_value());
+            const auto trailers =
+                log_context.requestTrailers()->get(Http::LowerCaseString("x-request-trailer"));
+            ASSERT_EQ(1, trailers.size());
+            EXPECT_EQ("value", trailers[0]->value().getStringView());
           }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -2989,7 +2995,10 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
                                          {":authority", "host"},
                                          {":path", "/"},
                                          {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
-        decoder_->decodeHeaders(std::move(headers), true);
+        decoder_->decodeHeaders(std::move(headers), false);
+        RequestTrailerMapPtr trailers{
+            new TestRequestTrailerMapImpl{{"x-request-trailer", "value"}}};
+        decoder_->decodeTrailers(std::move(trailers));
 
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
