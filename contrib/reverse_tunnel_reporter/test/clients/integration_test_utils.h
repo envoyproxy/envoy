@@ -163,6 +163,46 @@ inline Cluster getRevConnCluster(bool enable_tenant_isolation = false) {
   return cluster;
 }
 
+// Same as getRevConnCluster but configures the drain metadata key on the upstream (client) codec
+// so a received connection-metadata frame with that key triggers a redial + reporter event.
+inline Cluster getRevConnClusterWithMetadata(const std::string& metadata_key,
+                                             bool enable_tenant_isolation = false) {
+  Cluster cluster;
+  cluster.set_name(revConnCluster);
+  cluster.set_lb_policy(Cluster::CLUSTER_PROVIDED);
+
+  auto* cluster_type = cluster.mutable_cluster_type();
+  cluster_type->set_name("envoy.clusters.reverse_connection");
+  ReverseConnectionClusterConfig rc_config;
+  rc_config.mutable_cleanup_interval()->set_seconds(60);
+  rc_config.set_host_id_format("%REQ(x-computed-host-id)%");
+  if (enable_tenant_isolation) {
+    rc_config.set_tenant_id_format("%REQ(x-tenant-id)%");
+  }
+  std::ignore = cluster_type->mutable_typed_config()->PackFrom(rc_config);
+
+  ConfigHelper::HttpProtocolOptions http_options;
+  // The upstream (client) codec must opt into metadata frame support so it decodes and delivers
+  // the stream-0 METADATA frame the draining downstream sends (the drain signal). Without
+  // allow_metadata the adapter drops the METADATA frame and onMetadata never fires, so the
+  // reporter is never notified at metadata time.
+  auto* h2 = http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+  h2->set_allow_metadata(true);
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(http_options);
+
+  ReverseTunnelUpstreamCodecOptions codec_options;
+  codec_options.set_enable_drain_with_goaway(true);
+  codec_options.set_metadata_key(metadata_key);
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.reverse_tunnel.v3."
+                     "ReverseTunnelUpstreamCodecOptions"]
+                        .PackFrom(codec_options);
+
+  return cluster;
+}
+
 inline Listener getUpstreamListener(absl::string_view anyhost) {
   Listener listener;
   listener.set_name(upstreamListener);
@@ -181,6 +221,33 @@ inline Listener getUpstreamListener(absl::string_view anyhost) {
   std::ignore = filter->mutable_typed_config()->PackFrom(rtFilter);
 
   return listener;
+}
+
+// Adds a ``/slow`` route that answers 200 after `delay`, plus the fault filter that injects the
+// delay. Tests use it to hold a stream open on a tunnel across a drain, so the tunnel stays up
+// until the HCM's final GOAWAY instead of closing as soon as the peer's pool drains it. Must be
+// called before the router filter is added, because the fault filter has to run ahead of it.
+inline void addSlowRoute(
+    envoy::config::route::v3::VirtualHost& vh,
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
+    std::chrono::seconds delay) {
+  auto* slow_route = vh.add_routes();
+  slow_route->mutable_match()->set_prefix("/slow");
+  auto* slow_resp = slow_route->mutable_direct_response();
+  slow_resp->set_status(200);
+  slow_resp->mutable_body()->set_inline_string("slow reverse connection listener OK");
+  envoy::extensions::filters::http::fault::v3::HTTPFault fault_cfg;
+  fault_cfg.mutable_delay()->mutable_fixed_delay()->set_seconds(delay.count());
+  fault_cfg.mutable_delay()->mutable_percentage()->set_numerator(100);
+  std::ignore =
+      (*slow_route->mutable_typed_per_filter_config())["envoy.filters.http.fault"].PackFrom(
+          fault_cfg);
+
+  // Per-route fault config above only applies if the filter is in the chain (empty default here).
+  auto* fault_filter = hcm.add_http_filters();
+  fault_filter->set_name("envoy.filters.http.fault");
+  envoy::extensions::filters::http::fault::v3::HTTPFault default_fault_cfg;
+  std::ignore = fault_filter->mutable_typed_config()->PackFrom(default_fault_cfg);
 }
 
 inline Listener
@@ -222,23 +289,7 @@ getDownstreamListener(const std::string& name, int num_listeners,
   direct_response->set_status(200);
   direct_response->mutable_body()->set_inline_string("reverse connection listener OK");
 
-  auto* slow_route = vh->add_routes();
-  slow_route->mutable_match()->set_prefix("/slow");
-  auto* slow_resp = slow_route->mutable_direct_response();
-  slow_resp->set_status(200);
-  slow_resp->mutable_body()->set_inline_string("slow reverse connection listener OK");
-  envoy::extensions::filters::http::fault::v3::HTTPFault fault_cfg;
-  fault_cfg.mutable_delay()->mutable_fixed_delay()->set_seconds(slowRouteDelay.count());
-  fault_cfg.mutable_delay()->mutable_percentage()->set_numerator(100);
-  std::ignore =
-      (*slow_route->mutable_typed_per_filter_config())["envoy.filters.http.fault"].PackFrom(
-          fault_cfg);
-
-  // Per-route fault config above only applies if the filter is in the chain (empty default here).
-  auto* fault_filter = hcm.add_http_filters();
-  fault_filter->set_name("envoy.filters.http.fault");
-  envoy::extensions::filters::http::fault::v3::HTTPFault default_fault_cfg;
-  std::ignore = fault_filter->mutable_typed_config()->PackFrom(default_fault_cfg);
+  addSlowRoute(*vh, hcm, slowRouteDelay);
 
   auto* http_filter = hcm.add_http_filters();
   http_filter->set_name("envoy.filters.http.router");
@@ -249,6 +300,85 @@ getDownstreamListener(const std::string& name, int num_listeners,
       drain_aware_hcm;
   *drain_aware_hcm.mutable_hcm_config() = std::move(hcm);
   drain_aware_hcm.set_enable_drain_with_goaway(true);
+
+  std::ignore = filter->mutable_typed_config()->PackFrom(drain_aware_hcm);
+  return listener;
+}
+
+// Same as getDownstreamListener but enables the three-phase metadata drain: METADATA at `delay`,
+// soft GOAWAY (shutdownNotice) at `shutdown_notice_delay`, final GOAWAY at `drain_timeout`.
+// Requires delay < shutdown_notice_delay < drain_timeout. http2 allow_metadata is enabled so the
+// METADATA frame can be emitted on stream 0. The ``/slow`` route answers after
+// `slow_route_delay`, so a test can keep a stream in flight across the whole drain.
+inline Listener getDownstreamListenerWithMetadata(
+    const std::string& name, int num_listeners,
+    std::chrono::seconds max_conn_duration = std::chrono::seconds(1),
+    const std::string& metadata_key = "drain_reverse_tunnel",
+    std::chrono::milliseconds delay = std::chrono::milliseconds(1000),
+    std::chrono::milliseconds shutdown_notice_delay = std::chrono::milliseconds(5000),
+    std::chrono::seconds drain_timeout = std::chrono::seconds(10),
+    std::chrono::seconds slow_route_delay = slowRouteDelay) {
+  Listener listener;
+  listener.set_name(name);
+
+  auto* sa = listener.mutable_address()->mutable_socket_address();
+  sa->set_address(std::format("rc://{}:{}:{}@{}:{}", name, downstreamCluster, downstreamTenant,
+                              downstreamCluster, num_listeners));
+  sa->set_port_value(0);
+  sa->set_resolver_name(downstreamResolver);
+
+  listener.mutable_listener_filters_timeout()->set_seconds(0);
+
+  auto* filter_chain = listener.add_filter_chains();
+  auto* filter = filter_chain->add_filters();
+  filter->set_name("envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager");
+
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
+  hcm.set_stat_prefix(name);
+
+  hcm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->set_seconds(
+      max_conn_duration.count());
+  hcm.mutable_drain_timeout()->set_seconds(drain_timeout.count());
+  hcm.set_codec_type(envoy::extensions::filters::network::http_connection_manager::v3::
+                         HttpConnectionManager::HTTP2);
+  hcm.mutable_request_timeout()->set_seconds(180);
+  hcm.mutable_http2_protocol_options()->set_allow_metadata(true);
+
+  auto* route_config = hcm.mutable_route_config();
+  auto* vh = route_config->add_virtual_hosts();
+  vh->set_name(name);
+  vh->add_domains("*");
+
+  auto* route = vh->add_routes();
+  route->mutable_match()->set_prefix("/direct");
+  auto* direct_response = route->mutable_direct_response();
+  direct_response->set_status(200);
+  direct_response->mutable_body()->set_inline_string("reverse connection listener OK");
+
+  addSlowRoute(*vh, hcm, slow_route_delay);
+
+  auto* http_filter = hcm.add_http_filters();
+  http_filter->set_name("envoy.filters.http.router");
+  envoy::extensions::filters::http::router::v3::Router router_cfg;
+  std::ignore = http_filter->mutable_typed_config()->PackFrom(router_cfg);
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager
+      drain_aware_hcm;
+  *drain_aware_hcm.mutable_hcm_config() = std::move(hcm);
+  drain_aware_hcm.set_enable_drain_with_goaway(true);
+  auto* metadata = drain_aware_hcm.mutable_drain_connection_metadata();
+  metadata->set_metadata_key(metadata_key);
+  metadata->mutable_delay()->set_seconds(
+      std::chrono::duration_cast<std::chrono::seconds>(delay).count());
+  metadata->mutable_delay()->set_nanos(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(delay % std::chrono::seconds(1))
+          .count());
+  metadata->mutable_shutdown_notice_delay()->set_seconds(
+      std::chrono::duration_cast<std::chrono::seconds>(shutdown_notice_delay).count());
+  metadata->mutable_shutdown_notice_delay()->set_nanos(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(shutdown_notice_delay %
+                                                           std::chrono::seconds(1))
+          .count());
 
   std::ignore = filter->mutable_typed_config()->PackFrom(drain_aware_hcm);
   return listener;

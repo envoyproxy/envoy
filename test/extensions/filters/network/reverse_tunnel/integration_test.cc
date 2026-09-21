@@ -220,6 +220,8 @@ typed_config:
 
   void runEndToEndReverseConnectionHandshakeScenario();
   void addDrainingAwareReverseConnectionHcmListener(uint32_t reverse_connection_count = 1);
+  void
+  addDrainingAwareReverseConnectionHcmListenerWithMetadata(uint32_t reverse_connection_count = 1);
   void completeReverseTunnelHandshake(FakeRawConnection& connection) const;
   void startHttp2Session(FakeRawConnection& connection) const;
   static FakeRawConnection::ValidatorFunction
@@ -274,6 +276,59 @@ filter_chains:
         - name: envoy.filters.http.router
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF",
+                                                      reverse_connection_count);
+
+        auto* listener = bootstrap.mutable_static_resources()->add_listeners();
+        TestUtility::loadFromYaml(listener_yaml, *listener);
+      });
+}
+
+void ReverseTunnelFilterIntegrationTest::addDrainingAwareReverseConnectionHcmListenerWithMetadata(
+    uint32_t reverse_connection_count) {
+  config_helper_.addConfigModifier(
+      [reverse_connection_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        bootstrap.mutable_static_resources()->clear_listeners();
+
+        // Three-phase drain: METADATA at `delay` (0.2s), soft GOAWAY at `shutdown_notice_delay`
+        // (0.4s), final GOAWAY at `drain_timeout` (0.8s). Validation requires delay <
+        // shutdown_notice_delay < drain_timeout.
+        const std::string listener_yaml = fmt::format(R"EOF(
+name: reverse_connection_listener
+address:
+  socket_address:
+    address: "rc://e2e-node:e2e-cluster:e2e-tenant@cluster_0:{}"
+    port_value: 0
+    resolver_name: envoy.resolvers.reverse_connection
+filter_chains:
+- filters:
+  - name: envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager
+      enable_drain_with_goaway: true
+      hcm_config:
+        stat_prefix: reverse_connection_hcm
+        codec_type: HTTP2
+        http2_protocol_options: {{allow_metadata: true}}
+        drain_timeout: 0.8s
+        route_config:
+          name: local_route
+          virtual_hosts:
+          - name: local_service
+            domains: ["*"]
+            routes:
+            - match:
+                prefix: "/"
+              direct_response:
+                status: 200
+        http_filters:
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      drain_connection_metadata:
+        metadata_key: "drain_reverse_tunnel"
+        delay: 0.2s
+        shutdown_notice_delay: 0.4s
 )EOF",
                                                       reverse_connection_count);
 
@@ -734,6 +789,56 @@ TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsGoAwayOnReverseC
   // Advance simulated time past the 1s drain_time so the graceful drain completion timer fires.
   timeSystem().advanceTimeWait(std::chrono::seconds(2));
   // Confirm the full chain completed: workers stopped the listener and called.
+  test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
+}
+
+// With enable_drain_with_goaway and drain_connection_metadata configured, a graceful listener
+// drain emits the three drain phases on the wire in order: a METADATA frame (client propagation)
+// first, then a GOAWAY. The METADATA frame must arrive before any GOAWAY so the peer redials
+// before being told to stop new streams.
+TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsMetadataThenGoAway) {
+  DISABLE_IF_ADMIN_DISABLED;
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(1);
+  addDrainingAwareReverseConnectionHcmListenerWithMetadata(1);
+  initialize();
+
+  FakeRawConnectionPtr reverse_conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(reverse_conn));
+  completeReverseTunnelHandshake(*reverse_conn);
+  // Let the wrapper detach its HTTP/1 handshake codec before sending HTTP/2 bytes.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  startHttp2Session(*reverse_conn);
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  reverse_conn->clearData();
+
+  BufferingStreamDecoderPtr admin_response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners?graceful",
+                                         "", Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(admin_response->complete());
+  ASSERT_EQ("200", admin_response->headers().getStatusValue());
+
+  // Phase 1: a METADATA frame arrives on stream 0 (client propagation), and crucially NO GOAWAY
+  // yet. The drain key/value are HPACK/Huffman-encoded inside the frame, so their content is
+  // verified in the unit tests rather than here.
+  std::string raw_data;
+  ASSERT_TRUE(
+      reverse_conn->waitForData(waitForHttp2FrameType(Http::Http2::Http2Frame::Type::Metadata),
+                                &raw_data, std::chrono::milliseconds(5000)));
+  logHttp2Frames("conn metadata received", raw_data);
+  // No GOAWAY should have arrived yet (it fires after the metadata phase).
+  EXPECT_FALSE(
+      reverse_conn->waitForData(waitForHttp2FrameType(Http::Http2::Http2Frame::Type::GoAway),
+                                &raw_data, std::chrono::milliseconds(100)));
+
+  // Phase 2/3: a GOAWAY arrives after the metadata frame.
+  ASSERT_TRUE(
+      reverse_conn->waitForData(waitForHttp2FrameType(Http::Http2::Http2Frame::Type::GoAway),
+                                &raw_data, std::chrono::milliseconds(5000)));
+  logHttp2Frames("conn goaway received", raw_data);
+
+  EXPECT_TRUE(reverse_conn->close());
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
   test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
 }
 
