@@ -7,7 +7,7 @@ module(
 # deps: Module
 ####################################################################################
 
-bazel_dep(name = "abseil-cpp", version = "20260107.1")
+bazel_dep(name = "abseil-cpp", version = "20260817.0")
 bazel_dep(name = "antlr4-cpp-runtime", version = "4.13.2")
 bazel_dep(name = "apple_support", version = "2.3.0", repo_name = "build_bazel_apple_support")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.0")
