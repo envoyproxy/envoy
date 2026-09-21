@@ -1993,10 +1993,13 @@ public:
     added_or_updated_ = true;
   }
   bool requiredForAds() const override { return required_for_ads_; }
+  void markSkipCdsPause() override { skip_cds_pause_ = true; }
+  bool skipCdsPause() const override { return skip_cds_pause_; }
 
   NiceMock<MockClusterMockPrioritySet> cluster_;
   bool added_or_updated_{};
   bool required_for_ads_{};
+  bool skip_cds_pause_{};
 };
 
 TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
@@ -2787,11 +2790,10 @@ Config::ScopedResume makePauseHandle(bool& resumed) {
 }
 
 // Sets up ADS mux, creates the cluster manager, stubs pause() to track whether CDS was paused,
-// adds a warming cluster built from cluster_yaml (whose initialize() is never resolved),
-// and asserts CDS was NOT paused. Used to verify that clusters with SDS
-// initial_fetch_timeout == 0 do not block CDS regardless of which SDS field carries the secret.
-void expectSdsZeroTimeoutDoesNotBlockCds(ClusterManagerImplTest& t,
-                                         const std::string& cluster_yaml) {
+// adds a warming cluster with wait_for_warm_on_init: false (whose initialize() is never resolved),
+// and asserts CDS was NOT paused.
+void expectWaitForWarmOnInitFalseDoesNotBlockCds(ClusterManagerImplTest& t,
+                                                 const std::string& cluster_yaml) {
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
   ON_CALL(t.factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
@@ -2809,7 +2811,8 @@ void expectSdsZeroTimeoutDoesNotBlockCds(ClusterManagerImplTest& t,
   std::shared_ptr<MockClusterMockPrioritySet> mock_cluster =
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
   mock_cluster->info_->name_ = cluster_config.name();
-  EXPECT_CALL(*mock_cluster, initialize(_)); // SDS never resolves
+  ON_CALL(*mock_cluster->info_, waitForWarmOnInit()).WillByDefault(Return(false));
+  EXPECT_CALL(*mock_cluster, initialize(_));
   EXPECT_CALL(t.factory_, clusterFromProto_(ProtoEq(cluster_config), _, true))
       .WillOnce(Return(std::make_pair(mock_cluster, nullptr)));
 
@@ -2868,16 +2871,15 @@ TEST_F(ClusterManagerImplTest, WarmingClusterBlocksCdsUntilWarmed) {
   EXPECT_TRUE(cds_resumed);
 }
 
-// A cluster with SDS tls_certificate_sds_secret_configs and initial_fetch_timeout == 0 must
-// NOT pause CDS: it may wait for a secret indefinitely and would deadlock ADS.
-TEST_F(ClusterManagerImplTest, WarmingClusterWithSdsZeroTimeoutDoesNotBlockCds) {
-  expectSdsZeroTimeoutDoesNotBlockCds(*this, R"EOF(
-    name: sds_cluster
+// A cluster with wait_for_warm_on_init: false must NOT pause CDS.
+TEST_F(ClusterManagerImplTest, WarmingClusterWithWaitForWarmOnInitFalseDoesNotBlockCds) {
+  expectWaitForWarmOnInitFalseDoesNotBlockCds(*this, R"EOF(
+    name: no_wait_cluster
     connect_timeout: 0.250s
     type: STATIC
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: sds_cluster
+      cluster_name: no_wait_cluster
       endpoints:
       - lb_endpoints:
         - endpoint:
@@ -2885,23 +2887,12 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithSdsZeroTimeoutDoesNotBlockCds) 
               socket_address:
                 address: 127.0.0.1
                 port_value: 11001
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        common_tls_context:
-          tls_certificate_sds_secret_configs:
-            - name: client_cert
-              sds_config:
-                ads: {}
-                resource_api_version: V3
-                initial_fetch_timeout: 0s
   )EOF");
 }
 
-// When one cluster is stuck on SDS (initial_fetch_timeout == 0) and another is warming normally,
+// When one cluster has wait_for_warm_on_init: false and another is warming normally,
 // the normal cluster should still be able to pause and then unblock CDS independently.
-TEST_F(ClusterManagerImplTest, SdsZeroTimeoutClusterDoesNotBlockCdsForOtherWarmingClusters) {
+TEST_F(ClusterManagerImplTest, WaitForWarmOnInitFalseClusterDoesNotBlockCdsForOtherWarmingClusters) {
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
   ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
@@ -2917,14 +2908,14 @@ TEST_F(ClusterManagerImplTest, SdsZeroTimeoutClusterDoesNotBlockCdsForOtherWarmi
         return makePauseHandle(cds_resumed);
       }));
 
-  // Cluster A: stuck on SDS with initial_fetch_timeout == 0.
-  const std::string sds_cluster_yaml = R"EOF(
-    name: sds_cluster
+  // Cluster A: wait_for_warm_on_init: false — should not block CDS.
+  const std::string no_wait_cluster_yaml = R"EOF(
+    name: no_wait_cluster
     connect_timeout: 0.250s
     type: STATIC
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: sds_cluster
+      cluster_name: no_wait_cluster
       endpoints:
       - lb_endpoints:
         - endpoint:
@@ -2932,25 +2923,15 @@ TEST_F(ClusterManagerImplTest, SdsZeroTimeoutClusterDoesNotBlockCdsForOtherWarmi
               socket_address:
                 address: 127.0.0.1
                 port_value: 11001
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        common_tls_context:
-          tls_certificate_sds_secret_configs:
-            - name: client_cert
-              sds_config:
-                ads: {}
-                resource_api_version: V3
-                initial_fetch_timeout: 0s
   )EOF";
-  auto sds_config = parseClusterFromV3Yaml(sds_cluster_yaml);
-  std::shared_ptr<MockClusterMockPrioritySet> sds_cluster =
+  auto no_wait_config = parseClusterFromV3Yaml(no_wait_cluster_yaml);
+  std::shared_ptr<MockClusterMockPrioritySet> no_wait_cluster =
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
-  sds_cluster->info_->name_ = "sds_cluster";
-  EXPECT_CALL(*sds_cluster, initialize(_)); // never resolves
-  EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(sds_config), _, true))
-      .WillOnce(Return(std::make_pair(sds_cluster, nullptr)));
+  no_wait_cluster->info_->name_ = "no_wait_cluster";
+  ON_CALL(*no_wait_cluster->info_, waitForWarmOnInit()).WillByDefault(Return(false));
+  EXPECT_CALL(*no_wait_cluster, initialize(_)); // never resolves
+  EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(no_wait_config), _, true))
+      .WillOnce(Return(std::make_pair(no_wait_cluster, nullptr)));
 
   // Cluster B: normal warming cluster.
   const std::string normal_cluster_yaml = R"EOF(
@@ -2977,8 +2958,8 @@ TEST_F(ClusterManagerImplTest, SdsZeroTimeoutClusterDoesNotBlockCdsForOtherWarmi
   EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(normal_config), _, true))
       .WillOnce(Return(std::make_pair(normal_cluster, nullptr)));
 
-  // Add stuck SDS cluster first. CDS must not be paused for it.
-  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(sds_config, "v1"));
+  // Add no-wait cluster first. CDS must not be paused for it.
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(no_wait_config, "v1"));
   EXPECT_FALSE(cds_paused);
   EXPECT_FALSE(cds_resumed);
 
@@ -2992,13 +2973,9 @@ TEST_F(ClusterManagerImplTest, SdsZeroTimeoutClusterDoesNotBlockCdsForOtherWarmi
   EXPECT_TRUE(cds_resumed);
 }
 
-// A cluster with SDS in combined_validation_context and initial_fetch_timeout == 0 must NOT
-// pause CDS. This exercises the combined_validation_context branch of
-// clusterHasSdsWithZeroTimeout, complementing WarmingClusterWithSdsZeroTimeoutDoesNotBlockCds
-// which covers the tls_certificate_sds_secret_configs branch.
-TEST_F(ClusterManagerImplTest,
-       WarmingClusterWithCombinedValidationContextSdsZeroTimeoutDoesNotBlockCds) {
-  expectSdsZeroTimeoutDoesNotBlockCds(*this, R"EOF(
+// A cluster whose waitForWarmOnInit() returns false must NOT pause CDS regardless of config shape.
+TEST_F(ClusterManagerImplTest, WarmingClusterWithWaitForWarmOnInitFalseDoesNotBlockCdsVariantA) {
+  expectWaitForWarmOnInitFalseDoesNotBlockCds(*this, R"EOF(
     name: validation_sds_cluster
     connect_timeout: 0.250s
     type: STATIC
@@ -3027,11 +3004,9 @@ TEST_F(ClusterManagerImplTest,
   )EOF");
 }
 
-// A cluster using transport_socket_matches with SDS initial_fetch_timeout == 0 must NOT
-// pause CDS.
-TEST_F(ClusterManagerImplTest,
-       WarmingClusterWithTransportSocketMatchSdsZeroTimeoutDoesNotBlockCds) {
-  expectSdsZeroTimeoutDoesNotBlockCds(*this, R"EOF(
+// A cluster using transport_socket_matches with wait_for_warm_on_init: false must NOT pause CDS.
+TEST_F(ClusterManagerImplTest, WarmingClusterWithWaitForWarmOnInitFalseDoesNotBlockCdsVariantB) {
+  expectWaitForWarmOnInitFalseDoesNotBlockCds(*this, R"EOF(
     name: match_sds_cluster
     connect_timeout: 0.250s
     type: STATIC
@@ -3062,9 +3037,8 @@ TEST_F(ClusterManagerImplTest,
   )EOF");
 }
 
-// A cluster with SDS but a non-zero initial_fetch_timeout should still block CDS: it will
-// eventually time out and finish warming on its own.
-TEST_F(ClusterManagerImplTest, WarmingClusterWithSdsNonZeroTimeoutBlocksCds) {
+// A cluster with wait_for_warm_on_init not set (default true) should block CDS.
+TEST_F(ClusterManagerImplTest, WarmingClusterWithDefaultWaitForWarmOnInitBlocksCds) {
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
   ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));

@@ -13,7 +13,6 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
@@ -87,57 +86,6 @@ getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostCons
     return std::nullopt;
   }
   return {{"https", sni, host->address()->ip()->port()}};
-}
-
-// Returns true if any SDS ConfigSource in the cluster's transport socket has
-// initial_fetch_timeout == 0, meaning the cluster may wait indefinitely for a
-// secret and should not block CDS ACKs.
-bool clusterHasSdsWithZeroTimeout(const envoy::config::cluster::v3::Cluster& config) {
-  auto hasZeroTimeout = [](const envoy::config::core::v3::ConfigSource& src) {
-    return src.has_initial_fetch_timeout() &&
-           DurationUtil::durationToMilliseconds(src.initial_fetch_timeout()) == 0;
-  };
-
-  auto commonTlsHasZeroTimeout =
-      [&hasZeroTimeout](
-          const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& ctx) {
-        for (const auto& sds : ctx.tls_certificate_sds_secret_configs()) {
-          if (sds.has_sds_config() && hasZeroTimeout(sds.sds_config())) {
-            return true;
-          }
-        }
-        if (ctx.has_combined_validation_context()) {
-          const auto& cvc = ctx.combined_validation_context();
-          if (cvc.has_validation_context_sds_secret_config() &&
-              cvc.validation_context_sds_secret_config().has_sds_config() &&
-              hasZeroTimeout(cvc.validation_context_sds_secret_config().sds_config())) {
-            return true;
-          }
-        }
-        return false;
-      };
-
-  auto transportSocketHasZeroTimeout =
-      [&commonTlsHasZeroTimeout](const envoy::config::core::v3::TransportSocket& ts) {
-        if (!ts.has_typed_config()) {
-          return false;
-        }
-        envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_ctx;
-        if (ts.typed_config().UnpackTo(&tls_ctx) && tls_ctx.has_common_tls_context()) {
-          return commonTlsHasZeroTimeout(tls_ctx.common_tls_context());
-        }
-        return false;
-      };
-
-  if (config.has_transport_socket() && transportSocketHasZeroTimeout(config.transport_socket())) {
-    return true;
-  }
-  for (const auto& match : config.transport_socket_matches()) {
-    if (match.has_transport_socket() && transportSocketHasZeroTimeout(match.transport_socket())) {
-      return true;
-    }
-  }
-  return false;
 }
 
 bool isBlockingAdsCluster(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
@@ -1047,6 +995,10 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
     ASSERT(inserted);
   }
 
+  if (!cluster_reference.info()->waitForWarmOnInit()) {
+    cluster_entry_it->second->markSkipCdsPause();
+  }
+
   if (cluster_provided_lb) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(lb);
   } else {
@@ -1075,19 +1027,18 @@ void ClusterManagerImpl::updateClusterCounts() {
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
   if (all_clusters_initialized && !shutdown_ && xds_manager_.adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-    // Clusters whose SDS config has initial_fetch_timeout == 0 may wait indefinitely for a
-    // secret. Holding the CDS pause for such clusters would deadlock ADS. Those clusters
-    // are excluded from the per-cluster pause accounting below.
+    // Clusters with wait_for_warm_on_init: false opt out of blocking CDS. All other
+    // warming clusters hold a CDS pause handle until they finish warming.
     for (const auto& [name, cluster_data] : warming_clusters_) {
-      if (!cds_pauses_.contains(name) &&
-          !clusterHasSdsWithZeroTimeout(cluster_data->cluster_config_)) {
+      if (!cds_pauses_.contains(name) && !cluster_data->skipCdsPause()) {
         cds_pauses_.emplace(name, xds_manager_.pause(type_url));
       }
     }
-    // Release handles for clusters that are no longer warming.
-    absl::erase_if(cds_pauses_,
-                   [this](const auto& entry) { return !warming_clusters_.contains(entry.first); });
   }
+  // Release handles for clusters that are no longer warming. Run unconditionally so that
+  // handles are dropped promptly even if shutdown_ is already set.
+  absl::erase_if(cds_pauses_,
+                 [this](const auto& entry) { return !warming_clusters_.contains(entry.first); });
   cm_stats_.active_clusters_.set(active_clusters_.size());
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
 }

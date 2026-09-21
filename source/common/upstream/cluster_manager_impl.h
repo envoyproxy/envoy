@@ -122,6 +122,13 @@ public:
   // Return true if the cluster must be ready-for-use before ADS (Aggregated Discovery Service) can
   // be initialized; will only occur if ADS is configured to use the cluster via EnvoyGrpc.
   virtual bool requiredForAds() const PURE;
+
+  // Mark this cluster as opted out of CDS pausing (wait_for_warm_on_init: false).
+  // Such clusters remain in warming_clusters_ but do not hold a CDS pause handle.
+  virtual void markSkipCdsPause() PURE;
+
+  // Returns true if markSkipCdsPause() has been called for this cluster.
+  virtual bool skipCdsPause() const PURE;
 };
 
 /**
@@ -316,9 +323,8 @@ public:
   void shutdown() override {
     shutdown_ = true;
     for (auto& [name, handle] : cds_pauses_) {
-      if (handle) {
-        handle->cancel();
-      }
+      ASSERT(handle != nullptr);
+      handle->cancel();
     }
     cds_pauses_.clear();
     // Make sure we destroy all potential outgoing connections before this returns.
@@ -852,6 +858,9 @@ private:
     }
     bool requiredForAds() const override { return required_for_ads_; }
 
+    void markSkipCdsPause() override { skip_cds_pause_ = true; }
+    bool skipCdsPause() const override { return skip_cds_pause_; }
+
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
     const std::string version_info_;
@@ -871,6 +880,7 @@ private:
     const bool avoid_cds_removal_ : 1;
     bool added_or_updated_ : 1 = false;
     const bool required_for_ads_ : 1;
+    bool skip_cds_pause_ : 1 = false;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
