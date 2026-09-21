@@ -300,6 +300,9 @@ public:
   // ReplayResumeHandler
   void onReplayResumed() override;
 
+  // Flushes any sub-threshold queued backlog when the bridge pauses the ingest source.
+  void onIngestPaused() { maybeIssueWrite(); }
+
 private:
   // Issues a write of the queued backlog when one is warranted: no write is in
   // flight and the backlog has reached WriteFlushThreshold, the stream has ended,

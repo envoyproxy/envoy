@@ -114,7 +114,7 @@ TEST_F(DispatcherExecutorTest, CancelDisarmsTimer) {
 
 Task<absl::Status> yieldThenReturn() { co_return co_await yield(); }
 
-TEST_F(DispatcherExecutorTest, YieldSuspendsAndResumesOnNextIteration) {
+TEST_F(DispatcherExecutorTest, YieldSuspendsAndResumeAtEndOfCurrentIteration) {
   std::optional<absl::Status> result;
   DetachedHandle handle = launch(
       yieldThenReturn(), executor_, [&result](absl::Status status) { result = std::move(status); },
