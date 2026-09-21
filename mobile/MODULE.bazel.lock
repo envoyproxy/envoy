@@ -1,5 +1,5 @@
 {
-  "lockFileVersion": 24,
+  "lockFileVersion": 28,
   "registryFileHashes": {
     "https://bcr.bazel.build/bazel_registry.json": "8a28e4aff06ee60aed2a8c281907fb8bcbf3b753c91fb5a5c57da3215d5b3497",
     "https://bcr.bazel.build/modules/abseil-cpp/20210324.2/MODULE.bazel": "7cd0312e064fde87c8d1cd79ba06c876bd23630c83466e9500321be55c96ace2",
@@ -897,9 +897,9 @@
       "general": {
         "bzlTransitiveDigest": "65knptj6j9eJvcE9M24kM5CvTTSPJvCLgbEVCKamQTk=",
         "usagesDigest": "r1Y9CkNjvK1L2kWk+6uNrfnV4E3EvXLmA0SeD58v1qU=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:,envoy_toolshed envoy_toolshed+"
+        ],
         "generatedRepoSpecs": {
           "envoy_mobile_extra_swift_sources": {
             "repoRuleId": "@@//bazel:extensions.bzl%default_extra_swift_sources",
@@ -909,23 +909,16 @@
             "repoRuleId": "@@//bazel:extensions.bzl%default_extra_jni_deps",
             "attributes": {}
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "",
-            "envoy_toolshed",
-            "envoy_toolshed+"
-          ]
-        ]
+        }
       }
     },
     "//bazel:extensions.bzl%envoy_mobile_platforms_extension": {
       "general": {
         "bzlTransitiveDigest": "65knptj6j9eJvcE9M24kM5CvTTSPJvCLgbEVCKamQTk=",
         "usagesDigest": "dM1PF8ccg/fav5S42vf1hmqurL1rSi7KORwOvc5ZSx4=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:,envoy_toolshed envoy_toolshed+"
+        ],
         "generatedRepoSpecs": {
           "mobile_clang_platform": {
             "repoRuleId": "@@envoy_toolshed+//repository:utils.bzl%arch_alias",
@@ -935,23 +928,31 @@
               }
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "",
-            "envoy_toolshed",
-            "envoy_toolshed+"
-          ]
-        ]
+        }
       }
     },
     "@@aspect_rules_esbuild+//esbuild:extensions.bzl%esbuild": {
       "general": {
         "bzlTransitiveDigest": "zHTxEUJi37HHbuoiJkToNOdzMWPcyGFW+RzKIesV/Gg=",
         "usagesDigest": "sj4kz7yaVclWMuWhUhSLq0bVH7+HrkWyMdODMeA7Zhw=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:aspect_bazel_lib+,bazel_lib bazel_lib+",
+          "REPO_MAPPING:aspect_bazel_lib+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:aspect_bazel_lib+,bazel_tools bazel_tools",
+          "REPO_MAPPING:aspect_bazel_lib+,tar.bzl tar.bzl+",
+          "REPO_MAPPING:aspect_rules_esbuild+,aspect_rules_js aspect_rules_js+",
+          "REPO_MAPPING:aspect_rules_esbuild+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:aspect_rules_js+,aspect_bazel_lib aspect_bazel_lib+",
+          "REPO_MAPPING:aspect_rules_js+,aspect_rules_js aspect_rules_js+",
+          "REPO_MAPPING:aspect_rules_js+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:aspect_rules_js+,bazel_tools bazel_tools",
+          "REPO_MAPPING:bazel_lib+,bazel_lib bazel_lib+",
+          "REPO_MAPPING:bazel_lib+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:bazel_lib+,bazel_tools bazel_tools",
+          "REPO_MAPPING:tar.bzl+,aspect_bazel_lib aspect_bazel_lib+",
+          "REPO_MAPPING:tar.bzl+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:tar.bzl+,tar.bzl tar.bzl+"
+        ],
         "generatedRepoSpecs": {
           "esbuild_darwin-x64": {
             "repoRuleId": "@@aspect_rules_esbuild+//esbuild:repositories.bzl%esbuild_repositories",
@@ -1047,98 +1048,32 @@
               "exclude_package_contents": []
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "aspect_bazel_lib+",
-            "bazel_lib",
-            "bazel_lib+"
-          ],
-          [
-            "aspect_bazel_lib+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "aspect_bazel_lib+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "aspect_bazel_lib+",
-            "tar.bzl",
-            "tar.bzl+"
-          ],
-          [
-            "aspect_rules_esbuild+",
-            "aspect_rules_js",
-            "aspect_rules_js+"
-          ],
-          [
-            "aspect_rules_esbuild+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "aspect_rules_js+",
-            "aspect_bazel_lib",
-            "aspect_bazel_lib+"
-          ],
-          [
-            "aspect_rules_js+",
-            "aspect_rules_js",
-            "aspect_rules_js+"
-          ],
-          [
-            "aspect_rules_js+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "aspect_rules_js+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "bazel_lib+",
-            "bazel_lib",
-            "bazel_lib+"
-          ],
-          [
-            "bazel_lib+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "bazel_lib+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "tar.bzl+",
-            "aspect_bazel_lib",
-            "aspect_bazel_lib+"
-          ],
-          [
-            "tar.bzl+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "tar.bzl+",
-            "tar.bzl",
-            "tar.bzl+"
-          ]
-        ]
+        }
       }
     },
     "@@aspect_rules_js+//npm:extensions.bzl%pnpm": {
       "general": {
-        "bzlTransitiveDigest": "+MHFp3InBMZE32sUKAceh42/xN4lp1dv+hb9qShub8I=",
+        "bzlTransitiveDigest": "M0VQ/QcbGaZn33VfT9iEVMbDtMlHqY6xZd6nFtnbxPw=",
         "usagesDigest": "kbjSw2REjlSC0HtTZDf2p+l/dmiMt3NHLoiWEXYAoQI=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:aspect_bazel_lib+,bazel_lib bazel_lib+",
+          "REPO_MAPPING:aspect_bazel_lib+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:aspect_bazel_lib+,bazel_tools bazel_tools",
+          "REPO_MAPPING:aspect_bazel_lib+,tar.bzl tar.bzl+",
+          "REPO_MAPPING:aspect_rules_js+,aspect_bazel_lib aspect_bazel_lib+",
+          "REPO_MAPPING:aspect_rules_js+,aspect_rules_js aspect_rules_js+",
+          "REPO_MAPPING:aspect_rules_js+,bazel_features bazel_features+",
+          "REPO_MAPPING:aspect_rules_js+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:aspect_rules_js+,bazel_tools bazel_tools",
+          "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",
+          "REPO_MAPPING:bazel_features+,bazel_features_version bazel_features++version_extension+bazel_features_version",
+          "REPO_MAPPING:bazel_lib+,bazel_lib bazel_lib+",
+          "REPO_MAPPING:bazel_lib+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:bazel_lib+,bazel_tools bazel_tools",
+          "REPO_MAPPING:tar.bzl+,aspect_bazel_lib aspect_bazel_lib+",
+          "REPO_MAPPING:tar.bzl+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:tar.bzl+,tar.bzl tar.bzl+"
+        ],
         "generatedRepoSpecs": {
           "pnpm": {
             "repoRuleId": "@@aspect_rules_js+//npm/private:npm_import.bzl%npm_import_rule",
@@ -1192,103 +1127,14 @@
               "exclude_package_contents": []
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "aspect_bazel_lib+",
-            "bazel_lib",
-            "bazel_lib+"
-          ],
-          [
-            "aspect_bazel_lib+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "aspect_bazel_lib+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "aspect_bazel_lib+",
-            "tar.bzl",
-            "tar.bzl+"
-          ],
-          [
-            "aspect_rules_js+",
-            "aspect_bazel_lib",
-            "aspect_bazel_lib+"
-          ],
-          [
-            "aspect_rules_js+",
-            "aspect_rules_js",
-            "aspect_rules_js+"
-          ],
-          [
-            "aspect_rules_js+",
-            "bazel_features",
-            "bazel_features+"
-          ],
-          [
-            "aspect_rules_js+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "aspect_rules_js+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "bazel_features+",
-            "bazel_features_globals",
-            "bazel_features++version_extension+bazel_features_globals"
-          ],
-          [
-            "bazel_features+",
-            "bazel_features_version",
-            "bazel_features++version_extension+bazel_features_version"
-          ],
-          [
-            "bazel_lib+",
-            "bazel_lib",
-            "bazel_lib+"
-          ],
-          [
-            "bazel_lib+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "bazel_lib+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "tar.bzl+",
-            "aspect_bazel_lib",
-            "aspect_bazel_lib+"
-          ],
-          [
-            "tar.bzl+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "tar.bzl+",
-            "tar.bzl",
-            "tar.bzl+"
-          ]
-        ]
+        }
       }
     },
     "@@emsdk+//:emscripten_cache.bzl%emscripten_cache": {
       "general": {
         "bzlTransitiveDigest": "uqDvXmpTNqW4+ie/Fk+xC3TrFrKvL+9hNtoP51Kt2oo=",
         "usagesDigest": "DiK4MwwPwWtYLSt+yREBFYKvCLbm0Cqdn0INE2VZjKM=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "emscripten_cache": {
             "repoRuleId": "@@emsdk+//:emscripten_cache.bzl%_emscripten_cache_repository",
@@ -1297,17 +1143,17 @@
               "targets": []
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@emsdk+//:emscripten_deps.bzl%emscripten_deps": {
       "general": {
         "bzlTransitiveDigest": "wW73uvNlfCeIEuN9uldWVDcyilYgacL1eyG1zwCMdlg=",
         "usagesDigest": "yRGSmWwksrOI68EzUU8kC0L5tJnr2E2AVst3Nt5BY1s=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:bazel_tools,rules_cc rules_cc+",
+          "REPO_MAPPING:emsdk+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "emscripten_bin_linux": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
@@ -1359,75 +1205,41 @@
               "url": "https://storage.googleapis.com/webassembly/emscripten-releases-builds/win/aaa43392544d695232b70eda706d751f18980c2a/wasm-binaries.zip"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "bazel_tools",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "emsdk+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@envoy+//bazel:extensions.bzl%envoy_build_config_ext": {
       "general": {
         "bzlTransitiveDigest": "iIOox5OuJtl5d9I+uNspOiQuPQpvXsjs+Nd1ur3jglg=",
         "usagesDigest": "MrVoFyJGnqGOoRAUJsFPTWEWZuxGSLr21Od8F9ExzzM=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
+          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "envoy_build_config": {
             "repoRuleId": "@@envoy+//bazel:envoy_build_config.bzl%default_envoy_build_config",
             "attributes": {}
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "envoy+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "envoy+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "envoy+",
-            "cu",
-            "envoy++wasm_cargo+cu"
-          ],
-          [
-            "envoy+",
-            "envoy_toolshed",
-            "envoy_toolshed+"
-          ],
-          [
-            "envoy+",
-            "rules_rust",
-            "rules_rust+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@envoy+//bazel:extensions.bzl%envoy_module_graph_extension": {
       "general": {
         "bzlTransitiveDigest": "iIOox5OuJtl5d9I+uNspOiQuPQpvXsjs+Nd1ur3jglg=",
         "usagesDigest": "3kZLOs4LMLPfk4sJrOzP9Uiqq6maNbEmvUx7u9y0WpU=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
+          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "envoy_mod_graph": {
             "repoRuleId": "@@envoy+//bazel:extensions.bzl%_envoy_mod_graph_repo",
@@ -1435,95 +1247,41 @@
               "lockfile": "@@envoy+//:MODULE.bazel.lock"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "envoy+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "envoy+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "envoy+",
-            "cu",
-            "envoy++wasm_cargo+cu"
-          ],
-          [
-            "envoy+",
-            "envoy_toolshed",
-            "envoy_toolshed+"
-          ],
-          [
-            "envoy+",
-            "rules_rust",
-            "rules_rust+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@envoy+//bazel:extensions.bzl%envoy_repo_extension": {
       "general": {
         "bzlTransitiveDigest": "iIOox5OuJtl5d9I+uNspOiQuPQpvXsjs+Nd1ur3jglg=",
         "usagesDigest": "UCSmFZeXnHbRzuagqpmZw1T0XhX84mI6/Buwhz7nsy4=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
+          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "envoy_repo": {
             "repoRuleId": "@@envoy+//bazel:repo.bzl%_envoy_repo",
             "attributes": {}
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "envoy+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "envoy+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "envoy+",
-            "cu",
-            "envoy++wasm_cargo+cu"
-          ],
-          [
-            "envoy+",
-            "envoy_toolshed",
-            "envoy_toolshed+"
-          ],
-          [
-            "envoy+",
-            "rules_rust",
-            "rules_rust+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@envoy+//bazel:extensions.bzl%envoy_toolchains_extension": {
       "general": {
         "bzlTransitiveDigest": "iIOox5OuJtl5d9I+uNspOiQuPQpvXsjs+Nd1ur3jglg=",
         "usagesDigest": "WY4QAn4jcr1k1UynWUX8idOJIvH/64ZyE0GQQvqAI+8=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
+          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "clang_platform": {
             "repoRuleId": "@@envoy_toolshed+//repository:utils.bzl%arch_alias",
@@ -1534,48 +1292,14 @@
               }
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "envoy+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "envoy+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "envoy+",
-            "cu",
-            "envoy++wasm_cargo+cu"
-          ],
-          [
-            "envoy+",
-            "envoy_toolshed",
-            "envoy_toolshed+"
-          ],
-          [
-            "envoy+",
-            "rules_rust",
-            "rules_rust+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@envoy_toolshed+//compile:extensions.bzl%libcxx_extension": {
       "general": {
         "bzlTransitiveDigest": "s0/r6mfqp0rXyIhom2PcbxWgVMxzxZ1h54y9ehc6UB8=",
         "usagesDigest": "KpydMUF67Thjj7dxFRyP1XfRypHyTi2PieulXg/q++8=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "llvm_libcxx_aarch64": {
             "repoRuleId": "@@envoy_toolshed+//compile:llvm_prebuilt.bzl%llvm_prebuilt",
@@ -1593,17 +1317,14 @@
               "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz"
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@envoy_toolshed+//compile:extensions.bzl%libcxx_libs_extension": {
       "general": {
         "bzlTransitiveDigest": "s0/r6mfqp0rXyIhom2PcbxWgVMxzxZ1h54y9ehc6UB8=",
         "usagesDigest": "z47Defo42ymUqFSeAV/Zd/WotswORz2XQzadP9dIQ/I=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "libcxx_libs_aarch64": {
             "repoRuleId": "@@envoy_toolshed+//compile:libcxx_libs.bzl%libcxx_libs",
@@ -1621,17 +1342,14 @@
               "arch": "x86_64"
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@envoy_toolshed+//compile:extensions.bzl%llvm_minimal_build_extension": {
       "general": {
         "bzlTransitiveDigest": "s0/r6mfqp0rXyIhom2PcbxWgVMxzxZ1h54y9ehc6UB8=",
         "usagesDigest": "jRuNylX+Wvm9FUqKjwwEVWdejsJARKKUNm6FKUUVu90=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "llvm_tarball_linux_x86_64": {
             "repoRuleId": "@@envoy_toolshed+//compile:llvm_minimal.bzl%llvm_tarball",
@@ -1660,17 +1378,14 @@
               "platform": "macOS-ARM64"
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@envoy_toolshed+//compile:extensions.bzl%llvm_minimal_extension": {
       "general": {
         "bzlTransitiveDigest": "s0/r6mfqp0rXyIhom2PcbxWgVMxzxZ1h54y9ehc6UB8=",
         "usagesDigest": "nd8zmbfX+BIKHjNpn0Uu3prvphO/8AKVvH0kNcKYxq8=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "llvm_minimal_linux_x64": {
             "repoRuleId": "@@envoy_toolshed+//compile:llvm_minimal.bzl%llvm_minimal_repo",
@@ -1696,17 +1411,14 @@
               "strip_prefix": "llvm-minimal-22.1.8-macOS-ARM64"
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@envoy_toolshed+//compile:extensions.bzl%llvm_toolchain_alias_extension": {
       "general": {
         "bzlTransitiveDigest": "s0/r6mfqp0rXyIhom2PcbxWgVMxzxZ1h54y9ehc6UB8=",
         "usagesDigest": "ey4rIkZ6GahsS/g1/IGCyj2lWRtwbbae05GdUB2uaJA=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "llvm_minimal_linux_x64": {
             "repoRuleId": "@@envoy_toolshed+//compile:llvm_minimal.bzl%llvm_minimal_repo",
@@ -1740,17 +1452,14 @@
               "minimal_macos_arm64": "@@envoy_toolshed++llvm_toolchain_alias_extension+llvm_minimal_macos_arm64//:BUILD.bazel"
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@envoy_toolshed+//compile:extensions.bzl%sanitizer_extension": {
       "general": {
         "bzlTransitiveDigest": "s0/r6mfqp0rXyIhom2PcbxWgVMxzxZ1h54y9ehc6UB8=",
         "usagesDigest": "hakpQpF46t2OQfRzm/zoeJQF2gQG+W9JVF7J4xeiVFk=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "msan_libs": {
             "repoRuleId": "@@envoy_toolshed+//compile:sanitizer_libs.bzl%msan_libs",
@@ -1766,39 +1475,29 @@
               "sha256": "3e0a7c4521a75b5b9c473d50d7fd32a9601c92c5abe8d014ac3cc4b3c915efbf"
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@envoy_toolshed+//coverage/grcov:extensions.bzl%grcov_extension": {
       "general": {
         "bzlTransitiveDigest": "SyRcRSF+Fq3fTnEFDCNdy6s7CoJ04VJDp7lP6OLpgOM=",
         "usagesDigest": "vKRLRKLTY5/jItKBUf9U/LlwpptIF7KnxaoBSXw/adU=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:envoy_toolshed+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "grcov": {
             "repoRuleId": "@@envoy_toolshed+//coverage/grcov:grcov_repository.bzl%_grcov_repo",
             "attributes": {}
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "envoy_toolshed+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@envoy_toolshed+//sysroot:extensions.bzl%sysroot_extension": {
       "general": {
         "bzlTransitiveDigest": "Cto+Uu+01yvzybeuQB+k+RQjoCWsUBYwe/NbEufaXKQ=",
         "usagesDigest": "nSDDX99vyIfwgBgpFKfFOenma3fzdgW2DxMaRUaLQuk=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "sysroot_linux_amd64": {
             "repoRuleId": "@@envoy_toolshed+//sysroot:sysroot.bzl%sysroot",
@@ -1820,17 +1519,14 @@
               "stdcc_version": "13"
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@envoy_toolshed+//v8:extensions.bzl%wee8_prebuilt_extension": {
       "general": {
         "bzlTransitiveDigest": "DYWZ7MC9Gq2WCbqzKZa1Q5rNjvVJCDGKoWGHd8U85N8=",
         "usagesDigest": "1LkYfuJ4wP9SC/50Ojzaae6XuzBMAfFxok4I2PEFUVY=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "wee8_prebuilt_x86_64": {
             "repoRuleId": "@@envoy_toolshed+//v8:wee8_prebuilt.bzl%wee8_prebuilt",
@@ -1859,28 +1555,24 @@
               "stdlib": "libcxx"
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@googleapis+//:extensions.bzl%switched_rules": {
       "general": {
         "bzlTransitiveDigest": "1ZTg77R3Ks/ksx8QMNIoTRJetbJPRlzGFlJa9hoUn+Y=",
         "usagesDigest": "LS/ccuoYlsHm7ha0dlDIBye/nlh7EWKG3q64NI22RhM=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
-        "generatedRepoSpecs": {},
-        "recordedRepoMappingEntries": []
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
       }
     },
     "@@grpc+//bazel:extensions.bzl%exec_properties": {
       "general": {
         "bzlTransitiveDigest": "C9g6ijTS6Lje+XG5c5mDmAaZaTlui4lk3BEeg1bUjFA=",
         "usagesDigest": "DxxfBGY1W38OkvKpXj7NuZtWDNWR5jqAS99gtmGPBaQ=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:grpc+,bazel_toolchains grpc++_repo_rules+bazel_toolchains"
+        ],
         "generatedRepoSpecs": {
           "grpc_custom_exec_properties": {
             "repoRuleId": "@@grpc++_repo_rules+bazel_toolchains//rules/exec_properties:exec_properties.bzl%_exec_property_sets_repository",
@@ -1888,23 +1580,16 @@
               "constants_bzl_content": "LARGE_MACHINE = {\"label:os\": \"ubuntu\", \"label:machine_size\": \"large\"}\n"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "grpc+",
-            "bazel_toolchains",
-            "grpc++_repo_rules+bazel_toolchains"
-          ]
-        ]
+        }
       }
     },
     "@@grpc-httpjson-transcoding+//:extensions.bzl%non_module_deps": {
       "general": {
         "bzlTransitiveDigest": "uHh/mUuFwB6Voj6CEKd0d2223B3VA6HTKMzGoGJxfjg=",
         "usagesDigest": "12HwAa+jGkwAa6tGGKn6vop8VOPfANQP2FiMnhV71ns=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:grpc-httpjson-transcoding+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "com_google_googleapis": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
@@ -1914,23 +1599,16 @@
               "strip_prefix": "googleapis-1d5522ad1056f16a6d593b8f3038d831e64daeea"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "grpc-httpjson-transcoding+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@grpc-httpjson-transcoding+//:googleapis_ext.bzl%googleapis_ext": {
       "general": {
         "bzlTransitiveDigest": "n+E0pdKhXBNEdjfE/AGncepD7Eh9xX07wWf4cO5og6w=",
         "usagesDigest": "Fc3I6XGHAyLwbQotH5z/MZl1mX7S7/kLiVXrDi7smjA=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:grpc-httpjson-transcoding+,com_google_googleapis grpc-httpjson-transcoding++non_module_deps+com_google_googleapis"
+        ],
         "generatedRepoSpecs": {
           "com_google_googleapis_imports": {
             "repoRuleId": "@@grpc-httpjson-transcoding++non_module_deps+com_google_googleapis//:repository_rules.bzl%switched_rules",
@@ -2091,23 +1769,14 @@
               }
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "grpc-httpjson-transcoding+",
-            "com_google_googleapis",
-            "grpc-httpjson-transcoding++non_module_deps+com_google_googleapis"
-          ]
-        ]
+        }
       }
     },
     "@@protobuf+//python/dist:system_python.bzl%system_python_extension": {
       "general": {
         "bzlTransitiveDigest": "qh0n9IrXU/xS94wxKQrG1J63zrLkA1Wy2Y3BQxptPcI=",
         "usagesDigest": "DCJhR7LPgXJ//Na7lsN0d5+HulnHLKpkspMdWCAmYDU=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "system_python": {
             "repoRuleId": "@@protobuf+//python/dist:system_python.bzl%system_python",
@@ -2115,17 +1784,21 @@
               "minimum_python_version": "3.9"
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@proxy-wasm-rust-sdk+//bazel:extensions.bzl%crates_deps": {
       "general": {
         "bzlTransitiveDigest": "0GU5F0DE7hez1e0VcDzd2/MtfJsOuymxDRNg5MWBPNA=",
         "usagesDigest": "DoeyjeHdit/bqF+1HIB6+05yHVIdzQU1NCYHuH53F8s=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:proxy-wasm-rust-sdk+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:proxy-wasm-rust-sdk+,bazel_tools bazel_tools",
+          "REPO_MAPPING:proxy-wasm-rust-sdk+,crates_vendor proxy-wasm-rust-sdk++crates_deps+crates_vendor",
+          "REPO_MAPPING:proxy-wasm-rust-sdk+,proxy_wasm_rust_sdk proxy-wasm-rust-sdk+",
+          "REPO_MAPPING:proxy-wasm-rust-sdk+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "crates_vendor": {
             "repoRuleId": "@@rules_rust+//crate_universe/private:crates_vendor.bzl%crates_vendor_remote_repository",
@@ -2276,48 +1949,16 @@
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",
           "reproducible": false
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "proxy-wasm-rust-sdk+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "proxy-wasm-rust-sdk+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "proxy-wasm-rust-sdk+",
-            "crates_vendor",
-            "proxy-wasm-rust-sdk++crates_deps+crates_vendor"
-          ],
-          [
-            "proxy-wasm-rust-sdk+",
-            "proxy_wasm_rust_sdk",
-            "proxy-wasm-rust-sdk+"
-          ],
-          [
-            "proxy-wasm-rust-sdk+",
-            "rules_rust",
-            "rules_rust+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@rules_android+//bzlmod_extensions:apksig.bzl%apksig_extension": {
       "general": {
         "bzlTransitiveDigest": "15xx/lo4VYL9KdLW0Cc94ebALMF07+XZH8dZcVU8/LI=",
         "usagesDigest": "S8lLnnZxdeYUYq3kIGhVMk0wQ9Fd6elmCskvn+SL6iw=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:rules_android+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "apksig": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
@@ -2329,23 +1970,16 @@
               "build_file": "@@rules_android+//bzlmod_extensions:apksig.BUILD"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_android+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@rules_android+//bzlmod_extensions:com_android_dex.bzl%com_android_dex_extension": {
       "general": {
         "bzlTransitiveDigest": "K0jbWcRwfM8njdIXNRjRvdApKmBfKeFLScDH+5LSSE0=",
         "usagesDigest": "0hluQmaWiWak6sVMP5L4wXhNyIwv9fw0y5JJ8lnPb1c=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:rules_android+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "com_android_dex": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
@@ -2357,147 +1991,71 @@
               "sha256": "86b4848c038bf687fadc812239cb01fb8d1d15cef3125b480a0448360992b95d"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_android+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@rules_android+//rules/android_sdk_repository:rule.bzl%android_sdk_repository_extension": {
       "general": {
         "bzlTransitiveDigest": "qHbR00gVzVzkxX+PRtv4UGcUFMtBz7TK9CNYUWH8nIE=",
         "usagesDigest": "DdCT36NleifPRDkfpNz886rJ65bO0SKTXgNDHqZ5q6w=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "androidsdk": {
             "repoRuleId": "@@rules_android+//rules/android_sdk_repository:rule.bzl%_android_sdk_repository",
             "attributes": {}
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@rules_android_ndk+//:extension.bzl%android_ndk_repository_extension": {
       "general": {
         "bzlTransitiveDigest": "j+NMXk5/a1vnDypModKL+ToEo/4o7DJeXSFhTfbJ7rI=",
         "usagesDigest": "H8xCzJYhb/6YBF88yhWmF+bAU8q+PvxjyfZ4MX3fVek=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "androidndk": {
             "repoRuleId": "@@rules_android_ndk+//:rules.bzl%android_ndk_repository",
             "attributes": {}
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@rules_apple+//apple:apple.bzl%provisioning_profile_repository_extension": {
       "general": {
         "bzlTransitiveDigest": "uTSW7CAWVch/aWLFLj1i92EX7ollVkbKiNpcZAAMLhw=",
         "usagesDigest": "M0UtNlitbFFLs0DofYpuQhw5bC9e1LQqlHUbiK6Fmxw=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:apple_support+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:bazel_tools,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_apple+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:rules_apple+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_apple+,build_bazel_apple_support apple_support+",
+          "REPO_MAPPING:rules_apple+,build_bazel_rules_swift rules_swift+",
+          "REPO_MAPPING:rules_cc+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_cc+,cc_compatibility_proxy rules_cc++compatibility_proxy+cc_compatibility_proxy",
+          "REPO_MAPPING:rules_cc+,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_cc++compatibility_proxy+cc_compatibility_proxy,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_swift+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:rules_swift+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_swift+,build_bazel_apple_support apple_support+",
+          "REPO_MAPPING:rules_swift+,build_bazel_rules_swift rules_swift+",
+          "REPO_MAPPING:rules_swift+,build_bazel_rules_swift_local_config rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+        ],
         "generatedRepoSpecs": {
           "local_provisioning_profiles": {
             "repoRuleId": "@@rules_apple+//apple/internal:local_provisioning_profiles.bzl%provisioning_profile_repository",
             "attributes": {}
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "apple_support+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "bazel_tools",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_apple+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "rules_apple+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_apple+",
-            "build_bazel_apple_support",
-            "apple_support+"
-          ],
-          [
-            "rules_apple+",
-            "build_bazel_rules_swift",
-            "rules_swift+"
-          ],
-          [
-            "rules_cc+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_cc+",
-            "cc_compatibility_proxy",
-            "rules_cc++compatibility_proxy+cc_compatibility_proxy"
-          ],
-          [
-            "rules_cc+",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_cc++compatibility_proxy+cc_compatibility_proxy",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_swift+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "rules_swift+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_swift+",
-            "build_bazel_apple_support",
-            "apple_support+"
-          ],
-          [
-            "rules_swift+",
-            "build_bazel_rules_swift",
-            "rules_swift+"
-          ],
-          [
-            "rules_swift+",
-            "build_bazel_rules_swift_local_config",
-            "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
-          ]
-        ]
+        }
       }
     },
     "@@rules_buf+//buf:extensions.bzl%buf": {
       "general": {
         "bzlTransitiveDigest": "IjW2he5lp+L/zEfsBKIilXijyHH6PC4Lf3y19MA6G4c=",
         "usagesDigest": "Qg1rLbuptbACkOJHg4/XUGk3PZu3kdJ8kvvXmQ0GRFo=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:rules_buf+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "rules_buf_toolchains": {
             "repoRuleId": "@@rules_buf+//buf/internal:toolchain.bzl%buf_download_releases",
@@ -2506,23 +2064,16 @@
               "sha256": "366ed6c11819d56e122042c18cb8dbcf012f773456821f15324c22d192dfc65c"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_buf+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@rules_detekt+//detekt:extensions.bzl%detekt": {
       "general": {
         "bzlTransitiveDigest": "HzPPG0KdkQCFyvW8Yg0p5uh3tcmJpn91yu5X+Jw8bKo=",
         "usagesDigest": "yTKTgZSxir1frlBXAR2BeYXgu0La6m/JCbot7yzhbW0=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:rules_detekt+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "detekt_cli_all": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_jar",
@@ -2533,23 +2084,14 @@
               ]
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_detekt+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@rules_m4+//m4/internal:default_toolchain_ext.bzl%default_toolchain_ext": {
       "general": {
         "bzlTransitiveDigest": "tdX+2sxsI0cUAT/hNag1pWuAZVRyakmuNkW1hjVYEqA=",
         "usagesDigest": "Ajj5C5Smb9328fDq6XiGNG7n46AVKp8cwF+3Rli07AA=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "m4_v1.4.18": {
             "repoRuleId": "@@rules_m4+//m4/rules:m4_repository.bzl%m4_repository",
@@ -2571,17 +2113,14 @@
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",
           "reproducible": false
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@rules_nodejs+//nodejs:extensions.bzl%node": {
       "general": {
         "bzlTransitiveDigest": "q44Ox2Nwogn6OsO0Xw5lhjkd/xmxkvvpwVOn5P4pmHQ=",
         "usagesDigest": "NlnQ6PAogiWN8K4JH42XrZz1/V7VpdSMmDbPCZaXC04=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "nodejs_linux_amd64": {
             "repoRuleId": "@@rules_nodejs+//nodejs:repositories.bzl%_nodejs_repositories",
@@ -2692,17 +2231,17 @@
               "user_node_repository_name": "nodejs"
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     },
     "@@rules_python+//python/uv:uv.bzl%uv": {
       "general": {
         "bzlTransitiveDigest": "ELjwPp2kLku5M3S/gpjjVjy3TwT760/zVEQ70nJreHU=",
         "usagesDigest": "LCPgc6OYAryd0HQJS9CtnCxvca1YfrjIZ67iPax2aRs=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:rules_python+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_python+,platforms platforms"
+        ],
         "generatedRepoSpecs": {
           "uv": {
             "repoRuleId": "@@rules_python+//python/uv/private:uv_toolchains_repo.bzl%uv_toolchains_repo",
@@ -2722,37 +2261,34 @@
               "toolchain_target_settings": {}
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_python+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_python+",
-            "platforms",
-            "platforms"
-          ]
-        ]
+        }
       }
     },
     "@@rules_rust+//crate_universe:extension.bzl%crate": {
       "general": {
-        "bzlTransitiveDigest": "P3MtaSkreHCxFlnhfsRCr7EY6sh74qAij+kGqugNqrU=",
+        "bzlTransitiveDigest": "59Lud8aQSeN0KE6NtzhmvQmeplPYBxHtKtbVn7O631M=",
         "usagesDigest": "PfMiM0uyhEQWNhIHICL/rPW96cuSbJ1AoWxmp+g3dhc=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {
-          "CARGO_BAZEL_DEBUG": null,
-          "CARGO_BAZEL_GENERATOR_SHA256": null,
-          "CARGO_BAZEL_GENERATOR_URL": null,
-          "CARGO_BAZEL_ISOLATED": null,
-          "CARGO_BAZEL_REPIN": null,
-          "CARGO_BAZEL_REPIN_ONLY": null,
-          "CARGO_BAZEL_TIMEOUT": null,
-          "REPIN": null
-        },
+        "recordedInputs": [
+          "ENV:CARGO_BAZEL_DEBUG \\0",
+          "ENV:CARGO_BAZEL_GENERATOR_SHA256 \\0",
+          "ENV:CARGO_BAZEL_GENERATOR_URL \\0",
+          "ENV:CARGO_BAZEL_ISOLATED \\0",
+          "ENV:CARGO_BAZEL_REPIN \\0",
+          "ENV:CARGO_BAZEL_REPIN_ONLY \\0",
+          "ENV:CARGO_BAZEL_TIMEOUT \\0",
+          "ENV:REPIN \\0",
+          "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",
+          "REPO_MAPPING:bazel_features+,bazel_features_version bazel_features++version_extension+bazel_features_version",
+          "REPO_MAPPING:rules_cc+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_cc+,cc_compatibility_proxy rules_cc++compatibility_proxy+cc_compatibility_proxy",
+          "REPO_MAPPING:rules_cc+,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_cc++compatibility_proxy+cc_compatibility_proxy,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_rust+,bazel_features bazel_features+",
+          "REPO_MAPPING:rules_rust+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_rust+,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_rust+,rules_rust rules_rust+"
+        ],
         "generatedRepoSpecs": {
           "crates": {
             "repoRuleId": "@@rules_rust+//crate_universe:extensions.bzl%_generate_repo",
@@ -3052,88 +2588,39 @@
               "build_file_content": "###############################################################################\n# @generated\n# DO NOT MODIFY: This file is auto-generated by a crate_universe tool. To \n# regenerate this file, run the following:\n#\n#     bazel mod show_repo 'protobuf'\n###############################################################################\n\nload(\"@rules_rust//cargo:defs.bzl\", \"cargo_toml_env_vars\")\n\nload(\"@rules_rust//rust:defs.bzl\", \"rust_library\")\n\n# buildifier: disable=bzl-visibility\nload(\"@rules_rust//crate_universe/private:selects.bzl\", \"selects\")\n\npackage(default_visibility = [\"//visibility:public\"])\n\ncargo_toml_env_vars(\n    name = \"cargo_toml_env_vars\",\n    src = \"Cargo.toml\",\n)\n\nrust_library(\n    name = \"unicode_ident\",\n    compile_data = glob(\n        allow_empty = True,\n        include = [\"**\"],\n        exclude = [\n            \"**/* *\",\n            \".tmp_git_root/**/*\",\n            \"BUILD\",\n            \"BUILD.bazel\",\n            \"WORKSPACE\",\n            \"WORKSPACE.bazel\",\n        ],\n    ),\n    crate_root = \"src/lib.rs\",\n    edition = \"2021\",\n    rustc_env_files = [\n        \":cargo_toml_env_vars\",\n    ],\n    rustc_flags = [\n        \"--cap-lints=allow\",\n    ],\n    srcs = glob(\n        allow_empty = True,\n        include = [\"**/*.rs\"],\n    ),\n    tags = [\n        \"cargo-bazel\",\n        \"crate-name=unicode-ident\",\n        \"manual\",\n        \"noclippy\",\n        \"norustfmt\",\n    ],\n    target_compatible_with = select({\n        \"@rules_rust//rust/platform:aarch64-apple-darwin\": [],\n        \"@rules_rust//rust/platform:aarch64-unknown-linux-gnu\": [],\n        \"@rules_rust//rust/platform:wasm32-unknown-unknown\": [],\n        \"@rules_rust//rust/platform:wasm32-wasip1\": [],\n        \"@rules_rust//rust/platform:x86_64-pc-windows-msvc\": [],\n        \"@rules_rust//rust/platform:x86_64-unknown-linux-gnu\": [],\n        \"@rules_rust//rust/platform:x86_64-unknown-nixos-gnu\": [],\n        \"//conditions:default\": [\"@platforms//:incompatible\"],\n    }),\n    version = \"1.0.26\",\n)\n"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "bazel_features+",
-            "bazel_features_globals",
-            "bazel_features++version_extension+bazel_features_globals"
-          ],
-          [
-            "bazel_features+",
-            "bazel_features_version",
-            "bazel_features++version_extension+bazel_features_version"
-          ],
-          [
-            "rules_cc+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_cc+",
-            "cc_compatibility_proxy",
-            "rules_cc++compatibility_proxy+cc_compatibility_proxy"
-          ],
-          [
-            "rules_cc+",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_cc++compatibility_proxy+cc_compatibility_proxy",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_features",
-            "bazel_features+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_rust+",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_rust+",
-            "rules_rust",
-            "rules_rust+"
-          ]
-        ]
+        }
       }
     },
     "@@rules_rust+//crate_universe:extensions.bzl%crate": {
       "general": {
-        "bzlTransitiveDigest": "lXh8d/GctOXzEgEa+21Oh2NOynLv6d31SLhnD50iOcw=",
+        "bzlTransitiveDigest": "U4gUVsgQSM9piDx2NrFunInyFAFKuSmSuCdOM4zV/BI=",
         "usagesDigest": "xO1WUIvpoQ+VssRgvNMiSSHRhEpnj/21EFIaXoFOxg0=",
-        "recordedFileInputs": {
-          "@@envoy+//Cargo.lock": "5bfe56b103b1da3590fe75ed5ebcfe19fa3ec483f19c4d9a3b356fcbd983f1a7",
-          "@@envoy+//Cargo.toml": "c9efddb99563255164b111971f35618643cbd15948caa9a29199cc3fabb2b7fe",
-          "@@sq+//Cargo.lock": "895825c3c5231254147ce308ba39579e74691b1ed559d9f8db59cb16febda46d",
-          "@@sq+//Cargo.toml": "c8ae9714158e67aec183942e36cf5d14ad1868fdb6472b50fbec9dbf8f9bdb43",
-          "@@wasmtime+//Cargo.lock": "23dc066229af684ccd62f89b98775c49beb79d3add7f4f70bd3b8dd9e01037be"
-        },
-        "recordedDirentsInputs": {},
-        "envVariables": {
-          "CARGO_BAZEL_DEBUG": null,
-          "CARGO_BAZEL_GENERATOR_SHA256": null,
-          "CARGO_BAZEL_GENERATOR_URL": null,
-          "CARGO_BAZEL_ISOLATED": null,
-          "CARGO_BAZEL_REPIN": null,
-          "CARGO_BAZEL_REPIN_ONLY": null,
-          "CARGO_BAZEL_TIMEOUT": null,
-          "REPIN": null
-        },
+        "recordedInputs": [
+          "ENV:CARGO_BAZEL_DEBUG \\0",
+          "ENV:CARGO_BAZEL_GENERATOR_SHA256 \\0",
+          "ENV:CARGO_BAZEL_GENERATOR_URL \\0",
+          "ENV:CARGO_BAZEL_ISOLATED \\0",
+          "ENV:CARGO_BAZEL_REPIN \\0",
+          "ENV:CARGO_BAZEL_REPIN_ONLY \\0",
+          "ENV:CARGO_BAZEL_TIMEOUT \\0",
+          "ENV:REPIN \\0",
+          "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",
+          "REPO_MAPPING:bazel_features+,bazel_features_version bazel_features++version_extension+bazel_features_version",
+          "REPO_MAPPING:rules_cc+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_cc+,cc_compatibility_proxy rules_cc++compatibility_proxy+cc_compatibility_proxy",
+          "REPO_MAPPING:rules_cc+,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_cc++compatibility_proxy+cc_compatibility_proxy,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_rust+,bazel_features bazel_features+",
+          "REPO_MAPPING:rules_rust+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_rust+,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_rust+,rules_rust rules_rust+",
+          "FILE:@@envoy+//Cargo.lock 5bfe56b103b1da3590fe75ed5ebcfe19fa3ec483f19c4d9a3b356fcbd983f1a7",
+          "FILE:@@envoy+//Cargo.toml c9efddb99563255164b111971f35618643cbd15948caa9a29199cc3fabb2b7fe",
+          "FILE:@@sq+//Cargo.lock 895825c3c5231254147ce308ba39579e74691b1ed559d9f8db59cb16febda46d",
+          "FILE:@@sq+//Cargo.toml c8ae9714158e67aec183942e36cf5d14ad1868fdb6472b50fbec9dbf8f9bdb43",
+          "FILE:@@wasmtime+//Cargo.lock 23dc066229af684ccd62f89b98775c49beb79d3add7f4f70bd3b8dd9e01037be"
+        ],
         "generatedRepoSpecs": {
           "envoy_rust_crate_index": {
             "repoRuleId": "@@rules_rust+//crate_universe:extensions.bzl%_generate_repo",
@@ -17927,73 +17414,28 @@
               "build_file_content": "###############################################################################\n# @generated\n# DO NOT MODIFY: This file is auto-generated by a crate_universe tool. To \n# regenerate this file, run the following:\n#\n#     bazel mod show_repo 'wasmtime'\n###############################################################################\n\nload(\"@rules_rust//cargo:defs.bzl\", \"cargo_toml_env_vars\")\n\nload(\"@rules_rust//rust:defs.bzl\", \"rust_library\")\n\n# buildifier: disable=bzl-visibility\nload(\"@rules_rust//crate_universe/private:selects.bzl\", \"selects\")\n\npackage(default_visibility = [\"//visibility:public\"])\n\ncargo_toml_env_vars(\n    name = \"cargo_toml_env_vars\",\n    src = \"Cargo.toml\",\n)\n\nrust_library(\n    name = \"windows_sys\",\n    deps = [\n        \"@cu__windows-link-0.2.1//:windows_link\",\n    ],\n    compile_data = glob(\n        allow_empty = True,\n        include = [\"**\"],\n        exclude = [\n            \"**/* *\",\n            \".tmp_git_root/**/*\",\n            \"BUILD\",\n            \"BUILD.bazel\",\n            \"WORKSPACE\",\n            \"WORKSPACE.bazel\",\n        ],\n    ),\n    crate_features = [\n        \"Win32\",\n        \"Win32_Foundation\",\n        \"Win32_Security\",\n        \"Win32_Storage\",\n        \"Win32_Storage_FileSystem\",\n        \"Win32_System\",\n        \"Win32_System_Diagnostics\",\n        \"Win32_System_Diagnostics_Debug\",\n        \"Win32_System_Kernel\",\n        \"Win32_System_Memory\",\n        \"Win32_System_SystemInformation\",\n        \"Win32_System_Threading\",\n        \"default\",\n    ],\n    crate_root = \"src/lib.rs\",\n    edition = \"2021\",\n    rustc_env_files = [\n        \":cargo_toml_env_vars\",\n    ],\n    rustc_flags = [\n        \"--cap-lints=allow\",\n    ],\n    srcs = glob(\n        allow_empty = True,\n        include = [\"**/*.rs\"],\n    ),\n    tags = [\n        \"cargo-bazel\",\n        \"crate-name=windows-sys\",\n        \"manual\",\n        \"noclippy\",\n        \"norustfmt\",\n    ],\n    target_compatible_with = select({\n        \"@rules_rust//rust/platform:aarch64-apple-darwin\": [],\n        \"@rules_rust//rust/platform:aarch64-unknown-linux-gnu\": [],\n        \"@rules_rust//rust/platform:wasm32-unknown-unknown\": [],\n        \"@rules_rust//rust/platform:wasm32-wasip1\": [],\n        \"@rules_rust//rust/platform:x86_64-pc-windows-msvc\": [],\n        \"@rules_rust//rust/platform:x86_64-unknown-linux-gnu\": [],\n        \"@rules_rust//rust/platform:x86_64-unknown-nixos-gnu\": [],\n        \"//conditions:default\": [\"@platforms//:incompatible\"],\n    }),\n    version = \"0.61.2\",\n)\n"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "bazel_features+",
-            "bazel_features_globals",
-            "bazel_features++version_extension+bazel_features_globals"
-          ],
-          [
-            "bazel_features+",
-            "bazel_features_version",
-            "bazel_features++version_extension+bazel_features_version"
-          ],
-          [
-            "rules_cc+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_cc+",
-            "cc_compatibility_proxy",
-            "rules_cc++compatibility_proxy+cc_compatibility_proxy"
-          ],
-          [
-            "rules_cc+",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_cc++compatibility_proxy+cc_compatibility_proxy",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_features",
-            "bazel_features+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_rust+",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_rust+",
-            "rules_rust",
-            "rules_rust+"
-          ]
-        ]
+        }
       }
     },
     "@@rules_rust+//crate_universe/private:internal_extensions.bzl%cu_nr": {
       "general": {
-        "bzlTransitiveDigest": "uPJVfb/0w8aYbzGhZ5GkNURspN9xpSeDMSfC0yUKFzc=",
+        "bzlTransitiveDigest": "YxRMtG0Q3thxYmm4iFQWhdp9B9IJWCdy1e52UbN2zns=",
         "usagesDigest": "xySaNeW2GV9NA5IxiSWIpedYsXF/b2CM/Du3W/pvtUY=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",
+          "REPO_MAPPING:bazel_features+,bazel_features_version bazel_features++version_extension+bazel_features_version",
+          "REPO_MAPPING:rules_cc+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_cc+,cc_compatibility_proxy rules_cc++compatibility_proxy+cc_compatibility_proxy",
+          "REPO_MAPPING:rules_cc+,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_cc++compatibility_proxy+cc_compatibility_proxy,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_rust+,bazel_features bazel_features+",
+          "REPO_MAPPING:rules_rust+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_rust+,cui rules_rust++cu+cui",
+          "REPO_MAPPING:rules_rust+,rrc rules_rust++i2+rrc",
+          "REPO_MAPPING:rules_rust+,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_rust+,rules_rust rules_rust+"
+        ],
         "generatedRepoSpecs": {
           "cargo_bazel_bootstrap": {
             "repoRuleId": "@@rules_rust+//cargo/private:cargo_bootstrap.bzl%cargo_bootstrap_repository",
@@ -18069,83 +17511,16 @@
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",
           "reproducible": false
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "bazel_features+",
-            "bazel_features_globals",
-            "bazel_features++version_extension+bazel_features_globals"
-          ],
-          [
-            "bazel_features+",
-            "bazel_features_version",
-            "bazel_features++version_extension+bazel_features_version"
-          ],
-          [
-            "rules_cc+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_cc+",
-            "cc_compatibility_proxy",
-            "rules_cc++compatibility_proxy+cc_compatibility_proxy"
-          ],
-          [
-            "rules_cc+",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_cc++compatibility_proxy+cc_compatibility_proxy",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_features",
-            "bazel_features+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_rust+",
-            "cui",
-            "rules_rust++cu+cui"
-          ],
-          [
-            "rules_rust+",
-            "rrc",
-            "rules_rust++i2+rrc"
-          ],
-          [
-            "rules_rust+",
-            "rules_cc",
-            "rules_cc+"
-          ],
-          [
-            "rules_rust+",
-            "rules_rust",
-            "rules_rust+"
-          ]
-        ]
+        }
       }
     },
     "@@rules_swift+//swift:extensions.bzl%non_module_deps": {
       "general": {
         "bzlTransitiveDigest": "VG6/uQ4wBxYFb7HQ5HW8YgrUV9lsniIUajTvEQUXkIk=",
         "usagesDigest": "9w18ec4dj90mX/JqpR2tBU2YVc1GU9yNxi/d7q6lLVA=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:rules_swift+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "com_github_apple_swift_protobuf": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
@@ -18283,45 +17658,31 @@
             "repoRuleId": "@@rules_swift+//swift/internal:swift_autoconfiguration.bzl%swift_autoconfiguration",
             "attributes": {}
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_swift+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@rules_xcodeproj+//xcodeproj:extensions.bzl%internal": {
       "general": {
         "bzlTransitiveDigest": "vlNGg1OkmN92UbnrVW4A+qXbCai/lBzEsIQOfJhdzbY=",
         "usagesDigest": "uPMxo60oQoyKBSZTHQ1QGc+0ZwUQkVBRF1K7F7nGYoc=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:rules_xcodeproj+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "rules_xcodeproj_generated": {
             "repoRuleId": "@@rules_xcodeproj+//xcodeproj:repositories.bzl%generated_files_repo",
             "attributes": {}
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_xcodeproj+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@rules_xcodeproj+//xcodeproj:extensions.bzl%non_module_deps": {
       "general": {
         "bzlTransitiveDigest": "vlNGg1OkmN92UbnrVW4A+qXbCai/lBzEsIQOfJhdzbY=",
         "usagesDigest": "JAzrOE1SvjrAeftO7Nvdjp/AsL1Fv1NGCEZU8QiVvLY=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:rules_xcodeproj+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "rules_xcodeproj_index_import": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
@@ -18331,23 +17692,16 @@
               "url": "https://github.com/MobileNativeFoundation/index-import/releases/download/5.8.0.1/index-import.tar.gz"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_xcodeproj+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@sq+//:prebuilt.bzl%sq_prebuilt": {
       "general": {
         "bzlTransitiveDigest": "Brh+JbNjwBYIgQa6N0NTbAfleQPFWSz34l4e+ZAZrH0=",
         "usagesDigest": "Y38Mivug56JOowBlryToNqBqz57aq3rGvGmiRZk6H2U=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [
+          "REPO_MAPPING:sq+,bazel_tools bazel_tools"
+        ],
         "generatedRepoSpecs": {
           "sq_prebuilt_linux_x86_64": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
@@ -18371,23 +17725,14 @@
               "type": "tar.zst"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "sq+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        }
       }
     },
     "@@toolchains_llvm+//toolchain/extensions:distributions.bzl%llvm_distributions": {
       "general": {
         "bzlTransitiveDigest": "UjfWy+RWdwj4BIiZFchPZA3MIBFUkIKzj19B8/LDGko=",
         "usagesDigest": "RMQmnjhQu0/s1mluVFIa5TjoFcqct9XtWtNP5Bjy1Ho=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "recordedInputs": [],
         "generatedRepoSpecs": {
           "llvm_distributions_data": {
             "repoRuleId": "@@toolchains_llvm+//toolchain/internal:distributions_repo.bzl%llvm_distributions_repo",
@@ -18400,8 +17745,7 @@
               ]
             }
           }
-        },
-        "recordedRepoMappingEntries": []
+        }
       }
     }
   },
@@ -22102,5 +21446,6 @@
       },
       "fact_version": "v1"
     }
-  }
+  },
+  "factsVersions": {}
 }
