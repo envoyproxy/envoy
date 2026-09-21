@@ -28,6 +28,13 @@ public:
   virtual std::vector<uint8_t> getSha256Digest(const Buffer::Instance& buffer) PURE;
 
   /**
+   * Computes the SHA-256 digest of a contiguous chunk of data.
+   * @param text the data to digest.
+   * @return a vector of bytes for the computed digest.
+   */
+  virtual std::vector<uint8_t> getSha256Digest(absl::string_view text) PURE;
+
+  /**
    * Computes the SHA-256 HMAC for a given key and message.
    * @param key the HMAC function key.
    * @param message string_view message data for the HMAC function.

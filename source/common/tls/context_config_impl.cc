@@ -31,10 +31,9 @@ SINGLETON_MANAGER_REGISTRATION(cipher_suites_pool);
 namespace {
 
 std::string generateCertificateHash(const std::string& cert_data) {
-  Buffer::OwnedImpl buffer(cert_data);
-
   // Calculate SHA-256 hash of cert data and take first 8 chars
-  auto hash = Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer));
+  auto hash =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(cert_data));
 
   return hash.substr(0, 8);
 }
