@@ -14,9 +14,9 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "absl/strings/match.h"
@@ -94,7 +94,7 @@ bool contentEncodingIsIdentity(const Http::ResponseHeaderMap& headers) {
 // status-only and publishes as FAILED.
 envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degraded) {
   envoy::data::ai::v3::TokenUsage typed;
-  typed.set_api_protocol(protocolToProto(usage.api_protocol));
+  typed.set_llm_protocol(protocolToProto(usage.llm_protocol));
   if (!usage.model.empty()) {
     typed.set_model(usage.model);
   }
@@ -144,8 +144,8 @@ FilterConfig::FilterConfig(
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
           proto.response_handling().token_usage().include_unconfigured_routes()),
-      default_api_protocol_(
-          protocolFromProto(proto.response_handling().token_usage().default_api_protocol())),
+      default_llm_protocol_(
+          protocolFromProto(proto.response_handling().token_usage().default_llm_protocol())),
       metadata_namespace_(proto.response_handling().token_usage().metadata_namespace().empty()
                               ? std::string(DefaultTokenUsageNamespace)
                               : proto.response_handling().token_usage().metadata_namespace()),
@@ -227,7 +227,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     route_request_protocol_ = route_config->requestProtocol();
     if (route_has_request_) {
       ENVOY_LOG(debug, "ai_protocol_manager: route declares request API {}",
-                apiProtocolName(route_request_protocol_));
+                llmProtocolName(route_request_protocol_));
     }
   }
 
@@ -518,9 +518,9 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // The wire API to extract against, in precedence order: the route's declared
   // response API, the route's declared request API, the configured fallback;
   // Unspecified auto-detects from the response shape.
-  ApiProtocol protocol = config_->defaultApiProtocol();
+  LLMProtocol protocol = config_->defaultLLMProtocol();
   if (route_config != nullptr &&
-      route_config->effectiveResponseProtocol() != ApiProtocol::Unspecified) {
+      route_config->effectiveResponseProtocol() != LLMProtocol::Unspecified) {
     protocol = route_config->effectiveResponseProtocol();
   }
 
@@ -607,7 +607,7 @@ bool AiProtocolManagerFilter::finalizeResponseHandling() {
 
   // Convert the finalized accumulator once into the authoritative typed
   // record (envoy.data.ai.v3.TokenUsage). When extraction failed outright the
-  // record is status-only (api_protocol/model/extraction_status, no counts),
+  // record is status-only (llm_protocol/model/extraction_status, no counts),
   // letting consumers distinguish "failed to extract" from "no usage
   // supplied". Only typed metadata is published: consumers with full-fidelity
   // needs (ext_proc typed forwarding, filters reading typed metadata) share
