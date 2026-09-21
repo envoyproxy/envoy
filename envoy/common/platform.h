@@ -70,10 +70,14 @@ typedef DWORD signal_t;            // NOLINT(modernize-use-using)
 typedef unsigned int sa_family_t;
 
 // Posix structure for scatter/gather I/O, not present on Windows.
+#ifndef _IOVEC_DEFINED_
+#define _IOVEC_DEFINED_
+#define _STRUCT_IOVEC
 struct iovec {
   void* iov_base;
   size_t iov_len;
 };
+#endif
 
 // Posix structure for describing messages sent by 'sendmsg` and received by
 // 'recvmsg'
