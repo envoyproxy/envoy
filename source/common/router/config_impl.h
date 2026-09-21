@@ -555,22 +555,16 @@ struct VirtualHostInitializationObject : Logger::Loggable<Logger::Id::router> {
     if (!vhost_proto_) {
       return nullptr;
     }
-    try {
-      absl::Status creation_status = absl::OkStatus();
-      auto vhost = std::make_shared<VirtualHostImpl>(
-          *vhost_proto_, global_route_config_, factory_context_, *vhost_stats_scope_, validator_,
-          init_manager_, /*validate_clusters=*/false, creation_status);
-      if (!creation_status.ok()) {
-        ENVOY_LOG(error, "Failed to initialize deferred virtual host '{}': {}",
-                  vhost_proto_->name(), creation_status.message());
-        return nullptr;
-      }
-      return vhost;
-    } catch (const EnvoyException& e) {
-      ENVOY_LOG(error, "Exception initializing deferred virtual host '{}': {}",
-                vhost_proto_->name(), e.what());
+    absl::Status creation_status = absl::OkStatus();
+    auto vhost = std::make_shared<VirtualHostImpl>(
+        *vhost_proto_, global_route_config_, factory_context_, *vhost_stats_scope_, validator_,
+        init_manager_, /*validate_clusters=*/false, creation_status);
+    if (!creation_status.ok()) {
+      ENVOY_LOG(error, "Failed to initialize deferred virtual host '{}': {}", vhost_proto_->name(),
+                creation_status.message());
       return nullptr;
     }
+    return vhost;
   }
 
   const ArenaWrappedProto<envoy::config::route::v3::VirtualHost> vhost_proto_;
