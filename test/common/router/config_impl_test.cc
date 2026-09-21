@@ -13380,7 +13380,7 @@ TEST_F(RouteMatcherTest, DeferredVirtualHostValidationRejectsMissingClusterSpeci
 
   const std::string yaml = R"EOF(
 virtual_hosts:
-- name: csp_vhost
+- name: vhost
   domains: ["csp.example.com"]
   routes:
   - match: { prefix: "/" }
@@ -13401,11 +13401,11 @@ virtual_hosts:
 - name: isolated_vhost
   domains: ["isolated.example.com"]
   virtual_clusters:
-  - name: vcluster1
+  - name: cluster1
     headers:
     - name: ":path"
       string_match:
-        prefix: "/vcluster"
+        prefix: "/cluster"
   routes:
   - match: { prefix: "/" }
     route: { cluster: "cluster_isolated" }
@@ -13424,7 +13424,7 @@ virtual_hosts:
 
   // First request should lazily instantiate the virtual host and succeed
   Http::TestRequestHeaderMapImpl headers =
-      genHeaders("isolated.example.com", "/vcluster/test", "GET");
+      genHeaders("isolated.example.com", "/cluster/test", "GET");
   const auto route = config.route(headers, 0);
   ASSERT_NE(nullptr, route.route);
   EXPECT_EQ("isolated_vhost", route->virtualHost().name());
@@ -13595,7 +13595,7 @@ TEST_F(RouteMatcherTest, DeferredVirtualHostFastPathSafetyInvariant) {
   factory_context_.cluster_manager_.initializeClusters(
       {"cluster_fast_path", "shadow_cluster_fast_path"}, {});
 
-  const std::vector<std::string> valid_fast_path_yamls = {
+  const std::vector<std::string> valid_fast_path_yaml = {
       // 1. Basic prefix route
       R"EOF(
 virtual_hosts:
@@ -13672,7 +13672,7 @@ virtual_hosts:
 )EOF",
   };
 
-  for (const auto& yaml : valid_fast_path_yamls) {
+  for (const auto& yaml : valid_fast_path_yaml) {
     auto route_config = parseRouteConfigurationFromYaml(yaml);
     const auto& vhost_proto = route_config.virtual_hosts(0);
 
