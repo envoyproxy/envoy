@@ -1,0 +1,25 @@
+events {
+  downstream_send_event {
+    h2_frames { settings { flags: NONE } }
+    h2_frames { settings { flags: ACK } }
+    h2_frames {
+      metadata {
+        stream_index: 0
+        metadata { metadata { key: "a" value: "1" } }
+      }
+    }
+    h2_frames {
+      metadata {
+        flags: END_METADATA
+        stream_index: 0
+        metadata { metadata { key: "b" value: "2" } }
+      }
+    }
+  }
+}
+events {
+  upstream_send_event {
+    h2_frames { settings { flags: NONE } }
+    h2_frames { settings { flags: ACK } }
+  }
+}
