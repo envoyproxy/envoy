@@ -133,7 +133,8 @@
     "https://bcr.bazel.build/modules/boringssl/0.20260413.0/source.json": "4e954245542ed32b91b08d25af1a54f1df29be2e1e9c09b94eead351e3cef36b",
     "https://bcr.bazel.build/modules/brotli/1.1.0/MODULE.bazel": "3b5b90488995183419c4b5c9b063a164f6c0bc4d0d6b40550a612a5e860cc0fe",
     "https://bcr.bazel.build/modules/brotli/1.2.0.bcr.1/MODULE.bazel": "945ec1b6fbb979b493424a5938b38590db3149d4290d45de579a9b37212e2b92",
-    "https://bcr.bazel.build/modules/brotli/1.2.0.bcr.1/source.json": "7d93f86e45a24ad8440e47c23eabafaa5fbe1ff821a5147438282c3f989c91b7",
+    "https://bcr.bazel.build/modules/brotli/1.2.0.bcr.3/MODULE.bazel": "9a69f0de5e6ae550c4b8faca2dc6d4b2c70a5e1ffbb45caacfee44b3dea78283",
+    "https://bcr.bazel.build/modules/brotli/1.2.0.bcr.3/source.json": "2248bf1d5239c75a041f8ea7f49a820b804c3f2c6c2437444dc9295e6ef84826",
     "https://bcr.bazel.build/modules/buildifier_prebuilt/8.2.1.1/MODULE.bazel": "2e2e306add04b7c7cd21e73c9293dcbd7528a08a84338e919036f402eb6b1e2e",
     "https://bcr.bazel.build/modules/buildifier_prebuilt/8.2.1.1/source.json": "4c86fd3a384a09613c2213fb1f71562d6d70471977e6e81173e6625fd6ce53bc",
     "https://bcr.bazel.build/modules/buildozer/7.1.2/MODULE.bazel": "2e8dd40ede9c454042645fd8d8d0cd1527966aa5c919de86661e62953cd73d84",
@@ -3001,7 +3002,7 @@
           "@@//test/extensions/dynamic_modules/test_data/rust/Cargo.toml": "07a18cf38869528c43a05ea3c309273309b6fcbcef7df3b55109aa26d1596227",
           "@@sq+//Cargo.lock": "895825c3c5231254147ce308ba39579e74691b1ed559d9f8db59cb16febda46d",
           "@@sq+//Cargo.toml": "c8ae9714158e67aec183942e36cf5d14ad1868fdb6472b50fbec9dbf8f9bdb43",
-          "@@wasmtime+//Cargo.lock": "fe41703e177e8da68355f6bdc22054daf6b6b2c6b32effe1fc1ce8c9c705e52d"
+          "@@wasmtime+//Cargo.lock": "23dc066229af684ccd62f89b98775c49beb79d3add7f4f70bd3b8dd9e01037be"
         },
         "recordedDirentsInputs": {},
         "envVariables": {
