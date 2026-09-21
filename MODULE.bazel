@@ -133,7 +133,7 @@ bazel_dep(name = "rules_fuzzing", version = "0.6.0")
 fuzzing_ext = use_extension("@rules_fuzzing//fuzzing/private:extensions.bzl", "non_module_dependencies")
 use_repo(fuzzing_ext, "rules_fuzzing_oss_fuzz")
 
-bazel_dep(name = "rules_shellcheck", version = "0.4.0", dev_dependency = True, repo_name = "shellcheck")
+bazel_dep(name = "rules_shellcheck", version = "0.6.4", dev_dependency = True, repo_name = "shellcheck")
 
 ####################################################################################
 # deps: Overrides
