@@ -63,12 +63,10 @@ public:
    *         raise that follows it; every caller sets before it reads.
    */
   static LuaErrorMessage& threadLocal() {
-    // Trivial default construction and destruction make this a plain zero-initialized block of
-    // thread-local storage: no initialization guard is checked on the way in, nothing is
-    // registered to run at thread exit, and the buffer is not cleared on the success path.
-    static_assert(std::is_trivially_default_constructible<LuaErrorMessage>::value,
-                  "LuaErrorMessage must be trivially default constructible so that the thread "
-                  "local holder needs no initialization guard and starts out zeroed");
+    // The class has no user-provided constructor or destructor, so this is a plain zero-initialized
+    // block of thread-local storage: no initialization guard is checked on the way in, nothing is
+    // registered to run at thread exit, and the buffer is not cleared on the success path. Keep it
+    // that way -- adding a member with an initializer would make every access pay for a guard.
     static thread_local LuaErrorMessage instance;
     return instance;
   }
