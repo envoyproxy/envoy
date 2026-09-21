@@ -1184,8 +1184,10 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
 // Trigger pipe used to wake up accept() when a connection is established.
 void ReverseConnectionIOHandle::createTriggerPipe() {
   ENVOY_LOG(debug, "reverse_tunnel: Creating trigger pipe for single-byte mechanism");
-  int pipe_fds[2];
-  if (pipe(pipe_fds) == -1) {
+  os_fd_t pipe_fds[2];
+  if (Api::OsSysCallsSingleton::get()
+          .socketpair(ENVOY_DEFAULT_PIPE_TYPE, SOCK_STREAM, 0, pipe_fds)
+          .return_value_ == -1) {
     ENVOY_LOG(error, "Failed to create trigger pipe: {}", errorDetails(errno));
     trigger_pipe_read_fd_ = -1;
     trigger_pipe_write_fd_ = -1;
@@ -1194,14 +1196,8 @@ void ReverseConnectionIOHandle::createTriggerPipe() {
   trigger_pipe_read_fd_ = pipe_fds[0];
   trigger_pipe_write_fd_ = pipe_fds[1];
   // Make both ends non-blocking.
-  int flags = fcntl(trigger_pipe_write_fd_, F_GETFL, 0);
-  if (flags != -1) {
-    fcntl(trigger_pipe_write_fd_, F_SETFL, flags | O_NONBLOCK);
-  }
-  flags = fcntl(trigger_pipe_read_fd_, F_GETFL, 0);
-  if (flags != -1) {
-    fcntl(trigger_pipe_read_fd_, F_SETFL, flags | O_NONBLOCK);
-  }
+  Api::OsSysCallsSingleton::get().setsocketblocking(trigger_pipe_write_fd_, false);
+  Api::OsSysCallsSingleton::get().setsocketblocking(trigger_pipe_read_fd_, false);
   ENVOY_LOG(debug, "reverse_tunnel: Created trigger pipe: read_fd={}, write_fd={}",
             trigger_pipe_read_fd_, trigger_pipe_write_fd_);
 }

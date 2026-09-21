@@ -46,28 +46,20 @@ using TransportSockets::Tls::MockSslHandshakerImpl;
 
 namespace {
 
-// The trigger pipe is created with pipe(), so its ends are ordinary file descriptors rather
-// than sockets. Windows spells the POSIX file I/O functions with a leading underscore, so
-// route the raw pipe I/O in these tests through small wrappers.
+// The trigger "pipe" is created with socketpair(), so on Windows its descriptors are SOCKETs
+// rather than CRT file descriptors, and ::read/::write/::close cannot operate on them. These
+// helpers use the socket APIs, which behave identically on POSIX.
 ssize_t triggerPipeWrite(int fd, const void* buffer, size_t length) {
-#ifdef WIN32
-  return ::_write(fd, buffer, static_cast<unsigned int>(length));
-#else
-  return ::write(fd, buffer, length);
-#endif
+  return ::send(fd, static_cast<const char*>(buffer), static_cast<int>(length), 0);
 }
 
 ssize_t triggerPipeRead(int fd, void* buffer, size_t length) {
-#ifdef WIN32
-  return ::_read(fd, buffer, static_cast<unsigned int>(length));
-#else
-  return ::read(fd, buffer, length);
-#endif
+  return ::recv(fd, static_cast<char*>(buffer), static_cast<int>(length), 0);
 }
 
 void triggerPipeClose(int fd) {
 #ifdef WIN32
-  ::_close(fd);
+  ::closesocket(fd);
 #else
   ::close(fd);
 #endif
