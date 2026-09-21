@@ -4,7 +4,6 @@
 #include <fcntl.h>
 #include <io.h>
 #include <sys/stat.h>
-#include <ws2tcpip.h>
 
 #include <cstdint>
 #include <string>
