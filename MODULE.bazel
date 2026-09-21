@@ -128,10 +128,7 @@ bazel_dep(name = "zstd", version = "1.5.7.bcr.1")
 
 bazel_dep(name = "google_benchmark", version = "1.9.5", dev_dependency = True, repo_name = "benchmark")
 
-bazel_dep(name = "rules_fuzzing", version = "0.6.0")
-
-fuzzing_ext = use_extension("@rules_fuzzing//fuzzing/private:extensions.bzl", "non_module_dependencies")
-use_repo(fuzzing_ext, "rules_fuzzing_oss_fuzz")
+bazel_dep(name = "rules_fuzzing", version = "0.8.0", dev_dependency = True)
 
 bazel_dep(name = "rules_shellcheck", version = "0.4.0", dev_dependency = True, repo_name = "shellcheck")
 
@@ -303,12 +300,15 @@ pip.parse(
     python_version = "3.12",
     requirements_lock = "//tools/base:requirements.txt",
 )
-pip.parse(
+use_repo(pip, "base_pip3")
+
+pip_dev = use_extension("@rules_python//python/extensions:pip.bzl", "pip", dev_dependency = True)
+pip_dev.parse(
     hub_name = "fuzzing_pip3",
     python_version = "3.12",
     requirements_lock = "@rules_fuzzing//fuzzing:requirements.txt",
 )
-use_repo(pip, "base_pip3", "fuzzing_pip3")
+use_repo(pip_dev, "fuzzing_pip3")
 
 # Golang
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk", dev_dependency = True)
@@ -414,6 +414,13 @@ buf.toolchains(
 use_repo(buf, "rules_buf_toolchains")
 
 register_toolchains("@envoy_toolshed//pgp:sq_toolchain")
+
+####################################################################################
+# repo: Extensions (external)
+####################################################################################
+
+fuzzing_ext = use_extension("@rules_fuzzing//fuzzing/private:extensions.bzl", "non_module_dependencies", dev_dependency = True)
+use_repo(fuzzing_ext, "rules_fuzzing_oss_fuzz")
 
 ####################################################################################
 # repo: Extensions
