@@ -1320,7 +1320,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_build_config_ext": {
       "general": {
-        "bzlTransitiveDigest": "TUUonqmyB5GOg7aSgDf7KkmkOPPaVqtRvKI5H/FjiEo=",
+        "bzlTransitiveDigest": "iIOox5OuJtl5d9I+uNspOiQuPQpvXsjs+Nd1ur3jglg=",
         "usagesDigest": "te+H5lDECVAouozDM6kj1yoE98SbvZqpczBzyouQeTs=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -1349,11 +1349,6 @@
           ],
           [
             "envoy+",
-            "envoy",
-            "envoy+"
-          ],
-          [
-            "envoy+",
             "envoy_toolshed",
             "envoy_toolshed+"
           ],
@@ -1372,7 +1367,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_module_graph_extension": {
       "general": {
-        "bzlTransitiveDigest": "TUUonqmyB5GOg7aSgDf7KkmkOPPaVqtRvKI5H/FjiEo=",
+        "bzlTransitiveDigest": "iIOox5OuJtl5d9I+uNspOiQuPQpvXsjs+Nd1ur3jglg=",
         "usagesDigest": "3kZLOs4LMLPfk4sJrOzP9Uiqq6maNbEmvUx7u9y0WpU=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -1403,11 +1398,6 @@
           ],
           [
             "envoy+",
-            "envoy",
-            "envoy+"
-          ],
-          [
-            "envoy+",
             "envoy_toolshed",
             "envoy_toolshed+"
           ],
@@ -1426,7 +1416,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_repo_extension": {
       "general": {
-        "bzlTransitiveDigest": "TUUonqmyB5GOg7aSgDf7KkmkOPPaVqtRvKI5H/FjiEo=",
+        "bzlTransitiveDigest": "iIOox5OuJtl5d9I+uNspOiQuPQpvXsjs+Nd1ur3jglg=",
         "usagesDigest": "JPan5EJba0XH4g5z0LkIL3XzA6Lo8N5AuJMtajlHkqg=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -1455,11 +1445,6 @@
           ],
           [
             "envoy+",
-            "envoy",
-            "envoy+"
-          ],
-          [
-            "envoy+",
             "envoy_toolshed",
             "envoy_toolshed+"
           ],
@@ -1478,7 +1463,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "TUUonqmyB5GOg7aSgDf7KkmkOPPaVqtRvKI5H/FjiEo=",
+        "bzlTransitiveDigest": "iIOox5OuJtl5d9I+uNspOiQuPQpvXsjs+Nd1ur3jglg=",
         "usagesDigest": "b1lElbZxgsTTU7tOt0i3ngz0FnElDIHOs90r//+imdI=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -1488,8 +1473,8 @@
             "repoRuleId": "@@envoy_toolshed+//repository:utils.bzl%arch_alias",
             "attributes": {
               "aliases": {
-                "amd64": "@envoy//bazel/platforms/rbe:linux_x64",
-                "aarch64": "@envoy//bazel/platforms/rbe:linux_arm64"
+                "amd64": "'@@envoy+//bazel/platforms/rbe:linux_x64'",
+                "aarch64": "'@@envoy+//bazel/platforms/rbe:linux_arm64'"
               }
             }
           }
@@ -1509,11 +1494,6 @@
             "envoy+",
             "cu",
             "envoy++wasm_cargo+cu"
-          ],
-          [
-            "envoy+",
-            "envoy",
-            "envoy+"
           ],
           [
             "envoy+",
