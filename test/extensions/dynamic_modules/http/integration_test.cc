@@ -245,6 +245,28 @@ TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   EXPECT_EQ(10U, response->body().size());
 }
 
+TEST_P(DynamicModulesIntegrationTest, FilterConstructorFailsClosed) {
+  // A module whose filter constructor fails must return a 500 to the client instead of crashing the
+  // worker. Only the Rust module can force this path with a caught constructor panic.
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the filter_new_panic filter is only in the rust test module";
+  }
+  initializeFilter("filter_new_panic");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  // The caught constructor panic is what leaves a null filter, so pin the 500 to that path.
+  EXPECT_LOG_CONTAINS("error", "caught panic at FFI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, GenericSecretCallbacks) {
   // The module subscribes by name with no config source, so the name resolves against the
   // statically configured secrets.

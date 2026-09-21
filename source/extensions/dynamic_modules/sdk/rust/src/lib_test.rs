@@ -4470,6 +4470,132 @@ fn test_http_filter_state_object_round_trip() {
   assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
 }
 
+// =========================================================================
+// Span ABI stubs
+// =========================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_active_span(
+  _filter: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_span_envoy_ptr {
+  1 as abi::envoy_dynamic_module_type_span_envoy_ptr
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_set_tag(
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+) {
+}
+
+static SET_TAG_BATCH_CALLED: AtomicBool = AtomicBool::new(false);
+static SET_TAG_BATCH_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_set_tag_batch(
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  _tags: *const abi::envoy_dynamic_module_type_module_key_value_pair,
+  tags_size: usize,
+) {
+  SET_TAG_BATCH_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+  SET_TAG_BATCH_COUNT.store(tags_size, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_set_operation(
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  _operation: abi::envoy_dynamic_module_type_module_buffer,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_log(
+  _filter: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  _event: abi::envoy_dynamic_module_type_module_buffer,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_set_sampled(
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  _sampled: bool,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_disable_local_decision(
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_get_baggage(
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_set_baggage(
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_get_trace_id(
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  _value: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_get_span_id(
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  _value: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_span_spawn_child(
+  _filter: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _span: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  _operation: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_child_span_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_child_span_finish(
+  _child_span: abi::envoy_dynamic_module_type_child_span_module_ptr,
+) {
+}
+
+#[test]
+fn test_span_set_tags_batch() {
+  use std::sync::atomic::Ordering;
+  SET_TAG_BATCH_CALLED.store(false, Ordering::SeqCst);
+  SET_TAG_BATCH_COUNT.store(0, Ordering::SeqCst);
+
+  let envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let span = envoy_filter
+    .get_active_span()
+    .expect("stub returns non-null");
+  span.set_tags(&[("k1", "v1"), ("k2", "v2"), ("k3", "v3")]);
+
+  assert!(SET_TAG_BATCH_CALLED.load(Ordering::SeqCst));
+  assert_eq!(SET_TAG_BATCH_COUNT.load(Ordering::SeqCst), 3);
+}
+
 static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
 
 #[no_mangle]
@@ -7612,6 +7738,53 @@ pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers(
   true
 }
 
+// Records whether the panic barrier reported a matcher error, so the barrier test below can assert
+// the reporting callback ran.
+static MATCHER_SET_ERROR_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_matcher_set_error(
+  _matcher_input_envoy_ptr: abi::envoy_dynamic_module_type_matcher_input_envoy_ptr,
+) {
+  MATCHER_SET_ERROR_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+// A matcher whose match hook panics, used to exercise the panic barrier that declare_matcher!
+// generates.
+struct PanicMatcherConfig;
+
+impl crate::matcher::MatcherConfig for PanicMatcherConfig {
+  fn new(_name: &str, _config: &[u8]) -> Result<Self, String> {
+    Ok(Self)
+  }
+
+  fn on_matcher_match(&self, _ctx: &crate::matcher::MatchContext) -> bool {
+    panic!("matcher hook panicked on purpose");
+  }
+}
+
+crate::declare_matcher!(PanicMatcherConfig);
+
+#[test]
+fn test_matcher_panic_reports_error_and_returns_false() {
+  use std::sync::atomic::Ordering;
+  MATCHER_SET_ERROR_CALLED.store(false, Ordering::SeqCst);
+
+  let empty = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: std::ptr::null_mut(),
+    length: 0,
+  };
+  let config = envoy_dynamic_module_on_matcher_config_new(std::ptr::null_mut(), empty, empty);
+  assert!(!config.is_null());
+
+  // The hook panics, so the barrier must report the error and return false rather than unwind.
+  let matched = envoy_dynamic_module_on_matcher_match(config, std::ptr::null_mut());
+  assert!(!matched);
+  assert!(MATCHER_SET_ERROR_CALLED.load(Ordering::SeqCst));
+
+  envoy_dynamic_module_on_matcher_config_destroy(config);
+}
+
 #[test]
 fn test_matcher_get_all_headers() {
   let ctx = crate::matcher::MatchContext::new(std::ptr::null_mut());
@@ -10274,6 +10447,10 @@ fn test_attribute_id_ordering() {
   assert_eq!(
     69,
     abi::envoy_dynamic_module_type_attribute_id::XdsVirtualClusterName as u32
+  );
+  assert_eq!(
+    70,
+    abi::envoy_dynamic_module_type_attribute_id::UpstreamProtocol as u32
   );
 }
 

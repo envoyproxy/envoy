@@ -38,7 +38,7 @@ void expectCreateFilter(std::string yaml, bool is_sds_config) {
   ON_CALL(context.server_factory_context_, secretManager())
       .WillByDefault(ReturnRef(secret_manager));
   if (is_sds_config) {
-    ON_CALL(secret_manager, findOrCreateGenericSecretProvider(_, _, _, _))
+    ON_CALL(secret_manager, findOrCreateGenericSecretProvider(_, _, _, _, _))
         .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
             envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
   } else {

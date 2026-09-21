@@ -430,6 +430,7 @@ func (p *spanCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	if span := p.handle.GetActiveSpan(); span != nil {
 		span.SetTag("key", "value")
+		span.SetTags([][2]string{{"batch.key1", "batch.value1"}, {"batch.key2", "batch.value2"}})
 		span.SetOperation("operation")
 		span.Log("event")
 		span.SetSampled(true)

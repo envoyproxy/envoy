@@ -51,10 +51,14 @@ pub trait DnsResolverConfig: Send + Sync {
   ///
   /// The `envoy_callback` is used by the resolver to deliver resolution results back to Envoy.
   /// It is safe to call from any thread.
+  ///
+  /// Returns `None` if the resolver could not be created, for example when a runtime or socket
+  /// resource cannot be acquired. Envoy then rejects the configuration rather than aborting, so
+  /// implementations must return `None` instead of panicking on a recoverable failure.
   fn new_resolver(
     &self,
     envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
-  ) -> Box<dyn DnsResolverInstance>;
+  ) -> Option<Box<dyn DnsResolverInstance>>;
 }
 
 /// The module-side DNS resolver instance.
@@ -122,7 +126,7 @@ pub trait EnvoyDnsResolverConfig: Send + Sync {
   fn define_counter_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyCounterVecId, abi::envoy_dynamic_module_type_metrics_result>;
 
   /// Define a new gauge with the given name and no labels.
@@ -135,7 +139,7 @@ pub trait EnvoyDnsResolverConfig: Send + Sync {
   fn define_gauge_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyGaugeVecId, abi::envoy_dynamic_module_type_metrics_result>;
 
   /// Define a new histogram with the given name and no labels.
@@ -148,7 +152,7 @@ pub trait EnvoyDnsResolverConfig: Send + Sync {
   fn define_histogram_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyHistogramVecId, abi::envoy_dynamic_module_type_metrics_result>;
 
   // -------------------------------------------------------------------------
@@ -166,7 +170,7 @@ pub trait EnvoyDnsResolverConfig: Send + Sync {
   fn increment_counter_vec(
     &self,
     id: EnvoyCounterVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
@@ -181,7 +185,7 @@ pub trait EnvoyDnsResolverConfig: Send + Sync {
   fn set_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
@@ -196,7 +200,7 @@ pub trait EnvoyDnsResolverConfig: Send + Sync {
   fn increase_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
@@ -211,7 +215,7 @@ pub trait EnvoyDnsResolverConfig: Send + Sync {
   fn decrease_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
@@ -226,7 +230,7 @@ pub trait EnvoyDnsResolverConfig: Send + Sync {
   fn record_histogram_value_vec(
     &self,
     id: EnvoyHistogramVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 }
@@ -326,16 +330,16 @@ impl EnvoyDnsResolverConfig for EnvoyDnsResolverConfigImpl {
   fn define_counter_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyCounterVecId, abi::envoy_dynamic_module_type_metrics_result> {
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_names = strs_to_module_buffers(label_names);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_dns_resolver_config_define_counter(
         self.raw,
         str_to_module_buffer(name),
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_names.as_mut_ptr(),
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -362,16 +366,16 @@ impl EnvoyDnsResolverConfig for EnvoyDnsResolverConfigImpl {
   fn define_gauge_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyGaugeVecId, abi::envoy_dynamic_module_type_metrics_result> {
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_names = strs_to_module_buffers(label_names);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_dns_resolver_config_define_gauge(
         self.raw,
         str_to_module_buffer(name),
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_names.as_mut_ptr(),
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -398,16 +402,16 @@ impl EnvoyDnsResolverConfig for EnvoyDnsResolverConfigImpl {
   fn define_histogram_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyHistogramVecId, abi::envoy_dynamic_module_type_metrics_result> {
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_names = strs_to_module_buffers(label_names);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_dns_resolver_config_define_histogram(
         self.raw,
         str_to_module_buffer(name),
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_names.as_mut_ptr(),
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -434,17 +438,17 @@ impl EnvoyDnsResolverConfig for EnvoyDnsResolverConfigImpl {
   fn increment_counter_vec(
     &self,
     id: EnvoyCounterVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyCounterVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     dns_metric_result_to_rust(unsafe {
       abi::envoy_dynamic_module_callback_dns_resolver_config_increment_counter(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     })
@@ -470,17 +474,17 @@ impl EnvoyDnsResolverConfig for EnvoyDnsResolverConfigImpl {
   fn set_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     dns_metric_result_to_rust(unsafe {
       abi::envoy_dynamic_module_callback_dns_resolver_config_set_gauge(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     })
@@ -506,17 +510,17 @@ impl EnvoyDnsResolverConfig for EnvoyDnsResolverConfigImpl {
   fn increase_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     dns_metric_result_to_rust(unsafe {
       abi::envoy_dynamic_module_callback_dns_resolver_config_increment_gauge(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     })
@@ -542,17 +546,17 @@ impl EnvoyDnsResolverConfig for EnvoyDnsResolverConfigImpl {
   fn decrease_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     dns_metric_result_to_rust(unsafe {
       abi::envoy_dynamic_module_callback_dns_resolver_config_decrement_gauge(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     })
@@ -578,17 +582,17 @@ impl EnvoyDnsResolverConfig for EnvoyDnsResolverConfigImpl {
   fn record_histogram_value_vec(
     &self,
     id: EnvoyHistogramVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyHistogramVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     dns_metric_result_to_rust(unsafe {
       abi::envoy_dynamic_module_callback_dns_resolver_config_record_histogram_value(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     })
@@ -660,9 +664,15 @@ ffi_export! {
     let config = unsafe { &**config };
     let envoy_callback: Arc<dyn EnvoyDnsResolverCallback> =
       Arc::new(EnvoyDnsResolverCallbackImpl { resolver_envoy_ptr });
-    let resolver = config.new_resolver(envoy_callback);
-    let wrapper = Box::new(DnsResolverWrapper { resolver });
-    Box::into_raw(wrapper) as abi::envoy_dynamic_module_type_dns_resolver_module_ptr
+    // A None result means the module could not create the resolver. Return null so the host rejects
+    // the configuration instead of treating it as a fatal error.
+    match config.new_resolver(envoy_callback) {
+      Some(resolver) => {
+        let wrapper = Box::new(DnsResolverWrapper { resolver });
+        Box::into_raw(wrapper) as abi::envoy_dynamic_module_type_dns_resolver_module_ptr
+      },
+      None => std::ptr::null(),
+    }
   }
   on_panic = std::ptr::null()
 }

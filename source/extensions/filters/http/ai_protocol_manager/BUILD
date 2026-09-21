@@ -69,6 +69,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
@@ -112,6 +113,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "api_protocol_conversion_lib",
+    hdrs = ["api_protocol_conversion.h"],
+    deps = [
+        ":token_usage_lib",
+        "//source/common/common:assert_lib",
+        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "api_protocol_adapters_lib",
     srcs = ["api_protocol_adapters.cc"],
     deps = [
@@ -119,6 +130,7 @@ envoy_cc_library(
         ":schema_lib",
         ":token_usage_lib",
         "//source/common/common:macros",
+        "//source/extensions/filters/http/ai_protocol_manager/schema:anthropic_messages_lib",
         "//source/extensions/filters/http/ai_protocol_manager/schema:openai_chat_completions_lib",
         "@abseil-cpp//absl/strings",
     ],
@@ -148,6 +160,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/http/sse:sse_parser_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/sse:sse_scanner_lib",
         "@abseil-cpp//absl/strings",
     ],
 )
@@ -174,17 +187,29 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "replay_awaitable_lib",
+    hdrs = ["replay_awaitable.h"],
+    deps = [
+        ":buffer_manager_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
     name = "serializer_lib",
     srcs = ["serializer.cc"],
     hdrs = ["serializer.h"],
     deps = [
         ":buffer_manager_lib",
         ":json_with_ext_buf_lib",
+        ":replay_awaitable_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:thread_lib",
-        "//source/common/coroutine:leaf_awaitable_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
         "@abseil-cpp//absl/functional:any_invocable",
@@ -196,13 +221,33 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ai_filter_lib",
+    hdrs = ["ai_filter.h"],
+    deps = [
+        ":ai_request_lib",
+        ":token_usage_lib",
+        "//envoy/common:pure_lib",
+        "//envoy/config:typed_config_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_manager_lib",
     srcs = ["filter_manager.cc"],
-    hdrs = [
-        "ai_filter.h",
-        "filter_manager.h",
-    ],
+    hdrs = ["filter_manager.h"],
     deps = [
+        ":ai_filter_lib",
         ":ai_request_lib",
         ":buffer_manager_lib",
         ":json_with_ext_buf_lib",
@@ -229,6 +274,8 @@ envoy_cc_library(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
+        ":ai_filter_lib",
+        ":api_protocol_conversion_lib",
         ":buffer_manager_lib",
         ":external_buffer_interface",
         ":filter_chain_bridge_lib",
@@ -239,11 +286,14 @@ envoy_cc_library(
         ":schema_lib",
         ":serializer_lib",
         ":stats_lib",
+        "//envoy/common:exception_lib",
         "//envoy/http:codes_interface",
         "//envoy/router:router_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
@@ -251,6 +301,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",

@@ -251,6 +251,178 @@ protected:
   Filesystem::MockInstance filesystem_;
 };
 
+class TlsCertificateSdsPollingTest : public testing::Test, public SdsRotationApiTest {
+protected:
+  TlsCertificateSdsPollingTest() {
+    envoy::config::core::v3::ConfigSource config_source;
+    config_source.mutable_path_config_source()->set_path("/sds.yaml");
+    config_source.mutable_path_config_source()->mutable_poll_interval()->set_seconds(1);
+    poll_timer_ = new Event::MockTimer(&mock_dispatcher_);
+    sds_api_ = std::make_unique<TlsCertificateSdsApi>(
+        config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
+        []() {}, mock_dispatcher_, *api_, true);
+    init_manager_.add(*sds_api_->initTarget());
+    initialize();
+    handle_ =
+        sds_api_->addUpdateCallback([this]() { return secret_callback_.onAddOrUpdateSecret(); });
+  }
+
+  Event::MockTimer* poll_timer_;
+  std::unique_ptr<TlsCertificateSdsApi> sds_api_;
+};
+
+TEST_F(TlsCertificateSdsPollingTest, PollsReferencedFilesWithoutCreatingWatchers) {
+  EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).Times(0);
+  InSequence s;
+
+  const std::string yaml = R"EOF(
+  name: "abc.com"
+  tls_certificate:
+    certificate_chain:
+      filename: "/foo/bar/cert.pem"
+    private_key:
+      filename: "/foo/bar/key.pem"
+    watched_directory:
+      path: "/foo"
+    )EOF";
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(yaml, typed_secret);
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+
+  EXPECT_CALL(*poll_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("b"));
+  EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+  EXPECT_OK(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "v1"));
+
+  EXPECT_CALL(*poll_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+  poll_timer_->invokeCallback();
+
+  ASSERT_NE(nullptr, sds_api_->secret());
+  EXPECT_EQ("c", sds_api_->secret()->certificate_chain().inline_bytes());
+  EXPECT_EQ("d", sds_api_->secret()->private_key().inline_bytes());
+
+  envoy::extensions::transport_sockets::tls::v3::Secret inline_secret;
+  inline_secret.set_name("abc.com");
+  inline_secret.mutable_tls_certificate()->mutable_certificate_chain()->set_inline_bytes("e");
+  inline_secret.mutable_tls_certificate()->mutable_private_key()->set_inline_bytes("f");
+  const auto inline_resources = TestUtility::decodeResources({inline_secret});
+  EXPECT_CALL(*poll_timer_, disableTimer());
+  EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+  EXPECT_OK(subscription_factory_.callbacks_->onConfigUpdate(inline_resources.refvec_, "v2"));
+  EXPECT_CALL(*poll_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_FALSE(poll_timer_->enabled());
+}
+
+TEST_F(TlsCertificateSdsPollingTest, RecoversFromReferencedFileReadFailure) {
+  EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).Times(0);
+  InSequence s;
+
+  const std::string yaml = R"EOF(
+  name: "abc.com"
+  tls_certificate:
+    certificate_chain:
+      filename: "/foo/bar/cert.pem"
+    private_key:
+      filename: "/foo/bar/key.pem"
+    )EOF";
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(yaml, typed_secret);
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+
+  EXPECT_CALL(*poll_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("b"));
+  EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+  EXPECT_OK(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "v1"));
+
+  EXPECT_CALL(*poll_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem"))
+      .WillOnce(Throw(EnvoyException("read failure")));
+  EXPECT_LOG_CONTAINS("warn", "Failed to reload certificates: read failure",
+                      { poll_timer_->invokeCallback(); });
+  EXPECT_CALL(*poll_timer_, enabled());
+  EXPECT_TRUE(poll_timer_->enabled());
+
+  ASSERT_NE(nullptr, sds_api_->secret());
+  EXPECT_EQ("a", sds_api_->secret()->certificate_chain().inline_bytes());
+  EXPECT_EQ("b", sds_api_->secret()->private_key().inline_bytes());
+  EXPECT_EQ(1U, stats_.counter("sds.abc.com.key_rotation_failed").value());
+
+  EXPECT_CALL(*poll_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+  poll_timer_->invokeCallback();
+
+  EXPECT_EQ("c", sds_api_->secret()->certificate_chain().inline_bytes());
+  EXPECT_EQ("d", sds_api_->secret()->private_key().inline_bytes());
+}
+
+class CertificateValidationContextSdsPollingTest : public testing::Test, public SdsRotationApiTest {
+protected:
+  CertificateValidationContextSdsPollingTest() {
+    envoy::config::core::v3::ConfigSource config_source;
+    config_source.mutable_path_config_source()->set_path("/sds.yaml");
+    config_source.mutable_path_config_source()->mutable_poll_interval()->set_seconds(1);
+    poll_timer_ = new Event::MockTimer(&mock_dispatcher_);
+    sds_api_ = std::make_unique<CertificateValidationContextSdsApi>(
+        config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
+        []() {}, mock_dispatcher_, *api_, true);
+    init_manager_.add(*sds_api_->initTarget());
+    initialize();
+    handle_ =
+        sds_api_->addUpdateCallback([this]() { return secret_callback_.onAddOrUpdateSecret(); });
+  }
+
+  Event::MockTimer* poll_timer_;
+  std::unique_ptr<CertificateValidationContextSdsApi> sds_api_;
+};
+
+TEST_F(CertificateValidationContextSdsPollingTest, PollsReferencedFilesWithoutCreatingWatchers) {
+  EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).Times(0);
+  InSequence s;
+
+  const std::string yaml = R"EOF(
+  name: "abc.com"
+  validation_context:
+    trusted_ca:
+      filename: "/foo/bar/ca.pem"
+    crl:
+      filename: "/foo/bar/crl.pem"
+    watched_directory:
+      path: "/foo"
+    )EOF";
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(yaml, typed_secret);
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+
+  EXPECT_CALL(*poll_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ca.pem")).WillOnce(Return("a"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/crl.pem")).WillOnce(Return("b"));
+  EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+  EXPECT_OK(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "v1"));
+
+  EXPECT_CALL(*poll_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ca.pem")).WillOnce(Return("c"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/crl.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ca.pem")).WillOnce(Return("c"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/crl.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+  poll_timer_->invokeCallback();
+
+  ASSERT_NE(nullptr, sds_api_->secret());
+  EXPECT_EQ("c", sds_api_->secret()->trusted_ca().inline_bytes());
+  EXPECT_EQ("d", sds_api_->secret()->crl().inline_bytes());
+}
+
 class TlsCertificateSdsRotationApiTest : public testing::TestWithParam<bool>,
                                          public SdsRotationApiTest {
 protected:
