@@ -170,6 +170,50 @@ well. A route which selects a script by :ref:`name
 script at all, runs in a VM belonging to the filter and already has the filter-level patterns; its
 own patterns are unused.
 
+.. _config_http_filters_lua_shared_vm_id:
+
+Sharing Lua VMs between configurations
+--------------------------------------
+
+Every configured script gets its own set of Lua VMs: one per worker thread plus one on the main
+thread. A deployment that repeats the same script across many listeners, filter chains or routes
+therefore pays for the same code many times over. Setting :ref:`shared_vm_id
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.shared_vm_id>` opts a configuration into
+sharing those VMs with every other Lua configuration that sets the same id:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.lua
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      shared_vm_id: my_scripts
+      default_source_code:
+        filename: /etc/envoy/lua/common.lua
+
+Sharing is decided per script rather than per configuration. Two configurations that agree on the
+id share a VM only for the scripts whose contents match and whose :ref:`package_paths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>` and :ref:`package_cpaths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_cpaths>` match, since a script that
+resolves its ``require`` calls elsewhere does not produce an equivalent VM. The id applies to every
+script the configuration defines: the default script, the deprecated ``inline_code``, and each
+entry of :ref:`source_codes <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
+Routes draw from the same pool, so a route setting :ref:`LuaPerRoute.shared_vm_id
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.shared_vm_id>` can reuse a VM a
+filter configuration already built, and the other way around.
+
+.. attention::
+
+  A Lua VM is not only an amount of memory, it is also a set of Lua globals that outlive a
+  request. Scripts sharing a VM see each other's globals, exactly as separate requests through one
+  configuration already do. Only share VMs between configurations whose scripts are prepared for
+  that.
+
+A shared VM lives for as long as at least one configuration using it is alive. Once the last one is
+drained the VM is torn down, and the next configuration asking for that id and script builds a
+fresh one. Leaving the field unset, which is the default, keeps every configuration's scripts in
+VMs of their own.
+
 Upstream Filter
 ---------------
 
@@ -196,7 +240,8 @@ individual filter instance/script can be tracked by providing a per-filter
 In addition, a single process-wide ``lua.lua_vm_count`` gauge (not affected by ``stat_prefix``) tracks
 the total number of active Lua VMs across every filter-config-level and route-level Lua script
 configured in the process. Each configured script accounts for ``concurrency + 1`` VMs (one per
-worker thread, plus the main thread).
+worker thread, plus the main thread), except that scripts sharing VMs through :ref:`shared_vm_id
+<config_http_filters_lua_shared_vm_id>` are counted once between them.
 
 Script examples
 ---------------

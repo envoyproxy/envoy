@@ -23,6 +23,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.lua"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/singleton:manager_impl_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",
         "//test/mocks/api:api_mocks",

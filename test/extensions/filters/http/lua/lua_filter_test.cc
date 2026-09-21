@@ -6,6 +6,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/lua/lua_filter.h"
 
@@ -106,7 +107,8 @@ public:
     absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(
         proto_config, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
-        server_factory_context_.options().concurrency(), creation_status);
+        server_factory_context_.options().concurrency(), server_factory_context_.singletonManager(),
+        creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
     // Setup per route config for Lua filter.
     per_route_config_ = std::make_shared<FilterConfigPerRoute>(
@@ -309,13 +311,14 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Api::MockApi> api;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  Singleton::ManagerImpl singleton_manager;
 
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
 
   absl::Status creation_status = absl::OkStatus();
   FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua", 1,
-               creation_status);
+               singleton_manager, creation_status);
   EXPECT_THAT(creation_status, StatusHelpers::HasStatusMessage(
                                    "script load error: [string \"...\"]:3: '=' expected near "
                                    "'<eof>'"));
@@ -4204,7 +4207,8 @@ TEST_F(LuaHttpFilterTest, LuaVmCountGaugeDecrementOnDestroy) {
     absl::Status creation_status = absl::OkStatus();
     auto extra_config = std::make_shared<FilterConfig>(
         extra_proto, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
-        server_factory_context_.options().concurrency(), creation_status);
+        server_factory_context_.options().concurrency(), server_factory_context_.singletonManager(),
+        creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
     EXPECT_EQ(2 * per_setup_vm_count,
               stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
@@ -5101,6 +5105,217 @@ TEST_F(LuaHttpFilterTest, StatsApiWithPrefix) {
 
   // Verify the counter was created with the custom prefix.
   EXPECT_EQ(1, stats_store_.counter("test.lua.custom_prefix.requests").value());
+}
+
+// Fixture for the `shared_vm_id` tests. They build filter and route configurations directly and
+// never run a stream, so they do not need LuaHttpFilterTest's stream mocks. Each test gets its
+// own MockServerFactoryContext, and therefore its own singleton manager, so the registry of
+// shared VMs does not leak between tests.
+class LuaSharedVmTest : public testing::Test {
+public:
+  LuaSharedVmTest() {
+    ON_CALL(api_, rootScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(server_factory_context_.api_, rootScope())
+        .WillByDefault(ReturnRef(*stats_store_.rootScope()));
+  }
+
+  envoy::extensions::filters::http::lua::v3::Lua luaConfig(const std::string& shared_vm_id,
+                                                           const std::string& code) {
+    envoy::extensions::filters::http::lua::v3::Lua proto_config;
+    proto_config.set_shared_vm_id(shared_vm_id);
+    proto_config.mutable_default_source_code()->set_inline_string(code);
+    return proto_config;
+  }
+
+  std::shared_ptr<FilterConfig>
+  makeFilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config) {
+    absl::Status creation_status = absl::OkStatus();
+    auto config = std::make_shared<FilterConfig>(
+        proto_config, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
+        concurrency_, server_factory_context_.singletonManager(), creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
+    return config;
+  }
+
+  std::shared_ptr<FilterConfigPerRoute>
+  makeRouteConfig(const envoy::extensions::filters::http::lua::v3::LuaPerRoute& proto_config) {
+    absl::Status creation_status = absl::OkStatus();
+    auto config = std::make_shared<FilterConfigPerRoute>(proto_config, server_factory_context_,
+                                                         creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
+    return config;
+  }
+
+  uint64_t vmCount() {
+    return stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value();
+  }
+
+  Stats::TestUtil::TestStore stats_store_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Api::MockApi> api_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  // One PerLuaCodeSetup accounts for this many VMs: one per worker thread plus main.
+  const uint32_t per_setup_vm_count_{server_factory_context_.options().concurrency() + 1};
+  const uint32_t concurrency_{server_factory_context_.options().concurrency()};
+
+  const std::string SCRIPT_A{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("x-script", "a")
+    end
+  )EOF"};
+  const std::string SCRIPT_B{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("x-script", "b")
+    end
+  )EOF"};
+};
+
+// With no `shared_vm_id`, each configuration builds its own VM even when the script is identical.
+// This is the pre-existing behavior and the default.
+TEST_F(LuaSharedVmTest, NoSharedVmIdKeepsVmsPerConfig) {
+  auto first = makeFilterConfig(luaConfig("", SCRIPT_A));
+  auto second = makeFilterConfig(luaConfig("", SCRIPT_A));
+
+  EXPECT_NE(first->perLuaCodeSetup(), second->perLuaCodeSetup());
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+}
+
+// Two configurations agreeing on both the id and the script get one VM between them.
+TEST_F(LuaSharedVmTest, SameIdAndCodeShareOneVm) {
+  auto first = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+  EXPECT_EQ(per_setup_vm_count_, vmCount());
+
+  auto second = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+  EXPECT_EQ(first->perLuaCodeSetup(), second->perLuaCodeSetup());
+  // No second set of VMs was built.
+  EXPECT_EQ(per_setup_vm_count_, vmCount());
+}
+
+// The id alone does not make two configurations share: the script has to match as well.
+TEST_F(LuaSharedVmTest, SameIdDifferentCodeDoNotShare) {
+  auto first = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+  auto second = makeFilterConfig(luaConfig("shared", SCRIPT_B));
+
+  EXPECT_NE(first->perLuaCodeSetup(), second->perLuaCodeSetup());
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+}
+
+// The id namespaces the cache, so the same script under two ids stays in two VMs.
+TEST_F(LuaSharedVmTest, DifferentIdSameCodeDoNotShare) {
+  auto first = makeFilterConfig(luaConfig("one", SCRIPT_A));
+  auto second = makeFilterConfig(luaConfig("two", SCRIPT_A));
+
+  EXPECT_NE(first->perLuaCodeSetup(), second->perLuaCodeSetup());
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+}
+
+// A script whose `require` resolves against different search paths does not describe the same VM,
+// so configurations that disagree on the package paths must not share one.
+TEST_F(LuaSharedVmTest, SameIdDifferentPackagePathsDoNotShare) {
+  auto proto_one = luaConfig("shared", SCRIPT_A);
+  proto_one.add_package_paths("/etc/envoy/lua/?.lua");
+  auto proto_two = luaConfig("shared", SCRIPT_A);
+  proto_two.add_package_paths("/opt/lua/?.lua");
+  auto proto_three = luaConfig("shared", SCRIPT_A);
+  proto_three.add_package_cpaths("/opt/lua/?.so");
+
+  auto first = makeFilterConfig(proto_one);
+  auto second = makeFilterConfig(proto_two);
+  auto third = makeFilterConfig(proto_three);
+
+  EXPECT_NE(first->perLuaCodeSetup(), second->perLuaCodeSetup());
+  EXPECT_NE(first->perLuaCodeSetup(), third->perLuaCodeSetup());
+  EXPECT_EQ(3 * per_setup_vm_count_, vmCount());
+}
+
+// Sharing is decided per script, so the entries of `source_codes` are matched one by one, both
+// against each other and against the default script.
+TEST_F(LuaSharedVmTest, SourceCodesEntriesShareIndividually) {
+  envoy::config::core::v3::DataSource src_a, src_b;
+  src_a.set_inline_string(SCRIPT_A);
+  src_b.set_inline_string(SCRIPT_B);
+
+  auto proto_one = luaConfig("shared", SCRIPT_A);
+  proto_one.mutable_source_codes()->insert({"a.lua", src_a});
+  proto_one.mutable_source_codes()->insert({"b.lua", src_b});
+  auto first = makeFilterConfig(proto_one);
+
+  // `a.lua` is the same script as the default one, so the two names resolve to one VM. Together
+  // with `b.lua` that is two VM setups for three configured scripts.
+  EXPECT_EQ(first->perLuaCodeSetup(), first->perLuaCodeSetup("a.lua"));
+  EXPECT_NE(first->perLuaCodeSetup(), first->perLuaCodeSetup("b.lua"));
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+
+  // A second configuration naming the same scripts differently still reuses both VMs.
+  auto proto_two = luaConfig("shared", SCRIPT_B);
+  proto_two.mutable_source_codes()->insert({"other.lua", src_a});
+  auto second = makeFilterConfig(proto_two);
+
+  EXPECT_EQ(first->perLuaCodeSetup("b.lua"), second->perLuaCodeSetup());
+  EXPECT_EQ(first->perLuaCodeSetup(), second->perLuaCodeSetup("other.lua"));
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+}
+
+// Routes and filter configurations draw from the same pool, so a route's inline script reuses the
+// VM a filter configuration already built for it.
+TEST_F(LuaSharedVmTest, RouteAndFilterConfigShareOneVm) {
+  auto filter_config = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute route_proto;
+  route_proto.set_shared_vm_id("shared");
+  route_proto.mutable_source_code()->set_inline_string(SCRIPT_A);
+  auto route_config = makeRouteConfig(route_proto);
+
+  EXPECT_EQ(filter_config->perLuaCodeSetup(), route_config->perLuaCodeSetup());
+  EXPECT_EQ(per_setup_vm_count_, vmCount());
+}
+
+// A route that sets no id keeps its own VM, as before.
+TEST_F(LuaSharedVmTest, RouteWithoutIdKeepsItsOwnVm) {
+  auto filter_config = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute route_proto;
+  route_proto.mutable_source_code()->set_inline_string(SCRIPT_A);
+  auto route_config = makeRouteConfig(route_proto);
+
+  EXPECT_NE(filter_config->perLuaCodeSetup(), route_config->perLuaCodeSetup());
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+}
+
+// A shared VM is torn down once the last configuration using it is gone, and the next
+// configuration asking for it builds a fresh one rather than getting a dangling entry.
+TEST_F(LuaSharedVmTest, SharedVmIsReleasedWithItsLastUser) {
+  {
+    auto first = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+    auto second = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+    EXPECT_EQ(per_setup_vm_count_, vmCount());
+    // Dropping one of the two users is not enough.
+    first.reset();
+    EXPECT_EQ(per_setup_vm_count_, vmCount());
+  }
+  EXPECT_EQ(0, vmCount());
+
+  auto third = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+  EXPECT_EQ(per_setup_vm_count_, vmCount());
+}
+
+// A script that does not parse is rejected and not registered, so the next configuration asking
+// for the same id and script is rejected in the same way instead of being handed nothing.
+TEST_F(LuaSharedVmTest, InvalidCodeIsNotRegistered) {
+  const auto proto_config = luaConfig("shared", R"EOF(
+    bad
+  )EOF");
+
+  for (int i = 0; i < 2; i++) {
+    absl::Status creation_status = absl::OkStatus();
+    FilterConfig(proto_config, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
+                 concurrency_, server_factory_context_.singletonManager(), creation_status);
+    EXPECT_THAT(creation_status,
+                StatusHelpers::HasStatusMessage(
+                    "script load error: [string \"...\"]:3: '=' expected near '<eof>'"));
+  }
+  EXPECT_EQ(0, vmCount());
 }
 
 } // namespace
