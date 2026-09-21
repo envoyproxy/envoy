@@ -39,10 +39,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <envoy_v3_api_msg_config.core.v3.HealthCheck>` controls thresholds, intervals, jitter,
 // statistics, and event logging.
 message UdpHealthCheck {
-  // Payload sent as exactly one UDP datagram at the start of each health-check attempt.
+  // Payload sent as exactly one UDP datagram at the start of each health-check attempt. The decoded
+  // payload must not exceed 65,507 bytes. A smaller payload may be required to avoid IP
+  // fragmentation along the network path.
   config.core.v3.HealthCheck.Payload send = 1 [(validate.rules).message = {required: true}];
 
   // Expected response payload. A response datagram must match the entire payload exactly to make
-  // the health-check attempt successful.
+  // the health-check attempt successful. The decoded payload must not exceed 65,507 bytes. A
+  // smaller payload may be required to avoid IP fragmentation along the network path.
   config.core.v3.HealthCheck.Payload receive = 2 [(validate.rules).message = {required: true}];
 }

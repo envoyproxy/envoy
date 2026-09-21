@@ -18,6 +18,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/health_checker_impl.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -40,10 +42,19 @@ namespace {
 // Bound repeated EINTR retries so a signal-heavy socket cannot monopolize the dispatcher.
 constexpr uint32_t MaxSendAttemptsPerInvocation = 16;
 
-std::vector<uint8_t> decodePayload(const envoy::config::core::v3::HealthCheck::Payload& payload) {
+// This is the largest UDP payload that is valid for both IPv4 and IPv6 without jumbograms.
+constexpr uint64_t MaxUdpPayloadSize = 65507;
+
+std::vector<uint8_t> decodePayload(const envoy::config::core::v3::HealthCheck::Payload& payload,
+                                   const char* field_name) {
   auto bytes_or_error = PayloadMatcher::loadProtoBytes(payload);
   THROW_IF_NOT_OK_REF(bytes_or_error.status());
   ASSERT(bytes_or_error->size() == 1);
+  if (bytes_or_error->front().size() > MaxUdpPayloadSize) {
+    throw EnvoyException(absl::StrCat(
+        "UDP health checker ", field_name, " payload size ", bytes_or_error->front().size(),
+        " exceeds the maximum supported size of ", MaxUdpPayloadSize, " bytes"));
+  }
   return std::move(bytes_or_error->front());
 }
 
@@ -55,8 +66,8 @@ UdpHealthCheckerImpl::UdpHealthCheckerImpl(
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
     HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
-      send_bytes_(decodePayload(udp_config.send())),
-      receive_bytes_(decodePayload(udp_config.receive())) {}
+      send_bytes_(decodePayload(udp_config.send(), "send")),
+      receive_bytes_(decodePayload(udp_config.receive(), "receive")) {}
 
 UdpHealthCheckerImpl::ActiveSession::ActiveSession(UdpHealthCheckerImpl& parent,
                                                    const HostSharedPtr& host)

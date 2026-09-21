@@ -30,6 +30,7 @@ envoy_cc_extension(
         "//source/common/upstream:health_checker_lib",
         "//source/extensions/health_checkers/common:health_checker_base_lib",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/health_checkers/udp/v3:pkg_cc_proto",

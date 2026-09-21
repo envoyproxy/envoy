@@ -41,6 +41,7 @@ using testing::ReturnRef;
 using testing::SaveArg;
 
 constexpr uint32_t MaxSendAttemptsPerInvocation = 16;
+constexpr uint64_t MaxUdpPayloadSize = 65507;
 
 Api::IoCallUint64Result ioSuccess(uint64_t bytes) { return {bytes, Api::IoError::none()}; }
 
@@ -115,6 +116,7 @@ protected:
     envoy::config::core::v3::HealthCheck health_check;
     health_check.mutable_timeout()->set_seconds(1);
     health_check.mutable_interval()->set_seconds(1);
+    health_check.mutable_no_traffic_interval()->set_seconds(5);
     health_check.mutable_unhealthy_threshold()->set_value(unhealthy_threshold);
     health_check.mutable_healthy_threshold()->set_value(healthy_threshold);
     health_check.mutable_custom_health_check()->set_name("envoy.health_checkers.udp");
@@ -275,6 +277,39 @@ TEST_F(UdpHealthCheckerTest, ExactDatagramSucceeds) {
   EXPECT_EQ(0, counter("failure"));
   EXPECT_FALSE(timeout_timer_->enabled());
   EXPECT_TRUE(interval_timer_->enabled());
+}
+
+TEST_F(UdpHealthCheckerTest, SentBytesSelectRegularInterval) {
+  initialize();
+  EXPECT_FALSE(cluster_->info_->trafficStats()->upstream_cx_total_.used());
+  cluster_->info_->trafficStats()->upstream_cx_tx_bytes_total_.add(1);
+  SocketState& state = queueSocket();
+  startAndSend(state);
+
+  EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
+      .WillOnce(Invoke(receiveDatagram(std::string("\x03\x04", 2))));
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
+
+  EXPECT_EQ(1, counter("success"));
+}
+
+TEST_F(UdpHealthCheckerTest, ReceivedBytesSelectRegularInterval) {
+  initialize();
+  EXPECT_FALSE(cluster_->info_->trafficStats()->upstream_cx_total_.used());
+  EXPECT_FALSE(cluster_->info_->trafficStats()->upstream_cx_tx_bytes_total_.used());
+  cluster_->info_->trafficStats()->upstream_cx_rx_bytes_total_.add(1);
+  SocketState& state = queueSocket();
+  startAndSend(state);
+
+  EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
+      .WillOnce(Invoke(receiveDatagram(std::string("\x03\x04", 2))));
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
+
+  EXPECT_EQ(1, counter("success"));
 }
 
 TEST_F(UdpHealthCheckerTest, IgnoresMismatchesUntilExactDatagramArrives) {
@@ -703,6 +738,33 @@ TEST(UdpHealthCheckerFactoryTest, RejectsInvalidHexPayload) {
   EXPECT_THROW(
       factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context),
       EnvoyException);
+}
+
+TEST_F(UdpHealthCheckerTest, AcceptsMaximumPayloadSize) {
+  initialize(std::string(MaxUdpPayloadSize, 'a'), std::string(MaxUdpPayloadSize, 'b'));
+  EXPECT_NE(nullptr, health_checker_);
+}
+
+TEST_F(UdpHealthCheckerTest, RejectsOversizedSendPayload) {
+  try {
+    initialize(std::string(MaxUdpPayloadSize + 1, 'a'), "");
+    FAIL() << "expected oversized send payload to be rejected";
+  } catch (const EnvoyException& error) {
+    EXPECT_EQ("UDP health checker send payload size 65508 exceeds the maximum supported size of "
+              "65507 bytes",
+              std::string(error.what()));
+  }
+}
+
+TEST_F(UdpHealthCheckerTest, RejectsOversizedReceivePayload) {
+  try {
+    initialize("", std::string(MaxUdpPayloadSize + 1, 'a'));
+    FAIL() << "expected oversized receive payload to be rejected";
+  } catch (const EnvoyException& error) {
+    EXPECT_EQ("UDP health checker receive payload size 65508 exceeds the maximum supported size of "
+              "65507 bytes",
+              std::string(error.what()));
+  }
 }
 
 } // namespace
