@@ -325,10 +325,30 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "trigger_lib",
+    hdrs = ["trigger.h"],
+    deps = [
+        "//envoy/server/overload:overload_manager_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "realtime_trigger_lib",
+    hdrs = ["realtime_trigger.h"],
+    deps = [
+        ":trigger_lib",
+        "//envoy/server:resource_monitor_interface",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "overload_manager_lib",
     srcs = ["overload_manager_impl.cc"],
     hdrs = ["overload_manager_impl.h"],
     deps = [
+        ":realtime_trigger_lib",
+        ":trigger_lib",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/stats:stats_interface",
         "//envoy/thread_local:thread_local_interface",
@@ -337,7 +357,7 @@ envoy_cc_library(
         "//source/common/event:scaled_range_timer_manager_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
-        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )

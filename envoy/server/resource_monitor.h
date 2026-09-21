@@ -54,6 +54,46 @@ public:
 };
 
 using ResourceMonitorPtr = std::unique_ptr<ResourceMonitor>;
+using ResourceMonitorSharedPtr = std::shared_ptr<ResourceMonitor>;
+
+/**
+ * A resource monitor that can be queried synchronously by LoadShedPoints on worker threads
+ * in addition to periodic monitoring on the main thread.
+ *
+ * Implementations MUST be thread-safe, as getResourceUsage() and onLoadAccepted() are
+ * invoked concurrently across worker threads (and the main thread) without external
+ * synchronization.
+ */
+class RealtimeResourceMonitor : public ResourceMonitor {
+public:
+  ~RealtimeResourceMonitor() override = default;
+
+  /**
+   * Synchronously returns the current resource usage.
+   * Called directly by LoadShedPoints on worker threads (and by the default
+   * updateResourceUsage() implementation on the main thread). Must be thread-safe.
+   */
+  virtual ResourceUsage getResourceUsage() = 0;
+
+  /**
+   * Allows RealtimeResourceMonitor to also be used with OverloadActions and periodic
+   * pressure stats. Always called on the main thread.
+   */
+  void updateResourceUsage(ResourceUpdateCallbacks& callbacks) override {
+    callbacks.onSuccess(getResourceUsage());
+  }
+
+  /**
+   * Optional callback invoked synchronously on a worker thread when a LoadShedPoint
+   * check passes and load is accepted. Must be thread-safe.
+   */
+  virtual void onLoadAccepted(absl::string_view load_shed_point_name) {
+    UNREFERENCED_PARAMETER(load_shed_point_name);
+  }
+};
+
+using RealtimeResourceMonitorPtr = std::unique_ptr<RealtimeResourceMonitor>;
+using RealtimeResourceMonitorSharedPtr = std::shared_ptr<RealtimeResourceMonitor>;
 
 } // namespace Server
 } // namespace Envoy

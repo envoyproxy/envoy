@@ -92,6 +92,24 @@ public:
   std::string category() const override { return "envoy.resource_monitors"; }
 };
 
+class RealtimeResourceMonitorFactory : public Config::TypedFactory {
+public:
+  ~RealtimeResourceMonitorFactory() override = default;
+
+  /**
+   * Create a particular real-time resource monitor implementation.
+   * @param config const Protobuf::Message& supplies the config for the real-time resource monitor
+   *        implementation.
+   * @param context ResourceMonitorFactoryContext& supplies the resource monitor's context.
+   * @return RealtimeResourceMonitorPtr the resource monitor instance. Should not be nullptr.
+   */
+  virtual absl::StatusOr<RealtimeResourceMonitorPtr>
+  createRealtimeResourceMonitor(const Protobuf::Message& config,
+                                ResourceMonitorFactoryContext& context) = 0;
+
+  std::string category() const override { return "envoy.resource_monitors"; }
+};
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

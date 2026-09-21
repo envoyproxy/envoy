@@ -1096,6 +1096,7 @@ protected:
     });
     initialize();
     updateResource(0);
+    updateRealtimeResource(0);
   }
   void
   initializeWithBypassOverloadManager(const envoy::config::overload::v3::LoadShedPoint& config) {
@@ -1747,6 +1748,96 @@ TEST_P(LoadShedPointIntegrationTest, Http3ServerDispatchSendsGoAwayCompletingPen
       "overload.envoy.load_shed_points.http3_server_go_away_on_dispatch.scale_"
       "percent",
       Eq(0));
+}
+
+TEST_P(LoadShedPointIntegrationTest, RealtimeResourceMonitorShedsLoadAndNotifiesOnAccept) {
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http_connection_manager_decode_headers"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_realtime_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // 1. Pressure below threshold: request is accepted and onLoadAccepted() is invoked on worker.
+  updateRealtimeResource(0.0);
+  const uint64_t initial_accepted = realtimeLoadAcceptedCount();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_EQ(response1->headers().getStatusValue(), "200");
+  EXPECT_EQ(realtimeLoadAcceptedCount(), initial_accepted + 1);
+
+  // 2. Pressure above threshold: worker synchronously sheds load (503) without calling
+  // onLoadAccepted().
+  updateRealtimeResource(0.95);
+
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  test_server_->waitForCounter("http.config_test.downstream_rq_overload_close", Eq(1));
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ(response2->headers().getStatusValue(), "503");
+  EXPECT_EQ(realtimeLoadAcceptedCount(), initial_accepted + 1);
+
+  // 3. Pressure drops below threshold: next request immediately succeeds and notifies
+  // onLoadAccepted().
+  updateRealtimeResource(0.50);
+
+  auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response3->waitForEndStream());
+  EXPECT_EQ(response3->headers().getStatusValue(), "200");
+  EXPECT_EQ(realtimeLoadAcceptedCount(), initial_accepted + 2);
+}
+
+TEST_P(LoadShedPointIntegrationTest, HybridRegularAndRealtimeResourceMonitorShedsLoad) {
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http_connection_manager_decode_headers"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+        - name: "envoy.resource_monitors.testonly.fake_realtime_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // 1. Both monitors below threshold -> request accepted and onLoadAccepted() called.
+  updateResource(0.0);
+  updateRealtimeResource(0.0);
+  const uint64_t initial_accepted = realtimeLoadAcceptedCount();
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_EQ(response1->headers().getStatusValue(), "200");
+  EXPECT_EQ(realtimeLoadAcceptedCount(), initial_accepted + 1);
+
+  // 2. Regular monitor overloaded (0.95), real-time monitor low (0.10) -> shed (503),
+  // onLoadAccepted() NOT called.
+  updateResource(0.95);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http_connection_manager_decode_headers.scale_percent",
+      Eq(100));
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ(response2->headers().getStatusValue(), "503");
+  EXPECT_EQ(realtimeLoadAcceptedCount(), initial_accepted + 1);
+
+  // 3. Regular monitor low (0.10), real-time monitor overloaded (0.95) -> shed (503) synchronously,
+  // onLoadAccepted() NOT called.
+  updateResource(0.10);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http_connection_manager_decode_headers.scale_percent",
+      Eq(0));
+  updateRealtimeResource(0.95);
+  auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response3->waitForEndStream());
+  EXPECT_EQ(response3->headers().getStatusValue(), "503");
+  EXPECT_EQ(realtimeLoadAcceptedCount(), initial_accepted + 1);
 }
 
 // Verifies that worker thread watchdog configuration is correctly applied and triggers megamiss

@@ -332,6 +332,7 @@ envoy_cc_test(
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "//source/server:null_overload_manager_lib",
         "//source/server:overload_manager_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -341,6 +342,16 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "realtime_trigger_test",
+    srcs = ["realtime_trigger_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/server:realtime_trigger_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
