@@ -4,7 +4,7 @@ module(
 )
 
 bazel_dep(name = "abseil-cpp", version = "20260817.0")
-bazel_dep(name = "aspect_bazel_lib", version = "2.22.0")
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "protoc-gen-validate", version = "1.3.3.envoy")
 bazel_dep(name = "envoy", version = "1.40.0-dev")
