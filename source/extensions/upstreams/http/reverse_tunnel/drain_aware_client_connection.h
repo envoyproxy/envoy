@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -33,17 +34,19 @@ namespace ReverseTunnel {
 class DrainAwareClientCallbacks : public Envoy::Http::ConnectionCallbacks,
                                   public Logger::Loggable<Logger::Id::client> {
 public:
-  DrainAwareClientCallbacks(Envoy::Http::ConnectionCallbacks& inner, int fd)
-      : inner_(inner), fd_(fd) {}
+  // `metadata_key` is the connection-metadata key the upstream watches for a drain signal from the
+  // peer. When null, every received connection-metadata map is forwarded to the inner callbacks
+  // unchanged (no reporter notification). Defaults to null so non-reverse-tunnel callers that do
+  // not care about drain metadata can construct the wrapper without it.
+  DrainAwareClientCallbacks(Envoy::Http::ConnectionCallbacks& inner, int fd,
+                            std::shared_ptr<std::string> metadata_key = nullptr)
+      : inner_(inner), fd_(fd), metadata_key_(std::move(metadata_key)) {}
 
   // Envoy::Http::ConnectionCallbacks
   void onGoAway(Envoy::Http::GoAwayErrorCode error_code) override {
     ENVOY_LOG(debug, "reverse_tunnel upstream codec: observed peer GOAWAY (error_code={})",
               static_cast<int>(error_code));
-    if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
-            getThreadLocalSocketManager()) {
-      socket_manager->onGoAway(fd_);
-    }
+    notifyReporter();
     inner_.onGoAway(error_code);
   }
   void onSettings(Envoy::Http::ReceivedSettings& settings) override { inner_.onSettings(settings); }
@@ -51,14 +54,45 @@ public:
     inner_.onMaxStreamsChanged(num_streams);
   }
 
+  void notifyReporter() {
+    if (notified_) {
+      return;
+    }
+
+    if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
+            getThreadLocalSocketManager()) {
+      socket_manager->onGoAway(fd_);
+      notified_ = true;
+    }
+  }
+
   // Drive onGoAway into the pool's active client so the pool drains THIS connection (no new
   // streams, in-flight finish, close when idle). Needed because our drain GOAWAY is emitted
   // out-of-band, so the pool would not otherwise stop multiplexing onto it.
   void drainOwnPoolConnection() { inner_.onGoAway(Envoy::Http::GoAwayErrorCode::NoError); }
 
+  void onMetadata(Envoy::Http::MetadataMapPtr&& metadata_map_ptr) override {
+    ENVOY_LOG(debug, "reverse_tunnel upstream codec: received connection metadata ({} entries)",
+              metadata_map_ptr->size());
+    if (!metadata_key_) {
+      return inner_.onMetadata(std::move(metadata_map_ptr));
+    }
+
+    auto it = metadata_map_ptr->find(*metadata_key_);
+    if (it != metadata_map_ptr->end() && it->second == metadata_val) {
+      notifyReporter();
+      metadata_map_ptr->erase(it);
+    }
+
+    inner_.onMetadata(std::move(metadata_map_ptr));
+  }
+
 private:
   Envoy::Http::ConnectionCallbacks& inner_;
   int fd_;
+  bool notified_{false};
+  std::shared_ptr<std::string> metadata_key_;
+  constexpr static absl::string_view metadata_val{"true"};
 };
 
 /**
