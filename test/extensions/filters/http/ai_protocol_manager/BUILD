@@ -73,6 +73,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "transcoding_engine_test",
+    srcs = ["transcoding_engine_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:api_protocol_adapters_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:transcoding_engine_lib",
+        "//test/test_common:status_utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "json_with_ext_buf_parser_test",
     srcs = ["json_with_ext_buf_parser_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
