@@ -315,8 +315,9 @@
     "https://bcr.bazel.build/modules/nlohmann_json/3.12.0/MODULE.bazel": "21f19a4479e994c1546cf6f10c65d2fa464cd95f49eebad98dc5bac49c801dab",
     "https://bcr.bazel.build/modules/nlohmann_json/3.12.0/source.json": "6bf17b358c467effad70c02ab43e2d65939d740f667157397f583435909cfae1",
     "https://bcr.bazel.build/modules/nlohmann_json/3.6.1/MODULE.bazel": "6f7b417dcc794d9add9e556673ad25cb3ba835224290f4f848f8e2db1e1fca74",
+    "https://bcr.bazel.build/modules/numactl/2.0.19.bcr.1/MODULE.bazel": "2eee9c4f1e3b2b274b7a06c8893a08e9b16ff1e35e2a50d4942d762a11fd706a",
+    "https://bcr.bazel.build/modules/numactl/2.0.19.bcr.1/source.json": "8a31c89917f12c8094e013d553421eeeb80bda6ca8b0c6d8b2b537081dd360dd",
     "https://bcr.bazel.build/modules/numactl/2.0.19/MODULE.bazel": "4905b12bdbd33fa33f16ed1084939eea0d5081ea72b5d42591c32670009ef5c6",
-    "https://bcr.bazel.build/modules/numactl/2.0.19/source.json": "12874a996a808a6a8afc8f6251ceb95ee3d7f8aad2054f4f3e334076dbe3ea5b",
     "https://bcr.bazel.build/modules/ocp-diag-core/0.0.0-230505-e965ac0.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/opencensus-cpp/0.0.0-20230502-50eb5de.bcr.2/MODULE.bazel": "cc18734138dd18c912c6ce2a59186db28f85d8058c99c9f21b46ca3e0aba0ebe",
     "https://bcr.bazel.build/modules/opencensus-cpp/0.0.0-20230502-50eb5de.bcr.2/source.json": "7c135f9d42bb3b045669c3c6ab3bb3c208e00b46aca4422eea64c29811a5b240",
@@ -3127,7 +3128,7 @@
           "@@envoy+//Cargo.toml": "c9efddb99563255164b111971f35618643cbd15948caa9a29199cc3fabb2b7fe",
           "@@sq+//Cargo.lock": "895825c3c5231254147ce308ba39579e74691b1ed559d9f8db59cb16febda46d",
           "@@sq+//Cargo.toml": "c8ae9714158e67aec183942e36cf5d14ad1868fdb6472b50fbec9dbf8f9bdb43",
-          "@@wasmtime+//Cargo.lock": "fe41703e177e8da68355f6bdc22054daf6b6b2c6b32effe1fc1ce8c9c705e52d"
+          "@@wasmtime+//Cargo.lock": "23dc066229af684ccd62f89b98775c49beb79d3add7f4f70bd3b8dd9e01037be"
         },
         "recordedDirentsInputs": {},
         "envVariables": {
