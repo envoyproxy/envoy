@@ -9,7 +9,7 @@ module(
 
 bazel_dep(name = "abseil-cpp", version = "20260107.1")
 bazel_dep(name = "antlr4-cpp-runtime", version = "4.13.2")
-bazel_dep(name = "apple_support", version = "2.3.0", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "apple_support", version = "2.8.4", repo_name = "build_bazel_apple_support")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.0")
 bazel_dep(name = "aspect_rules_js", version = "2.5.0")
 bazel_dep(name = "aws-c-auth-testdata", version = "0.10.4.envoy")
