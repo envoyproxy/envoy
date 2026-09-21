@@ -293,8 +293,23 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
 TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
   ASSERT_OK(initialize());
   Stats::TestUtil::TestStore store;
-  EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
+  EXPECT_EQ(SSL_VERIFY_PEER,
             validator().initializeSslContexts({}, false, *store.rootScope()).value());
+}
+
+TEST_F(TestSPIFFEValidator, TestRequireClientCertificate) {
+  ASSERT_OK(initialize());
+
+  SSLContextPtr optional_ctx = SSL_CTX_new(TLS_method());
+  SSL_CTX_set_verify(optional_ctx.get(), SSL_VERIFY_PEER, nullptr);
+  ASSERT_OK(validator().addClientValidationContext(optional_ctx.get(), false));
+  EXPECT_EQ(SSL_VERIFY_PEER, SSL_CTX_get_verify_mode(optional_ctx.get()));
+
+  SSLContextPtr required_ctx = SSL_CTX_new(TLS_method());
+  SSL_CTX_set_verify(required_ctx.get(), SSL_VERIFY_PEER, nullptr);
+  ASSERT_OK(validator().addClientValidationContext(required_ctx.get(), true));
+  EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
+            SSL_CTX_get_verify_mode(required_ctx.get()));
 }
 
 TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
