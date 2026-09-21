@@ -610,10 +610,11 @@
     "https://bcr.bazel.build/modules/rules_shell/0.4.0/MODULE.bazel": "0f8f11bb3cd11755f0b48c1de0bbcf62b4b34421023aa41a2fc74ef68d9584f0",
     "https://bcr.bazel.build/modules/rules_shell/0.4.1/MODULE.bazel": "00e501db01bbf4e3e1dd1595959092c2fadf2087b2852d3f553b5370f5633592",
     "https://bcr.bazel.build/modules/rules_shell/0.6.1/MODULE.bazel": "72e76b0eea4e81611ef5452aa82b3da34caca0c8b7b5c0c9584338aa93bae26b",
+    "https://bcr.bazel.build/modules/rules_shell/0.7.1/MODULE.bazel": "257dd8d667371de804918dfceb86f6ddd2e1b5e025f5d9322878d4a73dc8aa58",
     "https://bcr.bazel.build/modules/rules_shell/0.8.0/MODULE.bazel": "f6a89f1d6a669a26f28fe814503857055d76306b79cfc11d12399af08d0b80ae",
     "https://bcr.bazel.build/modules/rules_shell/0.8.0/source.json": "eb53cc815bc503c6683c5fe12d943f98883f81fc22f51403ec8a95610cba4195",
-    "https://bcr.bazel.build/modules/rules_shellcheck/0.4.0/MODULE.bazel": "e779debc3c2900d9ebe065c65b2972a99630894ea18df7d469f24c0f4e346539",
-    "https://bcr.bazel.build/modules/rules_shellcheck/0.4.0/source.json": "53f90843000414a45be2cc92cfc936b72456df1fd0d11ea79014f1baa3cf3458",
+    "https://bcr.bazel.build/modules/rules_shellcheck/0.6.4/MODULE.bazel": "c2bc5271e5e6c0a732f14527f167f50cc51537ac49244db3187754ac82104a08",
+    "https://bcr.bazel.build/modules/rules_shellcheck/0.6.4/source.json": "145ce8525188d23871d9ee105e3a7635b7a45671a20c400b34a4124420700f8f",
     "https://bcr.bazel.build/modules/rules_swift/1.16.0/MODULE.bazel": "4a09f199545a60d09895e8281362b1ff3bb08bbde69c6fc87aff5b92fcc916ca",
     "https://bcr.bazel.build/modules/rules_swift/2.1.1/MODULE.bazel": "494900a80f944fc7aa61500c2073d9729dff0b764f0e89b824eb746959bc1046",
     "https://bcr.bazel.build/modules/rules_swift/2.4.0/MODULE.bazel": "1639617eb1ede28d774d967a738b4a68b0accb40650beadb57c21846beab5efd",
@@ -17973,10 +17974,10 @@
         ]
       }
     },
-    "@@rules_shellcheck+//internal:extensions.bzl%shellcheck_dependencies": {
+    "@@rules_shellcheck+//shellcheck/internal:extensions.bzl%shellcheck": {
       "general": {
-        "bzlTransitiveDigest": "lHBpUbpaThITeSKf/Pn6B9bDy1HDPZiogoDmivsRTEA=",
-        "usagesDigest": "gZ5mts5iUwm7R4hu1lnRjiuIzjiK0+1e8NTxs0a4epE=",
+        "bzlTransitiveDigest": "eJ7QFVTBwd025Ap9sazmZQJk/lmEdym4BDQ6pjr4q0U=",
+        "usagesDigest": "3t/q483JeN1GKD2lzKSiuOkCNHKauy/bUnmoh1fkL6w=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -17985,7 +17986,7 @@
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
               "strip_prefix": "shellcheck-v0.11.0",
-              "build_file_content": "exports_files([\"shellcheck\"])\n",
+              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_darwin_aarch64\",\n    shellcheck = \"shellcheck\",\n)\n",
               "sha256": "56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79",
               "urls": [
                 "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.aarch64.tar.xz"
@@ -17996,7 +17997,7 @@
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
               "strip_prefix": "shellcheck-v0.11.0",
-              "build_file_content": "exports_files([\"shellcheck\"])\n",
+              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_darwin_x86_64\",\n    shellcheck = \"shellcheck\",\n)\n",
               "sha256": "3c89db4edcab7cf1c27bff178882e0f6f27f7afdf54e859fa041fca10febe4c6",
               "urls": [
                 "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.x86_64.tar.xz"
@@ -18007,7 +18008,7 @@
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
               "strip_prefix": "shellcheck-v0.11.0",
-              "build_file_content": "exports_files([\"shellcheck\"])\n",
+              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_linux_aarch64\",\n    shellcheck = \"shellcheck\",\n)\n",
               "sha256": "12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588",
               "urls": [
                 "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.aarch64.tar.xz"
@@ -18018,7 +18019,7 @@
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
               "strip_prefix": "shellcheck-v0.11.0",
-              "build_file_content": "exports_files([\"shellcheck\"])\n",
+              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_linux_armv6hf\",\n    shellcheck = \"shellcheck\",\n)\n",
               "sha256": "8afc50b302d5feeac9381ea114d563f0150d061520042b254d6eb715797c8223",
               "urls": [
                 "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.armv6hf.tar.xz"
@@ -18029,7 +18030,7 @@
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
               "strip_prefix": "shellcheck-v0.11.0",
-              "build_file_content": "exports_files([\"shellcheck\"])\n",
+              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_linux_x86_64\",\n    shellcheck = \"shellcheck\",\n)\n",
               "sha256": "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198",
               "urls": [
                 "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz"
@@ -18039,11 +18040,25 @@
           "shellcheck_windows_x86_64": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
-              "build_file_content": "exports_files([\"shellcheck\"])\n",
+              "strip_prefix": "",
+              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_windows_x86_64\",\n    shellcheck = \"shellcheck.exe\",\n)\n",
               "sha256": "8a4e35ab0b331c85d73567b12f2a444df187f483e5079ceffa6bda1faa2e740e",
               "urls": [
                 "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.zip"
               ]
+            }
+          },
+          "shellcheck_toolchains": {
+            "repoRuleId": "@@rules_shellcheck+//shellcheck/internal:extensions.bzl%shellcheck_toolchains_hub",
+            "attributes": {
+              "toolchains": {
+                "@@rules_shellcheck++shellcheck+shellcheck_darwin_aarch64//:toolchain": "darwin_aarch64",
+                "@@rules_shellcheck++shellcheck+shellcheck_darwin_x86_64//:toolchain": "darwin_x86_64",
+                "@@rules_shellcheck++shellcheck+shellcheck_linux_aarch64//:toolchain": "linux_aarch64",
+                "@@rules_shellcheck++shellcheck+shellcheck_linux_armv6hf//:toolchain": "linux_armv6hf",
+                "@@rules_shellcheck++shellcheck+shellcheck_linux_x86_64//:toolchain": "linux_x86_64",
+                "@@rules_shellcheck++shellcheck+shellcheck_windows_x86_64//:toolchain": "windows_x86_64"
+              }
             }
           }
         },
