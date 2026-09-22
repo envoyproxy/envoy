@@ -31,7 +31,7 @@ bazel_dep(name = "rules_android", version = "0.7.2")
 bazel_dep(name = "rules_android_ndk", version = "0.1.5")
 bazel_dep(name = "hermetic-android-toolchains", version = "0.0.0-20260807-c6a9f20.envoy", dev_dependency = True)
 bazel_dep(name = "rules_apple", version = "3.20.1.envoy")
-bazel_dep(name = "rules_robolectric", version = "4.16")
+bazel_dep(name = "rules_robolectric", version = "4.17")
 bazel_dep(name = "rules_cc", version = "0.2.25")
 bazel_dep(name = "rules_detekt", version = "0.8.1.2")
 bazel_dep(name = "rules_java", version = "9.9.0")
@@ -150,7 +150,7 @@ maven.install(
         "androidx.test:runner:1.5.0",
         "androidx.test:monitor:1.5.0",
         "androidx.test.ext:junit:1.1.5",
-        "org.robolectric:robolectric:4.16",
+        "org.robolectric:robolectric:4.17",
         "org.hamcrest:hamcrest:3.0",
     ],
     version_conflict_policy = "pinned",
