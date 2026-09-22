@@ -1211,7 +1211,7 @@ TEST_P(MultiHealthCheckIntegrationTest, OneSubCheckerTimeout) {
 
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounter("cluster.cluster_1.health_check.second.failure", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_1.health_check.name.second.failure", Ge(1));
   test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(0));
 }
 
@@ -1225,8 +1225,8 @@ TEST_P(MultiHealthCheckIntegrationTest, StatsWithName) {
 
   test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
 
-  test_server_->waitForCounter("cluster.cluster_1.health_check.first.attempt", Ge(1));
-  test_server_->waitForCounter("cluster.cluster_1.health_check.second.attempt", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_1.health_check.name.first.attempt", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_1.health_check.name.second.attempt", Ge(1));
 }
 
 TEST_P(MultiHealthCheckIntegrationTest, HostAddAfterStart) {

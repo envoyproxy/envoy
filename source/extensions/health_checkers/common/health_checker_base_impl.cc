@@ -93,8 +93,8 @@ HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope,
   const Stats::TaggedStatName prefix(
       scope.symbolTable(), "health_check.",
       name.empty() ? Stats::TagStringViewSpan{}
-                   : Stats::TagStringViewSpan{{"envoy.health_check_name", name}},
-      name.empty() ? "health_check." : absl::StrCat("health_check.", name, "."));
+                   : Stats::TagStringViewSpan{{Config::TagNames::get().HEALTH_CHECK_NAME, name}},
+      name.empty() ? "health_check." : absl::StrCat("health_check.name.", name, "."));
 
   return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_TAGGED(scope, prefix),
                                    POOL_GAUGE_TAGGED(scope, prefix))};

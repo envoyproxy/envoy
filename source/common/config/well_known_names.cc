@@ -148,6 +148,10 @@ TagNameValues::TagNameValues() {
   // cluster.(<cluster_name>.)*
   addTokenized(CLUSTER_NAME, "cluster.$.**");
 
+  // cluster.<cluster_name>.health_check.name.(<health_check_name>.)*
+  addRe2(HEALTH_CHECK_NAME, R"(^cluster\.<TAG_VALUE>\.health_check(\.name\.(<TAG_VALUE>))\..+)",
+         ".health_check.");
+
   // listener.[<address>.]http.(<stat_prefix>.)*
   // The <address> part can be anything here (.*?) for the sake of a simpler
   // internal state of the regex which performs better.
