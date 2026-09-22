@@ -63,7 +63,7 @@ message HealthStatusSet {
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
 
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -265,6 +265,11 @@ message HealthCheck {
   }
 
   reserved 10;
+
+  // Optional name for this health checker. <insert docs on how this changes the stat name>
+  //
+  // This is required if multiple health checks are configured on a cluster.
+  string name = 27;
 
   // The time to wait for a health check response. If the timeout is reached the
   // health check attempt will be considered a failure.

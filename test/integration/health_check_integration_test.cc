@@ -1069,4 +1069,224 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttpWithBinaryPayloa
 }
 
 } // namespace
+
+class MultiHealthCheckIntegrationTest : public Event::TestUsingSimulatedTime,
+                                        public testing::TestWithParam<Network::Address::IpVersion>,
+                                        public HttpIntegrationTest {
+public:
+  MultiHealthCheckIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), ConfigHelper::httpProxyConfig()) {}
+
+  void TearDown() override {
+    for (auto& conn : hc_connections_) {
+      if (conn != nullptr) {
+        AssertionResult result = conn->close();
+        RELEASE_ASSERT(result, result.message());
+      }
+    }
+  }
+
+  void addMultiTcpHealthChecks(envoy::config::cluster::v3::Cluster* cluster,
+                               const std::string& name1, const std::string& name2) {
+    auto* hc1 = cluster->add_health_checks();
+    hc1->set_name(name1);
+    hc1->mutable_timeout()->set_seconds(30);
+    hc1->mutable_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    hc1->mutable_no_traffic_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    hc1->mutable_unhealthy_threshold()->set_value(1);
+    hc1->mutable_healthy_threshold()->set_value(1);
+    hc1->mutable_tcp_health_check()->mutable_send()->set_text("50696E6731");
+    hc1->mutable_tcp_health_check()->add_receive()->set_text("506F6E6731");
+
+    auto* hc2 = cluster->add_health_checks();
+    hc2->set_name(name2);
+    hc2->mutable_timeout()->set_seconds(30);
+    hc2->mutable_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    hc2->mutable_no_traffic_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    hc2->mutable_unhealthy_threshold()->set_value(1);
+    hc2->mutable_healthy_threshold()->set_value(1);
+    hc2->mutable_tcp_health_check()->mutable_send()->set_text("50696E6732");
+    hc2->mutable_tcp_health_check()->add_receive()->set_text("506F6E6732");
+  }
+
+  void initializeWithStaticCluster(const std::string& name1 = "first",
+                                   const std::string& name2 = "second") {
+    use_lds_ = false;
+    defer_listener_finalization_ = true;
+
+    auto up_config = upstreamConfig();
+    up_config.upstream_protocol_ = Http::CodecType::HTTP1;
+    host_upstream_ = std::make_unique<FakeUpstream>(0, version_, up_config);
+
+    config_helper_.addConfigModifier(
+        [this, name1, name2](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+          cluster->set_name("cluster_1");
+          cluster->mutable_connect_timeout()->set_seconds(5);
+
+          auto* load_assignment = cluster->mutable_load_assignment();
+          load_assignment->set_cluster_name("cluster_1");
+          auto* ep = load_assignment->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+          ep->mutable_address()->mutable_socket_address()->set_address(
+              Network::Test::getLoopbackAddressString(GetParam()));
+          ep->mutable_address()->mutable_socket_address()->set_port_value(
+              host_upstream_->localAddress()->ip()->port());
+
+          addMultiTcpHealthChecks(cluster, name1, name2);
+        });
+
+    HttpIntegrationTest::initialize();
+
+    ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+    ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+    ASSERT_TRUE(hc_connections_[0]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+    ASSERT_TRUE(hc_connections_[1]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  }
+
+  void initializeWithEds() {
+    use_lds_ = false;
+    defer_listener_finalization_ = true;
+
+    auto up_config = upstreamConfig();
+    up_config.upstream_protocol_ = Http::CodecType::HTTP1;
+    host_upstream_ = std::make_unique<FakeUpstream>(0, version_, up_config);
+
+    auto cla = ConfigHelper::buildClusterLoadAssignment(
+        "cluster_1", Network::Test::getLoopbackAddressString(GetParam()),
+        host_upstream_->localAddress()->ip()->port());
+    eds_helper_.setEds({cla});
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+      cluster->set_name("cluster_1");
+      cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
+      cluster->mutable_connect_timeout()->set_seconds(5);
+      cluster->mutable_eds_cluster_config()
+          ->mutable_eds_config()
+          ->mutable_path_config_source()
+          ->set_path(eds_helper_.edsPath());
+
+      addMultiTcpHealthChecks(cluster, "first", "second");
+    });
+
+    HttpIntegrationTest::initialize();
+
+    ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+    ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+    ASSERT_TRUE(hc_connections_[0]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+    ASSERT_TRUE(hc_connections_[1]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  }
+
+  EdsHelper eds_helper_;
+  FakeUpstreamPtr host_upstream_;
+  FakeUpstreamPtr host_upstream_2_;
+  std::vector<FakeRawConnectionPtr> hc_connections_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, MultiHealthCheckIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(MultiHealthCheckIntegrationTest, BothSubCheckersPass) {
+  initializeWithStaticCluster();
+
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[1]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.membership_total", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.health_check.healthy", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.health_check.degraded", Eq(0));
+}
+
+TEST_P(MultiHealthCheckIntegrationTest, OneSubCheckerTimeout) {
+  initializeWithStaticCluster();
+
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(30));
+
+  test_server_->waitForCounter("cluster.cluster_1.health_check.name.second.health_check.failure",
+                               Ge(1));
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(0));
+}
+
+TEST_P(MultiHealthCheckIntegrationTest, StatsWithName) {
+  initializeWithStaticCluster("first", "second");
+
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[1]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+
+  test_server_->waitForCounter("cluster.cluster_1.health_check.name.first.health_check.attempt",
+                               Ge(1));
+  test_server_->waitForCounter("cluster.cluster_1.health_check.name.second.health_check.attempt",
+                               Ge(1));
+}
+
+TEST_P(MultiHealthCheckIntegrationTest, HostAddAfterStart) {
+  initializeWithEds();
+
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[1]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+
+  auto config = upstreamConfig();
+  config.upstream_protocol_ = Http::CodecType::HTTP1;
+  host_upstream_2_ = std::make_unique<FakeUpstream>(0, version_, config);
+
+  auto cla = ConfigHelper::buildClusterLoadAssignment(
+      "cluster_1", Network::Test::getLoopbackAddressString(GetParam()),
+      host_upstream_->localAddress()->ip()->port());
+  auto* ep2 = cla.mutable_endpoints(0)->add_lb_endpoints()->mutable_endpoint();
+  ep2->mutable_address()->mutable_socket_address()->set_address(
+      Network::Test::getLoopbackAddressString(GetParam()));
+  ep2->mutable_address()->mutable_socket_address()->set_port_value(
+      host_upstream_2_->localAddress()->ip()->port());
+  eds_helper_.setEds({cla});
+
+  ASSERT_TRUE(host_upstream_2_->waitForRawConnection(hc_connections_.emplace_back()));
+  ASSERT_TRUE(host_upstream_2_->waitForRawConnection(hc_connections_.emplace_back()));
+  ASSERT_TRUE(hc_connections_[2]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  ASSERT_TRUE(hc_connections_[3]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+
+  result = hc_connections_[2]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[3]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(2));
+  test_server_->waitForGauge("cluster.cluster_1.membership_total", Eq(2));
+}
+
+TEST_P(MultiHealthCheckIntegrationTest, HostRemoveAfterStart) {
+  initializeWithEds();
+
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[1]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment empty_cla;
+  empty_cla.set_cluster_name("cluster_1");
+  eds_helper_.setEds({empty_cla});
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_total", Eq(0));
+}
+
 } // namespace Envoy
