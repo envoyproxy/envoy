@@ -460,6 +460,7 @@
 /*/extensions/router/cluster_specifiers/matcher @wbpcode @agrawroh
 
 # Queue policy
+/*/extensions/queue_policy/adaptive_lifo @nezdolik @yanavlasov @tonya11en @balrawi-figma
 /*/extensions/queue_policy/common @nezdolik @yanavlasov @tonya11en @balrawi-figma
 /*/extensions/queue_policy/fifo @nezdolik @yanavlasov @tonya11en @balrawi-figma
 

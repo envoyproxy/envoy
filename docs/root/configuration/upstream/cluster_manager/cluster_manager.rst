@@ -12,3 +12,4 @@ Cluster manager
   cds
   cluster_hc
   cluster_circuit_breakers
+  pending_request_queueing
