@@ -323,7 +323,9 @@ public:
   void shutdown() override {
     shutdown_ = true;
     for (auto& [name, handle] : cds_pauses_) {
-      handle->cancel();
+      if (handle) {
+        handle->cancel();
+      }
     }
     cds_pauses_.clear();
     // Make sure we destroy all potential outgoing connections before this returns.
