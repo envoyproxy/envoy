@@ -124,10 +124,7 @@ envoy_cc_test_library_with_engine_builder(
 
 envoy_cc_test_with_engine_builder(
     name = "rtds_integration_test",
-    srcs = envoy_select_envoy_mobile_xds(
-        ["rtds_integration_test.cc"],
-        "@envoy",
-    ),
+    srcs = envoy_select_envoy_mobile_xds(["rtds_integration_test.cc"]),
     data = [
         "@envoy//test/config/integration/certs",
     ],
@@ -147,10 +144,7 @@ envoy_cc_test_with_engine_builder(
 
 envoy_cc_test_with_engine_builder(
     name = "cds_integration_test",
-    srcs = envoy_select_envoy_mobile_xds(
-        ["cds_integration_test.cc"],
-        "@envoy",
-    ),
+    srcs = envoy_select_envoy_mobile_xds(["cds_integration_test.cc"]),
     data = [
         "@envoy//test/config/integration/certs",
     ],
@@ -168,10 +162,7 @@ envoy_cc_test_with_engine_builder(
 
 envoy_cc_test_with_engine_builder(
     name = "sds_integration_test",
-    srcs = envoy_select_envoy_mobile_xds(
-        ["sds_integration_test.cc"],
-        "@envoy",
-    ),
+    srcs = envoy_select_envoy_mobile_xds(["sds_integration_test.cc"]),
     data = [
         "@envoy//test/config/integration/certs",
     ],
@@ -234,8 +225,5 @@ envoy_cc_test_library(
         "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_build_config//:extension_registry",
-    ] + envoy_select_signal_trace(
-        ["@envoy//source/common/signal:sigaction_lib"],
-        "@envoy",
-    ),
+    ] + envoy_select_signal_trace(["@envoy//source/common/signal:sigaction_lib"]),
 )

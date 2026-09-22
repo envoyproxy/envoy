@@ -1,3 +1,4 @@
+load("@envoy//bazel:envoy_select.bzl", "deprecate_repository")
 load("@rules_android//android:rules.bzl", "android_local_test")
 load("@rules_kotlin//kotlin:android.bzl", "kt_android_local_test")
 load("//bazel:envoy_mobile_android_jni.bzl", "native_lib_name")
@@ -23,7 +24,8 @@ def _contains_all(srcs, extension):
     return True
 
 # A basic macro to run android based (robolectric) tests with native dependencies
-def envoy_mobile_android_test(name, srcs, test_class, native_lib_name = "", deps = [], native_deps = [], exec_properties = {}, **kwargs):
+def envoy_mobile_android_test(name, srcs, test_class, native_lib_name = "", deps = [], native_deps = [], exec_properties = {}, repository = "", **kwargs):
+    deprecate_repository("envoy_mobile_android_test", repository)
     dependencies = deps + [
         "@maven//:androidx_annotation_annotation",
         "@maven//:androidx_test_core",

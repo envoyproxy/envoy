@@ -54,21 +54,15 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
         "@envoy_mobile//library/common/extensions/quic_packet_writer/platform:config",
         "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
-    ] + envoy_select_envoy_mobile_listener(
-        [
-            "@envoy//source/extensions/udp_packet_writer/default:config",
-            "@envoy//source/common/listener_manager:listener_manager_lib",
-            "@envoy//source/common/listener_manager:connection_handler_lib",
-        ],
-        "@envoy",
-    ) + envoy_select_envoy_mobile_xds(
-        [
-            "@envoy//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
-            "@envoy//source/extensions/config_subscription/grpc:grpc_mux_lib",
-            "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
-        ],
-        "@envoy",
-    ),
+    ] + envoy_select_envoy_mobile_listener([
+        "@envoy//source/extensions/udp_packet_writer/default:config",
+        "@envoy//source/common/listener_manager:listener_manager_lib",
+        "@envoy//source/common/listener_manager:connection_handler_lib",
+    ]) + envoy_select_envoy_mobile_xds([
+        "@envoy//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+        "@envoy//source/extensions/config_subscription/grpc:grpc_mux_lib",
+        "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+    ]),
 )
 
 envoy_cc_library(

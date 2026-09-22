@@ -23,10 +23,10 @@ import yaml
 logger = logging.getLogger(__name__)
 
 DEPRECATED_ENVOY_REPOSITORY_KWARG = re.compile(
-    r"\benvoy_[A-Za-z0-9_]+\s*\([\s\S]*?\brepository\s*=")
+    r"^repository\s*=")
 DEPRECATED_ENVOY_SELECT_REPOSITORY_ARG = re.compile(
-    r"\benvoy_select_[A-Za-z0-9_]+\s*\(\s*(?:\[[\s\S]*?\]|[^,\)]*)\s*,\s*"
-    r'(?:repository\s*=\s*)?"@envoy"\s*\)')
+    r'^(?:repository\s*=\s*)?(?P<repository>(?:"[^"\n]*"|\'[^\'\n]*\'))$')
+ENVOY_MACRO_CALL = re.compile(r"(?<!def )\b(?P<name>envoy_[A-Za-z0-9_]+)\s*\(")
 
 
 class FormatConfig:
@@ -440,6 +440,103 @@ class FormatChecker:
         # Envoy's public Starlark macro definitions intentionally keep the deprecated
         # repository parameter for downstream compatibility. In-tree callers must not use it.
         return file_path.startswith("./bazel/envoy")
+
+    def deprecated_envoy_repository_arg_errors(self, file_path, contents):
+        error_messages = []
+        for match in ENVOY_MACRO_CALL.finditer(contents):
+            open_paren = match.end() - 1
+            close_paren = self.find_matching_paren(contents, open_paren)
+            if close_paren is None:
+                continue
+            args = self.split_top_level_call_args(contents, open_paren + 1, close_paren)
+            for arg, offset in args:
+                kwarg_match = DEPRECATED_ENVOY_REPOSITORY_KWARG.search(arg)
+                if kwarg_match:
+                    line_number = self.find_line_number(contents, offset + kwarg_match.start())
+                    error_messages.append(
+                        f"{file_path}:{line_number}: deprecated Envoy macro `repository` argument is not allowed in in-tree callers"
+                    )
+            if match.group("name").startswith("envoy_select_") and len(args) > 1:
+                select_arg = args[1][0]
+                select_match = DEPRECATED_ENVOY_SELECT_REPOSITORY_ARG.fullmatch(select_arg)
+                if select_match:
+                    repository_offset = args[1][1] + select_match.start("repository")
+                    line_number = self.find_line_number(contents, repository_offset)
+                    error_messages.append(
+                        f"{file_path}:{line_number}: deprecated repository string argument is not allowed for envoy_select_* helpers"
+                    )
+        return error_messages
+
+    def find_line_number(self, contents, offset):
+        return contents.count("\n", 0, offset) + 1
+
+    def find_matching_paren(self, contents, open_paren):
+        depth = 0
+        quote = None
+        escaped = False
+        for index in range(open_paren, len(contents)):
+            char = contents[index]
+            if quote:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    quote = None
+                continue
+            if char in ("'", '"'):
+                quote = char
+            elif char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    return index
+        return None
+
+    def split_top_level_call_args(self, contents, start, end):
+        args = []
+        quote = None
+        escaped = False
+        paren_depth = 0
+        bracket_depth = 0
+        brace_depth = 0
+        arg_start = start
+        for index in range(start, end):
+            char = contents[index]
+            if quote:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    quote = None
+                continue
+            if char in ("'", '"'):
+                quote = char
+            elif char == "(":
+                paren_depth += 1
+            elif char == ")":
+                paren_depth -= 1
+            elif char == "[":
+                bracket_depth += 1
+            elif char == "]":
+                bracket_depth -= 1
+            elif char == "{":
+                brace_depth += 1
+            elif char == "}":
+                brace_depth -= 1
+            elif char == "," and not paren_depth and not bracket_depth and not brace_depth:
+                stripped = contents[arg_start:index].strip()
+                if stripped:
+                    leading_ws = len(contents[arg_start:index]) - len(contents[arg_start:index].lstrip())
+                    args.append((stripped, arg_start + leading_ws))
+                arg_start = index + 1
+        stripped = contents[arg_start:end].strip()
+        if stripped:
+            leading_ws = len(contents[arg_start:end]) - len(contents[arg_start:end].lstrip())
+            args.append((stripped, arg_start + leading_ws))
+        return args
 
     def is_starlark_file(self, file_path):
         return file_path.endswith(".bzl")
@@ -886,14 +983,7 @@ class FormatChecker:
         error_messages.extend(self.check_file_contents(file_path, self.check_build_line))
         if not self.allow_listed_for_deprecated_envoy_repository_args(file_path):
             contents = pathlib.Path(file_path).read_text()
-            if DEPRECATED_ENVOY_REPOSITORY_KWARG.search(contents):
-                error_messages.append(
-                    "deprecated Envoy macro `repository` argument is not allowed in in-tree callers"
-                )
-            if DEPRECATED_ENVOY_SELECT_REPOSITORY_ARG.search(contents):
-                error_messages.append(
-                    "deprecated `@envoy` repository argument is not allowed for envoy_select_* helpers"
-                )
+            error_messages.extend(self.deprecated_envoy_repository_arg_errors(file_path, contents))
         return error_messages
 
     def fix_source_path(self, file_path):
