@@ -327,8 +327,8 @@ TEST_F(DynamicModuleRouteSpecifierTest, UnknownDecisionPassesThrough) {
   ASSERT_NE(nullptr, route.route);
   EXPECT_EQ("matched_cluster", route.route->routeEntry()->clusterName());
   EXPECT_EQ(
-      1,
-      context_.store_.counter("route_specifier.dynamic_modules.test.failure_module_error").value());
+      1, context_.store_.counter("dynamicmodulescustom.route_specifier.test.failure_module_error")
+             .value());
 }
 
 // NO_ROUTE drops the route rather than falling back to the route table.
@@ -462,8 +462,8 @@ route_specifiers:
                                    "virtual host or a route")));
 }
 
-// With the runtime feature enabled a configured metrics namespace replaces the default and is
-// registered as a custom stat namespace.
+// With the runtime feature enabled a configured metrics namespace replaces the default, is
+// registered as a custom stat namespace, and roots the statistics of the specifier.
 TEST_F(DynamicModuleRouteSpecifierTest, RegistersCustomStatNamespace) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
@@ -478,6 +478,13 @@ TEST_F(DynamicModuleRouteSpecifierTest, RegistersCustomStatNamespace) {
 )EOF");
   ASSERT_TRUE(config.ok());
   EXPECT_TRUE(custom_stat_namespaces_.registered("custom_metrics"));
+
+  // The statistics of the specifier are rooted at the configured metrics namespace.
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ(
+      1,
+      context_.store_.counter("custom_metrics.route_specifier.test.decision_pass_through").value());
 }
 
 // A decision that records route entry overrides produces a route entry wrapper. Its rewritten path,
@@ -605,9 +612,9 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteMetadataRejectionFailsOpen) {
   const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
   ASSERT_NE(nullptr, route.route);
   EXPECT_EQ("matched_cluster", route.route->routeEntry()->clusterName());
-  EXPECT_EQ(1,
-            context_.store_.counter("route_specifier.dynamic_modules.test.failure_route_metadata")
-                .value());
+  EXPECT_EQ(
+      1, context_.store_.counter("dynamicmodulescustom.route_specifier.test.failure_route_metadata")
+             .value());
 }
 
 } // namespace

@@ -253,14 +253,19 @@ message DynamicModuleRouteSpecifier {
   google.protobuf.Any specifier_config = 3;
 
   // Prefix for the statistics of this specifier, emitted as
-  // ``route_specifier.dynamic_modules.<stat_prefix>.*``. Specifiers that share a prefix share
-  // counters, so the prefix must be unique within the Envoy process.
+  // ``<metrics_namespace>.route_specifier.<stat_prefix>.*``, where ``metrics_namespace`` is the
+  // :ref:`metrics_namespace
+  // <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>`
+  // of the module. Specifiers that share a metrics namespace and prefix share counters, so keep
+  // the prefix unique within that namespace.
   string stat_prefix = 4 [(validate.rules).string = {min_len: 1}];
 
-  // The route templates the module may select. The ``template_id`` values must be unique.
+  // The route templates the module may select by ``template_id``, each replacing the resolved
+  // route with a route built from configuration. The ``template_id`` values must be unique.
   repeated RouteTemplate route_templates = 5;
 
-  // Route action overrides the module may select by name with ``set_route_action_override``.
+  // Named route action overrides the module may select with ``set_route_action_override``, each
+  // overlaying its action properties onto the produced route.
   map<string, RouteActionOverride> route_action_overrides = 6
       [(validate.rules).map = {keys {string {min_len: 1}}}];
 

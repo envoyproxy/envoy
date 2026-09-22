@@ -315,7 +315,7 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, PassThrough) {
 
   auto response = sendRequest({});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.decision_pass_through",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.decision_pass_through",
                                testing::Ge(1));
 }
 
@@ -343,7 +343,7 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, SelectsTemplate) {
                                {"x-echo", "route-cluster-name"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("canary", header(response->headers(), "x-echo-result"));
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.decision_select_template",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.decision_select_template",
                                testing::Ge(1));
 }
 
@@ -388,8 +388,8 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, TemplateMatchFailedPassesThro
 
   auto response = sendRequest({{"x-decision", "select-template"}, {"x-template", "unmatched"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.failure_template_match_failed",
-                               testing::Ge(1));
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.test.failure_template_match_failed", testing::Ge(1));
 }
 
 // A decision that selects no template cannot be honored either.
@@ -399,8 +399,8 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, TemplateNotSelectedPassesThro
 
   auto response = sendRequest({{"x-decision", "select-template"}, {"x-template", "unknown"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.failure_template_not_selected",
-                               testing::Ge(1));
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.test.failure_template_not_selected", testing::Ge(1));
 }
 
 // A module that reports an error is handled by the failure policy rather than by the decision.
@@ -410,7 +410,7 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ModuleErrorPassesThrough) {
 
   auto response = sendRequest({{"x-decision", "error"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.failure_module_error",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.failure_module_error",
                                testing::Ge(1));
 }
 
@@ -432,7 +432,7 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, NoRoute) {
 
   auto response = sendRequest({{"x-decision", "no-route"}});
   EXPECT_EQ("404", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.decision_no_route",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.decision_no_route",
                                testing::Ge(1));
 }
 
@@ -449,7 +449,7 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverridesCluster) {
   EXPECT_EQ("cluster_0", header(response->headers(), "x-echo-result"));
   test_server_->waitForCounter("cluster.canary.upstream_rq_200", testing::Ge(1));
   EXPECT_EQ(0, counterValue("cluster.cluster_0.upstream_rq_200"));
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.decision_override",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.decision_override",
                                testing::Ge(1));
 }
 
@@ -482,10 +482,12 @@ shadow_mode:
   auto response =
       sendRequest({{"x-decision", "override"}, {"x-filter-disabled", "envoy.filters.http.denied"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_match", testing::Ge(1));
-  EXPECT_EQ(0, test_server_
-                   ->counter("route_specifier.dynamic_modules.test.shadow_mismatch_filter_disabled")
-                   ->value());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_match",
+                               testing::Ge(1));
+  EXPECT_EQ(
+      0, test_server_
+             ->counter("dynamicmodulescustom.route_specifier.test.shadow_mismatch_filter_disabled")
+             ->value());
 }
 
 // A module that disables an allowed filter differs from the route table it replaces, which shadow
@@ -503,7 +505,7 @@ shadow_mode:
       {{"x-decision", "override"}, {"x-filter-disabled", "envoy.filters.http.allowed"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter(
-      "route_specifier.dynamic_modules.test.shadow_mismatch_filter_disabled", testing::Ge(1));
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_filter_disabled", testing::Ge(1));
 }
 
 // Route entry properties cannot be applied to a route that answers the request directly.
@@ -515,7 +517,8 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverrideOnDirectResponse) {
       {{"x-decision", "select-template"}, {"x-template", "direct"}, {"x-cluster", "canary"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter(
-      "route_specifier.dynamic_modules.test.failure_override_on_non_route_entry", testing::Ge(1));
+      "dynamicmodulescustom.route_specifier.test.failure_override_on_non_route_entry",
+      testing::Ge(1));
 }
 
 // The route timeout a module records reaches the upstream request.
@@ -543,8 +546,8 @@ shadow_mode:
 
   auto response = sendRequest({{"x-decision", "override"}, {"x-override", "hedged_action"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_mismatch_hedge_policy",
-                               testing::Ge(1));
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_hedge_policy", testing::Ge(1));
 }
 
 // The status code a module records for a missing cluster is the one the request fails with.
@@ -573,10 +576,12 @@ shadow_mode:
                                {"x-route-meta-number", "42"},
                                {"x-route-meta-bool", "true"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_match", testing::Ge(1));
-  EXPECT_EQ(0, test_server_
-                   ->counter("route_specifier.dynamic_modules.test.shadow_mismatch_route_metadata")
-                   ->value());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_match",
+                               testing::Ge(1));
+  EXPECT_EQ(
+      0, test_server_
+             ->counter("dynamicmodulescustom.route_specifier.test.shadow_mismatch_route_metadata")
+             ->value());
 }
 
 // An override of a request that matching resolved no route for cannot be honored.
@@ -759,7 +764,7 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsRouteStateWithoutRoute) 
     EXPECT_EQ("404", response->headers().getStatusValue()) << accessor;
   }
   test_server_->waitForCounter(
-      "route_specifier.dynamic_modules.test.failure_override_without_route", testing::Ge(1));
+      "dynamicmodulescustom.route_specifier.test.failure_override_without_route", testing::Ge(1));
 }
 
 // The route getters read a direct response input route, including its response code.
@@ -886,7 +891,7 @@ runtime_fraction:
 
   auto response = sendRequest({{"x-decision", "no-route"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.runtime_skipped",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.runtime_skipped",
                                testing::Ge(1));
 }
 
@@ -902,11 +907,11 @@ shadow_mode:
   auto response = sendRequest({{"x-decision", "select-template"}, {"x-template", "canary"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_mismatch",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_mismatch",
                                testing::Ge(1));
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_mismatch_cluster_name",
-                               testing::Ge(1));
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_mismatch_timeout",
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_cluster_name", testing::Ge(1));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_mismatch_timeout",
                                testing::Ge(1));
   test_server_->waitForCounter("dynamicmodulescustom.shadow_results.outcome.mismatch",
                                testing::Ge(1));
@@ -951,7 +956,7 @@ shadow_mode: {}
   };
   for (const auto& test_case : test_cases) {
     const std::string counter =
-        absl::StrCat("route_specifier.dynamic_modules.test.shadow_mismatch_", test_case.field);
+        absl::StrCat("dynamicmodulescustom.route_specifier.test.shadow_mismatch_", test_case.field);
     const uint64_t before = test_server_->counter(counter)->value();
     auto response = sendRequest(test_case.headers);
     EXPECT_EQ("200", response->headers().getStatusValue()) << test_case.field;
@@ -980,10 +985,11 @@ shadow_mode:
                                                            {"x-template", "redirect_found"}}));
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("301", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_mismatch_response_code",
-                               testing::Ge(1));
   test_server_->waitForCounter(
-      "route_specifier.dynamic_modules.test.shadow_mismatch_redirect_location", testing::Ge(1));
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_response_code", testing::Ge(1));
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_redirect_location",
+      testing::Ge(1));
 
   // The matched route and the template answer with different bodies under different names.
   response = codec_client_->makeHeaderOnlyRequest(requestHeaders(
@@ -991,9 +997,10 @@ shadow_mode:
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter(
-      "route_specifier.dynamic_modules.test.shadow_mismatch_direct_response_body", testing::Ge(1));
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_mismatch_route_name",
-                               testing::Ge(1));
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_direct_response_body",
+      testing::Ge(1));
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_route_name", testing::Ge(1));
 }
 
 // The comparison of the properties built from extensions runs their whole comparison, not only the
@@ -1010,7 +1017,8 @@ shadow_mode:
       {{":path", "/complex"}, {"x-decision", "override"}, {"x-override", "complex_match"}}));
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_match", testing::Ge(1));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_match",
+                               testing::Ge(1));
 }
 
 // When the properties built from extensions differ, each is reported on its own mismatch counter.
@@ -1025,30 +1033,30 @@ shadow_mode:
       {{":path", "/complex"}, {"x-decision", "override"}, {"x-override", "complex_diff"}}));
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_mismatch_hash_policy",
-                               testing::Ge(1));
   test_server_->waitForCounter(
-      "route_specifier.dynamic_modules.test.shadow_mismatch_metadata_match", testing::Ge(1));
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_hash_policy", testing::Ge(1));
   test_server_->waitForCounter(
-      "route_specifier.dynamic_modules.test.shadow_mismatch_request_mirror_policies",
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_metadata_match", testing::Ge(1));
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_request_mirror_policies",
       testing::Ge(1));
 
   // A metadata match that differs in the number of criteria reaches the size check, a different
   // rejection than a value that differs.
   const uint64_t metadata_mismatches =
-      counterValue("route_specifier.dynamic_modules.test.shadow_mismatch_metadata_match");
+      counterValue("dynamicmodulescustom.route_specifier.test.shadow_mismatch_metadata_match");
   response = codec_client_->makeHeaderOnlyRequest(requestHeaders(
       {{":path", "/complex"}, {"x-decision", "override"}, {"x-override", "complex_meta_size"}}));
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter(
-      "route_specifier.dynamic_modules.test.shadow_mismatch_metadata_match",
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_metadata_match",
       testing::Gt(metadata_mismatches));
 
   // A mirror policy whose header mutations differ is compared through its header evaluator, past
   // the comparison of its plain fields.
-  const uint64_t mirror_mismatches =
-      counterValue("route_specifier.dynamic_modules.test.shadow_mismatch_request_mirror_policies");
+  const uint64_t mirror_mismatches = counterValue(
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_request_mirror_policies");
   response = codec_client_->makeHeaderOnlyRequest(
       requestHeaders({{":path", "/complex"},
                       {"x-decision", "override"},
@@ -1056,7 +1064,7 @@ shadow_mode:
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter(
-      "route_specifier.dynamic_modules.test.shadow_mismatch_request_mirror_policies",
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_request_mirror_policies",
       testing::Gt(mirror_mismatches));
 }
 
@@ -1075,7 +1083,8 @@ shadow_mode: {}
       requestHeaders({{":authority", "nomatch.example.com"}, {"x-decision", "no-route"}}));
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("404", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_match", testing::Ge(1));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_match",
+                               testing::Ge(1));
 }
 
 // Shadow mode also compares the filters named in its configuration, so an operator can watch a
@@ -1093,7 +1102,7 @@ shadow_mode:
   auto response = sendRequest({{"x-decision", "select-template"}, {"x-template", "filter_off"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter(
-      "route_specifier.dynamic_modules.test.shadow_mismatch_filter_disabled", testing::Ge(1));
+      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_filter_disabled", testing::Ge(1));
 }
 
 // A shadowed decision that produces an equivalent route is counted as a match.
@@ -1107,7 +1116,8 @@ shadow_mode:
   auto response = sendRequest({{"x-decision", "override"}, {"x-cluster", "cluster_0"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_match", testing::Ge(1));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_match",
+                               testing::Ge(1));
   test_server_->waitForCounter("dynamicmodulescustom.shadow_results.outcome.match", testing::Ge(1));
 }
 
@@ -1121,7 +1131,7 @@ shadow_mode: {}
 
   auto response = sendRequest({});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_pass_through",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_pass_through",
                                testing::Ge(1));
 }
 
@@ -1134,9 +1144,10 @@ shadow_mode: {}
 
   auto response = sendRequest({{"x-decision", "error"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.shadow_failure",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_failure",
                                testing::Ge(1));
-  EXPECT_EQ(0, test_server_->counter("route_specifier.dynamic_modules.test.shadow_match")->value());
+  EXPECT_EQ(
+      0, test_server_->counter("dynamicmodulescustom.route_specifier.test.shadow_match")->value());
   test_server_->waitForCounter("dynamicmodulescustom.shadow_results.outcome.failure",
                                testing::Ge(1));
 }
@@ -1155,7 +1166,7 @@ typed_config:
   auto response = sendRequest({{"x-decision", "override"}, {"x-cluster", "canary"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   // The module ran once while the route was first resolved and again for the refresh.
-  test_server_->waitForCounter("route_specifier.dynamic_modules.test.decision_override",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.decision_override",
                                testing::Ge(2));
   test_server_->waitForCounter("cluster.canary.upstream_rq_200", testing::Ge(1));
 }
@@ -1168,16 +1179,16 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, StopsChain) {
 
   auto response = sendRequest({{"x-decision", "override"}, {"x-cluster", "canary"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.second.decision_override",
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.second.decision_override",
                                testing::Ge(1));
 
   response =
       sendRequest({{"x-decision", "override"}, {"x-cluster", "canary"}, {"x-stop-chain", "true"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   // The second specifier did not run again, so its counter did not move.
-  EXPECT_EQ(
-      1,
-      test_server_->counter("route_specifier.dynamic_modules.second.decision_override")->value());
+  EXPECT_EQ(1,
+            test_server_->counter("dynamicmodulescustom.route_specifier.second.decision_override")
+                ->value());
 }
 
 // A decision that continues the chain lets the specifiers after it run, even for a decision that
@@ -1192,15 +1203,16 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ContinuesChain) {
                                {"x-template", "canary"},
                                {"x-echo", "selected-template"}});
   EXPECT_EQ("canary", header(baseline->headers(), "x-echo-result"));
-  EXPECT_EQ(0, counterValue("route_specifier.dynamic_modules.second.decision_select_template"));
+  EXPECT_EQ(0,
+            counterValue("dynamicmodulescustom.route_specifier.second.decision_select_template"));
 
   // Continuing the chain is the only difference, so the second specifier running is attributable to
   // it.
   auto response = sendRequest(
       {{"x-decision", "select-template"}, {"x-template", "canary"}, {"x-continue-chain", "true"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("route_specifier.dynamic_modules.second.decision_select_template",
-                               testing::Ge(1));
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.second.decision_select_template", testing::Ge(1));
 }
 
 // Each append action combines an added header with one of the same name in its own way.

@@ -305,7 +305,7 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
       runtime_(context.serverFactoryContext().runtime()),
       time_source_(context.serverFactoryContext().timeSource()),
       stats_scope_(context.serverFactoryContext().serverScope().createScope(
-          absl::StrCat("route_specifier.dynamic_modules.", proto_config.stat_prefix(), "."))),
+          absl::StrCat(metrics_namespace, ".route_specifier.", proto_config.stat_prefix(), "."))),
       stats_{ALL_DYNAMIC_MODULE_ROUTE_SPECIFIER_STATS(POOL_COUNTER(*stats_scope_),
                                                       POOL_HISTOGRAM(*stats_scope_))},
       mismatch_counters_(CompareFieldCount, nullptr) {

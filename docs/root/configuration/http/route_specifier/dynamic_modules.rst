@@ -93,10 +93,10 @@ Notes
 Statistics
 ----------
 
-The specifier emits statistics rooted at ``route_specifier.dynamic_modules.<stat_prefix>.``, where
-``stat_prefix`` is the
+The specifier emits statistics rooted at ``<metrics_namespace>.route_specifier.<stat_prefix>.``,
+where ``stat_prefix`` is the
 :ref:`stat_prefix <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.stat_prefix>`
-of the specifier.
+of the specifier, sharing the ``metrics_namespace`` of the module-defined metrics above.
 
 .. csv-table::
   :header: Name, Type, Description
