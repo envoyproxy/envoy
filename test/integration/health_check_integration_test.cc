@@ -1091,8 +1091,7 @@ public:
     auto* hc1 = cluster->add_health_checks();
     hc1->set_name(name1);
     hc1->mutable_timeout()->set_seconds(30);
-    hc1->mutable_interval()->CopyFrom(
-        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    hc1->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     hc1->mutable_no_traffic_interval()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     hc1->mutable_unhealthy_threshold()->set_value(1);
@@ -1103,8 +1102,7 @@ public:
     auto* hc2 = cluster->add_health_checks();
     hc2->set_name(name2);
     hc2->mutable_timeout()->set_seconds(30);
-    hc2->mutable_interval()->CopyFrom(
-        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    hc2->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     hc2->mutable_no_traffic_interval()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     hc2->mutable_unhealthy_threshold()->set_value(1);

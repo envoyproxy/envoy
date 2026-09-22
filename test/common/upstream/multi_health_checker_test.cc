@@ -36,7 +36,8 @@ public:
 
   void createChecker(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks) {
-    health_checker_ = std::make_shared<MultiHealthChecker>(*cluster_, health_checks, server_context_);
+    health_checker_ =
+        std::make_shared<MultiHealthChecker>(*cluster_, health_checks, server_context_);
   }
 
   void setupTwoTcpNoData() {
@@ -424,7 +425,8 @@ public:
     )EOF",
     });
 
-    health_checker_ = std::make_shared<MultiHealthChecker>(*cluster_, health_checks, server_context_);
+    health_checker_ =
+        std::make_shared<MultiHealthChecker>(*cluster_, health_checks, server_context_);
   }
 
   std::shared_ptr<NiceMock<MockClusterMockPrioritySet>> cluster_;

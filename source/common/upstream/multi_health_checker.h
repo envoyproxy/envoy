@@ -60,8 +60,8 @@ private:
     uint32_t pending_bits{0};
   };
 
-  void onCheckerResult(uint32_t checker_index, HostSharedPtr host,
-                       HealthTransition changed_state, HealthState result);
+  void onCheckerResult(uint32_t checker_index, HostSharedPtr host, HealthTransition changed_state,
+                       HealthState result);
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void initializeHost(const HostSharedPtr& host);
 

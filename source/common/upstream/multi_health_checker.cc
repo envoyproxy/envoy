@@ -7,11 +7,10 @@ namespace Upstream {
 
 namespace {
 
-constexpr uint32_t kActiveHcFlagMask =
-    static_cast<uint32_t>(Host::HealthFlag::FAILED_ACTIVE_HC) |
-    static_cast<uint32_t>(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
-    static_cast<uint32_t>(Host::HealthFlag::PENDING_ACTIVE_HC) |
-    static_cast<uint32_t>(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+constexpr uint32_t kActiveHcFlagMask = static_cast<uint32_t>(Host::HealthFlag::FAILED_ACTIVE_HC) |
+                                       static_cast<uint32_t>(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
+                                       static_cast<uint32_t>(Host::HealthFlag::PENDING_ACTIVE_HC) |
+                                       static_cast<uint32_t>(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
 
 } // namespace
 
@@ -45,17 +44,17 @@ MultiHealthChecker::MultiHealthChecker(
     data.stat_scope = cluster.info()->statsScope().createScopeWithTaggedName(
         "health_check", tags, absl::StrCat("health_check.name.", sub_config.name(), "."));
 
-    auto checker_or_error = HealthCheckerFactory::create(
-        sub_config, cluster, server_context, *data.stat_scope, data.flag_callbacks);
+    auto checker_or_error = HealthCheckerFactory::create(sub_config, cluster, server_context,
+                                                         *data.stat_scope, data.flag_callbacks);
     THROW_IF_NOT_OK(checker_or_error.status());
 
     data.checker = std::move(checker_or_error.value());
 
-    data.checker->addHostCheckCompleteCb(
-        [this, checker_idx](const HostSharedPtr& host, HealthTransition changed_state,
-                            HealthState result) {
-          onCheckerResult(checker_idx, host, changed_state, result);
-        });
+    data.checker->addHostCheckCompleteCb([this, checker_idx](const HostSharedPtr& host,
+                                                             HealthTransition changed_state,
+                                                             HealthState result) {
+      onCheckerResult(checker_idx, host, changed_state, result);
+    });
   }
 
   member_update_cb_ = cluster_.prioritySet().addMemberUpdateCb(
@@ -120,12 +119,9 @@ void MultiHealthChecker::initializeHost(const HostSharedPtr& host) {
 
   const uint32_t all_bits = (1u << checkers_.size()) - 1;
   auto& state = host_states_[host.get()];
-  state.pending_bits =
-      host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ? all_bits : 0;
-  state.fail_bits =
-      host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ? all_bits : 0;
-  state.degraded_bits =
-      host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC) ? all_bits : 0;
+  state.pending_bits = host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ? all_bits : 0;
+  state.fail_bits = host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ? all_bits : 0;
+  state.degraded_bits = host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC) ? all_bits : 0;
 
   adjustGauges(host_states_[host.get()], &Stats::Gauge::inc);
 }
