@@ -78,6 +78,9 @@ TagVector MetricHelper::tags(const SymbolTable& symbol_table) const {
 }
 
 TagVector MetricHelper::tags(const SymbolTable& symbol_table, StatNameStringCache& cache) const {
+  if (!cache.enabled()) {
+    return tags(symbol_table);
+  }
   TagVector tags;
   iterateTagStatNames([&tags, &symbol_table, &cache](StatName name, StatName value) -> bool {
     tags.emplace_back(cache.decodeTag(name, value, symbol_table));

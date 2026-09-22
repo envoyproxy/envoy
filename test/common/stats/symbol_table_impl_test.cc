@@ -9,6 +9,7 @@
 #include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
@@ -1168,6 +1169,20 @@ TEST_F(StatNameTest, StringCache) {
   cache.clear();
   EXPECT_TRUE(cache.empty());
   EXPECT_EQ(0, cache.size());
+}
+
+TEST_F(StatNameTest, StringCacheDisabled) {
+  StatName a = makeStat("cluster.service_foo.upstream_rq_200");
+  StatName c = makeStat("200");
+
+  StatNameStringCache cache(&table_, /*enabled=*/false);
+  EXPECT_FALSE(cache.enabled());
+  Tag tag = cache.decodeTag(a, c);
+  EXPECT_EQ("cluster.service_foo.upstream_rq_200", tag.name_);
+  EXPECT_EQ("200", tag.value_);
+
+  cache.setEnabled(true);
+  EXPECT_TRUE(cache.enabled());
 }
 
 } // namespace Stats

@@ -12,6 +12,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -96,7 +97,9 @@ MetricsPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
   int64_t snapshot_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                  snapshot.snapshotTime().time_since_epoch())
                                  .count();
-  Stats::StatNameStringCache cache;
+  Stats::StatNameStringCache cache(
+      nullptr,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stat_name_string_cache"));
   for (const auto& counter : snapshot.counters()) {
     if (predicate_(counter.counter_.get())) {
       flushCounter(*metrics->Add(), counter, snapshot_time_ms, cache);

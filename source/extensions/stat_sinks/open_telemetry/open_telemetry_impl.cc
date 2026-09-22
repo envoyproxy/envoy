@@ -1,5 +1,6 @@
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/stat_match_action.h"
 
@@ -374,7 +375,9 @@ MetricAggregator::SortedAttributesVector OtlpMetricsFlusherImpl::getCombinedAttr
 
 template <typename SinkType>
 void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkType& sink) const {
-  Stats::StatNameStringCache cache;
+  Stats::StatNameStringCache cache(
+      nullptr,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stat_name_string_cache"));
 
   // Process Gauges
   for (const auto& gauge : snapshot.gauges()) {

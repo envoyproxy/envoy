@@ -1240,12 +1240,15 @@ template <class T> using StatNameHashMap = absl::flat_hash_map<StatName, T>;
  *
  * NOTE: StatNameStringCache holds raw StatName keys pointing to backing SymbolTable/Metric
  * storage. It should only be used in ephemeral scopes (e.g. within a single flush tick) and
- * must not be retained across metric lifecycle destructions.
+ * must not be retained across metric flush lifecycles.
  */
 class StatNameStringCache {
 public:
-  explicit StatNameStringCache(const SymbolTable* symbol_table = nullptr)
-      : symbol_table_(symbol_table) {}
+  explicit StatNameStringCache(const SymbolTable* symbol_table = nullptr, bool enabled = true)
+      : symbol_table_(symbol_table), enabled_(enabled) {}
+
+  bool enabled() const { return enabled_; }
+  void setEnabled(bool enabled) { enabled_ = enabled; }
 
   /**
    * Decodes a StatName to std::string using the cache.
@@ -1295,6 +1298,9 @@ public:
    * Decodes all tags of a Metric into a TagVector using the cache.
    */
   template <typename MetricType> TagVector decodeTags(const MetricType& metric) {
+    if (!enabled_) {
+      return metric.tags();
+    }
     if constexpr (requires(MetricType m) {
                     m.iterateTagStatNames(std::declval<std::function<bool(StatName, StatName)>>());
                   }) {
@@ -1315,7 +1321,10 @@ public:
   /**
    * Decodes the full name of a Metric using the cache.
    */
-  template <typename MetricType> const std::string& decodeMetricName(const MetricType& metric) {
+  template <typename MetricType> std::string decodeMetricName(const MetricType& metric) {
+    if (!enabled_) {
+      return metric.name();
+    }
     if constexpr (requires {
                     metric.statName();
                     metric.constSymbolTable();
@@ -1331,8 +1340,10 @@ public:
   /**
    * Decodes the tag-extracted name of a Metric using the cache.
    */
-  template <typename MetricType>
-  const std::string& decodeTagExtractedName(const MetricType& metric) {
+  template <typename MetricType> std::string decodeTagExtractedName(const MetricType& metric) {
+    if (!enabled_) {
+      return metric.tagExtractedName();
+    }
     if constexpr (requires {
                     metric.tagExtractedStatName();
                     metric.constSymbolTable();
@@ -1351,6 +1362,7 @@ public:
 
 private:
   const SymbolTable* symbol_table_;
+  bool enabled_{true};
   StatNameHashMap<std::string> cache_;
   const std::string empty_string_;
 };

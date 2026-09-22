@@ -11,6 +11,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -350,7 +351,9 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
 
   // Save a map of the relevant histograms per cluster in a convenient format.
   absl::node_hash_map<std::string, QuantileLatencyMap> time_histograms;
-  Stats::StatNameStringCache cache(&server_.scope().symbolTable());
+  Stats::StatNameStringCache cache(
+      &server_.scope().symbolTable(),
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stat_name_string_cache"));
   for (const auto& histogram : snapshot.histograms()) {
     if (histogram.get().tagExtractedStatName() == cluster_upstream_rq_time_) {
       std::optional<std::string> value =
