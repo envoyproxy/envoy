@@ -29,17 +29,16 @@ absl::StatusOr<std::shared_ptr<MultiHealthChecker>> MultiHealthChecker::create(
   auto checker = std::shared_ptr<MultiHealthChecker>(new MultiHealthChecker(cluster));
 
   checker->checkers_.reserve(health_checks.size());
-  for (int i = 0; i < health_checks.size(); i++) {
-    const auto& sub_config = health_checks[i];
+  for (uint32_t checker_idx = 0; checker_idx < static_cast<uint32_t>(health_checks.size());
+       checker_idx++) {
+    const auto& sub_config = health_checks[checker_idx];
 
     if (sub_config.name().empty()) {
       return absl::InvalidArgumentError(
           fmt::format("health check at index {} is missing a name; all health checks "
                       "must have a name when multiple health checks are configured",
-                      i));
+                      checker_idx));
     }
-
-    const uint32_t checker_idx = static_cast<uint32_t>(i);
 
     checker->checkers_.emplace_back(*checker, checker_idx);
     auto& data = checker->checkers_.back();
