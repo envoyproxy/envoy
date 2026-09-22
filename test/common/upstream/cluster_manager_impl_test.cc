@@ -2892,7 +2892,8 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithWaitForWarmOnInitFalseDoesNotBl
 
 // When one cluster has wait_for_warm_on_init: false and another is warming normally,
 // the normal cluster should still be able to pause and then unblock CDS independently.
-TEST_F(ClusterManagerImplTest, WaitForWarmOnInitFalseClusterDoesNotBlockCdsForOtherWarmingClusters) {
+TEST_F(ClusterManagerImplTest,
+       WaitForWarmOnInitFalseClusterDoesNotBlockCdsForOtherWarmingClusters) {
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
   ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
