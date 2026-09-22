@@ -157,6 +157,30 @@ json generateInitializeResponse(const json& session_id, absl::string_view server
   return ret;
 }
 
+json generateServerDiscoverResponse(const json& session_id, absl::string_view server_name) {
+  json ret;
+  ret[McpConstants::JSONRPC_FIELD] = McpConstants::JSONRPC_VERSION;
+  ret[McpConstants::ID_FIELD] = session_id;
+
+  json result;
+  result[McpConstants::SUPPORTED_VERSIONS_FIELD] =
+      json::array({McpConstants::MCP_VERSION_2026_07_28});
+
+  result[McpConstants::CAPABILITIES_FIELD][McpConstants::TOOLS_FIELD]
+        [McpConstants::LIST_CHANGED_FIELD] = false;
+  result[McpConstants::META_FIELD][McpConstants::MCP_META_SERVER_INFO_FIELD]
+        [McpConstants::NAME_FIELD] = server_name;
+  result[McpConstants::META_FIELD][McpConstants::MCP_META_SERVER_INFO_FIELD]
+        [McpConstants::VERSION_FIELD] = McpConstants::DEFAULT_SERVER_VERSION;
+
+  result[McpConstants::TTL_MS_FIELD] = 0;
+  result[McpConstants::CACHE_SCOPE_FIELD] = McpConstants::CACHE_SCOPE_PUBLIC;
+  ret[McpConstants::RESULT_FIELD] = result;
+
+  addCompleteResultTypeIfStateless(ret, /*is_stateless_request=*/true);
+  return ret;
+}
+
 json generateErrorJsonResponse(int error_code, absl::string_view error_message) {
   return json{
       {McpConstants::ERROR_CODE_FIELD, error_code},
@@ -622,6 +646,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
   if (mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
       mcp_operation_ == McpOperation::OperationFailed ||
+      mcp_operation_ == McpOperation::ServerDiscover ||
       mcp_operation_ == McpOperation::ToolsListLocal) {
     // sendLocalReply/encodeHeaders was called in handleMcpMethod for these operations.
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -639,6 +664,8 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   // The response for InitializedNotification is empty body so we don't need
   // to modify the response headers.
   case McpOperation::InitializationAck:
+  // ServerDiscover sends a local reply, so the headers are already correct.
+  case McpOperation::ServerDiscover:
   // ToolsListLocal sends a local reply, so the headers are already correct.
   case McpOperation::ToolsListLocal:
     return Http::FilterHeadersStatus::Continue;
@@ -712,11 +739,11 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
 
 Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
                                                            bool end_stream) {
-  // No need to encode the response body for Initialization and InitializationAck. ToolsListLocal is
-  // a local response, and the response body is already encoded.
+
   if (mcp_operation_ == McpOperation::Unspecified ||
       mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
+      mcp_operation_ == McpOperation::ServerDiscover ||
       mcp_operation_ == McpOperation::ToolsListLocal) {
     return Http::FilterDataStatus::Continue;
   }
@@ -1039,6 +1066,17 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
       setTraceContextHeaders(*request_headers, trace_context);
     }
     mapMcpToolToApiBackend(json_rpc, per_route_config);
+  } else if (method == McpConstants::Methods::SERVER_DISCOVER && is_stateless_request_) {
+    mcp_operation_ = McpOperation::ServerDiscover;
+    setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
+                                   ? json_rpc[McpConstants::PARAMS_FIELD]
+                                   : json::object());
+    decoder_callbacks_->sendLocalReply(
+        Http::Code::OK, generateServerDiscoverResponse(*session_id_, server_name_).dump(),
+        [](Http::ResponseHeaderMap& headers) {
+          headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+        },
+        Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_server_discover");
   } else {
     sendErrorResponse(
         Http::Code::OK, BridgeStatus::RequestMcpMethodNotSupported,

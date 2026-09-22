@@ -281,6 +281,8 @@ private:
     ToolsCall = 6,
     // MCP operation failed.
     OperationFailed = 7,
+    // Clients send a server/discover request that is handled locally.
+    ServerDiscover = 8,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   std::optional<nlohmann::json> session_id_;
