@@ -114,6 +114,8 @@ void MultiHealthChecker::start() {
   for (auto& data : checkers_) {
     data.checker->start();
   }
+
+  started_ = true;
 }
 
 void MultiHealthChecker::initializeHost(const HostSharedPtr& host) {
@@ -137,6 +139,10 @@ void MultiHealthChecker::initializeHost(const HostSharedPtr& host) {
 
 void MultiHealthChecker::onClusterMemberUpdate(const HostVector& hosts_added,
                                                const HostVector& hosts_removed) {
+  if (!started_) {
+    return;
+  }
+
   for (const auto& host : hosts_added) {
     initializeHost(host);
   }

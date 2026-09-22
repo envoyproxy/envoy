@@ -81,6 +81,7 @@ private:
   absl::node_hash_map<const Host*, PerHostState> host_states_;
   std::vector<HostStatusCb> callbacks_;
   Common::CallbackHandlePtr member_update_cb_;
+  bool started_{false};
 };
 
 } // namespace Upstream
