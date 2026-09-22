@@ -92,9 +92,8 @@ public:
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
-  void setIntTag(absl::string_view name, int64_t value) override;
-  void setDoubleTag(absl::string_view name, double value) override;
-  void setBoolTag(absl::string_view name, bool value) override;
+  void setTypedTag(absl::string_view name, absl::string_view value,
+                   Tracing::TagValueType type) override;
   void reserveTags(size_t size) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override;
   void finishSpan() override;

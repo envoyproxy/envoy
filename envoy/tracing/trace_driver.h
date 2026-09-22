@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -14,6 +13,13 @@ namespace Tracing {
 
 class Span;
 using SpanPtr = std::unique_ptr<Span>;
+
+/**
+ * The desired value type for a typed span tag. Tracers that support typed span
+ * attributes (e.g. OpenTelemetry) may emit the tag as a native attribute of this
+ * type; tracers without such support keep treating the value as a string.
+ */
+enum class TagValueType { String, Int, Double, Bool };
 
 /**
  * The upstream service type.
@@ -77,36 +83,21 @@ public:
   virtual void setTag(absl::string_view name, absl::string_view value) PURE;
 
   /**
-   * Attach an integer-valued tag to a Span.
+   * Attach a typed tag to a Span.
    *
-   * The default implementation renders the value as a string via setTag(), so
-   * tracers without typed-attribute support keep their existing behavior. Tracers
-   * such as OpenTelemetry override this to emit a native integer span attribute.
+   * The value is provided as its string representation together with the desired
+   * type. The default implementation ignores the type and records the original
+   * string via setTag(), so tracers without typed-attribute support keep their
+   * existing behavior and never rewrite the value. Tracers such as OpenTelemetry
+   * override this to emit a native typed span attribute when the value parses,
+   * falling back to a string tag otherwise.
    * @param name the name of the tag
-   * @param value the integer value to associate with the tag
+   * @param value the string representation of the tag value
+   * @param type the desired value type
    */
-  virtual void setIntTag(absl::string_view name, int64_t value) {
-    setTag(name, std::to_string(value));
-  }
-
-  /**
-   * Attach a double-valued tag to a Span. See setIntTag() for the fallback
-   * semantics.
-   * @param name the name of the tag
-   * @param value the double value to associate with the tag
-   */
-  virtual void setDoubleTag(absl::string_view name, double value) {
-    setTag(name, std::to_string(value));
-  }
-
-  /**
-   * Attach a boolean-valued tag to a Span. See setIntTag() for the fallback
-   * semantics.
-   * @param name the name of the tag
-   * @param value the boolean value to associate with the tag
-   */
-  virtual void setBoolTag(absl::string_view name, bool value) {
-    setTag(name, value ? "true" : "false");
+  virtual void setTypedTag(absl::string_view name, absl::string_view value,
+                           TagValueType /* type */) {
+    setTag(name, value);
   }
 
   /**

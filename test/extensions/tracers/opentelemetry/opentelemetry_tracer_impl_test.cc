@@ -1174,9 +1174,12 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithTypedAttributes) {
                                              operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
-  span->setIntTag("int_tag", 42);
-  span->setDoubleTag("double_tag", 3.5);
-  span->setBoolTag("bool_tag", true);
+  span->setTypedTag("int_tag", "42", Tracing::TagValueType::Int);
+  span->setTypedTag("double_tag", "3.5", Tracing::TagValueType::Double);
+  span->setTypedTag("bool_tag", "true", Tracing::TagValueType::Bool);
+  span->setTypedTag("string_tag", "hello", Tracing::TagValueType::String);
+  // A value that does not parse to the requested type falls back to a string attribute.
+  span->setTypedTag("fallback_tag", "not-a-number", Tracing::TagValueType::Int);
 
   constexpr absl::string_view request_yaml = R"(
 resource_spans:
@@ -1210,6 +1213,12 @@ resource_spans:
         - key: "bool_tag"
           value:
             bool_value: true
+        - key: "string_tag"
+          value:
+            string_value: "hello"
+        - key: "fallback_tag"
+          value:
+            string_value: "not-a-number"
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();

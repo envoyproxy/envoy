@@ -18,7 +18,6 @@
 #include "test/mocks/router/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -514,29 +513,36 @@ TEST_F(HttpConnManFinalizerImplTest, SpanCustomTagsTypedValues) {
 
   {
     auto tag = make_tag("{ tag: int-ok, value: '42', value_type: INT }");
-    EXPECT_CALL(span, setIntTag(Eq("int-ok"), Eq(int64_t{42})));
+    EXPECT_CALL(span, setTypedTag(Eq("int-ok"), Eq("42"), TagValueType::Int));
     tag->applySpan(span, ctx);
   }
   {
     auto tag = make_tag("{ tag: double-ok, value: '3.5', value_type: DOUBLE }");
-    EXPECT_CALL(span, setDoubleTag(Eq("double-ok"), Eq(3.5)));
+    EXPECT_CALL(span, setTypedTag(Eq("double-ok"), Eq("3.5"), TagValueType::Double));
     tag->applySpan(span, ctx);
   }
   {
     auto tag = make_tag("{ tag: bool-ok, value: 'true', value_type: BOOL }");
-    EXPECT_CALL(span, setBoolTag(Eq("bool-ok"), Eq(true)));
+    EXPECT_CALL(span, setTypedTag(Eq("bool-ok"), Eq("true"), TagValueType::Bool));
     tag->applySpan(span, ctx);
   }
   {
-    // A value that does not parse to the requested type falls back to a string tag.
-    auto tag = make_tag("{ tag: int-bad, value: 'not-a-number', value_type: INT }");
-    EXPECT_CALL(span, setTag(Eq("int-bad"), Eq("not-a-number")));
+    // The raw string value is forwarded together with the requested type; parsing
+    // and any fallback are the tracer's responsibility, not the custom tag's.
+    auto tag = make_tag("{ tag: int-raw, value: 'not-a-number', value_type: INT }");
+    EXPECT_CALL(span, setTypedTag(Eq("int-raw"), Eq("not-a-number"), TagValueType::Int));
     tag->applySpan(span, ctx);
   }
   {
-    // The default value type keeps emitting a string tag.
-    auto tag = make_tag("{ tag: str, value: '42' }");
-    EXPECT_CALL(span, setTag(Eq("str"), Eq("42")));
+    // An explicit STRING type is forwarded as a string.
+    auto tag = make_tag("{ tag: str, value: '42', value_type: STRING }");
+    EXPECT_CALL(span, setTypedTag(Eq("str"), Eq("42"), TagValueType::String));
+    tag->applySpan(span, ctx);
+  }
+  {
+    // An unset value type is treated as a string.
+    auto tag = make_tag("{ tag: unspec, value: '42' }");
+    EXPECT_CALL(span, setTypedTag(Eq("unspec"), Eq("42"), TagValueType::String));
     tag->applySpan(span, ctx);
   }
 }
@@ -564,17 +570,17 @@ count: 7)EOF",
 
   {
     auto tag = make_tag("{ tag: lit, literal: { value: '42' }, value_type: INT }");
-    EXPECT_CALL(span, setIntTag(Eq("lit"), Eq(int64_t{42})));
+    EXPECT_CALL(span, setTypedTag(Eq("lit"), Eq("42"), TagValueType::Int));
     tag->applySpan(span, ctx);
   }
   {
     auto tag = make_tag("{ tag: env, environment: { name: E_TYPED_DOUBLE }, value_type: DOUBLE }");
-    EXPECT_CALL(span, setDoubleTag(Eq("env"), Eq(3.5)));
+    EXPECT_CALL(span, setTypedTag(Eq("env"), Eq("3.5"), TagValueType::Double));
     tag->applySpan(span, ctx);
   }
   {
     auto tag = make_tag("{ tag: hdr, request_header: { name: x-flag }, value_type: BOOL }");
-    EXPECT_CALL(span, setBoolTag(Eq("hdr"), Eq(true)));
+    EXPECT_CALL(span, setTypedTag(Eq("hdr"), Eq("true"), TagValueType::Bool));
     tag->applySpan(span, ctx);
   }
   {
@@ -584,28 +590,9 @@ metadata:
   kind: { request: {} }
   metadata_key: { key: m.typed, path: [ { key: count } ] }
 value_type: INT)EOF");
-    EXPECT_CALL(span, setIntTag(Eq("meta"), Eq(int64_t{7})));
+    EXPECT_CALL(span, setTypedTag(Eq("meta"), Eq("7"), TagValueType::Int));
     tag->applySpan(span, ctx);
   }
-}
-
-TEST_F(HttpConnManFinalizerImplTest, SpanCustomTagValueTypeRuntimeGuardDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.tracing_typed_custom_tags", "false"}});
-
-  request_headers_ = Http::TestRequestHeaderMapImpl{{":path", "/test"}, {":method", "GET"}};
-  ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers_));
-
-  HttpTraceContext trace_context{request_headers_};
-  const CustomTagContext ctx{trace_context, stream_info, {&request_headers_}};
-
-  envoy::type::tracing::v3::CustomTag custom_tag;
-  TestUtility::loadFromYaml("{ tag: lit, literal: { value: '42' }, value_type: INT }", custom_tag);
-  auto tag = CustomTagUtility::createCustomTag(custom_tag);
-
-  EXPECT_CALL(span, setIntTag(_, _)).Times(0);
-  EXPECT_CALL(span, setTag(Eq("lit"), Eq("42")));
-  tag->applySpan(span, ctx);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {

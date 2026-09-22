@@ -5,9 +5,8 @@
 #include "envoy/router/router.h"
 
 #include "source/common/formatter/substitution_formatter.h"
-#include "source/common/runtime/runtime_features.h"
 
-#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -23,40 +22,17 @@ std::optional<std::string> jsonOrNullopt(const Protobuf::Message& message) {
 #endif
 }
 
-void setTypedTag(Span& span, absl::string_view tag, absl::string_view value,
-                 envoy::type::tracing::v3::CustomTag::ValueType value_type) {
-  if (value_type != envoy::type::tracing::v3::CustomTag::STRING &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tracing_typed_custom_tags")) {
-    switch (value_type) {
-    case envoy::type::tracing::v3::CustomTag::INT: {
-      int64_t int_value = 0;
-      if (absl::SimpleAtoi(value, &int_value)) {
-        span.setIntTag(tag, int_value);
-        return;
-      }
-      break;
-    }
-    case envoy::type::tracing::v3::CustomTag::DOUBLE: {
-      double double_value = 0;
-      if (absl::SimpleAtod(value, &double_value)) {
-        span.setDoubleTag(tag, double_value);
-        return;
-      }
-      break;
-    }
-    case envoy::type::tracing::v3::CustomTag::BOOL: {
-      bool bool_value = false;
-      if (absl::SimpleAtob(value, &bool_value)) {
-        span.setBoolTag(tag, bool_value);
-        return;
-      }
-      break;
-    }
-    default:
-      break;
-    }
+TagValueType toTagValueType(envoy::type::tracing::v3::CustomTag::ValueType value_type) {
+  switch (value_type) {
+  case envoy::type::tracing::v3::CustomTag::INT:
+    return TagValueType::Int;
+  case envoy::type::tracing::v3::CustomTag::DOUBLE:
+    return TagValueType::Double;
+  case envoy::type::tracing::v3::CustomTag::BOOL:
+    return TagValueType::Bool;
+  default:
+    return TagValueType::String;
   }
-  span.setTag(tag, value);
 }
 
 } // namespace
@@ -64,7 +40,7 @@ void setTypedTag(Span& span, absl::string_view tag, absl::string_view value,
 void CustomTagBase::applySpan(Span& span, const CustomTagContext& ctx) const {
   absl::string_view tag_value = value(ctx);
   if (!tag_value.empty()) {
-    setTypedTag(span, tag(), tag_value, value_type_);
+    span.setTypedTag(tag(), tag_value, toTagValueType(value_type_));
   }
 }
 
@@ -114,12 +90,12 @@ void MetadataCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const
 
   if (!meta_str.has_value()) {
     if (!default_value_.empty()) {
-      setTypedTag(span, tag(), default_value_, value_type_);
+      span.setTypedTag(tag(), default_value_, toTagValueType(value_type_));
     }
     return;
   }
 
-  setTypedTag(span, tag(), meta_str.value(), value_type_);
+  span.setTypedTag(tag(), meta_str.value(), toTagValueType(value_type_));
 }
 
 void MetadataCustomTag::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
@@ -205,7 +181,7 @@ FormatterCustomTag::FormatterCustomTag(absl::string_view tag, absl::string_view 
 void FormatterCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const {
   auto formatted_value = formatter_->format(ctx.formatter_context, ctx.stream_info);
   if (!formatted_value.empty()) {
-    setTypedTag(span, tag_, formatted_value, value_type_);
+    span.setTypedTag(tag_, formatted_value, toTagValueType(value_type_));
   }
 }
 
