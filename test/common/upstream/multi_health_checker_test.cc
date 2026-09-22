@@ -259,21 +259,23 @@ TEST_F(MultiHealthCheckerImplTest, CallbackFiresOnTransition) {
 
   health_checker_->start();
 
+  // First checker reports but gate holds until all checkers have reported once.
   respondSuccess(s1);
+  EXPECT_EQ(0, callback_count);
+
+  // Second checker reports, gate lifts, first callback fires.
+  respondSuccess(s2);
   EXPECT_EQ(1, callback_count);
   EXPECT_EQ(HealthTransition::Unchanged, last_transition);
   EXPECT_EQ(HealthState::Healthy, last_state);
 
-  respondSuccess(s2);
-  EXPECT_EQ(2, callback_count);
-
   auto s1b = triggerNextCheck(s1);
   respondSuccess(s1b);
-  EXPECT_EQ(3, callback_count);
+  EXPECT_EQ(2, callback_count);
 
   auto s2b = triggerNextCheck(s2);
   respondFailure(s2b);
-  EXPECT_EQ(4, callback_count);
+  EXPECT_EQ(3, callback_count);
   EXPECT_EQ(HealthTransition::Changed, last_transition);
   EXPECT_EQ(HealthState::Unhealthy, last_state);
 }
@@ -627,6 +629,68 @@ TEST_F(MultiHealthCheckerDegradedTest, DestructorDecrementsGauges) {
   health_checker_.reset();
   EXPECT_EQ(0, gaugeValue("health_check.healthy"));
   EXPECT_EQ(0, gaugeValue("health_check.degraded"));
+}
+
+TEST_F(MultiHealthCheckerDegradedTest, GateWithFailureThenSuccessGaugeCorrect) {
+  setup();
+  auto host = makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host};
+  health_checker_->start();
+
+  ASSERT_EQ(2u, fake_factory_.instances_.size());
+  auto* checker_a = fake_factory_.instances_[0];
+  auto* checker_b = fake_factory_.instances_[1];
+
+  // Host starts healthy (gauge=1). First checker reports failure — gate holds.
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  checker_a->reportResult(host, true, false);
+  // No side effects yet: gauge still reflects initial state.
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+
+  // Second checker reports success — gate lifts. Aggregate is failed (one checker failed).
+  // Gauge must decrement from 1 to 0.
+  checker_b->reportResult(host, false, false);
+  EXPECT_EQ(0, gaugeValue("health_check.healthy"));
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+}
+
+TEST_F(MultiHealthCheckerDegradedTest, HostAddedAfterStartGateWorks) {
+  setup();
+  auto host1 = makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host1};
+  health_checker_->start();
+
+  ASSERT_EQ(2u, fake_factory_.instances_.size());
+  auto* checker_a = fake_factory_.instances_[0];
+  auto* checker_b = fake_factory_.instances_[1];
+
+  // Complete initial checks for host1.
+  checker_a->reportResult(host1, false, false);
+  checker_b->reportResult(host1, false, false);
+  EXPECT_FALSE(host1->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+
+  // Add a second host mid-flight.
+  auto host2 = makeTestHost(cluster_->info_, "tcp://127.0.0.1:81");
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host1, host2};
+  cluster_->prioritySet().getMockHostSet(0)->runCallbacks({host2}, {});
+
+  // host2 starts healthy (gauge now 2).
+  EXPECT_EQ(2, gaugeValue("health_check.healthy"));
+
+  // First checker reports failure for host2 — gate holds, no side effects.
+  checker_a->reportResult(host2, true, false);
+  EXPECT_FALSE(host2->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_EQ(2, gaugeValue("health_check.healthy"));
+
+  // Second checker reports success for host2 — gate lifts, host2 marked failed.
+  checker_b->reportResult(host2, false, false);
+  EXPECT_TRUE(host2->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+
+  // host1 is unaffected.
+  EXPECT_FALSE(host1->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 }
 
 } // namespace

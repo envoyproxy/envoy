@@ -125,6 +125,7 @@ void MultiHealthChecker::initializeHost(const HostSharedPtr& host) {
   state.pending_bits = host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ? all_bits : 0;
   state.fail_bits = host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ? all_bits : 0;
   state.degraded_bits = host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC) ? all_bits : 0;
+  state.initial_check_pending = all_bits;
 
   adjustGauges(host_states_[host.get()], &Stats::Gauge::inc);
 }
@@ -156,10 +157,6 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
   ASSERT(state_it != host_states_.end());
   auto& state = state_it->second;
 
-  const bool was_aggregate_failed = state.fail_bits != 0;
-  const bool was_aggregate_degraded = state.degraded_bits != 0;
-  const bool was_aggregate_pending = state.pending_bits != 0;
-
   uint32_t checker_flags = checkers_[checker_index].host_flags[host.get()];
 
   if (checker_flags & static_cast<uint32_t>(Host::HealthFlag::FAILED_ACTIVE_HC)) {
@@ -179,6 +176,19 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
   } else {
     state.pending_bits &= ~bit;
   }
+
+  // Don't do any operations with a side effect until all checkers have posted their initial result.
+  state.initial_check_pending &= ~bit;
+  if (state.initial_check_pending != 0) {
+    return;
+  }
+
+  // Derive "was" from host flags, which reflect the last-applied state. This is correct both
+  // during normal operation and when the gate above just lifted, since no side effects run
+  // during the gated period.
+  const bool was_aggregate_failed = host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  const bool was_aggregate_degraded = host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  const bool was_aggregate_pending = host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC);
 
   const bool now_aggregate_failed = state.fail_bits != 0;
   const bool now_aggregate_degraded = state.degraded_bits != 0;

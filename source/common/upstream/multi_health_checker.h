@@ -53,6 +53,7 @@ private:
   };
 
   struct PerHostState {
+    uint32_t initial_check_pending{0};
     uint32_t fail_bits{0};
     uint32_t degraded_bits{0};
     uint32_t pending_bits{0};
