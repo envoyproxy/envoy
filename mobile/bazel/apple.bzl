@@ -1,5 +1,6 @@
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines")
+load("@envoy//bazel:envoy_select.bzl", "deprecate_repository")
 load("@rules_apple//apple:ios.bzl", "ios_unit_test")
 load("@rules_cc//cc:objc_library.bzl", "objc_library")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
@@ -35,7 +36,8 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
 #     ],
 # )
 #
-def envoy_mobile_swift_test(name, srcs, size = None, data = [], deps = [], tags = [], repository = "", visibility = [], flaky = False, exec_properties = {}):
+def envoy_mobile_swift_test(name, srcs, size = None, data = [], deps = [], tags = [], visibility = [], flaky = False, exec_properties = {}, repository = ""):
+    deprecate_repository("envoy_mobile_swift_test", repository)
     test_lib_name = name + "_lib"
     swift_library(
         name = test_lib_name,
