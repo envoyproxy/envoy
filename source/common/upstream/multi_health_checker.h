@@ -37,7 +37,7 @@ private:
     void set(Host& host, Host::HealthFlag flag) override;
     void clear(Host& host, Host::HealthFlag flag) override;
 
-    // Causes creation and initializion of the flags if they don't yet exist.
+    // Causes creation and initialization of the flags if they don't yet exist.
     uint32_t& hostFlags(const Host& host);
 
   private:
