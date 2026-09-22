@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.extensions.http.ai_filters.transcoder.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.ai_filters.transcoder.v3";
+option java_outer_classname = "TranscoderProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ai_filters/transcoder/v3;transcoderv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Transcoder AI filter]
+// Transcoder AI filter :ref:`configuration overview
+// <config_http_filters_ai_protocol_manager_ai_filters>`.
+// [#extension: envoy.http.ai_filters.transcoder]
+
+// Rewrites an AI request payload from one vendor's API schema into another's, using the
+// declarative transcoding engine.
+//
+// All schemas are translated through a single canonical form -- OpenAI Chat Completions -- so
+// that adding a dialect costs one declarative rule set rather than a rule set per pair. Filters
+// placed between the two legs therefore only ever need to understand the canonical form.
+message Transcoder {
+  // Which leg of the translation this filter instance performs.
+  enum Direction {
+    DIRECTION_UNSPECIFIED = 0;
+
+    // Client schema -> canonical IR (OpenAI Chat Completions) on the request decode path,
+    // and canonical IR -> client schema on the response encode path.
+    TO_IR = 1;
+
+    // Canonical IR (OpenAI Chat Completions) -> target backend schema on the request decode
+    // path (followed by target schema validation), and target backend schema -> canonical IR
+    // on the response encode path.
+    FROM_IR = 2;
+  }
+
+  // Required. Configuring ``DIRECTION_UNSPECIFIED`` is rejected at config load rather than
+  // silently defaulting, so a missing field never quietly turns transcoding into a no-op.
+  Direction direction = 1;
+}

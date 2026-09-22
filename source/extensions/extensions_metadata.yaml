@@ -2389,6 +2389,13 @@ envoy.http.ai_filters.request_info:
   status: alpha
   type_urls:
   - envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+envoy.http.ai_filters.transcoder:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
 envoy.config_subscription.rest:
   categories:
   - envoy.config_subscription

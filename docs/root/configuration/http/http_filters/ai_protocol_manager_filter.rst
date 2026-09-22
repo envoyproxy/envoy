@@ -218,6 +218,60 @@ receives it through typed namespace forwarding:
 Only typed metadata is published. If the namespace already holds a record for
 the stream, the new one is skipped and counted by ``request_info.duplicate``.
 
+Transcoder
+~~~~~~~~~~
+
+The :ref:`transcoder filter
+<envoy_v3_api_msg_extensions.http.ai_filters.transcoder.v3.Transcoder>` rewrites the
+parsed payload into the request schema of the AI backend the route targets, so a client
+may speak one vendor's API while the upstream speaks another.
+
+Translation runs through a single canonical schema, OpenAI Chat Completions, rather than
+pairwise between vendors. Supporting a new dialect therefore costs one mapping rather than
+one per pair, and AI filters placed between the two legs only ever see the canonical shape.
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.ai_protocol_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+      request_handling: {}
+      filters:
+      - name: envoy.http.ai_filters.transcoder
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
+          direction: TO_IR
+      - name: envoy.http.ai_filters.transcoder
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
+          direction: FROM_IR
+
+Two instances of the filter bracket the intermediate AI filters: the ``TO_IR`` instance
+converts the client's declared request protocol into the canonical OpenAI Chat Completions
+IR, and the ``FROM_IR`` instance converts that canonical payload into the target backend's
+schema. Filters configured between the two therefore only ever see the canonical form.
+
+The rewritten payload is validated against the target's schema before it is
+replayed, so a document the upstream would reject fails locally rather than over the
+network. Such a rejection is counted by ``transcoder.failed``.
+
+.. note::
+
+  Only the request path is transcoded today. Responses are forwarded unchanged, because the
+  transcoding engine does not yet carry response mapping rules; a client that speaks one
+  vendor's API therefore still receives the backend's native response shape.
+
+.. note::
+
+  Only the payload body is rewritten. Vendors also differ in request path and
+  authentication headers, and Gemini in particular carries the model in the path
+  (``/v1beta/models/{model}:generateContent``), so the route must supply the path and
+  credentials the upstream expects, for example through ``prefix_rewrite`` and
+  ``request_headers_to_add``. The ``TO_IR`` leg lifts Gemini's model out of the request
+  path into the canonical payload so intermediate AI filters and the ``FROM_IR`` leg see
+  it as an ordinary ``model`` field.
+
 Response token-usage extraction
 -------------------------------
 
@@ -517,3 +571,6 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   request_info.published, Counter, The request info AI filter published an ``envoy.data.ai.v3.RequestInfo`` record.
   request_info.partial, Counter, A published request info record ignored at least one value Envoy could not use.
   request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.
+  transcoder.transcoded, Counter, The transcoder AI filter converted a payload into the canonical IR or into the target schema.
+  transcoder.unresolved, Counter, "A payload was rejected because the protocol for its leg was unspecified: the route declared no wire API for ``TO_IR``, or no target backend protocol is set for ``FROM_IR``."
+  transcoder.failed, Counter, A payload was rejected because the conversion rules failed or the converted payload failed the target schema.
