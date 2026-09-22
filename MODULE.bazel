@@ -15,9 +15,9 @@ bazel_dep(name = "aws-c-auth-testdata", version = "0.10.4.envoy")
 bazel_dep(name = "bazel-compdb", version = "0.0.0-20220906-4086479.envoy")
 bazel_dep(name = "bazel_features", version = "1.51.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
-bazel_dep(name = "boringssl", version = "0.20260413.0")
-bazel_dep(name = "boringssl-fips", version = "0.20260413.0.envoy")
-bazel_dep(name = "boringssl-source", version = "0.20260413.0.envoy")
+bazel_dep(name = "boringssl", version = "0.20260813.0")
+bazel_dep(name = "boringssl-fips", version = "0.20260813.0.envoy")
+bazel_dep(name = "boringssl-source", version = "0.20260813.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy")
 bazel_dep(name = "brotli", version = "1.2.0.bcr.3")
 bazel_dep(name = "buildifier_prebuilt", version = "10.0.1", repo_name = "buildifier")
@@ -154,7 +154,7 @@ single_version_override(
 
 single_version_override(
     module_name = "boringssl",
-    version = "0.20260413.0",
+    version = "0.20260813.0",
 )
 
 # testing/debugging

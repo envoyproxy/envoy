@@ -2,6 +2,7 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
 #include "test/integration/http_integration.h"
+#include "test/integration/utility.h"
 
 using testing::Ge;
 namespace Envoy {
@@ -117,6 +118,21 @@ TEST_P(QuicStatsIntegrationTest, CertChainTooLong) {
 
     std::ignore = ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
   });
+
+  initialize();
+
+  // The amplification-limit arithmetic above assumes a single-MTU ClientHello. BoringSSL now
+  // offers X25519MLKEM768 by default, whose ~1.2kB key_share pushes the ClientHello into two
+  // Initial packets and roughly doubles the server's pre-validation send budget, so the 9kB
+  // chain would no longer trip the throttle. Pin the client to X25519 to keep the test's
+  // premise intact.
+  quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(
+      *api_, stats_store_, context_manager_, thread_local_,
+      Ssl::ClientSslTransportOptions()
+          .setAlpn(true)
+          .setSan(san_to_match_)
+          .setSni("lyft.com")
+          .setCurves({"X25519"}));
 
   testRouterHeaderOnlyRequestAndResponse();
   codec_client_->goAway();
