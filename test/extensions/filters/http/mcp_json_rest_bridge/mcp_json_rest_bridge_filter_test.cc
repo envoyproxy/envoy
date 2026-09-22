@@ -368,7 +368,7 @@ TEST_F(McpJsonRestBridgeFilterTest, StatelessServerDiscoverReturnsLocalDiscovery
       sendLocalReply(
           Eq(Http::Code::OK),
           StrEq(
-              R"json({"id":7,"jsonrpc":"2.0","result":{"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"test-host","version":"1.0.0"}},"cacheScope":"public","capabilities":{"tools":{"listChanged":false}},"resultType":"complete","supportedVersions":["2026-07-28"],"ttlMs":0}})json"),
+              R"json({"id":7,"jsonrpc":"2.0","result":{"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"test-host","version":"1.0.0"}},"cacheScope":"private","capabilities":{"tools":{"listChanged":false}},"resultType":"complete","supportedVersions":["2026-07-28"],"ttlMs":0}})json"),
           _, _, StrEq("mcp_json_rest_bridge_filter_server_discover")));
 
   Protobuf::Struct expected_metadata;
@@ -397,7 +397,7 @@ TEST_F(McpJsonRestBridgeFilterTest, StatelessServerDiscoverReturnsLocalDiscovery
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::Continue);
   Buffer::OwnedImpl response_body(
-      R"json({"id":7,"jsonrpc":"2.0","result":{"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"test-host","version":"1.0.0"}},"cacheScope":"public","capabilities":{"tools":{"listChanged":false}},"resultType":"complete","supportedVersions":["2026-07-28"],"ttlMs":0}})json");
+      R"json({"id":7,"jsonrpc":"2.0","result":{"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"test-host","version":"1.0.0"}},"cacheScope":"private","capabilities":{"tools":{"listChanged":false}},"resultType":"complete","supportedVersions":["2026-07-28"],"ttlMs":0}})json");
   const std::string unmodified_response_body = response_body.toString();
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);

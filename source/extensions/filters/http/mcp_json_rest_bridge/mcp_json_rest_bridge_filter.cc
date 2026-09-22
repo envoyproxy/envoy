@@ -174,7 +174,7 @@ json generateServerDiscoverResponse(const json& session_id, absl::string_view se
         [McpConstants::VERSION_FIELD] = McpConstants::DEFAULT_SERVER_VERSION;
 
   result[McpConstants::TTL_MS_FIELD] = 0;
-  result[McpConstants::CACHE_SCOPE_FIELD] = McpConstants::CACHE_SCOPE_PUBLIC;
+  result[McpConstants::CACHE_SCOPE_FIELD] = McpConstants::CACHE_SCOPE_PRIVATE;
   ret[McpConstants::RESULT_FIELD] = result;
 
   addCompleteResultTypeIfStateless(ret, /*is_stateless_request=*/true);
