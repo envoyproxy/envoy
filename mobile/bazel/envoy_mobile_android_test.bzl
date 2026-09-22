@@ -23,7 +23,7 @@ def _contains_all(srcs, extension):
     return True
 
 # A basic macro to run android based (robolectric) tests with native dependencies
-def envoy_mobile_android_test(name, srcs, test_class, native_lib_name = "", deps = [], native_deps = [], repository = "", exec_properties = {}, **kwargs):
+def envoy_mobile_android_test(name, srcs, test_class, native_lib_name = "", deps = [], native_deps = [], exec_properties = {}, **kwargs):
     dependencies = deps + [
         "@maven//:androidx_annotation_annotation",
         "@maven//:androidx_test_core",
