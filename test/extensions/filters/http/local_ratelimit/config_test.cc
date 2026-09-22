@@ -1,3 +1,4 @@
+#include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 #include "source/extensions/filters/http/local_ratelimit/config.h"
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
@@ -426,6 +427,57 @@ stat_prefix: test
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   callback(filter_callback);
+}
+
+// A route level configuration hands both the rate limiter and the share provider manager to the
+// main dispatcher when it is released, because a route configuration can be released on a worker
+// thread and neither the rate limiter's fill timer nor the manager's cluster membership callback
+// handle can be torn down there.
+TEST(Factory, RouteSpecificConfigReleasesSharedStateOnTheMainThread) {
+  const std::string config_yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: 1
+  tokens_per_fill: 1
+  fill_interval: 1000s
+local_cluster_rate_limit: {}
+)";
+
+  LocalRateLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  context.cluster_manager_.local_cluster_name_ = "local_cluster";
+  context.cluster_manager_.initializeClusters({"local_cluster"}, {});
+
+  NiceMock<Upstream::MockPrioritySet> priority_set;
+  const auto* local_cluster = context.cluster_manager_.active_clusters_.at("local_cluster").get();
+  EXPECT_CALL(*local_cluster, prioritySet()).WillOnce(ReturnRef(priority_set));
+
+  auto config_or_error = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  ASSERT_OK(config_or_error.status());
+  auto config = config_or_error.value();
+
+  // The share provider manager is an unpinned singleton, so the singleton manager holds only a
+  // weak reference and the configuration owns the last strong one.
+  std::weak_ptr<Filters::Common::LocalRateLimit::ShareProviderManager> share_provider_manager =
+      Filters::Common::LocalRateLimit::ShareProviderManager::singleton(
+          context.mainThreadDispatcher(), context.clusterManager(), context.singletonManager());
+  ASSERT_FALSE(share_provider_manager.expired());
+
+  Event::PostCb posted;
+  EXPECT_CALL(context.dispatcher_, post(_)).WillOnce([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  });
+  config.reset();
+  ASSERT_TRUE(posted != nullptr);
+  EXPECT_FALSE(share_provider_manager.expired());
+
+  // Running the posted callback releases both on the main thread.
+  posted();
+  EXPECT_TRUE(share_provider_manager.expired());
 }
 
 } // namespace LocalRateLimitFilter

@@ -35,6 +35,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.local_ratelimit"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
         "//source/extensions/filters/http/local_ratelimit:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:status_utility_lib",
