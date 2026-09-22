@@ -48,6 +48,7 @@ void FilterManager::startUnaryResponse(ExternalBufferFactory& buffer_factory,
   response_manager_ =
       std::make_unique<ResponseFilterManager>(std::move(reversed), buffer_factory, bridge,
                                               out_buffer_manager, std::move(on_complete), config);
+  response_manager_->start();
 }
 
 void FilterManager::onResponseData(Buffer::Instance& data, bool end_stream) {
