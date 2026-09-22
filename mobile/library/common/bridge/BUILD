@@ -8,7 +8,6 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         "//library/common:engine_types_lib",

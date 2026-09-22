@@ -37,6 +37,7 @@ paths:
   - bazel/external/cargo/remote/
   - bazel/external/http_parser/
   - bazel/rbe/toolchains/configs/
+  - bazel/tests/external/
   - bazel-
   - compat/openssl/
   - build

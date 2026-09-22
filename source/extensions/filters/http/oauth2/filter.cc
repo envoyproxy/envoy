@@ -302,8 +302,7 @@ std::string generateCodeVerifier(Random::RandomGenerator& random) {
 // Generates a PKCE code challenge from a code verifier.
 std::string generateCodeChallenge(const std::string& code_verifier) {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  std::vector<uint8_t> sha256_digest =
-      crypto_util.getSha256Digest(Buffer::OwnedImpl(code_verifier));
+  std::vector<uint8_t> sha256_digest = crypto_util.getSha256Digest(code_verifier);
   std::string sha256_string(sha256_digest.begin(), sha256_digest.end());
   return Base64Url::encode(sha256_string.data(), sha256_string.size());
 }

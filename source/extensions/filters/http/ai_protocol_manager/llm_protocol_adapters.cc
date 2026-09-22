@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema/anthropic_messages.h"
+#include "source/extensions/filters/http/ai_protocol_manager/schema/gemini_generate_content.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema/openai_chat_completions.h"
 
 #include "absl/strings/match.h"
@@ -190,7 +191,11 @@ protected:
 class GeminiGenerateContentAdapter : public LLMProtocolAdapter {
 public:
   LLMProtocol protocol() const override { return LLMProtocol::GeminiGenerateContent; }
-  const PayloadSchema* schema() const override { return nullptr; }
+  const PayloadSchema* schema() const override {
+    // Construct-on-first-use, as for Chat Completions above.
+    static const PayloadSchema* gemini_schema = new PayloadSchema(Gemini::createPayloadSchema());
+    return gemini_schema;
+  }
 
   void canonicalizeUsage(TokenUsage& usage, bool& overflow) const override {
     // Native prompt/candidates counts exclude tool-use and thoughts, and are

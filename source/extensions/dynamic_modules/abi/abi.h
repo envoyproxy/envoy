@@ -14883,6 +14883,40 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
     uint64_t* cumulative_count_out);
 
 /**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name is the
+ * histogram counterpart of the counter tag-extracted-name callback below, with the same buffer
+ * and truncation contract. The index is into the snapshot's histogram collection.
+ *
+ * These histogram tag callbacks are only valid during envoy_dynamic_module_on_stat_sink_flush.
+ * A module aggregating observations from envoy_dynamic_module_on_stat_sink_on_histogram_complete
+ * can use the raw name returned by envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram
+ * to associate those observations with an owned copy of this name and its tags. No tag extraction
+ * or histogram statistics computation is performed by these callbacks.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count is the histogram
+ * counterpart of the counter tag-count callback below. Returns false for an out-of-range
+ * histogram index without writing tag_count. A histogram with no tags returns true and zero.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag is the histogram counterpart
+ * of the counter tag callback below, with the same buffer and truncation contract. Returns false
+ * without writing outputs if either the histogram index or tag index is out of range.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
+
+/**
  * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name writes the
  * tag-extracted name of a counter at the given index. The tag-extracted name is the stat name with
  * the tag values removed (for example "cluster.foo.bar" with a "cluster_name" tag extracted becomes

@@ -174,7 +174,7 @@
 /*/extensions/filters/network/echo @yanavlasov @UNOWNED
 /*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
 /*/extensions/filters/network/direct_response @kyessenov @UNOWNED
-/*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
+/*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010 @nezdolik
 /*/extensions/clusters/aggregate @yxue @mattklein123
 /*/extensions/clusters/composite @agrawroh @yanavlasov @wbpcode
 /*/extensions/clusters/mcp_multicluster @yanavlasov @botengyao @agrawroh

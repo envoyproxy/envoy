@@ -8,9 +8,9 @@ module(
 # deps: Module
 ####################################################################################
 
-bazel_dep(name = "abseil-cpp", version = "20260107.1")
-bazel_dep(name = "aspect_bazel_lib", version = "2.22.0")
-bazel_dep(name = "bazel_skylib", version = "1.9.0")
+bazel_dep(name = "abseil-cpp", version = "20260817.0")
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
+bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "boringssl", version = "0.20260413.0")
 bazel_dep(name = "envoy_toolshed", version = "0.4.15.envoy")
 bazel_dep(name = "gazelle", version = "0.47.0")
@@ -23,14 +23,14 @@ bazel_dep(name = "opentelemetry-proto", version = "1.8.0")
 bazel_dep(name = "prometheus-metrics-model", version = "0.6.2.envoy", repo_name = "prometheus_metrics_model")
 bazel_dep(name = "protobuf", version = "35.1.bcr.envoy")
 bazel_dep(name = "protoc-gen-validate", version = "1.3.3.envoy")
-bazel_dep(name = "re2", version = "2025-08-12.bcr.1")
-bazel_dep(name = "rules_cc", version = "0.2.22")
+bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
+bazel_dep(name = "rules_cc", version = "0.2.25")
 bazel_dep(name = "rules_go", version = "0.59.0")
-bazel_dep(name = "rules_java", version = "9.3.0")
-bazel_dep(name = "rules_jvm_external", version = "6.10")
+bazel_dep(name = "rules_java", version = "9.9.0")
+bazel_dep(name = "rules_jvm_external", version = "7.1")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "rules_python", version = "2.2.0")
-bazel_dep(name = "xds", version = "0.0.1-20251110-8bfbf64.envoy")
+bazel_dep(name = "xds", version = "0.0.0-20251210-ee656c7")
 bazel_dep(name = "yq.bzl", version = "0.1.1.envoy")
 bazel_dep(name = "zipkin-api", version = "1.0.0.envoy")
 
@@ -39,7 +39,7 @@ bazel_dep(name = "zipkin-api", version = "1.0.0.envoy")
 # deps: Dev
 ####################################################################################
 
-bazel_dep(name = "googletest", version = "1.17.0.bcr.2", dev_dependency = True)
+bazel_dep(name = "googletest", version = "1.18.0.bcr.1", dev_dependency = True)
 bazel_dep(name = "protoc-gen-jsonschema", version = "0.0.0-20230530-7680e49.envoy", dev_dependency = True)
 
 
@@ -69,8 +69,8 @@ go_deps.module(
 )
 go_deps.module(
     path = "google.golang.org/protobuf",
-    sum = "h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=",
-    version = "v1.36.10",
+    sum = "h1:fV6ZwhNocDyBLK0dj+fg8ektcVegBBuEolpbTQyBNVE=",
+    version = "v1.36.11",
 )
 go_deps.module(
     path = "google.golang.org/genproto/googleapis/rpc",
