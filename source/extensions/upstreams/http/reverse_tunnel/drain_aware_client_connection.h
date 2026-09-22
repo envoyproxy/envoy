@@ -14,7 +14,6 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
-#include "source/extensions/upstreams/http/reverse_tunnel/drain_aware_http2_client_connection.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_registry.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/reverse_tunnel_codec_stats.h"
 
@@ -25,6 +24,8 @@ namespace Extensions {
 namespace Upstreams {
 namespace Http {
 namespace ReverseTunnel {
+
+constexpr absl::string_view metadata_val{"true"};
 
 /**
  * Wraps the codec connection callbacks so the upstream (client) side observes a peer GOAWAY: the
@@ -80,6 +81,10 @@ public:
 
     auto it = metadata_map_ptr->find(*metadata_key_);
     if (it != metadata_map_ptr->end() && it->second == metadata_val) {
+      ENVOY_LOG(info,
+                "reverse_tunnel upstream codec: drain metadata matched key='{}'; "
+                "notifying reporter",
+                *metadata_key_);
       notifyReporter();
       metadata_map_ptr->erase(it);
     }
@@ -92,7 +97,6 @@ private:
   int fd_;
   bool notified_{false};
   std::shared_ptr<std::string> metadata_key_;
-  constexpr static absl::string_view metadata_val{"true"};
 };
 
 /**
@@ -110,11 +114,10 @@ public:
                              const ReverseTunnelUpstreamCodecStats& stats,
                              Event::Dispatcher& dispatcher,
                              UpstreamCodecDrainRegistrySharedPtr registry,
-                             absl::string_view cluster,
-                             DrainAwareHttp2ClientConnection* h2_codec = nullptr)
+                             absl::string_view cluster, std::shared_ptr<std::string> metadata_key)
       : callbacks_(std::move(callbacks)), inner_(std::move(inner)), stats_(stats),
         dispatcher_(dispatcher), registry_(std::move(registry)), cluster_(cluster),
-        h2_codec_(h2_codec) {
+        metadata_key_(metadata_key) {
     ENVOY_LOG(debug, "reverse_tunnel upstream codec: drain-aware client connection installed");
     if (registry_ != nullptr) {
       registry_->add(cluster_, *this);
@@ -157,16 +160,7 @@ public:
       callbacks_->drainOwnPoolConnection();
     });
     drain_timer_->enableTimer(drain_time);
-
-    // Phase 1 (now): graceful first GOAWAY with max stream id. shutdownNotice() is a no-op on a
-    // client codec (server-only), so use the subclass's direct SubmitGoAway when available. Keep
-    // this LAST: it can synchronously destroy this object on a write error.
-    if (h2_codec_ != nullptr) {
-      stats_.goaway_sent_.inc();
-      h2_codec_->sendGracefulGoAway();
-    } else {
-      inner_->shutdownNotice();
-    }
+    sendMetadata();
   }
 
   // Envoy::Http::ClientConnection
@@ -192,6 +186,23 @@ public:
   }
 
 private:
+  void sendMetadata() {
+    if (!metadata_key_) {
+      return;
+    }
+
+    ENVOY_LOG(info, "reverse_tunnel upstream codec: sending drain metadata (key='{}')",
+              *metadata_key_);
+    Envoy::Http::MetadataMap metadata_map;
+    metadata_map.emplace(*metadata_key_, metadata_val);
+    Envoy::Http::MetadataMapPtr metadata_map_ptr =
+        std::make_unique<Envoy::Http::MetadataMap>(std::move(metadata_map));
+    Envoy::Http::MetadataMapVector metadata_map_vector;
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
+
+    inner_->encodeMetadata(std::move(metadata_map_vector));
+  }
+
   // Declared before inner_ so it outlives the codec, which holds a reference to it.
   const std::unique_ptr<DrainAwareClientCallbacks> callbacks_;
   const Envoy::Http::ClientConnectionPtr inner_;
@@ -199,10 +210,9 @@ private:
   Event::Dispatcher& dispatcher_;
   const UpstreamCodecDrainRegistrySharedPtr registry_;
   const std::string cluster_;
-  // Non-owning typed view of inner_ when it is our HTTP/2 subclass; nullptr otherwise.
-  DrainAwareHttp2ClientConnection* const h2_codec_;
   Event::TimerPtr drain_timer_;
   bool draining_{false};
+  std::shared_ptr<std::string> metadata_key_;
 };
 
 } // namespace ReverseTunnel

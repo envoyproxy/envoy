@@ -391,10 +391,10 @@ TEST_F(ReverseTunnelUpstreamCodecTest, LocalGracefulDrainDoesNotReportGoAway) {
   auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
-                                   /*registry=*/nullptr, /*cluster=*/"");
+                                   /*registry=*/nullptr, /*cluster=*/"", /*metadata_key=*/nullptr);
 
   EXPECT_CALL(*reporter, reportGoAwayEvent(_, _, _)).Times(0);
-  EXPECT_CALL(*inner_raw, shutdownNotice());
+  // No metadata key: Phase 1 (sendMetadata) is a no-op; only the deferred final GOAWAY fires.
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
   codec.startGracefulDrain(std::chrono::milliseconds(100));
 
@@ -409,7 +409,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsAndCountsGoawaySent) {
   auto* inner_raw = inner.get();
   auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
-                                   /*registry=*/nullptr, /*cluster=*/"");
+                                   /*registry=*/nullptr, /*cluster=*/"", /*metadata_key=*/nullptr);
 
   EXPECT_CALL(*inner_raw, goAway());
   codec.goAway();
@@ -431,10 +431,10 @@ TEST_F(ReverseTunnelUpstreamCodecTest, StartGracefulDrainTwoPhase) {
   // MockTimer registers with the dispatcher and captures the timer callback for invokeCallback().
   auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
-                                   /*registry=*/nullptr, /*cluster=*/"");
+                                   /*registry=*/nullptr, /*cluster=*/"", /*metadata_key=*/nullptr);
 
-  // Phase 1: shutdown notice now, GOAWAY deferred (no goaway_sent yet).
-  EXPECT_CALL(*inner_raw, shutdownNotice());
+  // Phase 1: no metadata key, so sendMetadata() is a no-op (no immediate wire signal); GOAWAY is
+  // deferred (no goaway_sent yet).
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(5000), _));
   codec.startGracefulDrain(std::chrono::milliseconds(5000));
   EXPECT_EQ(0, stats_.goaway_sent_.value());
@@ -451,6 +451,33 @@ TEST_F(ReverseTunnelUpstreamCodecTest, StartGracefulDrainTwoPhase) {
   codec.startGracefulDrain(std::chrono::milliseconds(5000));
 }
 
+// With a metadata key configured, startGracefulDrain sends a connection-level METADATA frame
+// immediately (Phase 1, via encodeMetadata on the wrapped codec), then after drain_time sends the
+// final GOAWAY and gracefully drains the local pool connection (Phase 2). No soft GOAWAY is sent:
+// the METADATA frame is the only immediate peer signal. This is the metadata-driven drain path.
+TEST_F(ReverseTunnelUpstreamCodecTest, StartGracefulDrainSendsMetadataThenGoAway) {
+  auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
+  auto* inner_raw = inner.get();
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
+  auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  auto metadata_key = std::make_shared<std::string>("drain_reverse_tunnel");
+  DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
+                                   /*registry=*/nullptr, /*cluster=*/"", metadata_key);
+
+  // Phase 1: METADATA encoded now (drain key -> peer redials). MockClientConnection does not mock
+  // encodeMetadata, so the call hits the base no-op; the body of sendMetadata() still runs (builds
+  // the map and calls encodeMetadata), which is what we want for coverage. No GOAWAY yet.
+  EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(5000), _));
+  codec.startGracefulDrain(std::chrono::milliseconds(5000));
+  EXPECT_EQ(0, stats_.goaway_sent_.value());
+
+  // Phase 2: timer fires -> final GOAWAY + graceful pool drain (onGoAway into the local pool).
+  EXPECT_CALL(*inner_raw, goAway());
+  EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  drain_timer->invokeCallback();
+  EXPECT_EQ(1, stats_.goaway_sent_.value());
+}
+
 // The registry fans a drain out to a registered codec for the matching cluster, which triggers
 // the two-phase graceful drain (shutdownNotice now, GOAWAY after drain_time).
 TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsRegisteredCluster) {
@@ -462,13 +489,13 @@ TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsRegisteredCluster) {
   auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   // Constructing with the registry auto-registers under "cluster_a".
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
-                                   registry, "cluster_a");
+                                   registry, "cluster_a", /*metadata_key=*/nullptr);
 
   // Draining a different cluster is a no-op for this codec.
   registry->drainCluster("other", std::chrono::milliseconds(1000));
 
-  // Draining the matching cluster reaches the codec -> shutdownNotice now.
-  EXPECT_CALL(*inner_raw, shutdownNotice());
+  // Draining the matching cluster reaches the codec. No metadata key, so Phase 1 is a no-op; only
+  // the deferred final GOAWAY fires after drain_time.
   registry->drainCluster("cluster_a", std::chrono::milliseconds(1000));
 
   // Timer fires -> final GOAWAY + graceful pool drain (onGoAway into the local pool), not a close.
@@ -487,10 +514,10 @@ TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsAllClusters) {
   auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
-                                   registry, "cluster_a");
+                                   registry, "cluster_a", /*metadata_key=*/nullptr);
 
-  // Empty key fans the drain out across all registered clusters.
-  EXPECT_CALL(*inner_raw, shutdownNotice());
+  // Empty key fans the drain out across all registered clusters. No metadata key, so Phase 1 is a
+  // no-op; only the deferred final GOAWAY fires after drain_time.
   registry->drainCluster("", std::chrono::milliseconds(1000));
 
   EXPECT_CALL(*inner_raw, goAway());
@@ -554,36 +581,38 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CreatesDrainAwareCodecForReverseConnectio
   EXPECT_EQ(Envoy::Http::Protocol::Http2, codec->protocol());
 }
 
-// End-to-end on a real HTTP/2 client codec: startGracefulDrain sends the graceful first GOAWAY via
-// the HTTP/2 subclass (sendGracefulGoAway) immediately, then the final GOAWAY and a graceful pool
-// drain after drain_time. Exercises the h2_codec_ != nullptr path that the mock-inner tests cannot
-// reach.
-TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainTwoPhaseOnRealHttp2Codec) {
+// End-to-end on a real HTTP/2 client codec: startGracefulDrain sends a connection-level METADATA
+// frame immediately (Phase 1, via the stock codec's encodeMetadata), then the final GOAWAY and a
+// graceful pool drain after drain_time (Phase 2). Exercises the real-codec encodeMetadata path
+// that the mock-inner tests cannot reach, and requires http2_protocol_options.allow_metadata so
+// the codec emits the stream-0 METADATA frame.
+TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainSendsMetadataOnRealHttp2Codec) {
   ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
+  cluster_.http2_options_.set_allow_metadata(true);
 
   auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   auto& callbacks_ref = *callbacks;
-  auto h2 = std::make_unique<DrainAwareHttp2ClientConnection>(
+  auto h2 = std::make_unique<Envoy::Http::Http2::ClientConnectionImpl>(
       connection_, callbacks_ref, cluster_.http2CodecStats(), random_,
       cluster_.httpProtocolOptions().http2Options(),
       cluster_.maxResponseHeadersKb().value_or(Envoy::Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
       cluster_.maxResponseHeadersCount(), Envoy::Http::Http2::ProdNghttp2SessionFactory::get());
-  auto* h2_raw = h2.get();
+  auto metadata_key = std::make_shared<std::string>("drain_reverse_tunnel");
   // Registers with dispatcher_; the next createTimer() returns it.
   auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   DrainAwareClientConnection codec(std::move(h2), std::move(callbacks), stats_, dispatcher_,
-                                   /*registry=*/nullptr, /*cluster=*/"", h2_raw);
+                                   /*registry=*/nullptr, /*cluster=*/"", metadata_key);
 
-  // Phase 1: graceful GOAWAY emitted now via the HTTP/2 subclass (counted as sent).
+  // Phase 1: METADATA encoded now on the real codec (goaway_sent stays 0; no soft GOAWAY).
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(5000), _));
   codec.startGracefulDrain(std::chrono::milliseconds(5000));
-  EXPECT_EQ(1, stats_.goaway_sent_.value());
+  EXPECT_EQ(0, stats_.goaway_sent_.value());
 
-  // Phase 2: timer fires -> final GOAWAY on the codec + graceful pool drain (onGoAway into the
-  // wrapped callbacks).
+  // Phase 2: timer fires -> final GOAWAY on the real codec (goaway_sent -> 1) + graceful pool
+  // drain (onGoAway into the wrapped callbacks).
   EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
   drain_timer->invokeCallback();
-  EXPECT_EQ(2, stats_.goaway_sent_.value());
+  EXPECT_EQ(1, stats_.goaway_sent_.value());
 }
 
 // The DrainAwareClientCallbacks wrapper forwards the non-GOAWAY connection callbacks unchanged.
@@ -741,7 +770,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsRemainingCalls) {
   auto* inner_raw = inner.get();
   auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
-                                   /*registry=*/nullptr, /*cluster=*/"");
+                                   /*registry=*/nullptr, /*cluster=*/"", /*metadata_key=*/nullptr);
 
   NiceMock<Envoy::Http::MockResponseDecoder> decoder;
   NiceMock<Envoy::Http::MockRequestEncoder> encoder;

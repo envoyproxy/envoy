@@ -123,8 +123,8 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
   std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper;
   Http::ServerConnectionCallbacks* effective_callbacks = &callbacks;
   if (on_peer_goaway != nullptr) {
-    callbacks_wrapper =
-        std::make_unique<DrainAwareServerConnectionCallbacks>(callbacks, std::move(on_peer_goaway));
+    callbacks_wrapper = std::make_unique<DrainAwareServerConnectionCallbacks>(
+        callbacks, std::move(on_peer_goaway), metadata_config_);
     effective_callbacks = callbacks_wrapper.get();
   }
 

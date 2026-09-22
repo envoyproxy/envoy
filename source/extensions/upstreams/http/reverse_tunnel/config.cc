@@ -51,15 +51,14 @@ ReverseTunnelUpstreamCodecOptions::createClientCodec(const Context& context) con
   int fd = context.connection.getSocket()->ioHandle().fdDoNotUse();
   auto callbacks =
       std::make_unique<DrainAwareClientCallbacks>(context.callbacks, fd, metadata_key_);
-  auto inner = std::make_unique<DrainAwareHttp2ClientConnection>(
+  auto inner = std::make_unique<Envoy::Http::Http2::ClientConnectionImpl>(
       context.connection, *callbacks, cluster.http2CodecStats(), context.random,
       cluster.httpProtocolOptions().http2Options(),
       cluster.maxResponseHeadersKb().value_or(Envoy::Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
       cluster.maxResponseHeadersCount(), Envoy::Http::Http2::ProdNghttp2SessionFactory::get());
-  auto* h2_codec = inner.get();
   return std::make_unique<DrainAwareClientConnection>(std::move(inner), std::move(callbacks),
                                                       stats_, context.connection.dispatcher(),
-                                                      registry_, cluster.name(), h2_codec);
+                                                      registry_, cluster.name(), metadata_key_);
 }
 
 absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>

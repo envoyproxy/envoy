@@ -328,7 +328,9 @@ protected:
 // callbacks; a second GOAWAY delegates but does not re-fire the closure.
 TEST_F(DrainAwareServerConnectionCallbacksTest, PeerGoAwayFiresClosureOnceAndDelegates) {
   int fired = 0;
-  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, [&fired]() { ++fired; });
+  DrainAwareServerConnectionCallbacks wrapper(
+      inner_callbacks_, [&fired]() { ++fired; },
+      /*metadata_config=*/nullptr);
 
   EXPECT_CALL(inner_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
   wrapper.onGoAway(Http::GoAwayErrorCode::NoError);
@@ -341,14 +343,16 @@ TEST_F(DrainAwareServerConnectionCallbacksTest, PeerGoAwayFiresClosureOnceAndDel
 
 // A null closure (peer-GOAWAY re-dial disabled) just delegates onGoAway.
 TEST_F(DrainAwareServerConnectionCallbacksTest, NullClosureJustDelegatesGoAway) {
-  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr);
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr,
+                                              /*metadata_config=*/nullptr);
   EXPECT_CALL(inner_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
   wrapper.onGoAway(Http::GoAwayErrorCode::NoError);
 }
 
 // newStream passes through to the inner callbacks unchanged.
 TEST_F(DrainAwareServerConnectionCallbacksTest, NewStreamDelegates) {
-  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr);
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr,
+                                              /*metadata_config=*/nullptr);
   NiceMock<Http::MockResponseEncoder> encoder;
   NiceMock<Http::MockRequestDecoder> decoder;
   EXPECT_CALL(inner_callbacks_, newStream(_, false)).WillOnce(ReturnRef(decoder));
@@ -357,7 +361,8 @@ TEST_F(DrainAwareServerConnectionCallbacksTest, NewStreamDelegates) {
 
 // onSettings passes through to the inner callbacks unchanged.
 TEST_F(DrainAwareServerConnectionCallbacksTest, OnSettingsDelegates) {
-  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr);
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr,
+                                              /*metadata_config=*/nullptr);
   NiceMock<Http::MockReceivedSettings> settings;
   EXPECT_CALL(inner_callbacks_, onSettings(_));
   wrapper.onSettings(settings);
@@ -367,8 +372,89 @@ TEST_F(DrainAwareServerConnectionCallbacksTest, OnSettingsDelegates) {
 // default interface implementation, so it is not a gmock method; exercising the forwarding path is
 // enough for coverage.)
 TEST_F(DrainAwareServerConnectionCallbacksTest, OnMaxStreamsChangedDelegates) {
-  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr);
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr,
+                                              /*metadata_config=*/nullptr);
   wrapper.onMaxStreamsChanged(7);
+}
+
+// onMetadata with no metadata_config forwards the map unchanged and does NOT redial (the wrapper
+// is metadata-transparent in GOAWAY-only mode).
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnMetadataForwardsWhenNoConfig) {
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr,
+                                              /*metadata_config=*/nullptr);
+  auto metadata_map =
+      std::make_unique<Http::MetadataMap>(Http::MetadataMap{{"drain_reverse_tunnel", "true"}});
+  EXPECT_CALL(inner_callbacks_, onMetadata(_));
+  wrapper.onMetadata(std::move(metadata_map));
+}
+
+// onMetadata with a matching drain key+value redials (fires the closure once) and still forwards
+// the map to the inner callbacks. This is the upstream-initiated drain signal: the upstream
+// sends a stream-0 METADATA frame and the downstream dials a replacement immediately.
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnMetadataMatchingKeyRedialsAndForwards) {
+  int fired = 0;
+  auto metadata_config = std::make_shared<ConnectionMetadataConfig>(
+      ConnectionMetadataConfig{"drain_reverse_tunnel", std::chrono::milliseconds(2000),
+                               std::chrono::milliseconds(3000), std::chrono::milliseconds(5000)});
+  DrainAwareServerConnectionCallbacks wrapper(
+      inner_callbacks_, [&fired]() { ++fired; }, metadata_config);
+  EXPECT_CALL(inner_callbacks_, onMetadata(_));
+  auto metadata_map =
+      std::make_unique<Http::MetadataMap>(Http::MetadataMap{{"drain_reverse_tunnel", "true"}});
+  wrapper.onMetadata(std::move(metadata_map));
+  EXPECT_EQ(1, fired);
+}
+
+// onMetadata with a non-matching key forwards unchanged and does NOT redial: only the configured
+// key with value "true" is treated as a drain signal.
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnMetadataNonMatchingKeyForwardsNoRedial) {
+  int fired = 0;
+  auto metadata_config = std::make_shared<ConnectionMetadataConfig>(
+      ConnectionMetadataConfig{"drain_reverse_tunnel", std::chrono::milliseconds(2000),
+                               std::chrono::milliseconds(3000), std::chrono::milliseconds(5000)});
+  DrainAwareServerConnectionCallbacks wrapper(
+      inner_callbacks_, [&fired]() { ++fired; }, metadata_config);
+  EXPECT_CALL(inner_callbacks_, onMetadata(_));
+  auto metadata_map = std::make_unique<Http::MetadataMap>(Http::MetadataMap{{"other", "true"}});
+  wrapper.onMetadata(std::move(metadata_map));
+  EXPECT_EQ(0, fired);
+}
+
+// onMetadata with the configured key present but value != "true" forwards unchanged and does NOT
+// redial: only the exact key+value ("true") is treated as a drain signal.
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnMetadataWrongValueForwardsNoRedial) {
+  int fired = 0;
+  auto metadata_config = std::make_shared<ConnectionMetadataConfig>(
+      ConnectionMetadataConfig{"drain_reverse_tunnel", std::chrono::milliseconds(2000),
+                               std::chrono::milliseconds(3000), std::chrono::milliseconds(5000)});
+  DrainAwareServerConnectionCallbacks wrapper(
+      inner_callbacks_, [&fired]() { ++fired; }, metadata_config);
+  EXPECT_CALL(inner_callbacks_, onMetadata(_));
+  auto metadata_map =
+      std::make_unique<Http::MetadataMap>(Http::MetadataMap{{"drain_reverse_tunnel", "false"}});
+  wrapper.onMetadata(std::move(metadata_map));
+  EXPECT_EQ(0, fired);
+}
+
+// A matching metadata frame redials at most once: a subsequent peer GOAWAY on the same connection
+// forwards but does NOT redial again (the once-guard is shared between onMetadata and onGoAway).
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnMetadataThenGoAwayRedialsAtMostOnce) {
+  int fired = 0;
+  auto metadata_config = std::make_shared<ConnectionMetadataConfig>(
+      ConnectionMetadataConfig{"drain_reverse_tunnel", std::chrono::milliseconds(2000),
+                               std::chrono::milliseconds(3000), std::chrono::milliseconds(5000)});
+  DrainAwareServerConnectionCallbacks wrapper(
+      inner_callbacks_, [&fired]() { ++fired; }, metadata_config);
+
+  EXPECT_CALL(inner_callbacks_, onMetadata(_));
+  auto metadata_map =
+      std::make_unique<Http::MetadataMap>(Http::MetadataMap{{"drain_reverse_tunnel", "true"}});
+  wrapper.onMetadata(std::move(metadata_map));
+  EXPECT_EQ(1, fired);
+
+  EXPECT_CALL(inner_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  wrapper.onGoAway(Http::GoAwayErrorCode::NoError);
+  EXPECT_EQ(1, fired);
 }
 
 } // namespace
