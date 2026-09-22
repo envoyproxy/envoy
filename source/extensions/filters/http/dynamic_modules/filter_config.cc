@@ -25,8 +25,8 @@ DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
     : cluster_manager_(context.clusterManager()),
       main_thread_dispatcher_(context.mainThreadDispatcher()),
       stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
-      stat_name_pool_(stats_scope_->symbolTable()), init_manager_(init_manager),
-      server_context_(context), filter_name_(filter_name), filter_config_(filter_config),
+      metrics_(*stats_scope_), init_manager_(init_manager), server_context_(context),
+      filter_name_(filter_name), filter_config_(filter_config),
       metrics_namespace_(metrics_namespace), dynamic_module_(std::move(dynamic_module)) {}
 
 size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view name,
@@ -78,7 +78,7 @@ size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view n
     // and make it return a StatusOr instead, so that the exception handling can be removed here.
     TRY_ASSERT_MAIN_THREAD {
       provider = server_context_.secretManager().findOrCreateGenericSecretProvider(
-          sds_config, std::string(name), server_context_, init_manager_);
+          sds_config, std::string(name), server_context_, init_manager_, true);
     }
     END_TRY
     CATCH(const EnvoyException& e, {

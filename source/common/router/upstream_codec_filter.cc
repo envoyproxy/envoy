@@ -184,9 +184,7 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
       // Disable per-try timeouts since the websocket upgrade completed successfully
       filter_.callbacks_->upstreamCallbacks()->disablePerTryTimeoutForWebsocketUpgrade();
       filter_.callbacks_->continueDecoding();
-    } else if (Runtime::runtimeFeatureEnabled(
-                   "envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain") &&
-               status >= 400) {
+    } else if (status >= 400) {
       maybeEndDecode(end_stream);
       const bool has_upgrade_header = (headers->Upgrade() != nullptr);
       const bool has_connection_upgrade =

@@ -588,6 +588,64 @@ TEST_F(MaxmindProviderConfigTest, DEPRECATED_FEATURE_TEST(GeoFieldKeysTakesPrece
   EXPECT_FALSE(region_header.has_value());
 }
 
+TEST_F(MaxmindProviderConfigTest, RebuildsProviderWhenCachedEntryHasExpired) {
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+        city: "x-geo-city"
+    city_db_path: %s
+  )EOF";
+  // A second, distinct config. Its provider keeps the driver singleton alive - and with it the map
+  // of weak_ptrs - once the first provider is released. The singleton is only referenced by live
+  // providers, so without this the map would be torn down and rebuilt empty, and the expired entry
+  // path would never be reached.
+  const auto keepalive_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+    country_db_path: %s
+  )EOF";
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto country_db_path = genGeoDbFilePath("GeoIP2-Country-Test.mmdb");
+  MaxmindProviderConfig provider_config;
+  TestUtility::loadFromYaml(absl::StrFormat(provider_config_yaml, city_db_path), provider_config);
+  MaxmindProviderConfig keepalive_config;
+  TestUtility::loadFromYaml(absl::StrFormat(keepalive_config_yaml, country_db_path),
+                            keepalive_config);
+
+  MaxmindProviderFactory factory;
+  Geolocation::DriverSharedPtr driver =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
+  Geolocation::DriverSharedPtr keepalive_driver =
+      factory.createGeoipProviderDriver(keepalive_config, "maxmind", server_factory_context_);
+  ASSERT_NE(driver, nullptr);
+  ASSERT_NE(keepalive_driver, nullptr);
+  ASSERT_NE(driver.get(), keepalive_driver.get());
+
+  // Release the first provider. Its entry remains in the singleton's map, but is now expired.
+  std::weak_ptr<Geolocation::Driver> released_driver = driver;
+  driver.reset();
+  ASSERT_TRUE(released_driver.expired());
+
+  Geolocation::DriverSharedPtr rebuilt_driver =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
+  // The original provider is destroyed, so a non-null driver here is necessarily a new instance.
+  ASSERT_NE(rebuilt_driver, nullptr);
+  EXPECT_TRUE(released_driver.expired());
+  EXPECT_THAT(rebuilt_driver, AllOf(HasCityDbPath(city_db_path), HasCountryHeader("x-geo-country"),
+                                    HasCityHeader("x-geo-city")));
+
+  // The rebuilt provider replaces the expired entry under the same key.
+  EXPECT_EQ(
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_).get(),
+      rebuilt_driver.get());
+  // Pruning the expired entry must not disturb the still live one.
+  EXPECT_EQ(
+      factory.createGeoipProviderDriver(keepalive_config, "maxmind", server_factory_context_).get(),
+      keepalive_driver.get());
+}
+
 } // namespace Maxmind
 } // namespace GeoipProviders
 } // namespace Extensions

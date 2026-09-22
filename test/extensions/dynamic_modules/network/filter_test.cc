@@ -1,11 +1,16 @@
+#include <functional>
+
+#include "source/common/http/message_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -36,6 +41,40 @@ public:
 
     ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
     ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
+  }
+
+  // Runs the reentrancy probe with an inline callout completion and returns how many times the
+  // module observed on_http_callout_done. The gate must keep this at zero for inline completions.
+  uint64_t runInlineCalloutProbe(
+      std::function<void(Http::AsyncClient::Callbacks&, Http::AsyncClient::Request&)> complete) {
+    auto dynamic_module =
+        newDynamicModule(testSharedObjectPath("network_integration_test", "rust"), false);
+    EXPECT_OK(dynamic_module);
+    auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+        "http_callout_reentrancy_probe", "", DefaultMetricsNamespace,
+        std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
+        main_thread_dispatcher_);
+    EXPECT_OK(filter_config_or_status);
+
+    auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+    EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"callout_cluster"}))
+        .WillOnce(testing::Return(cluster.get()));
+    EXPECT_CALL(cluster->async_client_, send_(testing::_, testing::_, testing::_))
+        .WillOnce(testing::Invoke(
+            [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+              testing::NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
+              complete(callbacks, req);
+              return nullptr;
+            }));
+
+    auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_or_status.value());
+    filter->initializeReadFilterCallbacks(read_callbacks_);
+    EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+
+    auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.callout_done_total");
+    EXPECT_NE(counter, nullptr);
+    return counter == nullptr ? 0 : counter->value();
   }
 
   Stats::IsolatedStoreImpl stats_;
@@ -314,6 +353,24 @@ TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
 }
 
 // -----------------------------------------------------------------------------
+// Worker index tests
+// -----------------------------------------------------------------------------
+
+// The filter publishes the worker index parsed from its dispatcher name. Malformed names are
+// covered by the shared helper unit test.
+TEST_F(DynamicModuleNetworkFilterTest, WorkerIndexParsedFromDispatcherName) {
+  NiceMock<Event::MockDispatcher> worker_dispatcher{"worker_7"};
+  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
+  NiceMock<Network::MockConnection> connection;
+  ON_CALL(connection, dispatcher()).WillByDefault(testing::ReturnRef(worker_dispatcher));
+  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
+
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks);
+  EXPECT_EQ(7U, filter->workerIndex());
+}
+
+// -----------------------------------------------------------------------------
 // Metrics Tests
 // -----------------------------------------------------------------------------
 
@@ -336,7 +393,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndIncrementCounter) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify counter value.
-  auto counter = filter_config_->getCounterById(counter_id);
+  auto counter = filter_config_->metrics().getCounterById(counter_id);
   EXPECT_TRUE(counter.has_value());
 }
 
@@ -364,7 +421,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndManipulateGauge) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify gauge exists.
-  auto gauge = filter_config_->getGaugeById(gauge_id);
+  auto gauge = filter_config_->metrics().getGaugeById(gauge_id);
   EXPECT_TRUE(gauge.has_value());
 }
 
@@ -387,7 +444,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndRecordHistogram) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify histogram exists.
-  auto histogram = filter_config_->getHistogramById(histogram_id);
+  auto histogram = filter_config_->metrics().getHistogramById(histogram_id);
   EXPECT_TRUE(histogram.has_value());
 }
 
@@ -414,6 +471,28 @@ TEST_F(DynamicModuleNetworkFilterTest, MetricNotFound) {
   result =
       envoy_dynamic_module_callback_network_filter_record_histogram_value(filter.get(), 999, 1);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+// The async client can complete a callout inline, before send returns a request handle, while the
+// module is still inside the hook that issued the callout. The filter must not call back into the
+// module in that window. An inline reset exercises the onFailure gate.
+TEST_F(DynamicModuleNetworkFilterTest, HttpCalloutInlineFailureDoesNotReenterModule) {
+  EXPECT_EQ(0, runInlineCalloutProbe(
+                   [](Http::AsyncClient::Callbacks& callbacks, Http::AsyncClient::Request& req) {
+                     callbacks.onFailure(req, Http::AsyncClient::FailureReason::Reset);
+                   }));
+}
+
+// An inline response, such as a local reply from a cluster with no healthy hosts, exercises the
+// onSuccess gate on the same inline window.
+TEST_F(DynamicModuleNetworkFilterTest, HttpCalloutInlineSuccessDoesNotReenterModule) {
+  EXPECT_EQ(
+      0, runInlineCalloutProbe([](Http::AsyncClient::Callbacks& callbacks,
+                                  Http::AsyncClient::Request& req) {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+        callbacks.onSuccess(req, std::move(response));
+      }));
 }
 
 } // namespace NetworkFilters

@@ -8,13 +8,16 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/ssl/ssl.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
+#include "openssl/tls1.h"
 #include "openssl/x509v3.h"
 
 namespace Envoy {
@@ -635,6 +638,133 @@ std::vector<std::string> Utility::getCertificateCrlDpsForLogging(X509* cert) {
     }
   }
   return crldps;
+}
+
+std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+Utility::compliancePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params) {
+  switch (params.compliance_policies_size()) {
+  case 0:
+    return std::nullopt;
+  case 1:
+    return params.compliance_policies(0);
+  default:
+    IS_ENVOY_BUG("more than one policies are not supported");
+    return std::nullopt;
+  }
+}
+
+absl::StatusOr<ssl_compliance_policy_t> Utility::compliancePolicyToSslPolicy(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy) {
+  using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+  switch (policy) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case TlsProto::FIPS_202205:
+    return ssl_compliance_policy_fips_202205;
+  case TlsProto::CNSA2_202603:
+    return ssl_compliance_policy_cnsa2_202603;
+  case TlsProto::CNSA1_202603:
+    return ssl_compliance_policy_cnsa1_202603;
+  }
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unknown compliance policy: ", static_cast<int>(policy)));
+}
+
+unsigned Utility::tlsVersionFromProto(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol version,
+    unsigned default_version) {
+  using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+  switch (version) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case TlsProto::TLS_AUTO:
+    return default_version;
+  case TlsProto::TLSv1_0:
+    return TLS1_VERSION;
+  case TlsProto::TLSv1_1:
+    return TLS1_1_VERSION;
+  case TlsProto::TLSv1_2:
+    return TLS1_2_VERSION;
+  case TlsProto::TLSv1_3:
+    return TLS1_3_VERSION;
+  }
+  IS_ENVOY_BUG("unexpected tls version");
+  return default_version;
+}
+
+absl::Status Utility::validateCipherCurveAndSigalgsOnSslCtx(absl::string_view cipher_suites,
+                                                            absl::string_view ecdh_curves,
+                                                            absl::string_view signature_algorithms,
+                                                            SSL_CTX* ssl_ctx) {
+  if (!cipher_suites.empty() &&
+      !SSL_CTX_set_strict_cipher_list(ssl_ctx, std::string(cipher_suites).c_str())) {
+    // Retry each token individually to identify which ciphers are bad.
+    // "-" is both a leading operator (-ALL) and a name separator (ECDHE-RSA-AES128). Don't split
+    // on it; strip the leading "-" from any token that starts with it.
+    std::vector<absl::string_view> ciphers = StringUtil::splitToken(cipher_suites, ":+![|]", false);
+    std::vector<std::string> bad_ciphers;
+    for (const auto& cipher : ciphers) {
+      std::string cipher_str(cipher);
+      if (absl::StartsWith(cipher_str, "-")) {
+        cipher_str.erase(cipher_str.begin());
+      }
+      if (!SSL_CTX_set_strict_cipher_list(ssl_ctx, cipher_str.c_str())) {
+        bad_ciphers.push_back(cipher_str);
+      }
+    }
+    return absl::InvalidArgumentError(fmt::format(
+        "Failed to initialize cipher suites {}. The following ciphers were rejected when tried "
+        "individually: {}",
+        cipher_suites, absl::StrJoin(bad_ciphers, ", ")));
+  }
+  if (!ecdh_curves.empty() &&
+      !SSL_CTX_set1_curves_list(ssl_ctx, std::string(ecdh_curves).c_str())) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to initialize ECDH curves ", ecdh_curves));
+  }
+  if (!signature_algorithms.empty() &&
+      !SSL_CTX_set1_sigalgs_list(ssl_ctx, std::string(signature_algorithms).c_str())) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to initialize TLS signature algorithms ", signature_algorithms));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Utility::applyCompliancePolicyToSslCtx(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy,
+    SSL_CTX* ssl_ctx) {
+  auto ssl_policy_or_error = compliancePolicyToSslPolicy(policy);
+  if (!ssl_policy_or_error.ok()) {
+    return ssl_policy_or_error.status();
+  }
+  if (SSL_CTX_set_compliance_policy(ssl_ctx, *ssl_policy_or_error) != 1) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to apply compliance policy: ", getLastCryptoError().value_or("")));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Utility::applyCompliancePolicyToSsl(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy,
+    SSL* ssl) {
+  auto ssl_policy_or_error = compliancePolicyToSslPolicy(policy);
+  if (!ssl_policy_or_error.ok()) {
+    return ssl_policy_or_error.status();
+  }
+  if (SSL_set_compliance_policy(ssl, *ssl_policy_or_error) != 1) {
+    return absl::InternalError(absl::StrCat("Failed to apply per-cert compliance policy: ",
+                                            getLastCryptoError().value_or("")));
+  }
+  return absl::OkStatus();
+}
+
+Utility::EffectiveTlsParams Utility::effectiveTlsParams(const Ssl::TlsParams& params,
+                                                        bool provides_ciphers_and_curves,
+                                                        bool provides_sigalgs) {
+  return EffectiveTlsParams{
+      .cipher_suites = provides_ciphers_and_curves ? EMPTY_STRING : params.cipher_suites,
+      .ecdh_curves = provides_ciphers_and_curves ? EMPTY_STRING : params.ecdh_curves,
+      .signature_algorithms = provides_sigalgs ? EMPTY_STRING : params.signature_algorithms,
+  };
 }
 
 } // namespace Tls

@@ -26,6 +26,7 @@ func init() {
 		"http_callouts":                &HttpCalloutsConfigFactory{},
 		"send_response":                &SendResponseConfigFactory{},
 		"http_filter_scheduler":        &HttpFilterSchedulerConfigFactory{},
+		"span_across_callbacks":        &SpanAcrossCallbacksConfigFactory{},
 		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
 		"stats_callbacks":              &StatsCallbacksConfigFactory{},
 		"streaming_terminal_filter":    &StreamingTerminalConfigFactory{},
@@ -39,6 +40,7 @@ func init() {
 		"http_struct_config":           &HttpStructConfigFactory{},
 		"list_metadata_callbacks":      &ListMetadataCallbacksConfigFactory{},
 		"log_level":                    &LogLevelConfigFactory{},
+		"runtime_values":               &RuntimeValuesConfigFactory{},
 		"generic_secret_callbacks":     &GenericSecretCallbacksConfigFactory{},
 	})
 }
@@ -727,6 +729,54 @@ func (p *HttpFilterSchedulerFilter) OnStreamComplete() {
 
 	// Force the GC to release the scheduler and related C resources.
 	runtime.GC()
+}
+
+// -----------------------------------------------------------------------------
+// SpanAcrossCallbacks
+// -----------------------------------------------------------------------------
+
+type SpanAcrossCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *SpanAcrossCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	c []byte) (shared.HttpFilterFactory, error) {
+	return &SpanAcrossCallbacksFilterFactory{}, nil
+}
+
+type SpanAcrossCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *SpanAcrossCallbacksFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &SpanAcrossCallbacksFilter{handle: h}
+}
+
+// SpanAcrossCallbacksFilter spawns a child span in OnRequestHeaders, starts off-thread work, and
+// finishes the span from the scheduled callback to show a span can cover work between event hooks.
+type SpanAcrossCallbacksFilter struct {
+	shared.EmptyHttpFilter
+	handle    shared.HttpFilterHandle
+	childSpan shared.ChildSpan
+}
+
+func (p *SpanAcrossCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if span := p.handle.GetActiveSpan(); span != nil {
+		p.childSpan = span.SpawnChild("off_thread_work")
+	}
+	sched := p.handle.GetScheduler()
+	go func() {
+		sched.Schedule(func() {
+			if p.childSpan != nil {
+				p.childSpan.SetTag("completed", "true")
+				p.childSpan.Finish()
+				p.childSpan = nil
+			}
+			p.handle.ContinueRequest()
+		})
+	}()
+	return shared.HeadersStatusStop
 }
 
 // -----------------------------------------------------------------------------
@@ -1633,5 +1683,58 @@ func (p *GenericSecretCallbacksFilter) OnResponseHeaders(headers shared.HeaderMa
 	_, ok = p.handle.GetGenericSecret(shared.GenericSecretID(12345))
 	assertEq(ok, false, "reading an unknown secret ID")
 
+	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// RuntimeValues
+// -----------------------------------------------------------------------------
+
+// RuntimeValuesConfigFactory reads every runtime type at config creation, which is where the
+// runtime is reachable, and caches the values so the filter can echo them back on the response.
+type RuntimeValuesConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *RuntimeValuesConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &RuntimeValuesFilterFactory{
+		boolValue:     handle.GetRuntimeBool("test.runtime_bool", false),
+		intValue:      handle.GetRuntimeInt("test.runtime_int", 7),
+		numberValue:   handle.GetRuntimeNumber("test.runtime_number", 0.5),
+		missingBool:   handle.GetRuntimeBool("test.runtime_missing_bool", true),
+		missingInt:    handle.GetRuntimeInt("test.runtime_missing_int", 1234),
+		missingNumber: handle.GetRuntimeNumber("test.runtime_missing_number", 2.5),
+	}, nil
+}
+
+type RuntimeValuesFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	boolValue     bool
+	intValue      uint64
+	numberValue   float64
+	missingBool   bool
+	missingInt    uint64
+	missingNumber float64
+}
+
+func (f *RuntimeValuesFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &RuntimeValuesFilter{factory: f}
+}
+
+type RuntimeValuesFilter struct {
+	shared.EmptyHttpFilter
+	factory *RuntimeValuesFilterFactory
+}
+
+func (p *RuntimeValuesFilter) OnResponseHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	f := p.factory
+	headers.Set("x-runtime-bool", strconv.FormatBool(f.boolValue))
+	headers.Set("x-runtime-int", strconv.FormatUint(f.intValue, 10))
+	headers.Set("x-runtime-number", strconv.FormatFloat(f.numberValue, 'g', -1, 64))
+	headers.Set("x-runtime-missing-bool", strconv.FormatBool(f.missingBool))
+	headers.Set("x-runtime-missing-int", strconv.FormatUint(f.missingInt, 10))
+	headers.Set("x-runtime-missing-number", strconv.FormatFloat(f.missingNumber, 'g', -1, 64))
 	return shared.HeadersStatusContinue
 }

@@ -197,13 +197,14 @@ public:
   virtual bool logEnabled(LogLevel level) = 0;
 
   /** Logs a message through Envoy's logging subsystem. */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
 /** Host interface exposed while creating a thread-safe listener filter factory. */
-class ListenerFilterConfigHandle {
+class ListenerFilterConfigHandle : public CommonHandle {
 public:
-  virtual ~ListenerFilterConfigHandle();
+  ~ListenerFilterConfigHandle() override;
 
   /** Defines a histogram metric during config initialization. */
   virtual std::pair<MetricID, MetricsResult> defineHistogram(std::string_view name) = 0;
@@ -224,7 +225,8 @@ public:
   virtual bool logEnabled(LogLevel level) = 0;
 
   /** Logs a message through Envoy's logging subsystem. */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
 /** Base class for listener filters that operate on newly accepted downstream sockets. */

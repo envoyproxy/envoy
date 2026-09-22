@@ -29,7 +29,7 @@ namespace Http {
 /**
  * All stats for the connection manager. @see stats_macros.h
  */
-#define ALL_HTTP_CONN_MAN_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
+#define ALL_HTTP_CONN_MAN_STATS(COUNTER, GAUGE, HISTOGRAM, RESPONSE_CODE_CLASS_COUNTER)            \
   COUNTER(downstream_cx_delayed_close_timeout)                                                     \
   COUNTER(downstream_cx_destroy)                                                                   \
   COUNTER(downstream_cx_destroy_active_rq)                                                         \
@@ -53,11 +53,11 @@ namespace Http {
   COUNTER(downstream_cx_upgrades_total)                                                            \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
-  COUNTER(downstream_rq_1xx)                                                                       \
-  COUNTER(downstream_rq_2xx)                                                                       \
-  COUNTER(downstream_rq_3xx)                                                                       \
-  COUNTER(downstream_rq_4xx)                                                                       \
-  COUNTER(downstream_rq_5xx)                                                                       \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_1xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_2xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_3xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_4xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_5xx)                                                   \
   COUNTER(downstream_rq_completed)                                                                 \
   COUNTER(downstream_rq_failed_path_normalization)                                                 \
   COUNTER(downstream_rq_http1_total)                                                               \
@@ -96,20 +96,18 @@ namespace Http {
  * Wrapper struct for connection manager stats. @see stats_macros.h
  */
 struct ConnectionManagerNamedStats {
-  ALL_HTTP_CONN_MAN_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+  ALL_HTTP_CONN_MAN_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,
+                          GENERATE_COUNTER_STRUCT)
 };
 
 struct ConnectionManagerStats {
-  ConnectionManagerStats(ConnectionManagerNamedStats&& named_stats, const std::string& prefix,
-                         Stats::Scope& scope)
-      : named_(std::move(named_stats)), prefix_(prefix),
-        prefix_stat_name_storage_(prefix, scope.symbolTable()), scope_(scope) {}
-
-  Stats::StatName prefixStatName() const { return prefix_stat_name_storage_.statName(); }
+  // The scope is the connection manager's own 'http.<stat_prefix>.' scope, so the stats it holds
+  // need no additional prefix. The scope is retained for the stats that are created lazily on the
+  // request path, such as the per-user-agent ones.
+  ConnectionManagerStats(ConnectionManagerNamedStats&& named_stats, Stats::Scope& scope)
+      : named_(std::move(named_stats)), scope_(scope) {}
 
   ConnectionManagerNamedStats named_;
-  std::string prefix_;
-  Stats::StatNameManagedStorage prefix_stat_name_storage_;
   Stats::Scope& scope_;
 };
 
@@ -136,19 +134,19 @@ using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManag
 /**
  * Connection manager per listener stats. @see stats_macros.h
  */
-#define CONN_MAN_LISTENER_STATS(COUNTER)                                                           \
-  COUNTER(downstream_rq_1xx)                                                                       \
-  COUNTER(downstream_rq_2xx)                                                                       \
-  COUNTER(downstream_rq_3xx)                                                                       \
-  COUNTER(downstream_rq_4xx)                                                                       \
-  COUNTER(downstream_rq_5xx)                                                                       \
+#define CONN_MAN_LISTENER_STATS(COUNTER, RESPONSE_CODE_CLASS_COUNTER)                              \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_1xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_2xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_3xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_4xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_5xx)                                                   \
   COUNTER(downstream_rq_completed)
 
 /**
  * Wrapper struct for connection manager listener stats. @see stats_macros.h
  */
 struct ConnectionManagerListenerStats {
-  CONN_MAN_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
+  CONN_MAN_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_COUNTER_STRUCT)
 };
 
 /**

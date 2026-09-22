@@ -8,10 +8,13 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <source_location>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "sdk_common.h"
 
 namespace Envoy {
 namespace DynamicModules {
@@ -246,7 +249,10 @@ enum class AttributeID : uint32_t {
   XdsVirtualHostMetadata,
   XdsUpstreamHostMetadata,
   XdsFilterChainName,
-  HealthCheck
+  HealthCheck,
+  UpstreamRequestedServerName,
+  XdsVirtualClusterName,
+  UpstreamProtocol
 };
 
 enum class LogLevel : uint32_t { Trace, Debug, Info, Warn, Error, Critical, Off };
@@ -350,11 +356,18 @@ struct ClusterHostCounts {
 
 class ChildSpan;
 
+/**
+ * A tracing span for the current HTTP stream. The active span is owned by Envoy and must not be
+ * finished by the module. A span may be stored and used in a later event hook on the same worker
+ * thread. Do not use a span after the stream has ended or move it to another thread.
+ */
 class Span {
 public:
   virtual ~Span() = default;
 
   virtual void setTag(std::string_view key, std::string_view value) = 0;
+  virtual void
+  setTags(std::initializer_list<std::pair<std::string_view, std::string_view>> tags) = 0;
   virtual void setOperation(std::string_view operation) = 0;
   virtual void log(std::string_view event) = 0;
   virtual void setSampled(bool sampled) = 0;
@@ -365,6 +378,11 @@ public:
   virtual std::unique_ptr<ChildSpan> spawnChild(std::string_view operation) = 0;
 };
 
+/**
+ * A tracing span owned by the module. Call finish when done. A child span may be stored and
+ * finished in a later event hook on the same worker thread, for example to cover off-thread work
+ * that resumes in a scheduled callback.
+ */
 class ChildSpan : public Span {
 public:
   virtual void finish() = 0;
@@ -733,7 +751,8 @@ public:
                                                                SocketDirection direction) = 0;
 
   /**
-   * Retrieves the active tracing span for the current stream.
+   * Retrieves the active tracing span for the current stream. The returned span may be stored and
+   * used in a later event hook on the same worker thread.
    */
   virtual std::unique_ptr<Span> getActiveSpan() = 0;
 
@@ -997,13 +1016,15 @@ public:
    * Logs a message at the specified log level.
    * @param level The log level.
    * @param message The message to log.
+   * @param location The source location of the log statement, defaulted to the caller.
    */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
-class HttpFilterConfigHandle {
+class HttpFilterConfigHandle : public CommonHandle {
 public:
-  virtual ~HttpFilterConfigHandle();
+  ~HttpFilterConfigHandle() override;
 
   /**
    * Defines a histogram metric with a name and optional tag keys.
@@ -1139,8 +1160,10 @@ public:
    * Logs a message at the specified log level.
    * @param level The log level.
    * @param message The message to log.
+   * @param location The source location of the log statement, defaulted to the caller.
    */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 
   /**
    * Initiates a one-shot HTTP callout to a cluster. The response will be delivered via
@@ -1402,7 +1425,8 @@ private:
 #define DYM_LOG(HANDLE, LEVEL, FORMAT_STRING, ...)                                                 \
   do {                                                                                             \
     if (HANDLE.logEnabled(LEVEL)) {                                                                \
-      HANDLE.log(LEVEL, std::format(FORMAT_STRING, ##__VA_ARGS__));                                \
+      HANDLE.log(LEVEL, std::format(FORMAT_STRING, ##__VA_ARGS__),                                 \
+                 std::source_location::current());                                                 \
     }                                                                                              \
   } while (0)
 

@@ -1,5 +1,5 @@
 use crate::{
-  abi, bytes_to_module_buffer, str_to_module_buffer, wrap_into_c_void_ptr,
+  abi, bytes_to_module_buffer, ffi_export, str_to_module_buffer, wrap_into_c_void_ptr,
   NEW_TRACER_CONFIG_FUNCTION,
 };
 use std::ffi::c_void;
@@ -85,16 +85,19 @@ impl TracerConfigContext {
   pub fn define_counter_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<TracerCounterVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_counter(
         self.envoy_ptr,
         str_to_module_buffer(name),
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_names.as_ptr() as *mut _,
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -127,16 +130,19 @@ impl TracerConfigContext {
   pub fn define_gauge_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<TracerGaugeVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_gauge(
         self.envoy_ptr,
         str_to_module_buffer(name),
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_names.as_ptr() as *mut _,
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -169,16 +175,19 @@ impl TracerConfigContext {
   pub fn define_histogram_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<TracerHistogramVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_histogram(
         self.envoy_ptr,
         str_to_module_buffer(name),
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_names.as_ptr() as *mut _,
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -206,16 +215,19 @@ impl TracerConfigContext {
   pub fn increment_counter_vec(
     &self,
     handle: TracerCounterVecHandle,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_increment_counter(
         self.envoy_ptr,
         handle.id,
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_values.as_ptr() as *mut _,
+        label_values.len(),
         value,
       )
     })
@@ -242,16 +254,19 @@ impl TracerConfigContext {
   pub fn set_gauge_vec(
     &self,
     handle: TracerGaugeVecHandle,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_set_gauge(
         self.envoy_ptr,
         handle.id,
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_values.as_ptr() as *mut _,
+        label_values.len(),
         value,
       )
     })
@@ -278,16 +293,19 @@ impl TracerConfigContext {
   pub fn record_histogram_vec(
     &self,
     handle: TracerHistogramVecHandle,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_record_histogram_value(
         self.envoy_ptr,
         handle.id,
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_values.as_ptr() as *mut _,
+        label_values.len(),
         value,
       )
     })
@@ -336,6 +354,9 @@ pub trait TracerSpan: Send {
 
   /// Set a tag on this span.
   fn set_tag(&mut self, key: &str, value: &str);
+
+  /// Reserve capacity for tags that will be set via [`set_tag`](Self::set_tag).
+  fn reserve_tags(&mut self, _size: usize) {}
 
   /// Record a log event on this span.
   fn log(&mut self, timestamp_ns: i64, event: &str);
@@ -573,17 +594,16 @@ unsafe fn envoy_buffer_to_str(
 // Tracer Event Hook Implementations
 // -----------------------------------------------------------------------------
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_new(
-  config_envoy_ptr: abi::envoy_dynamic_module_type_tracer_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> abi::envoy_dynamic_module_type_tracer_config_module_ptr {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_config_new(
+    config_envoy_ptr: abi::envoy_dynamic_module_type_tracer_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_tracer_config_module_ptr {
     let name_str = unsafe { envoy_buffer_to_str(name) };
     let config_slice = unsafe {
       crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
@@ -598,49 +618,38 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_new(
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }
-  }));
-  match result {
-    Ok(ptr) => ptr,
-    Err(panic) => {
-      crate::log_ffi_panic("envoy_dynamic_module_on_tracer_config_new", panic);
-      std::ptr::null()
-    },
   }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_destroy(
-  config_module_ptr: abi::envoy_dynamic_module_type_tracer_config_module_ptr,
-) {
-  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_config_destroy(
+    config_module_ptr: abi::envoy_dynamic_module_type_tracer_config_module_ptr,
+  ) {
     let config = config_module_ptr as *mut *mut dyn TracerConfig;
     unsafe {
       let _outer = Box::from_raw(config);
       let _inner = Box::from_raw(*config);
     }
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_tracer_config_destroy", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_start_span(
-  config_module_ptr: abi::envoy_dynamic_module_type_tracer_config_module_ptr,
-  span_envoy_ptr: abi::envoy_dynamic_module_type_tracer_span_envoy_ptr,
-  operation_name: abi::envoy_dynamic_module_type_envoy_buffer,
-  traced: bool,
-  reason: abi::envoy_dynamic_module_type_trace_reason,
-) -> abi::envoy_dynamic_module_type_tracer_span_module_ptr {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_start_span(
+    config_module_ptr: abi::envoy_dynamic_module_type_tracer_config_module_ptr,
+    span_envoy_ptr: abi::envoy_dynamic_module_type_tracer_span_envoy_ptr,
+    operation_name: abi::envoy_dynamic_module_type_envoy_buffer,
+    traced: bool,
+    reason: abi::envoy_dynamic_module_type_trace_reason,
+  ) -> abi::envoy_dynamic_module_type_tracer_span_module_ptr {
     let config = config_module_ptr as *const *const dyn TracerConfig;
     let config = unsafe { &**config };
     let envoy_span = EnvoyTracerSpanImpl::new(span_envoy_ptr);
@@ -652,108 +661,110 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_start_span(
       },
       None => std::ptr::null(),
     }
-  }));
-  match result {
-    Ok(ptr) => ptr,
-    Err(panic) => {
-      crate::log_ffi_panic("envoy_dynamic_module_on_tracer_start_span", panic);
-      std::ptr::null()
-    },
   }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_operation(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-  operation: abi::envoy_dynamic_module_type_envoy_buffer,
-) {
-  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_set_operation(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    operation: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let op = unsafe { envoy_buffer_to_str(operation) };
     wrapper.inner.set_operation(op.as_ref());
-  }));
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_tag(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-  key: abi::envoy_dynamic_module_type_envoy_buffer,
-  value: abi::envoy_dynamic_module_type_envoy_buffer,
-) {
-  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_set_tag(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let k = unsafe { envoy_buffer_to_str(key) };
     let v = unsafe { envoy_buffer_to_str(value) };
     wrapper.inner.set_tag(k.as_ref(), v.as_ref());
-  }));
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_log(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-  timestamp_ns: i64,
-  event: abi::envoy_dynamic_module_type_envoy_buffer,
-) {
-  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_reserve_tags(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    tags_size: usize,
+  ) {
+    let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
+    wrapper.inner.reserve_tags(tags_size);
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_log(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    timestamp_ns: i64,
+    event: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let e = unsafe { envoy_buffer_to_str(event) };
     wrapper.inner.log(timestamp_ns, e.as_ref());
-  }));
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_finish(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-) {
-  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_finish(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+  ) {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     wrapper.inner.finish();
-  }));
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_inject_context(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-  span_envoy_ptr: abi::envoy_dynamic_module_type_tracer_span_envoy_ptr,
-) {
-  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_inject_context(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    span_envoy_ptr: abi::envoy_dynamic_module_type_tracer_span_envoy_ptr,
+  ) {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let envoy_span = EnvoyTracerSpanImpl::new(span_envoy_ptr);
     wrapper.inner.inject_context(&envoy_span);
-  }));
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_spawn_child(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  start_time_ns: i64,
-) -> abi::envoy_dynamic_module_type_tracer_span_module_ptr {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_spawn_child(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    start_time_ns: i64,
+  ) -> abi::envoy_dynamic_module_type_tracer_span_module_ptr {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let n = unsafe { envoy_buffer_to_str(name) };
     match wrapper.inner.spawn_child(n.as_ref(), start_time_ns) {
@@ -763,57 +774,48 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_spawn_child(
       },
       None => std::ptr::null(),
     }
-  }));
-  match result {
-    Ok(ptr) => ptr,
-    Err(panic) => {
-      crate::log_ffi_panic("envoy_dynamic_module_on_tracer_span_spawn_child", panic);
-      std::ptr::null()
-    },
+  }
+  on_panic = std::ptr::null()
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_set_sampled(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    sampled: bool,
+  ) {
+    let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
+    wrapper.inner.set_sampled(sampled);
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_sampled(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-  sampled: bool,
-) {
-  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-    let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
-    wrapper.inner.set_sampled(sampled);
-  }));
-}
-
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_use_local_decision(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-) -> bool {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_use_local_decision(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+  ) -> bool {
     let wrapper = unsafe { &*(span_module_ptr as *const SpanWrapper) };
     wrapper.inner.use_local_decision()
-  }));
-  result.unwrap_or(true)
+  }
+  on_panic = true
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_baggage(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-  key: abi::envoy_dynamic_module_type_envoy_buffer,
-  value_out: *mut abi::envoy_dynamic_module_type_module_buffer,
-) -> bool {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_get_baggage(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value_out: *mut abi::envoy_dynamic_module_type_module_buffer,
+  ) -> bool {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let k = unsafe { envoy_buffer_to_str(key) };
     match wrapper.inner.get_baggage(k.as_ref()) {
@@ -829,47 +831,42 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_baggage(
         false
       },
     }
-  }));
-  match result {
-    Ok(found) => found,
-    Err(_) => {
-      unsafe {
-        (*value_out).ptr = std::ptr::null();
-        (*value_out).length = 0;
-      }
-      false
-    },
+  }
+  on_panic = {
+    unsafe {
+      (*value_out).ptr = std::ptr::null();
+      (*value_out).length = 0;
+    }
+    false
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_baggage(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-  key: abi::envoy_dynamic_module_type_envoy_buffer,
-  value: abi::envoy_dynamic_module_type_envoy_buffer,
-) {
-  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_set_baggage(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let k = unsafe { envoy_buffer_to_str(key) };
     let v = unsafe { envoy_buffer_to_str(value) };
     wrapper.inner.set_baggage(k.as_ref(), v.as_ref());
-  }));
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_trace_id(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-  value_out: *mut abi::envoy_dynamic_module_type_module_buffer,
-) -> bool {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_get_trace_id(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    value_out: *mut abi::envoy_dynamic_module_type_module_buffer,
+  ) -> bool {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     match wrapper.inner.get_trace_id() {
       Some(val) => {
@@ -884,29 +881,25 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_trace_id(
         false
       },
     }
-  }));
-  match result {
-    Ok(found) => found,
-    Err(_) => {
-      unsafe {
-        (*value_out).ptr = std::ptr::null();
-        (*value_out).length = 0;
-      }
-      false
-    },
+  }
+  on_panic = {
+    unsafe {
+      (*value_out).ptr = std::ptr::null();
+      (*value_out).length = 0;
+    }
+    false
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_span_id(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-  value_out: *mut abi::envoy_dynamic_module_type_module_buffer,
-) -> bool {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_get_span_id(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    value_out: *mut abi::envoy_dynamic_module_type_module_buffer,
+  ) -> bool {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     match wrapper.inner.get_span_id() {
       Some(val) => {
@@ -921,36 +914,29 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_span_id(
         false
       },
     }
-  }));
-  match result {
-    Ok(found) => found,
-    Err(_) => {
-      unsafe {
-        (*value_out).ptr = std::ptr::null();
-        (*value_out).length = 0;
-      }
-      false
-    },
+  }
+  on_panic = {
+    unsafe {
+      (*value_out).ptr = std::ptr::null();
+      (*value_out).length = 0;
+    }
+    false
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_destroy(
-  span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
-) {
-  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_destroy(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+  ) {
     let wrapper = span_module_ptr as *mut SpanWrapper;
     unsafe {
       let _ = Box::from_raw(wrapper);
     }
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_tracer_span_destroy", panic);
-  });
+  }
 }
 
 /// Declare the init functions for the tracer dynamic module.
@@ -960,9 +946,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_destroy(
 #[macro_export]
 macro_rules! declare_tracer_init_functions {
   ($f:ident, $new_tracer_config_fn:expr) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
           envoy_proxy_dynamic_modules_rust_sdk::NEW_TRACER_CONFIG_FUNCTION,
           $new_tracer_config_fn,
@@ -974,13 +959,8 @@ macro_rules! declare_tracer_init_functions {
         } else {
           ::std::ptr::null()
         }
-      })) {
-        ::std::result::Result::Ok(v) => v,
-        ::std::result::Result::Err(payload) => {
-          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
-          ::std::ptr::null()
-        },
       }
+      on_panic = ::std::ptr::null()
     }
   };
 }

@@ -1,5 +1,7 @@
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
+#include "source/extensions/dynamic_modules/worker_index.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -69,12 +71,7 @@ void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
   // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
   cached_dispatcher_.store(&callbacks.connection().dispatcher(), std::memory_order_release);
 
-  const std::string& worker_name = callbacks.connection().dispatcher().name();
-  auto pos = worker_name.find_first_of('_');
-  ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
-  if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index_)) {
-    IS_ENVOY_BUG("failed to parse worker index from name");
-  }
+  worker_index_ = parseWorkerIndexFromDispatcherName(callbacks.connection().dispatcher().name());
 
   // Delay the in-module filter initialization until read callbacks are set
   // to allow accessing worker index during filter creation.
@@ -280,9 +277,11 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onSuccess(
   // ends up deallocating this callback itself.
   DynamicModuleNetworkFilterSharedPtr filter = filter_.lock();
   uint64_t callout_id = callout_id_;
-  // Check if the filter is destroyed before the callout completed.
+  // request_ is set only after the async client accepts the callout. Gating on it avoids a
+  // reentrant module call when send completes the callout inline, which is already reported by the
+  // return code.
   if (!filter || !filter->in_module_filter_ ||
-      !filter->config_->on_network_filter_http_callout_done_) {
+      !filter->config_->on_network_filter_http_callout_done_ || request_ == nullptr) {
     return;
   }
 
@@ -321,8 +320,11 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onFailure(
   // ends up deallocating this callback itself.
   DynamicModuleNetworkFilterSharedPtr filter = filter_.lock();
   uint64_t callout_id = callout_id_;
+  // request_ is set only after the async client accepts the callout. Gating on it avoids a
+  // reentrant module call when send fails the callout inline, which is already reported by the
+  // return code.
   if (!filter || !filter->in_module_filter_ ||
-      !filter->config_->on_network_filter_http_callout_done_) {
+      !filter->config_->on_network_filter_http_callout_done_ || request_ == nullptr) {
     return;
   }
 

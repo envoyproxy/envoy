@@ -45,6 +45,7 @@ envoy_cc_library(
         ":per_filter_config_lib",
         ":retry_policy_lib",
         ":retry_state_lib",
+        ":route_specifier_lib",
         ":router_ratelimit_lib",
         ":tls_context_match_criteria_lib",
         ":weighted_cluster_specifier_lib",
@@ -107,6 +108,23 @@ envoy_cc_library(
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "route_specifier_lib",
+    srcs = ["route_specifier_impl.cc"],
+    hdrs = ["route_specifier_impl.h"],
+    deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/router:route_specifier_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:utility_lib",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:span",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -222,6 +240,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:prefix_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -320,10 +339,12 @@ envoy_cc_library(
         "//source/common/config:config_provider_lib",
         "//source/common/config:resource_name_lib",
         "//source/common/config:resource_type_helper_lib",
+        "//source/common/config:well_known_names",
         "//source/common/config:xds_resource_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:watcher_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:prefix_utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

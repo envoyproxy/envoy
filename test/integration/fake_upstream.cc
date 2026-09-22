@@ -673,6 +673,16 @@ AssertionResult FakeConnectionBase::waitForHalfClose(milliseconds timeout) {
   return AssertionSuccess();
 }
 
+AssertionResult FakeConnectionBase::waitForDispatcherBarrier(milliseconds timeout) {
+  auto done = std::make_shared<absl::Notification>();
+  ASSERT(!dispatcher_.isThreadSafe());
+  dispatcher_.post([done]() { done->Notify(); });
+  if (!done->WaitForNotificationWithTimeout(absl::FromChrono(timeout))) {
+    return AssertionFailure() << "Timed out waiting for fake-upstream dispatcher barrier.";
+  }
+  return AssertionSuccess();
+}
+
 AssertionResult FakeConnectionBase::waitForNoPost(milliseconds timeout) {
   absl::MutexLock lock(lock_);
   if (!time_system_.waitFor(

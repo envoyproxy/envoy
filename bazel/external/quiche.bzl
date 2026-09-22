@@ -1,9 +1,9 @@
 load(
-    "@envoy//bazel:envoy_build_system.bzl",
+    "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_cc_test_library",
 )
-load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_http3")
+load("//bazel:envoy_select.bzl", "envoy_select_enable_http3")
 
 # These options are only used to suppress errors in brought-in QUICHE tests.
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
@@ -18,7 +18,7 @@ quiche_common_copts = [
 
 quiche_copts = select({
     # Ignore unguarded #pragma GCC statements in QUICHE sources
-    "@envoy//bazel:windows_x86_64": ["-wd4068"],
+    Label("//bazel:windows_x86_64"): ["-wd4068"],
     # Remove these after upstream fix.
     "//conditions:default": quiche_common_copts,
 })

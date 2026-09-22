@@ -4,6 +4,9 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.pb.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
@@ -383,6 +386,39 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnNonLocalAddress) {
   }
 
   requestResponseWithListenerAddress(*listener_address);
+}
+
+// Verifies that use_original_src_ip preserves the downstream source IP on the upstream datagram.
+TEST_P(UdpProxyIntegrationTest, UseOriginalSrcIp) {
+  if (version_ != Network::Address::IpVersion::v4) {
+    GTEST_SKIP() << "The test requires a second loopback address, which IPv6 does not provide.";
+  }
+  if (!Api::OsSysCallsSingleton::get().supportsIpTransparent(version_)) {
+    GTEST_SKIP() << "IP_TRANSPARENT is not available to the test process.";
+  }
+
+  setup(1, std::nullopt, R"EOF(
+  use_per_packet_load_balancing: true
+  use_original_src_ip: true
+)EOF");
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  const auto client_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 0);
+  Network::UdpListenSocket client(client_address, nullptr, true);
+  const Buffer::OwnedImpl request("hello");
+  const Api::IoCallUint64Result write_result =
+      Network::Utility::writeToSocket(client.ioHandle(), request, nullptr, **listener_address);
+  ASSERT_TRUE(write_result.ok());
+  ASSERT_EQ(request.length(), write_result.return_value_);
+
+  Network::UdpRecvData request_datagram;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+  EXPECT_EQ(request.toString(), request_datagram.buffer_->toString());
+  ASSERT_NE(nullptr, request_datagram.addresses_.peer_->ip());
+  EXPECT_EQ(client.connectionInfoProvider().localAddress()->ip()->addressAsString(),
+            request_datagram.addresses_.peer_->ip()->addressAsString());
 }
 
 // Make sure multiple clients are routed correctly to a single upstream host.

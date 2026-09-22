@@ -25,7 +25,7 @@ class FilterManager : public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
   using LocalReplyFn = absl::AnyInvocable<void(Http::Code code, std::string details)>;
 
-  FilterManager(std::vector<AiFilterPtr> filters, JsonWithExtBuf payload_index,
+  FilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
                 BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
                 StreamInfo::StreamInfo& stream_info,
                 Http::RequestHeaderMap* request_headers = nullptr,
@@ -57,7 +57,7 @@ private:
   void launchFilters();
   void launchSink();
 
-  std::vector<AiFilterPtr> filters_;
+  std::vector<AiFilterSharedPtr> filters_;
   JsonWithExtBuf payload_index_;
   std::shared_ptr<Coroutine::DispatcherExecutor> executor_;
   std::shared_ptr<AsyncState> async_state_;

@@ -30,7 +30,7 @@ This repository uses **Bazel** as its primary build system.
 - `.bazelrc` - Repository-wide Bazel configuration with build flags and platform settings
 - `user.bazelrc` - Optional user-specific overrides (gitignored)
 - `.bazelversion` - Specifies the exact Bazel version to use
-- `MODULE.bazel` / `WORKSPACE` - Dependency definitions (using bzlmod and WORKSPACE modes)
+- `MODULE.bazel` / `MODULE.bazel.lock` - Dependency definitions (bzlmod)
 
 ### Compiler configuration
 
@@ -86,7 +86,8 @@ bazel test --config=clang //test/... --test_env=HEAPCHECK=
 
 Dependencies are configured in `MODULE.bazel` and the Bazel registry; metadata is in `bazel/deps.yaml` and `api/bazel/deps.yaml`
 
-See `bazel/repositories.bzl` for setup - eg this is where any patching is controlled.
+Patching is controlled by the dependency's module entry in the Envoy Bazel registry
+(pinned via `--registry` in `.bazelrc`), not in this repo.
 
 If you need to create or update a patch - do the following:
 
@@ -95,8 +96,8 @@ If you need to create or update a patch - do the following:
 - make changes
 - diff the changes to the patch file
 
-Pay attention to how the patch_args are setup in repositories.bzl - some are p0, while others are p1. Prefer p1 when
-creating new patches.
+Pay attention to how patches are applied by the module's registry entry, and follow the existing
+convention there when creating new patches.
 
 
 ## Code formatting and linting
