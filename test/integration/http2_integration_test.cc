@@ -1215,6 +1215,106 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
                                Eq(kRequestsSentPerIOCycle), TestUtility::DefaultTimeout * 10);
 }
 
+// Regression test for a CONTINUATION-flag desync between the underlying HTTP/2
+// codec and Envoy's Http2Visitor. nghttp2 masks reserved CONTINUATION flag bits
+// when merging into its in-progress HEADERS frame, but forwards the raw
+// CONTINUATION frame header to on_begin_frame. Prior to the fix guarded by
+// `envoy.reloadable_features.http2_mask_continuation_flags`, Http2Visitor OR'd
+// all raw bits into the accumulated HEADERS flags, so a reserved `0x01` bit on
+// a CONTINUATION frame aliased FLAG_END_STREAM and caused Envoy to run the
+// decoder filter chain to completion while the codec still considered the
+// stream open. A subsequent trailers HEADERS then re-entered decodeTrailers()
+// on a completed filter chain and tripped a debug ASSERT.
+TEST_P(Http2FrameIntegrationTest, ContinuationReservedFlagsIgnored) {
+  beginSession();
+
+  const uint32_t sid = Http2Frame::makeClientStreamId(0);
+
+  // HEADERS, flags=0x00 (no END_STREAM, no END_HEADERS), routable pseudo-headers.
+  Http2Frame headers = Http2Frame::makeEmptyHeadersFrame(sid, Http2Frame::HeadersFlags::None);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::MethodGet);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::SchemeHttps);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::Path);
+  headers.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Authority, "host");
+  headers.adjustPayloadSize();
+
+  // CONTINUATION, flags=0x05 (END_HEADERS | reserved bit 0x01), empty payload.
+  // RFC 9113 §6.10 defines only END_HEADERS for CONTINUATION; the 0x01 bit is
+  // reserved and MUST be ignored on receipt.
+  Http2Frame cont =
+      Http2Frame::makeEmptyContinuationFrame(sid, static_cast<Http2Frame::HeadersFlags>(0x05));
+
+  // Trailers HEADERS, flags=END_STREAM|END_HEADERS.
+  Http2Frame trailers = Http2Frame::makeEmptyHeadersFrame(
+      sid, static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+               Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+  trailers.appendHeaderWithoutIndexing(Http2Frame::Header("foo", "bar"));
+  trailers.adjustPayloadSize();
+
+  std::string wire;
+  wire.append(static_cast<std::string>(headers));
+  wire.append(static_cast<std::string>(cont));
+  wire.append(static_cast<std::string>(trailers));
+  ASSERT_TRUE(tcp_client_->write(wire, false, false));
+
+  // With the reserved bit masked off, the request is decoded with
+  // end_stream=false after HEADERS+CONTINUATION and the follow-up trailers are
+  // delivered normally through the filter chain.
+  waitForNextUpstreamRequest();
+  ASSERT_NE(nullptr, upstream_request_->trailers());
+  EXPECT_EQ(
+      "bar",
+      upstream_request_->trailers()->get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  auto response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
+  tcp_client_->close();
+}
+
+// Companion to ContinuationReservedFlagsIgnored covering the guard-off legacy
+// path. With the guard disabled the reserved 0x01 bit on the CONTINUATION frame
+// aliases END_STREAM, so Envoy treats the request as complete after
+// HEADERS+CONTINUATION alone and forwards it upstream as a header-only request.
+// The follow-up trailers frame that triggers the debug ASSERT is intentionally
+// omitted here so the legacy behavior can be observed without crashing; the
+// crash reproduction is covered by the vh_poc harness with the guard disabled.
+TEST_P(Http2FrameIntegrationTest, ContinuationReservedFlagsLegacy) {
+  // The desync is only observable via the nghttp2 on_begin_frame callback path.
+  if (GetParam().http2_implementation != Http2Impl::Nghttp2) {
+    return;
+  }
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_mask_continuation_flags",
+                                    "false");
+  autonomous_upstream_ = true;
+  beginSession();
+
+  const uint32_t sid = Http2Frame::makeClientStreamId(0);
+
+  Http2Frame headers = Http2Frame::makeEmptyHeadersFrame(sid, Http2Frame::HeadersFlags::None);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::MethodGet);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::SchemeHttps);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::Path);
+  headers.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Authority, "host");
+  headers.adjustPayloadSize();
+
+  Http2Frame cont =
+      Http2Frame::makeEmptyContinuationFrame(sid, static_cast<Http2Frame::HeadersFlags>(0x05));
+
+  std::string wire;
+  wire.append(static_cast<std::string>(headers));
+  wire.append(static_cast<std::string>(cont));
+  ASSERT_TRUE(tcp_client_->write(wire, false, false));
+
+  // Legacy behavior: request is treated as end_stream=true and proxied
+  // immediately; the autonomous upstream replies with 200.
+  auto response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
+  tcp_client_->close();
+}
+
 // Tests sending an empty metadata map from downstream.
 TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   // Allow metadata usage.
