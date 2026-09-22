@@ -7,7 +7,7 @@ load(
 )
 load("@rules_android//android:rules.bzl", "aar_import")
 load("@rules_apple//apple:apple.bzl", "apple_static_framework_import")
-load("@rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
+load("@rules_kotlin//kotlin:core.bzl", "define_kt_toolchain")
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
