@@ -118,7 +118,9 @@ public:
    */
   void assign(const char* data, uint32_t size) {
     reserveDiscard(size);
-    memcpy(mutableData(), data, size); // NOLINT(safe-memcpy)
+    if (size != 0) {
+      memcpy(mutableData(), data, size); // NOLINT(safe-memcpy)
+    }
     size_ = size;
   }
 
@@ -126,6 +128,9 @@ public:
    * Take ownership of a copy of data appended to the data held currently.
    */
   void append(const char* data, uint32_t size) {
+    if (size == 0) {
+      return;
+    }
     const uint64_t new_size = static_cast<uint64_t>(size_) + size;
     ASSERT(new_size <= std::numeric_limits<uint32_t>::max());
     reservePreserve(static_cast<uint32_t>(new_size));
