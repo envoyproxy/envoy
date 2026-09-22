@@ -99,7 +99,7 @@ protected:
   HealthCheckerImplBase(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger,
-                        Stats::Scope& stats_scope, HealthFlagCallbacks& health_flag_callbacks);
+                        HealthFlagCallbacks& health_flag_callbacks);
   ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;

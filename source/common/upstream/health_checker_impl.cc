@@ -81,8 +81,8 @@ HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_
   }
   }
 
-  auto context = std::make_unique<HealthCheckerFactoryContextImpl>(
-      cluster, server_context, cluster.info()->statsScope(), health_flag_callbacks);
+  auto context = std::make_unique<HealthCheckerFactoryContextImpl>(cluster, server_context,
+                                                                   health_flag_callbacks);
 
   if (!health_check_config.event_log_path().empty() /* deprecated */ ||
       !health_check_config.event_logger().empty()) {

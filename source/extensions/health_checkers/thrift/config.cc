@@ -19,7 +19,7 @@ Upstream::HealthCheckerSharedPtr ThriftHealthCheckerFactory::createCustomHealthC
       context.cluster(), config,
       getThriftHealthCheckConfig(config, context.messageValidationVisitor()),
       context.mainThreadDispatcher(), context.runtime(), context.eventLogger(), context.api(),
-      ClientFactoryImpl::instance_, context.statsScope(), context.healthFlagCallbacks());
+      ClientFactoryImpl::instance_, context.healthFlagCallbacks());
 };
 
 /**

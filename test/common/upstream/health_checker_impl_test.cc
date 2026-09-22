@@ -4400,7 +4400,7 @@ public:
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
         *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_storage_.release()), cluster_->info()->statsScope(),
+        HealthCheckEventLoggerPtr(event_logger_storage_.release()),
         Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
@@ -5058,7 +5058,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  HealthCheckerFactoryContextImpl context(cluster, server_context, server_context.scope(),
+  HealthCheckerFactoryContextImpl context(cluster, server_context,
                                           DefaultHealthFlagCallbacks::instance());
 
   Event::SimulatedTimeSystem time_system;
@@ -5170,7 +5170,7 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  HealthCheckerFactoryContextImpl context(cluster, server_context, server_context.scope(),
+  HealthCheckerFactoryContextImpl context(cluster, server_context,
                                           DefaultHealthFlagCallbacks::instance());
 
   Event::SimulatedTimeSystem time_system;

@@ -15,14 +15,14 @@ namespace Upstream {
 HealthCheckerImplBase::HealthCheckerImplBase(
     const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
-    HealthCheckEventLoggerPtr&& event_logger, Stats::Scope& stats_scope,
-    HealthFlagCallbacks& health_flag_callbacks)
+    HealthCheckEventLoggerPtr&& event_logger, HealthFlagCallbacks& health_flag_callbacks)
     : always_log_health_check_failures_(config.always_log_health_check_failures()),
       always_log_health_check_success_(config.always_log_health_check_success()), cluster_(cluster),
       dispatcher_(dispatcher), timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
-      stats_(generateStats(stats_scope, config.name())), runtime_(runtime), random_(random),
+      stats_(generateStats(cluster.info()->statsScope(), config.name())), runtime_(runtime),
+      random_(random),
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       event_logger_(std::move(event_logger)), health_flag_callbacks_(health_flag_callbacks),
       interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),

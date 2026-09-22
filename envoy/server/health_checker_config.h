@@ -5,7 +5,6 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/factory_context.h"
-#include "envoy/stats/scope.h"
 #include "envoy/upstream/health_checker.h"
 
 namespace Envoy {
@@ -58,11 +57,6 @@ public:
    * @return Server context.
    */
   virtual Server::Configuration::ServerFactoryContext& serverFactoryContext() PURE;
-
-  /**
-   * @return Stats::Scope& the scope to use for health check stats.
-   */
-  virtual Stats::Scope& statsScope() PURE;
 
   /**
    * @return HealthFlagCallbacks& callbacks for health flag operations on hosts.
