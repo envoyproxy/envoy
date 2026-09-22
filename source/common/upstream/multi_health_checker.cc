@@ -117,7 +117,8 @@ void MultiHealthChecker::initializeHost(const HostSharedPtr& host) {
     data.host_flags[host.get()] = initial_flags;
   }
 
-  const uint32_t all_bits = (1u << checkers_.size()) - 1;
+  ASSERT(checkers_.size() > 0 && checkers_.size() <= 32, "32 bit shifts are UB");
+  const uint32_t all_bits = ~uint32_t{0} >> (32 - checkers_.size());
   auto& state = host_states_[host.get()];
   state.pending_bits = host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ? all_bits : 0;
   state.fail_bits = host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ? all_bits : 0;

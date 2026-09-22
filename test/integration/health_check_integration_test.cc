@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
+#include "source/common/common/hex.h"
 #include "source/common/upstream/health_discovery_service.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -1088,27 +1089,26 @@ public:
 
   void addMultiTcpHealthChecks(envoy::config::cluster::v3::Cluster* cluster,
                                const std::string& name1, const std::string& name2) {
-    auto* hc1 = cluster->add_health_checks();
-    hc1->set_name(name1);
-    hc1->mutable_timeout()->set_seconds(30);
-    hc1->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(100));
-    hc1->mutable_no_traffic_interval()->CopyFrom(
-        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
-    hc1->mutable_unhealthy_threshold()->set_value(1);
-    hc1->mutable_healthy_threshold()->set_value(1);
-    hc1->mutable_tcp_health_check()->mutable_send()->set_text("50696E6731");
-    hc1->mutable_tcp_health_check()->add_receive()->set_text("506F6E6731");
+    addTcpHealthCheck(cluster, name1, 1);
+    addTcpHealthCheck(cluster, name2, 2);
+  }
 
-    auto* hc2 = cluster->add_health_checks();
-    hc2->set_name(name2);
-    hc2->mutable_timeout()->set_seconds(30);
-    hc2->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(100));
-    hc2->mutable_no_traffic_interval()->CopyFrom(
+  void addTcpHealthCheck(envoy::config::cluster::v3::Cluster* cluster, const std::string& name,
+                         int index) {
+    auto* hc = cluster->add_health_checks();
+    hc->set_name(name);
+    hc->mutable_timeout()->set_seconds(30);
+    hc->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    hc->mutable_no_traffic_interval()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
-    hc2->mutable_unhealthy_threshold()->set_value(1);
-    hc2->mutable_healthy_threshold()->set_value(1);
-    hc2->mutable_tcp_health_check()->mutable_send()->set_text("50696E6732");
-    hc2->mutable_tcp_health_check()->add_receive()->set_text("506F6E6732");
+    hc->mutable_unhealthy_threshold()->set_value(1);
+    hc->mutable_healthy_threshold()->set_value(1);
+    auto send = fmt::format("Ping{}", index);
+    hc->mutable_tcp_health_check()->mutable_send()->set_text(Hex::encode(
+        absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(send.data()), send.size())));
+    auto recv = fmt::format("Pong{}", index);
+    hc->mutable_tcp_health_check()->add_receive()->set_text(Hex::encode(
+        absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(recv.data()), recv.size())));
   }
 
   void initializeWithStaticCluster(const std::string& name1 = "first",
@@ -1285,6 +1285,62 @@ TEST_P(MultiHealthCheckIntegrationTest, HostRemoveAfterStart) {
   eds_helper_.setEds({empty_cla});
 
   test_server_->waitForGauge("cluster.cluster_1.membership_total", Eq(0));
+}
+
+TEST_P(MultiHealthCheckIntegrationTest, MaxCheckersHealthyThenUnhealthy) {
+  constexpr int kNumCheckers = 32;
+
+  use_lds_ = false;
+  defer_listener_finalization_ = true;
+
+  auto up_config = upstreamConfig();
+  up_config.upstream_protocol_ = Http::CodecType::HTTP1;
+  host_upstream_ = std::make_unique<FakeUpstream>(0, version_, up_config);
+
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->set_name("cluster_1");
+    cluster->mutable_connect_timeout()->set_seconds(5);
+
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->set_cluster_name("cluster_1");
+    auto* ep = load_assignment->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+    ep->mutable_address()->mutable_socket_address()->set_address(
+        Network::Test::getLoopbackAddressString(GetParam()));
+    ep->mutable_address()->mutable_socket_address()->set_port_value(
+        host_upstream_->localAddress()->ip()->port());
+
+    for (int i = 0; i < kNumCheckers; i++) {
+      addTcpHealthCheck(cluster, absl::StrCat("checker_", i), i);
+    }
+  });
+
+  HttpIntegrationTest::initialize();
+
+  // Wait for all 32 connections and their initial send data.
+  for (int i = 0; i < kNumCheckers; i++) {
+    ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+  }
+  for (int i = 0; i < kNumCheckers; i++) {
+    ASSERT_TRUE(hc_connections_[i]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  }
+
+  // All checkers respond successfully.
+  for (int i = 0; i < kNumCheckers; i++) {
+    AssertionResult result = hc_connections_[i]->write(fmt::format("Pong{}", i));
+    RELEASE_ASSERT(result, result.message());
+  }
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.health_check.healthy", Eq(1));
+
+  // Now let the last checker time out to transition to unhealthy.
+  // Close its connection so the next health check attempt fails.
+  AssertionResult close_result = hc_connections_[kNumCheckers - 1]->close();
+  RELEASE_ASSERT(close_result, close_result.message());
+  hc_connections_[kNumCheckers - 1].reset();
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(0));
 }
 
 } // namespace Envoy
