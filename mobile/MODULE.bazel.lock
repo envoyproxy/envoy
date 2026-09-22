@@ -731,7 +731,8 @@
     "https://bcr.bazel.build/modules/yaml-cpp/0.9.0.bcr.1/source.json": "1e4c3e1716a29c4e6074d95ffafbb579ad7c762fcb9735788b819e7be98fff6a",
     "https://bcr.bazel.build/modules/yq.bzl/0.1.1.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/yq.bzl/0.1.1/MODULE.bazel": "9039681f9bcb8958ee2c87ffc74bdafba9f4369096a2b5634b88abc0eaefa072",
-    "https://bcr.bazel.build/modules/zipkin-api/1.0.0.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/zipkin-api/1.0.0.bcr.1/MODULE.bazel": "70616960ecd07fb708362e80bc9b2800da523f75487e2a7b256d25ebeaf9daf3",
+    "https://bcr.bazel.build/modules/zipkin-api/1.0.0.bcr.1/source.json": "a9b9eec6079225cc995802979753ba30c293a4fb1c39ce56f0332e97accf8c70",
     "https://bcr.bazel.build/modules/zlib-ng/2.3.2.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/zlib/1.2.11/MODULE.bazel": "07b389abc85fdbca459b69e2ec656ae5622873af3f845e1c9d80fe179f3effa0",
     "https://bcr.bazel.build/modules/zlib/1.2.12/MODULE.bazel": "3b1a8834ada2a883674be8cbd36ede1b6ec481477ada359cd2d3ddc562340b27",
@@ -889,8 +890,6 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/46a6e8eb4441355e25faad6a226681b241dcdc5c/modules/wuffs/0.4.0-alpha.9.envoy/source.json": "b215401a4bd5bb7c4af8b37940209e955e905cd41f3beaffffb00424eec8afcc",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/46a6e8eb4441355e25faad6a226681b241dcdc5c/modules/yq.bzl/0.1.1.envoy/MODULE.bazel": "9df3c0296a3a4439c6378fbee2c253c959f30d4145d2323c93e67d9a3f8d699d",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/46a6e8eb4441355e25faad6a226681b241dcdc5c/modules/yq.bzl/0.1.1.envoy/source.json": "1975b1025408b820389587b1f27e1f7237d61e400ab4933d583f0ba9846acec9",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/46a6e8eb4441355e25faad6a226681b241dcdc5c/modules/zipkin-api/1.0.0.envoy/MODULE.bazel": "6f896e2babd57c6a75c08d98e9f7d9d8ea4ca78145b54cdb83e48af5a1fa411d",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/46a6e8eb4441355e25faad6a226681b241dcdc5c/modules/zipkin-api/1.0.0.envoy/source.json": "412d6f93f6ac998e666c8868a7e5cee277e1553c4c0f97908e3a211e3d069c03",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/46a6e8eb4441355e25faad6a226681b241dcdc5c/modules/zlib-ng/2.3.2.envoy/MODULE.bazel": "3946e04bcbf78698bfd1a6fceb3749c3d9b8ee2a31a7e9b7714dc2e4ed475429",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/46a6e8eb4441355e25faad6a226681b241dcdc5c/modules/zlib-ng/2.3.2.envoy/source.json": "ee1117c413d5b5567fe6889baa72ec2bf06e769630e08358d7018c06f5b2979c"
   },
