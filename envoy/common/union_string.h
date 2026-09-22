@@ -87,6 +87,7 @@ public:
     case StorageLocation::Inline:
       return inline_;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   char* mutableData() {
@@ -100,6 +101,7 @@ public:
     case StorageLocation::Inline:
       return inline_;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   /**
