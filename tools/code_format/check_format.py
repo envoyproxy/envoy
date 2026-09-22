@@ -22,11 +22,29 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-DEPRECATED_ENVOY_REPOSITORY_KWARG = re.compile(
-    r"^repository\s*=")
-DEPRECATED_ENVOY_SELECT_REPOSITORY_ARG = re.compile(
-    r'^(?:repository\s*=\s*)?(?P<repository>(?:"[^"\n]*"|\'[^\'\n]*\'))$')
+DEPRECATED_ENVOY_REPOSITORY_KWARG = re.compile(r"\brepository\s*=")
 ENVOY_MACRO_CALL = re.compile(r"(?<!def )\b(?P<name>envoy_[A-Za-z0-9_]+)\s*\(")
+STRING_LITERAL = re.compile(r'^\s*(?:"[^"\n]*"|\'[^\'\n]*\')\s*$')
+ENVOY_SELECT_MACROS_WITH_REPOSITORY = frozenset((
+    "envoy_select_admin_functionality",
+    "envoy_select_admin_html",
+    "envoy_select_admin_no_html",
+    "envoy_select_disable_exceptions",
+    "envoy_select_disable_logging",
+    "envoy_select_enable_exceptions",
+    "envoy_select_enable_full_protos",
+    "envoy_select_enable_http3",
+    "envoy_select_enable_http_datagrams",
+    "envoy_select_enable_lite_protos",
+    "envoy_select_enable_yaml",
+    "envoy_select_envoy_mobile_listener",
+    "envoy_select_envoy_mobile_xds",
+    "envoy_select_google_grpc",
+    "envoy_select_hot_restart",
+    "envoy_select_nghttp2",
+    "envoy_select_signal_trace",
+    "envoy_select_static_extension_registration",
+))
 
 
 class FormatConfig:
@@ -441,102 +459,121 @@ class FormatChecker:
         # repository parameter for downstream compatibility. In-tree callers must not use it.
         return file_path.startswith("./bazel/envoy")
 
+    def strip_starlark_comment(self, line):
+        quote = None
+        escaped = False
+        for index, char in enumerate(line):
+            if quote:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    quote = None
+                continue
+            if char in ("'", '"'):
+                quote = char
+            elif char == "#":
+                return line[:index]
+        return line.split("#", 1)[0] if quote and "#" in line else line
+
+    def maybe_report_deprecated_select_repository_arg(
+            self, file_path, error_messages, active_call, reported_lines):
+        second_arg = ''.join(active_call["second_arg"]).strip()
+        if (active_call["name"] not in ENVOY_SELECT_MACROS_WITH_REPOSITORY
+                or not second_arg
+                or DEPRECATED_ENVOY_REPOSITORY_KWARG.search(second_arg)
+                or not STRING_LITERAL.fullmatch(second_arg)
+                or active_call["second_arg_line"] in reported_lines):
+            return
+        line_number = active_call["second_arg_line"]
+        reported_lines.add(line_number)
+        error_messages.append(
+            f"{file_path}:{line_number}: deprecated repository string argument is not allowed for envoy_select_* helpers"
+        )
+
     def deprecated_envoy_repository_arg_errors(self, file_path, contents):
         error_messages = []
-        for match in ENVOY_MACRO_CALL.finditer(contents):
-            open_paren = match.end() - 1
-            close_paren = self.find_matching_paren(contents, open_paren)
-            if close_paren is None:
-                continue
-            args = self.split_top_level_call_args(contents, open_paren + 1, close_paren)
-            for arg, offset in args:
-                kwarg_match = DEPRECATED_ENVOY_REPOSITORY_KWARG.search(arg)
-                if kwarg_match:
-                    line_number = self.find_line_number(contents, offset + kwarg_match.start())
+        reported_lines = set()
+        active_call = None
+
+        for line_number, raw_line in enumerate(contents.splitlines(), 1):
+            line = self.strip_starlark_comment(raw_line)
+            index = 0
+            while index < len(line):
+                if active_call is None:
+                    match = ENVOY_MACRO_CALL.search(line, index)
+                    if match is None:
+                        break
+                    active_call = {
+                        "name": match.group("name"),
+                        "paren_depth": 1,
+                        "bracket_depth": 0,
+                        "brace_depth": 0,
+                        "quote": None,
+                        "escaped": False,
+                        "arg_index": 0,
+                        "second_arg": [],
+                        "second_arg_line": None,
+                    }
+                    index = match.end()
+                    continue
+
+                char = line[index]
+                if (char == "r" and DEPRECATED_ENVOY_REPOSITORY_KWARG.match(line, index)
+                        and line_number not in reported_lines):
+                    reported_lines.add(line_number)
                     error_messages.append(
                         f"{file_path}:{line_number}: deprecated Envoy macro `repository` argument is not allowed in in-tree callers"
                     )
-            if match.group("name").startswith("envoy_select_") and len(args) > 1:
-                select_arg = args[1][0]
-                select_match = DEPRECATED_ENVOY_SELECT_REPOSITORY_ARG.fullmatch(select_arg)
-                if select_match:
-                    repository_offset = args[1][1] + select_match.start("repository")
-                    line_number = self.find_line_number(contents, repository_offset)
-                    error_messages.append(
-                        f"{file_path}:{line_number}: deprecated repository string argument is not allowed for envoy_select_* helpers"
-                    )
+
+                if active_call["quote"]:
+                    if active_call["arg_index"] == 1:
+                        active_call["second_arg"].append(char)
+                        if active_call["second_arg_line"] is None:
+                            active_call["second_arg_line"] = line_number
+                    if active_call["escaped"]:
+                        active_call["escaped"] = False
+                    elif char == "\\":
+                        active_call["escaped"] = True
+                    elif char == active_call["quote"]:
+                        active_call["quote"] = None
+                    index += 1
+                    continue
+
+                if char in ("'", '"'):
+                    active_call["quote"] = char
+                elif char == "[":
+                    active_call["bracket_depth"] += 1
+                elif char == "]":
+                    active_call["bracket_depth"] -= 1
+                elif char == "{":
+                    active_call["brace_depth"] += 1
+                elif char == "}":
+                    active_call["brace_depth"] -= 1
+                elif char == "(":
+                    active_call["paren_depth"] += 1
+                elif char == ")":
+                    if active_call["paren_depth"] == 1:
+                        self.maybe_report_deprecated_select_repository_arg(
+                            file_path, error_messages, active_call, reported_lines)
+                        active_call = None
+                        index += 1
+                        continue
+                    active_call["paren_depth"] -= 1
+                elif (char == "," and active_call["paren_depth"] == 1
+                      and not active_call["bracket_depth"] and not active_call["brace_depth"]):
+                    active_call["arg_index"] += 1
+                    index += 1
+                    continue
+
+                if active_call and active_call["arg_index"] == 1:
+                    active_call["second_arg"].append(char)
+                    if active_call["second_arg_line"] is None and not char.isspace():
+                        active_call["second_arg_line"] = line_number
+
+                index += 1
         return error_messages
-
-    def find_line_number(self, contents, offset):
-        return contents.count("\n", 0, offset) + 1
-
-    def find_matching_paren(self, contents, open_paren):
-        depth = 0
-        quote = None
-        escaped = False
-        for index in range(open_paren, len(contents)):
-            char = contents[index]
-            if quote:
-                if escaped:
-                    escaped = False
-                elif char == "\\":
-                    escaped = True
-                elif char == quote:
-                    quote = None
-                continue
-            if char in ("'", '"'):
-                quote = char
-            elif char == "(":
-                depth += 1
-            elif char == ")":
-                depth -= 1
-                if depth == 0:
-                    return index
-        return None
-
-    def split_top_level_call_args(self, contents, start, end):
-        args = []
-        quote = None
-        escaped = False
-        paren_depth = 0
-        bracket_depth = 0
-        brace_depth = 0
-        arg_start = start
-        for index in range(start, end):
-            char = contents[index]
-            if quote:
-                if escaped:
-                    escaped = False
-                elif char == "\\":
-                    escaped = True
-                elif char == quote:
-                    quote = None
-                continue
-            if char in ("'", '"'):
-                quote = char
-            elif char == "(":
-                paren_depth += 1
-            elif char == ")":
-                paren_depth -= 1
-            elif char == "[":
-                bracket_depth += 1
-            elif char == "]":
-                bracket_depth -= 1
-            elif char == "{":
-                brace_depth += 1
-            elif char == "}":
-                brace_depth -= 1
-            elif char == "," and not paren_depth and not bracket_depth and not brace_depth:
-                stripped = contents[arg_start:index].strip()
-                if stripped:
-                    leading_ws = len(contents[arg_start:index]) - len(contents[arg_start:index].lstrip())
-                    args.append((stripped, arg_start + leading_ws))
-                arg_start = index + 1
-        stripped = contents[arg_start:end].strip()
-        if stripped:
-            leading_ws = len(contents[arg_start:end]) - len(contents[arg_start:end].lstrip())
-            args.append((stripped, arg_start + leading_ws))
-        return args
 
     def is_starlark_file(self, file_path):
         return file_path.endswith(".bzl")
