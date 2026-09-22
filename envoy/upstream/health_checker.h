@@ -28,9 +28,8 @@ enum class HealthTransition {
 };
 
 /**
- * Callbacks for reading/writing health flags on a host. By default, operations go directly to the
- * host. The multi health checker provides overrides so that sub-checkers operate on local per-host
- * state instead of real host flags.
+ * Callbacks for reading/writing health flags on a host. This allows indirection required
+ * when multiple health checks are configured.
  */
 class HealthFlagCallbacks {
 public:
