@@ -17,6 +17,7 @@ _DISABLE_NGHTTP2 = Label("//bazel:disable_nghttp2")
 _DISABLE_SIGNAL_TRACE = Label("//bazel:disable_signal_trace")
 _DISABLE_STATIC_EXTENSION_REGISTRATION = Label("//bazel:disable_static_extension_registration")
 _DISABLE_YAML = Label("//bazel:disable_yaml")
+_DEPRECATED_REPO_ARG_ALLOWED = Label("//bazel:deprecated_repo_arg_is_allowed")
 _NOT_X86_OR_WASM_DISABLED = Label("//bazel:not_x86_or_wasm_disabled")
 _WINDOWS_X86_64 = Label("//bazel:windows_x86_64")
 
@@ -27,8 +28,19 @@ Use the `@envoy//bazel` label_flag overrides instead, for example \
 """
 
 def deprecate_repository(caller, repository):
-    if repository:
-        print("WARNING %s: %s Got %r." % (caller, _DEPRECATED_REPOSITORY_MESSAGE, repository))
+    """Returns a (usually empty) list to splice into a configurable list attr.
+
+    Warns at load time; fails at analysis time unless
+    --@envoy//bazel:deprecated_repo_arg_allowed is true.
+    """
+    if not repository:
+        return []
+    msg = "%s: %s Got %r." % (caller, _DEPRECATED_REPOSITORY_MESSAGE, repository)
+    print("WARNING " + msg)
+    return select(
+        {_DEPRECATED_REPO_ARG_ALLOWED: []},
+        no_match_error = msg,
+    )
 
 # Used to select a dependency that has different implementations on POSIX vs Windows.
 # The platform-specific implementations should be specified with envoy_cc_posix_library
@@ -41,146 +53,128 @@ def envoy_cc_platform_dep(name):
 
 # Selects the given values if Google gRPC is enabled in the current build.
 def envoy_select_google_grpc(xs, repository = ""):
-    deprecate_repository("envoy_select_google_grpc", repository)
     return select({
         _DISABLE_GOOGLE_GRPC: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_google_grpc", repository)
 
 # Selects the given values if logging is enabled in the current build.
 def envoy_select_disable_logging(xs, repository = ""):
-    deprecate_repository("envoy_select_disable_logging", repository)
     return select({
         _DISABLE_LOGGING: xs,
         "//conditions:default": [],
-    })
+    }) + deprecate_repository("envoy_select_disable_logging", repository)
 
 # Selects the given values if admin HTML is enabled in the current build.
 def envoy_select_admin_html(xs, repository = ""):
-    deprecate_repository("envoy_select_admin_html", repository)
     return select({
         _DISABLE_ADMIN_HTML: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_admin_html", repository)
 
 # Selects the given values if admin functionality is enabled in the current build.
 def envoy_select_admin_functionality(xs, repository = ""):
-    deprecate_repository("envoy_select_admin_functionality", repository)
     return select({
         _DISABLE_ADMIN_FUNCTIONALITY: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_admin_functionality", repository)
 
 def envoy_select_admin_no_html(xs, repository = ""):
-    deprecate_repository("envoy_select_admin_no_html", repository)
     return select({
         _DISABLE_ADMIN_HTML: xs,
         "//conditions:default": [],
-    })
+    }) + deprecate_repository("envoy_select_admin_no_html", repository)
 
 # Selects the given values if static extension registration is enabled in the current build.
 def envoy_select_static_extension_registration(xs, repository = ""):
-    deprecate_repository("envoy_select_static_extension_registration", repository)
     return select({
         _DISABLE_STATIC_EXTENSION_REGISTRATION: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_static_extension_registration", repository)
 
 # Selects the given values if the Envoy Mobile listener is enabled in the current build.
 def envoy_select_envoy_mobile_listener(xs, repository = ""):
-    deprecate_repository("envoy_select_envoy_mobile_listener", repository)
     return select({
         _DISABLE_ENVOY_MOBILE_LISTENER: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_envoy_mobile_listener", repository)
 
 # Selects the given values if Envoy Mobile xDS is enabled in the current build.
 def envoy_select_envoy_mobile_xds(xs, repository = ""):
-    deprecate_repository("envoy_select_envoy_mobile_xds", repository)
     return select({
         _DISABLE_ENVOY_MOBILE_XDS: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_envoy_mobile_xds", repository)
 
 # Selects the given values if http3 is enabled in the current build.
 def envoy_select_enable_http3(xs, repository = ""):
-    deprecate_repository("envoy_select_enable_http3", repository)
     return select({
         _DISABLE_HTTP3: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_enable_http3", repository)
 
 # Selects the given values if yaml is enabled in the current build.
 def envoy_select_enable_yaml(xs, repository = ""):
-    deprecate_repository("envoy_select_enable_yaml", repository)
     return select({
         _DISABLE_YAML: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_enable_yaml", repository)
 
 # Selects the given values if exceptions are disabled in the current build.
 def envoy_select_disable_exceptions(xs, repository = ""):
-    deprecate_repository("envoy_select_disable_exceptions", repository)
     return select({
         _DISABLE_EXCEPTIONS: xs,
         "//conditions:default": [],
-    })
+    }) + deprecate_repository("envoy_select_disable_exceptions", repository)
 
 # Selects the given values if exceptions are enabled in the current build.
 def envoy_select_enable_exceptions(xs, repository = ""):
-    deprecate_repository("envoy_select_enable_exceptions", repository)
     return select({
         _DISABLE_EXCEPTIONS: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_enable_exceptions", repository)
 
 # Selects the given values if HTTP datagram support is enabled in the current build.
 def envoy_select_enable_http_datagrams(xs, repository = ""):
-    deprecate_repository("envoy_select_enable_http_datagrams", repository)
     return select({
         _DISABLE_HTTP_DATAGRAMS: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_enable_http_datagrams", repository)
 
 # Selects the given values if hot restart is enabled in the current build.
 def envoy_select_hot_restart(xs, repository = ""):
-    deprecate_repository("envoy_select_hot_restart", repository)
     return select({
         _DISABLE_HOT_RESTART: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_hot_restart", repository)
 
 # Selects the given values if hot restart is enabled in the current build.
 def envoy_select_nghttp2(xs, repository = ""):
-    deprecate_repository("envoy_select_nghttp2", repository)
     return select({
         _DISABLE_NGHTTP2: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_nghttp2", repository)
 
 # Selects the given values if full protos are enabled in the current build.
 def envoy_select_enable_full_protos(xs, repository = ""):
-    deprecate_repository("envoy_select_enable_full_protos", repository)
     return select({
         _DISABLE_FULL_PROTOS: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_enable_full_protos", repository)
 
 # Selects the given values if lite protos are enabled in the current build.
 def envoy_select_enable_lite_protos(xs, repository = ""):
-    deprecate_repository("envoy_select_enable_lite_protos", repository)
     return select({
         _DISABLE_FULL_PROTOS: xs,
         "//conditions:default": [],
-    })
+    }) + deprecate_repository("envoy_select_enable_lite_protos", repository)
 
 # Selects the given values if signal trace is enabled in the current build.
 def envoy_select_signal_trace(xs, repository = ""):
-    deprecate_repository("envoy_select_signal_trace", repository)
     return select({
         _DISABLE_SIGNAL_TRACE: [],
         "//conditions:default": xs,
-    })
+    }) + deprecate_repository("envoy_select_signal_trace", repository)
 
 # Selects the given values depending on the Wasm runtimes enabled in the current build,
 # and the ability to build tests using Proxy-Wasm C++ SDK on the current platform.

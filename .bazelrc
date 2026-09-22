@@ -96,6 +96,9 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 coverage --config=coverage
 coverage --build_tests_only
 
+# Envoy deprecation
+common --@envoy//bazel:deprecated_repo_arg_allowed=false
+
 
 #############################################################################
 # global: deps
