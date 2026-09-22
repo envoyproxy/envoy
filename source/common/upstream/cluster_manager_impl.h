@@ -323,7 +323,6 @@ public:
   void shutdown() override {
     shutdown_ = true;
     for (auto& [name, handle] : cds_pauses_) {
-      ASSERT(handle != nullptr);
       handle->cancel();
     }
     cds_pauses_.clear();
