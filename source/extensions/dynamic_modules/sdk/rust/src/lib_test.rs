@@ -8008,10 +8008,15 @@ const STUB_COUNTERS: [(&str, u64, u64); 2] = [("counter_0", 10, 5), ("counter_1"
 const STUB_GAUGES: [(&str, u64); 1] = [("gauge_0", 42)];
 const STUB_TEXT_READOUTS: [(&str, &str); 1] = [("text_0", "value_0")];
 // name, sample_count, sample_sum, then the (upper_bound, cumulative_count) buckets.
-const STUB_HISTOGRAM_NAME: &str = "histogram_0";
+const STUB_HISTOGRAM_NAME: &str = "http.ingress_http.downstream_rq_time";
 const STUB_HISTOGRAM_SAMPLE_COUNT: u64 = 7;
 const STUB_HISTOGRAM_SAMPLE_SUM: f64 = 123.5;
 const STUB_HISTOGRAM_BUCKETS: [(f64, u64); 3] = [(1.0, 2), (5.0, 5), (10.0, 7)];
+const STUB_HISTOGRAM_TAG_EXTRACTED_NAME: &str = "http.downstream_rq_time";
+const STUB_HISTOGRAM_TAGS: [(&str, &str); 2] = [
+  ("envoy.http_conn_manager_prefix", "ingress_http"),
+  ("custom.tag", "quoted\"value\\\n"),
+];
 
 // Tag-extracted names and tags, indexed to match STUB_COUNTERS. counter_0 carries two tags,
 // counter_1 carries none, exercising both the empty and multi-tag paths.
@@ -8364,6 +8369,64 @@ pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+) -> bool {
+  if index != 0 {
+    return false;
+  }
+  unsafe {
+    stub_write(
+      STUB_HISTOGRAM_TAG_EXTRACTED_NAME,
+      name_buffer,
+      name_buffer_capacity,
+      name_size,
+    );
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  tag_count: *mut usize,
+) -> bool {
+  if index != 0 {
+    return false;
+  }
+  unsafe { *tag_count = STUB_HISTOGRAM_TAGS.len() };
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  tag_index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_buffer: *mut std::ffi::c_char,
+  value_buffer_capacity: usize,
+  value_size: *mut usize,
+) -> bool {
+  if index != 0 || tag_index >= STUB_HISTOGRAM_TAGS.len() {
+    return false;
+  }
+  let (name, value) = STUB_HISTOGRAM_TAGS[tag_index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    stub_write(value, value_buffer, value_buffer_capacity, value_size);
+  }
+  true
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
   _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
   histogram_index: usize,
@@ -8496,12 +8559,12 @@ fn test_metric_snapshot_reads_all_entry_types() {
 
   assert_eq!(snapshot.histogram_count(), 1);
   let histogram = snapshot.histogram(0, &mut name).unwrap();
-  assert_eq!(name.as_slice(), b"histogram_0");
+  assert_eq!(name.as_slice(), STUB_HISTOGRAM_NAME.as_bytes());
   assert_eq!(histogram.sample_count, 7);
   assert_eq!(histogram.sample_sum, 123.5);
   // An out-of-range read returns None and leaves the buffer untouched.
   assert!(snapshot.histogram(1, &mut name).is_none());
-  assert_eq!(name.as_slice(), b"histogram_0");
+  assert_eq!(name.as_slice(), STUB_HISTOGRAM_NAME.as_bytes());
 
   // The buckets are cumulative and carry Envoy's resolved upper bounds.
   assert_eq!(snapshot.histogram_bucket_count(0), 3);
@@ -8565,6 +8628,61 @@ fn test_metric_snapshot_reads_tags() {
   assert_eq!(value.as_slice(), b"xds");
   assert_eq!(snapshot.text_readout_tag_count(1), None);
   assert!(!snapshot.text_readout_tag(0, 1, &mut name, &mut value));
+}
+
+#[test]
+fn test_metric_snapshot_reads_histogram_tags() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+  let mut raw_name = Vec::new();
+  let mut name = Vec::new();
+  let mut value = Vec::new();
+
+  // Associate the same raw name used by on_histogram_complete with its native decomposition.
+  assert!(snapshot.histogram(0, &mut raw_name).is_some());
+  assert_eq!(raw_name.as_slice(), b"http.ingress_http.downstream_rq_time");
+  reset_stub_write_calls();
+  assert!(snapshot.histogram_tag_extracted_name(0, &mut name));
+  assert_eq!(name.as_slice(), b"http.downstream_rq_time");
+  assert_eq!(stub_write_calls(), 2); // Empty buffer: size query then retry.
+  assert_eq!(snapshot.histogram_tag_count(0), Some(2));
+  for (index, (expected_name, expected_value)) in STUB_HISTOGRAM_TAGS.iter().enumerate() {
+    assert!(snapshot.histogram_tag(0, index, &mut name, &mut value));
+    assert_eq!(name.as_slice(), expected_name.as_bytes());
+    assert_eq!(value.as_slice(), expected_value.as_bytes());
+  }
+
+  // Invalid metric or tag indices must preserve previously read buffers.
+  let previous_name = name.clone();
+  let previous_value = value.clone();
+  assert_eq!(snapshot.histogram_tag_count(1), None);
+  assert!(!snapshot.histogram_tag_extracted_name(1, &mut name));
+  assert!(!snapshot.histogram_tag(1, 0, &mut name, &mut value));
+  assert!(!snapshot.histogram_tag(0, 2, &mut name, &mut value));
+  assert_eq!(name, previous_name);
+  assert_eq!(value, previous_value);
+}
+
+#[test]
+fn test_metric_snapshot_histogram_tag_buffers_grow_then_reuse() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+  let mut name = Vec::new();
+  let mut value = Vec::new();
+
+  reset_stub_write_calls();
+  assert!(snapshot.histogram_tag(0, 0, &mut name, &mut value));
+  assert_eq!(stub_write_calls(), 4); // Two buffers, each written on query and retry.
+  assert_eq!(name.as_slice(), b"envoy.http_conn_manager_prefix");
+  assert_eq!(value.as_slice(), b"ingress_http");
+
+  let name_ptr = name.as_ptr();
+  let value_ptr = value.as_ptr();
+  reset_stub_write_calls();
+  assert!(snapshot.histogram_tag(0, 0, &mut name, &mut value));
+  assert_eq!(stub_write_calls(), 2); // One call, with no buffer growth.
+  assert_eq!(name.as_ptr(), name_ptr);
+  assert_eq!(value.as_ptr(), value_ptr);
 }
 
 #[test]
@@ -8879,7 +8997,7 @@ fn test_metric_snapshot_to_owned_copies_all_entries() {
   assert_eq!(
     owned.histograms,
     vec![stats_sink::OwnedHistogram {
-      name: "histogram_0".to_string(),
+      name: STUB_HISTOGRAM_NAME.to_string(),
       sample_count: 7,
       sample_sum: 123.5,
       buckets: vec![
