@@ -203,6 +203,26 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "flattening_json_codec_test",
+    srcs = ["flattening_json_codec_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":fake_bridge_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:buffer_manager_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:flattening_json_codec_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "filter_manager_test",
     srcs = ["filter_manager_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],

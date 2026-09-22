@@ -7,19 +7,22 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
 )
+load(":envoy_select.bzl", "deprecate_repository")
 load(":pch.bzl", "pch")
 
-def envoy_pch_deps(repository, target):
+_CLANG_PCH_BUILD = Label("//bazel:clang_pch_build")
+
+def envoy_pch_deps(target):
     return select({
-        repository + "//bazel:clang_pch_build": [repository + target],
+        _CLANG_PCH_BUILD: [target],
         "//conditions:default": [],
     })
 
-def envoy_pch_copts(repository, target):
+def envoy_pch_copts(target):
     return select({
-        repository + "//bazel:clang_pch_build": [
+        _CLANG_PCH_BUILD: [
             "-include-pch",
-            "$(location {}{})".format(repository, target),
+            "$(location %s)" % str(target),
         ],
         "//conditions:default": [],
     })
@@ -32,10 +35,11 @@ def envoy_pch_library(
         external_deps = [],
         testonly = False,
         repository = ""):
+    deprecate_repository("envoy_pch_library", repository)
     cc_library(
         name = name + "_libs",
         visibility = ["//visibility:private"],
-        copts = envoy_copts(repository),
+        copts = envoy_copts(),
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
         alwayslink = 1,
         testonly = testonly,
@@ -50,7 +54,7 @@ def envoy_pch_library(
         testonly = testonly,
         tags = ["no-remote"],
         enabled = select({
-            repository + "//bazel:clang_pch_build": True,
+            _CLANG_PCH_BUILD: True,
             "//conditions:default": False,
         }),
     )

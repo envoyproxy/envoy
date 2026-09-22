@@ -177,6 +177,15 @@ public:
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
+  void setTags(std::initializer_list<std::pair<std::string_view, std::string_view>> tags) override {
+    std::vector<envoy_dynamic_module_type_module_key_value_pair> pairs;
+    pairs.reserve(tags.size());
+    for (const auto& [key, value] : tags) {
+      pairs.push_back({key.data(), key.size(), value.data(), value.size()});
+    }
+    envoy_dynamic_module_callback_http_span_set_tag_batch(span_ptr_, pairs.data(), pairs.size());
+  }
+
   void setOperation(std::string_view operation) override {
     envoy_dynamic_module_callback_http_span_set_operation(
         span_ptr_, envoy_dynamic_module_type_module_buffer{operation.data(), operation.size()});
@@ -240,6 +249,15 @@ public:
     envoy_dynamic_module_callback_http_span_set_tag(
         span_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
+  void setTags(std::initializer_list<std::pair<std::string_view, std::string_view>> tags) override {
+    std::vector<envoy_dynamic_module_type_module_key_value_pair> pairs;
+    pairs.reserve(tags.size());
+    for (const auto& [key, value] : tags) {
+      pairs.push_back({key.data(), key.size(), value.data(), value.size()});
+    }
+    envoy_dynamic_module_callback_http_span_set_tag_batch(span_ptr_, pairs.data(), pairs.size());
   }
 
   void setOperation(std::string_view operation) override {

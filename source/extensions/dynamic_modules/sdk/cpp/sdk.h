@@ -251,7 +251,8 @@ enum class AttributeID : uint32_t {
   XdsFilterChainName,
   HealthCheck,
   UpstreamRequestedServerName,
-  XdsVirtualClusterName
+  XdsVirtualClusterName,
+  UpstreamProtocol
 };
 
 enum class LogLevel : uint32_t { Trace, Debug, Info, Warn, Error, Critical, Off };
@@ -365,6 +366,8 @@ public:
   virtual ~Span() = default;
 
   virtual void setTag(std::string_view key, std::string_view value) = 0;
+  virtual void
+  setTags(std::initializer_list<std::pair<std::string_view, std::string_view>> tags) = 0;
   virtual void setOperation(std::string_view operation) = 0;
   virtual void log(std::string_view event) = 0;
   virtual void setSampled(bool sampled) = 0;

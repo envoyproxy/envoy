@@ -130,6 +130,8 @@ envoy_cc_library(
         ":schema_lib",
         ":token_usage_lib",
         "//source/common/common:macros",
+        "//source/extensions/filters/http/ai_protocol_manager/schema:anthropic_messages_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/schema:gemini_generate_content_lib",
         "//source/extensions/filters/http/ai_protocol_manager/schema:openai_chat_completions_lib",
         "@abseil-cpp//absl/strings",
     ],
@@ -257,6 +259,28 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/coroutine:leaf_awaitable_lib",
         "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
+    name = "flattening_json_codec_lib",
+    srcs = ["flattening_json_codec.cc"],
+    hdrs = ["flattening_json_codec.h"],
+    deps = [
+        ":buffer_manager_lib",
+        ":replay_awaitable_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+        "@abseil-cpp//absl/types:variant",
+        "@nlohmann_json//:json",
     ],
 )
 

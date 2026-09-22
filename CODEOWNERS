@@ -444,6 +444,7 @@
 /*/extensions/tracers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/health_checkers/dynamic_modules @basundhara-c @agrawroh @mathetake @wbpcode
 /*/extensions/http/early_header_mutation/dynamic_modules @wbpcode @agrawroh @mathetake
+/*/extensions/http/header_formatters/dynamic_modules @wbpcode @agrawroh @mathetake
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 # AI Protocol Manager filter
@@ -495,6 +496,7 @@
 /contrib/exe/ @mattklein123 @wbpcode
 /contrib/client_ssl_auth/ @ggreenway @UNOWNED
 /contrib/checksum/ @ravenblackx @phlax
+/contrib/client_cert/ @heitzlki @UNOWNED
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack

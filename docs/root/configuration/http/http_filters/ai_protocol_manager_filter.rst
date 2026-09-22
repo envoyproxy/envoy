@@ -59,7 +59,8 @@ pins its own threshold uses that instead.
 Upon stream completion, the parsed document is validated against the payload
 schema of the route's declared :ref:`wire API
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.api_protocol>`,
-for APIs with a defined schema (currently ``OPENAI_CHAT_COMPLETIONS``).
+for APIs with a defined schema (currently ``OPENAI_CHAT_COMPLETIONS``, ``ANTHROPIC_MESSAGES``
+and ``GEMINI_GENERATE_CONTENT``).
 Validation checks required fields, data types, enum values, and offload rules
 -- ensuring metadata fields (like ``model`` and ``role``) remain inline in the
 DOM while permitting large message content to reside in external buffers. Any
@@ -69,8 +70,8 @@ schema validation failure triggers an immediate HTTP 400 response.
 
   On the request path the body is offloaded to an in-memory store. Request
   schema validation is supported for declared APIs with a defined schema
-  (currently OpenAI Chat Completions); schema transcoding is not implemented
-  yet.
+  (currently OpenAI Chat Completions, Anthropic Messages and Gemini GenerateContent).
+  transcoding is not implemented yet.
 
 The filter is a dual filter: besides the downstream HTTP filter chain shown
 below, it can also be placed in a cluster's upstream HTTP filter chain via

@@ -145,6 +145,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+        "@benchmark",
         "@cel-cpp//parser",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
         "@xds//xds/type/matcher/v3:pkg_cc_proto",

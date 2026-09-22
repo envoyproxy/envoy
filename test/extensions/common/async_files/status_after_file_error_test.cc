@@ -16,7 +16,11 @@ TEST(StatusAfterFileErrorTest, AllErrnosReturnErrors) {
   std::vector<int> errors = {
       EACCES,      EPERM,     EROFS,  EBADF,  EBUSY,  EISDIR, ELOOP,      ENOTDIR, ETXTBSY,
       EWOULDBLOCK, EMFILE,    ENFILE, ENOMEM, ENOSPC, EEXIST, EFAULT,     EINVAL,  ENAMETOOLONG,
-      EFBIG,       EOVERFLOW, EINTR,  ENODEV, ENOENT, ENXIO,  EOPNOTSUPP, EDQUOT,
+      EFBIG,       EOVERFLOW, EINTR,  ENODEV, ENOENT, ENXIO,  EOPNOTSUPP,
+// `EDQUOT` (disk quota exceeded) is not defined by the Windows CRT.
+#ifdef EDQUOT
+      EDQUOT,
+#endif
   };
   for (const int error : errors) {
     auto status = statusAfterFileError(error);

@@ -3,6 +3,8 @@
 #include "source/common/common/macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
+#include "source/extensions/filters/http/ai_protocol_manager/schema/anthropic_messages.h"
+#include "source/extensions/filters/http/ai_protocol_manager/schema/gemini_generate_content.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema/openai_chat_completions.h"
 
 #include "absl/strings/match.h"
@@ -121,7 +123,11 @@ public:
 class AnthropicMessagesAdapter : public ApiProtocolAdapter {
 public:
   ApiProtocol protocol() const override { return ApiProtocol::AnthropicMessages; }
-  const PayloadSchema* schema() const override { return nullptr; }
+  const PayloadSchema* schema() const override {
+    static const PayloadSchema* anthropic_schema =
+        new PayloadSchema(Anthropic::createPayloadSchema());
+    return anthropic_schema;
+  }
 
   void canonicalizeUsage(TokenUsage& usage, bool& overflow) const override {
     // Native input excludes the two disjoint cache buckets.
@@ -185,7 +191,11 @@ protected:
 class GeminiGenerateContentAdapter : public ApiProtocolAdapter {
 public:
   ApiProtocol protocol() const override { return ApiProtocol::GeminiGenerateContent; }
-  const PayloadSchema* schema() const override { return nullptr; }
+  const PayloadSchema* schema() const override {
+    // Construct-on-first-use, as for Chat Completions above.
+    static const PayloadSchema* gemini_schema = new PayloadSchema(Gemini::createPayloadSchema());
+    return gemini_schema;
+  }
 
   void canonicalizeUsage(TokenUsage& usage, bool& overflow) const override {
     // Native prompt/candidates counts exclude tool-use and thoughts, and are

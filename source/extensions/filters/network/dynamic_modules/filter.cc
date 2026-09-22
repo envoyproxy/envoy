@@ -277,9 +277,11 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onSuccess(
   // ends up deallocating this callback itself.
   DynamicModuleNetworkFilterSharedPtr filter = filter_.lock();
   uint64_t callout_id = callout_id_;
-  // Check if the filter is destroyed before the callout completed.
+  // request_ is set only after the async client accepts the callout. Gating on it avoids a
+  // reentrant module call when send completes the callout inline, which is already reported by the
+  // return code.
   if (!filter || !filter->in_module_filter_ ||
-      !filter->config_->on_network_filter_http_callout_done_) {
+      !filter->config_->on_network_filter_http_callout_done_ || request_ == nullptr) {
     return;
   }
 
@@ -318,8 +320,11 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onFailure(
   // ends up deallocating this callback itself.
   DynamicModuleNetworkFilterSharedPtr filter = filter_.lock();
   uint64_t callout_id = callout_id_;
+  // request_ is set only after the async client accepts the callout. Gating on it avoids a
+  // reentrant module call when send fails the callout inline, which is already reported by the
+  // return code.
   if (!filter || !filter->in_module_filter_ ||
-      !filter->config_->on_network_filter_http_callout_done_) {
+      !filter->config_->on_network_filter_http_callout_done_ || request_ == nullptr) {
     return;
   }
 

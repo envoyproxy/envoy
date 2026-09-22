@@ -9,12 +9,8 @@ fn get_body_content<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF, request: bool)
     envoy_filter.received_buffered_response_body()
   };
 
-  let buffered_size = if request {
-    envoy_filter.get_buffered_request_body_size()
-  } else {
-    envoy_filter.get_buffered_response_body_size()
-  };
-
+  // The received size still uses a cheap size call so the result is allocated once at the exact
+  // total. The buffered size is summed from its chunk lengths below to drop a redundant crossing.
   let received_size = if is_buffered {
     0
   } else if request {
@@ -23,13 +19,19 @@ fn get_body_content<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF, request: bool)
     envoy_filter.get_received_response_body_size()
   };
 
-  let mut result = Vec::with_capacity(buffered_size + received_size);
-
   let buffered = if request {
     envoy_filter.get_buffered_request_body()
   } else {
     envoy_filter.get_buffered_response_body()
   };
+  let buffered_size = buffered.as_ref().map_or(0, |chunks| {
+    chunks
+      .iter()
+      .map(|chunk| chunk.as_slice().len())
+      .sum::<usize>()
+  });
+
+  let mut result = Vec::with_capacity(buffered_size + received_size);
   if let Some(chunks) = buffered {
     for chunk in &chunks {
       result.extend_from_slice(chunk.as_slice());
@@ -152,10 +154,6 @@ mod tests {
       .times(1)
       .returning(|| true);
     mock
-      .expect_get_buffered_request_body_size()
-      .times(1)
-      .returning(|| 11);
-    mock
       .expect_get_buffered_request_body()
       .times(1)
       .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
@@ -174,10 +172,6 @@ mod tests {
       .expect_received_buffered_request_body()
       .times(1)
       .returning(|| false);
-    mock
-      .expect_get_buffered_request_body_size()
-      .times(1)
-      .returning(|| 6);
     mock
       .expect_get_received_request_body_size()
       .times(1)
@@ -204,10 +198,6 @@ mod tests {
       .times(1)
       .returning(|| false);
     mock
-      .expect_get_buffered_request_body_size()
-      .times(1)
-      .returning(|| 0);
-    mock
       .expect_get_received_request_body_size()
       .times(1)
       .returning(|| 5);
@@ -224,6 +214,29 @@ mod tests {
   }
 
   #[test]
+  fn test_read_whole_request_body_multi_chunk_buffered() {
+    // A multi-chunk buffered body is summed from its chunk lengths and concatenated in order.
+    static mut CHUNK_ONE: [u8; 6] = *b"hello ";
+    static mut CHUNK_TWO: [u8; 5] = *b"world";
+    let mut mock = MockEnvoyHttpFilter::default();
+    mock
+      .expect_received_buffered_request_body()
+      .times(1)
+      .returning(|| true);
+    mock
+      .expect_get_buffered_request_body()
+      .times(1)
+      .returning(|| {
+        Some(vec![
+          unsafe { EnvoyMutBuffer::new(&raw mut CHUNK_ONE) },
+          unsafe { EnvoyMutBuffer::new(&raw mut CHUNK_TWO) },
+        ])
+      });
+
+    assert_eq!(read_whole_request_body(&mut mock), b"hello world");
+  }
+
+  #[test]
   fn test_read_whole_response_body_received_is_buffered() {
     // When received_buffered_response_body() returns true, only the buffered body should be read.
     static mut BUFFER: [u8; 11] = *b"hello world";
@@ -232,10 +245,6 @@ mod tests {
       .expect_received_buffered_response_body()
       .times(1)
       .returning(|| true);
-    mock
-      .expect_get_buffered_response_body_size()
-      .times(1)
-      .returning(|| 11);
     mock
       .expect_get_buffered_response_body()
       .times(1)
@@ -256,10 +265,6 @@ mod tests {
       .expect_received_buffered_response_body()
       .times(1)
       .returning(|| false);
-    mock
-      .expect_get_buffered_response_body_size()
-      .times(1)
-      .returning(|| 6);
     mock
       .expect_get_received_response_body_size()
       .times(1)
@@ -286,10 +291,6 @@ mod tests {
       .times(1)
       .returning(|| false);
     mock
-      .expect_get_buffered_response_body_size()
-      .times(1)
-      .returning(|| 0);
-    mock
       .expect_get_received_response_body_size()
       .times(1)
       .returning(|| 5);
@@ -303,5 +304,28 @@ mod tests {
       .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut RECEIVED) }]));
 
     assert_eq!(read_whole_response_body(&mut mock), b"world");
+  }
+
+  #[test]
+  fn test_read_whole_response_body_multi_chunk_buffered() {
+    // A multi-chunk buffered body is summed from its chunk lengths and concatenated in order.
+    static mut CHUNK_ONE: [u8; 6] = *b"hello ";
+    static mut CHUNK_TWO: [u8; 5] = *b"world";
+    let mut mock = MockEnvoyHttpFilter::default();
+    mock
+      .expect_received_buffered_response_body()
+      .times(1)
+      .returning(|| true);
+    mock
+      .expect_get_buffered_response_body()
+      .times(1)
+      .returning(|| {
+        Some(vec![
+          unsafe { EnvoyMutBuffer::new(&raw mut CHUNK_ONE) },
+          unsafe { EnvoyMutBuffer::new(&raw mut CHUNK_TWO) },
+        ])
+      });
+
+    assert_eq!(read_whole_response_body(&mut mock), b"hello world");
   }
 }

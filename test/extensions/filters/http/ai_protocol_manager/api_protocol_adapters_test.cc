@@ -700,13 +700,20 @@ TEST(TokenUsageTest, SecondaryOnlyCountsStillPublish) {
 // Adapter registry.
 
 TEST(AdapterRegistryTest, SchemaLookup) {
-  // Chat Completions carries the one defined payload schema; APIs without a
-  // schema are not validated.
+  // Chat Completions, Anthropic Messages, and Gemini generateContent carry defined payload
+  // schemas; APIs without one are not validated.
   EXPECT_NE(AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions).schema(), nullptr);
+  EXPECT_NE(AdapterRegistry::get(ApiProtocol::AnthropicMessages).schema(), nullptr);
+  EXPECT_NE(AdapterRegistry::get(ApiProtocol::GeminiGenerateContent).schema(), nullptr);
   EXPECT_EQ(AdapterRegistry::get(ApiProtocol::Unspecified).schema(), nullptr);
   EXPECT_EQ(AdapterRegistry::get(ApiProtocol::OpenAiResponses).schema(), nullptr);
-  EXPECT_EQ(AdapterRegistry::get(ApiProtocol::AnthropicMessages).schema(), nullptr);
-  EXPECT_EQ(AdapterRegistry::get(ApiProtocol::GeminiGenerateContent).schema(), nullptr);
+}
+
+// The schema is a construct-on-first-use singleton, so every lookup must hand back the same
+// instance rather than rebuilding it per call.
+TEST(AdapterRegistryTest, SchemaLookupIsStable) {
+  const ApiProtocolAdapter& adapter = AdapterRegistry::get(ApiProtocol::GeminiGenerateContent);
+  EXPECT_EQ(adapter.schema(), adapter.schema());
 }
 
 TEST(AdapterRegistryTest, AdaptersReportTheirProtocol) {

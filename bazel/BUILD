@@ -535,6 +535,18 @@ label_flag(
     build_setting_default = "@boringssl//:crypto",
 )
 
+label_flag(
+    name = "test_main",
+    build_setting_default = "//test:main",
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "test_pch",
+    build_setting_default = "//test:test_pch",
+    visibility = ["//visibility:public"],
+)
+
 # wee8 engine: envoy_toolshed prebuilt by default, source for configs the
 # prebuilt is incompatible with (gcc libstdc++ ABI; sanitizers need instrumented deps).
 alias(

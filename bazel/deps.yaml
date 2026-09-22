@@ -7,6 +7,8 @@ abseil-cpp:
   use_category:
   - dataplane_core
   - controlplane
+  implied_untracked_deps:
+  - gloop
   license: "Apache-2.0"
   license_url: "https://github.com/abseil/abseil-cpp/blob/{version}/LICENSE"
 
@@ -27,7 +29,6 @@ antlr4-cpp-runtime:
   - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
   - envoy.rate_limit_descriptors.expr
   - envoy.stat_sinks.wasm
-
   use_category:
   - api
   - controlplane
