@@ -138,9 +138,10 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       RETURN_IF_NOT_OK_REF(checker_or_error.status());
       new_cluster_pair.first->setHealthChecker(checker_or_error.value());
     } else {
-      auto checker = std::make_shared<MultiHealthChecker>(*new_cluster_pair.first,
-                                                          cluster.health_checks(), server_context);
-      new_cluster_pair.first->setHealthChecker(checker);
+      auto checker_or_error = MultiHealthChecker::create(*new_cluster_pair.first,
+                                                         cluster.health_checks(), server_context);
+      RETURN_IF_NOT_OK_REF(checker_or_error.status());
+      new_cluster_pair.first->setHealthChecker(std::move(checker_or_error.value()));
     }
   }
 

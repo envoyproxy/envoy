@@ -36,8 +36,9 @@ public:
 
   void createChecker(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks) {
-    health_checker_ =
-        std::make_shared<MultiHealthChecker>(*cluster_, health_checks, server_context_);
+    auto checker_or_error = MultiHealthChecker::create(*cluster_, health_checks, server_context_);
+    THROW_IF_NOT_OK(checker_or_error.status());
+    health_checker_ = std::move(checker_or_error.value());
   }
 
   void setupTwoTcpNoData() {
@@ -111,7 +112,7 @@ public:
   std::shared_ptr<MultiHealthChecker> health_checker_;
 };
 
-TEST_F(MultiHealthCheckerImplTest, MissingNameThrows) {
+TEST_F(MultiHealthCheckerImplTest, MissingName) {
   auto health_checks = parseHealthChecksFromYaml({
       R"EOF(
     timeout: 1s
@@ -129,12 +130,14 @@ TEST_F(MultiHealthCheckerImplTest, MissingNameThrows) {
     tcp_health_check: {}
     )EOF",
   });
-  EXPECT_THROW_WITH_MESSAGE(createChecker(health_checks), EnvoyException,
-                            "health check at index 1 is missing a name; all health checks "
-                            "must have a name when multiple health checks are configured");
+  auto result = MultiHealthChecker::create(*cluster_, health_checks, server_context_);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "health check at index 1 is missing a name; all health checks "
+            "must have a name when multiple health checks are configured");
 }
 
-TEST_F(MultiHealthCheckerImplTest, FirstMissingNameThrows) {
+TEST_F(MultiHealthCheckerImplTest, FirstMissingName) {
   auto health_checks = parseHealthChecksFromYaml({
       R"EOF(
     timeout: 1s
@@ -152,9 +155,11 @@ TEST_F(MultiHealthCheckerImplTest, FirstMissingNameThrows) {
     tcp_health_check: {}
     )EOF",
   });
-  EXPECT_THROW_WITH_MESSAGE(createChecker(health_checks), EnvoyException,
-                            "health check at index 0 is missing a name; all health checks "
-                            "must have a name when multiple health checks are configured");
+  auto result = MultiHealthChecker::create(*cluster_, health_checks, server_context_);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "health check at index 0 is missing a name; all health checks "
+            "must have a name when multiple health checks are configured");
 }
 
 TEST_F(MultiHealthCheckerImplTest, BothCheckersHealthy) {
@@ -425,8 +430,7 @@ public:
     )EOF",
     });
 
-    health_checker_ =
-        std::make_shared<MultiHealthChecker>(*cluster_, health_checks, server_context_);
+    health_checker_ = MultiHealthChecker::create(*cluster_, health_checks, server_context_).value();
   }
 
   std::shared_ptr<NiceMock<MockClusterMockPrioritySet>> cluster_;

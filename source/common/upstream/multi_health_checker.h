@@ -18,10 +18,10 @@ namespace Upstream {
 
 class MultiHealthChecker : public HealthChecker {
 public:
-  MultiHealthChecker(
-      Cluster& cluster,
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,
-      Server::Configuration::ServerFactoryContext& server_context);
+  static absl::StatusOr<std::shared_ptr<MultiHealthChecker>>
+  create(Cluster& cluster,
+         const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,
+         Server::Configuration::ServerFactoryContext& server_context);
   ~MultiHealthChecker() override;
 
   // HealthChecker
@@ -64,6 +64,8 @@ private:
                        HealthState result);
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void initializeHost(const HostSharedPtr& host);
+
+  MultiHealthChecker(Cluster& cluster);
 
   static bool isGaugeHealthy(const PerHostState& state) { return state.fail_bits == 0; }
   static bool isGaugeDegraded(const PerHostState& state) { return state.degraded_bits != 0; }

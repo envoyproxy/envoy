@@ -14,22 +14,26 @@ constexpr uint32_t kActiveHcFlagMask = static_cast<uint32_t>(Host::HealthFlag::F
 
 } // namespace
 
-MultiHealthChecker::MultiHealthChecker(
-    Cluster& cluster,
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,
-    Server::Configuration::ServerFactoryContext& server_context)
+MultiHealthChecker::MultiHealthChecker(Cluster& cluster)
     : cluster_(cluster), stat_name_pool_(cluster.info()->statsScope().symbolTable()),
       healthy_gauge_(cluster.info()->statsScope().gaugeFromStatName(
           stat_name_pool_.add("health_check.healthy"), Stats::Gauge::ImportMode::Accumulate)),
       degraded_gauge_(cluster.info()->statsScope().gaugeFromStatName(
-          stat_name_pool_.add("health_check.degraded"), Stats::Gauge::ImportMode::Accumulate)) {
+          stat_name_pool_.add("health_check.degraded"), Stats::Gauge::ImportMode::Accumulate)) {}
 
-  checkers_.reserve(health_checks.size());
+absl::StatusOr<std::shared_ptr<MultiHealthChecker>> MultiHealthChecker::create(
+    Cluster& cluster,
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,
+    Server::Configuration::ServerFactoryContext& server_context) {
+
+  auto checker = std::shared_ptr<MultiHealthChecker>(new MultiHealthChecker(cluster));
+
+  checker->checkers_.reserve(health_checks.size());
   for (int i = 0; i < health_checks.size(); i++) {
     const auto& sub_config = health_checks[i];
 
     if (sub_config.name().empty()) {
-      throw EnvoyException(
+      return absl::InvalidArgumentError(
           fmt::format("health check at index {} is missing a name; all health checks "
                       "must have a name when multiple health checks are configured",
                       i));
@@ -37,8 +41,8 @@ MultiHealthChecker::MultiHealthChecker(
 
     const uint32_t checker_idx = static_cast<uint32_t>(i);
 
-    checkers_.emplace_back(*this, checker_idx);
-    auto& data = checkers_.back();
+    checker->checkers_.emplace_back(*checker, checker_idx);
+    auto& data = checker->checkers_.back();
 
     std::vector<Stats::TagStringView> tags{{"name", sub_config.name()}};
     data.stat_scope = cluster.info()->statsScope().createScopeWithTaggedName(
@@ -46,21 +50,23 @@ MultiHealthChecker::MultiHealthChecker(
 
     auto checker_or_error = HealthCheckerFactory::create(sub_config, cluster, server_context,
                                                          *data.stat_scope, data.flag_callbacks);
-    THROW_IF_NOT_OK(checker_or_error.status());
+    RETURN_IF_NOT_OK(checker_or_error.status());
 
     data.checker = std::move(checker_or_error.value());
 
-    data.checker->addHostCheckCompleteCb([this, checker_idx](const HostSharedPtr& host,
-                                                             HealthTransition changed_state,
-                                                             HealthState result) {
-      onCheckerResult(checker_idx, host, changed_state, result);
-    });
+    data.checker->addHostCheckCompleteCb(
+        [raw = checker.get(), checker_idx](const HostSharedPtr& host,
+                                           HealthTransition changed_state, HealthState result) {
+          raw->onCheckerResult(checker_idx, host, changed_state, result);
+        });
   }
 
-  member_update_cb_ = cluster_.prioritySet().addMemberUpdateCb(
-      [this](const HostVector& hosts_added, const HostVector& hosts_removed) {
-        onClusterMemberUpdate(hosts_added, hosts_removed);
+  checker->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
+      [raw = checker.get()](const HostVector& hosts_added, const HostVector& hosts_removed) {
+        raw->onClusterMemberUpdate(hosts_added, hosts_removed);
       });
+
+  return checker;
 }
 
 MultiHealthChecker::~MultiHealthChecker() {
