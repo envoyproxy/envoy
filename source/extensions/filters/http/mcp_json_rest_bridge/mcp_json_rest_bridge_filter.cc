@@ -739,7 +739,8 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
 
 Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
                                                            bool end_stream) {
-
+  // No need to encode the response body for Initialization and InitializationAck. ToolsListLocal
+  // and ServerDiscover are local responses, and the response body is already encoded.
   if (mcp_operation_ == McpOperation::Unspecified ||
       mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
