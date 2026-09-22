@@ -1,9 +1,6 @@
 #pragma once
 
-#include <cstdint>
 #include <initializer_list>
-#include <memory>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,7 +12,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -44,6 +40,19 @@ public:
     Drop,
     // Sets `target_path` to `default_value` if `target_path` is absent or null.
     SetDefault,
+    // Wraps a scalar at `target_path` in a single-element array. A no-op when the field is
+    // absent, null, or already an array.
+    EnsureArray,
+    // Wraps a scalar at `target_path` in an object keyed by `element_key`. A no-op when the
+    // field is absent, null, or already an object.
+    EnsureObject,
+    // Replaces the object at `target_path` with the value it holds under `element_key`, but
+    // only when that is its sole key. A no-op otherwise, which is what lets a rule set collapse
+    // a degenerate wrapper without disturbing a genuinely structured value.
+    UnwrapSingleKeyObject,
+    // Parses a numeric string at `target_path` into a real JSON number, as an integer when
+    // `integral` is set. A no-op when the field is absent, already numeric, or does not parse.
+    CoerceNumeric,
     // Translates scalar string values at `target_path` according to `value_map`.
     ValueMap,
     // Applies `sub_rules` to every object element of the array at `target_path`.
@@ -92,6 +101,33 @@ public:
 
   // Sets `path` to `default_value` if `path` is missing or null.
   static TranscodeRule setDefault(std::string path, nlohmann::json default_value);
+
+  // Normalizes `path` to array shape by wrapping a scalar in a single-element array. Fields that
+  // are absent, null, or already arrays are left untouched. Use this ahead of a mapping into a
+  // destination that only accepts an array, where the source dialect also permits a bare scalar
+  // (e.g. OpenAI `stop` -> Anthropic `stop_sequences`).
+  static TranscodeRule ensureArray(std::string path);
+
+  // Normalizes `path` to object shape by wrapping a scalar as `{key: <scalar>}`. Fields that are
+  // absent, null, or already objects are left untouched. Pairs with `unwrapSingleKeyObject` to
+  // move between a dialect that spells a choice as a bare string and one that spells it as a
+  // tagged object (e.g. OpenAI `tool_choice: "auto"` -> Anthropic `{"type": "auto"}`).
+  static TranscodeRule ensureObject(std::string path, std::string key);
+
+  // Replaces the object at `path` with the value under `key`, but only when `key` is its only
+  // member. An object carrying anything else is left alone, so a rule set can collapse the
+  // degenerate `{"type": "auto"}` form while leaving `{"type": "function", "function": {...}}`
+  // intact without needing conditional rules.
+  static TranscodeRule unwrapSingleKeyObject(std::string path, std::string key);
+
+  // Converts a numeric string at `path` into a real JSON number. Values that are absent, already
+  // numeric, or not parseable are left untouched; an unparseable string is the source schema's
+  // problem to reject, not this rule's. Use where a lenient source dialect permits a quoted
+  // number (Gemini renders proto numbers as strings) and the destination requires a real one.
+  static TranscodeRule toNumber(std::string path);
+
+  // As `toNumber`, but yields an integer, for destinations that declare the field as such.
+  static TranscodeRule toInteger(std::string path);
 
   // Maps string values at `path` using `mappings` ("this value should be interpreted as that").
   static TranscodeRule
@@ -150,14 +186,19 @@ private:
 
   Op op_;
   std::string source_path_;
+  std::vector<std::string> source_segments_;
   std::vector<std::string> source_paths_;
+  std::vector<std::vector<std::string>> source_paths_segments_;
   std::string target_path_;
+  std::vector<std::string> target_segments_;
   std::string predicate_field_;
   std::string extract_subpath_;
+  std::vector<std::string> extract_subpath_segments_;
   std::vector<std::string> match_values_;
   nlohmann::json default_value_;
   absl::flat_hash_map<std::string, std::string> value_mappings_;
   UnknownValuePolicy unknown_policy_{UnknownValuePolicy::Passthrough};
+  bool integral_{false};
   std::vector<TranscodeRule> sub_rules_;
 };
 
@@ -188,28 +229,37 @@ private:
   std::vector<TranscodeRule> rules_;
 };
 
-// Declarative dialect pack pairing a protocol's `inbound` (Protocol -> OpenAiChatCompletions)
-// and `outbound` (OpenAiChatCompletions -> Protocol) rule sets with model-prefix selection.
+// Declarative dialect pack pairing a protocol's `to_ir` (Protocol -> OpenAiChatCompletions)
+// and `from_ir` (OpenAiChatCompletions -> Protocol) rule sets.
 //
-// `dialect_schema` is the protocol's own `PayloadSchema`; it is what an outbound payload is
-// validated against before it is handed to the upstream. `hub_schema` is only used for static
-// rule verification at registration time -- see `TranscodingEngine::transcodeInbound()` for why
-// the hub document itself is not validated at runtime.
+// `dialect_schema` is the protocol's own `PayloadSchema`; it is what a payload converted out of
+// the IR is validated against before it is handed to the upstream. `ir_schema` is only used for
+// static rule verification at registration time -- see `TranscodingEngine::transcodeToIr()` for
+// why the IR document itself is not validated at runtime.
 struct DialectTranscodePack {
   ApiProtocol protocol{ApiProtocol::Unspecified};
-  TranscodeRuleSet inbound;
-  TranscodeRuleSet outbound;
-  std::vector<std::string> model_prefixes;
+  TranscodeRuleSet to_ir;
+  TranscodeRuleSet from_ir;
   const PayloadSchema* dialect_schema{nullptr};
-  const PayloadSchema* hub_schema{nullptr};
+  const PayloadSchema* ir_schema{nullptr};
 };
 
 // The Transcoding Engine: manages registered `DialectTranscodePack`s, verifies them against
-// `PayloadSchema` definitions at startup, resolves target protocols from model names, and
-// executes inbound and outbound transcoding.
+// `PayloadSchema` definitions at startup, and converts payloads between any registered dialect
+// schema and the intermediate representation (`transcodeToIr` / `transcodeFromIr`).
+//
+// The engine is a single-hop tool (`Dialect -> IR` or `IR -> Dialect`) and does not chain
+// `Dialect A -> IR -> Dialect B` or infer target wire protocols from model names. Orchestrating
+// transcoding legs, selecting target wire protocols from route/endpoint configuration, and
+// bypassing conversion when source and target protocols match are the responsibility of the
+// calling transcoding filter.
+//
+// TODO(ginama): Address the IR data-loss problem where dialect-specific fields not modeled by
+// `OpenAiChatCompletions` (e.g. unmapped `generationConfig` fields) are dropped when converting
+// to the IR.
 class TranscodingEngine {
 public:
-  static constexpr ApiProtocol kHubProtocol = ApiProtocol::OpenAiChatCompletions;
+  static constexpr ApiProtocol kIrProtocol = ApiProtocol::OpenAiChatCompletions;
 
   TranscodingEngine() = default;
 
@@ -220,61 +270,44 @@ public:
   // Statically verifies a rule set against `source_schema` at config load time.
   // Rejects any rule set where a value-reading rule (`ValueMap`) targets a field declared
   // `.offloadable()` in `source_schema`, since such a field may arrive as an `ExternalRef`
-  // binary node rather than an inline string.
+  // binary node rather than an inline string. Provenance is tracked across structural rules
+  // (including content-block array reshaping into `<field>[].text`) in execution order.
   static absl::Status validateRulesAgainstSchema(const TranscodeRuleSet& rules,
                                                  const PayloadSchema* source_schema = nullptr);
 
   // Registers a `DialectTranscodePack` after statically verifying its rule sets.
   //
-  // `dialect_schema` and `hub_schema` override the corresponding fields on `pack` when
+  // `dialect_schema` and `ir_schema` override the corresponding fields on `pack` when
   // non-null; when null, whatever `pack` already carries is kept. This lets a caller either
   // pass the schemas here or set them directly on the struct, without one silently winning.
   absl::Status registerPack(DialectTranscodePack pack,
                             const PayloadSchema* dialect_schema = nullptr,
-                            const PayloadSchema* hub_schema = nullptr);
+                            const PayloadSchema* ir_schema = nullptr);
 
-  // Resolves the target `ApiProtocol` from a model identifier (e.g. "claude-sonnet-4" ->
-  // `AnthropicMessages`, "gemini-2.5-pro" -> `GeminiGenerateContent`).
-  ApiProtocol resolveTargetProtocol(absl::string_view model) const;
-
-  // Step 1: Transcodes `payload` from `source_protocol` into the hub shape
-  // (`OpenAiChatCompletions`). A no-op when `source_protocol` is the hub protocol.
+  // Converts `payload` from `source_protocol` into the intermediate representation
+  // (`OpenAiChatCompletions`). A no-op when `source_protocol` is already the IR protocol.
   //
-  // The result is deliberately NOT validated against the hub schema. Two reasons: the source
+  // The result is deliberately NOT validated against the IR schema. Two reasons: the source
   // payload was already validated against its own schema by the AI Protocol Manager before the
-  // filter chain ran, so re-validating is duplicated work on the hot path; and the hub schema
+  // filter chain ran, so re-validating is duplicated work on the hot path; and the IR schema
   // requires `model`, which a Gemini request legitimately does not carry in its body (it lives
   // in the request path), so validating here would reject valid Gemini traffic.
-  absl::Status transcodeInbound(ApiProtocol source_protocol, JsonWithExtBuf& payload) const {
-    return transcodeInbound(source_protocol, payload.json());
+  absl::Status transcodeToIr(ApiProtocol source_protocol, JsonWithExtBuf& payload) const {
+    return transcodeToIr(source_protocol, payload.json());
   }
-  absl::Status transcodeInbound(ApiProtocol source_protocol, nlohmann::json& json) const;
+  absl::Status transcodeToIr(ApiProtocol source_protocol, nlohmann::json& json) const;
 
-  // Step 2: Transcodes `payload` from the hub shape (`OpenAiChatCompletions`) into
-  // `target_protocol`, then validates it against that protocol's schema so a payload the
-  // upstream would reject is caught here instead of over the network. Rule execution is skipped
-  // when `target_protocol` is the hub protocol, but validation still runs.
-  absl::Status transcodeOutbound(ApiProtocol target_protocol, JsonWithExtBuf& payload) const {
-    return transcodeOutbound(target_protocol, payload.json());
+  // Converts `payload` out of the intermediate representation into `target_protocol`,
+  // then validates it against that protocol's schema so a payload the upstream would reject is
+  // caught here instead of over the network. Rule execution is skipped when `target_protocol`
+  // is the IR protocol, but validation still runs.
+  absl::Status transcodeFromIr(ApiProtocol target_protocol, JsonWithExtBuf& payload) const {
+    return transcodeFromIr(target_protocol, payload.json());
   }
-  absl::Status transcodeOutbound(ApiProtocol target_protocol, nlohmann::json& json) const;
-
-  // End-to-end convenience helper: `source_protocol` -> Hub -> `target_protocol`.
-  absl::Status transcode(ApiProtocol source_protocol, ApiProtocol target_protocol,
-                         JsonWithExtBuf& payload) const {
-    return transcode(source_protocol, target_protocol, payload.json());
-  }
-  absl::Status transcode(ApiProtocol source_protocol, ApiProtocol target_protocol,
-                         nlohmann::json& json) const;
+  absl::Status transcodeFromIr(ApiProtocol target_protocol, nlohmann::json& json) const;
 
 private:
-  struct ModelPrefixEntry {
-    std::string prefix;
-    ApiProtocol protocol;
-  };
-
   absl::flat_hash_map<ApiProtocol, DialectTranscodePack> packs_;
-  std::vector<ModelPrefixEntry> model_prefixes_;
 };
 
 } // namespace AiProtocolManager

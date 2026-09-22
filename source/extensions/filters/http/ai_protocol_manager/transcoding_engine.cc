@@ -1,13 +1,18 @@
 #include "source/extensions/filters/http/ai_protocol_manager/transcoding_engine.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <optional>
 
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,18 +21,19 @@ namespace AiProtocolManager {
 
 namespace {
 
-// Splits a dot-delimited JSON path (e.g. "generationConfig.maxOutputTokens") into segments.
-std::vector<absl::string_view> splitPath(absl::string_view path) {
+// Splits a dot-delimited JSON path (e.g. "generationConfig.maxOutputTokens") into owned segments
+// at rule construction time so execution never re-tokenizes paths per message.
+std::vector<std::string> splitPath(absl::string_view path) {
   if (path.empty()) {
     return {};
   }
   return absl::StrSplit(path, '.');
 }
 
-// Extracts and removes the node at `path` from `root`, returning `std::nullopt` if any
-// segment is absent or not an object. Cleans up empty parent objects created along `path`.
-std::optional<nlohmann::json> extractNodeByPath(nlohmann::json& root, absl::string_view path) {
-  const std::vector<absl::string_view> parts = splitPath(path);
+// Extracts and removes the node at `parts` from `root`, returning `std::nullopt` if any
+// segment is absent or not an object. Cleans up empty parent objects created along `parts`.
+std::optional<nlohmann::json> extractNodeByPath(nlohmann::json& root,
+                                                absl::Span<const std::string> parts) {
   if (parts.empty() || !root.is_object()) {
     return std::nullopt;
   }
@@ -54,7 +60,7 @@ std::optional<nlohmann::json> extractNodeByPath(nlohmann::json& root, absl::stri
   // Prune any intermediate objects that became empty after removing the leaf.
   for (size_t i = parents.size(); i > 0; --i) {
     nlohmann::json* parent = parents[i - 1];
-    const absl::string_view child_key = parts[i - 1];
+    const std::string& child_key = parts[i - 1];
     auto child_it = parent->find(child_key);
     if (child_it != parent->end() && child_it->is_object() && child_it->empty()) {
       parent->erase(child_it);
@@ -66,14 +72,13 @@ std::optional<nlohmann::json> extractNodeByPath(nlohmann::json& root, absl::stri
   return extracted;
 }
 
-// Navigates to `path` inside `root` (read/write), returning `nullptr` if absent.
-nlohmann::json* findNodeByPath(nlohmann::json& root, absl::string_view path) {
-  const std::vector<absl::string_view> parts = splitPath(path);
+// Navigates to `parts` inside `root` (read/write), returning `nullptr` if absent.
+nlohmann::json* findNodeByPath(nlohmann::json& root, absl::Span<const std::string> parts) {
   if (parts.empty()) {
     return &root;
   }
   nlohmann::json* curr = &root;
-  for (const absl::string_view part : parts) {
+  for (const std::string& part : parts) {
     if (!curr->is_object()) {
       return nullptr;
     }
@@ -86,9 +91,9 @@ nlohmann::json* findNodeByPath(nlohmann::json& root, absl::string_view path) {
   return curr;
 }
 
-// Writes `value` into `root` at `path`, creating intermediate objects as needed.
-void setNodeByPath(nlohmann::json& root, absl::string_view path, nlohmann::json&& value) {
-  const std::vector<absl::string_view> parts = splitPath(path);
+// Writes `value` into `root` at `parts`, creating intermediate objects as needed.
+void setNodeByPath(nlohmann::json& root, absl::Span<const std::string> parts,
+                   nlohmann::json&& value) {
   if (parts.empty()) {
     root = std::move(value);
     return;
@@ -98,14 +103,14 @@ void setNodeByPath(nlohmann::json& root, absl::string_view path, nlohmann::json&
   }
   nlohmann::json* curr = &root;
   for (size_t i = 0; i + 1 < parts.size(); ++i) {
-    const std::string key(parts[i]);
+    const std::string& key = parts[i];
     auto it = curr->find(key);
     if (it == curr->end() || !it->is_object()) {
       (*curr)[key] = nlohmann::json::object();
     }
     curr = &((*curr)[key]);
   }
-  (*curr)[std::string(parts.back())] = std::move(value);
+  (*curr)[parts.back()] = std::move(value);
 }
 
 // Converts any message content node (string, ExternalRef, or array of blocks) into a normalized
@@ -123,23 +128,168 @@ nlohmann::json toContentBlockArray(nlohmann::json&& content) {
   return arr;
 }
 
-// Recursively collects the field paths targeted by `ValueMap` rules, for static verification
-// against `PayloadSchema`. Descends into `ForEach` sub-rules to build `messages[].role` style
-// paths, matching the format `requestOffloadableFieldPaths()` emits.
-void collectValueMapPaths(const std::vector<TranscodeRule>& rules, absl::string_view prefix,
-                          std::vector<std::string>& out_paths) {
-  for (const TranscodeRule& rule : rules) {
-    if (rule.op() == TranscodeRule::Op::ValueMap) {
-      const std::string full_path =
-          prefix.empty() ? rule.targetPath() : absl::StrCat(prefix, ".", rule.targetPath());
-      out_paths.push_back(full_path);
-    } else if (rule.op() == TranscodeRule::Op::ForEach) {
-      const std::string array_prefix = prefix.empty()
-                                           ? absl::StrCat(rule.targetPath(), "[]")
-                                           : absl::StrCat(prefix, ".", rule.targetPath(), "[]");
-      collectValueMapPaths(rule.subRules(), array_prefix, out_paths);
+std::string joinRulePath(absl::string_view prefix, absl::string_view relative_path) {
+  if (prefix.empty()) {
+    return std::string(relative_path);
+  }
+  return absl::StrCat(prefix, ".", relative_path);
+}
+
+// If `path` is equal to `from_prefix` or nested beneath it (via `.` or `[]`), returns the path
+// rewritten under `to_prefix`. Returns `std::nullopt` when `path` does not lie under
+// `from_prefix`.
+std::optional<std::string> rewritePathPrefix(absl::string_view path, absl::string_view from_prefix,
+                                             absl::string_view to_prefix) {
+  if (path == from_prefix) {
+    return std::string(to_prefix);
+  }
+  if (absl::StartsWith(path, from_prefix)) {
+    const absl::string_view suffix = path.substr(from_prefix.size());
+    if (absl::StartsWith(suffix, ".") || absl::StartsWith(suffix, "[]")) {
+      return absl::StrCat(to_prefix, suffix);
     }
   }
+  return std::nullopt;
+}
+
+// Moves every offloadable path under `from_prefix` to `to_prefix`. When `keep_source` is true
+// (e.g. `ExtractFromArray`, which leaves non-matching elements in the source array), the source
+// path also stays offloadable.
+void relocateOffloadablePaths(absl::flat_hash_set<std::string>& offloadable_set,
+                              absl::string_view from_prefix, absl::string_view to_prefix,
+                              bool keep_source = false) {
+  std::vector<std::string> to_remove;
+  std::vector<std::string> to_insert;
+  for (const std::string& path : offloadable_set) {
+    if (auto rewritten = rewritePathPrefix(path, from_prefix, to_prefix); rewritten.has_value()) {
+      if (!keep_source) {
+        to_remove.push_back(path);
+      }
+      to_insert.push_back(*std::move(rewritten));
+    }
+  }
+  for (const std::string& path : to_remove) {
+    offloadable_set.erase(path);
+  }
+  for (std::string& path : to_insert) {
+    offloadable_set.insert(std::move(path));
+  }
+}
+
+void dropOffloadablePaths(absl::flat_hash_set<std::string>& offloadable_set,
+                          absl::string_view dropped_prefix) {
+  for (auto it = offloadable_set.begin(); it != offloadable_set.end();) {
+    if (rewritePathPrefix(*it, dropped_prefix, "").has_value()) {
+      offloadable_set.erase(it++);
+    } else {
+      ++it;
+    }
+  }
+}
+
+// Walks `rules` in execution order, evolving `offloadable_set` as structural rules relocate fields
+// and rejecting any `ValueMap` whose target path currently holds an offloadable field.
+absl::Status verifyRulesTrackProvenance(const std::vector<TranscodeRule>& rules,
+                                        absl::string_view prefix,
+                                        absl::flat_hash_set<std::string>& offloadable_set) {
+  for (const TranscodeRule& rule : rules) {
+    switch (rule.op()) {
+    case TranscodeRule::Op::Move:
+      relocateOffloadablePaths(offloadable_set, joinRulePath(prefix, rule.sourcePath()),
+                               joinRulePath(prefix, rule.targetPath()));
+      break;
+    case TranscodeRule::Op::FirstOf: {
+      const std::string target = joinRulePath(prefix, rule.targetPath());
+      for (const std::string& candidate : rule.sourcePaths()) {
+        relocateOffloadablePaths(offloadable_set, joinRulePath(prefix, candidate), target);
+      }
+      break;
+    }
+    case TranscodeRule::Op::Drop:
+      dropOffloadablePaths(offloadable_set, joinRulePath(prefix, rule.sourcePath()));
+      break;
+    case TranscodeRule::Op::EnsureObject: {
+      const std::string target = joinRulePath(prefix, rule.targetPath());
+      relocateOffloadablePaths(offloadable_set, target,
+                               absl::StrCat(target, ".", rule.extractSubpath()),
+                               /*keep_source=*/true);
+      break;
+    }
+    case TranscodeRule::Op::UnwrapSingleKeyObject: {
+      const std::string target = joinRulePath(prefix, rule.targetPath());
+      relocateOffloadablePaths(offloadable_set, absl::StrCat(target, ".", rule.extractSubpath()),
+                               target, /*keep_source=*/true);
+      break;
+    }
+    case TranscodeRule::Op::WrapInArrayObject:
+      relocateOffloadablePaths(
+          offloadable_set, joinRulePath(prefix, rule.sourcePath()),
+          absl::StrCat(joinRulePath(prefix, rule.targetPath()), "[].", rule.extractSubpath()));
+      break;
+    case TranscodeRule::Op::UnwrapArrayObject: {
+      const std::string target = joinRulePath(prefix, rule.targetPath());
+      relocateOffloadablePaths(
+          offloadable_set,
+          absl::StrCat(joinRulePath(prefix, rule.sourcePath()), "[].", rule.extractSubpath()),
+          target);
+      // Multiple unwrapped parts fan out into `[{"type": "text", "text": ...}]` blocks.
+      relocateOffloadablePaths(offloadable_set, target, absl::StrCat(target, "[].text"),
+                               /*keep_source=*/true);
+      break;
+    }
+    case TranscodeRule::Op::ExtractFromArray: {
+      const std::string target = joinRulePath(prefix, rule.targetPath());
+      relocateOffloadablePaths(
+          offloadable_set,
+          absl::StrCat(joinRulePath(prefix, rule.sourcePath()), "[].", rule.extractSubpath()),
+          target, /*keep_source=*/true);
+      // Multiple matched elements concatenate into `[{"type": "text", "text": ...}]` blocks.
+      relocateOffloadablePaths(offloadable_set, target, absl::StrCat(target, "[].text"),
+                               /*keep_source=*/true);
+      break;
+    }
+    case TranscodeRule::Op::PrependToArray:
+      relocateOffloadablePaths(
+          offloadable_set, joinRulePath(prefix, rule.sourcePath()),
+          absl::StrCat(joinRulePath(prefix, rule.targetPath()), "[].", rule.extractSubpath()));
+      break;
+    case TranscodeRule::Op::ValueMap: {
+      const std::string full_path = joinRulePath(prefix, rule.targetPath());
+      if (offloadable_set.contains(full_path)) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "transcoding verifier error: value_map rule cannot target offloadable field '",
+            full_path, "' because large values are represented as ExternalRef nodes"));
+      }
+      break;
+    }
+    case TranscodeRule::Op::ForEach: {
+      const std::string array_prefix = absl::StrCat(joinRulePath(prefix, rule.targetPath()), "[]");
+      absl::Status status =
+          verifyRulesTrackProvenance(rule.subRules(), array_prefix, offloadable_set);
+      if (!status.ok()) {
+        return status;
+      }
+      break;
+    }
+    case TranscodeRule::Op::EnsureArray: {
+      const std::string target = joinRulePath(prefix, rule.targetPath());
+      relocateOffloadablePaths(offloadable_set, target, absl::StrCat(target, "[]"),
+                               /*keep_source=*/true);
+      break;
+    }
+    case TranscodeRule::Op::MergeConsecutiveByKey: {
+      const std::string merge_field =
+          absl::StrCat(joinRulePath(prefix, rule.targetPath()), "[].", rule.extractSubpath());
+      relocateOffloadablePaths(offloadable_set, merge_field, absl::StrCat(merge_field, "[].text"),
+                               /*keep_source=*/true);
+      break;
+    }
+    case TranscodeRule::Op::SetDefault:
+    case TranscodeRule::Op::CoerceNumeric:
+      break;
+    }
+  }
+  return absl::OkStatus();
 }
 
 // Anthropic requires `max_tokens`, but it is optional for every other dialect. When a client omits
@@ -147,17 +297,17 @@ void collectValueMapPaths(const std::vector<TranscodeRule>& rules, absl::string_
 // TODO(ginama): make this configurable per route rather than a compiled-in default.
 constexpr int kDefaultAnthropicMaxTokens = 4096;
 
-// Builds the declarative transcoding pack for Anthropic Messages <-> Hub (OpenAI Chat).
+// Builds the declarative transcoding pack for Anthropic Messages <-> IR (OpenAI Chat).
 DialectTranscodePack createAnthropicTranscodePack() {
   return DialectTranscodePack{
       /*protocol=*/ApiProtocol::AnthropicMessages,
-      /*inbound=*/
+      /*to_IR=*/
       TranscodeRuleSet(
-          ApiProtocol::AnthropicMessages, TranscodingEngine::kHubProtocol,
+          ApiProtocol::AnthropicMessages, TranscodingEngine::kIrProtocol,
           {
               // 1. Prepend top-level `system` prompt into `messages[]` as `{role: "system", ...}`
               TranscodeRule::prependToArray("system", "messages", "role", "system", "content"),
-              // 2. Map Anthropic `max_tokens` and `stop_sequences` to Hub (OpenAI Chat) names
+              // 2. Map Anthropic `max_tokens` and `stop_sequences` to IR (OpenAI Chat) names
               TranscodeRule::move("max_tokens", "max_completion_tokens"),
               TranscodeRule::move("stop_sequences", "stop"),
               // 3. Map Anthropic `tools[]` (`{name, description, input_schema}`) to OpenAI
@@ -169,10 +319,23 @@ DialectTranscodePack createAnthropicTranscodePack() {
                                          TranscodeRule::move("input_schema", "function.parameters"),
                                          TranscodeRule::setDefault("type", "function"),
                                      }),
+              // 4. Map `tool_choice`. Anthropic always spells this as an object
+              //    (`{type: auto|any|tool|none, name}`); the IR spells the unconstrained cases
+              //    as a bare string and only the pinned-tool case as an object. The final
+              //    unwrap collapses `{"type": "auto"}` to `"auto"` while leaving the two-member
+              //    `{"type": "function", "function": {...}}` untouched.
+              //    `disable_parallel_tool_use` has no IR equivalent, and leaving it in place
+              //    would block the collapse below, stranding `{"type": "auto", ...}` in a shape
+              //    the IR's `tool_choice` does not accept.
+              TranscodeRule::drop("tool_choice.disable_parallel_tool_use"),
+              TranscodeRule::valueMap("tool_choice.type",
+                                      {{"any", "required"}, {"tool", "function"}}),
+              TranscodeRule::move("tool_choice.name", "tool_choice.function.name"),
+              TranscodeRule::unwrapSingleKeyObject("tool_choice", "type"),
           }),
-      /*outbound=*/
+      /*from_IR=*/
       TranscodeRuleSet(
-          TranscodingEngine::kHubProtocol, ApiProtocol::AnthropicMessages,
+          TranscodingEngine::kIrProtocol, ApiProtocol::AnthropicMessages,
           {
               // 1. Extract `system` / `developer` messages from `messages[]` into top-level
               // `system`
@@ -190,7 +353,9 @@ DialectTranscodePack createAnthropicTranscodePack() {
               //    required `max_tokens` default if the client omitted both
               TranscodeRule::firstOf({"max_completion_tokens", "max_tokens"}, "max_tokens"),
               TranscodeRule::setDefault("max_tokens", kDefaultAnthropicMaxTokens),
-              // 4. Map `stop` -> `stop_sequences`
+              // 4. Map `stop` -> `stop_sequences`. The IR accepts either a bare string or an
+              //    array here, while `stop_sequences` is array-only, so normalize first.
+              TranscodeRule::ensureArray("stop"),
               TranscodeRule::move("stop", "stop_sequences"),
               // 5. Map OpenAI `tools[]` (`function.{name, description, parameters}`) to Anthropic
               //    `tools[]` (`{name, description, input_schema}`)
@@ -202,18 +367,25 @@ DialectTranscodePack createAnthropicTranscodePack() {
                                          TranscodeRule::drop("type"),
                                          TranscodeRule::drop("function"),
                                      }),
+              // 6. Map `tool_choice` into Anthropic's object-only form. The wrap turns the IR's
+              //    bare `"auto"` / `"none"` / `"required"` into `{"type": ...}`; the pinned-tool
+              //    object is already an object and passes through the wrap untouched.
+              TranscodeRule::ensureObject("tool_choice", "type"),
+              TranscodeRule::valueMap("tool_choice.type",
+                                      {{"required", "any"}, {"function", "tool"}}),
+              TranscodeRule::move("tool_choice.function.name", "tool_choice.name"),
+              TranscodeRule::drop("tool_choice.function"),
           }),
-      /*model_prefixes=*/{"claude-"},
   };
 }
 
-// Builds the declarative transcoding pack for Gemini GenerateContent <-> Hub (OpenAI Chat).
+// Builds the declarative transcoding pack for Gemini GenerateContent <-> IR (OpenAI Chat).
 DialectTranscodePack createGeminiTranscodePack() {
   return DialectTranscodePack{
       /*protocol=*/ApiProtocol::GeminiGenerateContent,
-      /*inbound=*/
+      /*to_IR=*/
       TranscodeRuleSet(
-          ApiProtocol::GeminiGenerateContent, TranscodingEngine::kHubProtocol,
+          ApiProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
           {
               // 1. Unwrap `systemInstruction.parts[0].text` -> `system`, then prepend to
               //    `contents` before renaming `contents` -> `messages`
@@ -227,31 +399,53 @@ DialectTranscodePack createGeminiTranscodePack() {
               TranscodeRule::forEach(
                   "messages",
                   {
+                      // Gemini leaves `role` optional and Vertex defaults it to `user`. Both
+                      // other dialects require it, so materialize the source default here
+                      // rather than let an otherwise valid request fail their role check.
+                      TranscodeRule::setDefault("role", "user"),
                       TranscodeRule::valueMap("role", {{"model", "assistant"}}),
                       TranscodeRule::unwrapArrayObject("parts", "text", "content"),
                   }),
               TranscodeRule::prependToArray("system", "messages", "role", "system", "content"),
-              // 3. Hoist `generationConfig` / `generation_config` parameters to top-level Hub
-              // fields
+              // 3. Hoist `generationConfig` / `generation_config` parameters to top-level IR
+              //    fields. Gemini renders proto numbers through ProtoJSON, so each of these may
+              //    arrive quoted (`"maxOutputTokens": "256"`). The IR and both other dialects
+              //    declare them as real numbers, so coerce after the hoist: the destination path
+              //    is single, while each source has up to four spellings.
               TranscodeRule::firstOf(
                   {"generationConfig.maxOutputTokens", "generationConfig.max_output_tokens",
                    "generation_config.maxOutputTokens", "generation_config.max_output_tokens"},
                   "max_completion_tokens"),
+              TranscodeRule::toInteger("max_completion_tokens"),
               TranscodeRule::firstOf(
                   {"generationConfig.temperature", "generation_config.temperature"}, "temperature"),
+              TranscodeRule::toNumber("temperature"),
               TranscodeRule::firstOf({"generationConfig.topP", "generationConfig.top_p",
                                       "generation_config.topP", "generation_config.top_p"},
                                      "top_p"),
+              TranscodeRule::toNumber("top_p"),
+              // `stopSequences` is already an array of strings in both dialects.
               TranscodeRule::firstOf(
                   {"generationConfig.stopSequences", "generationConfig.stop_sequences",
                    "generation_config.stopSequences", "generation_config.stop_sequences"},
                   "stop"),
+              // Dropping the rest of `generationConfig` also masks a latent version of the
+              // coercion above: `candidateCount`, `topK`, `seed`, `presencePenalty`,
+              // `frequencyPenalty`, `logprobs` and `thinkingConfig.thinkingBudget` are all
+              // declared number-or-string too. Whoever makes the IR lossless must coerce them
+              // on the way through, or they reach the destination quoted.
               TranscodeRule::drop("generationConfig"),
               TranscodeRule::drop("generation_config"),
+              // TODO(ginama): map `toolConfig.functionCallingConfig` back to `tool_choice`. The
+              // from-IR direction is covered, but the reverse needs a branch the rule language
+              // cannot express today: `mode: ANY` collapses to the IR's `"required"` when
+              // `allowedFunctionNames` is absent and to `{"type": "function", ...}` when it
+              // names one function. `mode` may also arrive as a raw enum integer rather than a
+              // name. Until then a Gemini-origin request loses its tool constraint at the IR.
           }),
-      /*outbound=*/
+      /*from_IR=*/
       TranscodeRuleSet(
-          TranscodingEngine::kHubProtocol, ApiProtocol::GeminiGenerateContent,
+          TranscodingEngine::kIrProtocol, ApiProtocol::GeminiGenerateContent,
           {
               // 1. Extract `system` / `developer` messages from `messages[]` and wrap into
               //    `systemInstruction.parts[{text: ...}]`
@@ -273,8 +467,25 @@ DialectTranscodePack createGeminiTranscodePack() {
                                      "generationConfig.maxOutputTokens"),
               TranscodeRule::move("temperature", "generationConfig.temperature"),
               TranscodeRule::move("top_p", "generationConfig.topP"),
+              // `stopSequences` is array-only, while the IR also allows a bare string.
+              TranscodeRule::ensureArray("stop"),
               TranscodeRule::move("stop", "generationConfig.stopSequences"),
-              // 4. `model` and `stream` belong in the Gemini URL (`/v1beta/models/{model}:
+              // 4. Map `tool_choice` to `toolConfig.functionCallingConfig`. Without this the
+              //    field rides through as an unknown member: Gemini's root sets
+              //    `allowUnknownFields(true)`, so the request is accepted and the caller's
+              //    constraint is silently ignored rather than rejected.
+              //    A pinned tool becomes `mode: ANY` plus a single-entry allow-list, which is
+              //    how Gemini spells "call exactly this function".
+              TranscodeRule::ensureObject("tool_choice", "type"),
+              TranscodeRule::move("tool_choice.function.name",
+                                  "toolConfig.functionCallingConfig.allowedFunctionNames"),
+              TranscodeRule::ensureArray("toolConfig.functionCallingConfig.allowedFunctionNames"),
+              TranscodeRule::valueMap(
+                  "tool_choice.type",
+                  {{"auto", "AUTO"}, {"none", "NONE"}, {"required", "ANY"}, {"function", "ANY"}}),
+              TranscodeRule::move("tool_choice.type", "toolConfig.functionCallingConfig.mode"),
+              TranscodeRule::drop("tool_choice"),
+              // 5. `model` and `stream` belong in the Gemini URL (`/v1beta/models/{model}:
               //    generateContent` vs `:streamGenerateContent`), not the body. They are
               //    deliberately left in the payload rather than dropped: dropping them destroys
               //    the only copy of the routing information, and Gemini's root schema sets
@@ -283,19 +494,17 @@ DialectTranscodePack createGeminiTranscodePack() {
               //    `AiFilterContext::request_headers` is non-const and the transcoder filter can
               //    rewrite the request line.
           }),
-      /*model_prefixes=*/{"gemini-"},
   };
 }
 
-// Builds the identity/normalization pack for OpenAI Chat Completions (the Hub protocol).
+// Builds the identity/normalization pack for OpenAI Chat Completions (the IR protocol).
 DialectTranscodePack createOpenAiChatTranscodePack() {
   return DialectTranscodePack{
       /*protocol=*/ApiProtocol::OpenAiChatCompletions,
-      /*inbound=*/
-      TranscodeRuleSet(ApiProtocol::OpenAiChatCompletions, TranscodingEngine::kHubProtocol, {}),
-      /*outbound=*/
-      TranscodeRuleSet(TranscodingEngine::kHubProtocol, ApiProtocol::OpenAiChatCompletions, {}),
-      /*model_prefixes=*/{"gpt-", "o1-", "o3-", "o4-"},
+      /*to_IR=*/
+      TranscodeRuleSet(ApiProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol, {}),
+      /*from_IR=*/
+      TranscodeRuleSet(TranscodingEngine::kIrProtocol, ApiProtocol::OpenAiChatCompletions, {}),
   };
 }
 
@@ -303,7 +512,9 @@ DialectTranscodePack createOpenAiChatTranscodePack() {
 
 TranscodeRule TranscodeRule::move(std::string from_path, std::string to_path) {
   TranscodeRule rule(Op::Move);
+  rule.source_segments_ = splitPath(from_path);
   rule.source_path_ = std::move(from_path);
+  rule.target_segments_ = splitPath(to_path);
   rule.target_path_ = std::move(to_path);
   return rule;
 }
@@ -312,20 +523,65 @@ TranscodeRule TranscodeRule::firstOf(std::initializer_list<std::string> from_pat
                                      std::string to_path) {
   TranscodeRule rule(Op::FirstOf);
   rule.source_paths_.assign(from_paths.begin(), from_paths.end());
+  rule.source_paths_segments_.reserve(rule.source_paths_.size());
+  for (const std::string& candidate : rule.source_paths_) {
+    rule.source_paths_segments_.push_back(splitPath(candidate));
+  }
+  rule.target_segments_ = splitPath(to_path);
   rule.target_path_ = std::move(to_path);
   return rule;
 }
 
 TranscodeRule TranscodeRule::drop(std::string path) {
   TranscodeRule rule(Op::Drop);
+  rule.source_segments_ = splitPath(path);
   rule.source_path_ = std::move(path);
   return rule;
 }
 
 TranscodeRule TranscodeRule::setDefault(std::string path, nlohmann::json default_value) {
   TranscodeRule rule(Op::SetDefault);
+  rule.target_segments_ = splitPath(path);
   rule.target_path_ = std::move(path);
   rule.default_value_ = std::move(default_value);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::ensureArray(std::string path) {
+  TranscodeRule rule(Op::EnsureArray);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::ensureObject(std::string path, std::string key) {
+  TranscodeRule rule(Op::EnsureObject);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  rule.extract_subpath_ = std::move(key);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::unwrapSingleKeyObject(std::string path, std::string key) {
+  TranscodeRule rule(Op::UnwrapSingleKeyObject);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  rule.extract_subpath_ = std::move(key);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::toNumber(std::string path) {
+  TranscodeRule rule(Op::CoerceNumeric);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::toInteger(std::string path) {
+  TranscodeRule rule(Op::CoerceNumeric);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  rule.integral_ = true;
   return rule;
 }
 
@@ -333,6 +589,7 @@ TranscodeRule TranscodeRule::valueMap(std::string path,
                                       std::initializer_list<ValueMapping> mappings,
                                       UnknownValuePolicy unknown_policy) {
   TranscodeRule rule(Op::ValueMap);
+  rule.target_segments_ = splitPath(path);
   rule.target_path_ = std::move(path);
   for (const auto& m : mappings) {
     rule.value_mappings_.emplace(m.from, m.to);
@@ -344,6 +601,7 @@ TranscodeRule TranscodeRule::valueMap(std::string path,
 TranscodeRule TranscodeRule::forEach(std::string array_path,
                                      std::initializer_list<TranscodeRule> rules) {
   TranscodeRule rule(Op::ForEach);
+  rule.target_segments_ = splitPath(array_path);
   rule.target_path_ = std::move(array_path);
   rule.sub_rules_.assign(rules.begin(), rules.end());
   return rule;
@@ -354,10 +612,13 @@ TranscodeRule TranscodeRule::extractFromArray(std::string array_path, std::strin
                                               std::string extract_subpath,
                                               std::string target_path) {
   TranscodeRule rule(Op::ExtractFromArray);
+  rule.source_segments_ = splitPath(array_path);
   rule.source_path_ = std::move(array_path);
   rule.predicate_field_ = std::move(predicate_field);
   rule.match_values_.assign(match_values.begin(), match_values.end());
+  rule.extract_subpath_segments_ = splitPath(extract_subpath);
   rule.extract_subpath_ = std::move(extract_subpath);
+  rule.target_segments_ = splitPath(target_path);
   rule.target_path_ = std::move(target_path);
   return rule;
 }
@@ -366,10 +627,13 @@ TranscodeRule TranscodeRule::prependToArray(std::string source_path, std::string
                                             std::string key_field, std::string key_value,
                                             std::string value_subpath) {
   TranscodeRule rule(Op::PrependToArray);
+  rule.source_segments_ = splitPath(source_path);
   rule.source_path_ = std::move(source_path);
+  rule.target_segments_ = splitPath(array_path);
   rule.target_path_ = std::move(array_path);
   rule.predicate_field_ = std::move(key_field);
   rule.match_values_ = {std::move(key_value)};
+  rule.extract_subpath_segments_ = splitPath(value_subpath);
   rule.extract_subpath_ = std::move(value_subpath);
   return rule;
 }
@@ -377,7 +641,9 @@ TranscodeRule TranscodeRule::prependToArray(std::string source_path, std::string
 TranscodeRule TranscodeRule::wrapInArrayObject(std::string from_path, std::string to_array_path,
                                                std::string element_key) {
   TranscodeRule rule(Op::WrapInArrayObject);
+  rule.source_segments_ = splitPath(from_path);
   rule.source_path_ = std::move(from_path);
+  rule.target_segments_ = splitPath(to_array_path);
   rule.target_path_ = std::move(to_array_path);
   rule.extract_subpath_ = std::move(element_key);
   return rule;
@@ -386,8 +652,11 @@ TranscodeRule TranscodeRule::wrapInArrayObject(std::string from_path, std::strin
 TranscodeRule TranscodeRule::unwrapArrayObject(std::string from_array_path, std::string element_key,
                                                std::string to_path) {
   TranscodeRule rule(Op::UnwrapArrayObject);
+  rule.source_segments_ = splitPath(from_array_path);
   rule.source_path_ = std::move(from_array_path);
+  rule.extract_subpath_segments_ = splitPath(element_key);
   rule.extract_subpath_ = std::move(element_key);
+  rule.target_segments_ = splitPath(to_path);
   rule.target_path_ = std::move(to_path);
   return rule;
 }
@@ -395,6 +664,7 @@ TranscodeRule TranscodeRule::unwrapArrayObject(std::string from_array_path, std:
 TranscodeRule TranscodeRule::mergeConsecutiveByKey(std::string array_path, std::string key_field,
                                                    std::string merge_field) {
   TranscodeRule rule(Op::MergeConsecutiveByKey);
+  rule.target_segments_ = splitPath(array_path);
   rule.target_path_ = std::move(array_path);
   rule.predicate_field_ = std::move(key_field);
   rule.extract_subpath_ = std::move(merge_field);
@@ -411,43 +681,108 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
     if (source_path_ == target_path_) {
       return absl::OkStatus();
     }
-    if (std::optional<nlohmann::json> val = extractNodeByPath(json, source_path_);
+    if (std::optional<nlohmann::json> val = extractNodeByPath(json, source_segments_);
         val.has_value()) {
-      setNodeByPath(json, target_path_, std::move(*val));
+      setNodeByPath(json, target_segments_, std::move(*val));
     }
     return absl::OkStatus();
   }
 
   case Op::FirstOf: {
     std::optional<nlohmann::json> chosen;
-    for (const std::string& candidate : source_paths_) {
-      std::optional<nlohmann::json> extracted = extractNodeByPath(json, candidate);
+    for (const std::vector<std::string>& candidate_segments : source_paths_segments_) {
+      std::optional<nlohmann::json> extracted = extractNodeByPath(json, candidate_segments);
       if (!chosen.has_value() && extracted.has_value() && !extracted->is_null()) {
         chosen = std::move(extracted);
       }
     }
     if (chosen.has_value()) {
-      setNodeByPath(json, target_path_, std::move(*chosen));
+      setNodeByPath(json, target_segments_, std::move(*chosen));
     }
     return absl::OkStatus();
   }
 
   case Op::Drop: {
-    extractNodeByPath(json, source_path_);
+    extractNodeByPath(json, source_segments_);
     return absl::OkStatus();
   }
 
   case Op::SetDefault: {
-    const nlohmann::json* existing = findNodeByPath(json, target_path_);
+    const nlohmann::json* existing = findNodeByPath(json, target_segments_);
     if (existing == nullptr || existing->is_null()) {
       nlohmann::json copy = default_value_;
-      setNodeByPath(json, target_path_, std::move(copy));
+      setNodeByPath(json, target_segments_, std::move(copy));
     }
     return absl::OkStatus();
   }
 
+  case Op::EnsureArray: {
+    nlohmann::json* node = findNodeByPath(json, target_segments_);
+    // An absent or null field has nothing to normalize, and wrapping it would invent a value the
+    // client never sent. An array is already the shape the destination wants.
+    if (node == nullptr || node->is_null() || node->is_array()) {
+      return absl::OkStatus();
+    }
+    nlohmann::json wrapped = nlohmann::json::array();
+    // Moved, not copied, so an `ExternalRef` node survives the wrap without materializing.
+    wrapped.push_back(std::move(*node));
+    *node = std::move(wrapped);
+    return absl::OkStatus();
+  }
+
+  case Op::EnsureObject: {
+    nlohmann::json* node = findNodeByPath(json, target_segments_);
+    if (node == nullptr || node->is_null() || node->is_object()) {
+      return absl::OkStatus();
+    }
+    nlohmann::json wrapped = nlohmann::json::object();
+    wrapped[extract_subpath_] = std::move(*node);
+    *node = std::move(wrapped);
+    return absl::OkStatus();
+  }
+
+  case Op::UnwrapSingleKeyObject: {
+    nlohmann::json* node = findNodeByPath(json, target_segments_);
+    // Anything carrying more than `extract_subpath_` is a structured value in its own right, so
+    // collapsing it would discard the other members.
+    if (node == nullptr || !node->is_object() || node->size() != 1) {
+      return absl::OkStatus();
+    }
+    auto it = node->find(extract_subpath_);
+    if (it == node->end()) {
+      return absl::OkStatus();
+    }
+    nlohmann::json inner = std::move(*it);
+    *node = std::move(inner);
+    return absl::OkStatus();
+  }
+
+  case Op::CoerceNumeric: {
+    nlohmann::json* node = findNodeByPath(json, target_segments_);
+    // Only a genuine inline string needs converting. Anything else is either already a number or
+    // an `ExternalRef` binary node, neither of which should be touched here.
+    if (node == nullptr || !node->is_string()) {
+      return absl::OkStatus();
+    }
+    const std::string& text = node->get_ref<const std::string&>();
+    if (integral_) {
+      int64_t parsed = 0;
+      if (!absl::SimpleAtoi(text, &parsed)) {
+        return absl::OkStatus();
+      }
+      *node = parsed;
+      return absl::OkStatus();
+    }
+    double parsed = 0;
+    if (!absl::SimpleAtod(text, &parsed)) {
+      return absl::OkStatus();
+    }
+    *node = parsed;
+    return absl::OkStatus();
+  }
+
   case Op::ValueMap: {
-    nlohmann::json* node = findNodeByPath(json, target_path_);
+    nlohmann::json* node = findNodeByPath(json, target_segments_);
     if (node == nullptr || node->is_null()) {
       return absl::OkStatus();
     }
@@ -467,7 +802,7 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
     case UnknownValuePolicy::Passthrough:
       return absl::OkStatus();
     case UnknownValuePolicy::Drop:
-      extractNodeByPath(json, target_path_);
+      extractNodeByPath(json, target_segments_);
       return absl::OkStatus();
     case UnknownValuePolicy::Reject:
       return absl::InvalidArgumentError(
@@ -477,7 +812,7 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
   }
 
   case Op::ForEach: {
-    nlohmann::json* arr = findNodeByPath(json, target_path_);
+    nlohmann::json* arr = findNodeByPath(json, target_segments_);
     if (arr == nullptr || !arr->is_array()) {
       return absl::OkStatus();
     }
@@ -496,7 +831,7 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
   }
 
   case Op::ExtractFromArray: {
-    nlohmann::json* arr = findNodeByPath(json, source_path_);
+    nlohmann::json* arr = findNodeByPath(json, source_segments_);
     if (arr == nullptr || !arr->is_array()) {
       return absl::OkStatus();
     }
@@ -515,7 +850,7 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
         }
       }
       if (matched) {
-        if (std::optional<nlohmann::json> sub = extractNodeByPath(elem, extract_subpath_);
+        if (std::optional<nlohmann::json> sub = extractNodeByPath(elem, extract_subpath_segments_);
             sub.has_value()) {
           extracted.push_back(std::move(*sub));
         }
@@ -529,7 +864,7 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
     }
     if (extracted.size() == 1) {
       // A single match keeps its original scalar shape, which every dialect accepts.
-      setNodeByPath(json, target_path_, std::move(extracted[0]));
+      setNodeByPath(json, target_segments_, std::move(extracted[0]));
       return absl::OkStatus();
     }
     // Multiple matches are concatenated as content blocks so that no prompt is lost and no
@@ -540,24 +875,24 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
         blocks.push_back(std::move(block));
       }
     }
-    setNodeByPath(json, target_path_, std::move(blocks));
+    setNodeByPath(json, target_segments_, std::move(blocks));
     return absl::OkStatus();
   }
 
   case Op::PrependToArray: {
-    std::optional<nlohmann::json> val = extractNodeByPath(json, source_path_);
+    std::optional<nlohmann::json> val = extractNodeByPath(json, source_segments_);
     if (!val.has_value() || val->is_null()) {
       return absl::OkStatus();
     }
     nlohmann::json elem = nlohmann::json::object();
     elem[predicate_field_] = match_values_.front();
-    setNodeByPath(elem, extract_subpath_, std::move(*val));
+    setNodeByPath(elem, extract_subpath_segments_, std::move(*val));
 
-    nlohmann::json* arr = findNodeByPath(json, target_path_);
+    nlohmann::json* arr = findNodeByPath(json, target_segments_);
     if (arr == nullptr || !arr->is_array()) {
       nlohmann::json new_arr = nlohmann::json::array();
       new_arr.push_back(std::move(elem));
-      setNodeByPath(json, target_path_, std::move(new_arr));
+      setNodeByPath(json, target_segments_, std::move(new_arr));
     } else {
       arr->insert(arr->begin(), std::move(elem));
     }
@@ -565,7 +900,7 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
   }
 
   case Op::WrapInArrayObject: {
-    std::optional<nlohmann::json> val = extractNodeByPath(json, source_path_);
+    std::optional<nlohmann::json> val = extractNodeByPath(json, source_segments_);
     if (!val.has_value() || val->is_null()) {
       return absl::OkStatus();
     }
@@ -574,10 +909,11 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
       // Content that is already a block array fans out into one wrapper per block. Nesting the
       // whole array under a single key would produce e.g. a Gemini `part.text` holding an array,
       // which the dialect schema rejects.
+      static const std::vector<std::string> kTextSegment = {"text"};
       for (nlohmann::json& block : *val) {
         nlohmann::json item = nlohmann::json::object();
         if (block.is_object()) {
-          std::optional<nlohmann::json> text = extractNodeByPath(block, "text");
+          std::optional<nlohmann::json> text = extractNodeByPath(block, kTextSegment);
           if (!text.has_value()) {
             return absl::InvalidArgumentError(
                 absl::StrCat("cannot transcode content block in '", source_path_,
@@ -589,18 +925,18 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
         }
         arr.push_back(std::move(item));
       }
-      setNodeByPath(json, target_path_, std::move(arr));
+      setNodeByPath(json, target_segments_, std::move(arr));
       return absl::OkStatus();
     }
     nlohmann::json item = nlohmann::json::object();
     item[extract_subpath_] = std::move(*val);
     arr.push_back(std::move(item));
-    setNodeByPath(json, target_path_, std::move(arr));
+    setNodeByPath(json, target_segments_, std::move(arr));
     return absl::OkStatus();
   }
 
   case Op::UnwrapArrayObject: {
-    std::optional<nlohmann::json> arr = extractNodeByPath(json, source_path_);
+    std::optional<nlohmann::json> arr = extractNodeByPath(json, source_segments_);
     if (!arr.has_value() || !arr->is_array() || arr->empty()) {
       return absl::OkStatus();
     }
@@ -615,7 +951,7 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
         return absl::InvalidArgumentError(
             absl::StrCat("cannot transcode non-object element in '", source_path_, "'"));
       }
-      std::optional<nlohmann::json> inner = extractNodeByPath(elem, extract_subpath_);
+      std::optional<nlohmann::json> inner = extractNodeByPath(elem, extract_subpath_segments_);
       if (!inner.has_value()) {
         return absl::InvalidArgumentError(
             absl::StrCat("cannot transcode element in '", source_path_, "' without field '",
@@ -624,10 +960,10 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
       blocks.push_back(std::move(*inner));
     }
     if (blocks.size() == 1) {
-      setNodeByPath(json, target_path_, std::move(blocks[0]));
+      setNodeByPath(json, target_segments_, std::move(blocks[0]));
       return absl::OkStatus();
     }
-    // Multiple parts collapse into the hub's array-of-content-blocks representation.
+    // Multiple parts collapse into the IR's array-of-content-blocks representation.
     nlohmann::json content = nlohmann::json::array();
     for (nlohmann::json& block : blocks) {
       nlohmann::json wrapper = nlohmann::json::object();
@@ -635,12 +971,12 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
       wrapper["text"] = std::move(block);
       content.push_back(std::move(wrapper));
     }
-    setNodeByPath(json, target_path_, std::move(content));
+    setNodeByPath(json, target_segments_, std::move(content));
     return absl::OkStatus();
   }
 
   case Op::MergeConsecutiveByKey: {
-    nlohmann::json* arr = findNodeByPath(json, target_path_);
+    nlohmann::json* arr = findNodeByPath(json, target_segments_);
     if (arr == nullptr || !arr->is_array() || arr->size() < 2) {
       return absl::OkStatus();
     }
@@ -692,42 +1028,29 @@ absl::Status TranscodingEngine::validateRulesAgainstSchema(const TranscodeRuleSe
     return absl::OkStatus();
   }
   const std::vector<std::string> offloadable_paths = source_schema->requestOffloadableFieldPaths();
-  const absl::flat_hash_set<std::string> offloadable_set(offloadable_paths.begin(),
-                                                         offloadable_paths.end());
-
-  std::vector<std::string> value_map_paths;
-  collectValueMapPaths(plan.rules(), "", value_map_paths);
-  for (const std::string& path : value_map_paths) {
-    if (offloadable_set.contains(path)) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "transcoding verifier error: value_map rule cannot target offloadable field '", path,
-          "' because large values are represented as ExternalRef nodes"));
-    }
-  }
-  return absl::OkStatus();
+  absl::flat_hash_set<std::string> offloadable_set(offloadable_paths.begin(),
+                                                   offloadable_paths.end());
+  return verifyRulesTrackProvenance(plan.rules(), "", offloadable_set);
 }
 
 absl::Status TranscodingEngine::registerPack(DialectTranscodePack pack,
                                              const PayloadSchema* dialect_schema,
-                                             const PayloadSchema* hub_schema) {
-  absl::Status inbound_status = validateRulesAgainstSchema(pack.inbound, dialect_schema);
-  if (!inbound_status.ok()) {
-    return inbound_status;
-  }
-  absl::Status outbound_status = validateRulesAgainstSchema(pack.outbound, hub_schema);
-  if (!outbound_status.ok()) {
-    return outbound_status;
-  }
+                                             const PayloadSchema* ir_schema) {
   // Only override the pack's own schema pointers when the caller supplied one. A pack constructed
   // with pre-populated schemas keeps them if `nullptr` is passed here.
   if (dialect_schema != nullptr) {
     pack.dialect_schema = dialect_schema;
   }
-  if (hub_schema != nullptr) {
-    pack.hub_schema = hub_schema;
+  if (ir_schema != nullptr) {
+    pack.ir_schema = ir_schema;
   }
-  for (const std::string& prefix : pack.model_prefixes) {
-    model_prefixes_.push_back({prefix, pack.protocol});
+  absl::Status to_ir_status = validateRulesAgainstSchema(pack.to_ir, pack.dialect_schema);
+  if (!to_ir_status.ok()) {
+    return to_ir_status;
+  }
+  absl::Status from_ir_status = validateRulesAgainstSchema(pack.from_ir, pack.ir_schema);
+  if (!from_ir_status.ok()) {
+    return from_ir_status;
   }
   const ApiProtocol protocol = pack.protocol;
   packs_.insert_or_assign(protocol, std::move(pack));
@@ -736,12 +1059,12 @@ absl::Status TranscodingEngine::registerPack(DialectTranscodePack pack,
 
 absl::StatusOr<TranscodingEngine> TranscodingEngine::createDefault() {
   TranscodingEngine engine;
-  const PayloadSchema* hub_schema = AdapterRegistry::get(kHubProtocol).schema();
+  const PayloadSchema* ir_schema = AdapterRegistry::get(kIrProtocol).schema();
 
   for (DialectTranscodePack pack : {createOpenAiChatTranscodePack(), createAnthropicTranscodePack(),
                                     createGeminiTranscodePack()}) {
     const PayloadSchema* dialect_schema = AdapterRegistry::get(pack.protocol).schema();
-    absl::Status status = engine.registerPack(std::move(pack), dialect_schema, hub_schema);
+    absl::Status status = engine.registerPack(std::move(pack), dialect_schema, ir_schema);
     if (!status.ok()) {
       return status;
     }
@@ -749,17 +1072,10 @@ absl::StatusOr<TranscodingEngine> TranscodingEngine::createDefault() {
   return engine;
 }
 
-ApiProtocol TranscodingEngine::resolveTargetProtocol(absl::string_view model) const {
-  for (const ModelPrefixEntry& entry : model_prefixes_) {
-    if (absl::StartsWith(model, entry.prefix)) {
-      return entry.protocol;
-    }
-  }
-  return ApiProtocol::Unspecified;
-}
-
-absl::Status TranscodingEngine::transcodeInbound(ApiProtocol source_protocol,
-                                                 nlohmann::json& json) const {
+// TODO(ginama): Address the IR data-loss problem where dialect-specific fields not modeled by
+// `OpenAiChatCompletions` are dropped when converting to the IR.
+absl::Status TranscodingEngine::transcodeToIr(ApiProtocol source_protocol,
+                                              nlohmann::json& json) const {
   if (source_protocol == ApiProtocol::Unspecified) {
     return absl::OkStatus();
   }
@@ -768,14 +1084,14 @@ absl::Status TranscodingEngine::transcodeInbound(ApiProtocol source_protocol,
     return absl::InvalidArgumentError(absl::StrCat("no transcoding pack registered for source ",
                                                    apiProtocolName(source_protocol)));
   }
-  if (source_protocol == kHubProtocol) {
+  if (source_protocol == kIrProtocol) {
     return absl::OkStatus();
   }
-  return it->second.inbound.execute(json);
+  return it->second.to_ir.execute(json);
 }
 
-absl::Status TranscodingEngine::transcodeOutbound(ApiProtocol target_protocol,
-                                                  nlohmann::json& json) const {
+absl::Status TranscodingEngine::transcodeFromIr(ApiProtocol target_protocol,
+                                                nlohmann::json& json) const {
   if (target_protocol == ApiProtocol::Unspecified) {
     return absl::OkStatus();
   }
@@ -784,8 +1100,8 @@ absl::Status TranscodingEngine::transcodeOutbound(ApiProtocol target_protocol,
     return absl::InvalidArgumentError(absl::StrCat("no transcoding pack registered for target ",
                                                    apiProtocolName(target_protocol)));
   }
-  if (target_protocol != kHubProtocol) {
-    absl::Status status = it->second.outbound.execute(json);
+  if (target_protocol != kIrProtocol) {
+    absl::Status status = it->second.from_ir.execute(json);
     if (!status.ok()) {
       return status;
     }
@@ -794,18 +1110,6 @@ absl::Status TranscodingEngine::transcodeOutbound(ApiProtocol target_protocol,
     return it->second.dialect_schema->validateRequest(json);
   }
   return absl::OkStatus();
-}
-
-absl::Status TranscodingEngine::transcode(ApiProtocol source_protocol, ApiProtocol target_protocol,
-                                          nlohmann::json& json) const {
-  // Both legs always run, even when `source_protocol == target_protocol`. The inbound leg is a
-  // no-op for a same-protocol pair, but the outbound leg still validates the payload against the
-  // target dialect schema, which is the check that protects the upstream cluster.
-  absl::Status status = transcodeInbound(source_protocol, json);
-  if (!status.ok()) {
-    return status;
-  }
-  return transcodeOutbound(target_protocol, json);
 }
 
 } // namespace AiProtocolManager

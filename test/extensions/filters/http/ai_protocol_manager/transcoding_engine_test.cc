@@ -14,16 +14,9 @@ namespace {
 
 using StatusHelpers::IsOk;
 
-TEST(TranscodingEngineTest, CreateDefaultAndResolveTargetProtocol) {
+TEST(TranscodingEngineTest, CreateDefaultRegistersCoreDialectPacks) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  EXPECT_EQ(engine.resolveTargetProtocol("claude-sonnet-4-5"), ApiProtocol::AnthropicMessages);
-  EXPECT_EQ(engine.resolveTargetProtocol("gemini-2.5-pro"), ApiProtocol::GeminiGenerateContent);
-  EXPECT_EQ(engine.resolveTargetProtocol("gpt-4o"), ApiProtocol::OpenAiChatCompletions);
-  EXPECT_EQ(engine.resolveTargetProtocol("o3-mini"), ApiProtocol::OpenAiChatCompletions);
-  EXPECT_EQ(engine.resolveTargetProtocol("unknown-model"), ApiProtocol::Unspecified);
 }
 
 TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_AnthropicSchema) {
@@ -52,7 +45,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_AnthropicSchem
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeOutbound(ApiProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::AnthropicMessages, payload), IsOk());
 
   // System message extracted to top-level `system`
   EXPECT_EQ(payload["system"], "Be concise.");
@@ -103,7 +96,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_GeminiSchema) 
   const JsonWithExtBuf::ExternalRef expected_ref{/*offset=*/128, /*length=*/50000};
   payload["messages"][1]["content"] = JsonWithExtBuf::makeExternalRef(expected_ref);
 
-  ASSERT_THAT(engine.transcodeOutbound(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
 
   // `model` and `stream` are preserved. Gemini carries them in the URL `:path` rather than the
   // body, but dropping them here would destroy the only copy of the routing information, and
@@ -138,47 +131,6 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_GeminiSchema) 
   EXPECT_THAT(gemini_schema->validateRequest(payload), IsOk());
 }
 
-TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_To_AnthropicSchema) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json gemini_payload = nlohmann::json::parse(R"({
-    "model": "claude-sonnet-4-5",
-    "systemInstruction": {
-      "parts": [{"text": "System prompt from Gemini client"}]
-    },
-    "contents": [
-      {"role": "user", "parts": [{"text": "Explain transcoding"}]},
-      {"role": "model", "parts": [{"text": "Sure!"}]}
-    ],
-    "generationConfig": {
-      "maxOutputTokens": 512,
-      "temperature": 0.2
-    }
-  })");
-
-  // Step 1: Inbound Transcode (Gemini -> Hub / OpenAI Chat Completions)
-  ASSERT_THAT(engine.transcodeInbound(ApiProtocol::GeminiGenerateContent, gemini_payload), IsOk());
-  EXPECT_EQ(gemini_payload["messages"].size(), 3);
-  EXPECT_EQ(gemini_payload["messages"][0]["role"], "system");
-  EXPECT_EQ(gemini_payload["messages"][1]["role"], "user");
-  EXPECT_EQ(gemini_payload["messages"][2]["role"], "assistant");
-  EXPECT_EQ(gemini_payload["max_completion_tokens"], 512);
-
-  // Step 2: Outbound Transcode (Hub -> Anthropic Messages)
-  const ApiProtocol target =
-      engine.resolveTargetProtocol(gemini_payload["model"].get<std::string>());
-  EXPECT_EQ(target, ApiProtocol::AnthropicMessages);
-  ASSERT_THAT(engine.transcodeOutbound(target, gemini_payload), IsOk());
-
-  EXPECT_EQ(gemini_payload["system"], "System prompt from Gemini client");
-  EXPECT_EQ(gemini_payload["max_tokens"], 512);
-  ASSERT_EQ(gemini_payload["messages"].size(), 2);
-  EXPECT_EQ(gemini_payload["messages"][0]["role"], "user");
-  EXPECT_EQ(gemini_payload["messages"][1]["role"], "assistant");
-}
-
 TEST(TranscodingEngineTest, VerifierRejectsValueMapOnOffloadableField) {
   const PayloadSchema* openai_schema =
       AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions).schema();
@@ -200,7 +152,7 @@ TEST(TranscodingEngineTest, VerifierRejectsValueMapOnOffloadableField) {
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
 }
 
-TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_OpenAiSchema) {
+TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_PassthroughIr) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
@@ -231,16 +183,12 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_OpenAiSchema) 
   payload["messages"][1]["content"] = JsonWithExtBuf::makeExternalRef(expected_ref);
   const nlohmann::json original_snapshot = payload;
 
-  // Step 1: Inbound Transcode (OpenAI -> Hub)
-  ASSERT_THAT(engine.transcodeInbound(ApiProtocol::OpenAiChatCompletions, payload), IsOk());
+  // Step 1: To IR (OpenAI -> IR)
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::OpenAiChatCompletions, payload), IsOk());
   EXPECT_EQ(payload, original_snapshot);
 
-  // Step 2: Resolve target protocol from "gpt-4o" -> OpenAiChatCompletions
-  const ApiProtocol target = engine.resolveTargetProtocol(payload["model"].get<std::string>());
-  EXPECT_EQ(target, ApiProtocol::OpenAiChatCompletions);
-
-  // Step 3: Outbound Transcode (Hub -> OpenAI)
-  ASSERT_THAT(engine.transcodeOutbound(target, payload), IsOk());
+  // Step 2: From IR (IR -> OpenAI)
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::OpenAiChatCompletions, payload), IsOk());
   EXPECT_EQ(payload, original_snapshot);
 
   // Validate against OpenAI Chat Completions RequestSchema
@@ -250,7 +198,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_OpenAiSchema) 
   EXPECT_THAT(openai_schema->validateRequest(payload), IsOk());
 }
 
-TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_To_AnthropicSchema) {
+TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_RoundTripViaIr) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
@@ -272,8 +220,8 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_To_AnthropicSc
     ]
   })");
 
-  // 1. Inbound (`inbound`): Anthropic -> OpenAI Chat Completions Hub
-  ASSERT_THAT(engine.transcodeInbound(ApiProtocol::AnthropicMessages, anthropic_payload), IsOk());
+  // 1. To IR (`to_ir`): Anthropic -> OpenAI Chat Completions
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::AnthropicMessages, anthropic_payload), IsOk());
   EXPECT_FALSE(anthropic_payload.contains("system"));
   ASSERT_EQ(anthropic_payload["messages"].size(), 2);
   EXPECT_EQ(anthropic_payload["messages"][0]["role"], "system");
@@ -286,11 +234,8 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_To_AnthropicSc
   ASSERT_NE(openai_schema, nullptr);
   EXPECT_THAT(openai_schema->validateRequest(anthropic_payload), IsOk());
 
-  // 2. Outbound (`outbound`): Hub -> Anthropic Messages
-  const ApiProtocol target =
-      engine.resolveTargetProtocol(anthropic_payload["model"].get<std::string>());
-  EXPECT_EQ(target, ApiProtocol::AnthropicMessages);
-  ASSERT_THAT(engine.transcodeOutbound(target, anthropic_payload), IsOk());
+  // 2. From IR (`from_ir`): OpenAI Chat Completions -> Anthropic Messages
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::AnthropicMessages, anthropic_payload), IsOk());
 
   EXPECT_EQ(anthropic_payload["system"], "You are a helpful coding assistant.");
   EXPECT_EQ(anthropic_payload["max_tokens"], 1500);
@@ -327,9 +272,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_To_OpenAiSchem
     ]
   })");
 
-  const ApiProtocol target = engine.resolveTargetProtocol(payload["model"].get<std::string>());
-  EXPECT_EQ(target, ApiProtocol::OpenAiChatCompletions);
-  ASSERT_THAT(engine.transcode(ApiProtocol::AnthropicMessages, target, payload), IsOk());
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::AnthropicMessages, payload), IsOk());
 
   EXPECT_FALSE(payload.contains("system"));
   EXPECT_EQ(payload["max_completion_tokens"], 256);
@@ -342,39 +285,6 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_To_OpenAiSchem
   ASSERT_EQ(payload["tools"].size(), 1);
   EXPECT_EQ(payload["tools"][0]["type"], "function");
   EXPECT_EQ(payload["tools"][0]["function"]["name"], "lookup_doc");
-}
-
-TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_To_GeminiSchema) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "gemini-2.5-pro",
-    "system": "Be helpful.",
-    "max_tokens": 1024,
-    "temperature": 0.4,
-    "messages": [
-      {"role": "user", "content": "Hello Gemini"},
-      {"role": "assistant", "content": "Hi there!"}
-    ]
-  })");
-
-  const ApiProtocol target = engine.resolveTargetProtocol(payload["model"].get<std::string>());
-  EXPECT_EQ(target, ApiProtocol::GeminiGenerateContent);
-  ASSERT_THAT(engine.transcode(ApiProtocol::AnthropicMessages, target, payload), IsOk());
-
-  // `model` is preserved for routing; see the Gemini pack's `outbound` notes.
-  EXPECT_EQ(payload["model"], "gemini-2.5-pro");
-  EXPECT_FALSE(payload.contains("system"));
-  EXPECT_EQ(payload["systemInstruction"]["parts"][0]["text"], "Be helpful.");
-  EXPECT_EQ(payload["generationConfig"]["maxOutputTokens"], 1024);
-  EXPECT_EQ(payload["generationConfig"]["temperature"], 0.4);
-  ASSERT_EQ(payload["contents"].size(), 2);
-  EXPECT_EQ(payload["contents"][0]["role"], "user");
-  EXPECT_EQ(payload["contents"][0]["parts"][0]["text"], "Hello Gemini");
-  EXPECT_EQ(payload["contents"][1]["role"], "model");
-  EXPECT_EQ(payload["contents"][1]["parts"][0]["text"], "Hi there!");
 }
 
 TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_To_OpenAiSchema) {
@@ -399,9 +309,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_To_OpenAiSchema) 
     }
   })");
 
-  const ApiProtocol target = engine.resolveTargetProtocol(payload["model"].get<std::string>());
-  EXPECT_EQ(target, ApiProtocol::OpenAiChatCompletions);
-  ASSERT_THAT(engine.transcode(ApiProtocol::GeminiGenerateContent, target, payload), IsOk());
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
 
   EXPECT_FALSE(payload.contains("systemInstruction"));
   EXPECT_FALSE(payload.contains("contents"));
@@ -419,7 +327,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_To_OpenAiSchema) 
   EXPECT_EQ(payload["messages"][2]["content"], "Welcome!");
 }
 
-TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_To_GeminiSchema) {
+TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_RoundTripViaIr) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
@@ -439,13 +347,11 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_To_GeminiSchema) 
     }
   })");
 
-  // 1. Inbound (`inbound`): Gemini -> OpenAI Chat Completions Hub
-  ASSERT_THAT(engine.transcodeInbound(ApiProtocol::GeminiGenerateContent, payload), IsOk());
-  const ApiProtocol target = engine.resolveTargetProtocol(payload["model"].get<std::string>());
-  EXPECT_EQ(target, ApiProtocol::GeminiGenerateContent);
+  // 1. To IR (`to_ir`): Gemini -> OpenAI Chat Completions
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
 
-  // 2. Outbound (`outbound`): OpenAI Chat Completions Hub -> Gemini
-  ASSERT_THAT(engine.transcodeOutbound(target, payload), IsOk());
+  // 2. From IR (`from_ir`): OpenAI Chat Completions -> Gemini
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
 
   EXPECT_EQ(payload["systemInstruction"]["parts"][0]["text"], "Keep answers brief.");
   EXPECT_EQ(payload["generationConfig"]["maxOutputTokens"], 128);
@@ -462,9 +368,9 @@ TEST(TranscodingEngineTest, CustomInboundAndOutboundConfiguration) {
 
   DialectTranscodePack custom_pack{
       /*protocol=*/ApiProtocol::OpenAiResponses,
-      /*inbound=*/
+      /*to_IR=*/
       TranscodeRuleSet(
-          ApiProtocol::OpenAiResponses, TranscodingEngine::kHubProtocol,
+          ApiProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
           {
               TranscodeRule::move("input", "messages"),
               TranscodeRule::forEach("messages",
@@ -473,9 +379,9 @@ TEST(TranscodingEngineTest, CustomInboundAndOutboundConfiguration) {
                                      }),
               TranscodeRule::move("max_output_tokens", "max_completion_tokens"),
           }),
-      /*outbound=*/
+      /*from_IR=*/
       TranscodeRuleSet(
-          TranscodingEngine::kHubProtocol, ApiProtocol::OpenAiResponses,
+          TranscodingEngine::kIrProtocol, ApiProtocol::OpenAiResponses,
           {
               TranscodeRule::forEach("messages",
                                      {
@@ -485,11 +391,9 @@ TEST(TranscodingEngineTest, CustomInboundAndOutboundConfiguration) {
               TranscodeRule::firstOf({"max_completion_tokens", "max_tokens"}, "max_output_tokens"),
               TranscodeRule::setDefault("max_output_tokens", 1024),
           }),
-      /*model_prefixes=*/{"custom-model-"},
   };
 
   ASSERT_THAT(engine.registerPack(std::move(custom_pack)), IsOk());
-  EXPECT_EQ(engine.resolveTargetProtocol("custom-model-v1"), ApiProtocol::OpenAiResponses);
 
   nlohmann::json payload = nlohmann::json::parse(R"({
     "model": "custom-model-v1",
@@ -500,14 +404,14 @@ TEST(TranscodingEngineTest, CustomInboundAndOutboundConfiguration) {
     ]
   })");
 
-  // Test custom `inbound` configuration
-  ASSERT_THAT(engine.transcodeInbound(ApiProtocol::OpenAiResponses, payload), IsOk());
+  // Test custom `to_ir` configuration
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::OpenAiResponses, payload), IsOk());
   EXPECT_EQ(payload["max_completion_tokens"], 300);
   ASSERT_EQ(payload["messages"].size(), 2);
   EXPECT_EQ(payload["messages"][1]["role"], "assistant");
 
-  // Test custom `outbound` configuration
-  ASSERT_THAT(engine.transcodeOutbound(ApiProtocol::OpenAiResponses, payload), IsOk());
+  // Test custom `from_ir` configuration
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::OpenAiResponses, payload), IsOk());
   EXPECT_EQ(payload["max_output_tokens"], 300);
   ASSERT_EQ(payload["input"].size(), 2);
   EXPECT_EQ(payload["input"][1]["role"], "bot");
@@ -528,8 +432,7 @@ TEST(TranscodingEngineTest, RejectsPayloadFailingTargetSchemaValidation) {
     ]
   })");
 
-  absl::Status status =
-      engine.transcodeOutbound(ApiProtocol::AnthropicMessages, system_only_payload);
+  absl::Status status = engine.transcodeFromIr(ApiProtocol::AnthropicMessages, system_only_payload);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
 
@@ -544,7 +447,7 @@ TEST(TranscodingEngineTest, RejectsPayloadFailingTargetSchemaValidation) {
   })");
 
   absl::Status status2 =
-      engine.transcodeOutbound(ApiProtocol::AnthropicMessages, negative_tokens_payload);
+      engine.transcodeFromIr(ApiProtocol::AnthropicMessages, negative_tokens_payload);
   EXPECT_FALSE(status2.ok());
   EXPECT_EQ(status2.code(), absl::StatusCode::kInvalidArgument);
 }
@@ -585,18 +488,18 @@ TEST(TranscodingEngineTest, RejectsUnregisteredProtocol) {
 
   // `OpenAiResponses` is not registered in `createDefault()`, so transcoding to/from it is
   // rejected.
-  absl::Status inbound_status = engine.transcodeInbound(ApiProtocol::OpenAiResponses, payload);
-  EXPECT_FALSE(inbound_status.ok());
-  EXPECT_EQ(inbound_status.code(), absl::StatusCode::kInvalidArgument);
+  absl::Status to_ir_status = engine.transcodeToIr(ApiProtocol::OpenAiResponses, payload);
+  EXPECT_FALSE(to_ir_status.ok());
+  EXPECT_EQ(to_ir_status.code(), absl::StatusCode::kInvalidArgument);
 
-  absl::Status outbound_status = engine.transcodeOutbound(ApiProtocol::OpenAiResponses, payload);
-  EXPECT_FALSE(outbound_status.ok());
-  EXPECT_EQ(outbound_status.code(), absl::StatusCode::kInvalidArgument);
+  absl::Status from_ir_status = engine.transcodeFromIr(ApiProtocol::OpenAiResponses, payload);
+  EXPECT_FALSE(from_ir_status.ok());
+  EXPECT_EQ(from_ir_status.code(), absl::StatusCode::kInvalidArgument);
 }
 
 // Regression: a genuine Gemini request carries the model in the URL
-// (`/v1beta/models/{model}:generateContent`), never in the body. The inbound leg previously
-// validated its output against the hub schema, where `model` is `.required()`, so every real
+// (`/v1beta/models/{model}:generateContent`), never in the body. The to-IR leg previously
+// validated its output against the IR schema, where `model` is `.required()`, so every real
 // Gemini request was rejected with a 400 before it could reach any upstream.
 TEST(TranscodingEngineTest, TranscodesGeminiRequestWithoutBodyLevelModel) {
   auto engine_or = TranscodingEngine::createDefault();
@@ -609,7 +512,7 @@ TEST(TranscodingEngineTest, TranscodesGeminiRequestWithoutBodyLevelModel) {
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeInbound(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
   EXPECT_FALSE(payload.contains("model"));
   ASSERT_EQ(payload["messages"].size(), 1);
   EXPECT_EQ(payload["messages"][0]["content"], "Hello");
@@ -632,7 +535,7 @@ TEST(TranscodingEngineTest, PreservesEverySystemMessageWhenTargetingAnthropic) {
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeOutbound(ApiProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::AnthropicMessages, payload), IsOk());
 
   // Both prompts survive as Anthropic text blocks, which `system` accepts alongside a bare string.
   ASSERT_TRUE(payload["system"].is_array());
@@ -662,7 +565,7 @@ TEST(TranscodingEngineTest, PreservesEverySystemMessageWhenTargetingGemini) {
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeOutbound(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
 
   // `part.text` is a string in Gemini's schema, so two prompts must become two parts rather than
   // one part holding an array.
@@ -689,7 +592,7 @@ TEST(TranscodingEngineTest, PreservesEveryGeminiMessagePart) {
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeInbound(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
 
   ASSERT_EQ(payload["messages"].size(), 1);
   ASSERT_TRUE(payload["messages"][0]["content"].is_array());
@@ -718,7 +621,7 @@ TEST(TranscodingEngineTest, RejectsGeminiPartThatCarriesNoText) {
     ]
   })");
 
-  absl::Status status = engine.transcodeInbound(ApiProtocol::GeminiGenerateContent, payload);
+  absl::Status status = engine.transcodeToIr(ApiProtocol::GeminiGenerateContent, payload);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
 }
@@ -742,7 +645,7 @@ TEST(TranscodingEngineTest, MergeDoesNotFabricateContentForMessageWithoutContent
 
   // The content-less message is left alone rather than merged, so no `null` text block is
   // invented. Anthropic's schema then rejects it on its own terms (`content` is `.required()`).
-  absl::Status status = engine.transcodeOutbound(ApiProtocol::AnthropicMessages, payload);
+  absl::Status status = engine.transcodeFromIr(ApiProtocol::AnthropicMessages, payload);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
 
@@ -751,9 +654,9 @@ TEST(TranscodingEngineTest, MergeDoesNotFabricateContentForMessageWithoutContent
   EXPECT_FALSE(payload["messages"][1].contains("content"));
 }
 
-// Regression: `transcode()` short-circuited when source and target matched, skipping the outbound
-// schema validation that is the only thing protecting the upstream cluster.
-TEST(TranscodingEngineTest, ValidatesAgainstTargetSchemaWhenSourceEqualsTarget) {
+// Verify that `transcodeFromIr` validates against the target dialect schema even when the target
+// protocol is the IR protocol itself (`OpenAiChatCompletions`).
+TEST(TranscodingEngineTest, TranscodeFromIrValidatesAgainstIrTargetSchema) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
@@ -765,15 +668,270 @@ TEST(TranscodingEngineTest, ValidatesAgainstTargetSchemaWhenSourceEqualsTarget) 
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  absl::Status status = engine.transcode(ApiProtocol::OpenAiChatCompletions,
-                                         ApiProtocol::OpenAiChatCompletions, payload);
+  absl::Status status = engine.transcodeFromIr(ApiProtocol::OpenAiChatCompletions, payload);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
 }
 
+// Regression: OpenAI allows `stop` to be a bare string, but both `stop_sequences` and
+// `stopSequences` are array-only, so moving the scalar straight across produced a payload the
+// destination schema rejects.
+TEST(TranscodingEngineTest, NormalizesScalarStopToArrayForAnthropic) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4",
+    "stop": "END",
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::AnthropicMessages, payload), IsOk());
+  EXPECT_FALSE(payload.contains("stop"));
+  EXPECT_EQ(payload["stop_sequences"], nlohmann::json::array({"END"}));
+}
+
+TEST(TranscodingEngineTest, NormalizesScalarStopToArrayForGemini) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-pro",
+    "stop": "END",
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  EXPECT_FALSE(payload.contains("stop"));
+  EXPECT_EQ(payload["generationConfig"]["stopSequences"], nlohmann::json::array({"END"}));
+}
+
+TEST(TranscodingEngineTest, LeavesAnExistingStopArrayAlone) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4",
+    "stop": ["END", "STOP"],
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::AnthropicMessages, payload), IsOk());
+  EXPECT_EQ(payload["stop_sequences"], nlohmann::json::array({"END", "STOP"}));
+}
+
+TEST(TranscodingEngineTest, DoesNotMaterializeStopSequencesWhenStopIsAbsent) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4",
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::AnthropicMessages, payload), IsOk());
+  EXPECT_FALSE(payload.contains("stop"));
+  EXPECT_FALSE(payload.contains("stop_sequences"));
+}
+
+// Regression: `tool_choice` was mapped in neither direction. OpenAI spells the unconstrained
+// cases as a bare string and Anthropic always uses an object, so every request that set the
+// field was rejected by Anthropic's schema on the way out.
+TEST(TranscodingEngineTest, MapsStringToolChoiceToAnthropicObject) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4",
+    "tool_choice": "required",
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::AnthropicMessages, payload), IsOk());
+  EXPECT_EQ(payload["tool_choice"], nlohmann::json::parse(R"({"type": "any"})"));
+}
+
+TEST(TranscodingEngineTest, MapsPinnedToolChoiceToAnthropicObject) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4",
+    "tool_choice": {"type": "function", "function": {"name": "lookup_doc"}},
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::AnthropicMessages, payload), IsOk());
+  EXPECT_EQ(payload["tool_choice"],
+            nlohmann::json::parse(R"({"type": "tool", "name": "lookup_doc"})"));
+}
+
+TEST(TranscodingEngineTest, MapsAnthropicToolChoiceBackToAnIrString) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gpt-4o",
+    "tool_choice": {"type": "auto"},
+    "max_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::AnthropicMessages, payload), IsOk());
+  EXPECT_EQ(payload["tool_choice"], "auto");
+}
+
+TEST(TranscodingEngineTest, MapsAnthropicPinnedToolChoiceBackToAnIrObject) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gpt-4o",
+    "tool_choice": {"type": "tool", "name": "lookup_doc"},
+    "max_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::AnthropicMessages, payload), IsOk());
+  EXPECT_EQ(payload["tool_choice"],
+            nlohmann::json::parse(R"({"type": "function", "function": {"name": "lookup_doc"}})"));
+}
+
+// Gemini accepts unknown root fields, so an unmapped `tool_choice` was forwarded and ignored:
+// the caller's constraint disappeared without any error.
+TEST(TranscodingEngineTest, MapsStringToolChoiceToGeminiFunctionCallingConfig) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-pro",
+    "tool_choice": "none",
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  EXPECT_FALSE(payload.contains("tool_choice"));
+  EXPECT_EQ(payload["toolConfig"]["functionCallingConfig"]["mode"], "NONE");
+}
+
+TEST(TranscodingEngineTest, MapsPinnedToolChoiceToGeminiAllowedFunctionNames) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-pro",
+    "tool_choice": {"type": "function", "function": {"name": "lookup_doc"}},
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(engine.transcodeFromIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  EXPECT_FALSE(payload.contains("tool_choice"));
+  const nlohmann::json& config = payload["toolConfig"]["functionCallingConfig"];
+  EXPECT_EQ(config["mode"], "ANY");
+  EXPECT_EQ(config["allowedFunctionNames"], nlohmann::json::array({"lookup_doc"}));
+}
+
+// Regression: Gemini renders proto numbers through ProtoJSON, so these fields can arrive quoted.
+// `firstOf` preserves the JSON type, so the string landed in an IR field declared numeric.
+TEST(TranscodingEngineTest, CoercesQuotedGeminiNumbersWhenEnteringTheIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gpt-4o",
+    "contents": [{"role": "user", "parts": [{"text": "Hello"}]}],
+    "generationConfig": {
+      "maxOutputTokens": "256",
+      "temperature": "0.5",
+      "topP": "0.9"
+    }
+  })");
+
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  EXPECT_TRUE(payload["max_completion_tokens"].is_number_integer());
+  EXPECT_EQ(payload["max_completion_tokens"], 256);
+  EXPECT_TRUE(payload["temperature"].is_number());
+  EXPECT_EQ(payload["temperature"], 0.5);
+  EXPECT_TRUE(payload["top_p"].is_number());
+  EXPECT_EQ(payload["top_p"], 0.9);
+
+  // Also verify that the coerced IR payload passes the OpenAI Chat Completions schema validation.
+  const PayloadSchema* openai_schema =
+      AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions).schema();
+  ASSERT_NE(openai_schema, nullptr);
+  EXPECT_THAT(openai_schema->validateRequest(payload), IsOk());
+}
+
+TEST(TranscodingEngineTest, LeavesRealGeminiNumbersUntouched) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "contents": [{"role": "user", "parts": [{"text": "Hello"}]}],
+    "generationConfig": {"maxOutputTokens": 256, "temperature": 0.5}
+  })");
+
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  EXPECT_EQ(payload["max_completion_tokens"], 256);
+  EXPECT_EQ(payload["temperature"], 0.5);
+}
+
+// Regression: Gemini leaves `role` optional (Vertex defaults it to `user`) while both other
+// dialects require it, so a valid Gemini request failed the destination's role check.
+TEST(TranscodingEngineTest, AppliesGeminiRoleDefaultForMessagesThatOmitIt) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gpt-4o",
+    "contents": [{"parts": [{"text": "Hello"}]}]
+  })");
+
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_EQ(payload["messages"].size(), 1);
+  EXPECT_EQ(payload["messages"][0]["role"], "user");
+  EXPECT_EQ(payload["messages"][0]["content"], "Hello");
+
+  const PayloadSchema* openai_schema =
+      AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions).schema();
+  ASSERT_NE(openai_schema, nullptr);
+  EXPECT_THAT(openai_schema->validateRequest(payload), IsOk());
+}
+
+TEST(TranscodingEngineTest, DoesNotOverrideAnExplicitGeminiRole) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "contents": [
+      {"role": "user", "parts": [{"text": "Hi"}]},
+      {"role": "model", "parts": [{"text": "Hello"}]}
+    ]
+  })");
+
+  ASSERT_THAT(engine.transcodeToIr(ApiProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_EQ(payload["messages"].size(), 2);
+  EXPECT_EQ(payload["messages"][0]["role"], "user");
+  EXPECT_EQ(payload["messages"][1]["role"], "assistant");
+}
+
 // Regression: `registerPack` unconditionally overwrote the pack's schema pointers with its
 // arguments, so a pack that arrived with its schemas already set was silently cleared and the
-// outbound validation it expected never ran.
+// from-IR validation it expected never ran.
 TEST(TranscodingEngineTest, RegisterPackKeepsSchemasAlreadySetOnThePack) {
   TranscodingEngine engine;
   const PayloadSchema* anthropic_schema =
@@ -782,13 +940,12 @@ TEST(TranscodingEngineTest, RegisterPackKeepsSchemasAlreadySetOnThePack) {
 
   DialectTranscodePack pack{
       /*protocol=*/ApiProtocol::AnthropicMessages,
-      /*inbound=*/
-      TranscodeRuleSet(ApiProtocol::AnthropicMessages, TranscodingEngine::kHubProtocol, {}),
-      /*outbound=*/
-      TranscodeRuleSet(TranscodingEngine::kHubProtocol, ApiProtocol::AnthropicMessages, {}),
-      /*model_prefixes=*/{"claude-"},
+      /*to_IR=*/
+      TranscodeRuleSet(ApiProtocol::AnthropicMessages, TranscodingEngine::kIrProtocol, {}),
+      /*from_IR=*/
+      TranscodeRuleSet(TranscodingEngine::kIrProtocol, ApiProtocol::AnthropicMessages, {}),
       /*dialect_schema=*/anthropic_schema,
-      /*hub_schema=*/nullptr,
+      /*ir_schema=*/nullptr,
   };
 
   // No schemas are passed as arguments, so the pack's own `dialect_schema` must survive.
@@ -801,9 +958,74 @@ TEST(TranscodingEngineTest, RegisterPackKeepsSchemasAlreadySetOnThePack) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  absl::Status status = engine.transcodeOutbound(ApiProtocol::AnthropicMessages, payload);
+  absl::Status status = engine.transcodeFromIr(ApiProtocol::AnthropicMessages, payload);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+}
+
+// Regression: the startup verifier previously checked `ValueMap` target paths against the
+// original schema without tracking earlier structural rules. Moving `messages` to `turns` before
+// running `ValueMap` on `turns[].content` bypassed the startup check even though
+// `messages[].content` is offloadable.
+TEST(TranscodingEngineTest, VerifierTracksOffloadableFieldProvenanceAcrossMoveAndUnwrap) {
+  const PayloadSchema* openai_schema =
+      AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions).schema();
+  ASSERT_NE(openai_schema, nullptr);
+
+  TranscodeRuleSet moved_array_plan(
+      ApiProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol,
+      {
+          TranscodeRule::move("messages", "turns"),
+          TranscodeRule::forEach("turns",
+                                 {
+                                     TranscodeRule::valueMap("content", {{"foo", "bar"}}),
+                                 }),
+      });
+
+  absl::Status moved_status =
+      TranscodingEngine::validateRulesAgainstSchema(moved_array_plan, openai_schema);
+  EXPECT_FALSE(moved_status.ok());
+  EXPECT_EQ(moved_status.code(), absl::StatusCode::kInvalidArgument);
+
+  const PayloadSchema* gemini_schema =
+      AdapterRegistry::get(ApiProtocol::GeminiGenerateContent).schema();
+  ASSERT_NE(gemini_schema, nullptr);
+
+  TranscodeRuleSet unwrapped_part_plan(
+      ApiProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
+      {
+          TranscodeRule::move("contents", "messages"),
+          TranscodeRule::forEach("messages",
+                                 {
+                                     TranscodeRule::unwrapArrayObject("parts", "text", "content"),
+                                     TranscodeRule::valueMap("content", {{"foo", "bar"}}),
+                                 }),
+      });
+
+  absl::Status unwrapped_status =
+      TranscodingEngine::validateRulesAgainstSchema(unwrapped_part_plan, gemini_schema);
+  EXPECT_FALSE(unwrapped_status.ok());
+  EXPECT_EQ(unwrapped_status.code(), absl::StatusCode::kInvalidArgument);
+
+  TranscodeRuleSet unwrapped_multi_part_plan(
+      ApiProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
+      {
+          TranscodeRule::move("contents", "messages"),
+          TranscodeRule::forEach(
+              "messages",
+              {
+                  TranscodeRule::unwrapArrayObject("parts", "text", "content"),
+                  TranscodeRule::forEach("content",
+                                         {
+                                             TranscodeRule::valueMap("text", {{"foo", "bar"}}),
+                                         }),
+              }),
+      });
+
+  absl::Status unwrapped_multi_status =
+      TranscodingEngine::validateRulesAgainstSchema(unwrapped_multi_part_plan, gemini_schema);
+  EXPECT_FALSE(unwrapped_multi_status.ok());
+  EXPECT_EQ(unwrapped_multi_status.code(), absl::StatusCode::kInvalidArgument);
 }
 
 } // namespace

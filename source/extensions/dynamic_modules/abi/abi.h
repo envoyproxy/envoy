@@ -455,6 +455,8 @@ typedef enum envoy_dynamic_module_type_attribute_id {
   envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
   // xds.virtual_cluster_name
   envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName,
+  // upstream.protocol
+  envoy_dynamic_module_type_attribute_id_UpstreamProtocol,
 } envoy_dynamic_module_type_attribute_id;
 
 /**
@@ -3390,6 +3392,17 @@ envoy_dynamic_module_type_span_envoy_ptr envoy_dynamic_module_callback_http_get_
 void envoy_dynamic_module_callback_http_span_set_tag(envoy_dynamic_module_type_span_envoy_ptr span,
                                                      envoy_dynamic_module_type_module_buffer key,
                                                      envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_tag_batch sets multiple tags on the given span.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param tags is the array of key-value pairs to set as tags.
+ * @param tags_size is the number of entries in the tags array.
+ */
+void envoy_dynamic_module_callback_http_span_set_tag_batch(
+    envoy_dynamic_module_type_span_envoy_ptr span,
+    const envoy_dynamic_module_type_module_key_value_pair* tags, size_t tags_size);
 
 /**
  * envoy_dynamic_module_callback_http_span_set_operation sets the operation name on the given span.
@@ -12383,6 +12396,17 @@ bool envoy_dynamic_module_callback_matcher_get_header_value(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out);
 
+/**
+ * Report that the module could not complete a match evaluation, for example because the match hook
+ * panicked. The matcher then applies its configured on_error policy for this evaluation instead of
+ * treating the failure as a no match. The SDK panic barrier invokes this when a match hook panics,
+ * so a hook that returns normally does not trigger it.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ */
+void envoy_dynamic_module_callback_matcher_set_error(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr);
+
 // =============================================================================
 // Matcher Data Input Types
 // =============================================================================
@@ -13378,6 +13402,16 @@ void envoy_dynamic_module_on_tracer_span_set_operation(
 void envoy_dynamic_module_on_tracer_span_set_tag(
     envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
     envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_reserve_tags is called to reserve capacity for tags that will
+ * be set via envoy_dynamic_module_on_tracer_span_set_tag.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param tags_size is the number of tags that will be set.
+ */
+void envoy_dynamic_module_on_tracer_span_reserve_tags(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr, size_t tags_size);
 
 /**
  * envoy_dynamic_module_on_tracer_span_log is called to record a log event on the span.
@@ -14847,6 +14881,40 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr,
     size_t histogram_index, size_t bucket_index, double* upper_bound_out,
     uint64_t* cumulative_count_out);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name is the
+ * histogram counterpart of the counter tag-extracted-name callback below, with the same buffer
+ * and truncation contract. The index is into the snapshot's histogram collection.
+ *
+ * These histogram tag callbacks are only valid during envoy_dynamic_module_on_stat_sink_flush.
+ * A module aggregating observations from envoy_dynamic_module_on_stat_sink_on_histogram_complete
+ * can use the raw name returned by envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram
+ * to associate those observations with an owned copy of this name and its tags. No tag extraction
+ * or histogram statistics computation is performed by these callbacks.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count is the histogram
+ * counterpart of the counter tag-count callback below. Returns false for an out-of-range
+ * histogram index without writing tag_count. A histogram with no tags returns true and zero.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag is the histogram counterpart
+ * of the counter tag callback below, with the same buffer and truncation contract. Returns false
+ * without writing outputs if either the histogram index or tag index is out of range.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
 
 /**
  * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name writes the

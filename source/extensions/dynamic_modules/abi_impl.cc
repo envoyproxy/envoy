@@ -950,6 +950,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_matcher_get_header_value, false,
           envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_module_buffer,
           envoy_dynamic_module_type_envoy_buffer*, size_t, size_t*)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_matcher_set_error,
+               envoy_dynamic_module_type_matcher_input_envoy_ptr)
+
 // ---------------------- Matcher data input callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the matcher data input extension abi_impl.cc when the extension is used.
@@ -2558,6 +2561,17 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_b
           envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, double*,
           uint64_t*)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name,
+          false, envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t,
+          size_t*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count, false,
+          envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag, false,
+          envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, char*, size_t,
+          size_t*, char*, size_t, size_t*)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count, false,
           envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*)
 
@@ -3006,6 +3020,10 @@ WEAK_STUB(envoy_dynamic_module_type_span_envoy_ptr,
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_span_set_tag,
                envoy_dynamic_module_type_span_envoy_ptr, envoy_dynamic_module_type_module_buffer,
                envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_http_span_set_tag_batch,
+               envoy_dynamic_module_type_span_envoy_ptr,
+               const envoy_dynamic_module_type_module_key_value_pair*, size_t)
 
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_span_set_operation,
                envoy_dynamic_module_type_span_envoy_ptr, envoy_dynamic_module_type_module_buffer)

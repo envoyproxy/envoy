@@ -371,6 +371,18 @@ func (mr *MockSpanMockRecorder) SetTag(key, value any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTag", reflect.TypeOf((*MockSpan)(nil).SetTag), key, value)
 }
 
+// SetTags mocks base method.
+func (m *MockSpan) SetTags(tags [][2]string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetTags", tags)
+}
+
+// SetTags indicates an expected call of SetTags.
+func (mr *MockSpanMockRecorder) SetTags(tags any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTags", reflect.TypeOf((*MockSpan)(nil).SetTags), tags)
+}
+
 // SpawnChild mocks base method.
 func (m *MockSpan) SpawnChild(operationName string) shared.ChildSpan {
 	m.ctrl.T.Helper()
@@ -524,6 +536,18 @@ func (m *MockChildSpan) SetTag(key, value string) {
 func (mr *MockChildSpanMockRecorder) SetTag(key, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTag", reflect.TypeOf((*MockChildSpan)(nil).SetTag), key, value)
+}
+
+// SetTags mocks base method.
+func (m *MockChildSpan) SetTags(tags [][2]string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetTags", tags)
+}
+
+// SetTags indicates an expected call of SetTags.
+func (mr *MockChildSpanMockRecorder) SetTags(tags any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTags", reflect.TypeOf((*MockChildSpan)(nil).SetTags), tags)
 }
 
 // SpawnChild mocks base method.

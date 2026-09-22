@@ -66,7 +66,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "abi_context_accessors_lib",
     srcs = ["abi_context_accessors.cc"],
-    hdrs = ["abi_context_accessors.h"],
+    hdrs = [
+        "abi_context_accessors.h",
+        "abi_conversions.h",
+    ],
     deps = [
         "//envoy/common:optref_lib",
         "//envoy/formatter:http_formatter_context_interface",
@@ -75,6 +78,8 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",

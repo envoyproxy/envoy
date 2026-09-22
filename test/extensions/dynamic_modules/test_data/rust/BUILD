@@ -12,6 +12,8 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/listener:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
     "//test/extensions/dynamic_modules/stat_sink:__pkg__",
+    # For regression test for a deadlock between the bootstrap init target and AWS credential resolution.
+    "//test/extensions/filters/http/aws_request_signing:__pkg__",
     "//test/extensions/formatter/dynamic_modules:__pkg__",
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",

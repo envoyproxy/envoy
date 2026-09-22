@@ -6,7 +6,6 @@ envoy_mobile_package()
 
 envoy_cc_library(
     name = "internal_engine_lib",
-    repository = "@envoy",
     deps = [
         ":engine_common_lib_stamped",
         ":internal_engine_lib_no_stamp",
@@ -21,7 +20,6 @@ envoy_cc_library(
     hdrs = [
         "internal_engine.h",
     ],
-    repository = "@envoy",
     deps = [
         ":engine_common_lib",
         ":engine_types_lib",
@@ -50,7 +48,6 @@ envoy_cc_library(
     name = "engine_common_lib",
     srcs = ["engine_common.cc"],
     hdrs = ["engine_common.h"],
-    repository = "@envoy",
     deps = [
         "//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto_descriptor",
         "//library/common/extensions/filters/http/local_error:filter_cc_proto_descriptor",
@@ -67,13 +64,11 @@ envoy_cc_library(
         "@envoy//source/server:null_overload_manager_lib",
     ] + envoy_select_signal_trace(
         ["@envoy//source/common/signal:sigaction_lib"],
-        "@envoy",
     ),
 )
 
 envoy_cc_library(
     name = "engine_common_lib_stamped",
-    repository = "@envoy",
     deps = [
         ":engine_common_lib",
         "@envoy//source/exe:envoy_stripped_main_base_lib",
@@ -85,7 +80,6 @@ envoy_cc_library(
     hdrs = [
         "engine_types.h",
     ],
-    repository = "@envoy",
     deps = [
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/functional:any_invocable",
@@ -104,7 +98,6 @@ envoy_cc_library(
     hdrs = [
         "mobile_process_wide.h",
     ],
-    repository = "@envoy",
     deps = [
         "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/common/common:thread_lib",
