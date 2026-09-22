@@ -31,7 +31,6 @@ namespace {
 
 constexpr absl::string_view DefaultTokenUsageNamespace{"envoy.ai.token_usage"};
 constexpr absl::string_view SseContentType{"text/event-stream"};
-constexpr absl::string_view JsonContentType{"application/json"};
 // Sized so that ordinary OpenAI Responses API terminal lifecycle events --
 // which embed the complete response object, generated output included -- are
 // extracted by default; see the proto for the rationale.
@@ -68,6 +67,20 @@ bool canHoldRequest(const Http::RequestHeaderMap& headers) {
     return false;
   }
   if (Http::Utility::isUpgrade(headers) || Http::HeaderUtility::isConnect(headers)) {
+    return false;
+  }
+  return isJsonContentType(headers.getContentTypeValue());
+}
+
+// Whether a response carries an unframed unary JSON body (`application/json`
+// or a `+json` structured-syntax suffix, excluding gRPC / Connect streaming
+// envelopes and upgraded connections).
+bool isJsonResponse(const Http::ResponseHeaderMap& headers, bool end_stream) {
+  if (Grpc::Common::isGrpcResponseHeaders(headers, end_stream) ||
+      Grpc::Common::isConnectStreamingResponseHeaders(headers)) {
+    return false;
+  }
+  if (Http::Utility::isUpgrade(headers)) {
     return false;
   }
   return isJsonContentType(headers.getContentTypeValue());
@@ -505,7 +518,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // inspected can count an encoding skip.
   const absl::string_view content_type = headers.getContentTypeValue();
   const bool is_sse = contentTypeMatches(content_type, SseContentType);
-  const bool is_json = !is_sse && contentTypeMatches(content_type, JsonContentType);
+  const bool is_json = !is_sse && isJsonResponse(headers, end_stream);
   if (!is_sse && !is_json) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -529,16 +542,26 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (can_filter_response && is_sse) {
+  uint64_t content_length = 0;
+  const bool has_content_length =
+      absl::SimpleAtoi(headers.getContentLengthValue(), &content_length);
+
+  if (can_filter_response && (is_sse || is_json)) {
     headers.removeContentLength();
     encode_bridge_ = std::make_unique<EncoderFilterChainBridge>(
         *encoder_callbacks_, *decoder_callbacks_, config_->stats());
     encode_manager_ = std::make_shared<BufferManager>(
         BufferManager::Config{encoder_callbacks_->encoderBufferLimit()}, buffer_factory_,
         *encode_bridge_);
-    filter_manager_->startSseResponse(
-        buffer_factory_, *encode_bridge_, *encode_manager_,
-        [this](absl::Status status) { onEncodeComplete(std::move(status)); });
+    if (is_sse) {
+      filter_manager_->startSseResponse(
+          buffer_factory_, *encode_bridge_, *encode_manager_,
+          [this](absl::Status status) { onEncodeComplete(std::move(status)); });
+    } else if (is_json) {
+      filter_manager_->startUnaryResponse(
+          buffer_factory_, *encode_bridge_, *encode_manager_,
+          [this](absl::Status status) { onEncodeComplete(std::move(status)); });
+    }
   }
 
   if (want_token_usage) {
@@ -567,9 +590,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
       // takes -- identical bodies produce the identical outcome regardless of
       // whether the length was advertised. onData() stays authoritative for
       // absent or wrong lengths.
-      uint64_t content_length = 0;
-      if (absl::SimpleAtoi(headers.getContentLengthValue(), &content_length) &&
-          content_length > config_->maxJsonBodySize()) {
+      if (has_content_length && content_length > config_->maxJsonBodySize()) {
         handler->abandonOverLimit();
       }
       response_handler_ = std::move(handler);
