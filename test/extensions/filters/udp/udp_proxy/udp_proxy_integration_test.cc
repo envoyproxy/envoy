@@ -327,6 +327,40 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
   requestResponseWithListenerAddress(*listener_address);
 }
 
+TEST_P(UdpProxyIntegrationTest, UpstreamBindConfigSourceAddress) {
+  if (version_ != Network::Address::IpVersion::v4) {
+    GTEST_SKIP();
+  }
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* source_address = bootstrap.mutable_static_resources()
+                               ->mutable_clusters(0)
+                               ->mutable_upstream_bind_config()
+                               ->mutable_source_address();
+    source_address->set_address("127.0.0.2");
+    source_address->set_port_value(0);
+  });
+  setup(1);
+
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+  Network::Test::UdpSyncPeer client(version_);
+  client.write("hello", *listener_address);
+
+  Network::UdpRecvData request_datagram;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+  EXPECT_EQ("hello", request_datagram.buffer_->toString());
+  ASSERT_NE(nullptr, request_datagram.addresses_.peer_->ip());
+  EXPECT_EQ("127.0.0.2", request_datagram.addresses_.peer_->ip()->addressAsString());
+
+  fake_upstreams_[0]->sendUdpDatagram("world", request_datagram.addresses_.peer_);
+  Network::UdpRecvData response_datagram;
+  client.recv(response_datagram);
+  EXPECT_EQ("world", response_datagram.buffer_->toString());
+  EXPECT_EQ(listener_address->asString(), response_datagram.addresses_.peer_->asString());
+}
+
 // Verify downstream drops are handled correctly with stats.
 TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
   setup(1);
