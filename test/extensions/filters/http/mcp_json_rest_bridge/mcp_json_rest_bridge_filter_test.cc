@@ -437,6 +437,166 @@ TEST_F(McpJsonRestBridgeFilterTest, NonStatelessServerDiscoverFallsBackToUnsuppo
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, StatelessInitializeIsRejectedAsUnsupportedMethod) {
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(R"json({"code":-32601,"message":"MCP method initialize is not supported"})json"), _,
+          _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
+
+  Protobuf::Struct expected_metadata;
+  MessageUtil::loadFromJson(R"json({
+    "status": "mcp_json_rest_bridge_request_mcp_method_not_supported",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2026-07-28",
+      "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities": {}
+      }
+    }
+  })json",
+                            expected_metadata);
+
+  EXPECT_CALL(
+      decoder_callbacks_.stream_info_,
+      setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2026-07-28","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       StatelessNotificationsInitializedIsRejectedAsUnsupportedMethod) {
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"code":-32601,"message":"MCP method notifications/initialized is not supported"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
+
+  Protobuf::Struct expected_metadata;
+  MessageUtil::loadFromJson(R"json({
+    "status": "mcp_json_rest_bridge_request_mcp_method_not_supported",
+    "method": "notifications/initialized",
+    "params": {
+      "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities": {}
+      }
+    }
+  })json",
+                            expected_metadata);
+
+  EXPECT_CALL(
+      decoder_callbacks_.stream_info_,
+      setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","method":"notifications/initialized","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body(
+      R"json({"code":-32601,"message":"MCP method notifications/initialized is not supported"})json");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"error":{"code":-32601,"message":"MCP method notifications/initialized is not supported"},"id":null,"jsonrpc":"2.0"})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, LegacyInitializeStillServedWhenStatelessProtocolSupported) {
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"id":0,"jsonrpc":"2.0","result":{"capabilities":{"tools":{"listChanged":false}},"protocolVersion":"2025-06-18","serverInfo":{"name":"test-host","version":"1.0.0"}}})json"),
+          _, _, StrEq("mcp_json_rest_bridge_filter_initialize")));
+
+  Protobuf::Struct expected_metadata;
+  MessageUtil::loadFromJson(R"json({
+    "status": "mcp_json_rest_bridge_ok",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18"
+    }
+  })json",
+                            expected_metadata);
+
+  EXPECT_CALL(
+      decoder_callbacks_.stream_info_,
+      setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       LegacyNotificationsInitializedStillServedWhenStatelessProtocolSupported) {
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::Accepted), StrEq(""), _, _,
+                             StrEq("mcp_json_rest_bridge_filter_initialize_ack")));
+
+  Protobuf::Struct expected_metadata;
+  MessageUtil::loadFromJson(R"json({
+    "status": "mcp_json_rest_bridge_ok",
+    "method": "notifications/initialized"
+  })json",
+                            expected_metadata);
+
+  EXPECT_CALL(
+      decoder_callbacks_.stream_info_,
+      setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, NonStringMethodReturnsError) {
   ASSERT_OK(makeFilter());
 

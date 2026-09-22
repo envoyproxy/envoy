@@ -1,1 +1,1 @@
-Added support for the MCP 2026-07-28 stateless ``server/discover`` lifecycle to the ``mcp_json_rest_bridge`` HTTP filter, which is now served as a local response. The legacy ``initialize`` handshake behavior is unchanged.
+Added support for the MCP 2026-07-28 stateless lifecycle in the MCP JSON REST bridge, including ``server/discover`` and removal of the legacy initialize connection handshake for stateless requests, while preserving existing initialization behavior for earlier protocol versions.

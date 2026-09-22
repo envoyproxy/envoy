@@ -175,9 +175,8 @@ json generateServerDiscoverResponse(const json& session_id, absl::string_view se
 
   result[McpConstants::TTL_MS_FIELD] = 0;
   result[McpConstants::CACHE_SCOPE_FIELD] = McpConstants::CACHE_SCOPE_PRIVATE;
+  result[McpConstants::RESULT_TYPE_FIELD] = McpConstants::RESULT_TYPE_COMPLETE;
   ret[McpConstants::RESULT_FIELD] = result;
-
-  addCompleteResultTypeIfStateless(ret, /*is_stateless_request=*/true);
   return ret;
 }
 
@@ -1019,7 +1018,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
                                        : json::object());
       }
     }
-  } else if (method == McpConstants::Methods::INITIALIZE) {
+
+  } else if (method == McpConstants::Methods::INITIALIZE && !is_stateless_request_) {
     mcp_operation_ = McpOperation::Initialization;
     if (json_rpc.contains(McpConstants::PARAMS_FIELD) &&
         json_rpc[McpConstants::PARAMS_FIELD].contains(McpConstants::PROTOCOL_VERSION_FIELD) &&
@@ -1048,7 +1048,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         nullptr, method,
         json_rpc.contains(McpConstants::PARAMS_FIELD) ? json_rpc[McpConstants::PARAMS_FIELD]
                                                       : json::object());
-  } else if (method == McpConstants::Methods::NOTIFICATION_INITIALIZED) {
+
+  } else if (method == McpConstants::Methods::NOTIFICATION_INITIALIZED && !is_stateless_request_) {
     mcp_operation_ = McpOperation::InitializationAck;
     setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                    ? json_rpc[McpConstants::PARAMS_FIELD]
