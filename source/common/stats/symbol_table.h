@@ -1427,7 +1427,7 @@ template <class T> using StatNameHashMap = absl::flat_hash_map<StatName, T>;
  *
  * NOTE: StatNameStringCache holds raw StatName keys pointing to backing SymbolTable/Metric
  * storage. It should only be used in ephemeral scopes (e.g. within a single flush tick) and
- * must not be retained across metric flush lifecycles.
+ * must not be retained across metric flush life cycles.
  */
 class StatNameStringCache {
 public:
