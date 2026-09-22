@@ -3600,13 +3600,14 @@ TEST(LuaHttpFilterConfigTest, PackagePathsAbsentIsAConfigError) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Api::MockApi> api;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  Singleton::ManagerImpl singleton_manager;
 
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   proto_config.mutable_default_source_code()->set_inline_string(REQUIRE_MODULE_SCRIPT);
 
   absl::Status creation_status = absl::OkStatus();
   FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua", 1,
-               creation_status);
+               singleton_manager, creation_status);
   EXPECT_THAT(creation_status,
               StatusHelpers::HasStatusMessage(
                   testing::AllOf(testing::HasSubstr("script load error"),
