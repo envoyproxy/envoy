@@ -254,21 +254,24 @@ public:
   // Convenience helper returning true when termination() == Termination::BlankLine.
   bool blank_line_terminated() const { return termination_ == Termination::BlankLine; }
 
-  // Estimated byte size of this event for watermark accounting.
+  // Estimated in-memory byte size of this event for watermark accounting.
+  // Stores that have offloaded to external storage (inMemoryBytes() == nullptr) contribute 0
+  // here because their bytes do not reside in memory.
   uint64_t byteSize() const {
     uint64_t size = sizeof(SseEvent);
     for (const auto& field : metadata_) {
       size += sizeof(MetadataField) + field.value.size();
     }
-    if (extras_store_ != nullptr) {
-      size += extras_store_->length();
+    if (extras_store_ != nullptr && extras_store_->inMemoryBytes() != nullptr) {
+      size += extras_store_->inMemoryBytes()->length();
     }
-    if (payload_store_ != nullptr) {
-      size += payload_store_->length();
-    } else if (!is_json_) {
-      size += raw_data_->length();
-    } else {
+    if (payload_store_ != nullptr && payload_store_->inMemoryBytes() != nullptr) {
+      size += payload_store_->inMemoryBytes()->length();
+    }
+    if (is_json_) {
       size += json_payload_bytes_;
+    } else {
+      size += raw_data_->length() + raw_data_ext_refs_.size() * sizeof(JsonWithExtBuf::ExternalRef);
     }
     return size;
   }
