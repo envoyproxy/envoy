@@ -124,6 +124,7 @@ register_toolchains("@androidndk//:all", "@androidsdk//:all", dev_dependency = T
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
     name = "maven",
+    known_contributing_modules = ["protobuf"],
     artifacts = [
         "com.google.code.findbugs:jsr305:3.0.2",
         "androidx.annotation:annotation:1.5.0",
@@ -165,6 +166,15 @@ maven.artifact(
     artifact = "protobuf-java",
     version = "4.35.1",
     force_version = True,
+)
+# This is to workaround upstream bug/noise
+maven.install(
+    name = "rules_android_maven",
+    known_contributing_modules = ["rules_android"],
+    repositories = [
+        "https://maven.google.com",
+        "https://repo1.maven.org/maven2",
+    ],
 )
 
 extra_sources = use_extension("//bazel:extensions.bzl", "envoy_mobile_extra_sources_extension")
