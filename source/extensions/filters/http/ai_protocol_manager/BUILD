@@ -207,6 +207,7 @@ envoy_cc_library(
         "//source/common/coroutine:dispatcher_executor_lib",
         "//source/common/coroutine:launch_lib",
         "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/container:btree",
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status",
     ],

@@ -23,6 +23,7 @@ public:
   explicit TestTaskGroup(Event::Dispatcher& dispatcher) : TaskGroup(dispatcher) {}
 
   using TaskGroup::cancelHandles;
+  using TaskGroup::handleCount;
   using TaskGroup::launchTask;
   using TaskGroup::markTerminated;
 };
@@ -34,6 +35,57 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
 };
+
+TEST_F(TaskGroupTest, CompletedHandlesAreRemovedInlineAndAsync) {
+  TestTaskGroup group(*dispatcher_);
+  EXPECT_EQ(group.handleCount(), 0);
+
+  // 1) A task that completes synchronously during StartMode::Inline leaves 0 tracked handles.
+  absl::Status inline_status = absl::UnknownError("not called");
+  group.launchTask([]() -> Coroutine::Task<absl::Status> { co_return absl::OkStatus(); }(),
+                   [&](absl::Status s) { inline_status = std::move(s); });
+  EXPECT_THAT(inline_status, IsOk());
+  EXPECT_EQ(group.handleCount(), 0);
+
+  // 2) Two tasks that suspend are tracked while active, and each removes its handle upon
+  //    asynchronous completion.
+  Coroutine::AsyncQueue<int> q1(/*max_size=*/1);
+  Coroutine::AsyncQueue<int> q2(/*max_size=*/1);
+  bool t1_done = false;
+  bool t2_done = false;
+
+  group.launchTask(
+      [](Coroutine::AsyncQueue<int>& q) -> Coroutine::Task<absl::Status> {
+        ASSIGN_OR_CO_RETURN(auto item, co_await q.pop());
+        (void)item;
+        co_return absl::OkStatus();
+      }(q1),
+      [&](absl::Status s) {
+        EXPECT_THAT(s, IsOk());
+        t1_done = true;
+      });
+  EXPECT_EQ(group.handleCount(), 1);
+
+  group.launchTask(
+      [](Coroutine::AsyncQueue<int>& q) -> Coroutine::Task<absl::Status> {
+        ASSIGN_OR_CO_RETURN(auto item, co_await q.pop());
+        (void)item;
+        co_return absl::OkStatus();
+      }(q2),
+      [&](absl::Status s) {
+        EXPECT_THAT(s, IsOk());
+        t2_done = true;
+      });
+  EXPECT_EQ(group.handleCount(), 2);
+
+  EXPECT_TRUE(q1.tryPush(1));
+  EXPECT_TRUE(t1_done);
+  EXPECT_EQ(group.handleCount(), 1);
+
+  EXPECT_TRUE(q2.tryPush(2));
+  EXPECT_TRUE(t2_done);
+  EXPECT_EQ(group.handleCount(), 0);
+}
 
 TEST_F(TaskGroupTest, LaunchAndMarkTerminated) {
   Coroutine::AsyncQueue<int> queue(/*max_size=*/1);
