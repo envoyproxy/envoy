@@ -956,18 +956,8 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   dispatcher_->clearDeferredDeleteList();
 }
 
-// Regression test for the in_progress race condition.
-//
-// Pre-fix bug: when a second createWasm call arrived while a remote fetch was
-// in_progress, the code called cb(nullptr) but did NOT return. Execution fell
-// through to the empty-code path which:
-//   1. Called cb(nullptr) a SECOND time (double callback)
-//   2. Set fetch=true, triggering a spurious second HTTP request
-//   3. Wrote a negative cache entry (code="" with fresh fetch_time)
-//   4. Returned true instead of false
-//
-// Post-fix: the in_progress branch calls cb(nullptr) and returns false.
-// Only one callback, no second fetch, no negative cache entry.
+// Regression test: a second createWasm while a remote fetch is in_progress must return false
+// with exactly one cb(nullptr) call — not fall through to the empty-code path.
 TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
   if (std::get<0>(GetParam()) == "null") {
     return;
@@ -1012,7 +1002,6 @@ TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             ++http_fetch_count;
-            std::cerr << "[DEBUG] HTTP fetch #" << http_fetch_count << " triggered\n";
             Http::ResponseMessagePtr response(
                 new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                     new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
@@ -1021,57 +1010,35 @@ TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
             return nullptr;
           }));
 
-  // --- Step 1: First createWasm — cache miss, sets in_progress = true ---
-  std::cerr << "[DEBUG] Step 1: first createWasm (expect cache miss, in_progress=true)\n";
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
   }));
+
+  // First createWasm: cache miss, sets in_progress = true (fetch deferred until init).
   bool first_ret = createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
                                lifecycle_notifier_, remote_data_provider_,
                                [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
-  std::cerr << "[DEBUG] first createWasm returned: " << (first_ret ? "true" : "false") << "\n";
-  std::cerr << "[DEBUG] HTTP fetches so far: " << http_fetch_count << "\n";
   EXPECT_TRUE(first_ret);
 
-  // --- Step 2: Second createWasm while in_progress = true (the race) ---
-  // Pre-fix:  cb called 2x, second fetch triggered, returns true
-  // Post-fix: cb called 1x, no second fetch, returns false
-  std::cerr << "[DEBUG] Step 2: second createWasm (in_progress race)\n";
+  // Second createWasm with the same sha256 while in_progress = true.
   int race_cb_count = 0;
   bool second_ret =
       createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
                  lifecycle_notifier_, remote_data_provider_,
                  [&race_cb_count](const WasmHandleSharedPtr& w) {
                    ++race_cb_count;
-                   std::cerr << "[DEBUG] race callback #" << race_cb_count
-                             << " (wasm_handle=" << (w ? "non-null" : "nullptr") << ")"
-                             << (race_cb_count > 1 ? " ** BUG: double callback! **" : "")
-                             << "\n";
                    EXPECT_EQ(w, nullptr);
                  });
-  std::cerr << "[DEBUG] second createWasm returned: " << (second_ret ? "true ** BUG **" : "false")
-            << "\n";
-  std::cerr << "[DEBUG] race callback count: " << race_cb_count
-            << (race_cb_count > 1 ? " ** BUG: expected 1 **" : " (correct)") << "\n";
-  std::cerr << "[DEBUG] HTTP fetches so far: " << http_fetch_count
-            << " (fetch is deferred until init target fires)\n";
+  EXPECT_FALSE(second_ret);
+  EXPECT_EQ(race_cb_count, 1);
+  EXPECT_EQ(http_fetch_count, 0);
 
-  // Post-fix assertions for the race:
-  EXPECT_FALSE(second_ret);       // pre-fix: true  (fell through to fetch path)
-  EXPECT_EQ(race_cb_count, 1);    // pre-fix: 2     (in_progress cb + negative cache cb)
-  EXPECT_EQ(http_fetch_count, 0); // no fetches yet — deferred until init
-
-  // --- Step 3: Complete the first fetch — wasm_handle must succeed ---
-  std::cerr << "[DEBUG] Step 3: completing first fetch via init target\n";
+  // Complete the first fetch via the init target.
   EXPECT_CALL(init_watcher, ready());
   init_target_handle->initialize(init_watcher);
   EXPECT_NE(wasm_handle, nullptr);
-  std::cerr << "[DEBUG] wasm_handle: " << (wasm_handle ? "created OK" : "nullptr ** BUG **")
-            << "\n";
-  std::cerr << "[DEBUG] HTTP fetches after init: " << http_fetch_count
-            << (http_fetch_count > 1 ? " ** BUG: spurious second fetch **" : " (correct)") << "\n";
-  EXPECT_EQ(http_fetch_count, 1); // pre-fix: 2  (original fetch + spurious retry)
+  EXPECT_EQ(http_fetch_count, 1);
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher_->clearDeferredDeleteList();
