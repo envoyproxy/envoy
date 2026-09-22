@@ -35,7 +35,7 @@ enum class HealthTransition {
 class HealthFlagCallbacks {
 public:
   virtual ~HealthFlagCallbacks() = default;
-  virtual bool get(const Host& host, Host::HealthFlag flag) const PURE;
+  virtual bool get(const Host& host, Host::HealthFlag flag) PURE;
   virtual void set(Host& host, Host::HealthFlag flag) PURE;
   virtual void clear(Host& host, Host::HealthFlag flag) PURE;
 };
@@ -45,9 +45,7 @@ public:
  */
 class DefaultHealthFlagCallbacks : public HealthFlagCallbacks {
 public:
-  bool get(const Host& host, Host::HealthFlag flag) const override {
-    return host.healthFlagGet(flag);
-  }
+  bool get(const Host& host, Host::HealthFlag flag) override { return host.healthFlagGet(flag); }
   void set(Host& host, Host::HealthFlag flag) override { host.healthFlagSet(flag); }
   void clear(Host& host, Host::HealthFlag flag) override { host.healthFlagClear(flag); }
 

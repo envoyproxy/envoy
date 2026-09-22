@@ -72,20 +72,23 @@ MultiHealthChecker::~MultiHealthChecker() {
 }
 
 bool MultiHealthChecker::SubCheckerHealthFlagCallbacks::get(const Host& host,
-                                                            Host::HealthFlag flag) const {
-  auto it = parent_.checkers_[checker_idx_].host_flags.find(&host);
-  if (it == parent_.checkers_[checker_idx_].host_flags.end()) {
-    return false;
-  }
-  return (it->second & static_cast<uint32_t>(flag)) != 0;
+                                                            Host::HealthFlag flag) {
+  return (hostFlags(host) & static_cast<uint32_t>(flag)) != 0;
 }
 
 void MultiHealthChecker::SubCheckerHealthFlagCallbacks::set(Host& host, Host::HealthFlag flag) {
-  parent_.checkers_[checker_idx_].host_flags[&host] |= static_cast<uint32_t>(flag);
+  hostFlags(host) |= static_cast<uint32_t>(flag);
 }
 
 void MultiHealthChecker::SubCheckerHealthFlagCallbacks::clear(Host& host, Host::HealthFlag flag) {
-  parent_.checkers_[checker_idx_].host_flags[&host] &= ~static_cast<uint32_t>(flag);
+  hostFlags(host) &= ~static_cast<uint32_t>(flag);
+}
+
+uint32_t& MultiHealthChecker::SubCheckerHealthFlagCallbacks::hostFlags(const Host& host) {
+  // Use `try_emplace` to create it if it doesn't exist, initialized to the correct value.
+  auto [it, _] = parent_.checkers_[checker_idx_].host_flags.try_emplace(
+      &host, host.healthFlagsGetAll() & kActiveHcFlagMask);
+  return it->second;
 }
 
 void MultiHealthChecker::adjustGauges(const PerHostState& state, void (Stats::Gauge::*op)()) {
@@ -114,20 +117,22 @@ void MultiHealthChecker::start() {
 }
 
 void MultiHealthChecker::initializeHost(const HostSharedPtr& host) {
-  uint32_t initial_flags = host->healthFlagsGetAll() & kActiveHcFlagMask;
-  for (auto& data : checkers_) {
-    data.host_flags[host.get()] = initial_flags;
+  for (auto& checker : checkers_) {
+    // This has a side-effect of ensuring the host flags exist and are initialized.
+    checker.flag_callbacks.hostFlags(*host);
   }
 
   ASSERT(checkers_.size() > 0 && checkers_.size() <= 32, "32 bit shifts are UB");
   const uint32_t all_bits = ~uint32_t{0} >> (32 - checkers_.size());
-  auto& state = host_states_[host.get()];
-  state.pending_bits = host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ? all_bits : 0;
-  state.fail_bits = host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ? all_bits : 0;
-  state.degraded_bits = host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC) ? all_bits : 0;
-  state.initial_check_pending = all_bits;
-
-  adjustGauges(host_states_[host.get()], &Stats::Gauge::inc);
+  auto [state_it, inserted] = host_states_.try_emplace(host.get());
+  if (inserted) {
+    auto& state = state_it->second;
+    state.pending_bits = host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ? all_bits : 0;
+    state.fail_bits = host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ? all_bits : 0;
+    state.degraded_bits = host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC) ? all_bits : 0;
+    state.initial_check_pending = all_bits;
+    adjustGauges(state, &Stats::Gauge::inc);
+  }
 }
 
 void MultiHealthChecker::onClusterMemberUpdate(const HostVector& hosts_added,
