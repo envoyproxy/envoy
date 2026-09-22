@@ -49,9 +49,14 @@ public:
 
   ~RequestInfoFilterTest() override { buffer_manager_.onDestroy(); }
 
-  RequestInfoFilterConfigSharedPtr makeConfig(const std::string& metadata_namespace = "") {
+  RequestInfoFilterConfigSharedPtr
+  makeConfig(const std::string& metadata_namespace = "",
+             std::optional<double> tokens_per_byte = std::nullopt) {
     envoy::extensions::http::ai_filters::request_info::v3::RequestInfo proto;
     proto.set_metadata_namespace(metadata_namespace);
+    if (tokens_per_byte.has_value()) {
+      proto.mutable_token_estimation()->set_tokens_per_byte(*tokens_per_byte);
+    }
     return std::make_shared<const RequestInfoFilterConfig>(proto, *stats_store_.rootScope());
   }
 
@@ -66,7 +71,7 @@ public:
     std::vector<AiFilterSharedPtr> filters;
     filters.push_back(std::make_unique<RequestInfoFilter>(
         config != nullptr ? std::move(config) : makeConfig(),
-        AiFilterContext{stream_info_, request_headers_, protocol}));
+        AiFilterContext{stream_info_, request_headers_, protocol, payload.size()}));
     FilterManager manager(std::move(filters));
 
     absl::Status status;
@@ -133,6 +138,42 @@ TEST_F(RequestInfoFilterTest, PublishesTypedRecordAndForwardsPayloadUnchanged) {
   EXPECT_EQ(counterValue("published"), 1);
   EXPECT_EQ(counterValue("partial"), 0);
   EXPECT_EQ(counterValue("duplicate"), 0);
+}
+
+TEST_F(RequestInfoFilterTest, NoEstimateUnlessTokenEstimationIsConfigured) {
+  run(R"({"model":"gpt-4o"})", ApiProtocol::OpenAiChatCompletions);
+  const auto record = published();
+  ASSERT_TRUE(record.has_value());
+  EXPECT_FALSE(record->has_estimated_input_tokens());
+}
+
+TEST_F(RequestInfoFilterTest, EstimatesInputTokensFromPayloadBytes) {
+  const std::string payload = R"({"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]})";
+  run(payload, ApiProtocol::OpenAiChatCompletions, "/v1/chat/completions",
+      makeConfig("", /*tokens_per_byte=*/0.5));
+  const auto record = published();
+  ASSERT_TRUE(record.has_value());
+  EXPECT_EQ(record->estimated_input_tokens().value(), (payload.size() + 1) / 2);
+}
+
+TEST_F(RequestInfoFilterTest, PartialTokenRoundsUp) {
+  run(R"({"model":"gpt-4o"})", ApiProtocol::OpenAiChatCompletions, "/v1/chat/completions",
+      makeConfig("", /*tokens_per_byte=*/0.001));
+  const auto record = published();
+  ASSERT_TRUE(record.has_value());
+  EXPECT_EQ(record->estimated_input_tokens().value(), 1);
+}
+
+// The estimate reads no JSON, so it is published where the extractor reads almost nothing.
+TEST_F(RequestInfoFilterTest, EstimatePublishedWithoutDeclaredProtocol) {
+  const std::string payload = R"({"model":"gpt-4o"})";
+  run(payload, ApiProtocol::Unspecified, "/v1/chat/completions",
+      makeConfig("", /*tokens_per_byte=*/0.25));
+  const auto record = published();
+  ASSERT_TRUE(record.has_value());
+  EXPECT_EQ(record->input_api_protocol(), envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED);
+  EXPECT_EQ(record->estimated_input_tokens().value(),
+            static_cast<uint64_t>((payload.size() + 3) / 4));
 }
 
 TEST_F(RequestInfoFilterTest, AbsentAttributesAreLeftUnset) {

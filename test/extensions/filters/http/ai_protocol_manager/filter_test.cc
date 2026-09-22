@@ -1324,6 +1324,7 @@ public:
     ApiProtocol protocol;
     std::string path;
     const StreamInfo::StreamInfo* stream_info;
+    uint64_t payload_bytes;
   };
 
   ContextRecordingAiFilter(const AiFilterContext& context, std::vector<Seen>& seen)
@@ -1334,7 +1335,8 @@ public:
                                        LocalReplier) override {
     ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
     seen_.push_back({context_.request_protocol,
-                     std::string(context_.request_headers.getPathValue()), &context_.stream_info});
+                     std::string(context_.request_headers.getPathValue()), &context_.stream_info,
+                     context_.request_payload_bytes});
     request->json()["model"] = "rewritten";
     co_return co_await std::move(propagate_request)(std::move(request));
   }
@@ -1366,6 +1368,27 @@ TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) 
   EXPECT_EQ(seen[0].stream_info, &callbacks_.stream_info_);
   EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
   EXPECT_TRUE(injected_end_stream_);
+}
+
+// The payload byte count a filter sees spans the whole body, not the frame that closed it.
+TEST_F(AiProtocolManagerFilterTest, AiFilterContextCarriesTotalPayloadBytes) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string first = R"({"model":"gpt-4","messages":)";
+  const std::string second = R"([{"role":"user","content":"hi"}]})";
+  Buffer::OwnedImpl head(first);
+  EXPECT_EQ(filter_->decodeData(head, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl tail(second);
+  EXPECT_EQ(filter_->decodeData(tail, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].payload_bytes, first.size() + second.size());
 }
 
 TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {

@@ -439,7 +439,7 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
     const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
-                                  route_request_protocol_};
+                                  route_request_protocol_, decode_manager_->length()};
     std::vector<AiFilterSharedPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());
     for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {

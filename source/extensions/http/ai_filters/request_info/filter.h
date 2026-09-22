@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/extensions/http/ai_filters/request_info/v3/request_info.pb.h"
@@ -33,11 +35,14 @@ public:
       Stats::Scope& scope);
 
   const std::string& metadataNamespace() const { return metadata_namespace_; }
+  // Empty when no estimate is configured.
+  const std::optional<double>& tokensPerByte() const { return tokens_per_byte_; }
   const RequestInfoFilterStats& stats() const { return stats_; }
 
 private:
   const RequestInfoFilterStats stats_;
   const std::string metadata_namespace_;
+  const std::optional<double> tokens_per_byte_;
 };
 using RequestInfoFilterConfigSharedPtr = std::shared_ptr<const RequestInfoFilterConfig>;
 

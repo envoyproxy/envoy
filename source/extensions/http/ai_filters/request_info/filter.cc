@@ -1,5 +1,8 @@
 #include "source/extensions/http/ai_filters/request_info/filter.h"
 
+#include <cmath>
+#include <cstdint>
+#include <optional>
 #include <utility>
 
 #include "envoy/data/ai/v3/request_info.pb.h"
@@ -45,6 +48,12 @@ envoy::data::ai::v3::RequestInfo toProto(const RequestAttributes& attrs) {
   return typed;
 }
 
+// The payload is bounded by the manager's buffer limits and the ratio by 1.0, so the product
+// stays well inside the exactly-representable range.
+uint64_t estimateInputTokens(uint64_t payload_bytes, double tokens_per_byte) {
+  return static_cast<uint64_t>(std::ceil(static_cast<double>(payload_bytes) * tokens_per_byte));
+}
+
 } // namespace
 
 RequestInfoFilterConfig::RequestInfoFilterConfig(
@@ -53,7 +62,10 @@ RequestInfoFilterConfig::RequestInfoFilterConfig(
     : stats_(RequestInfoFilterStats{ALL_REQUEST_INFO_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "ai_protocol_manager.request_info."))}),
       metadata_namespace_(proto.metadata_namespace().empty() ? std::string(DefaultMetadataNamespace)
-                                                             : proto.metadata_namespace()) {}
+                                                             : proto.metadata_namespace()),
+      tokens_per_byte_(proto.has_token_estimation()
+                           ? std::make_optional(proto.token_estimation().tokens_per_byte())
+                           : std::nullopt) {}
 
 RequestInfoFilter::RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
                                      const AiFilterContext& context)
@@ -79,8 +91,13 @@ void RequestInfoFilter::publish(const nlohmann::json& json) {
 
   const RequestAttributes attrs = extractRequestAttributes(context_.request_protocol, json,
                                                            context_.request_headers.getPathValue());
+  envoy::data::ai::v3::RequestInfo record = toProto(attrs);
+  if (config_->tokensPerByte().has_value()) {
+    record.mutable_estimated_input_tokens()->set_value(
+        estimateInputTokens(context_.request_payload_bytes, *config_->tokensPerByte()));
+  }
   Protobuf::Any typed_any;
-  MessageUtil::packFrom(typed_any, toProto(attrs));
+  MessageUtil::packFrom(typed_any, record);
   stream_info.setDynamicTypedMetadata(config_->metadataNamespace(), typed_any);
 
   config_->stats().published_.inc();
