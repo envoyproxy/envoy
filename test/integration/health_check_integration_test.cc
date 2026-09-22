@@ -1227,6 +1227,7 @@ TEST_P(MultiHealthCheckIntegrationTest, StatsWithName) {
 
   test_server_->waitForCounter("cluster.cluster_1.health_check.name.first.attempt", Ge(1));
   test_server_->waitForCounter("cluster.cluster_1.health_check.name.second.attempt", Ge(1));
+  test_server_->waitForGauge("cluster.cluster_1.health_check.healthy", Eq(1));
 }
 
 TEST_P(MultiHealthCheckIntegrationTest, HostAddAfterStart) {

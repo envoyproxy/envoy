@@ -40,8 +40,7 @@ absl::StatusOr<std::shared_ptr<MultiHealthChecker>> MultiHealthChecker::create(
                       checker_idx));
     }
 
-    checker->checkers_.emplace_back(*checker, checker_idx);
-    auto& data = checker->checkers_.back();
+    PerCheckerData& data = checker->checkers_.emplace_back(*checker, checker_idx);
 
     auto checker_or_error =
         HealthCheckerFactory::create(sub_config, cluster, server_context, data.flag_callbacks);
@@ -50,15 +49,16 @@ absl::StatusOr<std::shared_ptr<MultiHealthChecker>> MultiHealthChecker::create(
     data.checker = std::move(checker_or_error.value());
 
     data.checker->addHostCheckCompleteCb(
-        [raw = checker.get(), checker_idx](const HostSharedPtr& host,
-                                           HealthTransition changed_state, HealthState result) {
-          raw->onCheckerResult(checker_idx, host, changed_state, result);
+        [multi_checker = checker.get(), checker_idx](
+            const HostSharedPtr& host, HealthTransition changed_state, HealthState result) {
+          multi_checker->onCheckerResult(checker_idx, host, changed_state, result);
         });
   }
 
   checker->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [raw = checker.get()](const HostVector& hosts_added, const HostVector& hosts_removed) {
-        raw->onClusterMemberUpdate(hosts_added, hosts_removed);
+      [multi_checker = checker.get()](const HostVector& hosts_added,
+                                      const HostVector& hosts_removed) {
+        multi_checker->onClusterMemberUpdate(hosts_added, hosts_removed);
       });
 
   return checker;
