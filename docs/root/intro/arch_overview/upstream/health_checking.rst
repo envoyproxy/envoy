@@ -37,9 +37,8 @@ unhealthy, successes required before marking a host healthy, etc.):
 * **Thrift**: Envoy will send a Thrift request and expect a success response. The upstream host may
   also respond with an exception to cause the health check to fail. See
   :ref:`thrift <envoy_v3_api_msg_extensions.health_checkers.thrift.v3.Thrift>`.
-* **Multiple**: Runs multiple health checks against each host and requires all of them to pass for
-  the host to be considered healthy. Each sub-checker carries its own full configuration. See
-  :ref:`multi <envoy_v3_api_msg_extensions.health_checkers.multi.v3.Multi>`.
+* **Multiple**: Runs multiple health checks against each upstream host and requires all of them to
+  pass for the host to be considered healthy. See :ref:`multi <config_health_checkers_multi>`.
 
 Health checks occur over the transport socket specified for the cluster. This implies that if a cluster is
 using a TLS-enabled transport socket, the health check will also occur over TLS. The
