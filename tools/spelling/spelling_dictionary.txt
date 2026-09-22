@@ -668,6 +668,7 @@ auths
 authz
 automata
 autoscale
+autosharding
 awaitable
 awaitables
 awaiter
