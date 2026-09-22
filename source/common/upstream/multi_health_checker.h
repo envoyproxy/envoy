@@ -5,7 +5,6 @@
 
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/server/health_checker_config.h"
-#include "envoy/stats/scope.h"
 #include "envoy/upstream/health_checker.h"
 
 #include "source/common/common/callback_impl.h"
@@ -48,7 +47,6 @@ private:
         : flag_callbacks(parent, checker_idx) {}
 
     SubCheckerHealthFlagCallbacks flag_callbacks;
-    Stats::ScopeSharedPtr stat_scope;
     absl::node_hash_map<const Host*, uint32_t> host_flags;
     // Must be last: destructor invokes flag callbacks that access host_flags.
     HealthCheckerSharedPtr checker;

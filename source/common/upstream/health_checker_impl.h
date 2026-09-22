@@ -110,14 +110,12 @@ public:
    * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
    * @param server_context reference to the Server context object
-   * @param stats_scope optional scope override for health check stats.
    * @param health_flag_callbacks optional overrides for health flag operations.
    * @return a health checker.
    */
   static absl::StatusOr<HealthCheckerSharedPtr>
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
          Upstream::Cluster& cluster, Server::Configuration::ServerFactoryContext& server_context,
-         OptRef<Stats::Scope> stats_scope = std::nullopt,
          HealthFlagCallbacks& health_flag_callbacks = DefaultHealthFlagCallbacks::instance());
 };
 

@@ -22,7 +22,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(
       dispatcher_(dispatcher), timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
-      stats_(generateStats(stats_scope)), runtime_(runtime), random_(random),
+      stats_(generateStats(stats_scope, config.name())), runtime_(runtime), random_(random),
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       event_logger_(std::move(event_logger)), health_flag_callbacks_(health_flag_callbacks),
       interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
@@ -88,10 +88,16 @@ void HealthCheckerImplBase::decHealthy() { stats_.healthy_.sub(1); }
 
 void HealthCheckerImplBase::decDegraded() { stats_.degraded_.sub(1); }
 
-HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
-  std::string prefix("health_check.");
-  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                   POOL_GAUGE_PREFIX(scope, prefix))};
+HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope,
+                                                        absl::string_view name) {
+  const Stats::TaggedStatName prefix(
+      scope.symbolTable(), "health_check.",
+      name.empty() ? Stats::TagStringViewSpan{}
+                   : Stats::TagStringViewSpan{{"envoy.health_check_name", name}},
+      name.empty() ? "health_check." : absl::StrCat("health_check.", name, "."));
+
+  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_TAGGED(scope, prefix),
+                                   POOL_GAUGE_TAGGED(scope, prefix))};
 }
 
 void HealthCheckerImplBase::incHealthy() { stats_.healthy_.add(1); }

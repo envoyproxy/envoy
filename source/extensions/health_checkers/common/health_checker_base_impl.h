@@ -135,7 +135,7 @@ private:
   void addHosts(const HostVector& hosts);
   void decHealthy();
   void decDegraded();
-  HealthCheckerStats generateStats(Stats::Scope& scope);
+  HealthCheckerStats generateStats(Stats::Scope& scope, absl::string_view name);
   void incHealthy();
   void incDegraded();
   std::chrono::milliseconds interval(HealthState state, HealthTransition changed_state) const;

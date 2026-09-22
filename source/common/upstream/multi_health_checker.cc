@@ -44,12 +44,8 @@ absl::StatusOr<std::shared_ptr<MultiHealthChecker>> MultiHealthChecker::create(
     checker->checkers_.emplace_back(*checker, checker_idx);
     auto& data = checker->checkers_.back();
 
-    std::vector<Stats::TagStringView> tags{{"name", sub_config.name()}};
-    data.stat_scope = cluster.info()->statsScope().createScopeWithTaggedName(
-        "health_check", tags, absl::StrCat("health_check.name.", sub_config.name(), "."));
-
-    auto checker_or_error = HealthCheckerFactory::create(sub_config, cluster, server_context,
-                                                         *data.stat_scope, data.flag_callbacks);
+    auto checker_or_error =
+        HealthCheckerFactory::create(sub_config, cluster, server_context, data.flag_callbacks);
     RETURN_IF_NOT_OK(checker_or_error.status());
 
     data.checker = std::move(checker_or_error.value());

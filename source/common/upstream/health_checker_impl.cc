@@ -48,10 +48,11 @@ const std::string& HealthCheckerFactory::getHostname(const HostSharedPtr& host,
   return cluster->name();
 }
 
-absl::StatusOr<HealthCheckerSharedPtr> HealthCheckerFactory::create(
-    const envoy::config::core::v3::HealthCheck& health_check_config, Upstream::Cluster& cluster,
-    Server::Configuration::ServerFactoryContext& server_context, OptRef<Stats::Scope> stats_scope,
-    HealthFlagCallbacks& health_flag_callbacks) {
+absl::StatusOr<HealthCheckerSharedPtr>
+HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_check_config,
+                             Upstream::Cluster& cluster,
+                             Server::Configuration::ServerFactoryContext& server_context,
+                             HealthFlagCallbacks& health_flag_callbacks) {
   Server::Configuration::CustomHealthCheckerFactory* factory = nullptr;
 
   switch (health_check_config.health_checker_case()) {
@@ -81,8 +82,7 @@ absl::StatusOr<HealthCheckerSharedPtr> HealthCheckerFactory::create(
   }
 
   auto context = std::make_unique<HealthCheckerFactoryContextImpl>(
-      cluster, server_context, stats_scope.value_or(cluster.info()->statsScope()),
-      health_flag_callbacks);
+      cluster, server_context, cluster.info()->statsScope(), health_flag_callbacks);
 
   if (!health_check_config.event_log_path().empty() /* deprecated */ ||
       !health_check_config.event_logger().empty()) {
