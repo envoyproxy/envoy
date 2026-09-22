@@ -42,7 +42,9 @@ namespace {
 // Bound repeated EINTR retries so a signal-heavy socket cannot monopolize the dispatcher.
 constexpr uint32_t MaxSendAttemptsPerInvocation = 16;
 
-// This is the largest UDP payload that is valid for both IPv4 and IPv6 without jumbograms.
+// Limit payloads to 65,507 bytes, the maximum UDP payload for IPv4:
+// 65,535-byte IP packet minus a 20-byte IPv4 header and an 8-byte UDP header.
+// This limit is also valid for ordinary IPv6 packets.
 constexpr uint64_t MaxUdpPayloadSize = 65507;
 
 std::vector<uint8_t> decodePayload(const envoy::config::core::v3::HealthCheck::Payload& payload,

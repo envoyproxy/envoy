@@ -30,3 +30,21 @@ envoy_extension_cc_test(
         "//test/test_common:simulated_time_system_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "health_checker_integration_test",
+    size = "large",
+    srcs = ["health_checker_integration_test.cc"],
+    extension_names = ["envoy.health_checkers.udp"],
+    rbe_pool = "linux_x64_small",
+    tags = ["cpu:3"],
+    deps = [
+        "//source/extensions/health_checkers/udp:health_checker_lib",
+        "//test/config:v2_link_hacks",
+        "//test/integration:http_integration_lib",
+        "//test/integration:integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/health_checkers/udp/v3:pkg_cc_proto",
+    ],
+)
