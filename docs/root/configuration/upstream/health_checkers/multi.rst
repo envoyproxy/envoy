@@ -11,7 +11,7 @@ the host is marked unhealthy.
 
 When multiple health checks are configured, each entry must have a
 :ref:`name <envoy_v3_api_field_config.core.v3.HealthCheck.name>`. Stats for each
-checker will appear under ``health_check.name.<name>.health_check.{attempt,success,...}``
+checker will appear under ``health_check.name.<name>.{attempt,success,...}``
 instead of the default shared ``health_check.{attempt,success,...}``.
 
 An example cluster configuration with multiple health checks is shown below:
