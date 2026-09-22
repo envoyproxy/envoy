@@ -1128,5 +1128,47 @@ TEST(SymbolTableTest, Memory) {
   EXPECT_MEMORY_EQ(symbol_table_mem_used, 1726056);
 }
 
+TEST_F(StatNameTest, StringCache) {
+  StatName a = makeStat("cluster.service_foo.upstream_rq_200");
+  StatName b = makeStat("cluster.service_foo.upstream_rq_500");
+  StatName c = makeStat("200");
+  StatName empty = makeStat("");
+
+  StatNameStringCache cache(&table_);
+  EXPECT_TRUE(cache.empty());
+  EXPECT_EQ(0, cache.size());
+
+  // Decoding empty StatName
+  EXPECT_EQ("", cache.decode(empty));
+  EXPECT_EQ("", cache.decode(StatName()));
+
+  // First decode populates cache
+  EXPECT_EQ("cluster.service_foo.upstream_rq_200", cache.decode(a));
+  EXPECT_EQ(1, cache.size());
+  EXPECT_FALSE(cache.empty());
+
+  // Subsequent decode hits cache
+  EXPECT_EQ("cluster.service_foo.upstream_rq_200", cache.decode(a));
+  EXPECT_EQ(1, cache.size());
+
+  // DecodeView returns string_view
+  EXPECT_EQ("cluster.service_foo.upstream_rq_200", cache.decodeView(a));
+
+  // Decode other stat names
+  EXPECT_EQ("cluster.service_foo.upstream_rq_500", cache.decode(b, table_));
+  EXPECT_EQ("200", cache.decode(c));
+  EXPECT_EQ(3, cache.size());
+
+  // Decode tag
+  Tag tag = cache.decodeTag(a, c);
+  EXPECT_EQ("cluster.service_foo.upstream_rq_200", tag.name_);
+  EXPECT_EQ("200", tag.value_);
+
+  // Clear cache
+  cache.clear();
+  EXPECT_TRUE(cache.empty());
+  EXPECT_EQ(0, cache.size());
+}
+
 } // namespace Stats
 } // namespace Envoy

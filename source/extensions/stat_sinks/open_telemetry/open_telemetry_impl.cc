@@ -352,10 +352,11 @@ std::string OtlpMetricsFlusherImpl::getMetricName(
 
 template <class StatType>
 MetricAggregator::SortedAttributesVector OtlpMetricsFlusherImpl::getCombinedAttributes(
-    const StatType& stat, OptRef<const SinkConfig::ConversionAction> conversion_config) const {
+    const StatType& stat, OptRef<const SinkConfig::ConversionAction> conversion_config,
+    Stats::StatNameStringCache& cache) const {
   MetricAggregator::AttributesVector attrs;
   if (config_->emitTagsAsAttributes()) {
-    for (const auto& tag : stat.tags()) {
+    for (const auto& tag : stat.tags(cache)) {
       attrs.emplace_back(tag.name_, tag.value_);
     }
   }
@@ -373,6 +374,8 @@ MetricAggregator::SortedAttributesVector OtlpMetricsFlusherImpl::getCombinedAttr
 
 template <typename SinkType>
 void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkType& sink) const {
+  Stats::StatNameStringCache cache;
+
   // Process Gauges
   for (const auto& gauge : snapshot.gauges()) {
     const auto& g = gauge.get();
@@ -382,7 +385,7 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
         continue;
       }
       sink.addGauge(getMetricName(g, metric_config.conversion_action), g.value(),
-                    getCombinedAttributes(g, metric_config.conversion_action));
+                    getCombinedAttributes(g, metric_config.conversion_action, cache));
     }
   }
   for (const auto& gauge : snapshot.hostGauges()) {
@@ -391,7 +394,7 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
       continue;
     }
     sink.addGauge(getMetricName(gauge, metric_config.conversion_action), gauge.value(),
-                  getCombinedAttributes(gauge, metric_config.conversion_action));
+                  getCombinedAttributes(gauge, metric_config.conversion_action, cache));
   }
 
   // Process Counters
@@ -405,7 +408,7 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
       }
       const uint64_t counter_value = report_counters_as_deltas ? counter.delta_ : c.value();
       sink.addCounter(getMetricName(c, metric_config.conversion_action), counter_value,
-                      getCombinedAttributes(c, metric_config.conversion_action));
+                      getCombinedAttributes(c, metric_config.conversion_action, cache));
     }
   }
   for (const auto& counter : snapshot.hostCounters()) {
@@ -415,7 +418,7 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
     }
     const uint64_t counter_value = report_counters_as_deltas ? counter.delta() : counter.value();
     sink.addCounter(getMetricName(counter, metric_config.conversion_action), counter_value,
-                    getCombinedAttributes(counter, metric_config.conversion_action));
+                    getCombinedAttributes(counter, metric_config.conversion_action, cache));
   }
 
   // Process Histograms
@@ -430,7 +433,7 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
       const Stats::HistogramStatistics& histogram_stats =
           report_histograms_as_deltas ? h.intervalStatistics() : h.cumulativeStatistics();
       sink.addHistogram(getMetricName(h, metric_config.conversion_action), histogram_stats,
-                        getCombinedAttributes(h, metric_config.conversion_action));
+                        getCombinedAttributes(h, metric_config.conversion_action, cache));
     }
   }
 }

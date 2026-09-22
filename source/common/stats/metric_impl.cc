@@ -77,5 +77,14 @@ TagVector MetricHelper::tags(const SymbolTable& symbol_table) const {
   return tags;
 }
 
+TagVector MetricHelper::tags(const SymbolTable& symbol_table, StatNameStringCache& cache) const {
+  TagVector tags;
+  iterateTagStatNames([&tags, &symbol_table, &cache](StatName name, StatName value) -> bool {
+    tags.emplace_back(cache.decodeTag(name, value, symbol_table));
+    return true;
+  });
+  return tags;
+}
+
 } // namespace Stats
 } // namespace Envoy

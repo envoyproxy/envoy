@@ -128,6 +128,19 @@ absl::string_view sanitizeStatsName(absl::string_view name, std::string& buffer)
 std::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
 
 /**
+ * Finds a metric tag with the specified name and decodes its value using the provided cache.
+ *
+ * @param metric The metric in which the tag is expected to exist.
+ * @param find_tag_name The name of the tag to search for.
+ * @param cache The ephemeral string decoder cache to decode the tag value.
+ * @return The decoded string value of the tag, if found.
+ */
+std::optional<std::string> findTag(const Metric& metric, StatName find_tag_name,
+                                   StatNameStringCache& cache);
+std::optional<std::string> findTag(const Metric& metric, StatName find_tag_name,
+                                   const SymbolTable& symbol_table, StatNameStringCache& cache);
+
+/**
  * Creates a nested scope from a vector of StatNames which are used to create the
  * name.
  *

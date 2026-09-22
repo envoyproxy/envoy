@@ -350,14 +350,14 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
 
   // Save a map of the relevant histograms per cluster in a convenient format.
   absl::node_hash_map<std::string, QuantileLatencyMap> time_histograms;
+  Stats::StatNameStringCache cache(&server_.scope().symbolTable());
   for (const auto& histogram : snapshot.histograms()) {
     if (histogram.get().tagExtractedStatName() == cluster_upstream_rq_time_) {
-      std::optional<Stats::StatName> value =
-          Stats::Utility::findTag(histogram.get(), cluster_name_);
+      std::optional<std::string> value =
+          Stats::Utility::findTag(histogram.get(), cluster_name_, cache);
       // Make sure we found the cluster name tag
       ASSERT(value);
-      std::string value_str = server_.scope().symbolTable().toString(*value);
-      auto it_bool_pair = time_histograms.emplace(std::make_pair(value_str, QuantileLatencyMap()));
+      auto it_bool_pair = time_histograms.emplace(std::make_pair(*value, QuantileLatencyMap()));
       // Make sure histogram with this name was not already added
       ASSERT(it_bool_pair.second);
       QuantileLatencyMap& hist_map = it_bool_pair.first->second;

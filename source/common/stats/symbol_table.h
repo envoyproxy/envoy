@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/stats/tag.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/mem_block_builder.h"
@@ -29,8 +31,6 @@ using StatNameVec = absl::InlinedVector<StatName, 8>;
 class StatNameList;
 class StatNameSet;
 using StatNameSetPtr = std::unique_ptr<StatNameSet>;
-using StatNameTag = std::pair<StatName, StatName>;
-using StatNameTagSpan = absl::Span<const StatNameTag>;
 
 /**
  * Holds a range of indexes indicating which parts of a stat-name are
@@ -1228,6 +1228,132 @@ bool SymbolTable::StatNameCompare<GetStatName, Obj>::operator()(const Obj& a, co
   StatName b_stat_name = getter_(b);
   return symbol_table_.lessThanLockHeld(a_stat_name, b_stat_name);
 }
+
+template <class T> using StatNameHashMap = absl::flat_hash_map<StatName, T>;
+
+/**
+ * Ephemeral per-flush / scoped cache mapping StatName to decoded std::string.
+ *
+ * This avoids repetitive SymbolTable::lock_ acquisitions and varint decodeNumber() operations
+ * across hundreds of thousands of metrics referencing the same tag names, tag values, and
+ * prefix components during a stat flush or logging cycle.
+ *
+ * NOTE: StatNameStringCache holds raw StatName keys pointing to backing SymbolTable/Metric
+ * storage. It should only be used in ephemeral scopes (e.g. within a single flush tick) and
+ * must not be retained across metric lifecycle destructions.
+ */
+class StatNameStringCache {
+public:
+  explicit StatNameStringCache(const SymbolTable* symbol_table = nullptr)
+      : symbol_table_(symbol_table) {}
+
+  /**
+   * Decodes a StatName to std::string using the cache.
+   */
+  const std::string& decode(StatName stat_name, const SymbolTable& symbol_table) {
+    if (stat_name.empty()) {
+      return empty_string_;
+    }
+    auto it = cache_.find(stat_name);
+    if (it != cache_.end()) {
+      return it->second;
+    }
+    auto [inserted_it, _] = cache_.emplace(stat_name, symbol_table.toString(stat_name));
+    return inserted_it->second;
+  }
+
+  /**
+   * Decodes a StatName using the SymbolTable provided in the constructor.
+   */
+  const std::string& decode(StatName stat_name) {
+    ASSERT(symbol_table_ != nullptr);
+    return decode(stat_name, *symbol_table_);
+  }
+
+  /**
+   * Returns a string_view of the decoded StatName.
+   */
+  absl::string_view decodeView(StatName stat_name, const SymbolTable& symbol_table) {
+    return decode(stat_name, symbol_table);
+  }
+
+  absl::string_view decodeView(StatName stat_name) { return decode(stat_name); }
+
+  /**
+   * Decodes a single StatNameTag (pair of name and value StatNames) into Tag.
+   */
+  Tag decodeTag(StatName name, StatName value, const SymbolTable& symbol_table) {
+    return Tag{decode(name, symbol_table), decode(value, symbol_table)};
+  }
+
+  Tag decodeTag(StatName name, StatName value) {
+    ASSERT(symbol_table_ != nullptr);
+    return decodeTag(name, value, *symbol_table_);
+  }
+
+  /**
+   * Decodes all tags of a Metric into a TagVector using the cache.
+   */
+  template <typename MetricType> TagVector decodeTags(const MetricType& metric) {
+    if constexpr (requires(MetricType m) {
+                    m.iterateTagStatNames(std::declval<std::function<bool(StatName, StatName)>>());
+                  }) {
+      TagVector tags;
+      const SymbolTable& symbol_table =
+          symbol_table_ != nullptr ? *symbol_table_ : metric.constSymbolTable();
+      metric.iterateTagStatNames(
+          [this, &tags, &symbol_table](StatName name, StatName value) -> bool {
+            tags.emplace_back(Tag{decode(name, symbol_table), decode(value, symbol_table)});
+            return true;
+          });
+      return tags;
+    } else {
+      return metric.tags();
+    }
+  }
+
+  /**
+   * Decodes the full name of a Metric using the cache.
+   */
+  template <typename MetricType> const std::string& decodeMetricName(const MetricType& metric) {
+    if constexpr (requires {
+                    metric.statName();
+                    metric.constSymbolTable();
+                  }) {
+      const SymbolTable& symbol_table =
+          symbol_table_ != nullptr ? *symbol_table_ : metric.constSymbolTable();
+      return decode(metric.statName(), symbol_table);
+    } else {
+      return metric.name();
+    }
+  }
+
+  /**
+   * Decodes the tag-extracted name of a Metric using the cache.
+   */
+  template <typename MetricType>
+  const std::string& decodeTagExtractedName(const MetricType& metric) {
+    if constexpr (requires {
+                    metric.tagExtractedStatName();
+                    metric.constSymbolTable();
+                  }) {
+      const SymbolTable& symbol_table =
+          symbol_table_ != nullptr ? *symbol_table_ : metric.constSymbolTable();
+      return decode(metric.tagExtractedStatName(), symbol_table);
+    } else {
+      return metric.tagExtractedName();
+    }
+  }
+
+  void clear() { cache_.clear(); }
+  size_t size() const { return cache_.size(); }
+  bool empty() const { return cache_.empty(); }
+
+private:
+  const SymbolTable* symbol_table_;
+  StatNameHashMap<std::string> cache_;
+  const std::string empty_string_;
+};
 
 using SymbolTablePtr = std::unique_ptr<SymbolTable>;
 
