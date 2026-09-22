@@ -266,7 +266,8 @@ message HealthCheck {
 
   reserved 10;
 
-  // Optional name for this health checker. <insert docs on how this changes the stat name>
+  // Optional name for this health checker. When set, per-checker stats are emitted under
+  // ``health_check.name.<name>.<stat>`` instead of ``health_check.<stat>``.
   //
   // This is required if multiple health checks are configured on a cluster.
   string name = 27;
