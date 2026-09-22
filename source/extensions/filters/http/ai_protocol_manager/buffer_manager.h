@@ -80,10 +80,9 @@ public:
   void releaseUnacked(uint64_t bytes);
 
   // Move-only RAII token that charges `bytes` to `addUnacked()` on construction and releases them
-  // via `releaseUnacked()` on destruction or `reset()`.
+  // via `releaseUnacked()` on destruction.
   class ScopedUnacked {
   public:
-    ScopedUnacked() = default;
     ScopedUnacked(FilterChainBridge& bridge, uint64_t bytes) : bridge_(&bridge), bytes_(bytes) {
       if (bytes_ > 0) {
         bridge_->addUnacked(bytes_);
@@ -91,23 +90,12 @@ public:
     }
     ScopedUnacked(ScopedUnacked&& other) noexcept
         : bridge_(std::exchange(other.bridge_, nullptr)), bytes_(std::exchange(other.bytes_, 0)) {}
-    ScopedUnacked& operator=(ScopedUnacked&& other) noexcept {
-      if (this != &other) {
-        reset();
-        bridge_ = std::exchange(other.bridge_, nullptr);
-        bytes_ = std::exchange(other.bytes_, 0);
-      }
-      return *this;
-    }
+    ScopedUnacked& operator=(ScopedUnacked&&) = delete;
     ScopedUnacked(const ScopedUnacked&) = delete;
     ScopedUnacked& operator=(const ScopedUnacked&) = delete;
-    ~ScopedUnacked() { reset(); }
-
-    void reset() {
-      FilterChainBridge* bridge = std::exchange(bridge_, nullptr);
-      const uint64_t bytes = std::exchange(bytes_, 0);
-      if (bridge != nullptr && bytes > 0) {
-        bridge->releaseUnacked(bytes);
+    ~ScopedUnacked() {
+      if (bridge_ != nullptr && bytes_ > 0) {
+        bridge_->releaseUnacked(bytes_);
       }
     }
 
