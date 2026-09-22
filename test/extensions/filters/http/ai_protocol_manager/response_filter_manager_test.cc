@@ -215,6 +215,7 @@ public:
           result_ = std::move(status);
         },
         config);
+    manager_->start();
   }
 
   void feed(absl::string_view body, bool end_stream = true) {
@@ -571,6 +572,7 @@ TEST_F(ResponseFilterManagerTest, DestroyedInsideOnCompleteCallbackIsSafe) {
         manager_.reset();
       },
       ResponseFilterManager::Config{});
+  manager_->start();
 
   Buffer::OwnedImpl buf("data: {\"ok\":1}\n\n");
   manager_->onData(buf, true);

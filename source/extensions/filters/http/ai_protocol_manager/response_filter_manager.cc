@@ -361,16 +361,17 @@ ResponseFilterManager::ResponseFilterManager(std::vector<AiFilterSharedPtr> filt
                                              ExternalBufferFactory& buffer_factory,
                                              FilterChainBridge& bridge,
                                              BufferManager& out_buffer_manager,
-                                             OnCompleteFn on_complete, Config config) {
-  async_state_ =
-      std::make_shared<SseAsyncState>(std::move(filters), buffer_factory, bridge,
-                                      out_buffer_manager, std::move(on_complete), config.sse);
-  // Started separately from construction: the stages capture weak references to the state, which
-  // only exist once the shared_ptr does.
-  async_state_->start();
-}
+                                             OnCompleteFn on_complete, Config config)
+    : async_state_(std::make_shared<SseAsyncState>(std::move(filters), buffer_factory, bridge,
+                                                   out_buffer_manager, std::move(on_complete),
+                                                   config.sse)) {}
 
 ResponseFilterManager::~ResponseFilterManager() { cancel(); }
+
+void ResponseFilterManager::start() {
+  auto state = async_state_;
+  state->start();
+}
 
 void ResponseFilterManager::onData(Buffer::Instance& data, bool end_stream) {
   auto state = async_state_;

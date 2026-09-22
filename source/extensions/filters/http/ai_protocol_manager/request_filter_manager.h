@@ -40,6 +40,9 @@ public:
                        LocalReplyFn local_reply_fn = nullptr);
   ~RequestFilterManager();
 
+  // Starts the request filter pipeline and sink coroutines.
+  void start();
+
   // Cancels all in-flight request coroutines and cleans up state on stream reset.
   void cancel();
 

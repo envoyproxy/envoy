@@ -277,11 +277,14 @@ RequestFilterManager::RequestFilterManager(
     Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn)
     : async_state_(std::make_shared<AsyncState>(
           std::move(filters), std::move(payload_index), buffer_manager, dispatcher, stream_info,
-          std::move(on_complete), request_headers, std::move(local_reply_fn))) {
-  async_state_->start();
-}
+          std::move(on_complete), request_headers, std::move(local_reply_fn))) {}
 
 RequestFilterManager::~RequestFilterManager() { cancel(); }
+
+void RequestFilterManager::start() {
+  auto state = async_state_;
+  state->start();
+}
 
 void RequestFilterManager::cancel() {
   auto state = async_state_;

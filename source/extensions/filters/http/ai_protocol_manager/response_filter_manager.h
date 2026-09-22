@@ -44,6 +44,9 @@ public:
                         BufferManager& out_buffer_manager, OnCompleteFn on_complete, Config config);
   ~ResponseFilterManager();
 
+  // Starts the response filter pipeline and sink coroutines.
+  void start();
+
   // Feeds response body bytes. `data` is drained. Must be called with end_stream true exactly
   // once, as the last call.
   void onData(Buffer::Instance& data, bool end_stream);
