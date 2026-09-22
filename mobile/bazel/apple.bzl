@@ -37,15 +37,15 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
 # )
 #
 def envoy_mobile_swift_test(name, srcs, size = None, data = [], deps = [], tags = [], visibility = [], flaky = False, exec_properties = {}, repository = ""):
-    deprecate_repository("envoy_mobile_swift_test", repository)
     test_lib_name = name + "_lib"
+    deprecated_repo = deprecate_repository("envoy_mobile_swift_test", repository)
     swift_library(
         name = test_lib_name,
         srcs = srcs,
         data = data,
         deps = [
             Label("//library/swift:ios_lib"),
-        ] + deps,
+        ] + deps + deprecated_repo,
         linkopts = ["-lresolv.9"],
         testonly = True,
         visibility = ["//visibility:private"],

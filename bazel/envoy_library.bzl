@@ -98,7 +98,6 @@ def envoy_cc_library(
         linkopts = [],
         target_compatible_with = []):
     # Deprecated: keep accepting `repository` for compatibility with downstream callers.
-    deprecate_repository("envoy_cc_library", repository)
     if tcmalloc_dep:
         deps += tcmalloc_external_deps()
     exec_properties = exec_properties | select({
@@ -129,6 +128,7 @@ def envoy_cc_library(
         textual_hdrs = textual_hdrs,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] +
                envoy_pch_deps(_COMMON_PCH) +
+               deprecate_repository("envoy_cc_library", repository) +
                sanitizer_deps(),
         exec_properties = exec_properties,
         alwayslink = alwayslink,
