@@ -24,6 +24,7 @@ envoy_cc_library(
     hdrs = ["aws_lambda_filter.h"],
     deps = [
         ":request_response_cc_proto",
+        "//envoy/event:dispatcher_interface",
         "//envoy/http:filter_interface",
         "//source/common/common:base64_lib",
         "//source/common/common:cancel_wrapper_lib",

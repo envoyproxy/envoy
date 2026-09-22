@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
@@ -68,7 +69,9 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class FilterConfigImpl : public FilterConfig {
 public:
   FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
-                   Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload);
+                   Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload,
+                   Event::Dispatcher& main_dispatcher);
+  ~FilterConfigImpl() override;
 
   Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
@@ -76,6 +79,7 @@ public:
   bool useUnsignedPayload() const override;
 
 private:
+  Event::Dispatcher& main_dispatcher_;
   Extensions::Common::Aws::SignerPtr signer_;
   FilterStats stats_;
   std::string host_rewrite_;
