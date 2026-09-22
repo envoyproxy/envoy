@@ -119,7 +119,7 @@ public:
   void assign(const char* data, uint32_t size) {
     reserveDiscard(size);
     if (size != 0) {
-      memcpy(mutableData(), data, size); // NOLINT(safe-memcpy)
+      memmove(mutableData(), data, size); // NOLINT(safe-memcpy)
     }
     size_ = size;
   }
@@ -134,7 +134,7 @@ public:
     const uint64_t new_size = static_cast<uint64_t>(size_) + size;
     ASSERT(new_size <= std::numeric_limits<uint32_t>::max());
     reservePreserve(static_cast<uint32_t>(new_size));
-    memcpy(mutableData() + size_, data, size); // NOLINT(safe-memcpy)
+    memmove(mutableData() + size_, data, size); // NOLINT(safe-memcpy)
     size_ = static_cast<uint32_t>(new_size);
   }
 
