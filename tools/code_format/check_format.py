@@ -22,6 +22,12 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+DEPRECATED_ENVOY_REPOSITORY_KWARG = re.compile(
+    r"\benvoy_[A-Za-z0-9_]+\s*\([\s\S]*?\brepository\s*=")
+DEPRECATED_ENVOY_SELECT_REPOSITORY_ARG = re.compile(
+    r"\benvoy_select_[A-Za-z0-9_]+\s*\(\s*(?:\[[\s\S]*?\]|[^,\)]*)\s*,\s*"
+    r'(?:repository\s*=\s*)?"@envoy"\s*\)')
+
 
 class FormatConfig:
     """Provides a format config object based on parsed YAML config."""
@@ -429,6 +435,11 @@ class FormatChecker:
 
     def is_external_build_file(self, file_path):
         return self.is_build_file(file_path) and (file_path.startswith("./bazel/external/"))
+
+    def allow_listed_for_deprecated_envoy_repository_args(self, file_path):
+        # Envoy's public Starlark macro definitions intentionally keep the deprecated
+        # repository parameter for downstream compatibility. In-tree callers must not use it.
+        return file_path.startswith("./bazel/envoy")
 
     def is_starlark_file(self, file_path):
         return file_path.endswith(".bzl")
@@ -873,6 +884,16 @@ class FormatChecker:
         command = f"{self.config.buildifier_path} -mode=diff {file_path}"
         error_messages.extend(self.execute_command(command, "buildifier check failed", file_path))
         error_messages.extend(self.check_file_contents(file_path, self.check_build_line))
+        if not self.allow_listed_for_deprecated_envoy_repository_args(file_path):
+            contents = pathlib.Path(file_path).read_text()
+            if DEPRECATED_ENVOY_REPOSITORY_KWARG.search(contents):
+                error_messages.append(
+                    "deprecated Envoy macro `repository` argument is not allowed in in-tree callers"
+                )
+            if DEPRECATED_ENVOY_SELECT_REPOSITORY_ARG.search(contents):
+                error_messages.append(
+                    "deprecated `@envoy` repository argument is not allowed for envoy_select_* helpers"
+                )
         return error_messages
 
     def fix_source_path(self, file_path):

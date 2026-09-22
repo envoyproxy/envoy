@@ -26,7 +26,6 @@ envoy_cc_test_with_engine_builder(
         ],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     shard_count = 6,
     deps = [
         ":base_client_integration_test_lib",
@@ -58,7 +57,6 @@ envoy_cc_test_library_with_engine_builder(
     hdrs = [
         "base_client_integration_test.h",
     ],
-    repository = "@envoy",
     deps = [
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
@@ -82,7 +80,6 @@ envoy_cc_test_library(
     data = [
         "@envoy//test/config/integration/certs",
     ],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_common_lib",
         "@envoy//bazel:cpp_runfiles",
@@ -96,7 +93,6 @@ envoy_cc_test_library(
         "@envoy_build_config//:extension_registry",
     ] + envoy_select_signal_trace(
         ["@envoy//source/common/signal:sigaction_lib"],
-        "@envoy",
     ),
 )
 
@@ -108,7 +104,6 @@ envoy_cc_test_library(
     hdrs = [
         "test_server_interface.h",
     ],
-    repository = "@envoy",
     deps = [
         ":test_server_lib",
     ],
@@ -122,7 +117,6 @@ envoy_cc_test_library_with_engine_builder(
     hdrs = [
         "engine_with_test_server.h",
     ],
-    repository = "@envoy",
     deps = [
         ":test_server_lib",
     ],
@@ -140,7 +134,6 @@ envoy_cc_test_with_engine_builder(
     external_deps = [
         "abseil_strings",
     ],
-    repository = "@envoy",
     deps = [
         ":xds_integration_test_lib",
         "//library/common/api:external_api_lib",
@@ -164,7 +157,6 @@ envoy_cc_test_with_engine_builder(
     external_deps = [
         "abseil_strings",
     ],
-    repository = "@envoy",
     deps = [
         ":xds_integration_test_lib",
         "@envoy//test/test_common:environment_lib",
@@ -183,7 +175,6 @@ envoy_cc_test_with_engine_builder(
     data = [
         "@envoy//test/config/integration/certs",
     ],
-    repository = "@envoy",
     deps = [
         ":xds_integration_test_lib",
         "@envoy//source/common/config:protobuf_link_hacks",
@@ -207,7 +198,6 @@ envoy_cc_test_library_with_engine_builder(
     hdrs = [
         "xds_integration_test.h",
     ],
-    repository = "@envoy",
     deps = [
         ":base_client_integration_test_lib",
         "@envoy//source/common/config:api_version_lib",
@@ -228,7 +218,6 @@ envoy_cc_test_library(
     hdrs = [
         "xds_test_server.h",
     ],
-    repository = "@envoy",
     deps = [
         "@envoy//bazel:cpp_runfiles",
         "@envoy//source/common/event:libevent_lib",

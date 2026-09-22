@@ -16,7 +16,6 @@ envoy_cc_library(
         "extension_registry.cc",
     ],
     hdrs = ["extension_registry.h"],
-    repository = "@envoy",
     deps = [
         "extension_registry_platform_additions",
         "@envoy//source/common/http/matching:inputs_lib",
@@ -79,7 +78,6 @@ envoy_cc_library(
         "//conditions:default": ["extension_registry_noop.cc"],
     }),
     hdrs = ["extension_registry_platform_additions.h"],
-    repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": ["@envoy//source/extensions/network/dns_resolver/apple:config"],
         "//conditions:default": [],
@@ -92,7 +90,6 @@ envoy_cc_library(
     srcs = [
         "test_extensions_autoregister.cc",
     ],
-    repository = "@envoy",
     deps = [":test_extensions_no_autoregister"],
     alwayslink = 1,
 )
@@ -106,7 +103,6 @@ envoy_cc_library(
     hdrs = [
         "test_extensions.h",
     ],
-    repository = "@envoy",
     # List of modules to compile into the test files. For JVM we always compile these into the .so all
     # the time, while for iOS we have to force register the extensions, so test files must pull in
     # the TestExtensions module and call register_test_extensions().

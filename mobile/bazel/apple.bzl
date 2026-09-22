@@ -35,7 +35,7 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
 #     ],
 # )
 #
-def envoy_mobile_swift_test(name, srcs, size = None, data = [], deps = [], tags = [], repository = "", visibility = [], flaky = False, exec_properties = {}):
+def envoy_mobile_swift_test(name, srcs, size = None, data = [], deps = [], tags = [], visibility = [], flaky = False, exec_properties = {}):
     test_lib_name = name + "_lib"
     swift_library(
         name = test_lib_name,
