@@ -248,6 +248,16 @@ bool_flag(
     build_setting_default = False,
 )
 
+bool_flag(
+    name = "deprecated_repo_arg_allowed",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "deprecated_repo_arg_is_allowed",
+    flag_values = {":deprecated_repo_arg_allowed": "True"},
+)
+
 config_setting(
     name = "jemalloc_enabled",
     flag_values = {":jemalloc": "True"},

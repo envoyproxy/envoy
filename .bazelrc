@@ -576,6 +576,7 @@ build:remote-ci --remote_download_minimal
 common:ci --noshow_progress
 common:ci --noshow_loading_progress
 common:ci --test_output=errors
+common:ci --@envoy//bazel:deprecated_repo_arg_allowed=false
 
 
 #############################################################################
