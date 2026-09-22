@@ -182,19 +182,6 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
 
     registerCertCompression(tls_config.crypto_config_->ssl_ctx());
 
-    // QUICHE owns this SSL_CTX, so Envoy's ecdh_curves (and the
-    // pqc_default_ecdh_curves default) are not applied to it by ContextImpl. Apply them here so
-    // the QUIC ClientHello key_share follows Envoy's curve policy rather than BoringSSL's
-    // built-in default group list.
-    const std::string& curves = clientContextConfig()->ecdhCurves();
-    if (!curves.empty() &&
-        SSL_CTX_set1_curves_list(tls_config.crypto_config_->ssl_ctx(), curves.c_str()) != 1) {
-      IS_ENVOY_BUG(absl::StrCat("Failed to set ECDH curves on QUIC client SSL_CTX: ", curves));
-      tls_config.client_context_ = nullptr;
-      tls_config.crypto_config_ = nullptr;
-      return nullptr;
-    }
-
     if (client_certificates_enabled_) {
       absl::Status status = configureQuicClientCertChain(
           tls_config.crypto_config_->ssl_ctx(), tls_config.client_context_->getTlsContext());
