@@ -383,6 +383,27 @@ size_t sk_push(_STACK *sk, void *p) {
 /*
  * BoringSSL
  * =========
+ * sk_set sets the |i|th pointer in |sk| to |p| and returns |p|, or NULL if |i|
+ * is out of range.
+ *
+ * OpenSSL
+ * =======
+ * sk_TYPE_set() sets element idx of sk to ptr replacing the current element.
+ * The new element value is returned or NULL if an error occurred: this will
+ * only happen if sk is NULL or idx is out of range.
+ */
+void *OPENSSL_sk_set(_STACK *sk, size_t i, void *p) {
+  // Range check here, rather than relying on OpenSSL to do it, because OpenSSL
+  // pushes an error onto the error queue, whereas BoringSSL does not.
+  if (sk == NULL || i >= OPENSSL_sk_num(sk)) {
+    return NULL;
+  }
+  return ossl.ossl_OPENSSL_sk_set(sk, (int)i, p);
+}
+
+/*
+ * BoringSSL
+ * =========
  * sk_set_cmp_func sets the comparison function to be used by |sk| and returns
  * the previous one.
  *
@@ -427,6 +448,66 @@ void *OPENSSL_sk_shift(_STACK *sk) {
 void OPENSSL_sk_sort(_STACK *sk, OPENSSL_sk_call_cmp_func call_cmp_func) {
   (void)call_cmp_func;
   ossl.ossl_OPENSSL_sk_sort(sk);
+}
+
+/*
+ * This is a full implementation because OpenSSL doesn't have an equivalent
+ *
+ * BoringSSL
+ * =========
+ * sk_sort_and_dedup sorts |sk| and removes duplicates, as determined by the
+ * comparison function. If |free_func| is not NULL, it is called on each of the
+ * removed duplicates. A stack with no comparison function is left untouched.
+ */
+void OPENSSL_sk_sort_and_dedup(_STACK *sk,
+                               OPENSSL_sk_call_cmp_func call_cmp_func,
+                               OPENSSL_sk_call_free_func call_free_func,
+                               OPENSSL_sk_free_func free_func) {
+  (void)call_cmp_func;
+
+  if (sk == NULL) {
+    return;
+  }
+
+  // OpenSSL's stack is opaque, so the only way to get hold of its comparison
+  // function is to temporarily replace it. Note that doing so makes the stack
+  // not sorted, even if it was already sorted, which is why we always sort it
+  // below rather than relying on ossl.ossl_OPENSSL_sk_sort() being a no-op.
+  ossl_OPENSSL_sk_compfunc compfunc = ossl.ossl_OPENSSL_sk_set_cmp_func(sk, NULL);
+  ossl.ossl_OPENSSL_sk_set_cmp_func(sk, compfunc);
+
+  if (compfunc == NULL) {
+    // Without a comparison function, BoringSSL neither sorts nor dedups.
+    return;
+  }
+
+  ossl.ossl_OPENSSL_sk_sort(sk);
+
+  int num = ossl.ossl_OPENSSL_sk_num(sk);
+  int new_num = (num > 0) ? 1 : 0;
+
+  for (int i = 1; i < num; i++) {
+    void *value = ossl.ossl_OPENSSL_sk_value(sk, i);
+    void *previous = ossl.ossl_OPENSSL_sk_value(sk, new_num - 1);
+
+    if (compfunc(&value, &previous) != 0) {
+      if (new_num != i) {
+        ossl.ossl_OPENSSL_sk_set(sk, new_num, value);
+      }
+      new_num++;
+    } else if (free_func != NULL) {
+      call_free_func(free_func, value);
+    }
+  }
+
+  if (new_num < num) {
+    while (num-- > new_num) {
+      ossl.ossl_OPENSSL_sk_pop(sk);
+    }
+    // Popping elements makes the stack not sorted, even though the remaining
+    // elements are still in sorted order, so we have to sort it again.
+    ossl.ossl_OPENSSL_sk_sort(sk);
+  }
 }
 
 /*
