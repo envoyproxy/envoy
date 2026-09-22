@@ -30,7 +30,25 @@ public:
   void start() override;
 
 private:
+  class SubCheckerHealthFlagCallbacks : public Upstream::HealthFlagCallbacks {
+  public:
+    SubCheckerHealthFlagCallbacks(MultiHealthChecker& parent, uint32_t checker_idx)
+        : parent_(parent), checker_idx_(checker_idx) {}
+
+    bool get(const Upstream::Host& host, Upstream::Host::HealthFlag flag) const override;
+    void set(Upstream::Host& host, Upstream::Host::HealthFlag flag) override;
+    void clear(Upstream::Host& host, Upstream::Host::HealthFlag flag) override;
+
+  private:
+    MultiHealthChecker& parent_;
+    const uint32_t checker_idx_;
+  };
+
   struct PerCheckerData {
+    PerCheckerData(MultiHealthChecker& parent, uint32_t checker_idx)
+        : flag_callbacks(parent, checker_idx) {}
+
+    SubCheckerHealthFlagCallbacks flag_callbacks;
     Stats::ScopeSharedPtr stat_scope;
     absl::node_hash_map<const Upstream::Host*, uint32_t> host_flags;
     // Must be last: destructor invokes flag callbacks that access host_flags.

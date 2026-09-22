@@ -335,8 +335,8 @@ TEST_F(MultiHealthCheckerImplTest, MultipleHostsIndependentState) {
 
 class FakeHealthChecker : public Upstream::HealthChecker {
 public:
-  FakeHealthChecker(Upstream::HealthFlagCallbacks flag_callbacks)
-      : flag_callbacks_(std::move(flag_callbacks)) {}
+  FakeHealthChecker(Upstream::HealthFlagCallbacks& flag_callbacks)
+      : flag_callbacks_(flag_callbacks) {}
 
   void addHostCheckCompleteCb(HostStatusCb callback) override {
     callbacks_.push_back(std::move(callback));
@@ -368,7 +368,7 @@ public:
   }
 
 private:
-  Upstream::HealthFlagCallbacks flag_callbacks_;
+  Upstream::HealthFlagCallbacks& flag_callbacks_;
   std::vector<HostStatusCb> callbacks_;
 };
 

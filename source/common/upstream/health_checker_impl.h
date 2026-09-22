@@ -55,13 +55,13 @@ public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster,
                                   Server::Configuration::ServerFactoryContext& server_context,
                                   Stats::Scope& stats_scope,
-                                  HealthFlagCallbacks health_flag_callbacks)
+                                  HealthFlagCallbacks& health_flag_callbacks)
       : cluster_(cluster), runtime_(server_context.runtime()),
         dispatcher_(server_context.mainThreadDispatcher()),
         validation_visitor_(server_context.messageValidationVisitor()),
         log_manager_(server_context.accessLogManager()), api_(server_context.api()),
         server_context_(server_context), stats_scope_(stats_scope),
-        health_flag_callbacks_(std::move(health_flag_callbacks)) {}
+        health_flag_callbacks_(health_flag_callbacks) {}
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
@@ -81,7 +81,7 @@ public:
   };
 
   Stats::Scope& statsScope() override { return stats_scope_; }
-  HealthFlagCallbacks healthFlagCallbacks() const override { return health_flag_callbacks_; }
+  HealthFlagCallbacks& healthFlagCallbacks() override { return health_flag_callbacks_; }
 
 private:
   Upstream::Cluster& cluster_;
@@ -93,7 +93,7 @@ private:
   HealthCheckEventLoggerPtr event_logger_;
   Server::Configuration::ServerFactoryContext& server_context_;
   Stats::Scope& stats_scope_;
-  HealthFlagCallbacks health_flag_callbacks_;
+  HealthFlagCallbacks& health_flag_callbacks_;
 };
 
 /**
@@ -118,7 +118,7 @@ public:
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
          Upstream::Cluster& cluster, Server::Configuration::ServerFactoryContext& server_context,
          OptRef<Stats::Scope> stats_scope = std::nullopt,
-         HealthFlagCallbacks health_flag_callbacks = HealthFlagCallbacks::defaultCallbacks());
+         HealthFlagCallbacks& health_flag_callbacks = DefaultHealthFlagCallbacks::instance());
 };
 
 /**

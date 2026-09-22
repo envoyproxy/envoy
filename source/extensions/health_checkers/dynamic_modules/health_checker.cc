@@ -12,9 +12,9 @@ DynamicModuleHealthChecker::DynamicModuleHealthChecker(
     DynamicModuleHealthCheckerConfigSharedPtr module_config, Event::Dispatcher& dispatcher,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
     Upstream::HealthCheckEventLoggerPtr&& event_logger, Stats::Scope& stats_scope,
-    Upstream::HealthFlagCallbacks health_flag_callbacks)
+    Upstream::HealthFlagCallbacks& health_flag_callbacks)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger),
-                            stats_scope, std::move(health_flag_callbacks)),
+                            stats_scope, health_flag_callbacks),
       module_config_(std::move(module_config)) {}
 
 void DynamicModuleHealthCheckerScheduler::report(envoy_dynamic_module_type_host_health health) {

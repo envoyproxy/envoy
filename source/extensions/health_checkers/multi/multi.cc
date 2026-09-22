@@ -35,6 +35,7 @@ MultiHealthChecker::MultiHealthChecker(Upstream::Cluster& cluster,
   envoy::extensions::health_checkers::multi::v3::Multi multi_config;
   THROW_IF_NOT_OK(MessageUtil::unpackTo(any_config, multi_config));
 
+  checkers_.reserve(multi_config.health_checks_size());
   for (int i = 0; i < multi_config.health_checks_size(); i++) {
     const auto& entry = multi_config.health_checks(i);
     const auto& sub_config = entry.health_check();
@@ -43,34 +44,17 @@ MultiHealthChecker::MultiHealthChecker(Upstream::Cluster& cluster,
     auto checker_scope = cluster.info()->statsScope().createScopeWithTaggedName(
         "health_check", tags, absl::StrCat("health_check.name.", entry.name(), "."));
 
-    // Build flag callbacks so this sub-checker operates on local per-host state
-    // instead of the real host's flags.
     const uint32_t checker_idx = static_cast<uint32_t>(i);
-    Upstream::HealthFlagCallbacks flag_callbacks;
-    flag_callbacks.get = [this, checker_idx](const Upstream::Host& host,
-                                             Upstream::Host::HealthFlag flag) -> bool {
-      auto it = checkers_[checker_idx].host_flags.find(&host);
-      if (it == checkers_[checker_idx].host_flags.end()) {
-        return false;
-      }
-      return (it->second & static_cast<uint32_t>(flag)) != 0;
-    };
-    flag_callbacks.set = [this, checker_idx](Upstream::Host& host,
-                                             Upstream::Host::HealthFlag flag) {
-      checkers_[checker_idx].host_flags[&host] |= static_cast<uint32_t>(flag);
-    };
-    flag_callbacks.clear = [this, checker_idx](Upstream::Host& host,
-                                               Upstream::Host::HealthFlag flag) {
-      checkers_[checker_idx].host_flags[&host] &= ~static_cast<uint32_t>(flag);
-    };
+
+    checkers_.emplace_back(*this, checker_idx);
+    auto& data = checkers_.back();
+    data.stat_scope = std::move(checker_scope);
 
     auto checker_or_error = Upstream::HealthCheckerFactory::create(
-        sub_config, cluster, server_context, *checker_scope, std::move(flag_callbacks));
+        sub_config, cluster, server_context, *data.stat_scope, data.flag_callbacks);
     THROW_IF_NOT_OK(checker_or_error.status());
 
-    PerCheckerData data;
     data.checker = std::move(checker_or_error.value());
-    data.stat_scope = std::move(checker_scope);
 
     data.checker->addHostCheckCompleteCb(
         [this, checker_idx](const Upstream::HostSharedPtr& host,
@@ -78,8 +62,6 @@ MultiHealthChecker::MultiHealthChecker(Upstream::Cluster& cluster,
                             Upstream::HealthState result) {
           onCheckerResult(checker_idx, host, changed_state, result);
         });
-
-    checkers_.push_back(std::move(data));
   }
 
   member_update_cb_ = cluster_.prioritySet().addMemberUpdateCb(
@@ -92,6 +74,25 @@ MultiHealthChecker::~MultiHealthChecker() {
   for (const auto& [_, state] : host_states_) {
     adjustGauges(state, &Stats::Gauge::dec);
   }
+}
+
+bool MultiHealthChecker::SubCheckerHealthFlagCallbacks::get(const Upstream::Host& host,
+                                                            Upstream::Host::HealthFlag flag) const {
+  auto it = parent_.checkers_[checker_idx_].host_flags.find(&host);
+  if (it == parent_.checkers_[checker_idx_].host_flags.end()) {
+    return false;
+  }
+  return (it->second & static_cast<uint32_t>(flag)) != 0;
+}
+
+void MultiHealthChecker::SubCheckerHealthFlagCallbacks::set(Upstream::Host& host,
+                                                            Upstream::Host::HealthFlag flag) {
+  parent_.checkers_[checker_idx_].host_flags[&host] |= static_cast<uint32_t>(flag);
+}
+
+void MultiHealthChecker::SubCheckerHealthFlagCallbacks::clear(Upstream::Host& host,
+                                                              Upstream::Host::HealthFlag flag) {
+  parent_.checkers_[checker_idx_].host_flags[&host] &= ~static_cast<uint32_t>(flag);
 }
 
 void MultiHealthChecker::adjustGauges(const PerHostState& state, void (Stats::Gauge::*op)()) {

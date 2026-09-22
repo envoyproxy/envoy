@@ -71,7 +71,7 @@ public:
     health_checker_ = std::make_shared<DynamicModuleHealthChecker>(
         *cluster_, health_check_config, std::move(config_or_error.value()), *dispatcher_, runtime_,
         random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), cluster_->info()->statsScope(),
-        Upstream::HealthFlagCallbacks::defaultCallbacks());
+        Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   // Builds the checker for the given Rust-module mode ("healthy"/"degraded"/"unhealthy"/"timeout"/

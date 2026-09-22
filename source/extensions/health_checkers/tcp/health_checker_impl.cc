@@ -50,9 +50,9 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
                                            Random::RandomGenerator& random,
                                            HealthCheckEventLoggerPtr&& event_logger,
                                            Stats::Scope& stats_scope,
-                                           HealthFlagCallbacks health_flag_callbacks)
+                                           HealthFlagCallbacks& health_flag_callbacks)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger),
-                            stats_scope, std::move(health_flag_callbacks)),
+                            stats_scope, health_flag_callbacks),
       send_bytes_([&config] {
         if (!config.tcp_health_check().send().text().empty()) {
           auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.tcp_health_check().send());

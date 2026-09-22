@@ -32,23 +32,28 @@ enum class HealthTransition {
  * host. The multi health checker provides overrides so that sub-checkers operate on local per-host
  * state instead of real host flags.
  */
-struct HealthFlagCallbacks {
-  using HealthFlagGet = std::function<bool(const Host&, Host::HealthFlag)>;
-  using HealthFlagSet = std::function<void(Host&, Host::HealthFlag)>;
-  using HealthFlagClear = std::function<void(Host&, Host::HealthFlag)>;
+class HealthFlagCallbacks {
+public:
+  virtual ~HealthFlagCallbacks() = default;
+  virtual bool get(const Host& host, Host::HealthFlag flag) const PURE;
+  virtual void set(Host& host, Host::HealthFlag flag) PURE;
+  virtual void clear(Host& host, Host::HealthFlag flag) PURE;
+};
 
-  HealthFlagGet get;
-  HealthFlagSet set;
-  HealthFlagClear clear;
+/**
+ * Default implementation that delegates directly to the host's health flag methods.
+ */
+class DefaultHealthFlagCallbacks : public HealthFlagCallbacks {
+public:
+  bool get(const Host& host, Host::HealthFlag flag) const override {
+    return host.healthFlagGet(flag);
+  }
+  void set(Host& host, Host::HealthFlag flag) override { host.healthFlagSet(flag); }
+  void clear(Host& host, Host::HealthFlag flag) override { host.healthFlagClear(flag); }
 
-  // Define this explicitly instead of using the default constructor so that it is opt-in, to avoid
-  // accidental incorrect uses of the default.
-  static HealthFlagCallbacks defaultCallbacks() {
-    return HealthFlagCallbacks{
-        [](const Host& host, Host::HealthFlag flag) { return host.healthFlagGet(flag); },
-        [](Host& host, Host::HealthFlag flag) { host.healthFlagSet(flag); },
-        [](Host& host, Host::HealthFlag flag) { host.healthFlagClear(flag); },
-    };
+  static DefaultHealthFlagCallbacks& instance() {
+    static DefaultHealthFlagCallbacks instance;
+    return instance;
   }
 };
 

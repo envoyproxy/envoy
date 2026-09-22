@@ -190,7 +190,7 @@ public:
     health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
         *cluster_, config, dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()), cluster_->info()->statsScope(),
-        Upstream::HealthFlagCallbacks::defaultCallbacks());
+        Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void addCompletionCallback() {

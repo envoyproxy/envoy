@@ -22,9 +22,9 @@ RedisHealthChecker::RedisHealthChecker(
     const std::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
                             AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
-    Stats::Scope& stats_scope, Upstream::HealthFlagCallbacks health_flag_callbacks)
+    Stats::Scope& stats_scope, Upstream::HealthFlagCallbacks& health_flag_callbacks)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
-                            std::move(event_logger), stats_scope, std::move(health_flag_callbacks)),
+                            std::move(event_logger), stats_scope, health_flag_callbacks),
       client_factory_(client_factory), key_(redis_config.key()),
       redis_stats_(generateRedisStats(cluster.info()->statsScope())),
       auth_username_(

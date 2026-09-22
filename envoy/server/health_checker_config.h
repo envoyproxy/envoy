@@ -65,9 +65,9 @@ public:
   virtual Stats::Scope& statsScope() PURE;
 
   /**
-   * @return HealthFlagCallbacks callbacks for health flag operations on hosts.
+   * @return HealthFlagCallbacks& callbacks for health flag operations on hosts.
    */
-  virtual Upstream::HealthFlagCallbacks healthFlagCallbacks() const PURE;
+  virtual Upstream::HealthFlagCallbacks& healthFlagCallbacks() PURE;
 
   /**
    * Set the event logger to the context, nullptr is accepted since

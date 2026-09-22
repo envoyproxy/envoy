@@ -4401,7 +4401,7 @@ public:
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
         *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()), cluster_->info()->statsScope(),
-        Upstream::HealthFlagCallbacks::defaultCallbacks());
+        Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupData(unsigned int unhealthy_threshold = 2) {
@@ -5059,7 +5059,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   HealthCheckerFactoryContextImpl context(cluster, server_context, server_context.scope(),
-                                          HealthFlagCallbacks::defaultCallbacks());
+                                          DefaultHealthFlagCallbacks::instance());
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
@@ -5171,7 +5171,7 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   HealthCheckerFactoryContextImpl context(cluster, server_context, server_context.scope(),
-                                          HealthFlagCallbacks::defaultCallbacks());
+                                          DefaultHealthFlagCallbacks::instance());
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
