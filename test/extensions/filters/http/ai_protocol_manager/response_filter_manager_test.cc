@@ -826,20 +826,30 @@ TEST_F(ResponseFilterManagerTest, UnaryBowOutFilterSplicesRemainingBatches) {
 }
 
 TEST_F(ResponseFilterManagerTest, UnaryEmptyPropagationTerminatesDownstreamStreamEarly) {
+  auto upstream = std::make_shared<TaggingUnaryFilter>("upstream");
   auto ender = std::make_shared<EarlyStreamEndingUnaryFilter>();
   auto downstream = std::make_shared<TaggingUnaryFilter>("downstream");
-  makeManager({ender, downstream}, unaryConfig());
+  makeManager({upstream, ender, downstream}, unaryConfig());
 
-  // First chunk produces {"kept":1}, after which `ender` calls propagate({}) to end the stream.
-  // Second chunk {"ignored":2} is drained and never reaches `downstream` or the serialized JSON.
+  // First chunk produces {"kept":1}, after which `ender` calls propagate({}) to end the
+  // downstream stream. `upstream` (earlier in the chain) must still see the second chunk
+  // {"ignored":2}, and pipeline completion must wait until the full response is fed.
   feed(R"({"kept":1,)", /*end_stream=*/false);
+  EXPECT_EQ(complete_calls_, 0);
+  EXPECT_EQ(upstream->seen_batches_, 1u);
+  EXPECT_EQ(downstream->seen_batches_, 1u);
+
   feed(R"("ignored":2})", /*end_stream=*/true);
 
   EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(upstream->seen_batches_, 2u);
+  EXPECT_EQ(upstream->seen_fields_, 2u);
   EXPECT_EQ(downstream->seen_batches_, 1u);
   const nlohmann::json parsed = nlohmann::json::parse(output());
   EXPECT_EQ(parsed["kept"], 1);
   EXPECT_FALSE(parsed.contains("ignored"));
+  EXPECT_FALSE(parsed.contains("upstream"));
   EXPECT_EQ(parsed["downstream"], true);
 }
 

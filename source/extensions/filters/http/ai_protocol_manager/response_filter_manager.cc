@@ -51,7 +51,7 @@ public:
                      ResponseFilterManager::OnCompleteFn on_complete)
       : ResponseFilterManager::AsyncState(bridge.dispatcher()), filters_(std::move(filters)),
         pipeline_(filters_.size()), bridge_(bridge), out_buffer_manager_(out_buffer_manager),
-        on_complete_(std::move(on_complete)) {}
+        on_complete_(std::move(on_complete)), remaining_stages_(filters_.size()) {}
 
   ~ResponseAsyncState() override { cancel(); }
 
@@ -124,7 +124,7 @@ public:
       return;
     }
 
-    if (input_ended_ && !draining_pending_items_ && !terminated()) {
+    if (input_ended_ && !draining_pending_items_) {
       pipeline_.stage(0)->close();
     }
   }
@@ -133,7 +133,7 @@ public:
     if (terminated()) {
       return;
     }
-    auto self = shared_from_this();
+    auto self = weak_from_this().lock();
     on_complete_ = nullptr;
     cancelHandles();
     cleanupInput();
@@ -157,6 +157,7 @@ protected:
   void cleanupInput() {
     draining_pending_items_ = false;
     pending_items_.clear();
+    stages_done_.close();
   }
 
   // Mode-specific hooks.
@@ -207,8 +208,12 @@ private:
 
   // Forwards a stage's input untouched, standing in for a filter that has bowed out.
   Coroutine::Task<absl::Status> bypassStage(size_t index) {
+    auto self = shared_from_this();
     while (true) {
       ASSIGN_OR_CO_RETURN(auto item, co_await pipeline_.receive(index));
+      if (terminated()) {
+        co_return absl::CancelledError("response pipeline cancelled");
+      }
       if (!item.has_value()) {
         pipeline_.stage(index + 1)->close();
         co_return absl::OkStatus();
@@ -232,15 +237,29 @@ private:
       CO_RETURN_IF_ERROR(co_await serializeItem(std::move(*item)));
     }
     CO_RETURN_IF_ERROR(co_await finishSerialize());
+    if (remaining_stages_ > 0) {
+      // A filter later in the chain may have closed its downstream stage early while upstream
+      // response data is still arriving. Keep running until all earlier stages have drained the
+      // full response.
+      ASSIGN_OR_CO_RETURN(auto done, co_await stages_done_.pop());
+      (void)done;
+    }
     // Yield to the dispatcher before firing on_complete_ so completion never runs reentrantly
     // inside a filter's encodeData/encodeTrailers callback.
     CO_RETURN_IF_ERROR(co_await Coroutine::yield());
-    auto self = shared_from_this();
     markTerminated();
     if (ResponseFilterManager::OnCompleteFn callback = std::move(on_complete_)) {
+      auto self = shared_from_this();
       callback(absl::OkStatus());
     }
     co_return absl::OkStatus();
+  }
+
+  void onStageFinished() {
+    ASSERT(remaining_stages_ > 0);
+    if (--remaining_stages_ == 0) {
+      stages_done_.tryPush(true);
+    }
   }
 
   void onFilterCompletion(size_t index, absl::Status status) {
@@ -253,6 +272,7 @@ private:
     }
     if (pipeline_.stage(index)->closed() && pipeline_.stage(index)->empty()) {
       pipeline_.stage(index + 1)->close();
+      onStageFinished();
       return;
     }
     // The filter is done: splice it out and let the rest of the stream flow past it. An item it
@@ -263,6 +283,8 @@ private:
       if (auto s = weak.lock()) {
         if (!status.ok()) {
           s->fail(std::move(status));
+        } else {
+          s->onStageFinished();
         }
       }
     });
@@ -283,6 +305,8 @@ private:
 
   ResponseFilterManager::OnCompleteFn on_complete_;
   std::deque<PendingItem> pending_items_;
+  Coroutine::AsyncQueue<bool> stages_done_{/*max_size=*/1};
+  size_t remaining_stages_{0};
   bool draining_pending_items_{false};
   bool input_ended_{false};
 };

@@ -2249,6 +2249,55 @@ TEST_F(AiProtocolManagerFilterTest, UnaryJsonResponseEngagesOnStructuredSuffixAn
   EXPECT_EQ(encoded_injected_.toString(), R"({"a":1,"tagged":true})");
 }
 
+TEST_F(AiProtocolManagerFilterTest,
+       UnaryJsonResponseAnchorsContentLengthBeforeRemovalForTokenUsageLimit) {
+  if (filter_ != nullptr) {
+    filter_->onDestroy();
+  }
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
+  proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
+  proto.mutable_response_handling()
+      ->mutable_token_usage()
+      ->mutable_limits()
+      ->mutable_max_json_body_size()
+      ->set_value(128);
+  filter_ = std::make_unique<AiProtocolManagerFilter>(
+      factory_, std::make_shared<const FilterConfig>(
+                    proto, *stats_store_.rootScope(),
+                    AiFilterFactories{[](const AiFilterContext&) -> AiFilterSharedPtr {
+                      return std::make_shared<UnaryTaggingAiFilter>("tagged");
+                    }}));
+  filter_->setDecoderFilterCallbacks(callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  // Advertise content-length > max_json_body_size (128), while sending a body smaller than 128
+  // bytes so only the header check in encodeHeaders() can trigger response_body_too_large.
+  Http::TestResponseHeaderMapImpl resp_headers{
+      {":status", "200"}, {"content-type", "application/json"}, {"content-length", "1000"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_TRUE(resp_headers.getContentLengthValue().empty());
+  EXPECT_EQ(counterValue("response_body_too_large"), 1);
+
+  Buffer::OwnedImpl json_chunk(
+      R"({"model":"gpt-4","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(counterValue("token_usage_failed"), 1);
+  EXPECT_EQ(counterValue("token_usage_found"), 0);
+  EXPECT_EQ(
+      encoded_injected_.toString(),
+      R"({"model":"gpt-4","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12},"tagged":true})");
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

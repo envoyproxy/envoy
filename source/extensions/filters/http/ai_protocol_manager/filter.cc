@@ -542,6 +542,10 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     return Http::FilterHeadersStatus::Continue;
   }
 
+  uint64_t content_length = 0;
+  const bool has_content_length =
+      absl::SimpleAtoi(headers.getContentLengthValue(), &content_length);
+
   if (can_filter_response && (is_sse || is_json)) {
     headers.removeContentLength();
     encode_bridge_ = std::make_unique<EncoderFilterChainBridge>(
@@ -586,9 +590,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
       // takes -- identical bodies produce the identical outcome regardless of
       // whether the length was advertised. onData() stays authoritative for
       // absent or wrong lengths.
-      uint64_t content_length = 0;
-      if (absl::SimpleAtoi(headers.getContentLengthValue(), &content_length) &&
-          content_length > config_->maxJsonBodySize()) {
+      if (has_content_length && content_length > config_->maxJsonBodySize()) {
         handler->abandonOverLimit();
       }
       response_handler_ = std::move(handler);
