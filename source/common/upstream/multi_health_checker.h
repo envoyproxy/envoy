@@ -37,7 +37,7 @@ private:
     void set(Host& host, Host::HealthFlag flag) override;
     void clear(Host& host, Host::HealthFlag flag) override;
 
-    // Causes creation and initialization of the flags if they don't yet exist.
+    // Causes creation and initialization of per-host data if it doesn't yet exist.
     uint32_t& hostFlags(const Host& host);
 
   private:
@@ -50,37 +50,43 @@ private:
         : flag_callbacks(parent, checker_idx) {}
 
     SubCheckerHealthFlagCallbacks flag_callbacks;
-    absl::node_hash_map<const Host*, uint32_t> host_flags;
-    // Must be last: destructor invokes flag callbacks that access host_flags.
     HealthCheckerSharedPtr checker;
   };
 
   struct PerHostState {
-    uint32_t initial_check_pending{0};
-    uint32_t fail_bits{0};
-    uint32_t degraded_bits{0};
-    uint32_t pending_bits{0};
-    uint32_t timeout_bits{0};
-    uint32_t immediate_fail{0};
+    PerHostState(uint32_t num_checkers, const Host& host);
+
+    // Bit-fields of the per-checker state for each status, indexed by checker index.
+    uint32_t initial_check_pending_bits_; // Initial health check has not yet run for this checker.
+    uint32_t fail_bits_;                  // This checker has reported a failure state.
+    uint32_t degraded_bits_;              // This checker has reported a degraded state.
+    uint32_t pending_bits_;               // This checker has reported a pending state.
+    uint32_t timeout_bits_;               // This checker has reported a timeout state.
+    uint32_t immediate_fail_bits_;        // This checker has reported an immediate failure.
+
+    // Per-sub-checker health flags; indexed by checker index.
+    std::vector<uint32_t> checker_flags_;
   };
 
   void onCheckerResult(uint32_t checker_index, HostSharedPtr host, HealthTransition changed_state,
                        HealthState result);
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
-  void initializeHost(const HostSharedPtr& host);
+  PerHostState& getOrCreateHostState(const Host& host);
 
   MultiHealthChecker(Cluster& cluster);
 
-  static bool isGaugeHealthy(const PerHostState& state) { return state.fail_bits == 0; }
-  static bool isGaugeDegraded(const PerHostState& state) { return state.degraded_bits != 0; }
+  static bool isGaugeHealthy(const PerHostState& state) { return state.fail_bits_ == 0; }
+  static bool isGaugeDegraded(const PerHostState& state) { return state.degraded_bits_ != 0; }
   void adjustGauges(const PerHostState& state, void (Stats::Gauge::*op)());
 
   Cluster& cluster_;
   Stats::StatNamePool stat_name_pool_;
   Stats::Gauge& healthy_gauge_;
   Stats::Gauge& degraded_gauge_;
-  std::vector<PerCheckerData> checkers_;
+  // host_states_ must be declared before checkers_: checker destructors invoke flag callbacks
+  // that access host_states_, so it must outlive them.
   absl::node_hash_map<const Host*, PerHostState> host_states_;
+  std::vector<PerCheckerData> checkers_;
   std::vector<HostStatusCb> callbacks_;
   Common::CallbackHandlePtr member_update_cb_;
   bool started_{false};
