@@ -469,19 +469,26 @@ void OPENSSL_sk_sort_and_dedup(_STACK *sk,
     return;
   }
 
+  // Replacing the comparison function below clears the stack's sorted status,
+  // so remember it here, while it's still intact, to avoid needlessly sorting
+  // a stack that is already in sorted order.
+  int was_sorted = ossl.ossl_OPENSSL_sk_is_sorted(sk);
+
   // OpenSSL's stack is opaque, so the only way to get hold of its comparison
-  // function is to temporarily replace it. Note that doing so makes the stack
-  // not sorted, even if it was already sorted, which is why we always sort it
-  // below rather than relying on ossl.ossl_OPENSSL_sk_sort() being a no-op.
+  // function is to temporarily replace it.
   ossl_OPENSSL_sk_compfunc compfunc = ossl.ossl_OPENSSL_sk_set_cmp_func(sk, NULL);
   ossl.ossl_OPENSSL_sk_set_cmp_func(sk, compfunc);
 
   if (compfunc == NULL) {
-    // Without a comparison function, BoringSSL neither sorts nor dedups.
+    // Without a comparison function, BoringSSL neither sorts nor dedups. Note
+    // that the round trip above leaves the sorted status untouched in this
+    // case, because the comparison function never actually changed.
     return;
   }
 
-  ossl.ossl_OPENSSL_sk_sort(sk);
+  if (!was_sorted) {
+    ossl.ossl_OPENSSL_sk_sort(sk);
+  }
 
   int num = ossl.ossl_OPENSSL_sk_num(sk);
   int new_num = (num > 0) ? 1 : 0;
@@ -495,7 +502,7 @@ void OPENSSL_sk_sort_and_dedup(_STACK *sk,
         ossl.ossl_OPENSSL_sk_set(sk, new_num, value);
       }
       new_num++;
-    } else if (free_func != NULL) {
+    } else if (free_func != NULL && call_free_func != NULL) {
       call_free_func(free_func, value);
     }
   }
@@ -504,10 +511,14 @@ void OPENSSL_sk_sort_and_dedup(_STACK *sk,
     while (num-- > new_num) {
       ossl.ossl_OPENSSL_sk_pop(sk);
     }
-    // Popping elements makes the stack not sorted, even though the remaining
-    // elements are still in sorted order, so we have to sort it again.
-    ossl.ossl_OPENSSL_sk_sort(sk);
   }
+
+  // Restore the stack's sorted status, which was cleared by replacing the
+  // comparison function above, and by any popping of duplicates. The remaining
+  // elements are already in sorted order, but OpenSSL provides no way of
+  // saying so other than sorting them again. This is a no-op if the status
+  // survived.
+  ossl.ossl_OPENSSL_sk_sort(sk);
 }
 
 /*
