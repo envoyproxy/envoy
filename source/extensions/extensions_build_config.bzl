@@ -688,10 +688,10 @@ EXTENSIONS = {
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
 # need to directly reference Envoy extensions.
-EXTENSION_CONFIG_VISIBILITY = ["//:extension_config", "//:contrib_library", "//:mobile_library"]
-EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library", "//:contrib_library", "//:mobile_library"]
-CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]
-MOBILE_PACKAGE_VISIBILITY = ["//:mobile_library"]
+EXTENSION_CONFIG_VISIBILITY = ["@envoy//:extension_config", "@envoy//:contrib_library", "@envoy//:mobile_library"]
+EXTENSION_PACKAGE_VISIBILITY = ["@envoy//:extension_library", "@envoy//:contrib_library", "@envoy//:mobile_library"]
+CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["@envoy//:contrib_library"]
+MOBILE_PACKAGE_VISIBILITY = ["@envoy//:mobile_library"]
 
 # Set this variable to true to disable alwayslink for envoy_cc_library.
 # TODO(alyssawilk) audit uses of this in source/ and migrate all libraries to extensions.

@@ -8,7 +8,6 @@ envoy_mobile_package()
 envoy_cc_library(
     name = "engine_builder_test_shim_lib",
     hdrs = ["engine_builder_test_shim.h"],
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         "//library/cc:mobile_engine_builder_lib",
@@ -18,7 +17,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "engine_builder_test_shim_legacy_lib",
     hdrs = ["engine_builder_test_shim.h"],
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         "//library/cc:engine_builder_lib",
@@ -29,7 +27,6 @@ envoy_cc_test_with_engine_builder(
     name = "engine_test",
     srcs = ["engine_test.cc"],
     env = {"ENVOY_NO_LOG_SINK": ""},
-    repository = "@envoy",
     deps = [
         "//library/common:engine_types_lib",
         "//test/common/integration:engine_with_test_server",

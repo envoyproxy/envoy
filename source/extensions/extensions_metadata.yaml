@@ -1193,7 +1193,7 @@ envoy.geoip_providers.maxmind:
   categories:
   - envoy.geoip_providers
   security_posture: unknown
-  status: wip
+  status: stable
   type_urls:
   - envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
 envoy.grpc_credentials.file_based_metadata:

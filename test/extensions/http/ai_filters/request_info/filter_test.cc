@@ -67,15 +67,15 @@ public:
     filters.push_back(std::make_unique<RequestInfoFilter>(
         config != nullptr ? std::move(config) : makeConfig(),
         AiFilterContext{stream_info_, request_headers_, protocol}));
-    FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
-                          stream_info_);
+    FilterManager manager(std::move(filters));
 
     absl::Status status;
     bool completed = false;
-    manager.start([&status, &completed](absl::Status s) {
-      status = std::move(s);
-      completed = true;
-    });
+    manager.startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+                         [&status, &completed](absl::Status s) {
+                           status = std::move(s);
+                           completed = true;
+                         });
     for (int i = 0; i < 20; ++i) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }

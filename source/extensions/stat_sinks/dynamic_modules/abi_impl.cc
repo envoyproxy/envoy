@@ -252,6 +252,29 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
   return true;
 }
 
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size) {
+  return getTagExtractedName(toFlushContext(snapshot_envoy_ptr)->snapshot_.histograms(), index,
+                             name_buffer, name_buffer_capacity, name_size);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count) {
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  return getTagCount(*context, context->snapshot_.histograms(), index, tag_count);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size) {
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  return getTag(*context, context->snapshot_.histograms(), index, tag_index, name_buffer,
+                name_buffer_capacity, name_size, value_buffer, value_buffer_capacity, value_size);
+}
+
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
     char* name_buffer, size_t name_buffer_capacity, size_t* name_size) {
