@@ -1598,8 +1598,7 @@ dynamic_scoped_route_configs:
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump7));
 }
 
-// Tests that multiple dynamic scopes in /config_dump are returned in lexicographically sorted
-// order.
+// Tests that multiple dynamic scopes in /config_dump are returned in sorted order.
 TEST_F(ScopedRdsTest, ConfigDumpDeterministicOrdering) {
   setup();
   init_watcher_.expectReady();
