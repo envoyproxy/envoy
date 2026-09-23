@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.data.ai.v3;
 
-import "envoy/type/ai/v3/api_protocol.proto";
+import "envoy/type/ai/v3/llm_protocol.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -27,7 +27,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#next-free-field: 8]
 message RequestInfo {
   // The route's declared wire API. When unspecified, only ``model`` and ``stream`` are read.
-  type.ai.v3.ApiProtocol input_api_protocol = 1;
+  type.ai.v3.LLMProtocol input_llm_protocol = 1;
 
   // The requested model.
   string model = 2;

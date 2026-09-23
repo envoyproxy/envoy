@@ -103,13 +103,13 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "api_protocol_adapters_test",
-    srcs = ["api_protocol_adapters_test.cc"],
+    name = "llm_protocol_adapters_test",
+    srcs = ["llm_protocol_adapters_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/json:json_loader_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:api_protocol_adapters_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_adapters_lib",
         "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
         "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",
         "//test/test_common:utility_lib",

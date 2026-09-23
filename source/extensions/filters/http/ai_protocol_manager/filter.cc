@@ -14,9 +14,9 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "absl/strings/match.h"
@@ -31,7 +31,6 @@ namespace {
 
 constexpr absl::string_view DefaultTokenUsageNamespace{"envoy.ai.token_usage"};
 constexpr absl::string_view SseContentType{"text/event-stream"};
-constexpr absl::string_view JsonContentType{"application/json"};
 // Sized so that ordinary OpenAI Responses API terminal lifecycle events --
 // which embed the complete response object, generated output included -- are
 // extracted by default; see the proto for the rationale.
@@ -73,6 +72,20 @@ bool canHoldRequest(const Http::RequestHeaderMap& headers) {
   return isJsonContentType(headers.getContentTypeValue());
 }
 
+// Whether a response carries an unframed unary JSON body (`application/json`
+// or a `+json` structured-syntax suffix, excluding gRPC / Connect streaming
+// envelopes and upgraded connections).
+bool isJsonResponse(const Http::ResponseHeaderMap& headers, bool end_stream) {
+  if (Grpc::Common::isGrpcResponseHeaders(headers, end_stream) ||
+      Grpc::Common::isConnectStreamingResponseHeaders(headers)) {
+    return false;
+  }
+  if (Http::Utility::isUpgrade(headers)) {
+    return false;
+  }
+  return isJsonContentType(headers.getContentTypeValue());
+}
+
 // Extraction requires an unencoded body: every entry and comma-separated
 // coding of the (repeatable) Content-Encoding header must be `identity`.
 bool contentEncodingIsIdentity(const Http::ResponseHeaderMap& headers) {
@@ -94,7 +107,7 @@ bool contentEncodingIsIdentity(const Http::ResponseHeaderMap& headers) {
 // status-only and publishes as FAILED.
 envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degraded) {
   envoy::data::ai::v3::TokenUsage typed;
-  typed.set_api_protocol(protocolToProto(usage.api_protocol));
+  typed.set_llm_protocol(protocolToProto(usage.llm_protocol));
   if (!usage.model.empty()) {
     typed.set_model(usage.model);
   }
@@ -144,8 +157,8 @@ FilterConfig::FilterConfig(
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
           proto.response_handling().token_usage().include_unconfigured_routes()),
-      default_api_protocol_(
-          protocolFromProto(proto.response_handling().token_usage().default_api_protocol())),
+      default_llm_protocol_(
+          protocolFromProto(proto.response_handling().token_usage().default_llm_protocol())),
       metadata_namespace_(proto.response_handling().token_usage().metadata_namespace().empty()
                               ? std::string(DefaultTokenUsageNamespace)
                               : proto.response_handling().token_usage().metadata_namespace()),
@@ -233,7 +246,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     route_request_protocol_ = route_config->requestProtocol();
     if (route_has_request_) {
       ENVOY_LOG(debug, "ai_protocol_manager: route declares request API {}",
-                apiProtocolName(route_request_protocol_));
+                llmProtocolName(route_request_protocol_));
     }
   }
 
@@ -505,7 +518,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // inspected can count an encoding skip.
   const absl::string_view content_type = headers.getContentTypeValue();
   const bool is_sse = contentTypeMatches(content_type, SseContentType);
-  const bool is_json = !is_sse && contentTypeMatches(content_type, JsonContentType);
+  const bool is_json = !is_sse && isJsonResponse(headers, end_stream);
   if (!is_sse && !is_json) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -529,25 +542,35 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (can_filter_response && is_sse) {
+  uint64_t content_length = 0;
+  const bool has_content_length =
+      absl::SimpleAtoi(headers.getContentLengthValue(), &content_length);
+
+  if (can_filter_response && (is_sse || is_json)) {
     headers.removeContentLength();
     encode_bridge_ = std::make_unique<EncoderFilterChainBridge>(
         *encoder_callbacks_, *decoder_callbacks_, config_->stats());
     encode_manager_ = std::make_shared<BufferManager>(
         BufferManager::Config{encoder_callbacks_->encoderBufferLimit()}, buffer_factory_,
         *encode_bridge_);
-    filter_manager_->startSseResponse(
-        buffer_factory_, *encode_bridge_, *encode_manager_,
-        [this](absl::Status status) { onEncodeComplete(std::move(status)); });
+    if (is_sse) {
+      filter_manager_->startSseResponse(
+          buffer_factory_, *encode_bridge_, *encode_manager_,
+          [this](absl::Status status) { onEncodeComplete(std::move(status)); });
+    } else if (is_json) {
+      filter_manager_->startUnaryResponse(
+          buffer_factory_, *encode_bridge_, *encode_manager_,
+          [this](absl::Status status) { onEncodeComplete(std::move(status)); });
+    }
   }
 
   if (want_token_usage) {
     // The wire API to extract against, in precedence order: the route's declared
     // response API, the route's declared request API, the configured fallback;
     // Unspecified auto-detects from the response shape.
-    ApiProtocol protocol = config_->defaultApiProtocol();
+    LLMProtocol protocol = config_->defaultLLMProtocol();
     if (route_config != nullptr &&
-        route_config->effectiveResponseProtocol() != ApiProtocol::Unspecified) {
+        route_config->effectiveResponseProtocol() != LLMProtocol::Unspecified) {
       protocol = route_config->effectiveResponseProtocol();
     }
 
@@ -567,9 +590,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
       // takes -- identical bodies produce the identical outcome regardless of
       // whether the length was advertised. onData() stays authoritative for
       // absent or wrong lengths.
-      uint64_t content_length = 0;
-      if (absl::SimpleAtoi(headers.getContentLengthValue(), &content_length) &&
-          content_length > config_->maxJsonBodySize()) {
+      if (has_content_length && content_length > config_->maxJsonBodySize()) {
         handler->abandonOverLimit();
       }
       response_handler_ = std::move(handler);
@@ -681,7 +702,7 @@ bool AiProtocolManagerFilter::finalizeResponseHandling() {
 
   // Convert the finalized accumulator once into the authoritative typed
   // record (envoy.data.ai.v3.TokenUsage). When extraction failed outright the
-  // record is status-only (api_protocol/model/extraction_status, no counts),
+  // record is status-only (llm_protocol/model/extraction_status, no counts),
   // letting consumers distinguish "failed to extract" from "no usage
   // supplied". Only typed metadata is published: consumers with full-fidelity
   // needs (ext_proc typed forwarding, filters reading typed metadata) share

@@ -113,6 +113,16 @@ public:
   virtual Coroutine::Task<absl::Status> encodeSSE(SseStreamReceiver, SseStreamPropagator) {
     co_return absl::OkStatus();
   }
+
+  // Invoked for unary JSON HTTP responses. The coroutine runs for the lifetime of the response,
+  // receiving and propagating batches of flattened leaf JSON fields in a streaming fashion.
+  //
+  // Returning early splices the filter out of the pipeline so subsequent field batches flow past
+  // it untouched.
+  virtual Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver,
+                                                    AiResponseStreamPropagator) {
+    co_return absl::OkStatus();
+  }
 };
 
 using AiFilterSharedPtr = std::shared_ptr<AiFilter>;
@@ -123,7 +133,7 @@ struct AiFilterContext {
   StreamInfo::StreamInfo& stream_info;
   const Http::RequestHeaderMap& request_headers;
   // Route-declared request wire API; Unspecified when the route named none.
-  ApiProtocol request_protocol;
+  LLMProtocol request_protocol;
   // Bytes of the buffered request payload, captured before replay drains it.
   uint64_t request_payload_bytes{0};
 };

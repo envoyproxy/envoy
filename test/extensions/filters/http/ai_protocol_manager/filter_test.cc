@@ -188,7 +188,7 @@ public:
   // request payload for the filter to hold.
   void setRouteConfig() {
     PerRouteProto proto;
-    proto.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+    proto.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
     route_config_ = std::make_unique<RouteConfig>(proto);
     ON_CALL(callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(testing::Return(route_config_.get()));
@@ -625,7 +625,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, SseUsagePublishedAtEndOfStream) {
 
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   // The provider total is always preserved, agreeing or not.
   EXPECT_EQ(typed->model(), "gpt-4o");
   EXPECT_EQ(typed->input_tokens().value(), 19);
@@ -674,7 +674,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentLengthOverCapFailsExtraction)
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
   auto* token_usage = proto_config.mutable_response_handling()->mutable_token_usage();
   token_usage->set_include_unconfigured_routes(true);
-  token_usage->set_default_api_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  token_usage->set_default_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   token_usage->mutable_limits()->mutable_max_json_body_size()->set_value(64);
   setupWithProto(proto_config);
   Http::TestResponseHeaderMapImpl headers{
@@ -684,7 +684,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentLengthOverCapFailsExtraction)
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   EXPECT_EQ(counterValue("response_body_too_large"), 1);
   EXPECT_EQ(counterValue("response_parse_error"), 0); // Never buffered or parsed.
   EXPECT_EQ(counterValue("token_usage_failed"), 1);
@@ -752,7 +752,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ExtractionFailurePublishesStatusOnly
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   EXPECT_EQ(typed->model(), "gpt-4o");
   EXPECT_FALSE(typed->has_total_tokens()); // No counts recovered.
   EXPECT_FALSE(typed->has_input_tokens());
@@ -862,7 +862,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, SseAnthropicComputedTotal) {
   EXPECT_EQ(typed->input_tokens().value(), 2679);
   EXPECT_EQ(typed->output_tokens().value(), 15);
   EXPECT_EQ(typed->total_tokens().value(), 2694);
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
 }
 
 // A JSON body (Gemini generateContent) is parsed at end of stream.
@@ -883,7 +883,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, JsonBodyGemini) {
   EXPECT_EQ(typed->output_tokens().value(), 161);
   EXPECT_EQ(typed->total_tokens().value(), 167);
   EXPECT_EQ(typed->output_token_details().reasoning_tokens().value(), 12);
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
   EXPECT_EQ(typed->model(), "gemini-2.5-flash");
 }
 
@@ -1036,13 +1036,13 @@ TEST_F(AiProtocolManagerFilterResponseTest, UsageAbsentCountsMissing) {
 
 // A configured fallback wire API pins extraction for shapes auto-detection
 // cannot place.
-TEST_F(AiProtocolManagerFilterResponseTest, DefaultApiProtocolConfig) {
-  setup("{default_api_protocol: ANTHROPIC_MESSAGES}");
+TEST_F(AiProtocolManagerFilterResponseTest, DefaultLLMProtocolConfig) {
+  setup("{default_llm_protocol: ANTHROPIC_MESSAGES}");
   sendHeaders("application/json");
   sendData("{\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}", true);
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
 }
 
 // Token usage is scoped to declared routes by default: with
@@ -1082,30 +1082,30 @@ TEST_F(AiProtocolManagerFilterResponseTest, PerRouteProtocolPrecedence) {
   const std::string ambiguous = "{\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}";
 
   // route response (ANTHROPIC_MESSAGES) > route request (OPENAI_CHAT_COMPLETIONS).
-  setup("{default_api_protocol: GEMINI_GENERATE_CONTENT}");
+  setup("{default_llm_protocol: GEMINI_GENERATE_CONTENT}");
   PerRouteProto per_route;
-  per_route.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
-  per_route.mutable_response()->set_api_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  per_route.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  per_route.mutable_response()->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   setEncodeRouteConfig(per_route);
   sendHeaders("application/json");
   sendData(ambiguous, true);
   {
     const auto typed = singleTypedWrite("envoy.ai.token_usage");
     ASSERT_TRUE(typed.has_value());
-    EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+    EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   }
 
-  // route request > default_api_protocol.
-  setup("{default_api_protocol: GEMINI_GENERATE_CONTENT}");
+  // route request > default_llm_protocol.
+  setup("{default_llm_protocol: GEMINI_GENERATE_CONTENT}");
   PerRouteProto request_only;
-  request_only.mutable_request()->set_api_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  request_only.mutable_request()->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   setEncodeRouteConfig(request_only);
   sendHeaders("application/json");
   sendData(ambiguous, true);
   {
     const auto typed = singleTypedWrite("envoy.ai.token_usage");
     ASSERT_TRUE(typed.has_value());
-    EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+    EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   }
 }
 
@@ -1267,7 +1267,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, OversizedBodyWithoutContentLengthFai
 
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED);
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
   EXPECT_EQ(counterValue("response_body_too_large"), 1);
   EXPECT_EQ(counterValue("token_usage_failed"), 1);
@@ -1321,7 +1321,7 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
 class ContextRecordingAiFilter : public AiFilter {
 public:
   struct Seen {
-    ApiProtocol protocol;
+    LLMProtocol protocol;
     std::string path;
     const StreamInfo::StreamInfo* stream_info;
     uint64_t payload_bytes;
@@ -1363,7 +1363,7 @@ TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) 
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(built, 1);
   ASSERT_EQ(seen.size(), 1);
-  EXPECT_EQ(seen[0].protocol, ApiProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen[0].protocol, LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(seen[0].path, "/chat/completions");
   EXPECT_EQ(seen[0].stream_info, &callbacks_.stream_info_);
   EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
@@ -2104,6 +2104,221 @@ TEST_F(AiProtocolManagerFilterTest, SseResponseFilterErrorSendsBadGatewayLocalRe
 
   EXPECT_EQ(encode_local_reply_calls_, 1);
   EXPECT_EQ(encode_local_reply_code_, Http::Code::BadGateway);
+}
+
+class UnaryTaggingAiFilter : public AiFilter {
+public:
+  explicit UnaryTaggingAiFilter(std::string tag, std::vector<std::string>* order = nullptr,
+                                bool fail = false)
+      : tag_(std::move(tag)), order_(order), fail_(fail) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+
+  Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive,
+                                            AiResponseStreamPropagator propagate) override {
+    if (order_ != nullptr) {
+      order_->push_back(tag_);
+    }
+    while (true) {
+      ASSIGN_OR_CO_RETURN(std::vector<FlattenJsonField> fields, co_await receive());
+      if (fields.empty()) {
+        break;
+      }
+      if (fail_) {
+        co_return absl::InternalError("unary filter error");
+      }
+      CO_RETURN_IF_ERROR(co_await propagate(std::move(fields)));
+    }
+    std::vector<FlattenJsonField> tag_batch;
+    tag_batch.emplace_back(std::vector<FieldPathSegment>{tag_}, nlohmann::json(true));
+    CO_RETURN_IF_ERROR(co_await propagate(std::move(tag_batch)));
+    co_return absl::OkStatus();
+  }
+
+private:
+  std::string tag_;
+  std::vector<std::string>* order_;
+  bool fail_;
+};
+
+TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverUnaryJsonResponse) {
+  std::vector<std::string> encode_order;
+  createFilterWithAiFilters(
+      {[&](const AiFilterContext&) -> AiFilterSharedPtr {
+         return std::make_shared<UnaryTaggingAiFilter>("first", &encode_order);
+       },
+       [&](const AiFilterContext&) -> AiFilterSharedPtr {
+         return std::make_shared<UnaryTaggingAiFilter>("second", &encode_order);
+       }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{
+      {":status", "200"}, {"content-type", "application/json"}, {"content-length", "100"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_TRUE(resp_headers.getContentLengthValue().empty());
+
+  Buffer::OwnedImpl json_chunk(R"({"id":"chatcmpl-1","a":1})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_TRUE(encoded_injected_end_stream_);
+  // Filters run in reverse order on the response path: "second" (N-1) before "first" (0).
+  EXPECT_EQ(encode_order, (std::vector<std::string>{"second", "first"}));
+  EXPECT_EQ(encoded_injected_.toString(),
+            R"({"id":"chatcmpl-1","a":1,"second":true,"first":true})");
+}
+
+TEST_F(AiProtocolManagerFilterTest, UnaryJsonResponseEndedByTrailersContinuesEncoding) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<UnaryTaggingAiFilter>("tagged");
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "application/json"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl json_chunk(R"({"a":1})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Http::TestResponseTrailerMapImpl resp_trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_->encodeTrailers(resp_trailers), Http::FilterTrailersStatus::StopIteration);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_EQ(encode_continue_calls_, 1);
+  EXPECT_EQ(encoded_injected_.toString(), R"({"a":1,"tagged":true})");
+}
+
+TEST_F(AiProtocolManagerFilterTest, UnaryJsonResponseFilterErrorSendsBadGatewayLocalReply) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<UnaryTaggingAiFilter>("tagged", /*order=*/nullptr, /*fail=*/true);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "application/json"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl json_chunk(R"({"a":1})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 1);
+  EXPECT_EQ(encode_local_reply_code_, Http::Code::BadGateway);
+}
+
+TEST_F(AiProtocolManagerFilterTest, UnaryJsonResponseEngagesOnStructuredSuffixAndSkipsFramedRpc) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<UnaryTaggingAiFilter>("tagged");
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  // Framed RPC responses (`application/grpc+json`, `application/connect+json`) carry a 5-byte
+  // binary envelope and must pass through without starting the unary JSON pipeline.
+  Http::TestResponseHeaderMapImpl grpc_json_headers{
+      {":status", "200"}, {"content-type", "application/grpc+json"}, {"content-length", "50"}};
+  EXPECT_EQ(filter_->encodeHeaders(grpc_json_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(grpc_json_headers.getContentLengthValue(), "50");
+
+  Http::TestResponseHeaderMapImpl connect_json_headers{
+      {":status", "200"}, {"content-type", "application/connect+json"}, {"content-length", "50"}};
+  EXPECT_EQ(filter_->encodeHeaders(connect_json_headers, false),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(connect_json_headers.getContentLengthValue(), "50");
+
+  // A structured `+json` response suffix engages unary JSON filtering.
+  Http::TestResponseHeaderMapImpl vendor_json_headers{
+      {":status", "200"},
+      {"content-type", "application/vnd.openai+json"},
+      {"content-length", "50"}};
+  EXPECT_EQ(filter_->encodeHeaders(vendor_json_headers, false),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_TRUE(vendor_json_headers.getContentLengthValue().empty());
+
+  Buffer::OwnedImpl json_chunk(R"({"a":1})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encoded_injected_.toString(), R"({"a":1,"tagged":true})");
+}
+
+TEST_F(AiProtocolManagerFilterTest,
+       UnaryJsonResponseAnchorsContentLengthBeforeRemovalForTokenUsageLimit) {
+  if (filter_ != nullptr) {
+    filter_->onDestroy();
+  }
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
+  proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
+  proto.mutable_response_handling()
+      ->mutable_token_usage()
+      ->mutable_limits()
+      ->mutable_max_json_body_size()
+      ->set_value(128);
+  filter_ = std::make_unique<AiProtocolManagerFilter>(
+      factory_, std::make_shared<const FilterConfig>(
+                    proto, *stats_store_.rootScope(),
+                    AiFilterFactories{[](const AiFilterContext&) -> AiFilterSharedPtr {
+                      return std::make_shared<UnaryTaggingAiFilter>("tagged");
+                    }}));
+  filter_->setDecoderFilterCallbacks(callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  // Advertise content-length > max_json_body_size (128), while sending a body smaller than 128
+  // bytes so only the header check in encodeHeaders() can trigger response_body_too_large.
+  Http::TestResponseHeaderMapImpl resp_headers{
+      {":status", "200"}, {"content-type", "application/json"}, {"content-length", "1000"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_TRUE(resp_headers.getContentLengthValue().empty());
+  EXPECT_EQ(counterValue("response_body_too_large"), 1);
+
+  Buffer::OwnedImpl json_chunk(
+      R"({"model":"gpt-4","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(counterValue("token_usage_failed"), 1);
+  EXPECT_EQ(counterValue("token_usage_found"), 0);
+  EXPECT_EQ(
+      encoded_injected_.toString(),
+      R"({"model":"gpt-4","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12},"tagged":true})");
 }
 
 } // namespace

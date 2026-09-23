@@ -147,6 +147,20 @@ void envoy_dynamic_module_callback_access_logger_get_bytes_info(
   }
 }
 
+void envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_downstream_wire_bytes* bytes_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& downstream = logger->stream_info_->getDownstreamBytesMeter();
+  if (downstream) {
+    bytes_out->bytes_received = downstream->wireBytesReceived();
+    bytes_out->bytes_sent = downstream->wireBytesSent();
+  } else {
+    bytes_out->bytes_received = 0;
+    bytes_out->bytes_sent = 0;
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Access Logger Callbacks - Address Information
 // -----------------------------------------------------------------------------
