@@ -135,9 +135,10 @@ std::string joinRulePath(absl::string_view prefix, absl::string_view relative_pa
   return absl::StrCat(prefix, ".", relative_path);
 }
 
-// If `path` is equal to `from_prefix` or nested beneath it (via `.` or `[]`), returns the path
-// rewritten under `to_prefix`. Returns `std::nullopt` when `path` does not lie under
-// `from_prefix`.
+// When a rule moves `from_prefix` to `to_prefix`, checks if `path` is that field itself or a
+// child field inside it (e.g. moving `"messages"` -> `"turns"` rewrites `"messages[].content"`
+// to `"turns[].content"`, while ignoring unrelated fields like `"messages_count"` or `"tools"`).
+// Returns the new path if affected, or `std::nullopt` if `path` did not move.
 std::optional<std::string> rewritePathPrefix(absl::string_view path, absl::string_view from_prefix,
                                              absl::string_view to_prefix) {
   if (path == from_prefix) {
@@ -319,14 +320,15 @@ DialectTranscodePack createAnthropicTranscodePack() {
                                          TranscodeRule::move("input_schema", "function.parameters"),
                                          TranscodeRule::setDefault("type", "function"),
                                      }),
-              // 4. Map `tool_choice`. Anthropic always spells this as an object
-              //    (`{type: auto|any|tool|none, name}`); the IR spells the unconstrained cases
-              //    as a bare string and only the pinned-tool case as an object. The final
-              //    unwrap collapses `{"type": "auto"}` to `"auto"` while leaving the two-member
-              //    `{"type": "function", "function": {...}}` untouched.
-              //    `disable_parallel_tool_use` has no IR equivalent, and leaving it in place
-              //    would block the collapse below, stranding `{"type": "auto", ...}` in a shape
-              //    the IR's `tool_choice` does not accept.
+              // 4. Convert Anthropic `tool_choice` (always an object) to OpenAI IR:
+              //      {"type": "auto"|"none"}        -> "auto" | "none"
+              //      {"type": "any"}                -> "required"
+              //      {"type": "tool", "name": "fn"} -> {"type": "function", "function": {"name":
+              //      "fn"}}
+              //    `disable_parallel_tool_use` has no OpenAI equivalent and must be dropped first
+              //    so `unwrapSingleKeyObject` sees a single-key `{"type": "..."}` object and
+              //    collapses it to a string (leaving two-key `{"type": "function", "function":
+              //    {...}}` intact).
               TranscodeRule::drop("tool_choice.disable_parallel_tool_use"),
               TranscodeRule::valueMap("tool_choice.type",
                                       {{"any", "required"}, {"tool", "function"}}),
@@ -436,12 +438,10 @@ DialectTranscodePack createGeminiTranscodePack() {
               // on the way through, or they reach the destination quoted.
               TranscodeRule::drop("generationConfig"),
               TranscodeRule::drop("generation_config"),
-              // TODO(ginama): map `toolConfig.functionCallingConfig` back to `tool_choice`. The
-              // from-IR direction is covered, but the reverse needs a branch the rule language
-              // cannot express today: `mode: ANY` collapses to the IR's `"required"` when
-              // `allowedFunctionNames` is absent and to `{"type": "function", ...}` when it
-              // names one function. `mode` may also arrive as a raw enum integer rather than a
-              // name. Until then a Gemini-origin request loses its tool constraint at the IR.
+              // TODO(ginama): Map `toolConfig.functionCallingConfig` -> `tool_choice`.
+              // Gemini uses `mode: "ANY"` for both `"required"` (when `allowedFunctionNames` is
+              // omitted) and `{"type": "function", "function": {"name": "fn"}}` (when
+              // `allowedFunctionNames` is set), which requires conditional mapping support.
           }),
       /*from_IR=*/
       TranscodeRuleSet(
@@ -485,14 +485,11 @@ DialectTranscodePack createGeminiTranscodePack() {
                   {{"auto", "AUTO"}, {"none", "NONE"}, {"required", "ANY"}, {"function", "ANY"}}),
               TranscodeRule::move("tool_choice.type", "toolConfig.functionCallingConfig.mode"),
               TranscodeRule::drop("tool_choice"),
-              // 5. `model` and `stream` belong in the Gemini URL (`/v1beta/models/{model}:
-              //    generateContent` vs `:streamGenerateContent`), not the body. They are
-              //    deliberately left in the payload rather than dropped: dropping them destroys
-              //    the only copy of the routing information, and Gemini's root schema sets
-              //    `allowUnknownFields(true)` so the extra fields still validate.
-              //    TODO(ginama): relocate these into the `:path` header once
-              //    `AiFilterContext::request_headers` is non-const and the transcoder filter can
-              //    rewrite the request line.
+              // 5. Keep `model` and `stream` in the JSON body for now. Gemini encodes these in
+              //    the URL path (`/v1beta/models/{model}:generateContent` or
+              //    `:streamGenerateContent`), so the upper-layer transcoding filter needs them to
+              //    rewrite `:path` (Gemini's schema allows unknown root fields).
+              //    TODO(ginama): Move `model` and `stream` into `:path` in the transcoding filter.
           }),
   };
 }
