@@ -1598,6 +1598,60 @@ dynamic_scoped_route_configs:
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump7));
 }
 
+// Tests that multiple dynamic scopes in /config_dump are returned in lexicographically sorted
+// order.
+TEST_F(ScopedRdsTest, ConfigDumpDeterministicOrdering) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  const auto res_z = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: z-scope
+route_configuration_name: z-routes
+key:
+  fragments: { string_key: "172.30.30.30" }
+)EOF");
+  const auto res_a = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: a-scope
+route_configuration_name: a-routes
+key:
+  fragments: { string_key: "172.30.30.10" }
+)EOF");
+  const auto res_m = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: m-scope
+route_configuration_name: m-routes
+key:
+  fragments: { string_key: "172.30.30.20" }
+)EOF");
+
+  const auto decoded_resources = TestUtility::decodeResources({res_z, res_a, res_m});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
+  pushRdsConfig({"z-routes", "a-routes", "m-routes"}, "1");
+
+  UniversalStringMatcher universal_matcher;
+  auto message_ptr =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
+  const auto& scoped_routes_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
+          *message_ptr);
+
+  ASSERT_EQ(scoped_routes_config_dump.dynamic_scoped_route_configs_size(), 1);
+  const auto& dynamic_config = scoped_routes_config_dump.dynamic_scoped_route_configs(0);
+  ASSERT_EQ(dynamic_config.scoped_route_configs_size(), 3);
+
+  envoy::config::route::v3::ScopedRouteConfiguration scope0, scope1, scope2;
+  EXPECT_TRUE(dynamic_config.scoped_route_configs(0).UnpackTo(&scope0));
+  EXPECT_TRUE(dynamic_config.scoped_route_configs(1).UnpackTo(&scope1));
+  EXPECT_TRUE(dynamic_config.scoped_route_configs(2).UnpackTo(&scope2));
+
+  EXPECT_EQ(scope0.name(), "a-scope");
+  EXPECT_EQ(scope1.name(), "m-scope");
+  EXPECT_EQ(scope2.name(), "z-scope");
+}
+
 // Tests whether scope key conflict with updated scopes is ignored.
 TEST_F(ScopedRdsTest, IgnoreConflictWithUpdatedScopeDelta) {
   setup();
