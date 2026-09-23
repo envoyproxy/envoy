@@ -28,7 +28,7 @@ run --color=yes
 build --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/3d87dc99c966eefbb571078245e4a623a78ad130
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/b9543bf2dcbe311c213fa36b1dcebf767c3fc42a
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -115,6 +115,7 @@ build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
 # grpc
 build --@grpc//third_party:ssl_lib=@envoy//bazel:ssl
 build --@grpc//third_party:crypto_lib=@envoy//bazel:crypto
+build --@grpc//third_party:zlib_lib=@envoy//bazel:zlib
 
 # kafka
 build --@librdkafka//:with_curl=false
