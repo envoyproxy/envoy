@@ -9,7 +9,9 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
+#include "source/extensions/http/ai_filters/common/sync_filter.h"
 
+#include "absl/status/status.h"
 #include "nlohmann/json_fwd.hpp"
 
 namespace Envoy {
@@ -43,17 +45,15 @@ using RequestInfoFilterConfigSharedPtr = std::shared_ptr<const RequestInfoFilter
 
 // Publishes envoy.data.ai.v3.RequestInfo before the manager releases the request headers, so
 // later decode filters see it from their first headers callback. First writer owns the namespace.
-class RequestInfoFilter : public HttpFilters::AiProtocolManager::AiFilter,
+class RequestInfoFilter : public Common::SyncAiFilter,
                           public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
   RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
                     const HttpFilters::AiProtocolManager::AiFilterContext& context);
 
-  // HttpFilters::AiProtocolManager::AiFilter
-  Coroutine::Task<absl::Status>
-  decode(HttpFilters::AiProtocolManager::AiRequestReceiver receive_request,
-         HttpFilters::AiProtocolManager::AiRequestPropagator propagate_request,
-         HttpFilters::AiProtocolManager::LocalReplier reply_locally) override;
+  // Common::SyncAiFilter
+  absl::Status decodeSync(HttpFilters::AiProtocolManager::AiRequest& request,
+                          HttpFilters::AiProtocolManager::LocalReplier reply_locally) override;
 
 private:
   void publish(const nlohmann::json& json);

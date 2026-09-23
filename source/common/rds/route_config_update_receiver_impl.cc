@@ -62,7 +62,7 @@ RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
       warmer_(factory_context_.mainThreadDispatcher(), [this]() { onConfigWarmed(); }) {}
 
 void RouteConfigUpdateReceiverImpl::updateConfig(
-    std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
+    ArenaWrappedProto<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
     absl::string_view version_info) {
   std::string update_id =
       fmt::format("rds {}:{}", resourceName(proto_traits_, *route_config_proto), version_info);
@@ -78,7 +78,7 @@ void RouteConfigUpdateReceiverImpl::updateConfig(
 }
 
 void RouteConfigUpdateReceiverImpl::updateState(
-    std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
+    ArenaWrappedProto<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
     absl::string_view version_info, ConfigConstSharedPtr config,
     std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id) {
   // Abort a previous warming update first to ensure the init watcher will never be notified when
