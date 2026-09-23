@@ -16,6 +16,12 @@ absl::StatusOr<Http::FilterFactoryCb> RouterFilterConfig::createHttpFilterFactor
     const envoy::extensions::filters::http::router::v3::Router& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
+  // Unlike the other HTTP filters, the router does not create every stat under its own stat
+  // prefix: the virtual host, virtual cluster and route level stats ('vhost.<name>.vcluster.
+  // <name>.upstream_rq_*' and friends) are charged to this scope under names of their own and are
+  // documented to live at the root. So the router keeps the plain scope and carries the
+  // prefix of the filter chain in the stat prefix instead.
+  //
   // The stat prefix name must be created in the symbol table of the same scope that will be used
   // to create the stats.
   Stats::Scope& scope = extra_context.scopeOr(context);

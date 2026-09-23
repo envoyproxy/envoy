@@ -179,6 +179,11 @@ RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness
 // polling the listener DrainDecision. Latched per connection when the network filter is created.
 RUNTIME_GUARD(envoy_reloadable_features_use_connection_event_drain);
 RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
+// Give the HTTP filters of the HTTP connection manager the 'http.<stat_prefix>.' scope of the
+// connection manager as the stats prefix scope of their factory context, so that the stats prefix
+// they read is empty, instead of passing that prefix as a string and relying on every filter to
+// prepend it to its stat names itself.
+RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
