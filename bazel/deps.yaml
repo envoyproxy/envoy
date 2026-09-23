@@ -739,7 +739,7 @@ msgpack-cxx:
   project_name: "msgpack for C/C++"
   project_desc: "MessagePack is an efficient binary serialization format"
   project_url: "https://github.com/msgpack/msgpack-c"
-  apparent_name: msgpack-cxx
+  apparent_name: msgpack-c
   release_date: "2024-11-02"
   use_category:
   - observability_ext
