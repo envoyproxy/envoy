@@ -95,7 +95,7 @@ bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "rules_proto_grpc", version = "5.8.0")
 bazel_dep(name = "rules_proto_grpc_cpp", version = "5.8.0")
 bazel_dep(name = "rules_python", version = "2.2.0")
-bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
+bazel_dep(name = "rules_rust", version = "0.74.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
 bazel_dep(name = "rules_swift", version = "4.0.1")
 bazel_dep(name = "spdlog", version = "1.17.0")
@@ -371,11 +371,13 @@ crate.annotation(
 crate.from_cargo(
     name = "envoy_rust_crate_index",
     cargo_lockfile = "//:Cargo.lock",
+    lockfile = "//:Cargo.Bazel.envoy.lock",
     manifests = ["//:Cargo.toml"],
 )
 crate.from_cargo(
     name = "dynamic_modules_rust_sdk_crate_index",
     cargo_lockfile = "//:Cargo.lock",
+    lockfile = "//:Cargo.Bazel.dynamic_modules.lock",
     manifests = ["//:Cargo.toml"],
 )
 use_repo(

@@ -28,7 +28,7 @@ run --color=yes
 build --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/daf8a07aa3d7d12783b4eda5d88083a4cbdc588e
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/a267f81d66df9e3ed1dd524163d99d602e351995
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -100,6 +100,7 @@ build --incompatible_default_to_explicit_init_py
 # Rust
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
+common --@rules_rust//rust/settings:skip_fission_for_rust=true
 
 # kafka
 build --@librdkafka//:with_ssl=false
