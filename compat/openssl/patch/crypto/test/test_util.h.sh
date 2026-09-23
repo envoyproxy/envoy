@@ -9,5 +9,6 @@ uncomment.sh "$1" --comment -h \
   --uncomment-regex 'std::ostream &operator<<(' \
   --uncomment-regex 'bool DecodeHex(' \
   --uncomment-regex 'std::string EncodeHex(' \
-  --uncomment-regex 'testing::AssertionResult ErrorEquals.*' \
+  --uncomment-regex-range 'testing::AssertionResult ErrorEquals' '\s*std::optional<int> reason);' \
+  --uncomment-regex-range 'testing::AssertionResult ErrorsAreAndClear' '\s*libs_and_reasons);' \
 
