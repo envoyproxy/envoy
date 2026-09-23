@@ -243,57 +243,66 @@ envoy_dynamic_module_type_early_header_mutation_config_module_ptr
 envoy_dynamic_module_on_early_header_mutation_config_new(
     envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
-  auto config_handle = std::make_unique<EarlyHeaderMutationConfigHandleImpl>(config_envoy_ptr);
-  const std::string_view name_view(name.ptr, name.length);
-  const std::string_view config_view(config.ptr, config.length);
+  return failClosed(
+      "envoy_dynamic_module_on_early_header_mutation_config_new", nullptr,
+      [&]() -> envoy_dynamic_module_type_early_header_mutation_config_module_ptr {
+        auto config_handle =
+            std::make_unique<EarlyHeaderMutationConfigHandleImpl>(config_envoy_ptr);
+        const std::string_view name_view(name.ptr, name.length);
+        const std::string_view config_view(config.ptr, config.length);
 
-  const auto& registry = EarlyHeaderMutationConfigFactoryRegistry::getRegistry();
-  auto config_factory = registry.find(name_view);
-  if (config_factory == registry.end()) {
-    DYM_LOG((*config_handle), LogLevel::Warn,
-            "Early header mutation config factory not found for name: {}", name_view);
-    return nullptr;
-  }
+        const auto& registry = EarlyHeaderMutationConfigFactoryRegistry::getRegistry();
+        auto config_factory = registry.find(name_view);
+        if (config_factory == registry.end()) {
+          DYM_LOG((*config_handle), LogLevel::Warn,
+                  "Early header mutation config factory not found for name: {}", name_view);
+          return nullptr;
+        }
 
-  auto mutation = config_factory->second->create(*config_handle, config_view);
-  if (!mutation) {
-    DYM_LOG((*config_handle), LogLevel::Warn, "Failed to create early header mutation for name: {}",
-            name_view);
-    return nullptr;
-  }
+        auto mutation = config_factory->second->create(*config_handle, config_view);
+        if (!mutation) {
+          DYM_LOG((*config_handle), LogLevel::Warn,
+                  "Failed to create early header mutation for name: {}", name_view);
+          return nullptr;
+        }
 
-  auto wrapper = std::make_unique<EarlyHeaderMutationWrapper>();
-  wrapper->config_handle_ = std::move(config_handle);
-  wrapper->mutation_ = std::move(mutation);
-  return wrapPointer(wrapper.release());
+        auto wrapper = std::make_unique<EarlyHeaderMutationWrapper>();
+        wrapper->config_handle_ = std::move(config_handle);
+        wrapper->mutation_ = std::move(mutation);
+        return wrapPointer(wrapper.release());
+      });
 }
 
 void envoy_dynamic_module_on_early_header_mutation_config_destroy(
     envoy_dynamic_module_type_early_header_mutation_config_module_ptr config_module_ptr) {
-  auto* wrapper = unwrapPointer<EarlyHeaderMutationWrapper>(config_module_ptr);
-  if (wrapper == nullptr) {
-    return;
-  }
-  if (wrapper->mutation_) {
-    wrapper->mutation_->onDestroy();
-  }
-  delete wrapper;
+  failClosedVoid("envoy_dynamic_module_on_early_header_mutation_config_destroy", [&]() {
+    auto* wrapper = unwrapPointer<EarlyHeaderMutationWrapper>(config_module_ptr);
+    if (wrapper == nullptr) {
+      return;
+    }
+    if (wrapper->mutation_) {
+      wrapper->mutation_->onDestroy();
+    }
+    delete wrapper;
+  });
 }
 
 bool envoy_dynamic_module_on_early_header_mutation_mutate(
     envoy_dynamic_module_type_early_header_mutation_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr) {
-  auto* wrapper = unwrapPointer<EarlyHeaderMutationWrapper>(config_module_ptr);
-  if (wrapper == nullptr || !wrapper->mutation_) {
-    // The return value selects chain continuation, not success, so a missing mutation must not
-    // suppress the extensions configured after this one.
-    return true;
-  }
+  return failClosed("envoy_dynamic_module_on_early_header_mutation_mutate", true, [&]() {
+    auto* wrapper = unwrapPointer<EarlyHeaderMutationWrapper>(config_module_ptr);
+    if (wrapper == nullptr || !wrapper->mutation_) {
+      // The return value selects chain continuation, not success, so a missing mutation must not
+      // suppress the extensions configured after this one.
+      return true;
+    }
 
-  // The handle is the only per-request state: it is created on the stack for the duration of this
-  // call because the Envoy pointer it wraps is invalidated once the call returns.
-  EarlyHeaderMutationHandleImpl handle(envoy_ptr);
-  return wrapper->mutation_->mutate(handle.requestHeaders(), handle);
+    // The handle is the only per-request state: it is created on the stack for the duration of this
+    // call because the Envoy pointer it wraps is invalidated once the call returns.
+    EarlyHeaderMutationHandleImpl handle(envoy_ptr);
+    return wrapper->mutation_->mutate(handle.requestHeaders(), handle);
+  });
 }
 
 } // extern "C"

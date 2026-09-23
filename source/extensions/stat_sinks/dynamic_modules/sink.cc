@@ -25,13 +25,17 @@ void DynamicModuleStatsSink::onHistogramComplete(const Stats::Histogram& histogr
   // before any worker thread starts, so reading them here needs no synchronization.
   ASSERT(config_->on_histogram_complete_ != nullptr);
   thread_local std::vector<char> histogram_name_buffer;
-  const size_t required_size =
-      histogram.constSymbolTable().serializeToBuffer(histogram.statName(), nullptr, 0);
-  if (histogram_name_buffer.size() < required_size) {
+  const auto& symbol_table = histogram.constSymbolTable();
+  const auto stat_name = histogram.statName();
+  // Serialize into the reused buffer and retry only when it must grow, so the common case walks the
+  // symbol table once instead of once to size and once to fill.
+  size_t required_size = symbol_table.serializeToBuffer(stat_name, histogram_name_buffer.data(),
+                                                        histogram_name_buffer.size());
+  if (required_size > histogram_name_buffer.size()) {
     histogram_name_buffer.resize(required_size);
+    symbol_table.serializeToBuffer(stat_name, histogram_name_buffer.data(),
+                                   histogram_name_buffer.size());
   }
-  histogram.constSymbolTable().serializeToBuffer(histogram.statName(), histogram_name_buffer.data(),
-                                                 histogram_name_buffer.size());
   envoy_dynamic_module_type_envoy_buffer name_buf = {.ptr = histogram_name_buffer.data(),
                                                      .length = required_size};
   config_->on_histogram_complete_(config_->in_module_config_, name_buf, value);
