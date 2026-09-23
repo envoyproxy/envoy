@@ -267,6 +267,28 @@ TEST_P(DynamicModulesIntegrationTest, FilterConstructorFailsClosed) {
   EXPECT_EQ("500", response->headers().Status()->value().getStringView());
 }
 
+TEST_P(DynamicModulesIntegrationTest, HttpFilterConstructorExceptionFailsClosed) {
+  // A C++ module whose filter constructor throws must fail closed with a 500 instead of aborting
+  // the worker. The C++ SDK barrier catches the exception at the ABI boundary and returns a null
+  // filter.
+  if (GetParam() != "cpp") {
+    GTEST_SKIP() << "the throw_on_filter_new filter is only in the cpp test module";
+  }
+  initializeFilter("throw_on_filter_new");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS("error", "caught exception at the ABI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, GenericSecretCallbacks) {
   // The module subscribes by name with no config source, so the name resolves against the
   // statically configured secrets.
