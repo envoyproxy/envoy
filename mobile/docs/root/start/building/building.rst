@@ -31,9 +31,10 @@ automatically manage the correct Bazel version.
 Java requirements
 --------------------
 
-- Java 8
+- JDK 21 or newer
 
-Make sure that Java 8 set on `PATH` and that `JAVA_HOME` is set to the appropriate SDK.
+Make sure that a JDK 21+ installation is set on ``PATH`` and that ``JAVA_HOME`` is set to
+the appropriate SDK.
 
 --------------------
 Android requirements

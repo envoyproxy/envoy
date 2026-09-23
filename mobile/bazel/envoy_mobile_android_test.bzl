@@ -9,6 +9,7 @@ def jvm_flags(lib_name):
         "-Djava.library.path=library/jni:test/jni",
         "-Denvoy_jni_library_name={}".format(lib_name),
         "-Xcheck:jni",
+        "--add-opens=java.base/java.net=ALL-UNNAMED",
     ] + select({
         "@envoy//bazel:disable_google_grpc": ["-Denvoy_jni_google_grpc_disabled=true"],
         "//conditions:default": [],
