@@ -945,7 +945,7 @@ TEST(TranscodingEngineTest, RegisterPackKeepsSchemasAlreadySetOnThePack) {
       /*from_IR=*/
       TranscodeRuleSet(TranscodingEngine::kIrProtocol, ApiProtocol::AnthropicMessages, {}),
       /*dialect_schema=*/anthropic_schema,
-      /*ir_schema=*/nullptr,
+      /*IR_schema=*/nullptr,
   };
 
   // No schemas are passed as arguments, so the pack's own `dialect_schema` must survive.
