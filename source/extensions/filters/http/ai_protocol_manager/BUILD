@@ -179,6 +179,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "transcoding_engine_lib",
+    srcs = ["transcoding_engine.cc"],
+    hdrs = ["transcoding_engine.h"],
+    deps = [
+        ":json_with_ext_buf_lib",
+        ":llm_protocol_adapters_lib",
+        ":schema_lib",
+        ":token_usage_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
     name = "ai_request_lib",
     hdrs = ["ai_request.h"],
     deps = [
