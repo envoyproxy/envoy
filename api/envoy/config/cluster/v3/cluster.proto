@@ -934,7 +934,7 @@ message Cluster {
   // configuration for the cluster. If no
   // configuration is specified no health checking will be done and all cluster
   // members will be considered healthy at all times.
-  repeated core.v3.HealthCheck health_checks = 8 [(validate.rules).repeated = {max_items: 32}];
+  repeated core.v3.HealthCheck health_checks = 8 [(validate.rules).repeated = {max_items: 8}];
 
   // Optional maximum requests for a single upstream connection. This parameter
   // is respected by both the HTTP/1.1 and HTTP/2 connection pool

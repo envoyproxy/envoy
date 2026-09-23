@@ -5,6 +5,7 @@
 
 #include "source/common/common/hex.h"
 #include "source/common/upstream/health_discovery_service.h"
+#include "source/common/upstream/multi_health_checker.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/http2/http2_frame.h"
@@ -1289,7 +1290,7 @@ TEST_P(MultiHealthCheckIntegrationTest, HostRemoveAfterStart) {
 }
 
 TEST_P(MultiHealthCheckIntegrationTest, MaxCheckersHealthyThenUnhealthy) {
-  constexpr int kNumCheckers = 32;
+  constexpr int kNumCheckers = Upstream::MultiHealthChecker::kMaxHealthChecks;
 
   use_lds_ = false;
   defer_listener_finalization_ = true;

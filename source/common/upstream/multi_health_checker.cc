@@ -18,15 +18,16 @@ constexpr uint32_t kActiveHcFlagMask = enumToInt(Host::HealthFlag::FAILED_ACTIVE
 
 } // namespace
 
-MultiHealthChecker::PerHostState::PerHostState(uint32_t num_checkers, const Host& host) {
-  ASSERT(num_checkers > 0 && num_checkers <= 32, "32 bit shifts are UB");
+MultiHealthChecker::PerHostState::PerHostState(uint8_t num_checkers, const Host& host) {
+  ASSERT(num_checkers > 0 && num_checkers <= kMaxHealthChecks,
+         "bit shifts larger than size are UB");
 
-  const uint32_t all_bits = ~uint32_t{0} >> (32 - num_checkers);
+  const uint8_t all_bits = uint8_t{0xff} >> (kMaxHealthChecks - num_checkers);
 
   const uint32_t host_flags_all = host.healthFlagsGetAll();
-  checker_flags_.assign(num_checkers, host_flags_all & kActiveHcFlagMask);
+  checker_flags_.fill(host_flags_all & kActiveHcFlagMask);
 
-  auto flagBits = [&](Host::HealthFlag flag) -> uint32_t {
+  auto flagBits = [&](Host::HealthFlag flag) -> uint8_t {
     return (host_flags_all & enumToInt(flag)) ? all_bits : 0;
   };
   fail_bits_ = flagBits(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -50,11 +51,13 @@ absl::StatusOr<std::shared_ptr<MultiHealthChecker>> MultiHealthChecker::create(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,
     Server::Configuration::ServerFactoryContext& server_context) {
 
+  ASSERT(health_checks.size() <= kMaxHealthChecks);
+
   auto checker = std::shared_ptr<MultiHealthChecker>(new MultiHealthChecker(cluster));
 
   checker->checkers_.reserve(health_checks.size());
   absl::flat_hash_set<absl::string_view> seen_names;
-  for (uint32_t checker_idx = 0; checker_idx < static_cast<uint32_t>(health_checks.size());
+  for (uint8_t checker_idx = 0; checker_idx < static_cast<uint8_t>(health_checks.size());
        checker_idx++) {
     const auto& sub_config = health_checks[checker_idx];
 
@@ -187,16 +190,17 @@ void MultiHealthChecker::onClusterMemberUpdate(const HostVector& hosts_added,
   ASSERT(host_states_.size() == total_hosts);
 }
 
-void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr host,
+void MultiHealthChecker::onCheckerResult(uint8_t checker_index, HostSharedPtr host,
                                          HealthTransition /*changed_state*/,
                                          HealthState /*result*/) {
-  const uint32_t bit = 1u << checker_index;
+  ASSERT(checker_index < kMaxHealthChecks);
+  const uint8_t bit = 1u << checker_index;
   auto& state = getOrCreateHostState(*host);
 
   ASSERT(checker_index < state.checker_flags_.size(), "Flags must already be initialized");
   uint32_t checker_flags_ = state.checker_flags_[checker_index];
 
-  auto handleBit = [&](uint32_t& bits, Host::HealthFlag flag) {
+  auto handleBit = [&](uint8_t& bits, Host::HealthFlag flag) {
     if (checker_flags_ & enumToInt(flag)) {
       bits |= bit;
     } else {
