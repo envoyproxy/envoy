@@ -58,7 +58,7 @@ pins its own threshold uses that instead.
 
 Upon stream completion, the parsed document is validated against the payload
 schema of the route's declared :ref:`wire API
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.api_protocol>`,
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`,
 for APIs with a defined schema (currently ``OPENAI_CHAT_COMPLETIONS``, ``ANTHROPIC_MESSAGES``
 and ``GEMINI_GENERATE_CONTENT``).
 Validation checks required fields, data types, enum values, and offload rules
@@ -105,7 +105,7 @@ Which routes are AI endpoints is declared per route, with
 A route carrying a :ref:`request
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.request>`
 declaration names the :ref:`wire API
-<envoy_v3_api_enum_type.ai.v3.ApiProtocol>` its request payload follows, and
+<envoy_v3_api_enum_type.ai.v3.LLMProtocol>` its request payload follows, and
 (when ``request_handling`` is enabled) its payload is parsed and validated
 strictly: a malformed body — or one violating the declared API's payload
 schema, for APIs with a defined schema — is rejected with a 400. This is
@@ -123,7 +123,7 @@ normally attached to a route matching the provider's REST path, such as
       envoy.filters.http.ai_protocol_manager:
         "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
         request:
-          api_protocol: OPENAI_CHAT_COMPLETIONS
+          llm_protocol: OPENAI_CHAT_COMPLETIONS
 
 The request and response wire APIs are declared separately (an optional
 :ref:`response
@@ -186,7 +186,7 @@ tool counts as :ref:`envoy.data.ai.v3.RequestInfo
           "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
 
 Attributes are read according to the route's declared :ref:`wire API
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.api_protocol>`:
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`:
 
 .. csv-table::
   :header: Attribute, OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, Gemini
@@ -279,10 +279,10 @@ Both streaming shapes are handled:
 * JSON bodies, including Gemini's default (non-SSE) streaming whose complete
   body is a root-level JSON array of chunks.
 
-The response's :ref:`wire API <envoy_v3_api_enum_type.ai.v3.ApiProtocol>` is
+The response's :ref:`wire API <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` is
 resolved in precedence order: the route's declared response API, the route's
-declared request API, then :ref:`default_api_protocol
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.default_api_protocol>`;
+declared request API, then :ref:`default_llm_protocol
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.default_llm_protocol>`;
 when none is declared it is auto-detected from the response shape (only
 strong, dialect-unique markers lock detection).
 Cumulative streaming counters (Anthropic ``message_delta``, Gemini snapshots)
@@ -324,7 +324,7 @@ do not see this record; consume it through :ref:`ext_proc
 (``metadata_options.forwarding_namespaces.typed``) or a filter reading typed
 dynamic metadata, sharing the proto definition for safe parsing.
 
-``api_protocol`` names the wire API the response spoke, deliberately not a
+``llm_protocol`` names the wire API the response spoke, deliberately not a
 provider identity: shape detection cannot distinguish an OpenAI-compatible
 backend (vLLM, other gateways, Gemini's compatibility endpoint) from OpenAI
 itself. When the actual provider identity is needed, derive it from
@@ -342,7 +342,7 @@ Metadata is only published at a clean end of the HTTP response (a reset or
 abandoned stream publishes nothing). When extraction failed outright — the
 only usage-bearing event exceeded a cap, or every usage document was
 malformed, unparseable, or truncated — a **status-only** record is published
-(``api_protocol``, ``model`` when captured, and ``extraction_status:
+(``llm_protocol``, ``model`` when captured, and ``extraction_status:
 FAILED``, with no counts), so per-stream consumers can distinguish
 "extraction failed" from "the provider supplied no usage", which publishes
 nothing and counts ``token_usage_missing``. ``extraction_status`` reports

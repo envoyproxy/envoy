@@ -20,7 +20,7 @@ bazel_dep(name = "rules_cc", version = "0.2.25")
 bazel_dep(name = "rules_pkg", version = "1.3.0")
 bazel_dep(name = "rules_python", version = "2.2.0")
 bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
-bazel_dep(name = "toolchains_llvm", version = "1.9.0.envoy")
+bazel_dep(name = "toolchains_llvm", version = "1.9.1.envoy")
 bazel_dep(name = "xds", version = "0.0.0-20251210-ee656c7")
 bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
 

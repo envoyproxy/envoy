@@ -49,6 +49,10 @@ public:
                         BufferManager& out_buffer_manager, OnCompleteFn on_complete,
                         ResponseFilterManager::Config config = {});
 
+  // Starts the unary JSON response filter chain in reverse filter order (N-1..0).
+  void startUnaryResponse(ExternalBufferFactory& buffer_factory, FilterChainBridge& bridge,
+                          BufferManager& out_buffer_manager, OnCompleteFn on_complete);
+
   // Feeds response body bytes to the active response filter manager.
   void onResponseData(Buffer::Instance& data, bool end_stream);
 

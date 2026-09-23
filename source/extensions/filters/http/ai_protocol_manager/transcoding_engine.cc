@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <optional>
 
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/match.h"
@@ -301,10 +301,10 @@ constexpr int kDefaultAnthropicMaxTokens = 4096;
 // Builds the declarative transcoding pack for Anthropic Messages <-> IR (OpenAI Chat).
 DialectTranscodePack createAnthropicTranscodePack() {
   return DialectTranscodePack{
-      /*protocol=*/ApiProtocol::AnthropicMessages,
+      /*protocol=*/LLMProtocol::AnthropicMessages,
       /*to_IR=*/
       TranscodeRuleSet(
-          ApiProtocol::AnthropicMessages, TranscodingEngine::kIrProtocol,
+          LLMProtocol::AnthropicMessages, TranscodingEngine::kIrProtocol,
           {
               // 1. Prepend top-level `system` prompt into `messages[]` as `{role: "system", ...}`
               TranscodeRule::prependToArray("system", "messages", "role", "system", "content"),
@@ -337,7 +337,7 @@ DialectTranscodePack createAnthropicTranscodePack() {
           }),
       /*from_IR=*/
       TranscodeRuleSet(
-          TranscodingEngine::kIrProtocol, ApiProtocol::AnthropicMessages,
+          TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
           {
               // 1. Extract `system` / `developer` messages from `messages[]` into top-level
               // `system`
@@ -384,10 +384,10 @@ DialectTranscodePack createAnthropicTranscodePack() {
 // Builds the declarative transcoding pack for Gemini GenerateContent <-> IR (OpenAI Chat).
 DialectTranscodePack createGeminiTranscodePack() {
   return DialectTranscodePack{
-      /*protocol=*/ApiProtocol::GeminiGenerateContent,
+      /*protocol=*/LLMProtocol::GeminiGenerateContent,
       /*to_IR=*/
       TranscodeRuleSet(
-          ApiProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
+          LLMProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
           {
               // 1. Unwrap `systemInstruction.parts[0].text` -> `system`, then prepend to
               //    `contents` before renaming `contents` -> `messages`
@@ -445,7 +445,7 @@ DialectTranscodePack createGeminiTranscodePack() {
           }),
       /*from_IR=*/
       TranscodeRuleSet(
-          TranscodingEngine::kIrProtocol, ApiProtocol::GeminiGenerateContent,
+          TranscodingEngine::kIrProtocol, LLMProtocol::GeminiGenerateContent,
           {
               // 1. Extract `system` / `developer` messages from `messages[]` and wrap into
               //    `systemInstruction.parts[{text: ...}]`
@@ -497,11 +497,11 @@ DialectTranscodePack createGeminiTranscodePack() {
 // Builds the identity/normalization pack for OpenAI Chat Completions (the IR protocol).
 DialectTranscodePack createOpenAiChatTranscodePack() {
   return DialectTranscodePack{
-      /*protocol=*/ApiProtocol::OpenAiChatCompletions,
+      /*protocol=*/LLMProtocol::OpenAiChatCompletions,
       /*to_IR=*/
-      TranscodeRuleSet(ApiProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol, {}),
+      TranscodeRuleSet(LLMProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol, {}),
       /*from_IR=*/
-      TranscodeRuleSet(TranscodingEngine::kIrProtocol, ApiProtocol::OpenAiChatCompletions, {}),
+      TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiChatCompletions, {}),
   };
 }
 
@@ -1049,7 +1049,7 @@ absl::Status TranscodingEngine::registerPack(DialectTranscodePack pack,
   if (!from_ir_status.ok()) {
     return from_ir_status;
   }
-  const ApiProtocol protocol = pack.protocol;
+  const LLMProtocol protocol = pack.protocol;
   packs_.insert_or_assign(protocol, std::move(pack));
   return absl::OkStatus();
 }
@@ -1071,15 +1071,15 @@ absl::StatusOr<TranscodingEngine> TranscodingEngine::createDefault() {
 
 // TODO(ginama): Address the IR data-loss problem where dialect-specific fields not modeled by
 // `OpenAiChatCompletions` are dropped when converting to the IR.
-absl::Status TranscodingEngine::transcodeToIr(ApiProtocol source_protocol,
+absl::Status TranscodingEngine::transcodeToIr(LLMProtocol source_protocol,
                                               nlohmann::json& json) const {
-  if (source_protocol == ApiProtocol::Unspecified) {
+  if (source_protocol == LLMProtocol::Unspecified) {
     return absl::OkStatus();
   }
   auto it = packs_.find(source_protocol);
   if (it == packs_.end()) {
     return absl::InvalidArgumentError(absl::StrCat("no transcoding pack registered for source ",
-                                                   apiProtocolName(source_protocol)));
+                                                   llmProtocolName(source_protocol)));
   }
   if (source_protocol == kIrProtocol) {
     return absl::OkStatus();
@@ -1087,15 +1087,15 @@ absl::Status TranscodingEngine::transcodeToIr(ApiProtocol source_protocol,
   return it->second.to_ir.execute(json);
 }
 
-absl::Status TranscodingEngine::transcodeFromIr(ApiProtocol target_protocol,
+absl::Status TranscodingEngine::transcodeFromIr(LLMProtocol target_protocol,
                                                 nlohmann::json& json) const {
-  if (target_protocol == ApiProtocol::Unspecified) {
+  if (target_protocol == LLMProtocol::Unspecified) {
     return absl::OkStatus();
   }
   auto it = packs_.find(target_protocol);
   if (it == packs_.end()) {
     return absl::InvalidArgumentError(absl::StrCat("no transcoding pack registered for target ",
-                                                   apiProtocolName(target_protocol)));
+                                                   llmProtocolName(target_protocol)));
   }
   if (target_protocol != kIrProtocol) {
     absl::Status status = it->second.from_ir.execute(json);

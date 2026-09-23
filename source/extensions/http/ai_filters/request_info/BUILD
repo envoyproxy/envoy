@@ -35,7 +35,7 @@ envoy_cc_library(
         "//source/common/coroutine:task_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:api_protocol_conversion_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_conversion_lib",
         "@abseil-cpp//absl/status",
         "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/ai_filters/request_info/v3:pkg_cc_proto",

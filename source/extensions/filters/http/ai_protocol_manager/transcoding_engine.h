@@ -207,16 +207,16 @@ private:
 class TranscodeRuleSet {
 public:
   TranscodeRuleSet() = default;
-  TranscodeRuleSet(ApiProtocol source_protocol, ApiProtocol target_protocol,
+  TranscodeRuleSet(LLMProtocol source_protocol, LLMProtocol target_protocol,
                    std::initializer_list<TranscodeRule> rules)
       : source_protocol_(source_protocol), target_protocol_(target_protocol), rules_(rules) {}
-  TranscodeRuleSet(ApiProtocol source_protocol, ApiProtocol target_protocol,
+  TranscodeRuleSet(LLMProtocol source_protocol, LLMProtocol target_protocol,
                    std::vector<TranscodeRule> rules)
       : source_protocol_(source_protocol), target_protocol_(target_protocol),
         rules_(std::move(rules)) {}
 
-  ApiProtocol sourceProtocol() const { return source_protocol_; }
-  ApiProtocol targetProtocol() const { return target_protocol_; }
+  LLMProtocol sourceProtocol() const { return source_protocol_; }
+  LLMProtocol targetProtocol() const { return target_protocol_; }
   const std::vector<TranscodeRule>& rules() const { return rules_; }
 
   // Executes all rules in order on `payload`.
@@ -224,8 +224,8 @@ public:
   absl::Status execute(nlohmann::json& json) const;
 
 private:
-  ApiProtocol source_protocol_{ApiProtocol::Unspecified};
-  ApiProtocol target_protocol_{ApiProtocol::Unspecified};
+  LLMProtocol source_protocol_{LLMProtocol::Unspecified};
+  LLMProtocol target_protocol_{LLMProtocol::Unspecified};
   std::vector<TranscodeRule> rules_;
 };
 
@@ -237,7 +237,7 @@ private:
 // static rule verification at registration time -- see `TranscodingEngine::transcodeToIr()` for
 // why the IR document itself is not validated at runtime.
 struct DialectTranscodePack {
-  ApiProtocol protocol{ApiProtocol::Unspecified};
+  LLMProtocol protocol{LLMProtocol::Unspecified};
   TranscodeRuleSet to_ir;
   TranscodeRuleSet from_ir;
   const PayloadSchema* dialect_schema{nullptr};
@@ -259,7 +259,7 @@ struct DialectTranscodePack {
 // to the IR.
 class TranscodingEngine {
 public:
-  static constexpr ApiProtocol kIrProtocol = ApiProtocol::OpenAiChatCompletions;
+  static constexpr LLMProtocol kIrProtocol = LLMProtocol::OpenAiChatCompletions;
 
   TranscodingEngine() = default;
 
@@ -292,22 +292,22 @@ public:
   // filter chain ran, so re-validating is duplicated work on the hot path; and the IR schema
   // requires `model`, which a Gemini request legitimately does not carry in its body (it lives
   // in the request path), so validating here would reject valid Gemini traffic.
-  absl::Status transcodeToIr(ApiProtocol source_protocol, JsonWithExtBuf& payload) const {
+  absl::Status transcodeToIr(LLMProtocol source_protocol, JsonWithExtBuf& payload) const {
     return transcodeToIr(source_protocol, payload.json());
   }
-  absl::Status transcodeToIr(ApiProtocol source_protocol, nlohmann::json& json) const;
+  absl::Status transcodeToIr(LLMProtocol source_protocol, nlohmann::json& json) const;
 
   // Converts `payload` out of the intermediate representation into `target_protocol`,
   // then validates it against that protocol's schema so a payload the upstream would reject is
   // caught here instead of over the network. Rule execution is skipped when `target_protocol`
   // is the IR protocol, but validation still runs.
-  absl::Status transcodeFromIr(ApiProtocol target_protocol, JsonWithExtBuf& payload) const {
+  absl::Status transcodeFromIr(LLMProtocol target_protocol, JsonWithExtBuf& payload) const {
     return transcodeFromIr(target_protocol, payload.json());
   }
-  absl::Status transcodeFromIr(ApiProtocol target_protocol, nlohmann::json& json) const;
+  absl::Status transcodeFromIr(LLMProtocol target_protocol, nlohmann::json& json) const;
 
 private:
-  absl::flat_hash_map<ApiProtocol, DialectTranscodePack> packs_;
+  absl::flat_hash_map<LLMProtocol, DialectTranscodePack> packs_;
 };
 
 } // namespace AiProtocolManager
