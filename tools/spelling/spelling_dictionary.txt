@@ -470,6 +470,7 @@ qatzip
 qatzstd
 RAII
 RANLUX
+RBE
 RBAC
 RDN
 RDS
