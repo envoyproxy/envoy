@@ -6,11 +6,21 @@
 #include "envoy/extensions/clusters/composite/v3/cluster.pb.validate.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace Composite {
+namespace {
+
+// Runtime guard for skipping sub-clusters that cannot provide a host. When disabled the
+// composite cluster keeps the legacy behavior of failing the attempt when the sub-cluster
+// mapped to the current attempt has no host available.
+constexpr absl::string_view SkipClustersWithoutHostsRuntimeKey =
+    "envoy.reloadable_features.composite_cluster_skip_clusters_without_hosts";
+
+} // namespace
 
 Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::extensions::clusters::composite::v3::ClusterConfig& config,
@@ -100,6 +110,50 @@ void CompositeClusterLoadBalancer::onClusterRemoval(absl::string_view cluster_na
 }
 
 Upstream::HostSelectionResponse
+CompositeClusterLoadBalancer::selectHostWithFailover(Upstream::LoadBalancerContext* context,
+                                                     size_t start_index, uint32_t attempt_count) {
+  const bool skip_clusters_without_hosts =
+      Runtime::runtimeFeatureEnabled(SkipClustersWithoutHostsRuntimeKey);
+
+  // Start at the cluster mapped to the current attempt and, when that cluster cannot provide a
+  // host, advance to the following clusters. This allows failover to happen within a single
+  // attempt when a sub-cluster has no healthy hosts, for example because DNS resolution returned
+  // an empty endpoint list or because all of its hosts have been ejected.
+  Upstream::HostSelectionResponse response{nullptr};
+  for (size_t cluster_index = start_index; cluster_index < clusters_->size(); ++cluster_index) {
+    auto* cluster = getClusterByIndex(cluster_index);
+    if (cluster != nullptr) {
+      ENVOY_LOG(debug, "selecting cluster '{}' (index {}) for attempt {} in composite cluster '{}'",
+                cluster->info()->name(), cluster_index, attempt_count, parent_info_->name());
+
+      // Create wrapped context with cluster information.
+      CompositeLoadBalancerContext composite_context(context, cluster_index);
+
+      // Delegate to selected cluster's load balancer.
+      response = cluster->loadBalancer().chooseHost(&composite_context);
+
+      // Either a host was selected, or asynchronous host selection is in flight and owns the
+      // remainder of the selection process, so no other cluster may be tried.
+      if (response.host != nullptr || response.cancelable != nullptr) {
+        return response;
+      }
+
+      ENVOY_LOG(debug, "cluster '{}' (index {}) has no host available in composite cluster '{}'",
+                cluster->info()->name(), cluster_index, parent_info_->name());
+    } else {
+      ENVOY_LOG(debug, "cluster index {} not available for attempt {} in composite cluster '{}'",
+                cluster_index, attempt_count, parent_info_->name());
+    }
+
+    if (!skip_clusters_without_hosts) {
+      break;
+    }
+  }
+
+  return response;
+}
+
+Upstream::HostSelectionResponse
 CompositeClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   // Extract attempt count from context.
   const uint32_t attempt_count = getAttemptCount(context);
@@ -112,24 +166,7 @@ CompositeClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context)
     return {nullptr};
   }
 
-  const size_t cluster_index = cluster_index_opt.value();
-
-  // Get the target cluster.
-  auto* cluster = getClusterByIndex(cluster_index);
-  if (cluster == nullptr) {
-    ENVOY_LOG(debug, "cluster index {} not available for attempt {} in composite cluster '{}'",
-              cluster_index, attempt_count, parent_info_->name());
-    return {nullptr};
-  }
-
-  ENVOY_LOG(debug, "selecting cluster '{}' (index {}) for attempt {} in composite cluster '{}'",
-            cluster->info()->name(), cluster_index, attempt_count, parent_info_->name());
-
-  // Create wrapped context with cluster information.
-  CompositeLoadBalancerContext composite_context(context, cluster_index);
-
-  // Delegate to selected cluster's load balancer.
-  return cluster->loadBalancer().chooseHost(&composite_context);
+  return selectHostWithFailover(context, cluster_index_opt.value(), attempt_count);
 }
 
 Upstream::HostConstSharedPtr

@@ -102,7 +102,7 @@ envoy_cc_test_library(
     hdrs = ["kafka_mocks.h"],
     tags = ["skip_on_windows"],
     deps = [
-        "//bazel/foreign_cc:librdkafka",
+        "//bazel/deps:librdkafka",
         "//contrib/kafka/filters/network/source/mesh:librdkafka_utils_lib",
     ],
 )

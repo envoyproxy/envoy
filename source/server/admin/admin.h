@@ -386,7 +386,7 @@ private:
   public:
     AdminListener(AdminImpl& parent, Stats::Scope& listener_scope)
         : parent_(parent), name_("admin"), scope_(listener_scope),
-          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", scope_)),
+          stats_(Http::ConnectionManagerImpl::generateListenerStats(AdminStatPrefix, scope_)),
           init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
 
     // Network::ListenerConfig
@@ -473,6 +473,10 @@ private:
     const Network::FilterChainInfoSharedPtr filter_chain_info_;
   };
 
+  // The stat prefix of the admin's HTTP connection manager: its stats are 'http.admin.*' and its
+  // listener stats are 'listener.admin.http.admin.*'.
+  static constexpr absl::string_view AdminStatPrefix = "admin";
+
   Server::Instance& server_;
   const Network::ListenerInfoConstSharedPtr listener_info_;
   AdminFactoryContext factory_context_;
@@ -483,11 +487,14 @@ private:
   const bool flush_access_log_on_new_request_ = false;
   const std::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
+  // http.(admin.)*
+  const Stats::ScopeSharedPtr http_scope_;
   Http::ConnectionManagerStats stats_;
   NullOverloadManager null_overload_manager_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
   // Admin case.
   Stats::IsolatedStoreImpl no_op_store_;
+  const Stats::ScopeSharedPtr no_op_http_scope_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;

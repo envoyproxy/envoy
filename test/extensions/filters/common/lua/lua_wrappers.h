@@ -29,7 +29,7 @@ public:
   virtual void setup(const std::string& code) {
     coroutine_.reset();
     absl::Status creation_status = absl::OkStatus();
-    state_ = std::make_unique<ThreadLocalState>(code, tls_, creation_status);
+    state_ = std::make_unique<ThreadLocalState>(code, PackagePaths{}, tls_, creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
     state_->registerType<T>();
     coroutine_ = state_->createCoroutine();

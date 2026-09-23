@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -104,7 +105,9 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
-  void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
+  void setDeterministicValue(uint64_t value = 0) { random_config_ = TestRandomValue{value}; }
+  // Make test reproducible while retaining a pseudo-random distribution.
+  void setDeterministicSeed(uint64_t seed) { random_config_ = TestRandomSeed{seed}; }
   // Get socket option for a specific listener's socket.
   bool getSocketOption(const std::string& listener_name, int level, int optname, void* optval,
                        socklen_t* optlen, int address_index = 0);
@@ -560,6 +563,14 @@ public:
 
   void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
 
+  // Starts a server-wide drain the way production does: push the drain notification to every
+  // listener so that each connection learns of the drain, then start the drain sequence. Mirrors
+  // InstanceBase::drainListeners() and ListenersHandler::handlerDrainListeners(). Calling the
+  // drain manager directly is not enough, because the connection-level drain-close path is driven
+  // by that notification rather than by polling the drain manager. Blocks until the main thread
+  // has run both.
+  void startServerDrain(Network::DrainDirection direction = Network::DrainDirection::All);
+
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
                                              bool use_lds);
@@ -685,9 +696,7 @@ protected:
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
 
-  // If this member is not empty, the test will use a fixed RNG value specified
-  // by it.
-  std::optional<uint64_t> deterministic_value_;
+  TestRandomGeneratorConfig random_config_;
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.

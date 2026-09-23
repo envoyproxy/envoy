@@ -1,5 +1,5 @@
 {
-  "checksum": "40a2a11d09be5915d5a48778b649a0cd97d690366200ac4720f475b975ddbe8b",
+  "checksum": "56737b9521d649b0d67d0a461a111f2cc9bce4080a806535536821fa0b696529",
   "crates": {
     "aho-corasick 1.1.4": {
       "name": "aho-corasick",
@@ -7175,12 +7175,6 @@
         "compile_data_glob_excludes": [
           "**/*.rs"
         ],
-        "data": {
-          "common": [
-            "@llvm_toolchain//:redacted_dates.h"
-          ],
-          "selects": {}
-        },
         "data_glob": [
           "**"
         ],

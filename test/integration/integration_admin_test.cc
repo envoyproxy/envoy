@@ -128,6 +128,13 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
 }
 
 TEST_P(IntegrationAdminTest, Admin) {
+  // The `usedonly` assertions below expect no histograms, which only holds until the first stats
+  // flush merges the admin request/connection histograms into the parent store and marks them
+  // used. The default 5s flush interval is shorter than a slow run of this test, so push it out to
+  // the configurable maximum (the proto caps this just under 5m) rather than racing the timer.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_flush_interval()->set_seconds(299);
+  });
   initialize();
 
   BufferingStreamDecoderPtr response;
@@ -496,6 +503,24 @@ TEST_P(IntegrationAdminTest, AdminPrometheusProtobufFormat) {
   EXPECT_GT(families.size(), 0);
 
   codec_client_->close();
+}
+
+// Validates that /healthcheck/fail does not drain-close admin connections.
+TEST_P(IntegrationAdminTest, AdminNotDrainClosedOnHealthCheckFail) {
+  initialize();
+
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/fail", response));
+
+  // The server is now health check failed. A subsequent admin request must not be drain-closed.
+  EXPECT_EQ("200", request("admin", "GET", "/server_info", response));
+  EXPECT_NE("close", response->headers().getConnectionValue());
+
+  // The header check above only covers HTTP/1; the counter covers both protocols.
+  const Stats::CounterSharedPtr drain_close =
+      test_server_->counter("http.admin.downstream_cx_drain_close");
+  ASSERT_NE(nullptr, drain_close);
+  EXPECT_EQ(0, drain_close->value());
 }
 
 // Validates that the "inboundonly" drains inbound listeners.

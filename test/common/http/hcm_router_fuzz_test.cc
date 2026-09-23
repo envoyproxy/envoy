@@ -513,7 +513,7 @@ public:
     hcm_ = std::make_unique<ConnectionManagerImpl>(
         hcm_config_, drain_close_, random_, hcm_config_->http_context_, runtime_, local_info_,
         hcm_config_->cm_, overload_manager_, hcm_config_->time_system_,
-        envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, server_factory_context_);
     hcm_->initializeReadFilterCallbacks(filter_callbacks_);
     Buffer::OwnedImpl data;
     hcm_->onData(data, false);
@@ -594,6 +594,7 @@ private:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
+  NiceMock<Server::Configuration::StatelessMockServerFactoryContext> server_factory_context_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   std::unique_ptr<ConnectionManagerImpl> hcm_;
 

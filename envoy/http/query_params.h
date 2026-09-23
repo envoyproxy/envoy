@@ -27,6 +27,7 @@ public:
   std::string toString() const;
   std::string replaceQueryString(const HeaderString& path) const;
   std::optional<std::string> getFirstValue(absl::string_view key) const;
+  std::optional<absl::string_view> getFirstValueView(absl::string_view key) const;
 
   const absl::btree_map<std::string, std::vector<std::string>>& data() const { return data_; }
 

@@ -3,6 +3,8 @@
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/config/utility.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -14,12 +16,20 @@ CustomConfigValidatorsImpl::CustomConfigValidatorsImpl(
   for (const auto& validator_config : validators_configs) {
     auto& factory =
         Config::Utility::getAndCheckFactory<Config::ConfigValidatorFactory>(validator_config);
-    const auto validator_type_url = factory.typeUrl();
     Config::ConfigValidatorPtr validator =
         factory.createConfigValidator(validator_config.typed_config(), validation_visitor);
 
+    // Prefer the validator type url, falling back to the deprecated factory type url for validators
+    // that have not migrated.
+    absl::string_view type_url = validator->typeUrl();
+    std::string factory_type_url;
+    if (type_url.empty()) {
+      factory_type_url = factory.typeUrl();
+      type_url = factory_type_url;
+    }
+
     // Insert a new vector for the type url if one doesn't exist.
-    auto pair = validators_map_.emplace(validator_type_url, 0);
+    auto pair = validators_map_.emplace(type_url, 0);
     pair.first->second.emplace_back(std::move(validator));
   }
 }

@@ -1,6 +1,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_uring_socket_handle_impl.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/io/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -175,6 +176,30 @@ TEST_F(IoUringSocketHandleTest, RecvmmsgNotSupported) {
   IoHandle::RecvMsgOutput output(0, nullptr);
   EXPECT_THAT(impl.recvmmsg(array, 0, {}, output).err_->getErrorCode(),
               Api::IoError::IoErrorCode::NoSupport);
+}
+
+TEST_F(IoUringSocketHandleTest, CloseWithSendRstTrueSetsLingerZeroAndCloses) {
+  testing::NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
+          &os_sys_calls);
+
+  os_fd_t test_fd = 42;
+  IoUringSocketHandleImpl io_handle(factory_, test_fd, false, std::nullopt, false);
+
+  EXPECT_CALL(os_sys_calls,
+              setsockopt_(test_fd, SOL_SOCKET, SO_LINGER, testing::_, sizeof(struct linger)))
+      .WillOnce(testing::Invoke([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
+        const auto* l = static_cast<const struct linger*>(optval);
+        EXPECT_EQ(1, l->l_onoff);
+        EXPECT_EQ(0, l->l_linger);
+        return 0;
+      }));
+
+  io_handle.setAbortiveClose();
+  auto res = io_handle.close();
+  EXPECT_EQ(0, res.return_value_);
+  EXPECT_FALSE(io_handle.isOpen());
 }
 
 } // namespace

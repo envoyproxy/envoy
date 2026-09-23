@@ -176,7 +176,7 @@ TEST_F(JsonWithExtBufParserTest, ReferenceResolvesAgainstTheOffloadedBody) {
 
   // Offload as the BufferManager does -- verbatim from offset 0 -- which is what
   // makes the recorded offsets valid buffer offsets.
-  buffer.write(std::make_unique<Buffer::OwnedImpl>(body),
+  buffer.write(std::make_unique<Buffer::OwnedImpl>(body), false,
                [](ExternalBufferStatus status) { EXPECT_EQ(status, ExternalBufferStatus::Ok); });
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   ASSERT_EQ(buffer.length(), body.size());

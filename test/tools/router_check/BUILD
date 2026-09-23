@@ -6,7 +6,7 @@ load(
     "envoy_proto_library",
     "envoy_select_linkstatic",
 )
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//bazel:extension_configs.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2

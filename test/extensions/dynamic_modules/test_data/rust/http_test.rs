@@ -684,3 +684,63 @@ fn test_map_response_flags_none_when_unavailable() {
   let flags = map_response_flags(&envoy_filter);
   assert!(flags.as_headers().iter().all(|(_, is_set)| !is_set));
 }
+
+static FAKE_SPAN_SET_TAGS_CALLED: std::sync::atomic::AtomicBool =
+  std::sync::atomic::AtomicBool::new(false);
+
+struct FakeSpan;
+
+impl envoy_proxy_dynamic_modules_rust_sdk::EnvoySpan for FakeSpan {
+  fn set_tag(&self, _key: &str, _value: &str) {}
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    assert_eq!(tags.len(), 2);
+    assert_eq!(tags[0], ("batch.key1", "batch.value1"));
+    assert_eq!(tags[1], ("batch.key2", "batch.value2"));
+    FAKE_SPAN_SET_TAGS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+  fn set_operation(&self, _operation: &str) {}
+  fn log(&self, _event: &str) {}
+  fn set_sampled(&self, _sampled: bool) {}
+  fn disable_local_decision(&self) {}
+  fn get_baggage(&self, _key: &str) -> Option<String> {
+    None
+  }
+  fn set_baggage(&self, _key: &str, _value: &str) {}
+  fn get_trace_id(&self) -> Option<String> {
+    None
+  }
+  fn get_span_id(&self) -> Option<String> {
+    None
+  }
+  fn spawn_child(
+    &self,
+    _operation_name: &str,
+  ) -> Option<Box<dyn envoy_proxy_dynamic_modules_rust_sdk::EnvoyChildSpan>> {
+    None
+  }
+}
+
+#[test]
+fn test_span_callbacks_filter_calls_set_tags() {
+  FAKE_SPAN_SET_TAGS_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let f = SpanCallbacksFilter {};
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  envoy_filter.expect_get_active_span().returning(|| {
+    Some(Box::new(FakeSpan) as Box<dyn envoy_proxy_dynamic_modules_rust_sdk::EnvoySpan>)
+  });
+
+  envoy_filter
+    .expect_set_request_header()
+    .withf(|name, _| name == "x-span-callbacks")
+    .return_const(true)
+    .once();
+
+  let status = f.on_request_headers(&mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  );
+  assert!(FAKE_SPAN_SET_TAGS_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}

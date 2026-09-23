@@ -177,6 +177,15 @@ public:
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
+  void setTags(std::initializer_list<std::pair<std::string_view, std::string_view>> tags) override {
+    std::vector<envoy_dynamic_module_type_module_key_value_pair> pairs;
+    pairs.reserve(tags.size());
+    for (const auto& [key, value] : tags) {
+      pairs.push_back({key.data(), key.size(), value.data(), value.size()});
+    }
+    envoy_dynamic_module_callback_http_span_set_tag_batch(span_ptr_, pairs.data(), pairs.size());
+  }
+
   void setOperation(std::string_view operation) override {
     envoy_dynamic_module_callback_http_span_set_operation(
         span_ptr_, envoy_dynamic_module_type_module_buffer{operation.data(), operation.size()});
@@ -240,6 +249,15 @@ public:
     envoy_dynamic_module_callback_http_span_set_tag(
         span_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
+  void setTags(std::initializer_list<std::pair<std::string_view, std::string_view>> tags) override {
+    std::vector<envoy_dynamic_module_type_module_key_value_pair> pairs;
+    pairs.reserve(tags.size());
+    for (const auto& [key, value] : tags) {
+      pairs.push_back({key.data(), key.size(), value.data(), value.size()});
+    }
+    envoy_dynamic_module_callback_http_span_set_tag_batch(span_ptr_, pairs.data(), pairs.size());
   }
 
   void setOperation(std::string_view operation) override {
@@ -918,10 +936,13 @@ public:
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
   }
-  void log(LogLevel level, std::string_view message) override {
-    return envoy_dynamic_module_callback_log(
+  void log(LogLevel level, std::string_view message, std::source_location location) override {
+    const std::string_view source_file(location.file_name());
+    return envoy_dynamic_module_callback_log_v2(
         static_cast<envoy_dynamic_module_type_log_level>(level),
-        envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
+        envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
+        envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
+        location.line());
   }
 
   void* host_plugin_ptr_;
@@ -948,7 +969,7 @@ public:
 };
 
 // HttpFilterConfigHandle implementation
-class HttpFilterConfigHandleImpl : public HttpFilterConfigHandle {
+class HttpFilterConfigHandleImpl : public CommonHandleImpl<HttpFilterConfigHandle> {
 public:
   HttpFilterConfigHandleImpl(void* host_config_ptr) : host_config_ptr_(host_config_ptr) {}
 
@@ -1074,10 +1095,13 @@ public:
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
   }
-  void log(LogLevel level, std::string_view message) override {
-    return envoy_dynamic_module_callback_log(
+  void log(LogLevel level, std::string_view message, std::source_location location) override {
+    const std::string_view source_file(location.file_name());
+    return envoy_dynamic_module_callback_log_v2(
         static_cast<envoy_dynamic_module_type_log_level>(level),
-        envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
+        envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
+        envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
+        location.line());
   }
 
   std::pair<HttpCalloutInitResult, uint64_t> httpCallout(std::string_view cluster,
@@ -1159,10 +1183,14 @@ public:
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
   }
-  void log(LogLevel level, std::string_view message) {
-    return envoy_dynamic_module_callback_log(
+  void log(LogLevel level, std::string_view message,
+           std::source_location location = std::source_location::current()) {
+    const std::string_view source_file(location.file_name());
+    return envoy_dynamic_module_callback_log_v2(
         static_cast<envoy_dynamic_module_type_log_level>(level),
-        envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
+        envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
+        envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
+        location.line());
   }
 };
 
@@ -1530,7 +1558,6 @@ envoy_dynamic_module_on_http_filter_local_reply(
   if (plugin_handle == nullptr) {
     return envoy_dynamic_module_type_on_http_filter_local_reply_status_Continue;
   }
-  plugin_handle->local_reply_sent_ = true;
   return static_cast<envoy_dynamic_module_type_on_http_filter_local_reply_status>(
       plugin_handle->plugin_->onLocalReply(
           response_code,

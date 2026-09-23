@@ -61,6 +61,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.access_loggers.http_grpc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/formatter:serializer_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",

@@ -13,8 +13,8 @@ build --color=yes
 fetch --color=yes
 run --color=yes
 
-common --enable_workspace
-common --noenable_bzlmod
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/dfb07d6381f23ec6713bda30445542d72f302f77
 common --noincompatible_disallow_empty_glob
 
 build --workspace_status_command="bash get_workspace_status"
@@ -75,6 +75,40 @@ common:libc++ --@envoy//bazel:libc++=true
 
 
 #############################################################################
+# envoy test deps
+#############################################################################
+
+build --@googleurl//build_config:system_icu=0
+
+# proxy-wasm-cpp-host
+common --@proxy-wasm-cpp-host//bazel:crypto_lib=@envoy//bazel:crypto
+
+# libsxg
+build --@libsxg//:crypto_lib=@envoy//bazel:crypto
+
+# quiche
+build --@quiche//:zlib=@envoy//bazel:zlib
+build --@quiche//:ssl_lib=@envoy//bazel:ssl
+
+# quiche — non-test platform impls
+build --@quiche//:quic_base_impl_lib=@envoy//source/common/quic/platform:quic_base_impl_lib
+build --@quiche//:quiche_export_impl_lib=@envoy//source/common/quic/platform:quiche_export_impl_lib
+build --@quiche//:quiche_flags_impl_lib=@envoy//source/common/quic/platform:quiche_flags_impl_lib
+build --@quiche//:quiche_logging_impl_lib=@envoy//source/common/quic/platform:quiche_logging_impl_lib
+build --@quiche//:quiche_lower_case_string_impl_lib=@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib
+build --@quiche//:quiche_platform_iovec_impl_lib=@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib
+build --@quiche//:quiche_stack_trace_impl_lib=@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib
+build --@quiche//:quiche_time_utils_impl_lib=@envoy//source/common/quic/platform:quiche_time_utils_impl_lib
+
+# quiche — test platform impls
+build --@quiche//:quiche_expect_bug_impl_lib=@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib
+build --@quiche//:quiche_test_impl_lib=@envoy//test/common/quic/platform:quiche_test_impl_lib
+build --@quiche//:quiche_test_helpers_impl_lib=@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib
+build --@quiche//:quiche_test_output_impl_lib=@envoy//test/common/quic/platform:quiche_test_output_impl_lib
+build --@quiche//:quiche_thread_impl_lib=@envoy//test/common/quic/platform:quiche_thread_impl_lib
+
+
+#############################################################################
 # remote
 #############################################################################
 
@@ -83,9 +117,6 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-# This flag may be more generally useful - it sets foreign_cc builds -jauto.
-# It is only set here because if it were the default it risks OOMing on local builds.
-build:remote --@envoy//bazel/foreign_cc:parallel_builds
 
 ## RBE (Engflow Envoy)
 
@@ -121,3 +152,4 @@ common:remote-exec --jobs=200
 common:remote-exec --define=engflow_rbe=true
 
 try-import %workspace%/repo.bazelrc
+try-import %workspace%/user.bazelrc

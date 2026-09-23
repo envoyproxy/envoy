@@ -70,6 +70,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -182,6 +183,7 @@ envoy_cc_benchmark_binary(
         "//source/server/admin:admin_lib",
         "//test/common/stats:real_thread_test_base",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "@benchmark",
     ],
 )
 

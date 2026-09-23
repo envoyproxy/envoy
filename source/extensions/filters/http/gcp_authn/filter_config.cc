@@ -26,8 +26,10 @@ absl::StatusOr<Http::FilterFactoryCb> GcpAuthnFilterFactory::createFilterFactory
     RETURN_IF_NOT_OK(Http::Utility::validateCoreRetryPolicy(config.retry_policy()));
   }
 
+  absl::Status create_status;
   FilterConfigSharedPtr filter_config =
-      std::make_shared<FilterConfig>(config, context, stats_prefix, scope);
+      std::make_shared<FilterConfig>(config, context, stats_prefix, scope, create_status);
+  RETURN_IF_NOT_OK(create_status);
   auto fingerprinter = std::make_shared<CertFingerprinterImpl>();
 
   return [filter_config, fingerprinter](Http::FilterChainFactoryCallbacks& callbacks) -> void {

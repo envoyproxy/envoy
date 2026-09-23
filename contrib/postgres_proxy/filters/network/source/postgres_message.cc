@@ -1,5 +1,7 @@
 #include "contrib/postgres_proxy/filters/network/source/postgres_message.h"
 
+#include <format>
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -106,7 +108,7 @@ bool VarByteN::read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left)
 
 std::string VarByteN::toString() const {
   std::string out;
-  out = fmt::format("[({} bytes):", len_);
+  out = std::format("[({} bytes):", len_);
   absl::StrAppend(&out, absl::StrJoin(value_, " "));
   absl::StrAppend(&out, "]");
   return out;

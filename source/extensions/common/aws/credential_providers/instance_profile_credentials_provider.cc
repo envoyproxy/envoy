@@ -47,7 +47,7 @@ void InstanceProfileCredentialsProvider::refresh() {
   continue_on_async_fetch_failure_reason_ = "Token fetch failed, falling back to IMDSv1";
 
   // mark credentials as pending while async completes
-  credentials_pending_.store(true);
+  setCredentialsPendingToAllThreads();
 
   metadata_fetcher_->fetch(token_req_message, Tracing::NullSpan::instance(), *this);
 }
@@ -71,7 +71,7 @@ void InstanceProfileCredentialsProvider::fetchInstanceRoleAsync(const std::strin
   };
 
   // mark credentials as pending while async completes
-  credentials_pending_.store(true);
+  setCredentialsPendingToAllThreads();
 
   metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
 }
@@ -116,7 +116,7 @@ void InstanceProfileCredentialsProvider::fetchCredentialFromInstanceRoleAsync(
   };
 
   // mark credentials as pending while async completes
-  credentials_pending_.store(true);
+  setCredentialsPendingToAllThreads();
 
   metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
 }

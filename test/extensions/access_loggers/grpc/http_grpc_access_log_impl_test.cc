@@ -203,6 +203,15 @@ public:
           val.set_string_value("custom_resolved_value");
           return val;
         }
+        bool formatTo(std::string& sink, const Formatter::Context&,
+                      const StreamInfo::StreamInfo&) const override {
+          sink.append("custom_resolved_value");
+          return true;
+        }
+        void formatValueTo(Formatter::ValueSink& sink, const Formatter::Context&,
+                           const StreamInfo::StreamInfo&) const override {
+          sink.addString("custom_resolved_value");
+        }
       };
       return std::make_unique<TestProvider>();
     }

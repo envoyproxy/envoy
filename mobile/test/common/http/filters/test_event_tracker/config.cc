@@ -7,10 +7,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace TestEventTracker {
 
-Http::FilterFactoryCb TestEventTrackerFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+TestEventTrackerFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoymobile::extensions::filters::http::test_event_tracker::TestEventTracker&
         proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
 
   auto config = std::make_shared<TestEventTrackerFilterConfig>(proto_config);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

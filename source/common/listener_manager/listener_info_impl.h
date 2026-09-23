@@ -18,6 +18,12 @@ public:
         is_quic_(config.udp_listener_config().has_quic_options()),
         bypass_overload_manager_(config.bypass_overload_manager()),
         drain_type_(config.drain_type()) {}
+  // For listeners that are not built from a Listener proto and only need to declare a drain type,
+  // which is what decides whether their connections are drain-closed (see
+  // Network::listenerDrainType() and Network::shouldDrainClose()). All other fields keep their
+  // default-constructed values.
+  explicit ListenerInfoImpl(envoy::config::listener::v3::Listener::DrainType drain_type)
+      : drain_type_(drain_type) {}
   ListenerInfoImpl() = default;
 
   // Network::ListenerInfo

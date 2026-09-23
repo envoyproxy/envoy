@@ -20,6 +20,7 @@ envoy_cc_library(
         ],
     }),
     deps = [
+        "//source/common/formatter:serializer_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
@@ -50,6 +51,8 @@ envoy_cc_extension(
     ],
     deps = [
         "//envoy/registry",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/formatter/cel:cel_lib",
         "@envoy_api//envoy/extensions/formatter/cel/v3:pkg_cc_proto",
     ] + select(

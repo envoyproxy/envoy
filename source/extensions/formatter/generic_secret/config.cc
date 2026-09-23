@@ -52,6 +52,26 @@ public:
     return val;
   }
 
+  bool formatTo(std::string& sink, const Envoy::Formatter::Context&,
+                const StreamInfo::StreamInfo&) const override {
+    absl::string_view value = secret_provider_->secret();
+    if (value.empty()) {
+      return false;
+    }
+    sink.append(Envoy::Formatter::SubstitutionFormatUtils::truncateStringView(value, max_length_));
+    return true;
+  }
+
+  void formatValueTo(Envoy::Formatter::ValueSink& sink, const Envoy::Formatter::Context&,
+                     const StreamInfo::StreamInfo&) const override {
+    absl::string_view value = secret_provider_->secret();
+    if (value.empty()) {
+      return;
+    }
+    sink.addString(
+        Envoy::Formatter::SubstitutionFormatUtils::truncateStringView(value, max_length_));
+  }
+
 private:
   std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> secret_provider_;
   const std::optional<size_t> max_length_;
@@ -107,7 +127,8 @@ Envoy::Formatter::CommandParserPtr GenericSecretFormatterFactory::createCommandP
     Secret::GenericSecretConfigProviderSharedPtr provider;
     if (secret_config.has_sds_config()) {
       provider = server_context.secretManager().findOrCreateGenericSecretProvider(
-          secret_config.sds_config(), secret_config.name(), server_context, context.initManager());
+          secret_config.sds_config(), secret_config.name(), server_context, context.initManager(),
+          true);
     } else {
       provider =
           server_context.secretManager().findStaticGenericSecretProvider(secret_config.name());

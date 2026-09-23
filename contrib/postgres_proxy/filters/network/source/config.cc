@@ -1,5 +1,7 @@
 #include "contrib/postgres_proxy/filters/network/source/config.h"
 
+#include <format>
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -15,7 +17,7 @@ NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromPro
   ASSERT(!proto_config.stat_prefix().empty());
 
   PostgresFilterConfig::PostgresFilterConfigOptions config_options;
-  config_options.stats_prefix_ = fmt::format("postgres.{}", proto_config.stat_prefix());
+  config_options.stats_prefix_ = std::format("postgres.{}", proto_config.stat_prefix());
   config_options.enable_sql_parsing_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_sql_parsing, true);
   config_options.terminate_ssl_ = proto_config.terminate_ssl();

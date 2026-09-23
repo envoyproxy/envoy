@@ -537,11 +537,21 @@ void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_vi
 
 std::optional<std::string> Utility::QueryParamsMulti::getFirstValue(absl::string_view key) const {
   auto it = this->data_.find(key);
-  if (it == this->data_.end()) {
+  if (it == this->data_.end() || it->second.empty()) {
     return std::nullopt;
   }
 
   return std::optional<std::string>{it->second.at(0)};
+}
+
+std::optional<absl::string_view>
+Utility::QueryParamsMulti::getFirstValueView(absl::string_view key) const {
+  auto it = this->data_.find(key);
+  if (it == this->data_.end() || it->second.empty()) {
+    return std::nullopt;
+  }
+
+  return absl::string_view{it->second.at(0)};
 }
 
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
@@ -560,8 +570,13 @@ std::string Utility::stripQueryString(const HeaderString& path) {
   return {path_str.data(), query_offset != path_str.npos ? query_offset : path_str.size()};
 }
 
+absl::string_view Utility::stripQueryStringView(absl::string_view path) {
+  size_t query_offset = path.find('?');
+  return {path.data(), query_offset != path.npos ? query_offset : path.size()};
+}
+
 std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) const {
-  std::string new_path{Http::Utility::stripQueryString(path)};
+  std::string new_path(Http::Utility::stripQueryStringView(path.getStringView()));
 
   if (!this->data_.empty()) {
     absl::StrAppend(&new_path, this->toString());

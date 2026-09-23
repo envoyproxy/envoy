@@ -407,6 +407,23 @@ void ReverseConnectionIOHandle::resetFileEvents() {
   if (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe()) {
     rev_conn_retry_timer_.reset();
   }
+
+  // Handshake connections have their own file events. Tear them down on this worker so
+  // main-thread close()/destructor does not destroy in-flight codecs. Skip when
+  // worker_dispatcher_ is null (cleanup() after workers are gone).
+  if (worker_dispatcher_ != nullptr && worker_dispatcher_->isThreadSafe()) {
+    conn_wrapper_to_host_map_.clear();
+    std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
+    connection_wrappers_.clear();
+    for (auto& wrapper : wrappers) {
+      if (wrapper == nullptr) {
+        continue;
+      }
+      wrapper->shutdown();
+      worker_dispatcher_->deferredDelete(std::move(wrapper));
+    }
+  }
+
   IoSocketHandleImpl::resetFileEvents();
 }
 
@@ -535,12 +552,8 @@ void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::st
       connection->close(Network::ConnectionCloseType::FlushWrite);
     }
 
-    // Remove from wrapper-to-host map.
-    conn_wrapper_to_host_map_.erase(wrapper);
-    // Remove the wrapper from connection_wrappers_ vector.
-    std::erase_if(connection_wrappers_, [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) {
-      return w.get() == wrapper;
-    });
+    wrapper->shutdown();
+    removeAndDeferredDeleteWrapper(wrapper);
   }
   // Clear connection keys from host info.
   auto host_it = host_to_conn_info_map_.find(host);
@@ -1267,12 +1280,10 @@ void ReverseConnectionIOHandle::onConnectionDone(
     updateConnectionState(host_address, cluster_name, connection_key,
                           ReverseConnectionState::Failed);
 
-    // Safely close connection if still valid.
-    if (connection) {
-      if (connection->getSocket()) {
-        connection->getSocket()->ioHandle().resetFileEvents();
-      }
-      connection->close(Network::ConnectionCloseType::NoFlush);
+    // decodeHeaders() runs inside Http1::dispatch(); do not close() here.
+    // The wrapper is deferred-deleted; shutdown() closes the connection afterwards.
+    if (closed && connection && connection->getSocket()) {
+      connection->getSocket()->ioHandle().resetFileEvents();
     }
 
     trackConnectionFailure(host_address, cluster_name, retry_after);
@@ -1336,14 +1347,15 @@ void ReverseConnectionIOHandle::onConnectionDone(
     }
   }
 
-  // Safely remove wrapper from tracking.
+  removeAndDeferredDeleteWrapper(wrapper);
+}
+
+void ReverseConnectionIOHandle::removeAndDeferredDeleteWrapper(RCConnectionWrapper* wrapper) {
   conn_wrapper_to_host_map_.erase(wrapper);
 
-  // Find and remove wrapper from vector safely.
   auto wrapper_vector_it = std::find_if(
       connection_wrappers_.begin(), connection_wrappers_.end(),
       [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) { return w.get() == wrapper; });
-
   if (wrapper_vector_it != connection_wrappers_.end()) {
     auto wrapper_to_delete = std::move(*wrapper_vector_it);
     connection_wrappers_.erase(wrapper_vector_it);

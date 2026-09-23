@@ -9,6 +9,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/struct_matchers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "absl/container/fixed_array.h"
 #include "gmock/gmock.h"
@@ -1297,6 +1298,54 @@ TEST(IoHandleFactoryTest, UseExistingPassthroughState) {
     EXPECT_NE(std::dynamic_pointer_cast<TestPassthroughState>(io_handle_peer->passthroughState()),
               nullptr);
   }
+}
+
+TEST_F(IoHandleImplTest, ResetCloseEmitsConnectionResetErrorOnReadGuardEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  EXPECT_TRUE(io_handle_->isOpen());
+  EXPECT_TRUE(io_handle_peer_->isOpen());
+  io_handle_peer_->setAbortiveClose();
+  io_handle_peer_->close();
+  EXPECT_FALSE(io_handle_peer_->isOpen());
+  EXPECT_TRUE(io_handle_->isOpen());
+
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_FALSE(read_res.ok());
+  EXPECT_EQ(0, read_res.return_value_);
+  ASSERT_NE(nullptr, read_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, read_res.err_->getErrorCode());
+
+  Buffer::Slice mutable_slice(1024, nullptr);
+  auto slice = mutable_slice.reserve(1024);
+  Buffer::RawSlice raw_slice{slice.mem_, slice.len_};
+  auto readv_res = io_handle_->readv(1024, &raw_slice, 1);
+  EXPECT_FALSE(readv_res.ok());
+  EXPECT_EQ(0, readv_res.return_value_);
+  ASSERT_NE(nullptr, readv_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, readv_res.err_->getErrorCode());
+}
+
+TEST_F(IoHandleImplTest, ResetCloseEmitsEofOnReadGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
+
+  EXPECT_TRUE(io_handle_->isOpen());
+  EXPECT_TRUE(io_handle_peer_->isOpen());
+  io_handle_peer_->setAbortiveClose();
+  io_handle_peer_->close();
+  EXPECT_FALSE(io_handle_peer_->isOpen());
+  EXPECT_TRUE(io_handle_->isOpen());
+
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(read_res.ok());
+  EXPECT_EQ(0, read_res.return_value_);
+  EXPECT_EQ(nullptr, read_res.err_);
 }
 
 } // namespace

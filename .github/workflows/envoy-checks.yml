@@ -85,7 +85,11 @@ jobs:
   coverage:
     secrets:
       dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-      gcp-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED || secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      gcp-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED
+            || secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read

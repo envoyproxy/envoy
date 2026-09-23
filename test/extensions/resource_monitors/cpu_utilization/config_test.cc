@@ -27,7 +27,7 @@ public:
     has_success_ = true;
   }
 
-  void onFailure(const EnvoyException& error) override {
+  void onFailure(const absl::Status& error) override {
     error_ = error;
     has_error_ = true;
   }
@@ -38,7 +38,7 @@ public:
 
 private:
   std::optional<double> pressure_;
-  std::optional<EnvoyException> error_;
+  std::optional<absl::Status> error_;
   bool has_success_ = false;
   bool has_error_ = false;
 };

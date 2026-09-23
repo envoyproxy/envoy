@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/common/config:utility_lib",
+        "//source/common/formatter:serializer_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_mutation_lib",

@@ -11,6 +11,7 @@ CONTRIB_EXTENSIONS = {
     # HTTP filters
     #
     "envoy.filters.http.checksum":                              "//contrib/checksum/filters/http/source:config",
+    "envoy.filters.http.client_cert":                           "//contrib/client_cert/filters/http/source:config",
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
@@ -79,16 +80,6 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.matching.input_matchers.hyperscan":                  "//contrib/hyperscan/matching/input_matchers/source:config",
-
-    #
-    # Connection Balance extensions
-    #
-
-    # Disabled: upstream Intel mirror (downloadmirror.intel.com) returns HTTP
-    # 202 Accepted instead of 200 OK, breaking @dlb external_http_archive
-    # fetches and aborting //contrib/exe:envoy-static. See
-    # https://github.com/envoyproxy/envoy/issues/45491
-    # "envoy.network.connection_balance.dlb":                     "//contrib/dlb/source:connection_balancer",
 
     #
     # Regex engines

@@ -31,7 +31,6 @@ py_binary(
     deps = [
         ":api_type_db_proto_py_proto",
         ":types_py_proto",
-        "//tools/api_proto_plugin:utils",
         "@protobuf//:protobuf_python",
     ],
 )

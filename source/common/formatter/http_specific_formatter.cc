@@ -39,6 +39,17 @@ Protobuf::Value LocalReplyBodyFormatter::formatValue(const Context& context,
   return ValueUtil::stringValue(std::string(context.localReplyBody()));
 }
 
+bool LocalReplyBodyFormatter::formatTo(std::string& sink, const Context& context,
+                                       const StreamInfo::StreamInfo&) const {
+  sink.append(context.localReplyBody());
+  return true;
+}
+
+void LocalReplyBodyFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                            const StreamInfo::StreamInfo&) const {
+  sink.addString(context.localReplyBody());
+}
+
 std::optional<std::string> AccessLogTypeFormatter::format(const Context& context,
                                                           const StreamInfo::StreamInfo&) const {
   return AccessLogType_Name(context.accessLogType());
@@ -47,6 +58,17 @@ std::optional<std::string> AccessLogTypeFormatter::format(const Context& context
 Protobuf::Value AccessLogTypeFormatter::formatValue(const Context& context,
                                                     const StreamInfo::StreamInfo&) const {
   return ValueUtil::stringValue(AccessLogType_Name(context.accessLogType()));
+}
+
+bool AccessLogTypeFormatter::formatTo(std::string& sink, const Context& context,
+                                      const StreamInfo::StreamInfo&) const {
+  sink.append(AccessLogType_Name(context.accessLogType()));
+  return true;
+}
+
+void AccessLogTypeFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                           const StreamInfo::StreamInfo&) const {
+  sink.addString(AccessLogType_Name(context.accessLogType()));
 }
 
 HeaderFormatter::HeaderFormatter(absl::string_view main_header,
@@ -221,6 +243,21 @@ Protobuf::Value HeadersByteSizeFormatter::formatValue(const Context& context,
       context.requestHeaders(), context.responseHeaders(), context.responseTrailers()));
 }
 
+bool HeadersByteSizeFormatter::formatTo(std::string& sink, const Context& context,
+                                        const StreamInfo::StreamInfo&) const {
+  const uint64_t byte_size = extractHeadersByteSize(
+      context.requestHeaders(), context.responseHeaders(), context.responseTrailers());
+  fmt::format_int formatted(byte_size);
+  sink.append(formatted.data(), formatted.size());
+  return true;
+}
+
+void HeadersByteSizeFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                             const StreamInfo::StreamInfo&) const {
+  sink.addNumber(extractHeadersByteSize(context.requestHeaders(), context.responseHeaders(),
+                                        context.responseTrailers()));
+}
+
 Protobuf::Value TraceIDFormatter::formatValue(const Context& context,
                                               const StreamInfo::StreamInfo&) const {
   const auto active_span = context.activeSpan();
@@ -248,6 +285,33 @@ std::optional<std::string> TraceIDFormatter::format(const Context& context,
   return trace_id;
 }
 
+bool TraceIDFormatter::formatTo(std::string& sink, const Context& context,
+                                const StreamInfo::StreamInfo&) const {
+  const auto active_span = context.activeSpan();
+  if (!active_span.has_value()) {
+    return false;
+  }
+  const auto trace_id = active_span->getTraceId();
+  if (trace_id.empty()) {
+    return false;
+  }
+  sink.append(trace_id);
+  return true;
+}
+
+void TraceIDFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                     const StreamInfo::StreamInfo&) const {
+  const auto active_span = context.activeSpan();
+  if (!active_span.has_value()) {
+    return;
+  }
+  const auto trace_id = active_span->getTraceId();
+  if (trace_id.empty()) {
+    return;
+  }
+  sink.addString(trace_id);
+}
+
 Protobuf::Value SpanIDFormatter::formatValue(const Context& context,
                                              const StreamInfo::StreamInfo&) const {
   const auto active_span = context.activeSpan();
@@ -273,6 +337,33 @@ std::optional<std::string> SpanIDFormatter::format(const Context& context,
     return std::nullopt;
   }
   return span_id;
+}
+
+bool SpanIDFormatter::formatTo(std::string& sink, const Context& context,
+                               const StreamInfo::StreamInfo&) const {
+  const auto active_span = context.activeSpan();
+  if (!active_span.has_value()) {
+    return false;
+  }
+  const auto span_id = active_span->getSpanId();
+  if (span_id.empty()) {
+    return false;
+  }
+  sink.append(span_id);
+  return true;
+}
+
+void SpanIDFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                    const StreamInfo::StreamInfo&) const {
+  const auto active_span = context.activeSpan();
+  if (!active_span.has_value()) {
+    return;
+  }
+  const auto span_id = active_span->getSpanId();
+  if (span_id.empty()) {
+    return;
+  }
+  sink.addString(span_id);
 }
 
 absl::StatusOr<std::unique_ptr<GrpcStatusFormatter>>
@@ -309,16 +400,22 @@ GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
                                          std::optional<size_t> max_length, Format format)
     : HeaderFormatter(main_header, alternative_header, max_length), format_(format) {}
 
-std::optional<std::string> GrpcStatusFormatter::format(const Context& context,
-                                                       const StreamInfo::StreamInfo& info) const {
+std::optional<Grpc::Status::GrpcStatus>
+GrpcStatusFormatter::getGrpcStatus(const Context& context,
+                                   const StreamInfo::StreamInfo& info) const {
   if (!Grpc::Common::isGrpcRequestHeaders(
           context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers))) {
     return std::nullopt;
   }
-  const auto grpc_status = Grpc::Common::getGrpcStatus(
+  return Grpc::Common::getGrpcStatus(
       context.responseTrailers().value_or(*Http::StaticEmptyHeaders::get().response_trailers),
       context.responseHeaders().value_or(*Http::StaticEmptyHeaders::get().response_headers), info,
       true);
+}
+
+std::optional<std::string> GrpcStatusFormatter::format(const Context& context,
+                                                       const StreamInfo::StreamInfo& info) const {
+  const auto grpc_status = getGrpcStatus(context, info);
   if (!grpc_status.has_value()) {
     return std::nullopt;
   }
@@ -347,14 +444,7 @@ std::optional<std::string> GrpcStatusFormatter::format(const Context& context,
 
 Protobuf::Value GrpcStatusFormatter::formatValue(const Context& context,
                                                  const StreamInfo::StreamInfo& info) const {
-  if (!Grpc::Common::isGrpcRequestHeaders(
-          context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers))) {
-    return SubstitutionFormatUtils::unspecifiedValue();
-  }
-  const auto grpc_status = Grpc::Common::getGrpcStatus(
-      context.responseTrailers().value_or(*Http::StaticEmptyHeaders::get().response_trailers),
-      context.responseHeaders().value_or(*Http::StaticEmptyHeaders::get().response_headers), info,
-      true);
+  const auto grpc_status = getGrpcStatus(context, info);
   if (!grpc_status.has_value()) {
     return SubstitutionFormatUtils::unspecifiedValue();
   }
@@ -378,6 +468,73 @@ Protobuf::Value GrpcStatusFormatter::formatValue(const Context& context,
   case Number: {
     return ValueUtil::numberValue(grpc_status.value());
   }
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+bool GrpcStatusFormatter::formatTo(std::string& sink, const Context& context,
+                                   const StreamInfo::StreamInfo& info) const {
+  const auto grpc_status = getGrpcStatus(context, info);
+  if (!grpc_status.has_value()) {
+    return false;
+  }
+  switch (format_) {
+  case CamelString: {
+    const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
+    if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
+      sink.append(absl::StrCat(grpc_status.value()));
+    } else {
+      sink.append(grpc_status_message);
+    }
+    return true;
+  }
+  case SnakeString: {
+    const auto grpc_status_message =
+        absl::StatusCodeToString(static_cast<absl::StatusCode>(grpc_status.value()));
+    if (grpc_status_message == EMPTY_STRING) {
+      sink.append(absl::StrCat(grpc_status.value()));
+    } else {
+      sink.append(grpc_status_message);
+    }
+    return true;
+  }
+  case Number:
+    sink.append(absl::StrCat(grpc_status.value()));
+    return true;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+void GrpcStatusFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                        const StreamInfo::StreamInfo& info) const {
+  const auto grpc_status = getGrpcStatus(context, info);
+  if (!grpc_status.has_value()) {
+    return;
+  }
+  switch (format_) {
+  case CamelString: {
+    const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
+    if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
+      sink.addString(absl::StrCat(grpc_status.value()));
+    } else {
+      sink.addString(grpc_status_message);
+    }
+    return;
+  }
+  case SnakeString: {
+    const auto grpc_status_message =
+        absl::StatusCodeToString(static_cast<absl::StatusCode>(grpc_status.value()));
+    if (grpc_status_message == EMPTY_STRING) {
+      sink.addString(absl::StrCat(grpc_status.value()));
+    } else {
+      sink.addString(grpc_status_message);
+    }
+    return;
+  }
+  case Number:
+    // The number format keeps the value typed as a number.
+    sink.addNumber(grpc_status.value());
+    return;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
@@ -409,6 +566,37 @@ QueryParameterFormatter::formatValue(const Context& context,
   return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
+bool QueryParameterFormatter::formatTo(std::string& sink, const Context& context,
+                                       const StreamInfo::StreamInfo&) const {
+  const auto request_headers = context.requestHeaders();
+  if (!request_headers.has_value()) {
+    return false;
+  }
+  const auto query_params =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(request_headers->getPathValue());
+  std::optional<absl::string_view> value = query_params.getFirstValueView(parameter_key_);
+  if (!value.has_value()) {
+    return false;
+  }
+  sink.append(SubstitutionFormatUtils::truncateStringView(*value, max_length_));
+  return true;
+}
+
+void QueryParameterFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                            const StreamInfo::StreamInfo&) const {
+  const auto request_headers = context.requestHeaders();
+  if (!request_headers.has_value()) {
+    return;
+  }
+  const auto query_params =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(request_headers->getPathValue());
+  std::optional<absl::string_view> value = query_params.getFirstValueView(parameter_key_);
+  if (!value.has_value()) {
+    return;
+  }
+  sink.addString(SubstitutionFormatUtils::truncateStringView(*value, max_length_));
+}
+
 absl::StatusOr<FormatterProviderPtr>
 QueryParametersFormatter::create(absl::string_view decoding, std::optional<size_t> max_length) {
   DecodeOption decode_option;
@@ -421,6 +609,60 @@ QueryParametersFormatter::create(absl::string_view decoding, std::optional<size_
         "Invalid QUERY_PARAMS option: '{}', only 'ORIG'/'DECODED' are allowed", decoding));
   }
   return std::make_unique<QueryParametersFormatter>(decode_option, max_length);
+}
+
+bool QueryParametersFormatter::formatTo(std::string& sink, const Context& context,
+                                        const StreamInfo::StreamInfo&) const {
+  const auto request_headers = context.requestHeaders();
+  if (!request_headers.has_value()) {
+    return false;
+  }
+
+  // Gather query parameters substring from path
+  absl::string_view path_view = request_headers->getPathValue();
+  auto query_offset = path_view.find('?');
+  if (query_offset == absl::string_view::npos) {
+    return false;
+  }
+
+  absl::string_view query_params = path_view.substr(query_offset + 1);
+
+  // Apply percent decoding on the query params if requested
+  if (option_ == DecodeOption::Decoded) {
+    auto decoded = Http::Utility::PercentEncoding::urlDecodeQueryParameter(query_params);
+    SubstitutionFormatUtils::truncate(decoded, max_length_);
+    sink.append(decoded);
+  } else {
+    query_params = SubstitutionFormatUtils::truncateStringView(query_params, max_length_);
+    sink.append(query_params);
+  }
+  return true;
+}
+
+void QueryParametersFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                             const StreamInfo::StreamInfo&) const {
+  const auto request_headers = context.requestHeaders();
+  if (!request_headers.has_value()) {
+    return;
+  }
+
+  auto path_view = request_headers->getPathValue();
+  auto query_offset = path_view.find('?');
+  if (query_offset == absl::string_view::npos) {
+    return;
+  }
+
+  absl::string_view query_params = path_view.substr(query_offset + 1);
+
+  // Apply percent decoding on the query params if requested
+  if (option_ == DecodeOption::Decoded) {
+    auto decoded = Http::Utility::PercentEncoding::urlDecodeQueryParameter(query_params);
+    SubstitutionFormatUtils::truncate(decoded, max_length_);
+    sink.addString(decoded);
+  } else {
+    query_params = SubstitutionFormatUtils::truncateStringView(query_params, max_length_);
+    sink.addString(query_params);
+  }
 }
 
 // FormatterProvider
@@ -459,6 +701,14 @@ QueryParametersFormatter::formatValue(const Context& context,
 std::optional<std::string> PathFormatter::format(const Context& context,
                                                  const StreamInfo::StreamInfo&) const {
 
+  const auto path_view = pathView(context);
+  if (!path_view.has_value()) {
+    return std::nullopt;
+  }
+  return std::string(*path_view);
+}
+
+std::optional<absl::string_view> PathFormatter::pathView(const Context& context) const {
   absl::string_view path_view;
   const auto headers = context.requestHeaders();
   if (!headers.has_value()) {
@@ -491,13 +741,31 @@ std::optional<std::string> PathFormatter::format(const Context& context,
     }
   }
 
-  path_view = SubstitutionFormatUtils::truncateStringView(path_view, max_length_);
-  return std::string(path_view);
+  return SubstitutionFormatUtils::truncateStringView(path_view, max_length_);
 }
 
 Protobuf::Value PathFormatter::formatValue(const Context& context,
                                            const StreamInfo::StreamInfo& stream_info) const {
   return ValueUtil::optionalStringValue(format(context, stream_info));
+}
+
+bool PathFormatter::formatTo(std::string& sink, const Context& context,
+                             const StreamInfo::StreamInfo&) const {
+  const auto path_view = pathView(context);
+  if (!path_view.has_value()) {
+    return false;
+  }
+  sink.append(*path_view);
+  return true;
+}
+
+void PathFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                  const StreamInfo::StreamInfo&) const {
+  const auto path_view = pathView(context);
+  if (!path_view.has_value()) {
+    return;
+  }
+  sink.addString(*path_view);
 }
 
 absl::StatusOr<FormatterProviderPtr> PathFormatter::create(absl::string_view with_query,

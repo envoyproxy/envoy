@@ -1,5 +1,6 @@
 #include "contrib/kafka/filters/network/source/mesh/shared_consumer_manager_impl.h"
 
+#include <format>
 #include <functional>
 #include <optional>
 
@@ -89,7 +90,7 @@ void SharedConsumerManagerImpl::registerNewConsumer(const std::string& topic) {
       configuration_.computeClusterConfigForTopic(topic);
   if (!cluster_config) {
     throw EnvoyException(
-        fmt::format("Could not compute upstream cluster configuration for topic [{}]", topic));
+        std::format("Could not compute upstream cluster configuration for topic [{}]", topic));
   }
 
   // Create the consumer and register it.

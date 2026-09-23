@@ -208,6 +208,11 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   setAttribute(name, value);
 }
 
+void Span::reserveTags(size_t size) {
+  auto* attributes = span_.mutable_attributes();
+  attributes->Reserve(attributes->size() + size);
+}
+
 void Span::log(SystemTime timestamp, const std::string& event) {
   if (event.empty()) {
     return;
@@ -248,6 +253,16 @@ void Tracer::flushSpans() {
     return;
   }
 
+  if (!exporter_) {
+    ENVOY_LOG_EVERY_POW_2(warn,
+                          "Skipping log request to OpenTelemetry: no exporter "
+                          "configured; dropping {} spans",
+                          span_buffer_.size());
+    tracing_stats_.spans_dropped_.add(span_buffer_.size());
+    span_buffer_.clear();
+    return;
+  }
+
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
@@ -276,14 +291,10 @@ void Tracer::flushSpans() {
   for (const auto& pending_span : span_buffer_) {
     (*scope_span->add_spans()) = pending_span;
   }
-  if (exporter_) {
-    tracing_stats_.spans_sent_.add(span_buffer_.size());
-    if (!exporter_->log(request)) {
-      // TODO: should there be any sort of retry or reporting here?
-      ENVOY_LOG(trace, "Unsuccessful log request to OpenTelemetry trace collector.");
-    }
-  } else {
-    ENVOY_LOG(info, "Skipping log request to OpenTelemetry: no exporter configured");
+  tracing_stats_.spans_sent_.add(span_buffer_.size());
+  if (!exporter_->log(request)) {
+    // TODO: should there be any sort of retry or reporting here?
+    ENVOY_LOG(trace, "Unsuccessful log request to OpenTelemetry trace collector.");
   }
   span_buffer_.clear();
 }
