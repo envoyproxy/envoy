@@ -30,7 +30,7 @@ bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
 bazel_dep(name = "rules_android", version = "0.7.2")
 bazel_dep(name = "rules_android_ndk", version = "0.1.5")
 bazel_dep(name = "hermetic-android-toolchains", version = "0.0.0-20260807-c6a9f20.envoy", dev_dependency = True)
-bazel_dep(name = "rules_apple", version = "3.20.1.envoy")
+bazel_dep(name = "rules_apple", version = "5.1.0")
 bazel_dep(name = "rules_robolectric", version = "4.16")
 bazel_dep(name = "rules_cc", version = "0.2.25")
 bazel_dep(name = "rules_detekt", version = "0.8.1.2")
@@ -40,7 +40,7 @@ bazel_dep(name = "rules_kotlin", version = "2.3.20")
 bazel_dep(name = "rules_python", version = "2.2.0")
 bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
-bazel_dep(name = "rules_swift", version = "2.4.0", repo_name = "build_bazel_rules_swift")
+bazel_dep(name = "rules_swift", version = "4.0.1", repo_name = "build_bazel_rules_swift")
 bazel_dep(name = "rules_xcodeproj", version = "2.4.0", repo_name = "com_github_buildbuddy_io_rules_xcodeproj")
 bazel_dep(name = "toolchains_llvm", version = "1.9.0.envoy")
 bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
@@ -59,12 +59,6 @@ local_path_override(
 local_path_override(
     module_name = "envoy_build_config",
     path = "envoy_build_config",
-)
-
-# TODO(phlax): Remove once rules_apple is updated
-single_version_override(
-    module_name = "rules_swift",
-    version = "2.4.0",
 )
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
