@@ -1923,7 +1923,8 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigLifetimes) {
     const std::string route_filter_config_str = "router config";
     auto route_filter_config_or_status =
         Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-            filter_name, route_filter_config_str, std::move(dynamic_module_for_route.value()));
+            filter_name, route_filter_config_str, std::move(dynamic_module_for_route.value()),
+            context.mainThreadDispatcher());
     EXPECT_TRUE(route_filter_config_or_status.ok());
     auto route_filter_config = std::move(route_filter_config_or_status.value());
 
@@ -1947,6 +1948,41 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigLifetimes) {
                 ->value()
                 .getStringView(),
             "router config");
+}
+
+// A per-route configuration released off the main thread defers the module's destroy hook to the
+// main dispatcher, because the module may use configuration callbacks that require that thread.
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigDestroyedOnMainThread) {
+  const std::string filter_name = "per_route_config";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
+  EXPECT_TRUE(dynamic_module.ok());
+
+  ON_CALL(context.dispatcher_, isThreadSafe()).WillByDefault(testing::Return(false));
+
+  auto config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
+          filter_name, "router config", std::move(dynamic_module.value()),
+          context.mainThreadDispatcher());
+  EXPECT_TRUE(config_or_status.ok());
+  auto config = std::move(config_or_status.value());
+
+  Event::PostCb posted;
+  EXPECT_CALL(context.dispatcher_, post(_)).WillOnce([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  });
+  config.reset();
+  ASSERT_TRUE(posted != nullptr);
+
+  // Running the posted callback invokes the module's destroy hook on the main thread and then
+  // unloads the module.
+  posted();
 }
 
 TEST(HttpFilter, HeaderMapGetter) {

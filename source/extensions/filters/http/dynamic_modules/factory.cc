@@ -232,7 +232,7 @@ DynamicModuleConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
-    const RouteConfigProto& proto_config, Server::Configuration::ServerFactoryContext&,
+    const RouteConfigProto& proto_config, Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor&) {
 
   const auto& module_config = proto_config.dynamic_module_config();
@@ -259,7 +259,8 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
                      DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-              filter_name, config, std::move(dynamic_module.value()));
+              filter_name, config, std::move(dynamic_module.value()),
+              context.mainThreadDispatcher());
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create pre-route filter config: " +
