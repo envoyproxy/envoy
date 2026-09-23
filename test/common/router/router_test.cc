@@ -3339,6 +3339,9 @@ TEST_F(RouterTest, RetryRequestBeforeBody) {
 // Test retrying a request, when the first attempt fails while the client
 // is sending the body.
 TEST_F(RouterTest, RetryRequestDuringBody) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3388,6 +3391,9 @@ TEST_F(RouterTest, RetryRequestDuringBody) {
 // Verify that when retry buffering is enabled, the router stores the body in its private
 // retry_buffer_ and does NOT call callbacks_->addDecodedData().
 TEST_F(RouterTest, RetryBufferDoesNotDuplicateBodyOnContinueDecodingReplay) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3423,6 +3429,9 @@ TEST_F(RouterTest, RetryBufferDoesNotDuplicateBodyOnContinueDecodingReplay) {
 // is sending the body, with more data arriving in between upstream attempts
 // (which would normally happen during the backoff timer interval), but not end_stream.
 TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3496,6 +3505,9 @@ TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) 
 // is sending the body, with the rest of the request arriving in between upstream
 // request attempts.
 TEST_F(RouterTest, RetryRequestDuringBodyCompleteBetweenAttempts) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3542,6 +3554,9 @@ TEST_F(RouterTest, RetryRequestDuringBodyCompleteBetweenAttempts) {
 // is sending the body, with the trailers arriving in between upstream
 // request attempts.
 TEST_F(RouterTest, RetryRequestDuringBodyTrailerBetweenAttempts) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3588,6 +3603,9 @@ TEST_F(RouterTest, RetryRequestDuringBodyTrailerBetweenAttempts) {
 // is sending the body, with the rest of the request arriving in between upstream
 // request attempts, but exceeding the buffer limit causing a downstream request abort.
 TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(50));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3623,6 +3641,9 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
 // Test when request_body_buffer_limit is set we should use request_body_buffer_limit
 // regardless of other settings.
 TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   // Use route level buffer limit.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(60));
 
@@ -3658,6 +3679,9 @@ TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
 
 // Route level request buffer limit will override the connection buffer limit.
 TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   // Set up the connection buffer limit mock to return 40 as expected
   EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
@@ -3697,6 +3721,9 @@ TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
 
 // Test that when neither fields are set we use per_connection_buffer_limit_bytes.
 TEST_F(RouterTest, BufferLimitLogicCase3NeitherFieldSet) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   // Set up the connection buffer limit mock to return 40 as expected
   EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
@@ -3737,6 +3764,9 @@ TEST_F(RouterTest, BufferLimitLogicCase3NeitherFieldSet) {
 
 // Test edge case: Zero limits should prevent buffering
 TEST_F(RouterTest, BufferLimitLogicEdgeCaseZeroLimits) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   // Set request_body_buffer_limit to 0 (should prevent any buffering)
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(0));
 
@@ -3769,6 +3799,9 @@ TEST_F(RouterTest, BufferLimitLogicEdgeCaseZeroLimits) {
 
 // Test mixed buffer limit scenarios with multiple content chunks
 TEST_F(RouterTest, BufferLimitLogicMultipleDataChunks) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Buffer limit that should allow multiple small chunks but fail on larger ones
@@ -3813,6 +3846,9 @@ TEST_F(RouterTest, BufferLimitLogicMultipleDataChunks) {
 
 // Test request_body_buffer_limit with exactly uint32_t max value behavior
 TEST_F(RouterTest, BufferLimitLogicMaxUint32Boundary) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Test exactly at uint32_t max boundary
@@ -5719,6 +5755,9 @@ TEST_F(RouterTest, InternalRedirectWithRequestBodyBufferOverflow) {
 // request data, the decoding buffer and the data argument to decodeData() are the same object.
 // The buffer overflow check must not double-count the size in this case.
 TEST_F(RouterTest, InternalRedirectNoDoubleCountWhenDecodingBufferIsData) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   // Body is 15 bytes, limit is 20. Without the fix, the check would compute 15+15=30 > 20
   // and incorrectly mark the request as buffer-overflowed.
   Buffer::OwnedImpl body_data("fifteen_bytes!!");
