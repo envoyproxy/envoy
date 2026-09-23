@@ -1,5 +1,6 @@
 #include "source/common/upstream/multi_health_checker.h"
 
+#include "source/common/common/enum_to_int.h"
 #include "source/common/upstream/health_checker_impl.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -9,12 +10,11 @@ namespace Upstream {
 
 namespace {
 
-constexpr uint32_t kActiveHcFlagMask =
-    static_cast<uint32_t>(Host::HealthFlag::FAILED_ACTIVE_HC) |
-    static_cast<uint32_t>(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
-    static_cast<uint32_t>(Host::HealthFlag::PENDING_ACTIVE_HC) |
-    static_cast<uint32_t>(Host::HealthFlag::ACTIVE_HC_TIMEOUT) |
-    static_cast<uint32_t>(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+constexpr uint32_t kActiveHcFlagMask = enumToInt(Host::HealthFlag::FAILED_ACTIVE_HC) |
+                                       enumToInt(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
+                                       enumToInt(Host::HealthFlag::PENDING_ACTIVE_HC) |
+                                       enumToInt(Host::HealthFlag::ACTIVE_HC_TIMEOUT) |
+                                       enumToInt(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
 
 } // namespace
 
@@ -27,7 +27,7 @@ MultiHealthChecker::PerHostState::PerHostState(uint32_t num_checkers, const Host
   checker_flags_.assign(num_checkers, host_flags_all & kActiveHcFlagMask);
 
   auto flagBits = [&](Host::HealthFlag flag) -> uint32_t {
-    return (host_flags_all & static_cast<uint32_t>(flag)) ? all_bits : 0;
+    return (host_flags_all & enumToInt(flag)) ? all_bits : 0;
   };
   fail_bits_ = flagBits(Host::HealthFlag::FAILED_ACTIVE_HC);
   degraded_bits_ = flagBits(Host::HealthFlag::DEGRADED_ACTIVE_HC);
@@ -107,15 +107,15 @@ MultiHealthChecker::~MultiHealthChecker() {
 
 bool MultiHealthChecker::SubCheckerHealthFlagCallbacks::get(const Host& host,
                                                             Host::HealthFlag flag) {
-  return (hostFlags(host) & static_cast<uint32_t>(flag)) != 0;
+  return (hostFlags(host) & enumToInt(flag)) != 0;
 }
 
 void MultiHealthChecker::SubCheckerHealthFlagCallbacks::set(Host& host, Host::HealthFlag flag) {
-  hostFlags(host) |= static_cast<uint32_t>(flag);
+  hostFlags(host) |= enumToInt(flag);
 }
 
 void MultiHealthChecker::SubCheckerHealthFlagCallbacks::clear(Host& host, Host::HealthFlag flag) {
-  hostFlags(host) &= ~static_cast<uint32_t>(flag);
+  hostFlags(host) &= ~enumToInt(flag);
 }
 
 uint32_t& MultiHealthChecker::SubCheckerHealthFlagCallbacks::hostFlags(const Host& host) {
@@ -196,7 +196,7 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
   uint32_t checker_flags_ = state.checker_flags_[checker_index];
 
   auto handleBit = [&](uint32_t& bits, Host::HealthFlag flag) {
-    if (checker_flags_ & static_cast<uint32_t>(flag)) {
+    if (checker_flags_ & enumToInt(flag)) {
       bits |= bit;
     } else {
       bits &= ~bit;
