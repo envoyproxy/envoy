@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/filter_chain/v3/filter_chain.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
@@ -61,10 +62,12 @@ public:
   FilterChainPerRouteConfig(const FilterChainConfigProtoPerRoute& proto_config,
                             Server::Configuration::ServerFactoryContext& context,
                             const std::string& stats_prefix, absl::Status& creation_status);
+  ~FilterChainPerRouteConfig() override;
 
   OptRef<const FilterChain> filterChain() const { return makeOptRefFromPtr(filter_chain_.get()); }
 
 private:
+  Event::Dispatcher& main_dispatcher_;
   FilterChainConstSharedPtr filter_chain_;
 };
 

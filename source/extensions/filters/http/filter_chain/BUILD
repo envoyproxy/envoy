@@ -16,6 +16,7 @@ envoy_cc_library(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
+        "//envoy/event:dispatcher_interface",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
