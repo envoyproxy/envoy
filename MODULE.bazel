@@ -117,7 +117,7 @@ bazel_dep(name = "xxhash", version = "0.8.3.bcr.1")
 bazel_dep(name = "yaml-cpp", version = "0.9.0.bcr.1")
 bazel_dep(name = "yq.bzl", version = "0.4.0")
 bazel_dep(name = "zipkin-api", version = "1.0.0.bcr.1")
-bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
+bazel_dep(name = "zlib-ng", version = "2.3.3.bcr.2")
 bazel_dep(name = "zstd", version = "1.5.7.bcr.2")
 
 ####################################################################################
