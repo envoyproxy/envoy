@@ -60,6 +60,7 @@ private:
     uint32_t fail_bits{0};
     uint32_t degraded_bits{0};
     uint32_t pending_bits{0};
+    uint32_t timeout_bits{0};
   };
 
   void onCheckerResult(uint32_t checker_index, HostSharedPtr host, HealthTransition changed_state,

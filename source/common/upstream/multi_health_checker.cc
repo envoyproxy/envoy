@@ -2,6 +2,8 @@
 
 #include "source/common/upstream/health_checker_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -29,6 +31,7 @@ absl::StatusOr<std::shared_ptr<MultiHealthChecker>> MultiHealthChecker::create(
   auto checker = std::shared_ptr<MultiHealthChecker>(new MultiHealthChecker(cluster));
 
   checker->checkers_.reserve(health_checks.size());
+  absl::flat_hash_set<absl::string_view> seen_names;
   for (uint32_t checker_idx = 0; checker_idx < static_cast<uint32_t>(health_checks.size());
        checker_idx++) {
     const auto& sub_config = health_checks[checker_idx];
@@ -38,6 +41,13 @@ absl::StatusOr<std::shared_ptr<MultiHealthChecker>> MultiHealthChecker::create(
           fmt::format("health check at index {} is missing a name; all health checks "
                       "must have a name when multiple health checks are configured",
                       checker_idx));
+    }
+
+    if (!seen_names.insert(sub_config.name()).second) {
+      return absl::InvalidArgumentError(
+          fmt::format("duplicate health check name '{}' at index {}; all health check "
+                      "names must be unique within a cluster",
+                      sub_config.name(), checker_idx));
     }
 
     PerCheckerData& data = checker->checkers_.emplace_back(*checker, checker_idx);
@@ -131,6 +141,7 @@ void MultiHealthChecker::initializeHost(const HostSharedPtr& host) {
     state.pending_bits = host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ? all_bits : 0;
     state.fail_bits = host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ? all_bits : 0;
     state.degraded_bits = host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC) ? all_bits : 0;
+    state.timeout_bits = host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ? all_bits : 0;
     state.initial_check_pending = all_bits;
     adjustGauges(state, &Stats::Gauge::inc);
   }
@@ -167,6 +178,8 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
   ASSERT(state_it != host_states_.end());
   auto& state = state_it->second;
 
+  ASSERT(checkers_[checker_index].host_flags.count(host.get()) != 0,
+         "Flags must already be initialized");
   uint32_t checker_flags = checkers_[checker_index].host_flags[host.get()];
 
   if (checker_flags & static_cast<uint32_t>(Host::HealthFlag::FAILED_ACTIVE_HC)) {
@@ -187,6 +200,12 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
     state.pending_bits &= ~bit;
   }
 
+  if (checker_flags & static_cast<uint32_t>(Host::HealthFlag::ACTIVE_HC_TIMEOUT)) {
+    state.timeout_bits |= bit;
+  } else {
+    state.timeout_bits &= ~bit;
+  }
+
   // Don't do any operations with a side effect until all checkers have posted their initial result.
   state.initial_check_pending &= ~bit;
   if (state.initial_check_pending != 0) {
@@ -203,6 +222,7 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
   const bool now_aggregate_failed = state.fail_bits != 0;
   const bool now_aggregate_degraded = state.degraded_bits != 0;
   const bool now_aggregate_pending = state.pending_bits != 0;
+  const bool now_aggregate_timeout = state.timeout_bits != 0;
 
   if (now_aggregate_failed) {
     host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -220,6 +240,12 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
     host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
   } else {
     host->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+
+  if (now_aggregate_timeout) {
+    host->healthFlagSet(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  } else {
+    host->healthFlagClear(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
   }
 
   if (was_aggregate_failed != now_aggregate_failed) {

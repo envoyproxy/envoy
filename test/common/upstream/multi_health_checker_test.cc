@@ -162,6 +162,32 @@ TEST_F(MultiHealthCheckerImplTest, FirstMissingName) {
             "must have a name when multiple health checks are configured");
 }
 
+TEST_F(MultiHealthCheckerImplTest, DuplicateName) {
+  auto health_checks = parseHealthChecksFromYaml({
+      R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    name: same_name
+    tcp_health_check: {}
+    )EOF",
+      R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    name: same_name
+    tcp_health_check: {}
+    )EOF",
+  });
+  auto result = MultiHealthChecker::create(*cluster_, health_checks, server_context_);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "duplicate health check name 'same_name' at index 1; all health check "
+            "names must be unique within a cluster");
+}
+
 TEST_F(MultiHealthCheckerImplTest, BothCheckersHealthy) {
   InSequence s;
 
@@ -354,7 +380,8 @@ public:
   }
   void start() override {}
 
-  void reportResult(const HostSharedPtr& host, bool failed, bool degraded, bool pending = false) {
+  void reportResult(const HostSharedPtr& host, bool failed, bool degraded, bool pending = false,
+                    bool timeout = false) {
     if (failed) {
       flag_callbacks_.set(*host, Host::HealthFlag::FAILED_ACTIVE_HC);
     } else {
@@ -369,6 +396,11 @@ public:
       flag_callbacks_.set(*host, Host::HealthFlag::PENDING_ACTIVE_HC);
     } else {
       flag_callbacks_.clear(*host, Host::HealthFlag::PENDING_ACTIVE_HC);
+    }
+    if (timeout) {
+      flag_callbacks_.set(*host, Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+    } else {
+      flag_callbacks_.clear(*host, Host::HealthFlag::ACTIVE_HC_TIMEOUT);
     }
 
     auto state = failed ? HealthState::Unhealthy : HealthState::Healthy;
@@ -691,6 +723,36 @@ TEST_F(MultiHealthCheckerDegradedTest, HostAddedAfterStartGateWorks) {
 
   // host1 is unaffected.
   EXPECT_FALSE(host1->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+}
+
+TEST_F(MultiHealthCheckerDegradedTest, TimeoutFlagAggregated) {
+  setup();
+  auto host = makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host};
+  health_checker_->start();
+
+  ASSERT_EQ(2u, fake_factory_.instances_.size());
+  auto* checker_a = fake_factory_.instances_[0];
+  auto* checker_b = fake_factory_.instances_[1];
+
+  // Both healthy, no timeout.
+  checker_a->reportResult(host, false, false);
+  checker_b->reportResult(host, false, false);
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT));
+
+  // Checker A reports failed with timeout.
+  checker_a->reportResult(host, true, false, false, true);
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT));
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+
+  // Checker B still healthy — aggregate timeout stays because checker A has it.
+  checker_b->reportResult(host, false, false);
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT));
+
+  // Checker A recovers, clears timeout.
+  checker_a->reportResult(host, false, false);
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT));
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 }
 
 } // namespace

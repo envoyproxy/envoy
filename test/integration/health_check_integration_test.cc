@@ -1192,6 +1192,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiHealthCheckIntegrationTest,
 TEST_P(MultiHealthCheckIntegrationTest, BothSubCheckersPass) {
   initializeWithStaticCluster();
 
+  // Write both "Pong1" and "Pong2" to each connection. We don't know which connection maps to
+  // which checker, but TCP PayloadMatcher searches for expected bytes anywhere in accumulated
+  // data, so the combined payload satisfies either checker.
   AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
   RELEASE_ASSERT(result, result.message());
   result = hc_connections_[1]->write("Pong1Pong2");
