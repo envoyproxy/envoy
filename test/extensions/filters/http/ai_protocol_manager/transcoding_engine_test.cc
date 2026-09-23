@@ -1028,6 +1028,145 @@ TEST(TranscodingEngineTest, VerifierTracksOffloadableFieldProvenanceAcrossMoveAn
   EXPECT_EQ(unwrapped_multi_status.code(), absl::StatusCode::kInvalidArgument);
 }
 
+TEST(TranscodingEngineTest, CoversAllRuleAndEngineEdgeCases) {
+  // 1. Exercise `TranscodeRule` introspection accessors and `std::vector<TranscodeRule>` rule set.
+  TranscodeRule rule = TranscodeRule::valueMap("role", {{"bot", "assistant"}},
+                                               TranscodeRule::UnknownValuePolicy::Drop);
+  EXPECT_EQ(rule.op(), TranscodeRule::Op::ValueMap);
+  EXPECT_EQ(rule.targetPath(), "role");
+  EXPECT_EQ(rule.unknownValuePolicy(), TranscodeRule::UnknownValuePolicy::Drop);
+  EXPECT_EQ(rule.valueMappings().size(), 1);
+
+  TranscodeRule def_rule = TranscodeRule::setDefault("temperature", 0.7);
+  EXPECT_EQ(def_rule.defaultValue(), 0.7);
+
+  TranscodeRule ext_rule =
+      TranscodeRule::extractFromArray("messages", "role", {"system"}, "content", "system");
+  EXPECT_EQ(ext_rule.predicateField(), "role");
+  EXPECT_EQ(ext_rule.extractSubpath(), "content");
+  EXPECT_EQ(ext_rule.matchValues().size(), 1);
+
+  std::vector<TranscodeRule> rule_vec = {rule};
+  TranscodeRuleSet vec_rule_set(LLMProtocol::OpenAiResponses, LLMProtocol::OpenAiChatCompletions,
+                                std::move(rule_vec));
+  EXPECT_EQ(vec_rule_set.sourceProtocol(), LLMProtocol::OpenAiResponses);
+  EXPECT_EQ(vec_rule_set.targetProtocol(), LLMProtocol::OpenAiChatCompletions);
+
+  // 2. Exercise `JsonWithExtBuf` wrapper overloads on `TranscodeRuleSet` and `TranscodingEngine`.
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& default_engine = *engine_or;
+
+  JsonWithExtBuf ext_payload;
+  ext_payload.json() = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5",
+    "role": "unknown_role",
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(vec_rule_set.execute(ext_payload), IsOk());
+  EXPECT_FALSE(ext_payload.json().contains("role"));
+
+  ASSERT_THAT(default_engine.transcodeToIr(LLMProtocol::Unspecified, ext_payload), IsOk());
+  ASSERT_THAT(default_engine.transcodeFromIr(LLMProtocol::Unspecified, ext_payload), IsOk());
+  ASSERT_THAT(default_engine.transcodeToIr(LLMProtocol::OpenAiChatCompletions, ext_payload),
+              IsOk());
+  ASSERT_THAT(default_engine.transcodeFromIr(LLMProtocol::AnthropicMessages, ext_payload), IsOk());
+
+  // 3. Non-object root payload is rejected by `TranscodeRule::apply`.
+  nlohmann::json non_obj = nlohmann::json::array({1, 2, 3});
+  EXPECT_FALSE(TranscodeRule::drop("a").apply(non_obj).ok());
+
+  // 4. Empty path, self-move (`source_path == target_path`), and intermediate non-object paths.
+  nlohmann::json edge_doc = nlohmann::json::parse(R"({
+    "a": "scalar",
+    "single_other": {"other": 123},
+    "bad_int": "not_an_int",
+    "bad_num": "not_a_float",
+    "non_str": 42,
+    "arr_with_scalar": [123, {"k": "v"}],
+    "scalar_blocks": ["hello"],
+    "bad_blocks": [{"no_text": 1}],
+    "non_obj_parts": [123],
+    "multi_sys": [
+      {"role": "system", "content": [{"type": "text", "text": "sys1"}]},
+      {"role": "system", "content": "sys2"}
+    ]
+  })");
+  EXPECT_THAT(TranscodeRule::move("", "").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::move("a", "a").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::move("a.b.c", "x.y").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::setDefault("", nlohmann::json::object()).apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::unwrapSingleKeyObject("single_other", "type").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::toInteger("bad_int").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::toNumber("bad_num").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::valueMap("non_str", {{"a", "b"}}).apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::forEach("arr_with_scalar", {TranscodeRule::drop("k")}).apply(edge_doc),
+              IsOk());
+  EXPECT_THAT(TranscodeRule::extractFromArray("missing_arr", "role", {"system"}, "content", "sys")
+                  .apply(edge_doc),
+              IsOk());
+  EXPECT_THAT(TranscodeRule::extractFromArray("multi_sys", "role", {"system"}, "content", "sys_out")
+                  .apply(edge_doc),
+              IsOk());
+  EXPECT_THAT(
+      TranscodeRule::prependToArray("bad_int", "new_messages_arr", "role", "system", "content")
+          .apply(edge_doc),
+      IsOk());
+  EXPECT_THAT(
+      TranscodeRule::wrapInArrayObject("scalar_blocks", "wrapped_scalars", "text").apply(edge_doc),
+      IsOk());
+  EXPECT_FALSE(
+      TranscodeRule::wrapInArrayObject("bad_blocks", "wrapped_bad", "text").apply(edge_doc).ok());
+  EXPECT_FALSE(
+      TranscodeRule::unwrapArrayObject("non_obj_parts", "text", "out").apply(edge_doc).ok());
+
+  // 5. Runtime `ExternalRef` protection on `ValueMap` and `registerPack` / `transcodeFromIr` error
+  //    propagation.
+  nlohmann::json ext_ref_doc = nlohmann::json::object();
+  ext_ref_doc["field"] = JsonWithExtBuf::makeExternalRef({0, 16});
+  EXPECT_FALSE(TranscodeRule::valueMap("field", {{"a", "b"}}).apply(ext_ref_doc).ok());
+
+  const PayloadSchema* openai_schema =
+      AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
+  TranscodingEngine custom_engine;
+  DialectTranscodePack bad_to_ir_pack{
+      /*protocol=*/LLMProtocol::OpenAiChatCompletions,
+      /*to_IR=*/
+      TranscodeRuleSet(
+          LLMProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol,
+          {TranscodeRule::forEach("messages", {TranscodeRule::valueMap("content", {{"a", "b"}})})}),
+      /*from_IR=*/
+      TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiChatCompletions, {}),
+  };
+  EXPECT_FALSE(
+      custom_engine.registerPack(std::move(bad_to_ir_pack), openai_schema, openai_schema).ok());
+
+  DialectTranscodePack bad_from_ir_pack{
+      /*protocol=*/LLMProtocol::OpenAiChatCompletions,
+      /*to_IR=*/
+      TranscodeRuleSet(LLMProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol, {}),
+      /*from_IR=*/
+      TranscodeRuleSet(
+          TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiChatCompletions,
+          {TranscodeRule::forEach("messages", {TranscodeRule::valueMap("content", {{"a", "b"}})})}),
+  };
+  EXPECT_FALSE(
+      custom_engine.registerPack(std::move(bad_from_ir_pack), openai_schema, openai_schema).ok());
+
+  DialectTranscodePack strict_from_ir_pack{
+      /*protocol=*/LLMProtocol::OpenAiResponses,
+      /*to_IR=*/
+      TranscodeRuleSet(LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol, {}),
+      /*from_IR=*/
+      TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiResponses,
+                       {TranscodeRule::valueMap("mode", {{"ok", "yes"}},
+                                                TranscodeRule::UnknownValuePolicy::Reject)}),
+  };
+  ASSERT_THAT(custom_engine.registerPack(std::move(strict_from_ir_pack)), IsOk());
+  nlohmann::json bad_mode = nlohmann::json::parse(R"({"mode": "invalid"})");
+  EXPECT_FALSE(custom_engine.transcodeFromIr(LLMProtocol::OpenAiResponses, bad_mode).ok());
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters
