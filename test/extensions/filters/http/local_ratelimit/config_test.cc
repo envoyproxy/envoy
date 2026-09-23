@@ -458,7 +458,7 @@ local_cluster_rate_limit: {}
   auto config_or_error = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   ASSERT_OK(config_or_error.status());
-  auto config = config_or_error.value();
+  auto config = std::move(config_or_error.value());
 
   // The share provider manager is an unpinned singleton, so the singleton manager holds only a
   // weak reference and the configuration owns the last strong one.
@@ -468,9 +468,10 @@ local_cluster_rate_limit: {}
   ASSERT_FALSE(share_provider_manager.expired());
 
   Event::PostCb posted;
-  EXPECT_CALL(context.dispatcher_, post(_)).WillOnce([&posted](Event::PostCb callback) {
-    posted = std::move(callback);
-  });
+  EXPECT_CALL(context.dispatcher_, post(_))
+      .WillOnce([&posted](Event::PostCb callback) { posted = std::move(callback); })
+      // The share provider manager in turn posts its cluster membership callback handle.
+      .WillOnce([](Event::PostCb callback) { callback(); });
   config.reset();
   ASSERT_TRUE(posted != nullptr);
   EXPECT_FALSE(share_provider_manager.expired());
