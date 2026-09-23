@@ -124,6 +124,10 @@ uint32_t& MultiHealthChecker::SubCheckerHealthFlagCallbacks::hostFlags(const Hos
 }
 
 void MultiHealthChecker::adjustGauges(const PerHostState& state, void (Stats::Gauge::*op)()) {
+  if (state.initial_check_pending_bits_ != 0) {
+    return;
+  }
+
   if (isGaugeHealthy(state)) {
     (healthy_gauge_.*op)();
   }
@@ -152,9 +156,6 @@ void MultiHealthChecker::start() {
 
 MultiHealthChecker::PerHostState& MultiHealthChecker::getOrCreateHostState(const Host& host) {
   auto [it, inserted] = host_states_.try_emplace(&host, checkers_.size(), host);
-  if (inserted) {
-    adjustGauges(it->second, &Stats::Gauge::inc);
-  }
   return it->second;
 }
 
@@ -209,15 +210,15 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
   handleBit(state.timeout_bits_, Host::HealthFlag::ACTIVE_HC_TIMEOUT);
   handleBit(state.immediate_fail_bits_, Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
 
-  // Don't do any operations with a side effect until all checkers have posted their initial result.
+  const bool gate_was_pending = state.initial_check_pending_bits_ != 0;
   state.initial_check_pending_bits_ &= ~bit;
   if (state.initial_check_pending_bits_ != 0) {
+    // Don't do any operations with a side effect until all checkers have posted their initial
+    // result.
     return;
   }
 
-  // Derive "was" from host flags, which reflect the last-applied state. This is correct both
-  // during normal operation and when the gate above just lifted, since no side effects run
-  // during the gated period.
+  // Capture "was" before updating host flags below.
   const bool was_aggregate_failed = host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC);
   const bool was_aggregate_degraded = host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
   const bool was_aggregate_pending = host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC);
@@ -242,18 +243,24 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
   handleFlag(Host::HealthFlag::ACTIVE_HC_TIMEOUT, now_aggregate_timeout);
   handleFlag(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL, now_aggregate_excluded);
 
-  if (was_aggregate_failed != now_aggregate_failed) {
-    if (now_aggregate_failed) {
-      healthy_gauge_.dec();
-    } else {
-      healthy_gauge_.inc();
+  if (gate_was_pending) {
+    // All checkers have now reported their first result. Count this host in gauges based on the
+    // aggregate state. Skip transition logic since no prior gauge adjustment has been made.
+    adjustGauges(state, &Stats::Gauge::inc);
+  } else {
+    if (was_aggregate_failed != now_aggregate_failed) {
+      if (now_aggregate_failed) {
+        healthy_gauge_.dec();
+      } else {
+        healthy_gauge_.inc();
+      }
     }
-  }
-  if (was_aggregate_degraded != now_aggregate_degraded) {
-    if (now_aggregate_degraded) {
-      degraded_gauge_.inc();
-    } else {
-      degraded_gauge_.dec();
+    if (was_aggregate_degraded != now_aggregate_degraded) {
+      if (now_aggregate_degraded) {
+        degraded_gauge_.inc();
+      } else {
+        degraded_gauge_.dec();
+      }
     }
   }
 
