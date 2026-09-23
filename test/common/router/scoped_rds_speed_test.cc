@@ -27,13 +27,6 @@ static ScopedRouteConfiguration genScopedRoute(int i) {
   return config;
 }
 
-static ScopeKeyPtr genScopeKey(int i) {
-  auto key = std::make_unique<ScopeKey>();
-  key->addFragment(
-      std::make_unique<StringKeyFragment>(absl::StrCat("10.0.", (i / 256) % 256, ".", i % 256)));
-  return key;
-}
-
 static std::vector<ScopedRouteInfoConstSharedPtr> genScopedRouteInfos(int n) {
   std::vector<ScopedRouteInfoConstSharedPtr> scopes;
   scopes.reserve(n);
@@ -123,7 +116,6 @@ static void bmComputeScopeKey(benchmark::State& state) {
   }
 }
 
-BENCHMARK(bmScopeLookup)->RangeMultiplier(4)->Range(16, 4096);
 BENCHMARK(bmScopeAddAll)->RangeMultiplier(4)->Range(16, 4096);
 BENCHMARK(bmScopeIncrementalUpdate)->RangeMultiplier(4)->Range(16, 4096);
 
