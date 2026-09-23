@@ -333,10 +333,19 @@ pub struct BytesInfo {
   pub bytes_received: u64,
   /// Total bytes sent to downstream.
   pub bytes_sent: u64,
-  /// Wire bytes received (including TLS overhead).
+  /// Wire bytes received from upstream.
   pub wire_bytes_received: u64,
-  /// Wire bytes sent (including TLS overhead).
+  /// Wire bytes sent to upstream.
   pub wire_bytes_sent: u64,
+}
+
+/// Cumulative wire byte counts from the stream's downstream bytes meter.
+#[derive(Debug, Clone, Default)]
+pub struct DownstreamWireBytes {
+  /// Wire bytes received from downstream.
+  pub bytes_received: u64,
+  /// Wire bytes sent to downstream.
+  pub bytes_sent: u64,
 }
 
 /// Access log type indicating when the log was recorded.
@@ -579,6 +588,29 @@ impl LogContext {
       bytes_sent: info.bytes_sent,
       wire_bytes_received: info.wire_bytes_received,
       wire_bytes_sent: info.wire_bytes_sent,
+    }
+  }
+
+  /// Get cumulative downstream wire byte counts.
+  ///
+  /// These correspond to `DOWNSTREAM_WIRE_BYTES_RECEIVED` and `DOWNSTREAM_WIRE_BYTES_SENT` in
+  /// access logs. For HTTP streams, they include protocol overhead accounted for by the codec,
+  /// not just body bytes. They can be nonzero for locally generated responses with no upstream
+  /// connection. Both fields are zero if the downstream bytes meter is unavailable.
+  pub fn downstream_wire_bytes(&self) -> DownstreamWireBytes {
+    let mut info = abi::envoy_dynamic_module_type_downstream_wire_bytes {
+      bytes_received: 0,
+      bytes_sent: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(
+        self.envoy_ptr,
+        &mut info,
+      );
+    }
+    DownstreamWireBytes {
+      bytes_received: info.bytes_received,
+      bytes_sent: info.bytes_sent,
     }
   }
 

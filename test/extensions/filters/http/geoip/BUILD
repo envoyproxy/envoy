@@ -66,6 +66,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/stats:utility_lib",
         "//source/extensions/filters/http/geoip:config",
         "//source/extensions/filters/http/geoip:geoip_filter_lib",
         "//source/extensions/geoip_providers/maxmind:config",
