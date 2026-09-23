@@ -172,6 +172,39 @@ TEST_F(GcpAuthnClientImplTest, SuccessAccessToken) {
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
+TEST_F(GcpAuthnClientImplTest, SuccessAccessTokenWithScopes) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token()->add_scopes("https://www.googleapis.com/auth/cloud-platform");
+  audience.mutable_access_token()->add_scopes("openid");
+  client_->fetchUnboundAccessToken(audience, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  EXPECT_EQ(message_->headers().Path()->value().getStringView(),
+            "/computeMetadata/v1/instance/service-accounts/default/"
+            "token?scopes=https://www.googleapis.com/auth/cloud-platform,openid");
+
+  EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
+  EXPECT_EQ(options_.retry_policy->retry_back_off().base_interval().seconds(), 1);
+  EXPECT_EQ(options_.retry_policy->retry_back_off().max_interval().seconds(), 10);
+  EXPECT_EQ(options_.retry_policy->retry_on(), "5xx,gateway-error,connect-failure,reset");
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(
+      R"({"access_token": "mock_access_token", "expires_in": 3600, "token_type": "Bearer"})");
+
+  uint64_t current_time = DateUtil::nowToSeconds(context_.server_factory_context_.timeSource());
+  uint64_t expected_exp_time = current_time + 3600;
+  GcpToken expected_token{"mock_access_token", expected_exp_time, audience};
+  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<GcpToken>(expected_token)));
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
 TEST_F(GcpAuthnClientImplTest, AccessTokenParsingFailure) {
   setupMockObjects();
   createClient();
@@ -497,6 +530,39 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessToken) {
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/"
             "token?bindCertificateFingerprint=abc%252Bdef%252Fghi%253D");
+
+  EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(
+      R"({"access_token": "mock_access_token", "expires_in": 3600, "token_type": "Bearer"})");
+
+  uint64_t current_time = DateUtil::nowToSeconds(context_.server_factory_context_.timeSource());
+  uint64_t expected_exp_time = current_time + 3600;
+  GcpToken expected_token{"mock_access_token", expected_exp_time, audience, fingerprint};
+  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<GcpToken>(expected_token)));
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessTokenWithScopes) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_bound_access_token()->add_scopes(
+      "https://www.googleapis.com/auth/cloud-platform");
+  audience.mutable_bound_access_token()->add_scopes("openid");
+  const std::string fingerprint = "abc+def/ghi=";
+  client_->fetchBoundAccessToken(audience, fingerprint, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  EXPECT_EQ(message_->headers().Path()->value().getStringView(),
+            "/computeMetadata/v1/instance/service-accounts/default/"
+            "token?bindCertificateFingerprint=abc%252Bdef%252Fghi%253D"
+            "&scopes=https://www.googleapis.com/auth/cloud-platform,openid");
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
 

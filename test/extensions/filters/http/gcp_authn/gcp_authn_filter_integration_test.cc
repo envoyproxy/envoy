@@ -191,18 +191,12 @@ public:
     EXPECT_TRUE(request_->complete());
   }
 
-  void waitForGcpAuthnServerResponseBoundAccessToken(const std::string& expected_fingerprint) {
+  void waitForGcpAuthnServerResponseToken(const std::string& expected_path) {
     AssertionResult result =
         fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_gcp_authn_connection_);
     RELEASE_ASSERT(result, result.message());
     result = fake_gcp_authn_connection_->waitForNewStream(*dispatcher_, request_);
     RELEASE_ASSERT(result, result.message());
-
-    std::string expected_path =
-        absl::StrCat("/computeMetadata/v1/instance/service-accounts/default/token"
-                     "?bindCertificateFingerprint=",
-                     Http::Utility::PercentEncoding::urlEncode(
-                         Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)));
 
     // Need to wait for headers complete before reading headers value.
     result = request_->waitForHeadersComplete();
@@ -221,6 +215,15 @@ public:
     RELEASE_ASSERT(result, result.message());
     // Verify the proxied request was received upstream, as expected.
     EXPECT_TRUE(request_->complete());
+  }
+
+  void waitForGcpAuthnServerResponseBoundAccessToken(const std::string& expected_fingerprint) {
+    std::string expected_path =
+        absl::StrCat("/computeMetadata/v1/instance/service-accounts/default/token"
+                     "?bindCertificateFingerprint=",
+                     Http::Utility::PercentEncoding::urlEncode(
+                         Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)));
+    waitForGcpAuthnServerResponseToken(expected_path);
   }
 
   // Send the request to destination upstream cluster
@@ -658,6 +661,99 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenCacheHit) {
   // Verify request has been routed to gcp_authn exactly 1 time (since the second was a cache hit).
   EXPECT_EQ(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 1);
   EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 2);
+}
+
+TEST_P(GcpAuthnFilterIntegrationTest, AccessTokenWithScopesSuccess) {
+  // Initialize config, but do not add standard audience metadata yet.
+  initializeConfig(/*add_audience=*/false);
+
+  // Configure cluster_0 with access_token audience metadata including scopes.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+    envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+    auto* access_token = audience.mutable_access_token();
+    access_token->add_scopes("https://www.googleapis.com/auth/cloud-platform");
+    access_token->add_scopes("openid");
+    std::ignore = (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
+                      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                          .PackFrom(audience);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection();
+
+  const std::string expected_path =
+      "/computeMetadata/v1/instance/service-accounts/default/"
+      "token?scopes=https://www.googleapis.com/auth/cloud-platform,openid";
+
+  waitForGcpAuthnServerResponseToken(expected_path);
+
+  // Verify the token is appended to cluster_0's upstream call, and clean up.
+  sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
+  cleanup();
+
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 1);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
+}
+
+TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenWithScopesSuccess) {
+  // Instruct the integration test framework that the upstream destination cluster uses TLS.
+  upstream_tls_ = true;
+
+  // Initialize config, but do not add standard audience metadata yet.
+  initializeConfig(/*add_audience=*/false);
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+    // Add bound_access_token audience metadata with scopes
+    envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+    auto* bound_access_token = audience.mutable_bound_access_token();
+    bound_access_token->add_scopes("https://www.googleapis.com/auth/cloud-platform");
+    bound_access_token->add_scopes("openid");
+    std::ignore = (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
+                      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                          .PackFrom(audience);
+  });
+
+  config_helper_.configureUpstreamTls(
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/std::nullopt,
+      [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
+        const std::string rundir = TestEnvironment::runfilesDirectory();
+        auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+        certs->mutable_certificate_chain()->set_filename(
+            rundir + "/test/config/integration/certs/clientcert.pem");
+        certs->mutable_private_key()->set_filename(rundir +
+                                                   "/test/config/integration/certs/clientkey.pem");
+      });
+
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection();
+
+  CertFingerprinterImpl fingerprinter;
+  const std::string cert_path =
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem");
+  const std::string cert_pem = TestEnvironment::readFileToStringForTest(cert_path);
+  const std::string expected_fingerprint = fingerprinter.getFingerprintFromPem(cert_pem).value();
+
+  const std::string expected_path =
+      absl::StrCat("/computeMetadata/v1/instance/service-accounts/default/token"
+                   "?bindCertificateFingerprint=",
+                   Http::Utility::PercentEncoding::urlEncode(
+                       Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)),
+                   "&scopes=https://www.googleapis.com/auth/cloud-platform,openid");
+
+  waitForGcpAuthnServerResponseToken(expected_path);
+
+  // Verify the token is appended to cluster_0's upstream call, and clean up.
+  sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
+  cleanup();
+
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 1);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
 TEST_P(GcpAuthnFilterIntegrationTest, PreserveExistingHeaderSkipsAuthn) {
