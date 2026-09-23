@@ -65,7 +65,7 @@ public:
     config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
       envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
           per_route;
-      per_route.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+      per_route.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
       auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
       std::ignore =
           (*route->mutable_typed_per_filter_config())["envoy.filters.http.ai_protocol_manager"]
@@ -146,7 +146,7 @@ TEST_P(RequestInfoIntegrationTest, PublishesRecordBeforeReleasingHeaders) {
 
   ASSERT_TRUE(headers_seen_.WaitForNotificationWithTimeout(absl::Seconds(5)));
   ASSERT_TRUE(record_present_);
-  EXPECT_EQ(captured_.input_api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(captured_.input_llm_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   EXPECT_EQ(captured_.model(), "gpt-4o");
   ASSERT_TRUE(captured_.has_stream());
   EXPECT_FALSE(captured_.stream().value());
