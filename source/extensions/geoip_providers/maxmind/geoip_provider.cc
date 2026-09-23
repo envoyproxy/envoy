@@ -232,7 +232,7 @@ DbFileProvider::DbFileProvider(Event::Dispatcher& dispatcher, Stats::ScopeShared
 }
 
 MaxmindDbSharedPtr DbFileProvider::db() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(mmdb_mutex_);
+  absl::MutexLock lock(mmdb_mutex_);
   return db_;
 }
 
