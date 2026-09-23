@@ -113,8 +113,7 @@ class ScopedRdsConfigSubscription : public Envoy::Config::DeltaConfigSubscriptio
                                     public Envoy::Config::SubscriptionCallbacks {
 public:
   using ScopedRouteConfigurationMap =
-      absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration,
-                          HeterogeneousStringHash, HeterogeneousStringEqual>;
+      absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>;
 
   ScopedRdsConfigSubscription(
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
@@ -242,9 +241,7 @@ private:
   RouteConfigProviderManager& route_config_provider_manager_;
 
   // RdsRouteConfigProvider by scope name.
-  absl::flat_hash_map<std::string, RdsRouteConfigProviderHelperPtr, HeterogeneousStringHash,
-                      HeterogeneousStringEqual>
-      route_provider_by_scope_;
+  absl::flat_hash_map<std::string, RdsRouteConfigProviderHelperPtr> route_provider_by_scope_;
   // A map of (hash, scope-name), used to detect the key conflict between scopes.
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
 };

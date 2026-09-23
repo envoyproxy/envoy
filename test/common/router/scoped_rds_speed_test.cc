@@ -246,8 +246,8 @@ static void bmBaselineAddOrUpdateScopes(benchmark::State& state) {
   }
 }
 
-// Optimized addOrUpdateScopes: absl::flat_hash_map with HeterogeneousStringHash
-// and absl::string_view scope_name avoiding string allocation.
+// Optimized addOrUpdateScopes: absl::flat_hash_map and absl::string_view scope_name avoiding string
+// allocation.
 static void bmOptimizedAddOrUpdateScopes(benchmark::State& state) {
   const int n = state.range(0);
   std::vector<ScopedRouteConfiguration> configs;
@@ -259,9 +259,7 @@ static void bmOptimizedAddOrUpdateScopes(benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT
     ScopedRouteMap scoped_route_map;
-    absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr, HeterogeneousStringHash,
-                        HeterogeneousStringEqual>
-        route_provider_by_scope;
+    absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> route_provider_by_scope;
     absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash;
 
     for (const auto& scoped_route_config : configs) {

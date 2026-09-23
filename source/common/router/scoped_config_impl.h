@@ -95,21 +95,8 @@ private:
   const ConfigConstSharedPtr route_config_;
   const uint64_t config_hash_;
 };
-// Transparent hasher and equality functor for heterogeneous lookups (e.g. absl::string_view lookup
-// in std::string keyed maps).
-struct HeterogeneousStringHash {
-  using is_transparent = void; // NOLINT(readability-identifier-naming)
-  size_t operator()(absl::string_view key) const { return absl::Hash<absl::string_view>()(key); }
-};
-
-struct HeterogeneousStringEqual {
-  using is_transparent = void; // NOLINT(readability-identifier-naming)
-  bool operator()(absl::string_view lhs, absl::string_view rhs) const { return lhs == rhs; }
-};
-
 using ScopedRouteInfoConstSharedPtr = std::shared_ptr<const ScopedRouteInfo>;
-using ScopedRouteMap = absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr,
-                                           HeterogeneousStringHash, HeterogeneousStringEqual>;
+using ScopedRouteMap = absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr>;
 
 /**
  * Each Envoy worker is assigned an instance of this type. When config updates are received,
