@@ -289,6 +289,8 @@ public:
     return disallowed_headers_matcher_;
   }
 
+  bool emitClientSpan() const { return emit_client_span_; }
+
 private:
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
@@ -350,6 +352,7 @@ private:
   const bool include_peer_certificate_;
   const bool include_tls_session_;
   const bool charge_cluster_response_stats_;
+  const bool emit_client_span_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
@@ -392,7 +395,11 @@ public:
                           : std::nullopt),
         http_service_(config.has_check_settings() && config.check_settings().has_http_service()
                           ? std::make_optional(config.check_settings().http_service())
-                          : std::nullopt) {
+                          : std::nullopt),
+        emit_client_span_(
+            config.has_check_settings() && config.check_settings().has_emit_client_span()
+                ? std::make_optional(config.check_settings().emit_client_span().value())
+                : std::nullopt) {
     if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
         config.check_settings().has_with_request_body()) {
       creation_status = absl::InvalidArgumentError(
@@ -438,6 +445,11 @@ public:
     return http_service_;
   }
 
+  /**
+   * @return The emit_client_span override for this route, if any.
+   */
+  const std::optional<bool>& emitClientSpan() const { return emit_client_span_; }
+
 private:
   // We save the context extensions as a protobuf map instead of a std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
@@ -447,6 +459,7 @@ private:
   const std::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
   const std::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>
       http_service_;
+  std::optional<bool> emit_client_span_;
 };
 
 /**

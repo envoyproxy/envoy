@@ -90,24 +90,27 @@ MockScope::MockScope(StatName prefix, MockStore& store)
       }));
 }
 
-Counter& MockScope::counterFromTaggedName_(StatName base_name, std::optional<StatNameTagSpan>,
-                                           StatName) {
-  // We always just respond with the mocked counter, so the tags don't matter.
-  return mock_store_.counter(symbolTable().toString(base_name));
+Counter& MockScope::counterFromTaggedName_(StatName base_name,
+                                           std::optional<StatNameTagSpan> name_tags,
+                                           StatName tagged_name) {
+  // We always just respond with the mocked counter, so only the name matters.
+  return mock_store_.counter(statNameWithTags(base_name, name_tags, tagged_name));
 }
-Gauge& MockScope::gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan>, StatName,
-                                      Gauge::ImportMode import_mode) {
-  // We always just respond with the mocked gauge, so the tags don't matter.
-  return mock_store_.gauge(symbolTable().toString(base_name), import_mode);
+Gauge& MockScope::gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                      StatName tagged_name, Gauge::ImportMode import_mode) {
+  // We always just respond with the mocked gauge, so only the name matters.
+  return mock_store_.gauge(statNameWithTags(base_name, name_tags, tagged_name), import_mode);
 }
-Histogram& MockScope::histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan>,
-                                              StatName, Histogram::Unit unit) {
-  return mock_store_.histogram(symbolTable().toString(base_name), unit);
+Histogram& MockScope::histogramFromTaggedName(StatName base_name,
+                                              std::optional<StatNameTagSpan> name_tags,
+                                              StatName tagged_name, Histogram::Unit unit) {
+  return mock_store_.histogram(statNameWithTags(base_name, name_tags, tagged_name), unit);
 }
 TextReadout& MockScope::textReadoutFromTaggedName(StatName base_name,
-                                                  std::optional<StatNameTagSpan>, StatName) {
-  // We always just respond with the mocked counter, so the tags don't matter.
-  return mock_store_.textReadout(symbolTable().toString(base_name));
+                                                  std::optional<StatNameTagSpan> name_tags,
+                                                  StatName tagged_name) {
+  // We always just respond with the mocked text readout, so only the name matters.
+  return mock_store_.textReadout(statNameWithTags(base_name, name_tags, tagged_name));
 }
 
 MockStore::MockStore() {

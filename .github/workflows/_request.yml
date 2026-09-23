@@ -46,14 +46,14 @@ jobs:
       caches: ${{ steps.caches.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/actions/github/checkout@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/github/checkout@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       id: checkout
       name: Checkout Envoy repository (requested)
       with:
@@ -67,7 +67,7 @@ jobs:
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
     # use
     - name: Generate environment variables from commit
-      uses: envoyproxy/toolshed/actions/envoy/ci/request@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+      uses: envoyproxy/toolshed/actions/envoy/ci/request@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       id: env
       with:
         branch-name: ${{ steps.checkout.outputs.branch-name }}
@@ -80,7 +80,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/actions/github/env/summary@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+      uses: envoyproxy/toolshed/actions/github/env/summary@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -96,7 +96,7 @@ jobs:
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
 
     - name: Environment data
-      uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+      uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       id: data
       with:
         input: |
@@ -135,7 +135,7 @@ jobs:
         path: /tmp/cache
         key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}-arm64
     - name: Caches
-      uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+      uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       id: caches
       with:
         input-format: yaml

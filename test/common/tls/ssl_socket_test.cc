@@ -2687,7 +2687,7 @@ TEST_P(SslSocketTest, PerCertTlsParamsMaxVersionApplied) {
   // Context allows TLSv1.3 by default, but cert's tls_params cap it at TLSv1.2 — mismatch.
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
   testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
-      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "tlsv1 alert protocol version")));
 }
 
 // Per-cert tls_params: cert restricts ecdh_curves to P-384. Client only supports P-256 — no
@@ -2797,7 +2797,7 @@ TEST_P(SslSocketTest, PerCertTlsParamsMinVersionApplied) {
   // TLSv1_2 cannot negotiate.
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
   testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
-      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "tlsv1 alert protocol version")));
 }
 
 // Certificate-level tls_params under a TLS 1.3 handshake: cert restricts to one signature
@@ -3544,7 +3544,7 @@ TEST_P(SslSocketTest, GetValidatedPeerCertChainWithIntermediate) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
@@ -5249,7 +5249,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::vector<std::string>& server_names2,
                                  const std::string& client_ctx_yaml, bool expect_reuse,
                                  const Network::Address::IpVersion ip_version,
-                                 const uint32_t expected_lifetime_hint = 0) {
+                                 const uint32_t expected_lifetime_hint = 0,
+                                 const std::string& expected_sni = "") {
   Event::SimulatedTimeSystem time_system;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       transport_socket_factory_context;
@@ -5379,12 +5380,18 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   // first, so always wait until both have happened.
   size_t connect_count = 0;
   auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
-                              expect_reuse]() {
+                              expect_reuse, &expected_sni]() {
     connect_count++;
     if (connect_count == 2) {
       if (expect_reuse) {
         EXPECT_NE(EMPTY_STRING, server_connection->ssl()->sessionId());
         EXPECT_EQ(server_connection->ssl()->sessionId(), client_connection->ssl()->sessionId());
+        // On a resumed connection the server must still be able to retrieve the SNI from the
+        // ClientHello. This depends on `SSL_get_servername()` returning the requested name for
+        // resumed sessions (see https://github.com/envoyproxy/envoy/pull/47297).
+        if (!expected_sni.empty()) {
+          EXPECT_EQ(expected_sni, server_connection->ssl()->sni());
+        }
       } else {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
       }
@@ -5520,6 +5527,34 @@ TEST_P(SslSocketTest, TicketSessionResumption) {
 
   testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
                               version_);
+}
+
+// Validates that when a session is resumed, the server can still read the SNI from the
+// connection. Retrieving the SNI relies on `SSL_get_servername()` returning the requested
+// server name for resumed sessions, which must hold for both BoringSSL and the OpenSSL
+// compatibility layer (see https://github.com/envoyproxy/envoy/pull/47297).
+TEST_P(SslSocketTest, TicketSessionResumptionWithSni) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
+)EOF";
+
+  const std::vector<std::string> server_names = {"server1.example.com"};
+
+  const std::string client_ctx_yaml = R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_yaml, server_names, server_ctx_yaml, server_names,
+                              client_ctx_yaml, true, version_, 0, "server1.example.com");
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionCustomTimeout) {
@@ -7672,6 +7707,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   // Trust chain contains:
   //  - Root authority certificate (i.e., ca_cert.pem)
   //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - End-entity certificate (i.e. san_dns*_cert.pem)
   //
   // Certificate revocation list contains:
   //  - Root authority certificate revocation list (i.e., ca_cert.crl)
@@ -7685,7 +7721,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.crl"
 )EOF";
@@ -7695,6 +7731,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   // Trust chain contains:
   //  - Root authority certificate (i.e., ca_cert.pem)
   //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - End-entity certificate (i.e. san_dns*_cert.pem)
   //
   // Certificate revocation list contains:
   //  - Root authority certificate revocation list (i.e., ca_cert.crl)
@@ -7710,7 +7747,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"
 )EOF";
@@ -7720,7 +7757,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
 )EOF";
@@ -7730,7 +7767,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_key.pem"
 )EOF";
@@ -7753,12 +7790,10 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-// Ensure that complete crl chains succeed with unrevoked certificates.
-#ifndef ENVOY_SSL_OPENSSL
+  // Ensure that complete crl chains succeed with unrevoked certificates.
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
-#endif
 }
 
 TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
@@ -7779,7 +7814,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_both_crls.pem"
 )EOF";
 
   // This should fail, since the crl chain is incomplete.
@@ -7800,7 +7835,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_intermediate_crl.pem"
 )EOF";
 
   // This should fail, since the certificate has been revoked.
@@ -7808,7 +7843,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
 )EOF";
@@ -7818,7 +7853,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_key.pem"
 )EOF";
@@ -7841,12 +7876,10 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-// Ensure that complete crl chains succeed with unrevoked certificates.
-#ifndef ENVOY_SSL_OPENSSL
+  // Ensure that complete crl chains succeed with unrevoked certificates.
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
-#endif
 }
 
 TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
@@ -7869,7 +7902,7 @@ TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_intermediate_crl.pem"
       only_verify_leaf_cert_crl: true
 )EOF";
 
@@ -7878,7 +7911,7 @@ TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_key.pem"
 )EOF";
@@ -7908,7 +7941,7 @@ TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_intermediate_crl.pem"
       only_verify_leaf_cert_crl: true
 )EOF";
 
@@ -7917,7 +7950,7 @@ TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
 )EOF";

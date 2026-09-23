@@ -5,11 +5,10 @@
 //! [`crate::declare_all_init_functions!`] (or [`crate::declare_stat_sink_init_functions!`]) and
 //! return a [`StatSink`] from it.
 
-use crate::{abi, EnvoyBuffer, EnvoyGaugeId, NewStatSinkConfigFunction};
+use crate::{abi, ffi_export, EnvoyBuffer, EnvoyGaugeId, NewStatSinkConfigFunction};
 use mockall::*;
 use std::ffi::{c_char, c_void};
 use std::marker::PhantomData;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 /// The values of a counter, returned by [`MetricSnapshot::counter`].
@@ -369,6 +368,67 @@ impl<'a> MetricSnapshot<'a> {
     })
   }
 
+  /// Reads the histogram's tag-extracted name into `name`. See
+  /// [`counter_tag_extracted_name`](Self::counter_tag_extracted_name).
+  ///
+  /// During [`StatSink::on_flush`], use the raw name from [`histogram`](Self::histogram) as a
+  /// cache key and copy this name and all tags into module-owned storage. This lets a sink keep
+  /// aggregating raw observations from [`StatSink::on_histogram_complete`] off-thread without
+  /// guessing labels from the flat name. These getters read metadata, not histogram statistics.
+  pub fn histogram_tag_extracted_name(&self, index: usize, name: &mut Vec<u8>) -> bool {
+    fill_buffer(name, |ptr, capacity, size| unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+        self.envoy_ptr,
+        index,
+        ptr,
+        capacity,
+        size,
+      )
+    })
+  }
+
+  /// The number of tags on the histogram at `index`, or `None` when the index is out of range.
+  pub fn histogram_tag_count(&self, index: usize) -> Option<usize> {
+    let mut count: usize = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+        self.envoy_ptr,
+        index,
+        &mut count,
+      )
+    };
+    found.then_some(count)
+  }
+
+  /// Reads tag `tag_index` of the histogram at `index` into `name` and `value`. See
+  /// [`counter_tag`](Self::counter_tag). Copy every tag before caching the histogram's identity;
+  /// an incomplete label set can conflate distinct histograms with the same tag-extracted name.
+  pub fn histogram_tag(
+    &self,
+    index: usize,
+    tag_index: usize,
+    name: &mut Vec<u8>,
+    value: &mut Vec<u8>,
+  ) -> bool {
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+          self.envoy_ptr,
+          index,
+          tag_index,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
+        )
+      },
+    )
+  }
+
   /// Copies the whole snapshot into an [`OwnedMetricSnapshot`].
   ///
   /// The returned value owns its data and is `Send`, so it can be moved to another thread to
@@ -704,17 +764,16 @@ impl EnvoyStatSinkConfigScheduler for Box<dyn EnvoyStatSinkConfigScheduler> {
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_config_new(
-  config_envoy_ptr: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> *const c_void {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_stat_sink_config_new(
+    config_envoy_ptr: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> *const c_void {
     // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes. The
     // helpers tolerate `(nullptr, 0)` empty inputs and substitute `U+FFFD` for malformed UTF-8.
     let name_str =
@@ -732,11 +791,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_config_new(
       &mut envoy_config,
       new_fn,
     )
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_stat_sink_config_new", panic);
-    ptr::null()
-  })
+  }
+  on_panic = ptr::null()
 }
 
 /// Testable wrapper for [`envoy_dynamic_module_on_stat_sink_config_new`].
@@ -755,81 +811,62 @@ pub fn envoy_dynamic_module_on_stat_sink_config_new_impl(
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_config_destroy(
-  config_ptr: *const c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_stat_sink_config_destroy(
+    config_ptr: *const c_void,
+  ) {
     crate::drop_wrapped_c_void_ptr!(config_ptr, StatSink);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_stat_sink_config_destroy", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_flush(
-  config_ptr: *const c_void,
-  snapshot_envoy_ptr: *mut c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_stat_sink_flush(
+    config_ptr: *const c_void,
+    snapshot_envoy_ptr: *mut c_void,
+  ) {
     let sink = &*(config_ptr as *const Box<dyn StatSink>);
     let snapshot = MetricSnapshot::new(snapshot_envoy_ptr);
     sink.on_flush(&snapshot);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_stat_sink_flush", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_on_histogram_complete(
-  config_ptr: *const c_void,
-  histogram_name: abi::envoy_dynamic_module_type_envoy_buffer,
-  value: u64,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_stat_sink_on_histogram_complete(
+    config_ptr: *const c_void,
+    histogram_name: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: u64,
+  ) {
     let sink = &*(config_ptr as *const Box<dyn StatSink>);
     let name =
       unsafe { EnvoyBuffer::new_from_raw(histogram_name.ptr as *const u8, histogram_name.length) };
     sink.on_histogram_complete(name, value);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_stat_sink_on_histogram_complete",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_config_scheduled(
-  config_envoy_ptr: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
-  config_ptr: *const c_void,
-  event_id: u64,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_stat_sink_config_scheduled(
+    config_envoy_ptr: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
+    config_ptr: *const c_void,
+    event_id: u64,
+  ) {
     let sink = &*(config_ptr as *const Box<dyn StatSink>);
     let mut envoy_config = EnvoyStatSinkConfig::new(config_envoy_ptr);
     sink.on_config_scheduled(&mut envoy_config, event_id);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_stat_sink_config_scheduled", panic);
-  });
+  }
 }

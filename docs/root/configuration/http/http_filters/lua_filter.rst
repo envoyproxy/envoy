@@ -358,6 +358,32 @@ situation.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
+``requestHeaders()``
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local request_headers = handle:requestHeaders()
+
+Returns the stream's request headers, on both the request and the response path. In
+``envoy_on_request`` this is the same header map that ``headers()`` returns. In
+``envoy_on_response`` it is the request's headers, which are otherwise unreachable from the
+response path -- previously the only ways to carry a request value into ``envoy_on_response`` were
+dynamic metadata and filter state, both of which cost a write and a read per request.
+
+The returned handle may be modified on either path. On the response path the request has already
+been sent upstream, so a write does not change what the upstream saw; it is visible to access
+logging, tracing, and any later filter that reads the request headers on the encode path. This
+matches what native C++ encode-path filters can already do through
+``StreamEncoderFilterCallbacks::requestHeaders()``.
+
+Returns ``nil`` if the stream has no request headers. That happens when a response is generated
+before the request headers were fully received -- for example an early error response from a
+request-header timeout, a stream idle timeout that fires before headers arrive, or a
+protocol-level rejection during header parsing.
+
+Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
+
 ``body()``
 ^^^^^^^^^^
 

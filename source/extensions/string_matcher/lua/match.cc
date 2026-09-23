@@ -107,8 +107,9 @@ LuaStringMatcherFactory::createStringMatcher(const Protobuf::Message& untyped_co
   absl::StatusOr<std::string> result = Config::DataSource::read(
       config.source_code(), false /* allow_empty */, context.api(), 0 /* max_size */);
   if (!result.ok()) {
-    throw EnvoyException(
-        fmt::format("Failed to get lua string matcher code from source: {}", result.status()));
+    const absl::Status& status = result.status();
+    throw EnvoyException(fmt::format("Failed to get lua string matcher code from source: {}: {}",
+                                     absl::StatusCodeToString(status.code()), status.message()));
   }
   return std::make_unique<LuaStringMatcherThreadWrapper>(*result, context.threadLocal());
 }

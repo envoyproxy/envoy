@@ -1,3 +1,5 @@
+#include <cstdint>
+#include <limits>
 #include <thread>
 #include <vector>
 
@@ -1610,6 +1612,24 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetSocketOptionInt) {
   EXPECT_EQ(value, result);
 }
 
+// A level, name, or value outside the int range is skipped so a truncated option is never applied
+// or stored.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetSocketOptionSkipsOutOfRange) {
+  const int64_t too_large = static_cast<int64_t>(std::numeric_limits<int>::max()) + 1;
+  const int64_t too_small = static_cast<int64_t>(std::numeric_limits<int>::min()) - 1;
+  envoy_dynamic_module_callback_network_set_socket_option_int(
+      filterPtr(), too_large, 2, envoy_dynamic_module_type_socket_option_state_Prebind, 123);
+  envoy_dynamic_module_callback_network_set_socket_option_int(
+      filterPtr(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind, too_large);
+
+  const std::string bytes = "x";
+  envoy_dynamic_module_callback_network_set_socket_option_bytes(
+      filterPtr(), too_small, 2, envoy_dynamic_module_type_socket_option_state_Bound,
+      {bytes.data(), bytes.size()});
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_network_get_socket_options_size(filterPtr()));
+}
+
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetSocketOptionBytes) {
   const int64_t level = 3;
   const int64_t name = 4;
@@ -2691,6 +2711,66 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, MetricsFrozenAfterInit) {
                 static_cast<void*>(filter_config_.get()), name, &out_id));
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PerFilterStatsOperateOnDefinedMetrics) {
+  void* config = static_cast<void*>(filter_config_.get());
+
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer counter_name = {const_cast<char*>("filter_counter"), 14};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_config_define_counter(config, counter_name,
+                                                                               &counter_id));
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("filter_gauge"), 12};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_config_define_gauge(config, gauge_name,
+                                                                             &gauge_id));
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer histogram_name = {const_cast<char*>("filter_histogram"),
+                                                            16};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_config_define_histogram(
+                config, histogram_name, &histogram_id));
+
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_network_filter_increment_counter(filterPtr(), counter_id, 7));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_set_gauge(filterPtr(), gauge_id, 100));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_network_filter_increment_gauge(filterPtr(), gauge_id, 10));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_decrement_gauge(filterPtr(), gauge_id, 5));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_network_filter_record_histogram_value(filterPtr(),
+                                                                                histogram_id, 42));
+
+  EXPECT_EQ(7, stats_.counterFromString("dynamicmodulescustom.filter_counter").value());
+  EXPECT_EQ(105, stats_
+                     .gaugeFromString("dynamicmodulescustom.filter_gauge",
+                                      Stats::Gauge::ImportMode::Accumulate)
+                     .value());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PerFilterStatsReturnMetricNotFoundForUnknownIds) {
+  const size_t unknown_metric_id = 9999;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_network_filter_increment_counter(filterPtr(),
+                                                                           unknown_metric_id, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_network_filter_set_gauge(filterPtr(), unknown_metric_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_network_filter_increment_gauge(filterPtr(),
+                                                                         unknown_metric_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_network_filter_decrement_gauge(filterPtr(),
+                                                                         unknown_metric_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_network_filter_record_histogram_value(
+                filterPtr(), unknown_metric_id, 1));
+}
+
 // Verifies metrics can be operated from the filter config context (outside the connection
 // lifecycle), mirroring the per-filter operate callbacks.
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ConfigStatsOperate) {
@@ -2758,6 +2838,28 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ConfigStatsOperate) {
                 config, invalid_id, 1));
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeUpstreamRequestedServerName) {
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
+      &string_result));
+
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string sni = "network-upstream.example.com";
+  ON_CALL(*ssl_info, sni()).WillByDefault(testing::ReturnRef(sni));
+  connection_.stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
+      &string_result));
+  EXPECT_EQ("network-upstream.example.com",
+            absl::string_view(string_result.ptr, string_result.length));
+  bool bool_result = false;
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
+      &bool_result));
+}
+
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeInt) {
   const uint64_t response_flags = (1ULL << 1) | (1ULL << 26);
   EXPECT_CALL(connection_.stream_info_, legacyResponseFlags())
@@ -2774,7 +2876,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeInt) {
 
   // A request attribute that is not backed by stream info returns false.
   EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_attribute_int(
-      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestSize, &result));
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeBool) {

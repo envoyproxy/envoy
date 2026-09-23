@@ -172,6 +172,10 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
+    // The fake upstream keeps a validation context for mTLS-capable tests, which now defaults
+    // resumption and early data off. Enable them so upstream 0-RTT tests still exercise early data.
+    quic_config.mutable_enable_resumption()->set_value(true);
+    quic_config.mutable_enable_early_data()->set_value(true);
 
     auto& config_factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(
@@ -482,10 +486,10 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
     Server::FieldValidationConfig validator_config, bool allow_lds_rejection,
     IntegrationTestServerPtr& test_server) {
   test_server = IntegrationTestServer::create(
-      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_,
-      deterministic_value_, timeSystem(), *api_, defer_listener_finalization_, process_object_,
-      validator_config, concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_,
-      use_real_stats_, use_bootstrap_node_metadata_);
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, random_config_,
+      timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
+      concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_,
+      use_bootstrap_node_metadata_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -646,6 +650,10 @@ void BaseIntegrationTest::cleanUpXdsConnection() {
     AssertionResult result = xds_connection_->close();
     RELEASE_ASSERT(result, result.message());
     result = xds_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    // The disconnect notification can run inside another fake-upstream event callback. Wait for
+    // that callback to unwind before destroying the connection wrapper it may still reference.
+    result = xds_connection_->waitForDispatcherBarrier();
     RELEASE_ASSERT(result, result.message());
     xds_connection_.reset();
   }

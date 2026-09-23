@@ -106,13 +106,15 @@ void HealthCheckerImplBase::incDegraded() { stats_.degraded_.add(1); }
 
 std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
                                                           HealthTransition changed_state) const {
-  // See if the cluster has ever made a connection. If not, we use a much slower interval to keep
-  // the host info relatively up to date in case we suddenly start sending traffic to this cluster.
-  // In general host updates are rare and this should greatly smooth out needless health checking.
-  // If a connection has been established, we choose an interval based on the host's health. Please
-  // refer to the HealthCheck API documentation for more details.
+  // See if the cluster has ever had upstream traffic. The connection counter covers
+  // connection-oriented traffic, while the byte counters cover connectionless traffic such as
+  // UDP. If there has been no traffic, use a much slower interval to keep the host info relatively
+  // up to date in case we suddenly start sending traffic to this cluster. In general host updates
+  // are rare and this should greatly smooth out needless health checking.
   uint64_t base_time_ms;
-  if (cluster_.info()->trafficStats()->upstream_cx_total_.used()) {
+  const auto& traffic_stats = *cluster_.info()->trafficStats();
+  if (traffic_stats.upstream_cx_total_.used() || traffic_stats.upstream_cx_tx_bytes_total_.used() ||
+      traffic_stats.upstream_cx_rx_bytes_total_.used()) {
     // When healthy/unhealthy threshold is configured the health transition of a host will be
     // delayed. In this situation Envoy should use the edge interval settings between health checks.
     //

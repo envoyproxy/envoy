@@ -51,8 +51,8 @@ Dependency declarations must:
   be used if no CPE for the project is available in the CPE database. CPEs should be _versionless_
   with a `:*` suffix, since the version can be computed from `version`.
 
-When build or test code references Python modules, they should be specified via `pip_install` in
-[bazel/repositories_extra.bzl](bazel/repositories_extra.bzl). Python modules should not be listed in
+When build or test code references Python modules, they should be specified via `pip_parse` in
+[bazel/python_dependencies.bzl](bazel/python_dependencies.bzl). Python modules should not be listed in
 `deps.yaml` entries. `requirements.txt` files for Python dependencies must pin to
 exact versions, e.g. `PyYAML==5.4.1` and ideally also include a [SHA256
 checksum](https://davidwalsh.name/hashin).
@@ -126,7 +126,8 @@ kept up-to-date.
 ## Dependency patches
 
 Occasionally it is necessary to introduce an Envoy-side patch to a dependency in a `.patch` file.
-These are typically applied in [bazel/repositories.bzl](bazel/repositories.bzl). Our policy on this
+These are typically applied by the dependency's module entry in the
+[Envoy Bazel registry](https://github.com/envoyproxy/bazel-registry). Our policy on this
 is as follows:
 
 * Patch files impede dependency updates. They are expedient at creation time but are a maintenance
@@ -139,7 +140,8 @@ is as follows:
 * There should exist a plan-of-record, filed as an issue in Envoy or the upstream GitHub tracking
   elimination of the patch.
 
-* Every patch must have comments at its point-of-use in [bazel/repositories.bzl](bazel/repositories.bzl)
+* Every patch must have comments at its point-of-use in the
+  [Envoy Bazel registry](https://github.com/envoyproxy/bazel-registry)
   providing a rationale and detailing the tracking issue.
 
 ## Policy exceptions
