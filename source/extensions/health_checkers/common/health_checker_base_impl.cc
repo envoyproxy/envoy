@@ -221,10 +221,6 @@ void HealthCheckerImplBase::HealthCheckHostMonitorImpl::setUnhealthy(UnhealthyTy
 
 void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
                                                     HealthCheckHostMonitor::UnhealthyType type) {
-  if (type == HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail) {
-    health_flag_callbacks_.set(*host, Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-  }
-
   // The threading here is complex. The cluster owns the only strong reference to the health
   // checker. It might go away when we post to the main thread from a worker thread. To deal with
   // this we use the following sequence of events:
@@ -233,10 +229,15 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
   // 2) On the main thread, we make sure it is still valid (as the cluster may have been destroyed).
   // 3) Additionally, the host/session may also be gone by then so we check that also.
   std::weak_ptr<HealthCheckerImplBase> weak_this = shared_from_this();
-  dispatcher_.post([weak_this, host]() -> void {
+  dispatcher_.post([weak_this, host, type]() -> void {
     std::shared_ptr<HealthCheckerImplBase> shared_this = weak_this.lock();
     if (shared_this == nullptr) {
       return;
+    }
+
+    if (type == HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail) {
+      shared_this->health_flag_callbacks_.set(*host,
+                                              Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
     }
 
     const auto session = shared_this->active_sessions_.find(host);

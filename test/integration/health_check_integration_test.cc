@@ -1344,4 +1344,92 @@ TEST_P(MultiHealthCheckIntegrationTest, MaxCheckersHealthyThenUnhealthy) {
   test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(0));
 }
 
+// Verify that x-envoy-immediate-health-check-fail in a proxied upstream response correctly
+// propagates EXCLUDED_VIA_IMMEDIATE_HC_FAIL to the real host when using multi health checkers.
+// This exercises the cross-thread path: the router sets the flag on a worker thread, which posts
+// to the main thread where the multi-checker's flag callbacks run.
+TEST_P(MultiHealthCheckIntegrationTest, ImmediateHealthCheckFailCrossThread) {
+  use_lds_ = false;
+  defer_listener_finalization_ = true;
+
+  auto up_config = upstreamConfig();
+  up_config.upstream_protocol_ = Http::CodecType::HTTP1;
+  host_upstream_ = std::make_unique<FakeUpstream>(0, version_, up_config);
+
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->set_name("cluster_1");
+    cluster->mutable_connect_timeout()->set_seconds(5);
+
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->set_cluster_name("cluster_1");
+    auto* ep = load_assignment->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+    ep->mutable_address()->mutable_socket_address()->set_address(
+        Network::Test::getLoopbackAddressString(GetParam()));
+    ep->mutable_address()->mutable_socket_address()->set_port_value(
+        host_upstream_->localAddress()->ip()->port());
+
+    addMultiTcpHealthChecks(cluster, "first", "second");
+  });
+
+  // Route traffic to cluster_1 so proxied requests reach the multi-HC host.
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    hcm.mutable_route_config()
+        ->mutable_virtual_hosts(0)
+        ->mutable_routes(0)
+        ->mutable_route()
+        ->set_cluster("cluster_1");
+  });
+
+  HttpIntegrationTest::initialize();
+
+  // Wait for both TCP health check connections.
+  ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+  ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+  ASSERT_TRUE(hc_connections_[0]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  ASSERT_TRUE(hc_connections_[1]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+
+  // Make both health checks pass.
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[1]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_excluded")->value());
+
+  // Register listener ports now that health checks have passed and the listener is ready.
+  registerTestServerPorts({"http"});
+
+  // Send a request through the proxy to cluster_1.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+
+  // Wait for the request to arrive at the upstream.
+  FakeHttpConnectionPtr upstream_conn;
+  ASSERT_TRUE(host_upstream_->waitForHttpConnection(*dispatcher_, upstream_conn));
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(upstream_conn->waitForNewStream(*dispatcher_, upstream_request));
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+
+  // Upstream responds with x-envoy-immediate-health-check-fail header.
+  // This triggers setUnhealthyCrossThread from the worker thread.
+  upstream_request->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"x-envoy-immediate-health-check-fail", "true"}},
+      true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // The EXCLUDED_VIA_IMMEDIATE_HC_FAIL flag should propagate to the real host
+  // via the multi-checker's aggregation, visible as membership_excluded.
+  test_server_->waitForGauge("cluster.cluster_1.membership_excluded", Eq(1));
+
+  codec_client_->close();
+  result = upstream_conn->close();
+  RELEASE_ASSERT(result, result.message());
+}
+
 } // namespace Envoy

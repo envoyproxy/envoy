@@ -9,10 +9,12 @@ namespace Upstream {
 
 namespace {
 
-constexpr uint32_t kActiveHcFlagMask = static_cast<uint32_t>(Host::HealthFlag::FAILED_ACTIVE_HC) |
-                                       static_cast<uint32_t>(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
-                                       static_cast<uint32_t>(Host::HealthFlag::PENDING_ACTIVE_HC) |
-                                       static_cast<uint32_t>(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+constexpr uint32_t kActiveHcFlagMask =
+    static_cast<uint32_t>(Host::HealthFlag::FAILED_ACTIVE_HC) |
+    static_cast<uint32_t>(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
+    static_cast<uint32_t>(Host::HealthFlag::PENDING_ACTIVE_HC) |
+    static_cast<uint32_t>(Host::HealthFlag::ACTIVE_HC_TIMEOUT) |
+    static_cast<uint32_t>(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
 
 } // namespace
 
@@ -142,6 +144,8 @@ void MultiHealthChecker::initializeHost(const HostSharedPtr& host) {
     state.fail_bits = host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ? all_bits : 0;
     state.degraded_bits = host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC) ? all_bits : 0;
     state.timeout_bits = host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ? all_bits : 0;
+    state.immediate_fail =
+        host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) ? all_bits : 0;
     state.initial_check_pending = all_bits;
     adjustGauges(state, &Stats::Gauge::inc);
   }
@@ -206,6 +210,12 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
     state.timeout_bits &= ~bit;
   }
 
+  if (checker_flags & static_cast<uint32_t>(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL)) {
+    state.immediate_fail |= bit;
+  } else {
+    state.immediate_fail &= ~bit;
+  }
+
   // Don't do any operations with a side effect until all checkers have posted their initial result.
   state.initial_check_pending &= ~bit;
   if (state.initial_check_pending != 0) {
@@ -223,6 +233,7 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
   const bool now_aggregate_degraded = state.degraded_bits != 0;
   const bool now_aggregate_pending = state.pending_bits != 0;
   const bool now_aggregate_timeout = state.timeout_bits != 0;
+  const bool now_aggregate_excluded = state.immediate_fail != 0;
 
   if (now_aggregate_failed) {
     host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -246,6 +257,12 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
     host->healthFlagSet(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
   } else {
     host->healthFlagClear(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  }
+
+  if (now_aggregate_excluded) {
+    host->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+  } else {
+    host->healthFlagClear(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
   }
 
   if (was_aggregate_failed != now_aggregate_failed) {

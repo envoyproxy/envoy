@@ -381,7 +381,7 @@ public:
   void start() override {}
 
   void reportResult(const HostSharedPtr& host, bool failed, bool degraded, bool pending = false,
-                    bool timeout = false) {
+                    bool timeout = false, bool excluded = false) {
     if (failed) {
       flag_callbacks_.set(*host, Host::HealthFlag::FAILED_ACTIVE_HC);
     } else {
@@ -401,6 +401,11 @@ public:
       flag_callbacks_.set(*host, Host::HealthFlag::ACTIVE_HC_TIMEOUT);
     } else {
       flag_callbacks_.clear(*host, Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+    }
+    if (excluded) {
+      flag_callbacks_.set(*host, Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+    } else {
+      flag_callbacks_.clear(*host, Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
     }
 
     auto state = failed ? HealthState::Unhealthy : HealthState::Healthy;
@@ -752,6 +757,78 @@ TEST_F(MultiHealthCheckerDegradedTest, TimeoutFlagAggregated) {
   // Checker A recovers, clears timeout.
   checker_a->reportResult(host, false, false);
   EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT));
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+}
+
+TEST_F(MultiHealthCheckerDegradedTest, ExcludedFlagAggregated) {
+  setup();
+  auto host = makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host};
+  health_checker_->start();
+
+  ASSERT_EQ(2u, fake_factory_.instances_.size());
+  auto* checker_a = fake_factory_.instances_[0];
+  auto* checker_b = fake_factory_.instances_[1];
+
+  // Both healthy, not excluded.
+  checker_a->reportResult(host, false, false);
+  checker_b->reportResult(host, false, false);
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
+
+  // Checker A reports excluded (simulating immediate HC fail from connection pool).
+  checker_a->reportResult(host, true, false, false, false, true);
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+
+  // Checker B still healthy — aggregate excluded stays because checker A has it.
+  checker_b->reportResult(host, false, false);
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
+
+  // Checker A recovers, clears excluded.
+  checker_a->reportResult(host, false, false);
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+}
+
+TEST_F(MultiHealthCheckerDegradedTest, ExcludedBothCheckersClearOneStillExcluded) {
+  setup();
+  auto host = makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host};
+  health_checker_->start();
+
+  auto* checker_a = fake_factory_.instances_[0];
+  auto* checker_b = fake_factory_.instances_[1];
+
+  // Both checkers report excluded.
+  checker_a->reportResult(host, true, false, false, false, true);
+  checker_b->reportResult(host, true, false, false, false, true);
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
+
+  // Clear checker A — still excluded because checker B has it.
+  checker_a->reportResult(host, false, false);
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
+
+  // Clear checker B — now fully cleared.
+  checker_b->reportResult(host, false, false);
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
+}
+
+TEST_F(MultiHealthCheckerDegradedTest, ExcludedWithoutFailedStillPropagated) {
+  setup();
+  auto host = makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host};
+  health_checker_->start();
+
+  auto* checker_a = fake_factory_.instances_[0];
+  auto* checker_b = fake_factory_.instances_[1];
+
+  checker_a->reportResult(host, false, false);
+  checker_b->reportResult(host, false, false);
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
+
+  // Checker A sets excluded without failed (edge case — excluded flag set independently).
+  checker_a->reportResult(host, false, false, false, false, true);
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
   EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 }
 
