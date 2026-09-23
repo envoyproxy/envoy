@@ -1178,6 +1178,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTra
 // When FULL_DUPLEX_STREAMED body mode is used with a retry policy, the upstream
 // must receive the request body exactly once.
 TEST_P(ExtProcIntegrationTest, FullDuplexStreamedNoDuplicateBodyOnRetry) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   // Enable retry policy on the route.
   config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
                                           v3::HttpConnectionManager& hcm) {
