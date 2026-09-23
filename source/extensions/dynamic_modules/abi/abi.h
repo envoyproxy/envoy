@@ -1018,9 +1018,11 @@ envoy_dynamic_module_on_http_filter_per_route_config_new(
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
 
 /**
- * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP per-route filter
- * configuration is destroyed in Envoy. The module should release any resources associated with the
- * corresponding in-module HTTP filter configuration.
+ * envoy_dynamic_module_on_http_filter_config_destroy is called by the main thread when the HTTP
+ * per-route filter configuration is destroyed in Envoy. The module should release any resources
+ * associated with the corresponding in-module HTTP filter configuration. A route configuration may
+ * be released on a worker thread, in which case Envoy defers this hook to the main thread, so the
+ * module may use callbacks that require the main thread from it.
  * @param filter_config_ptr is a pointer to the in-module HTTP filter configuration whose
  * corresponding Envoy HTTP filter configuration is being destroyed.
  */
