@@ -1,5 +1,7 @@
 #include "source/common/upstream/multi_health_checker.h"
 
+#include <limits>
+
 #include "source/common/common/enum_to_int.h"
 #include "source/common/upstream/health_checker_impl.h"
 
@@ -21,6 +23,10 @@ constexpr uint32_t kActiveHcFlagMask = enumToInt(Host::HealthFlag::FAILED_ACTIVE
 MultiHealthChecker::PerHostState::PerHostState(uint8_t num_checkers, const Host& host) {
   ASSERT(num_checkers > 0 && num_checkers <= kMaxHealthChecks,
          "bit shifts larger than size are UB");
+
+  static_assert(kActiveHcFlagMask <=
+                    std::numeric_limits<decltype(checker_flags_)::value_type>::max(),
+                "If this fails, checker_flags_ probably needs a larger type");
 
   const uint8_t all_bits = uint8_t{0xff} >> (kMaxHealthChecks - num_checkers);
 
@@ -121,7 +127,7 @@ void MultiHealthChecker::SubCheckerHealthFlagCallbacks::clear(Host& host, Host::
   hostFlags(host) &= ~enumToInt(flag);
 }
 
-uint32_t& MultiHealthChecker::SubCheckerHealthFlagCallbacks::hostFlags(const Host& host) {
+uint16_t& MultiHealthChecker::SubCheckerHealthFlagCallbacks::hostFlags(const Host& host) {
   ASSERT(parent_.getOrCreateHostState(host).checker_flags_.size() > checker_idx_);
   return parent_.getOrCreateHostState(host).checker_flags_[checker_idx_];
 }

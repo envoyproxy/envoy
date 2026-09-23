@@ -30,7 +30,6 @@ public:
   void start() override;
 
 private:
-
   class SubCheckerHealthFlagCallbacks : public HealthFlagCallbacks {
   public:
     SubCheckerHealthFlagCallbacks(MultiHealthChecker& parent, uint8_t checker_idx)
@@ -41,7 +40,7 @@ private:
     void clear(Host& host, Host::HealthFlag flag) override;
 
     // Causes creation and initialization of per-host data if it doesn't yet exist.
-    uint32_t& hostFlags(const Host& host);
+    uint16_t& hostFlags(const Host& host);
 
   private:
     MultiHealthChecker& parent_;
@@ -68,7 +67,7 @@ private:
     uint8_t immediate_fail_bits_;        // This checker has reported an immediate failure.
 
     // Per-sub-checker health flags; indexed by checker index.
-    std::array<uint32_t, kMaxHealthChecks> checker_flags_;
+    std::array<uint16_t, kMaxHealthChecks> checker_flags_;
   };
 
   void onCheckerResult(uint8_t checker_index, HostSharedPtr host, HealthTransition changed_state,
