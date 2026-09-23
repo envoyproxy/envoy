@@ -235,14 +235,14 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
       return;
     }
 
-    if (type == HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail) {
-      shared_this->health_flag_callbacks_.set(*host,
-                                              Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-    }
-
     const auto session = shared_this->active_sessions_.find(host);
     if (session == shared_this->active_sessions_.end()) {
       return;
+    }
+
+    if (type == HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail) {
+      shared_this->health_flag_callbacks_.set(*host,
+                                              Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
     }
 
     session->second->setUnhealthy(envoy::data::core::v3::PASSIVE, /*retriable=*/false);
