@@ -1134,8 +1134,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   // Check if we would exceed buffer limits, regardless of current buffering state
   // This ensures error details are set even if retry state was cleared due to upstream reset.
-  const bool use_private_retry_buffer = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.router_use_private_retry_buffer");
+  const bool use_private_retry_buffer =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.router_use_private_retry_buffer");
   uint64_t payload_length;
   if (use_private_retry_buffer) {
     payload_length = getLength(retry_buffer_.get()) + data.length();
@@ -2555,8 +2555,8 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  const bool use_private_retry_buffer = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.router_use_private_retry_buffer");
+  const bool use_private_retry_buffer =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.router_use_private_retry_buffer");
   const Buffer::Instance* buffered =
       use_private_retry_buffer ? retry_buffer_.get() : callbacks_->decodingBuffer();
   upstream_requests_.front()->acceptHeadersFromRouter(!buffered && !downstream_trailers_ &&
