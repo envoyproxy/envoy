@@ -10,8 +10,9 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_scanner.h"
 #include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 
 #include "absl/strings/string_view.h"
@@ -30,13 +31,13 @@ namespace AiProtocolManager {
 // possibly empty, or trailers) so pending parse work still resolves.
 class ResponseHandler {
 public:
-  ResponseHandler(ApiProtocol format, AiProtocolManagerStats& stats)
+  ResponseHandler(LLMProtocol format, AiProtocolManagerStats& stats)
       : format_(format), stats_(stats) {
     // Seed the resolved protocol so even a stream whose first input fails
     // (oversized, unparseable) publishes the configured wire API rather than
-    // API_PROTOCOL_UNSPECIFIED. Detection overwrites via merge() when the
+    // LLM_PROTOCOL_UNSPECIFIED. Detection overwrites via merge() when the
     // protocol was not configured.
-    usage_.api_protocol = format;
+    usage_.llm_protocol = format;
   }
   virtual ~ResponseHandler() = default;
 
@@ -61,7 +62,7 @@ protected:
   // callers stop processing later input against an authoritative result.
   bool processDocument(const nlohmann::json& json);
 
-  ApiProtocol format_;
+  LLMProtocol format_;
   TokenUsage usage_;
   bool parsing_complete_{false};
   bool degraded_{false};
@@ -85,7 +86,7 @@ using ResponseHandlerPtr = std::unique_ptr<ResponseHandler>;
 // bytes are charged to the stream's buffer memory account when present.
 class SseResponseHandler : public ResponseHandler, public Logger::Loggable<Logger::Id::filter> {
 public:
-  SseResponseHandler(ApiProtocol format, uint32_t max_event_size, uint32_t max_parsed_events,
+  SseResponseHandler(LLMProtocol format, uint32_t max_event_size, uint32_t max_parsed_events,
                      AiProtocolManagerStats& stats,
                      const Buffer::BufferMemoryAccountSharedPtr& account = nullptr)
       : ResponseHandler(format, stats), max_event_size_(max_event_size),
@@ -101,22 +102,6 @@ public:
 private:
   friend class SseResponseHandlerPeer; // Test-only access to the retained buffer.
 
-  // Line-state for the incremental event-boundary scanner. An SSE event ends
-  // at a blank line; lines terminate with LF, CR, or CRLF.
-  // TODO(botengyao): this bounded incremental decoder belongs in
-  // source/common/http/sse next to SseParser, shared with sse_to_metadata, so
-  // SSE framing semantics (CR/LF, BOM, EOF) have a single owner; coordinate
-  // with HTTP maintainers before extracting it.
-  enum class ScanState {
-    LineStart,   // At the start of a line; nothing on it yet.
-    LineContent, // The current line has at least one content byte.
-    TermCr,      // A CR ended a content line; an immediate LF joins that terminator.
-    BlankTermCr, // A CR ended a blank line; an immediate LF joins the boundary.
-  };
-
-  // Scans `data`, updating the line state. Returns the offset in `data` just
-  // past an event-terminating blank line, or nullopt if none completes here.
-  std::optional<uint64_t> scanView(absl::string_view data);
   // Processes one contiguous incoming region: scans for boundaries, retains
   // boundary-free bytes up to the cap (entering/leaving discard mode), and
   // consumes completed events. A complete event inside the region is handled
@@ -145,7 +130,9 @@ private:
   // Inside an over-cap unterminated event: nothing is retained, and the
   // scanner's line state finds the real terminating blank line.
   bool discarding_{false};
-  ScanState scan_state_{ScanState::LineStart};
+  // Line/boundary state. It, not any retained tail, is what carries the position within an
+  // event across incoming frames.
+  SseScanner scanner_;
   // Invariant: only scanned, boundary-free bytes of the current pending
   // event, never exceeding max_event_size_.
   Buffer::OwnedImpl buffer_;
@@ -159,7 +146,7 @@ private:
 // stream. Bodies over max_inspected_body_size abandon extraction.
 class JsonResponseHandler : public ResponseHandler, public Logger::Loggable<Logger::Id::filter> {
 public:
-  JsonResponseHandler(ApiProtocol format, uint32_t max_inspected_body_size,
+  JsonResponseHandler(LLMProtocol format, uint32_t max_inspected_body_size,
                       AiProtocolManagerStats& stats,
                       const Buffer::BufferMemoryAccountSharedPtr& account = nullptr);
 

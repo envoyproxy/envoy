@@ -491,6 +491,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     if (stats_config.stats_tags().empty() && use_all_default_tags &&
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stats_explicit_tags")) {
       stats_store_.setUseExplicitTags(true);
+      http_context_.setUseExplicitTags(true);
     }
   }
 

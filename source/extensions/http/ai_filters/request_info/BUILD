@@ -34,7 +34,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_request_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:api_protocol_conversion_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_conversion_lib",
         "//source/extensions/http/ai_filters/common:sync_filter_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",

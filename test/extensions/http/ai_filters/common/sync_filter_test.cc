@@ -40,8 +40,7 @@ class SyncAiFilterTest : public testing::Test {
 public:
   SyncAiFilterTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
-        bridge_raw_(new FakeBridge(*dispatcher_)),
-        buffer_manager_(factory_, std::unique_ptr<FakeBridge>(bridge_raw_)),
+        bridge_(*dispatcher_), buffer_manager_(BufferManager::Config{}, factory_, bridge_),
         stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
 
   ~SyncAiFilterTest() override { buffer_manager_.onDestroy(); }
@@ -55,7 +54,7 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   InMemoryExternalBufferFactory factory_;
-  FakeBridge* bridge_raw_{nullptr};
+  FakeBridge bridge_;
   BufferManager buffer_manager_;
   StreamInfo::StreamInfoImpl stream_info_;
 };
@@ -80,21 +79,21 @@ TEST_F(SyncAiFilterTest, ContinueAndMutate) {
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestSyncMutationFilter>("gpt-4o"));
 
-  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
-                        stream_info_);
+  FilterManager manager(std::move(filters));
 
   absl::Status status;
   bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
+  manager.startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+                       [&status, &completed](absl::Status s) {
+                         status = std::move(s);
+                         completed = true;
+                       });
 
   drain();
   EXPECT_TRUE(completed);
   ASSERT_OK(status);
 
-  auto parsed = nlohmann::json::parse(bridge_raw_->injected_.toString());
+  auto parsed = nlohmann::json::parse(bridge_.injected_.toString());
   EXPECT_EQ(parsed["model"], "gpt-4o");
 }
 
@@ -116,20 +115,21 @@ TEST_F(SyncAiFilterTest, LocalReply) {
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestSyncLocalReplyFilter>());
 
-  FilterManager manager(
-      std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+  FilterManager manager(std::move(filters));
+
+  absl::Status status;
+  bool completed = false;
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&status, &completed](absl::Status s) {
+        status = std::move(s);
+        completed = true;
+      },
       /*request_headers=*/nullptr,
       [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
         local_reply_code = code;
         local_reply_details = std::move(details);
       });
-
-  absl::Status status;
-  bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
 
   drain();
   EXPECT_TRUE(completed);
@@ -155,20 +155,21 @@ TEST_F(SyncAiFilterTest, ErrorStatusTriggersLocalReply) {
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestSyncErrorFilter>());
 
-  FilterManager manager(
-      std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+  FilterManager manager(std::move(filters));
+
+  absl::Status status;
+  bool completed = false;
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&status, &completed](absl::Status s) {
+        status = std::move(s);
+        completed = true;
+      },
       /*request_headers=*/nullptr,
       [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
         local_reply_code = code;
         local_reply_details = std::move(details);
       });
-
-  absl::Status status;
-  bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
 
   drain();
   EXPECT_TRUE(completed);

@@ -705,6 +705,12 @@ WEAK_STUB(CertValidatorGetFilterState,
           envoy_dynamic_module_callback_cert_validator_get_filter_state(nullptr, {nullptr, 0},
                                                                         nullptr))
 
+WEAK_STUB(ConfigValidatorSetRejectionMessage,
+          envoy_dynamic_module_callback_config_validator_set_rejection_message(nullptr,
+                                                                               {nullptr, 0}))
+WEAK_STUB(ConfigValidatorGetDynamicClusterCount,
+          envoy_dynamic_module_callback_config_validator_get_dynamic_cluster_count(nullptr))
+
 WEAK_STUB(ClusterAddHosts,
           envoy_dynamic_module_callback_cluster_add_hosts(nullptr, 0, nullptr, nullptr, nullptr,
                                                           nullptr, nullptr, nullptr, 0, 0, nullptr))
@@ -994,6 +1000,7 @@ WEAK_STUB(MatcherGetHeaderValue,
           envoy_dynamic_module_callback_matcher_get_header_value(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
               nullptr, 0, nullptr))
+WEAK_STUB(MatcherSetError, envoy_dynamic_module_callback_matcher_set_error(nullptr))
 WEAK_STUB(MatcherDataInputGetHeaderValue,
           envoy_dynamic_module_callback_matcher_data_input_get_header_value(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
@@ -1811,6 +1818,16 @@ WEAK_STUB(StatSinkSnapshotGetTextReadout,
 WEAK_STUB(StatSinkSnapshotGetCounterTagExtractedName,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
               nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+              nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(nullptr, 0,
+                                                                                   nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(nullptr, 0, 0, nullptr,
+                                                                             0, nullptr, nullptr, 0,
+                                                                             nullptr))
 WEAK_STUB(StatSinkSnapshotGetCounterTagCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(nullptr, 0,
                                                                                  nullptr))
@@ -2086,6 +2103,8 @@ WEAK_STUB(HttpSetBufferLimit, envoy_dynamic_module_callback_http_set_buffer_limi
 WEAK_STUB(HttpGetActiveSpan, envoy_dynamic_module_callback_http_get_active_span(nullptr))
 WEAK_STUB(HttpSpanSetTag,
           envoy_dynamic_module_callback_http_span_set_tag(nullptr, {nullptr, 0}, {nullptr, 0}))
+WEAK_STUB(HttpSpanSetTagBatch,
+          envoy_dynamic_module_callback_http_span_set_tag_batch(nullptr, nullptr, 0))
 WEAK_STUB(HttpSpanSetOperation,
           envoy_dynamic_module_callback_http_span_set_operation(nullptr, {nullptr, 0}))
 WEAK_STUB(HttpSpanLog, envoy_dynamic_module_callback_http_span_log(nullptr, nullptr, {nullptr, 0}))

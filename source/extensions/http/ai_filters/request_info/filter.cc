@@ -6,7 +6,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_conversion.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
 #include "source/extensions/http/ai_filters/request_info/extractor.h"
 
 #include "absl/strings/string_view.h"
@@ -27,7 +27,7 @@ constexpr absl::string_view DefaultMetadataNamespace{"envoy.ai.request_info"};
 
 envoy::data::ai::v3::RequestInfo toProto(const RequestAttributes& attrs) {
   envoy::data::ai::v3::RequestInfo typed;
-  typed.set_input_api_protocol(HttpFilters::AiProtocolManager::protocolToProto(attrs.api_protocol));
+  typed.set_input_llm_protocol(HttpFilters::AiProtocolManager::protocolToProto(attrs.llm_protocol));
   typed.set_model(attrs.model);
   if (attrs.stream.has_value()) {
     typed.mutable_stream()->set_value(attrs.stream.value());

@@ -355,6 +355,25 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_cert_validator_get_filter_state, f
           envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*)
 
+// ---------------------- Config Validator callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementation is
+// provided in the config validator dynamic module extension when it is used.
+
+__attribute__((weak)) void envoy_dynamic_module_callback_config_validator_set_rejection_message(
+    envoy_dynamic_module_type_config_validator_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_config_validator_set_rejection_message: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) uint64_t
+envoy_dynamic_module_callback_config_validator_get_dynamic_cluster_count(
+    envoy_dynamic_module_type_config_validator_context_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_config_validator_get_dynamic_cluster_count: "
+               "not implemented in this context");
+  return 0;
+}
+
 // ---------------------- Bootstrap extension admin handler callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the bootstrap extension abi_impl.cc when the bootstrap extension is used.
@@ -930,6 +949,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_matcher_get_header_value, false,
           envoy_dynamic_module_type_matcher_input_envoy_ptr,
           envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_module_buffer,
           envoy_dynamic_module_type_envoy_buffer*, size_t, size_t*)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_matcher_set_error,
+               envoy_dynamic_module_type_matcher_input_envoy_ptr)
 
 // ---------------------- Matcher data input callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
@@ -2539,6 +2561,17 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_b
           envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, double*,
           uint64_t*)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name,
+          false, envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t,
+          size_t*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count, false,
+          envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag, false,
+          envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, char*, size_t,
+          size_t*, char*, size_t, size_t*)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count, false,
           envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*)
 
@@ -2987,6 +3020,10 @@ WEAK_STUB(envoy_dynamic_module_type_span_envoy_ptr,
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_span_set_tag,
                envoy_dynamic_module_type_span_envoy_ptr, envoy_dynamic_module_type_module_buffer,
                envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_http_span_set_tag_batch,
+               envoy_dynamic_module_type_span_envoy_ptr,
+               const envoy_dynamic_module_type_module_key_value_pair*, size_t)
 
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_span_set_operation,
                envoy_dynamic_module_type_span_envoy_ptr, envoy_dynamic_module_type_module_buffer)

@@ -14,9 +14,9 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "absl/strings/match.h"
@@ -31,7 +31,6 @@ namespace {
 
 constexpr absl::string_view DefaultTokenUsageNamespace{"envoy.ai.token_usage"};
 constexpr absl::string_view SseContentType{"text/event-stream"};
-constexpr absl::string_view JsonContentType{"application/json"};
 // Sized so that ordinary OpenAI Responses API terminal lifecycle events --
 // which embed the complete response object, generated output included -- are
 // extracted by default; see the proto for the rationale.
@@ -73,6 +72,20 @@ bool canHoldRequest(const Http::RequestHeaderMap& headers) {
   return isJsonContentType(headers.getContentTypeValue());
 }
 
+// Whether a response carries an unframed unary JSON body (`application/json`
+// or a `+json` structured-syntax suffix, excluding gRPC / Connect streaming
+// envelopes and upgraded connections).
+bool isJsonResponse(const Http::ResponseHeaderMap& headers, bool end_stream) {
+  if (Grpc::Common::isGrpcResponseHeaders(headers, end_stream) ||
+      Grpc::Common::isConnectStreamingResponseHeaders(headers)) {
+    return false;
+  }
+  if (Http::Utility::isUpgrade(headers)) {
+    return false;
+  }
+  return isJsonContentType(headers.getContentTypeValue());
+}
+
 // Extraction requires an unencoded body: every entry and comma-separated
 // coding of the (repeatable) Content-Encoding header must be `identity`.
 bool contentEncodingIsIdentity(const Http::ResponseHeaderMap& headers) {
@@ -94,7 +107,7 @@ bool contentEncodingIsIdentity(const Http::ResponseHeaderMap& headers) {
 // status-only and publishes as FAILED.
 envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degraded) {
   envoy::data::ai::v3::TokenUsage typed;
-  typed.set_api_protocol(protocolToProto(usage.api_protocol));
+  typed.set_llm_protocol(protocolToProto(usage.llm_protocol));
   if (!usage.model.empty()) {
     typed.set_model(usage.model);
   }
@@ -144,8 +157,8 @@ FilterConfig::FilterConfig(
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
           proto.response_handling().token_usage().include_unconfigured_routes()),
-      default_api_protocol_(
-          protocolFromProto(proto.response_handling().token_usage().default_api_protocol())),
+      default_llm_protocol_(
+          protocolFromProto(proto.response_handling().token_usage().default_llm_protocol())),
       metadata_namespace_(proto.response_handling().token_usage().metadata_namespace().empty()
                               ? std::string(DefaultTokenUsageNamespace)
                               : proto.response_handling().token_usage().metadata_namespace()),
@@ -189,19 +202,22 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
 }
 
 void AiProtocolManagerFilter::onDestroy() {
-  if (filter_manager_ != nullptr) {
-    filter_manager_->cancel();
+  if (decode_bridge_ != nullptr) {
+    // Detach the bridge first so all registered BufferManagers on this path are detached and
+    // their callbacks disarmed before cancelling coroutines in filter_manager_.
+    decode_bridge_->detachFromFilterChain();
   }
   if (decode_manager_ != nullptr) {
-    // Detach the manager (releases the external buffer and unsubscribes from
-    // watermarks) but do NOT free it here. onDestroy() can run synchronously while
-    // the manager is mid-replay -- a downstream filter answering an injected frame
-    // with a local reply reaches destroyFilters() on this very stack -- and freeing
-    // the manager then would pull it out from under its own injectData()/read()
-    // reentrancy. The manager is owned by unique_ptr and freed when this filter is
-    // (deferred-)destroyed, by which point the replay stack has unwound. This honors
-    // BufferManager's onDestroy()-before-destruction contract (see buffer_manager.h).
     decode_manager_->onDestroy();
+  }
+  if (encode_bridge_ != nullptr) {
+    encode_bridge_->detachFromFilterChain();
+  }
+  if (encode_manager_ != nullptr) {
+    encode_manager_->onDestroy();
+  }
+  if (filter_manager_ != nullptr) {
+    filter_manager_->cancel();
   }
 }
 
@@ -230,7 +246,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     route_request_protocol_ = route_config->requestProtocol();
     if (route_has_request_) {
       ENVOY_LOG(debug, "ai_protocol_manager: route declares request API {}",
-                apiProtocolName(route_request_protocol_));
+                llmProtocolName(route_request_protocol_));
     }
   }
 
@@ -251,9 +267,14 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
   // for none of it: constructing it subscribes to upstream watermarks and claims
   // a schedulable callback.
-  decode_manager_ = std::make_unique<BufferManager>(
-      buffer_factory_,
-      std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_, config_->stats()));
+  decode_bridge_ =
+      std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_, config_->stats());
+  // A request small enough that the chain would have buffered it anyway is held in memory and
+  // replayed from there, so it costs no storage IO at all. Past that the chain would have pushed
+  // back, which is exactly the point at which offloading starts to pay for itself.
+  decode_manager_ = std::make_shared<BufferManager>(
+      BufferManager::Config{decoder_callbacks_->decoderBufferLimit()}, buffer_factory_,
+      *decode_bridge_);
 
   // Pin the headers so routing and admission filters do not act on them before
   // the payload is offloaded. decodeData() still fires while iteration is stopped
@@ -442,9 +463,10 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
     // TODO(penguingao): Avoid always passing downstream StreamInfo when constructing
     // FilterManager; when AI Protocol Manager is placed in an upstream filter chain, it should
     // behave differently.
-    filter_manager_ = std::make_unique<FilterManager>(
-        std::move(filters), std::move(request_json_), decode_manager_.get(),
-        decoder_callbacks_->dispatcher(), decoder_callbacks_->streamInfo(), request_headers_,
+    filter_manager_ = std::make_unique<FilterManager>(std::move(filters));
+    filter_manager_->startRequest(
+        std::move(request_json_), decode_manager_.get(), decoder_callbacks_->dispatcher(),
+        decoder_callbacks_->streamInfo(), std::move(on_complete), request_headers_,
         [this](Http::Code code, std::string details) {
           ENVOY_LOG(debug, "ai_protocol_manager: rejecting request via local reply: {} {}",
                     static_cast<uint32_t>(code), details);
@@ -452,9 +474,6 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
           decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
                                              "ai_protocol_manager_filter_rejected");
         });
-    filter_manager_->start([on_complete = std::move(on_complete)](absl::Status status) {
-      on_complete(std::move(status));
-    });
   } else {
     decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
   }
@@ -462,11 +481,14 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
 
 Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                                  bool end_stream) {
-  // The encode path is observe-only: headers are never held and the handler
-  // selection below can only make the filter inert, never affect the response.
-  if (config_ == nullptr || !config_->tokenUsageEnabled()) {
+  if (config_ == nullptr) {
     return Http::FilterHeadersStatus::Continue;
   }
+
+  // TODO(penguingao): consider add request only / response only AI filter chain
+  // when there is a need. Currently, all AI filters handle both request and
+  // response.
+  const bool can_filter_response = filter_manager_ != nullptr && !payload_rejected_;
 
   // Route scoping: only declared AI endpoints are inspected unless the filter
   // opted into unconfigured routes, so enabling token usage on a mixed
@@ -478,12 +500,15 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // request.
   const RouteConfig* route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(encoder_callbacks_);
-  if (route_config == nullptr && !config_->includeUnconfiguredRoutes()) {
+  const bool want_token_usage = config_->tokenUsageEnabled() &&
+                                (route_config != nullptr || config_->includeUnconfiguredRoutes());
+
+  if (!can_filter_response && !want_token_usage) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Only successful responses carry usage; errors and local replies pass through
-  // uninspected.
+  // Only successful responses carry usage or run response filters; errors and
+  // local replies pass through uninspected.
   const auto status = Http::Utility::getResponseStatusOrNullopt(headers);
   if (!status.has_value() || status.value() < 200 || status.value() >= 300) {
     return Http::FilterHeadersStatus::Continue;
@@ -493,7 +518,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // inspected can count an encoding skip.
   const absl::string_view content_type = headers.getContentTypeValue();
   const bool is_sse = contentTypeMatches(content_type, SseContentType);
-  const bool is_json = !is_sse && contentTypeMatches(content_type, JsonContentType);
+  const bool is_json = !is_sse && isJsonResponse(headers, end_stream);
   if (!is_sse && !is_json) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -502,48 +527,74 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // before this filter on the encode path, extraction is skipped (the response
   // is unaffected either way).
   if (!contentEncodingIsIdentity(headers)) {
-    config_->stats().unsupported_content_encoding_.inc();
+    if (want_token_usage) {
+      config_->stats().unsupported_content_encoding_.inc();
+    }
     return Http::FilterHeadersStatus::Continue;
   }
 
   // An eligible headers-only response carries no usage: counted like an
   // empty terminal body, independent of codec framing.
   if (end_stream) {
-    config_->stats().token_usage_missing_.inc();
+    if (want_token_usage) {
+      config_->stats().token_usage_missing_.inc();
+    }
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // The wire API to extract against, in precedence order: the route's declared
-  // response API, the route's declared request API, the configured fallback;
-  // Unspecified auto-detects from the response shape.
-  ApiProtocol protocol = config_->defaultApiProtocol();
-  if (route_config != nullptr &&
-      route_config->effectiveResponseProtocol() != ApiProtocol::Unspecified) {
-    protocol = route_config->effectiveResponseProtocol();
+  uint64_t content_length = 0;
+  const bool has_content_length =
+      absl::SimpleAtoi(headers.getContentLengthValue(), &content_length);
+
+  if (can_filter_response && (is_sse || is_json)) {
+    headers.removeContentLength();
+    encode_bridge_ = std::make_unique<EncoderFilterChainBridge>(
+        *encoder_callbacks_, *decoder_callbacks_, config_->stats());
+    encode_manager_ = std::make_shared<BufferManager>(
+        BufferManager::Config{encoder_callbacks_->encoderBufferLimit()}, buffer_factory_,
+        *encode_bridge_);
+    if (is_sse) {
+      filter_manager_->startSseResponse(
+          buffer_factory_, *encode_bridge_, *encode_manager_,
+          [this](absl::Status status) { onEncodeComplete(std::move(status)); });
+    } else if (is_json) {
+      filter_manager_->startUnaryResponse(
+          buffer_factory_, *encode_bridge_, *encode_manager_,
+          [this](absl::Status status) { onEncodeComplete(std::move(status)); });
+    }
   }
 
-  // Observation buffers charge the stream's memory account when tracking is
-  // enabled; in an upstream installation the decoder callbacks resolve to the
-  // downstream stream's account.
-  const Buffer::BufferMemoryAccountSharedPtr account = decoder_callbacks_->account();
-  if (is_sse) {
-    response_handler_ = std::make_unique<SseResponseHandler>(protocol, config_->maxSseEventSize(),
-                                                             config_->maxParsedSseEvents(),
-                                                             config_->stats(), account);
-  } else {
-    auto handler = std::make_unique<JsonResponseHandler>(protocol, config_->maxJsonBodySize(),
-                                                         config_->stats(), account);
-    // A body already known (from content-length) to exceed the cap abandons
-    // extraction up front, through the same transition the incremental cap
-    // takes -- identical bodies produce the identical outcome regardless of
-    // whether the length was advertised. onData() stays authoritative for
-    // absent or wrong lengths.
-    uint64_t content_length = 0;
-    if (absl::SimpleAtoi(headers.getContentLengthValue(), &content_length) &&
-        content_length > config_->maxJsonBodySize()) {
-      handler->abandonOverLimit();
+  if (want_token_usage) {
+    // The wire API to extract against, in precedence order: the route's declared
+    // response API, the route's declared request API, the configured fallback;
+    // Unspecified auto-detects from the response shape.
+    LLMProtocol protocol = config_->defaultLLMProtocol();
+    if (route_config != nullptr &&
+        route_config->effectiveResponseProtocol() != LLMProtocol::Unspecified) {
+      protocol = route_config->effectiveResponseProtocol();
     }
-    response_handler_ = std::move(handler);
+
+    // Observation buffers charge the stream's memory account when tracking is
+    // enabled; in an upstream installation the decoder callbacks resolve to the
+    // downstream stream's account.
+    const Buffer::BufferMemoryAccountSharedPtr account = decoder_callbacks_->account();
+    if (is_sse) {
+      response_handler_ = std::make_unique<SseResponseHandler>(protocol, config_->maxSseEventSize(),
+                                                               config_->maxParsedSseEvents(),
+                                                               config_->stats(), account);
+    } else {
+      auto handler = std::make_unique<JsonResponseHandler>(protocol, config_->maxJsonBodySize(),
+                                                           config_->stats(), account);
+      // A body already known (from content-length) to exceed the cap abandons
+      // extraction up front, through the same transition the incremental cap
+      // takes -- identical bodies produce the identical outcome regardless of
+      // whether the length was advertised. onData() stays authoritative for
+      // absent or wrong lengths.
+      if (has_content_length && content_length > config_->maxJsonBodySize()) {
+        handler->abandonOverLimit();
+      }
+      response_handler_ = std::move(handler);
+    }
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -558,10 +609,24 @@ Http::FilterDataStatus AiProtocolManagerFilter::encodeData(Buffer::Instance& dat
         // Synthesize empty trailers at end of stream to wake trailer-driven consumers.
         encoder_callbacks_->addEncodedTrailers();
         config_->stats().usage_trailers_synthesized_.inc();
+        encode_has_trailers_ = true;
         ENVOY_LOG(trace, "ai_protocol_manager: added end-of-stream trailers to carry usage");
       }
     }
   }
+
+  if (encode_manager_ != nullptr) {
+    if (encode_rejected_) {
+      data.drain(data.length());
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+    if (end_stream) {
+      encode_input_ended_ = true;
+    }
+    filter_manager_->onResponseData(data, end_stream);
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   return Http::FilterDataStatus::Continue;
 }
 
@@ -573,7 +638,39 @@ Http::FilterTrailersStatus AiProtocolManagerFilter::encodeTrailers(Http::Respons
     response_handler_->onEndStream();
     finalizeResponseHandling();
   }
+
+  if (encode_manager_ != nullptr) {
+    if (encode_rejected_) {
+      return Http::FilterTrailersStatus::StopIteration;
+    }
+    encode_has_trailers_ = true;
+    if (!encode_input_ended_) {
+      encode_input_ended_ = true;
+      Buffer::OwnedImpl empty;
+      filter_manager_->onResponseData(empty, /*end_stream=*/true);
+    }
+    return Http::FilterTrailersStatus::StopIteration;
+  }
+
   return Http::FilterTrailersStatus::Continue;
+}
+
+void AiProtocolManagerFilter::onEncodeComplete(absl::Status status) {
+  if (!status.ok()) {
+    ENVOY_LOG(error, "ai_protocol_manager: response filter chain failed: {}", status.message());
+    if (!encode_rejected_) {
+      encode_rejected_ = true;
+      encoder_callbacks_->sendLocalReply(Http::Code::BadGateway, status.message(), nullptr,
+                                         std::nullopt, "ai_protocol_manager_response_error");
+    }
+    return;
+  }
+  if (encode_has_trailers_) {
+    encoder_callbacks_->continueEncoding();
+  } else {
+    Buffer::OwnedImpl end_marker;
+    encoder_callbacks_->injectEncodedDataToFilterChain(end_marker, /*end_stream=*/true);
+  }
 }
 
 bool AiProtocolManagerFilter::finalizeResponseHandling() {
@@ -605,7 +702,7 @@ bool AiProtocolManagerFilter::finalizeResponseHandling() {
 
   // Convert the finalized accumulator once into the authoritative typed
   // record (envoy.data.ai.v3.TokenUsage). When extraction failed outright the
-  // record is status-only (api_protocol/model/extraction_status, no counts),
+  // record is status-only (llm_protocol/model/extraction_status, no counts),
   // letting consumers distinguish "failed to extract" from "no usage
   // supplied". Only typed metadata is published: consumers with full-fidelity
   // needs (ext_proc typed forwarding, filters reading typed metadata) share

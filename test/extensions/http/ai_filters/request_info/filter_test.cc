@@ -31,12 +31,12 @@ namespace {
 
 using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::AiFilterSharedPtr;
-using HttpFilters::AiProtocolManager::ApiProtocol;
 using HttpFilters::AiProtocolManager::BufferManager;
 using HttpFilters::AiProtocolManager::FakeBridge;
 using HttpFilters::AiProtocolManager::FilterManager;
 using HttpFilters::AiProtocolManager::InMemoryExternalBufferFactory;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
+using HttpFilters::AiProtocolManager::LLMProtocol;
 
 constexpr absl::string_view DefaultNamespace = "envoy.ai.request_info";
 
@@ -44,8 +44,7 @@ class RequestInfoFilterTest : public testing::Test {
 public:
   RequestInfoFilterTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
-        bridge_raw_(new FakeBridge(*dispatcher_)),
-        buffer_manager_(factory_, std::unique_ptr<FakeBridge>(bridge_raw_)),
+        bridge_(*dispatcher_), buffer_manager_(BufferManager::Config{}, factory_, bridge_),
         stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
 
   ~RequestInfoFilterTest() override { buffer_manager_.onDestroy(); }
@@ -57,7 +56,7 @@ public:
   }
 
   // Returns the replayed body.
-  std::string run(const std::string& payload, ApiProtocol protocol,
+  std::string run(const std::string& payload, LLMProtocol protocol,
                   absl::string_view path = "/v1/chat/completions",
                   RequestInfoFilterConfigSharedPtr config = nullptr) {
     request_headers_ =
@@ -68,21 +67,21 @@ public:
     filters.push_back(std::make_unique<RequestInfoFilter>(
         config != nullptr ? std::move(config) : makeConfig(),
         AiFilterContext{stream_info_, request_headers_, protocol}));
-    FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
-                          stream_info_);
+    FilterManager manager(std::move(filters));
 
     absl::Status status;
     bool completed = false;
-    manager.start([&status, &completed](absl::Status s) {
-      status = std::move(s);
-      completed = true;
-    });
+    manager.startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+                         [&status, &completed](absl::Status s) {
+                           status = std::move(s);
+                           completed = true;
+                         });
     for (int i = 0; i < 20; ++i) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
     EXPECT_TRUE(completed);
     EXPECT_TRUE(status.ok()) << status;
-    return bridge_raw_->injected_.toString();
+    return bridge_.injected_.toString();
   }
 
   std::optional<envoy::data::ai::v3::RequestInfo>
@@ -106,7 +105,7 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   InMemoryExternalBufferFactory factory_;
-  FakeBridge* bridge_raw_{nullptr};
+  FakeBridge bridge_;
   BufferManager buffer_manager_;
   StreamInfo::StreamInfoImpl stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
@@ -118,12 +117,12 @@ TEST_F(RequestInfoFilterTest, PublishesTypedRecordAndForwardsPayloadUnchanged) {
       R"({"model":"gpt-4o","stream":true,"max_completion_tokens":64,
           "messages":[{"role":"user","content":"hi"}],
           "tools":[{"type":"function","function":{"name":"f"}}]})";
-  const std::string replayed = run(payload, ApiProtocol::OpenAiChatCompletions);
+  const std::string replayed = run(payload, LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(nlohmann::json::parse(replayed), nlohmann::json::parse(payload));
 
   const auto record = published();
   ASSERT_TRUE(record.has_value());
-  EXPECT_EQ(record->input_api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(record->input_llm_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   EXPECT_EQ(record->model(), "gpt-4o");
   EXPECT_TRUE(record->stream().value());
   EXPECT_EQ(record->max_output_tokens().value(), 64);
@@ -137,10 +136,10 @@ TEST_F(RequestInfoFilterTest, PublishesTypedRecordAndForwardsPayloadUnchanged) {
 }
 
 TEST_F(RequestInfoFilterTest, AbsentAttributesAreLeftUnset) {
-  run(R"({"messages":[]})", ApiProtocol::AnthropicMessages, "/v1/messages");
+  run(R"({"messages":[]})", LLMProtocol::AnthropicMessages, "/v1/messages");
   const auto record = published();
   ASSERT_TRUE(record.has_value());
-  EXPECT_EQ(record->input_api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(record->input_llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   EXPECT_TRUE(record->model().empty());
   EXPECT_FALSE(record->has_stream());
   EXPECT_FALSE(record->has_max_output_tokens());
@@ -149,7 +148,7 @@ TEST_F(RequestInfoFilterTest, AbsentAttributesAreLeftUnset) {
 }
 
 TEST_F(RequestInfoFilterTest, FlagsPartialWhenAnAttributeIsUnusable) {
-  run(R"({"model":42,"stream":true,"messages":[]})", ApiProtocol::OpenAiChatCompletions);
+  run(R"({"model":42,"stream":true,"messages":[]})", LLMProtocol::OpenAiChatCompletions);
   const auto record = published();
   ASSERT_TRUE(record.has_value());
   EXPECT_TRUE(record->model().empty());
@@ -160,11 +159,11 @@ TEST_F(RequestInfoFilterTest, FlagsPartialWhenAnAttributeIsUnusable) {
 
 TEST_F(RequestInfoFilterTest, ReadsGeminiTargetFromRequestPath) {
   run(R"({"contents":[{"parts":[{"text":"hi"}]}],"generationConfig":{"maxOutputTokens":32}})",
-      ApiProtocol::GeminiGenerateContent,
+      LLMProtocol::GeminiGenerateContent,
       "/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse");
   const auto record = published();
   ASSERT_TRUE(record.has_value());
-  EXPECT_EQ(record->input_api_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  EXPECT_EQ(record->input_llm_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
   EXPECT_EQ(record->model(), "gemini-2.5-pro");
   EXPECT_TRUE(record->stream().value());
   EXPECT_EQ(record->max_output_tokens().value(), 32);
@@ -173,10 +172,10 @@ TEST_F(RequestInfoFilterTest, ReadsGeminiTargetFromRequestPath) {
 
 TEST_F(RequestInfoFilterTest, UnspecifiedProtocolPublishesSharedAttributesOnly) {
   run(R"({"model":"m","stream":false,"max_tokens":5,"messages":[{"role":"user","content":"hi"}]})",
-      ApiProtocol::Unspecified);
+      LLMProtocol::Unspecified);
   const auto record = published();
   ASSERT_TRUE(record.has_value());
-  EXPECT_EQ(record->input_api_protocol(), envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED);
+  EXPECT_EQ(record->input_llm_protocol(), envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED);
   EXPECT_EQ(record->model(), "m");
   EXPECT_FALSE(record->stream().value());
   EXPECT_FALSE(record->has_max_output_tokens());
@@ -184,7 +183,7 @@ TEST_F(RequestInfoFilterTest, UnspecifiedProtocolPublishesSharedAttributesOnly) 
 }
 
 TEST_F(RequestInfoFilterTest, PublishesUnderConfiguredNamespace) {
-  run(R"({"model":"m"})", ApiProtocol::OpenAiChatCompletions, "/v1/chat/completions",
+  run(R"({"model":"m"})", LLMProtocol::OpenAiChatCompletions, "/v1/chat/completions",
       makeConfig("custom.ns"));
   EXPECT_FALSE(published().has_value());
   ASSERT_TRUE(published("custom.ns").has_value());
@@ -198,7 +197,7 @@ TEST_F(RequestInfoFilterTest, FirstWriterOwnsTheNamespace) {
   ASSERT_TRUE(existing_any.PackFrom(existing));
   stream_info_.setDynamicTypedMetadata(std::string(DefaultNamespace), existing_any);
 
-  run(R"({"model":"second"})", ApiProtocol::OpenAiChatCompletions);
+  run(R"({"model":"second"})", LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(published()->model(), "first");
   EXPECT_EQ(counterValue("published"), 0);
   EXPECT_EQ(counterValue("duplicate"), 1);

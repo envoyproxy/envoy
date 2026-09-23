@@ -8,7 +8,6 @@ envoy_mobile_package()
 envoy_cc_test_with_engine_builder(
     name = "engine_common_test",
     srcs = ["engine_common_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_common_lib",
         "@envoy_build_config//:extension_registry",
@@ -18,7 +17,6 @@ envoy_cc_test_with_engine_builder(
 envoy_cc_test_with_engine_builder(
     name = "internal_engine_test",
     srcs = ["internal_engine_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:internal_engine_lib_no_stamp",
         "//library/common/bridge:utility_lib",
