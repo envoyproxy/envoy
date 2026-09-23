@@ -186,35 +186,19 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
          "Flags must already be initialized");
   uint32_t checker_flags = checkers_[checker_index].host_flags[host.get()];
 
-  if (checker_flags & static_cast<uint32_t>(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    state.fail_bits |= bit;
-  } else {
-    state.fail_bits &= ~bit;
-  }
+  auto handleBit = [&](uint32_t& bits, Host::HealthFlag flag) {
+    if (checker_flags & static_cast<uint32_t>(flag)) {
+      bits |= bit;
+    } else {
+      bits &= ~bit;
+    }
+  };
 
-  if (checker_flags & static_cast<uint32_t>(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
-    state.degraded_bits |= bit;
-  } else {
-    state.degraded_bits &= ~bit;
-  }
-
-  if (checker_flags & static_cast<uint32_t>(Host::HealthFlag::PENDING_ACTIVE_HC)) {
-    state.pending_bits |= bit;
-  } else {
-    state.pending_bits &= ~bit;
-  }
-
-  if (checker_flags & static_cast<uint32_t>(Host::HealthFlag::ACTIVE_HC_TIMEOUT)) {
-    state.timeout_bits |= bit;
-  } else {
-    state.timeout_bits &= ~bit;
-  }
-
-  if (checker_flags & static_cast<uint32_t>(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL)) {
-    state.immediate_fail |= bit;
-  } else {
-    state.immediate_fail &= ~bit;
-  }
+  handleBit(state.fail_bits, Host::HealthFlag::FAILED_ACTIVE_HC);
+  handleBit(state.degraded_bits, Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  handleBit(state.pending_bits, Host::HealthFlag::PENDING_ACTIVE_HC);
+  handleBit(state.timeout_bits, Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  handleBit(state.immediate_fail, Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
 
   // Don't do any operations with a side effect until all checkers have posted their initial result.
   state.initial_check_pending &= ~bit;
@@ -235,35 +219,19 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
   const bool now_aggregate_timeout = state.timeout_bits != 0;
   const bool now_aggregate_excluded = state.immediate_fail != 0;
 
-  if (now_aggregate_failed) {
-    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  } else {
-    host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  }
+  auto handleFlag = [&](Host::HealthFlag flag, bool value) {
+    if (value) {
+      host->healthFlagSet(flag);
+    } else {
+      host->healthFlagClear(flag);
+    }
+  };
 
-  if (now_aggregate_degraded) {
-    host->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
-  } else {
-    host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
-  }
-
-  if (now_aggregate_pending) {
-    host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
-  } else {
-    host->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
-  }
-
-  if (now_aggregate_timeout) {
-    host->healthFlagSet(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
-  } else {
-    host->healthFlagClear(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
-  }
-
-  if (now_aggregate_excluded) {
-    host->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-  } else {
-    host->healthFlagClear(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-  }
+  handleFlag(Host::HealthFlag::FAILED_ACTIVE_HC, now_aggregate_failed);
+  handleFlag(Host::HealthFlag::DEGRADED_ACTIVE_HC, now_aggregate_degraded);
+  handleFlag(Host::HealthFlag::PENDING_ACTIVE_HC, now_aggregate_pending);
+  handleFlag(Host::HealthFlag::ACTIVE_HC_TIMEOUT, now_aggregate_timeout);
+  handleFlag(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL, now_aggregate_excluded);
 
   if (was_aggregate_failed != now_aggregate_failed) {
     if (now_aggregate_failed) {
