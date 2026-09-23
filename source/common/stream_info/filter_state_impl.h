@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -45,15 +44,6 @@ public:
   bool hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const override;
   FilterState::ObjectsPtr objectsSharedWithUpstreamConnection() const override;
 
-  void setIndexedData(
-      FilterStateIndex index, std::shared_ptr<Object> data,
-      FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
-      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
-  const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const override;
-  Object* getIndexedDataMutableGeneric(FilterStateIndex index) override;
-  std::shared_ptr<Object> getIndexedDataSharedMutableGeneric(FilterStateIndex index) override;
-  bool hasIndexedData(FilterStateIndex index) const override;
-
   FilterState::LifeSpan lifeSpan() const override { return life_span_; }
   FilterStateSharedPtr parent() const override { return parent_; }
 
@@ -62,16 +52,9 @@ private:
   bool hasDataWithNameInternally(absl::string_view data_name) const;
   void maybeCreateParent(FilterStateSharedPtr ancestor);
 
-  struct IndexedFilterObject {
-    std::shared_ptr<Object> data_;
-    StreamSharingMayImpactPooling stream_sharing_{StreamSharingMayImpactPooling::None};
-  };
-
-  FilterStateSharedPtr parent_{};
+  FilterStateSharedPtr parent_;
   const FilterState::LifeSpan life_span_;
   absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>> data_storage_;
-  uint32_t indexed_count_{0};
-  std::array<std::unique_ptr<IndexedFilterObject>, FilterStateIndexCount> indexed_data_storage_{};
 };
 
 } // namespace StreamInfo
