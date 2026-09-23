@@ -7734,14 +7734,14 @@ api_listener:
   ASSERT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   ASSERT_TRUE(manager_->apiListener().has_value());
-  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
+  EXPECT_EQ("test_api_listener", manager_->apiListener()->name());
 
   // Only one ApiListener is added.
   ASSERT_FALSE(addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   // The original ApiListener is there.
   ASSERT_TRUE(manager_->apiListener().has_value());
-  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
+  EXPECT_EQ("test_api_listener", manager_->apiListener()->name());
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {

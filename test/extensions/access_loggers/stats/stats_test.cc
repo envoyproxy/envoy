@@ -1382,9 +1382,9 @@ TEST(GaugeKeyTest, EqualityAndHashing) {
   Stats::StatNameTagVector tags1 = {{tag_n1, tag_v1}};
   Stats::StatNameTagVector tags2 = {{tag_n1, tag_v2}};
 
-  GaugeKey key_tags1(name1, std::cref(tags1));
-  GaugeKey key_tags2(name1, std::cref(tags1));
-  GaugeKey key_tags3(name1, std::cref(tags2));
+  GaugeKey key_tags1(name1, tags1);
+  GaugeKey key_tags2(name1, tags1);
+  GaugeKey key_tags3(name1, tags2);
 
   EXPECT_EQ(key_tags1, key_tags2);
   EXPECT_NE(key_tags1, key_tags3);
@@ -1394,7 +1394,7 @@ TEST(GaugeKeyTest, EqualityAndHashing) {
   EXPECT_NE(absl::Hash<GaugeKey>{}(key_tags1), absl::Hash<GaugeKey>{}(key_tags3));
 
   // Borrowed vs Owned
-  GaugeKey key_owned(name1, std::cref(tags1));
+  GaugeKey key_owned(name1, tags1);
   key_owned.makeOwned();
 
   EXPECT_EQ(key_tags1, key_owned); // Borrowed vs Owned should be equal if content is same //
@@ -1419,11 +1419,11 @@ TEST(GaugeKeyTest, VerifyAbslHashCorrectness) {
   GaugeKey key_empty1(name1, std::nullopt);
   GaugeKey key_empty2(name2, std::nullopt);
 
-  GaugeKey key_borrowed(name1, std::cref(tags1));
-  GaugeKey key_owned(name1, std::cref(tags1));
+  GaugeKey key_borrowed(name1, tags1);
+  GaugeKey key_owned(name1, tags1);
   key_owned.makeOwned();
 
-  GaugeKey key_tags2(name1, std::cref(tags2));
+  GaugeKey key_tags2(name1, tags2);
 
   EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly(
       std::make_tuple(std::move(key_empty1), std::move(key_empty2), std::move(key_borrowed),
@@ -1456,14 +1456,14 @@ TEST(GaugeKeyTest, ExactMemoryFootprint) {
   // 2. Check memory usage of Borrowed tags GaugeKey.
   {
     Memory::TestUtil::MemoryTest memory_test;
-    GaugeKey key(name, std::cref(tags));
+    GaugeKey key(name, tags);
     // Borrowed tags should NOT cause heap allocation by GaugeKey itself.
     EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
   }
 
   // 3. Check memory usage after making it owned.
   {
-    GaugeKey key(name, std::cref(tags));
+    GaugeKey key(name, tags);
 
     Memory::TestUtil::MemoryTest memory_test;
     key.makeOwned();
@@ -1507,8 +1507,8 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateMemoryFootprint) {
 
     // 1. Add multiple items
     for (int i = 0; i < NUM_ITEMS; ++i) {
-      access_log_state->addInflightGauge(names[i], std::cref(tags),
-                                         Stats::Gauge::ImportMode::Accumulate, 1, {});
+      access_log_state->addInflightGauge(names[i], tags, Stats::Gauge::ImportMode::Accumulate, 1,
+                                         {});
     }
 
     // Verify it is within bounds (e.g., less than 384 bytes per entry including map overhead).
@@ -1523,8 +1523,8 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateMemoryFootprint) {
 
     // 2. Remove all items
     for (int i = 0; i < NUM_ITEMS; ++i) {
-      access_log_state->removeInflightGauge(names[i], std::cref(tags),
-                                            Stats::Gauge::ImportMode::Accumulate, 1);
+      access_log_state->removeInflightGauge(names[i], tags, Stats::Gauge::ImportMode::Accumulate,
+                                            1);
     }
 
     // absl::flat_hash_map is designed to not release its slots after removing entries,

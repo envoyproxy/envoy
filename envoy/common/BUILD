@@ -64,7 +64,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resource_interface",
     hdrs = ["resource.h"],
-    deps = [":pure_lib"],
+    deps = [
+        ":optref_lib",
+        ":pure_lib",
+    ],
 )
 
 envoy_cc_library(

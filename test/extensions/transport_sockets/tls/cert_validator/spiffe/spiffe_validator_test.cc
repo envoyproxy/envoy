@@ -1534,7 +1534,7 @@ typed_config:
 
   auto gauge_opt = store().findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
+  EXPECT_EQ(gauge_opt->value(), expected_expiry);
 }
 
 // Verify that a URI SAN matcher with an unregistered custom string matcher extension

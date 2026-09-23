@@ -51,7 +51,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   CounterOptConstRef opt_counter = scope1->findCounter(c2.statName());
   ASSERT_TRUE(opt_counter);
-  EXPECT_EQ(&c2, &opt_counter->get());
+  EXPECT_EQ(&c2, &opt_counter.ref());
   StatName not_found = pool_.add("not_found");
   EXPECT_FALSE(scope1->findCounter(not_found));
 
@@ -59,10 +59,10 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   c1.add(100);
   auto found_counter = scope_->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
-  EXPECT_EQ(&c1, &found_counter->get());
-  EXPECT_EQ(100, found_counter->get().value());
+  EXPECT_EQ(&c1, &found_counter.ref());
+  EXPECT_EQ(100, found_counter->value());
   c1.add(100);
-  EXPECT_EQ(200, found_counter->get().value());
+  EXPECT_EQ(200, found_counter->value());
 
   Gauge& g1 = scope_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromString("g2", Gauge::ImportMode::Accumulate);
@@ -74,7 +74,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(0, g2.tags().size());
   GaugeOptConstRef opt_gauge = scope1->findGauge(g2.statName());
   ASSERT_TRUE(opt_gauge);
-  EXPECT_EQ(&g2, &opt_gauge->get());
+  EXPECT_EQ(&g2, &opt_gauge.ref());
   EXPECT_FALSE(scope1->findGauge(not_found));
   // TODO(jmarantz): There may be a bug with
   // scope1->findGauge(h1.statName()), which finds the histogram added to
@@ -85,10 +85,10 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   g1.set(100);
   auto found_gauge = scope_->findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
-  EXPECT_EQ(&g1, &found_gauge->get());
-  EXPECT_EQ(100, found_gauge->get().value());
+  EXPECT_EQ(&g1, &found_gauge.ref());
+  EXPECT_EQ(100, found_gauge->value());
   g1.set(0);
-  EXPECT_EQ(0, found_gauge->get().value());
+  EXPECT_EQ(0, found_gauge->value());
 
   Histogram& h1 = scope_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_TRUE(h1.used()); // hardcoded in impl to be true always.
@@ -105,7 +105,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   h2.recordValue(200);
   HistogramOptConstRef opt_histogram = scope1->findHistogram(h2.statName());
   ASSERT_TRUE(opt_histogram);
-  EXPECT_EQ(&h2, &opt_histogram->get());
+  EXPECT_EQ(&h2, &opt_histogram.ref());
   EXPECT_FALSE(scope1->findHistogram(not_found));
   // TODO(jmarantz): There may be a bug with
   // scope1->findHistogram(h1.statName()), which finds the histogram added to
@@ -115,7 +115,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   StatNameManagedStorage h1_name("h1", store_->symbolTable());
   auto found_histogram = scope_->findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
-  EXPECT_EQ(&h1, &found_histogram->get());
+  EXPECT_EQ(&h1, &found_histogram.ref());
 
   ScopeSharedPtr scope2 = scope1->scopeFromStatName(makeStatName("foo."));
   EXPECT_EQ("scope1.foo.bar", scope2->counterFromString("bar").name());

@@ -65,7 +65,7 @@ void MinimumClustersValidator::validate(
   for (const auto& removed_cluster : removed_resources) {
     Upstream::ClusterConstOptRef cluster = cur_clusters.getCluster(removed_cluster);
     // Only clusters that were added via api can be removed.
-    if (cluster.has_value() && cluster->get().info()->addedViaApi()) {
+    if (cluster.has_value() && cluster->info()->addedViaApi()) {
       ++removed_clusters_num;
     }
   }

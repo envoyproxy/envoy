@@ -368,8 +368,7 @@ public:
   findByAddress(const Address::InstanceConstSharedPtr& listen_address) PURE;
 };
 
-using InternalListenerManagerOptRef =
-    std::optional<std::reference_wrapper<InternalListenerManager>>;
+using InternalListenerManagerOptRef = OptRef<InternalListenerManager>;
 
 // The thread local registry.
 class LocalInternalListenerRegistry {

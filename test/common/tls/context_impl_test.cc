@@ -1970,7 +1970,7 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
     Stats::CounterOptConstRef stat =
         store_.findCounterByString(absl::StrCat("ssl.ciphers.", cipher));
     ASSERT_TRUE(stat.has_value());
-    EXPECT_EQ(1, stat->get().value());
+    EXPECT_EQ(1, stat->value());
   }
 
   // Incrementing a stat for a random unknown cipher does not work. A
@@ -2095,7 +2095,7 @@ common_tls_context:
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
+  EXPECT_EQ(gauge_opt->value(), expected_expiry);
 }
 
 TEST_F(CertificateExpirationMetricsTest, ClientCertificateExpirationMetrics) {
@@ -2132,7 +2132,7 @@ common_tls_context:
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
+  EXPECT_EQ(gauge_opt->value(), expected_expiry);
 }
 
 // Certificate-level min > context max produces an effective range that can never negotiate.

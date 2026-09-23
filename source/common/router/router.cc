@@ -1593,7 +1593,7 @@ void Filter::onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag response_flags,
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -2174,7 +2174,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 
   Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
   if (tb_stats.has_value()) {
-    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
