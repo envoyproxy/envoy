@@ -89,13 +89,8 @@ bool isStatelessProtocolRequest(const json& json_rpc,
   }
 
   const auto& meta = params[McpConstants::META_FIELD];
-  const auto version_it = meta.find(McpConstants::MCP_META_PROTOCOL_VERSION_FIELD);
-  if (version_it == meta.end() || !version_it->is_string()) {
-    return false;
-  }
-
-  return version_it->get_ref<const nlohmann::json::string_t&>() ==
-         McpConstants::MCP_VERSION_2026_07_28;
+  return meta.contains(McpConstants::MCP_META_PROTOCOL_VERSION_FIELD) &&
+         meta[McpConstants::MCP_META_PROTOCOL_VERSION_FIELD].is_string();
 }
 
 void addCompleteResultTypeIfStateless(json& response, bool is_stateless_request) {
@@ -162,14 +157,32 @@ json generateInitializeResponse(const json& session_id, absl::string_view server
   return ret;
 }
 
-json generateServerDiscoverResponse(const json& session_id, absl::string_view server_name) {
+absl::string_view cacheScopeToString(
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CacheScope cache_scope) {
+  return cache_scope ==
+                 envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PRIVATE
+             ? McpConstants::CACHE_SCOPE_PRIVATE
+             : McpConstants::CACHE_SCOPE_PUBLIC;
+}
+
+constexpr absl::string_view kSupportedMcpProtocolVersions[] = {
+    McpConstants::MCP_VERSION_2024_11_05, McpConstants::MCP_VERSION_2025_03_26,
+    McpConstants::MCP_VERSION_2025_06_18, McpConstants::MCP_VERSION_2025_11_25,
+    McpConstants::MCP_VERSION_2026_07_28,
+};
+
+json generateServerDiscoverResponse(const json& session_id, absl::string_view server_name,
+                                    uint64_t cache_ttl_ms, absl::string_view cache_scope) {
   json ret;
   ret[McpConstants::JSONRPC_FIELD] = McpConstants::JSONRPC_VERSION;
   ret[McpConstants::ID_FIELD] = session_id;
 
   json result;
-  result[McpConstants::SUPPORTED_VERSIONS_FIELD] =
-      json::array({McpConstants::MCP_VERSION_2026_07_28});
+  json supported_versions = json::array();
+  for (const absl::string_view supported_version : kSupportedMcpProtocolVersions) {
+    supported_versions.push_back(supported_version);
+  }
+  result[McpConstants::SUPPORTED_VERSIONS_FIELD] = supported_versions;
 
   result[McpConstants::CAPABILITIES_FIELD][McpConstants::TOOLS_FIELD]
         [McpConstants::LIST_CHANGED_FIELD] = false;
@@ -178,8 +191,8 @@ json generateServerDiscoverResponse(const json& session_id, absl::string_view se
   result[McpConstants::META_FIELD][McpConstants::MCP_META_SERVER_INFO_FIELD]
         [McpConstants::VERSION_FIELD] = McpConstants::DEFAULT_SERVER_VERSION;
 
-  result[McpConstants::TTL_MS_FIELD] = 0;
-  result[McpConstants::CACHE_SCOPE_FIELD] = McpConstants::CACHE_SCOPE_PRIVATE;
+  result[McpConstants::TTL_MS_FIELD] = cache_ttl_ms;
+  result[McpConstants::CACHE_SCOPE_FIELD] = cache_scope;
   result[McpConstants::RESULT_TYPE_FIELD] = McpConstants::RESULT_TYPE_COMPLETE;
   ret[McpConstants::RESULT_FIELD] = result;
   return ret;
@@ -280,6 +293,10 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
                                                              DEFAULT_MAX_REQUEST_BODY_SIZE)),
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)),
+      server_discovery_cache_ttl_ms_(PROTOBUF_GET_MS_OR_DEFAULT(
+          proto_config_.server_info().server_discovery_cache_config(), ttl, 0)),
+      server_discovery_cache_scope_(cacheScopeToString(
+          proto_config_.server_info().server_discovery_cache_config().cache_scope())),
       clear_route_cache_(!proto_config_.disable_clear_route_cache()) {}
 
 absl::Status McpJsonRestBridgeFilterConfig::initialize() {
@@ -1079,7 +1096,11 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
                                    ? json_rpc[McpConstants::PARAMS_FIELD]
                                    : json::object());
     decoder_callbacks_->sendLocalReply(
-        Http::Code::OK, generateServerDiscoverResponse(*session_id_, server_name_).dump(),
+        Http::Code::OK,
+        generateServerDiscoverResponse(*session_id_, server_name_,
+                                       config_->serverDiscoveryCacheTtlMs(),
+                                       config_->serverDiscoveryCacheScope())
+            .dump(),
         [](Http::ResponseHeaderMap& headers) {
           headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
         },

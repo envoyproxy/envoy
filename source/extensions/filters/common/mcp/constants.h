@@ -59,6 +59,7 @@ constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
 constexpr absl::string_view SUPPORTED_VERSIONS_FIELD = "supportedVersions";
 constexpr absl::string_view TTL_MS_FIELD = "ttlMs";
 constexpr absl::string_view CACHE_SCOPE_FIELD = "cacheScope";
+constexpr absl::string_view CACHE_SCOPE_PUBLIC = "public";
 constexpr absl::string_view CACHE_SCOPE_PRIVATE = "private";
 
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
