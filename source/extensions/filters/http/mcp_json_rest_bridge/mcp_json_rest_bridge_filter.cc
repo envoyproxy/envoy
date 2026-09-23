@@ -89,8 +89,13 @@ bool isStatelessProtocolRequest(const json& json_rpc,
   }
 
   const auto& meta = params[McpConstants::META_FIELD];
-  return meta.contains(McpConstants::MCP_META_PROTOCOL_VERSION_FIELD) &&
-         meta[McpConstants::MCP_META_PROTOCOL_VERSION_FIELD].is_string();
+  const auto version_it = meta.find(McpConstants::MCP_META_PROTOCOL_VERSION_FIELD);
+  if (version_it == meta.end() || !version_it->is_string()) {
+    return false;
+  }
+
+  return version_it->get_ref<const nlohmann::json::string_t&>() ==
+         McpConstants::MCP_VERSION_2026_07_28;
 }
 
 void addCompleteResultTypeIfStateless(json& response, bool is_stateless_request) {
