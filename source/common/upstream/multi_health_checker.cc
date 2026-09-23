@@ -165,8 +165,11 @@ void MultiHealthChecker::onClusterMemberUpdate(const HostVector& hosts_added,
   }
 
   for (const auto& host : hosts_added) {
+    // This state is created on-demand so this isn't functionally needed, but creating it here
+    // allows the size check assertion below to always succeed.
     getOrCreateHostState(*host);
   }
+
   for (const auto& host : hosts_removed) {
     auto state_it = host_states_.find(host.get());
     ASSERT(state_it != host_states_.end());
@@ -187,10 +190,7 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, HostSharedPtr h
                                          HealthTransition /*changed_state*/,
                                          HealthState /*result*/) {
   const uint32_t bit = 1u << checker_index;
-
-  auto state_it = host_states_.find(host.get());
-  ASSERT(state_it != host_states_.end());
-  auto& state = state_it->second;
+  auto& state = getOrCreateHostState(*host);
 
   ASSERT(checker_index < state.checker_flags_.size(), "Flags must already be initialized");
   uint32_t checker_flags_ = state.checker_flags_[checker_index];
