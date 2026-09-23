@@ -38,11 +38,10 @@ bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
     return false;
   }
 
-  std::string key_str(key.ptr, key.length);
-  std::string value_str(value.ptr, value.length);
-
   call_context->callbacks->connection().streamInfo().filterState()->setData(
-      key_str, std::make_shared<Envoy::Router::StringAccessorImpl>(value_str),
+      absl::string_view(key.ptr, key.length),
+      std::make_shared<Envoy::Router::StringAccessorImpl>(
+          absl::string_view(value.ptr, value.length)),
       Envoy::StreamInfo::FilterState::LifeSpan::Connection);
   return true;
 }
@@ -177,8 +176,10 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
             Envoy::Ssl::ClientValidationStatus::NoClientCertificate, std::nullopt, error};
   }
 
-  // Encode certificates to DER.
-  std::vector<std::vector<uint8_t>> der_certs(num_certs);
+  // Encode certificates to DER. Each buffer is owned by der_owners for the duration of the module
+  // call, so it is passed to the module without a second copy.
+  std::vector<bssl::UniquePtr<uint8_t>> der_owners;
+  der_owners.reserve(num_certs);
   std::vector<envoy_dynamic_module_type_envoy_buffer> cert_buffers(num_certs);
   for (int i = 0; i < num_certs; i++) {
     X509* cert = sk_X509_value(&cert_chain, i);
@@ -191,9 +192,8 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
       return {ValidationResults::ValidationStatus::Failed,
               Envoy::Ssl::ClientValidationStatus::Failed, std::nullopt, error};
     }
-    der_certs[i].assign(der, der + der_len);
-    OPENSSL_free(der);
-    cert_buffers[i] = {reinterpret_cast<const char*>(der_certs[i].data()), der_certs[i].size()};
+    der_owners.emplace_back(der);
+    cert_buffers[i] = {reinterpret_cast<const char*>(der), static_cast<size_t>(der_len)};
   }
 
   envoy_dynamic_module_type_envoy_buffer host_name_buffer = {host_name.data(), host_name.size()};
