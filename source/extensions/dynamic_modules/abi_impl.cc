@@ -1417,6 +1417,10 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_access_logger_get_bytes_info,
                envoy_dynamic_module_type_access_logger_envoy_ptr,
                envoy_dynamic_module_type_bytes_info*)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes,
+               envoy_dynamic_module_type_access_logger_envoy_ptr,
+               envoy_dynamic_module_type_downstream_wire_bytes*)
+
 WEAK_STUB(uint64_t, envoy_dynamic_module_callback_access_logger_get_connection_id, 0,
           envoy_dynamic_module_type_access_logger_envoy_ptr)
 

@@ -20,7 +20,6 @@ envoy_proto_library(
 envoy_cc_library(
     name = "test_event_tracker_filter_lib",
     hdrs = ["filter.h"],
-    repository = "@envoy",
     deps = [
         "filter_cc_proto",
         "@envoy//source/common/common:assert_lib",
@@ -32,7 +31,6 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":test_event_tracker_filter_lib",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",

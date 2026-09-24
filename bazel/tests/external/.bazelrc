@@ -14,7 +14,7 @@ fetch --color=yes
 run --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/46a6e8eb4441355e25faad6a226681b241dcdc5c
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/060f772cd4675d6598b5a020d3f51ecdca64e584
 common --noincompatible_disallow_empty_glob
 
 build --workspace_status_command="bash get_workspace_status"

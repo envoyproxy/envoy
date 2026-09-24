@@ -12,7 +12,6 @@ envoy_extension_cc_test(
     name = "mobile_grpc_streamer_test",
     srcs = ["mobile_grpc_streamer_test.cc"],
     extension_names = ["envoy.stat_sinks.metrics_service.mobile"],
-    repository = "@envoy",
     deps = [
         "//library/common/extensions/stat_sinks/metrics_service:config",
         "//library/common/extensions/stat_sinks/metrics_service:service_cc_proto",
@@ -26,7 +25,6 @@ envoy_extension_cc_test(
     name = "mobile_grpc_streamer_integration_test",
     srcs = ["mobile_grpc_streamer_integration_test.cc"],
     extension_names = ["envoy.stat_sinks.metrics_service.mobile"],
-    repository = "@envoy",
     deps = [
         "//library/common/extensions/stat_sinks/metrics_service:config",
         "//library/common/extensions/stat_sinks/metrics_service:config_proto_cc_proto",

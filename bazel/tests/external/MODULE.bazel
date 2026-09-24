@@ -13,9 +13,9 @@ bazel_dep(name = "google_benchmark", version = "1.9.5", dev_dependency = True, r
 bazel_dep(name = "googletest", version = "1.18.0.bcr.1", dev_dependency = True)
 bazel_dep(name = "googleurl", version = "0.0.0-221103-dd4080f.envoy", dev_dependency = True)
 bazel_dep(name = "libsxg", version = "0.0.0-210708-beaa393.envoy", dev_dependency = True)
-bazel_dep(name = "quiche", version = "0.0.0-260831-5c9cc6b.envoy", dev_dependency = True)
+bazel_dep(name = "quiche", version = "0.0.0-260922-7f07dc4.envoy", dev_dependency = True)
 bazel_dep(name = "tclap", version = "1.2.5.bcr.1", dev_dependency = True)
-bazel_dep(name = "toolchains_llvm", version = "1.9.0.envoy", dev_dependency = True)
+bazel_dep(name = "toolchains_llvm", version = "1.9.1.envoy", dev_dependency = True)
 
 local_path_override(
     module_name = "envoy",
