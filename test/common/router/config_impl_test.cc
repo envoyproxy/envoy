@@ -13557,19 +13557,19 @@ virtual_hosts:
               testing::HasSubstr("route: unknown shadow cluster 'missing_shadow_cluster'"));
 }
 
-TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeLegacyInternalRedirect) {
+TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeInternalRedirectPolicy) {
   factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
       true);
 
   const std::string yaml = R"EOF(
 virtual_hosts:
-- name: legacy_redirect_vhost
+- name: redirect_vhost
   domains: ["redirect.example.com"]
   routes:
   - match: { prefix: "/" }
     route:
       cluster: "valid_cluster"
-      internal_redirect_action: HANDLE_INTERNAL_REDIRECT
+      internal_redirect_policy: {}
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"valid_cluster"}, {});
@@ -13580,7 +13580,7 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers = genHeaders("redirect.example.com", "/test", "GET");
   const auto route = config.route(headers, 0);
   ASSERT_NE(nullptr, route.route);
-  EXPECT_EQ("legacy_redirect_vhost", route->virtualHost().name());
+  EXPECT_EQ("redirect_vhost", route->virtualHost().name());
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostFastPathSafetyInvariant) {
