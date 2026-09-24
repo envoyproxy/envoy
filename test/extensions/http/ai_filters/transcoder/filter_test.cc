@@ -240,8 +240,8 @@ TEST_F(TranscoderFilterTest, FromIrRewritesCanonicalPayloadToTargetProtocol) {
 }
 
 // Full two-instance decode pipeline:
-// Client (Gemini) -> Transcoder(TO_IR) -> IrInspectingAiFilter -> Transcoder(FROM_IR) -> Backend
-// (Anthropic).
+// Client (Gemini) -> Transcoder(TO_IR) -> IrInspectingAiFilter ->
+// Transcoder(FROM_IR) -> Backend (Anthropic).
 TEST_F(TranscoderFilterTest, TwoInstanceDecodeChainTranscodesToIrAppliesAiFilterAndFromIr) {
   TranscoderFilter::setTargetProtocol(LLMProtocol::AnthropicMessages);
   request_headers_ = Http::TestRequestHeaderMapImpl{
@@ -281,11 +281,13 @@ TEST_F(TranscoderFilterTest, TwoInstanceDecodeChainTranscodesToIrAppliesAiFilter
   EXPECT_EQ(counterValue("transcoded"), 2);
 }
 
-// The response path is not transcoded yet -- see the note above `TranscoderFilter`. Both
-// transcoder instances splice themselves out of the encode pipeline, so a realistic Gemini
-// response reaches the client byte-for-byte rather than being mangled by the request rules or
-// rejected by the request schema (which would tear the stream down mid-response).
-TEST_F(TranscoderFilterTest, EncodeUnaryForwardsResponseUntouchedWhileResponseRulesAreMissing) {
+// Bidirectional unary response transcoding:
+// FilterManager runs the response chain in reverse order (`N-1 .. 0`).
+// With `[to_ir_filter, mid_filter, from_ir_filter]`, the response from the Gemini backend
+// (`targetProtocol() == GeminiGenerateContent`) first hits `from_ir_filter` (converting
+// Gemini -> OpenAI IR), then passes through `mid_filter`, and finally hits `to_ir_filter`
+// (converting OpenAI IR -> Anthropic Messages for the client).
+TEST_F(TranscoderFilterTest, EncodeUnaryTranscodesGeminiResponseToIrAndFromIrToAnthropic) {
   TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
   request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/messages"}};
 
@@ -307,10 +309,10 @@ TEST_F(TranscoderFilterTest, EncodeUnaryForwardsResponseUntouchedWhileResponseRu
     resp_done = true;
   });
 
-  // A real Gemini response shape: `candidates`, not the `contents` the request schema requires.
   const std::string response =
       R"({"candidates":[{"content":{"role":"model","parts":[{"text":"Hello back!"}]},)"
-      R"("finishReason":"STOP"}],"usageMetadata":{"totalTokenCount":42}})";
+      R"("finishReason":"STOP"}],"modelVersion":"gemini-2.5-pro",)"
+      R"("usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":30,"totalTokenCount":42}})";
   Buffer::OwnedImpl body(response);
   manager.onResponseData(body, /*end_stream=*/true);
   for (int i = 0; i < 20; ++i) {
@@ -318,24 +320,36 @@ TEST_F(TranscoderFilterTest, EncodeUnaryForwardsResponseUntouchedWhileResponseRu
   }
 
   ASSERT_TRUE(resp_done);
-  // The stream must survive: transcoding it with the request rules would fail the request schema
-  // ("missing required field: contents") and tear the response down.
   ASSERT_TRUE(resp_status.ok()) << resp_status;
   EXPECT_GT(mid_filter->seen_unary_batches_, 0);
-  EXPECT_EQ(nlohmann::json::parse(resp_bridge.injected_.toString()),
-            nlohmann::json::parse(response));
-  // Only the two decode legs count; the encode legs do no work.
-  EXPECT_EQ(counterValue("transcoded"), 0);
+
+  const nlohmann::json out = nlohmann::json::parse(resp_bridge.injected_.toString());
+  EXPECT_EQ(out["type"], "message");
+  EXPECT_EQ(out["role"], "assistant");
+  EXPECT_EQ(out["model"], "gemini-2.5-pro");
+  EXPECT_EQ(out["stop_reason"], "end_turn");
+  ASSERT_EQ(out["content"].size(), 1);
+  EXPECT_EQ(out["content"][0]["type"], "text");
+  EXPECT_EQ(out["content"][0]["text"], "Hello back!");
+  EXPECT_EQ(out["usage"]["input_tokens"], 12);
+  EXPECT_EQ(out["usage"]["output_tokens"], 30);
+  EXPECT_EQ(counterValue("transcoded"), 2);
   EXPECT_EQ(counterValue("failed"), 0);
   resp_out_buffer.onDestroy();
 }
 
-// Same contract for streaming: SSE frames pass through untouched until response rules land.
-TEST_F(TranscoderFilterTest, EncodeSseForwardsFramesUntouchedWhileResponseRulesAreMissing) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
-  request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/messages"}};
+// Bidirectional streaming SSE response transcoding:
+// With `[to_ir_filter, mid_filter, from_ir_filter]`, Anthropic SSE frames from the backend
+// (`targetProtocol() == AnthropicMessages`) first hit `from_ir_filter` (`FROM_IR` at backend
+// boundary, converting Anthropic -> OpenAI `chat.completion.chunk` IR frames), pass through
+// `mid_filter`, and finally hit `to_ir_filter` (`TO_IR` at client boundary, converting OpenAI IR
+// -> Gemini SSE frames for `source_protocol_ == GeminiGenerateContent`, dropping `[DONE]`).
+TEST_F(TranscoderFilterTest, EncodeSseTranscodesAnthropicSseToIrAndFromIrToGemini) {
+  TranscoderFilter::setTargetProtocol(LLMProtocol::AnthropicMessages);
+  request_headers_ = Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/v1beta/models/gemini-2.5-pro:streamGenerateContent"}};
 
-  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::AnthropicMessages};
+  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::GeminiGenerateContent};
   auto to_ir_filter =
       std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::TO_IR), context);
   auto mid_filter = std::make_shared<IrInspectingAiFilter>();
@@ -354,7 +368,14 @@ TEST_F(TranscoderFilterTest, EncodeSseForwardsFramesUntouchedWhileResponseRulesA
   });
 
   Buffer::OwnedImpl sse_data(
-      R"(data: {"candidates":[{"content":{"role":"model","parts":[{"text":"chunk"}]}}]})"
+      "event: message_start\n"
+      R"(data: {"type":"message_start","message":{"id":"msg_1","model":"claude-sonnet-4-5"}})"
+      "\n\n"
+      "event: content_block_delta\n"
+      R"(data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"chunk"}})"
+      "\n\n"
+      "event: message_stop\n"
+      R"(data: {"type":"message_stop"})"
       "\n\n");
   manager.onResponseData(sse_data, /*end_stream=*/true);
   for (int i = 0; i < 20; ++i) {
@@ -363,9 +384,10 @@ TEST_F(TranscoderFilterTest, EncodeSseForwardsFramesUntouchedWhileResponseRulesA
 
   ASSERT_TRUE(resp_done);
   ASSERT_TRUE(resp_status.ok()) << resp_status;
+  EXPECT_EQ(mid_filter->observed_encode_ir_["object"], "chat.completion.chunk");
   EXPECT_THAT(resp_bridge.injected_.toString(), testing::HasSubstr("\"candidates\""));
   EXPECT_THAT(resp_bridge.injected_.toString(), testing::HasSubstr("chunk"));
-  EXPECT_EQ(counterValue("transcoded"), 0);
+  EXPECT_THAT(resp_bridge.injected_.toString(), testing::Not(testing::HasSubstr("[DONE]")));
   EXPECT_EQ(counterValue("failed"), 0);
   resp_out_buffer.onDestroy();
 }

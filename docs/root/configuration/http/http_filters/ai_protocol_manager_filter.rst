@@ -247,10 +247,11 @@ one per pair, and AI filters placed between the two legs only ever see the canon
           "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
           direction: FROM_IR
 
-Two instances of the filter bracket the intermediate AI filters: the ``TO_IR`` instance
-converts the client's declared request protocol into the canonical OpenAI Chat Completions
-IR, and the ``FROM_IR`` instance converts that canonical payload into the target backend's
-schema. Filters configured between the two therefore only ever see the canonical form.
+Two instances of the filter bracket the intermediate AI filters across both the request and
+response (unary and SSE streaming) pipelines: the ``TO_IR`` instance at the client boundary
+converts between the client's declared protocol and the canonical OpenAI Chat Completions IR, and
+the ``FROM_IR`` instance at the backend boundary converts between the canonical IR and the target
+backend's schema. Filters configured between the two therefore only ever see the canonical form.
 
 The rewritten payload is validated against the target's schema before it is
 replayed, so a document the upstream would reject fails locally rather than over the

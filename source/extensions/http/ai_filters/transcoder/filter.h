@@ -53,104 +53,76 @@ private:
 };
 using TranscoderFilterConfigSharedPtr = std::shared_ptr<const TranscoderFilterConfig>;
 
-// Bidirectional AI filter that translates payloads between vendor schemas and the canonical IR
-// (OpenAI Chat Completions) via the declarative transcoding engine.
+// Bidirectional AI filter that translates request and response payloads between vendor schemas
+// and the canonical IR (OpenAI Chat Completions).
 //
-// Two instances of this filter bracket the intermediate AI filters in the chain, so those filters
-// only ever see the canonical IR regardless of what the client speaks or what the backend expects:
+// Two instances of this filter bracket the intermediate AI filters in the chain:
 //
-//   client -> transcoder(TO_IR) -> ...ai filters... -> transcoder(FROM_IR) -> backend
+//   Client <-> Transcoder(TO_IR) <-> ...IR filters... <-> Transcoder(FROM_IR) <-> Backend
 //
-// `FilterManager` runs the chain forward on the request path and in reverse on the response path,
-// so a single `direction` value describes both legs of an instance:
-//
+// `FilterManager` runs the chain forward on the request path (`TO_IR` -> `FROM_IR`) and in reverse
+// on the response path (`FROM_IR` -> `TO_IR`), so a single `direction` value describes both legs
+// of an instance:
 //   - `TO_IR` (client boundary):
-//       * decode():  client `source_protocol` -> IR   (`to_ir`)
-//       * encode*():  IR -> client `source_protocol`  (`from_ir`)   [not yet implemented]
+//       * decode():  client `source_protocol` -> IR
+//       * encode*(): IR -> client `source_protocol`
 //   - `FROM_IR` (backend boundary):
-//       * decode():  IR -> backend `target_protocol`  (`from_ir`)
-//       * encode*():  backend `target_protocol` -> IR (`to_ir`)     [not yet implemented]
-//
-// ---------------------------------------------------------------------------------------------
-// Response path -- deliberately NOT implemented yet. Read before adding `encodeSSE()` /
-// `encodeUnary()` overrides here.
-//
-// The shape above is symmetric, and wiring the two encode coroutines to `transcodeToIr()` /
-// `transcodeFromIr()` compiles and even passes naive tests. It is nonetheless wrong today,
-// for two reasons that both live in the engine rather than in this filter:
-//
-//  1. `DialectTranscodePack` carries only REQUEST rule sets. Its `to_ir` / `from_ir` rules encode
-//     request-shaped mappings (Gemini `contents` <-> OpenAI `messages`, Anthropic `max_tokens`
-//     <-> `max_completion_tokens`). A response needs an entirely different mapping (Gemini
-//     `candidates` <-> OpenAI `choices`, Anthropic `content` blocks <-> `choices[].message`).
-//     Running the request rules over a response document silently produces garbage.
-//
-//  2. `TranscodingEngine::transcodeFromIr()` finishes by calling
-//     `dialect_schema->validateRequest()`. Handed a response document that validator fails by
-//     construction -- a Gemini response has no `contents`, so it is rejected with
-//     "missing required field: contents".
-//
-// Failing there is worse than not translating: the encode coroutines signal failure by returning
-// a non-OK status, which `ResponseFilterManager` treats as "the response is no longer
-// trustworthy" and tears the stream down -- after earlier frames have already been serialized and
-// flushed to the client. The client would see a truncated, half-translated stream.
-//
-// So both coroutines are intentionally left unimplemented. The base class defaults return
-// `absl::OkStatus()` immediately, which splices this filter out of the response pipeline and lets
-// frames and field batches flow past it untouched. An untranslated response reaching a client
-// that asked for another dialect is a visible, diagnosable bug; a corrupted or truncated one is
-// not.
-//
-// TODO(ginama): implement the response legs once the engine grows response support. That needs:
-//   (a) `response_to_ir` / `response_from_ir` rule sets on `DialectTranscodePack`, verified at
-//       registration time the same way the request rule sets already are;
-//   (b) `PayloadSchema::validateResponse()`, so the converted document is checked against the
-//       response schema instead of the request schema;
-//   (c) a decision on the failure contract -- this filter should almost certainly forward a frame
-//       untranslated (counting `transcoder.failed`) rather than tear down a stream whose earlier
-//       frames the client already holds;
-//   (d) a streaming-friendly `encodeUnary()`. Reassembling the whole `FlattenJsonField` stream
-//       into one DOM before transcoding would undo the bound that the flattening codec and the
-//       external buffer exist to enforce, so either transcode incrementally or cap the buffered
-//       document explicitly.
-// ---------------------------------------------------------------------------------------------
+//       * decode():  IR -> backend `target_protocol`
+//       * encode*(): backend `target_protocol` -> IR
 class TranscoderFilter : public HttpFilters::AiProtocolManager::AiFilter,
                          public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
   TranscoderFilter(TranscoderFilterConfigSharedPtr config,
                    const HttpFilters::AiProtocolManager::AiFilterContext& context);
 
-  // Target backend protocol used by the `FROM_IR` leg.
-  //
-  // TODO(ginama): this is a placeholder, not the intended end state. Process-global mutable state
-  // is shared by every listener, route and worker in the process, so a proxy fronting more than
-  // one backend vendor cannot work -- the last writer wins for everyone. It also sits outside
-  // Envoy's configuration model, where config is immutable after load and scoped to a config
-  // object. Replace it with per-route/per-cluster configuration (resolved from the cluster the
-  // route selected) once the routing story is settled.
+  // Target backend protocol override used in unit tests; when Unspecified, falls back to the
+  // per-route response protocol (`AiProtocolManagerPerRoute.response.llm_protocol`).
   static void setTargetProtocol(HttpFilters::AiProtocolManager::LLMProtocol protocol);
   static HttpFilters::AiProtocolManager::LLMProtocol targetProtocol();
 
   // HttpFilters::AiProtocolManager::AiFilter
-  //
-  // `encodeSSE()` and `encodeUnary()` are deliberately not overridden; see the note above.
   Coroutine::Task<absl::Status>
   decode(HttpFilters::AiProtocolManager::AiRequestReceiver receive_request,
          HttpFilters::AiProtocolManager::AiRequestPropagator propagate_request,
          HttpFilters::AiProtocolManager::LocalReplier reply_locally) override;
 
+  Coroutine::Task<absl::Status>
+  encodeSSE(HttpFilters::AiProtocolManager::SseStreamReceiver receive_sse,
+            HttpFilters::AiProtocolManager::SseStreamPropagator propagate_sse) override;
+
+  Coroutine::Task<absl::Status> encodeUnary(
+      HttpFilters::AiProtocolManager::AiResponseStreamReceiver receive_response,
+      HttpFilters::AiProtocolManager::AiResponseStreamPropagator propagate_response) override;
+
 private:
+  HttpFilters::AiProtocolManager::LLMProtocol effectiveTargetProtocol() const;
+
   absl::Status transcodeRequest(nlohmann::json& json);
   absl::Status transcodeToIr(nlohmann::json& json);
   absl::Status transcodeFromIr(nlohmann::json& json);
+
+  absl::Status transcodeResponse(nlohmann::json& json);
+  absl::Status transcodeResponseToIr(nlohmann::json& json);
+  absl::Status transcodeResponseFromIr(nlohmann::json& json);
+
+  absl::Status transcodeSseEvent(HttpFilters::AiProtocolManager::SseEvent& event,
+                                 bool& should_drop);
+  absl::Status transcodeSseEventToIr(HttpFilters::AiProtocolManager::SseEvent& event,
+                                     bool& should_drop);
+  absl::Status transcodeSseEventFromIr(HttpFilters::AiProtocolManager::SseEvent& event,
+                                       bool& should_drop);
 
   static std::atomic<HttpFilters::AiProtocolManager::LLMProtocol> target_protocol_;
 
   TranscoderFilterConfigSharedPtr config_;
   const HttpFilters::AiProtocolManager::LLMProtocol source_protocol_;
+  const HttpFilters::AiProtocolManager::LLMProtocol route_target_protocol_;
   // Copied rather than referenced: `AiFilterContext`'s referents belong to the stream and must
   // not be read after the request is propagated.
   const std::string request_path_;
+  std::string sse_stream_id_{"chatcmpl-transcoded"};
+  std::string sse_stream_model_;
+  bool sse_done_emitted_{false};
 };
 
 } // namespace Transcoder

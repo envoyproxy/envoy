@@ -133,6 +133,8 @@ struct AiFilterContext {
   const Http::RequestHeaderMap& request_headers;
   // Route-declared request wire API; Unspecified when the route named none.
   LLMProtocol request_protocol;
+  // Route-declared response/backend wire API; Unspecified when the route named none.
+  LLMProtocol response_protocol = LLMProtocol::Unspecified;
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.

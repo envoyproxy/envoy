@@ -76,11 +76,9 @@ TEST(TranscoderConfigTest, RejectsUnsetDirection) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
 
-  const auto empty_proto = factory.createEmptyConfigProto();
-  ASSERT_NE(empty_proto, nullptr);
+  TranscoderProto proto;
 
-  const auto factory_cb =
-      factory.createAiFilterFactory(*empty_proto, context, *stats_store.rootScope());
+  const auto factory_cb = factory.createAiFilterFactory(proto, context, *stats_store.rootScope());
   EXPECT_FALSE(factory_cb.ok());
   EXPECT_THAT(std::string(factory_cb.status().message()),
               testing::HasSubstr("`direction` must be set"));
