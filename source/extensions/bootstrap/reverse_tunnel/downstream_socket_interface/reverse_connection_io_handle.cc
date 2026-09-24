@@ -1197,8 +1197,7 @@ void ReverseConnectionIOHandle::createTriggerPipe() {
 #endif
   const auto socket_pair_result = os_sys_calls.socketpair(domain, SOCK_STREAM, 0, pipe_fds);
   if (socket_pair_result.return_value_ != 0) {
-    ENVOY_LOG(error, "Failed to create trigger pipe: {}",
-              errorDetails(socket_pair_result.errno_));
+    ENVOY_LOG(error, "Failed to create trigger pipe: {}", errorDetails(socket_pair_result.errno_));
     SET_SOCKET_INVALID(trigger_pipe_read_fd_);
     SET_SOCKET_INVALID(trigger_pipe_write_fd_);
     return;
