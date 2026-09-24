@@ -165,6 +165,20 @@ TEST_F(DynamicModuleRouteSpecifierTest, DuplicateTemplateId) {
   EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr("duplicate route template id 'canary'")));
 }
 
+// A repeated route override list can carry the same override_id twice, which is rejected at
+// configuration load just like a duplicate template id.
+TEST_F(DynamicModuleRouteSpecifierTest, DuplicateRouteOverrideId) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      route_overrides:
+      - override_id: slow
+        retry_policy: {retry_on: "5xx", num_retries: 3}
+      - override_id: slow
+        hedge_policy: {hedge_on_per_try_timeout: true}
+)EOF"));
+  EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr("duplicate route override id 'slow'")));
+}
+
 TEST_F(DynamicModuleRouteSpecifierTest, TemplateWithRouteSpecifiers) {
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
@@ -195,67 +209,65 @@ TEST_F(DynamicModuleRouteSpecifierTest, InvalidTemplate) {
   EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr("route template 'canary'")));
 }
 
-TEST_F(DynamicModuleRouteSpecifierTest, EmptyRouteActionOverride) {
+TEST_F(DynamicModuleRouteSpecifierTest, EmptyRouteOverride) {
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
-      route_action_overrides:
-        canary: {}
+      route_overrides:
+      - override_id: canary
 )EOF"));
   EXPECT_THAT(config.status(),
-              HasStatusMessage(HasSubstr(
-                  "Route action override must replace at least one route action property")));
+              HasStatusMessage(HasSubstr("Route override must replace at least one property")));
 }
 
 TEST_F(DynamicModuleRouteSpecifierTest, MetadataMatchWithoutLbEntry) {
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
-      route_action_overrides:
-        canary:
-          metadata_match:
-            filter_metadata:
-              envoy.other: {key: value}
+      route_overrides:
+      - override_id: canary
+        metadata_match:
+          filter_metadata:
+            envoy.other: {key: value}
 )EOF"));
   EXPECT_THAT(config.status(),
-              HasStatusMessage(HasSubstr(
-                  "Route action override must replace at least one route action property")));
+              HasStatusMessage(HasSubstr("Route override must replace at least one property")));
 }
 
-// A route action override that only replaces the hedge policy is valid, so a module can add hedging
+// A route override that only replaces the hedge policy is valid, so a module can add hedging
 // to the route it produces.
-TEST_F(DynamicModuleRouteSpecifierTest, HedgePolicyRouteActionOverride) {
+TEST_F(DynamicModuleRouteSpecifierTest, HedgePolicyRouteOverride) {
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
-      route_action_overrides:
-        hedged:
-          hedge_policy:
-            hedge_on_per_try_timeout: true
+      route_overrides:
+      - override_id: hedged
+        hedge_policy:
+          hedge_on_per_try_timeout: true
 )EOF"));
   EXPECT_TRUE(config.ok());
 }
 
-// A route action override that only replaces the rate limits is valid, so a module can rate limit
+// A route override that only replaces the rate limits is valid, so a module can rate limit
 // the route it produces.
-TEST_F(DynamicModuleRouteSpecifierTest, RateLimitPolicyRouteActionOverride) {
+TEST_F(DynamicModuleRouteSpecifierTest, RateLimitPolicyRouteOverride) {
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
-      route_action_overrides:
-        rated:
-          rate_limits:
-          - actions: [{destination_cluster: {}}]
+      route_overrides:
+      - override_id: rated
+        rate_limits:
+        - actions: [{destination_cluster: {}}]
 )EOF"));
   EXPECT_TRUE(config.ok());
 }
 
-// A route action override that only replaces the CORS policy is valid, so a module can set CORS on
+// A route override that only replaces the CORS policy is valid, so a module can set CORS on
 // the route it produces.
-TEST_F(DynamicModuleRouteSpecifierTest, CorsPolicyRouteActionOverride) {
+TEST_F(DynamicModuleRouteSpecifierTest, CorsPolicyRouteOverride) {
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
-      route_action_overrides:
-        corsed:
-          cors:
-            allow_origin_string_match: [{exact: "example.com"}]
-            allow_methods: "GET"
+      route_overrides:
+      - override_id: corsed
+        cors:
+          allow_origin_string_match: [{exact: "example.com"}]
+          allow_methods: "GET"
 )EOF"));
   EXPECT_TRUE(config.ok());
 }
@@ -264,12 +276,12 @@ TEST_F(DynamicModuleRouteSpecifierTest, CorsPolicyRouteActionOverride) {
 TEST_F(DynamicModuleRouteSpecifierTest, CorsPolicyInvalidOriginMatcher) {
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
-      route_action_overrides:
-        corsed:
-          cors:
-            allow_origin_string_match: [{safe_regex: {regex: "("}}]
+      route_overrides:
+      - override_id: corsed
+        cors:
+          allow_origin_string_match: [{safe_regex: {regex: "("}}]
 )EOF"));
-  EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr("route action override 'corsed'")));
+  EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr("route override 'corsed'")));
 }
 
 // A rate limit whose descriptor value cannot be built is rejected at configuration load.
@@ -280,12 +292,12 @@ TEST_F(DynamicModuleRouteSpecifierTest, RateLimitPolicyInvalidDescriptor) {
         "true"}});
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
-      route_action_overrides:
-        rated:
-          rate_limits:
-          - actions: [{generic_key: {descriptor_value: "%"}}]
+      route_overrides:
+      - override_id: rated
+        rate_limits:
+        - actions: [{generic_key: {descriptor_value: "%"}}]
 )EOF"));
-  EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr("route action override 'rated'")));
+  EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr("route override 'rated'")));
 }
 
 TEST_F(DynamicModuleRouteSpecifierTest, ValidConfigWithTemplatesAndOverrides) {
@@ -300,9 +312,9 @@ TEST_F(DynamicModuleRouteSpecifierTest, ValidConfigWithTemplatesAndOverrides) {
         route:
           match: {prefix: "/"}
           redirect: {host_redirect: "example.com"}
-      route_action_overrides:
-        slow:
-          retry_policy: {retry_on: "5xx", num_retries: 3}
+      route_overrides:
+      - override_id: slow
+        retry_policy: {retry_on: "5xx", num_retries: 3}
       allowed_cluster_names:
       - exact: canary_cluster
       allowed_metadata_namespaces:
@@ -411,16 +423,16 @@ TEST_F(DynamicModuleRouteSpecifierTest, ConfigDestroyRunsOnTeardown) {
   EXPECT_EQ(before + 1, destroy_count.value()());
 }
 
-// A shadow policy of a route action override that names a cluster the cluster manager does not know
+// A shadow policy of a route override that names a cluster the cluster manager does not know
 // is rejected when clusters are validated, since a statically named cluster can be checked at load.
 TEST_F(DynamicModuleRouteSpecifierTest, ValidateClustersRejectsUnknownShadowCluster) {
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
       validate_clusters: true
-      route_action_overrides:
-        mirrored:
-          request_mirror_policies:
-          - cluster: unknown_cluster
+      route_overrides:
+      - override_id: mirrored
+        request_mirror_policies:
+        - cluster: unknown_cluster
 )EOF"));
   EXPECT_THAT(config.status(),
               HasStatusMessage(HasSubstr("unknown shadow cluster 'unknown_cluster'")));

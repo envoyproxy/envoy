@@ -72,16 +72,19 @@ message RouteTemplate {
   config.route.v3.Route route = 2 [(validate.rules).message = {required: true}];
 }
 
-// Route action properties the module may select by name for a request.
+// Route properties the module may select for a request.
 //
 // These properties are built from other extensions, so they are declared here and built once at
 // configuration load rather than constructed on the request path. An entry that replaces no
 // property is rejected. A property an entry leaves unset keeps the value of the route the decision
 // produced, so an entry can never remove a property that route configures.
-// [#next-free-field: 8]
-message RouteActionOverride {
+// [#next-free-field: 9]
+message RouteOverride {
+  // The identifier the module selects this override with. Must be unique within the specifier.
+  string override_id = 1 [(validate.rules).string = {min_len: 1}];
+
   // Retry policy replacing the retry policy of the produced route.
-  config.route.v3.RetryPolicy retry_policy = 1;
+  config.route.v3.RetryPolicy retry_policy = 2;
 
   // Metadata match criteria replacing those of the produced route, used by subset load balancing.
   // Only the ``envoy.lb`` entry of :ref:`filter_metadata
@@ -89,26 +92,26 @@ message RouteActionOverride {
   // :ref:`RouteAction.metadata_match
   // <envoy_v3_api_field_config.route.v3.RouteAction.metadata_match>`. An entry whose only property
   // is a ``metadata_match`` without an ``envoy.lb`` entry replaces nothing and is rejected.
-  config.core.v3.Metadata metadata_match = 2;
+  config.core.v3.Metadata metadata_match = 3;
 
   // Request mirroring policies replacing those of the produced route. Statically named mirror
   // clusters are checked against the cluster manager when ``validate_clusters`` is enabled.
-  repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 3;
+  repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 4;
 
   // Hash policy replacing the hash policy of the produced route, used when the upstream cluster
   // employs a hashing load balancer. A cluster level and a load balancer level hash policy, when
   // configured, take precedence over this route level policy.
-  repeated config.route.v3.RouteAction.HashPolicy hash_policy = 4;
+  repeated config.route.v3.RouteAction.HashPolicy hash_policy = 5;
 
   // Hedge policy replacing the hedge policy of the produced route.
-  config.route.v3.HedgePolicy hedge_policy = 5;
+  config.route.v3.HedgePolicy hedge_policy = 6;
 
   // Rate limits replacing the rate limits of the produced route.
-  repeated config.route.v3.RateLimit rate_limits = 6;
+  repeated config.route.v3.RateLimit rate_limits = 7;
 
   // CORS policy replacing the CORS policy of the produced route. The CORS filter reads it only when
   // CORS is not configured through per filter configuration.
-  config.route.v3.CorsPolicy cors = 7;
+  config.route.v3.CorsPolicy cors = 8;
 }
 
 // Shadow mode configuration.
@@ -264,10 +267,9 @@ message DynamicModuleRouteSpecifier {
   // route with a route built from configuration. The ``template_id`` values must be unique.
   repeated RouteTemplate route_templates = 5;
 
-  // Named route action overrides the module may select with ``set_route_action_override``, each
-  // overlaying its action properties onto the produced route.
-  map<string, RouteActionOverride> route_action_overrides = 6
-      [(validate.rules).map = {keys {string {min_len: 1}}}];
+  // The route overrides the module may select by ``override_id``, each overlaying its properties
+  // onto the produced route. The ``override_id`` values must be unique.
+  repeated RouteOverride route_overrides = 6;
 
   // If specified, the specifier runs in shadow mode and never changes the routing of a request.
   ShadowMode shadow_mode = 7;
@@ -289,7 +291,7 @@ message DynamicModuleRouteSpecifier {
   // ``shadow_mode`` is set, where the route the specifier was given is always used.
   FailurePolicy failure_policy = 9 [(validate.rules).enum = {defined_only: true}];
 
-  // Whether the clusters the route templates and the route action overrides name are checked
+  // Whether the clusters the route templates and the route overrides name are checked
   // against the cluster manager while the specifier is configured. If not specified, defaults to
   // ``false``, because the clusters a route names may be delivered after the route configuration
   // that references them. An unknown cluster then fails the request with the

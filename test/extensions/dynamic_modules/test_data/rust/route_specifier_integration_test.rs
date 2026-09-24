@@ -17,7 +17,7 @@
 //!   `x-buffer-limit`   the request body buffer limit to set, in bytes.
 //!   `x-priority`       `high` or `default`, the upstream resource priority to set.
 //!   `x-not-found-code` the status code to reply with when the selected cluster does not exist.
-//!   `x-override`       the name of the route action override to select.
+//!   `x-override`       the override_id of the route override to select.
 //!   `x-set-path`       the path of the request sent upstream.
 //!   `x-set-host`       the authority of the request sent upstream.
 //!   `x-append-action`  `append`, `add-if-absent`, `overwrite` or `overwrite-if-exists`, how an
@@ -424,8 +424,8 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
       // The declaration getter is queried, then the override is applied. Applying validates the name
       // too, so a name that is not declared exercises the rejection path. Tests pass both kinds.
       let name = buffer_to_string(name);
-      let _ = self.envoy_config.has_route_action_override(&name);
-      let _ = ctx.set_route_action_override(&name);
+      let _ = self.envoy_config.has_route_override(&name);
+      let _ = ctx.set_route_override(&name);
     }
 
     if let Some(path) = ctx.get_request_header("x-set-path") {

@@ -835,14 +835,14 @@ impl RouteSpecifierContext {
     }
   }
 
-  /// Select a named route action override declared in the route specifier configuration.
+  /// Select a route override declared in the route specifier configuration by override_id.
   ///
-  /// Returns `false` when the name is not declared.
-  pub fn set_route_action_override(&mut self, name: &str) -> bool {
+  /// Returns `false` when the override_id is not declared.
+  pub fn set_route_override(&mut self, override_id: &str) -> bool {
     unsafe {
-      abi::envoy_dynamic_module_callback_route_specifier_set_route_action_override(
+      abi::envoy_dynamic_module_callback_route_specifier_set_route_override(
         self.envoy_ptr,
-        crate::str_to_module_buffer(name),
+        crate::str_to_module_buffer(override_id),
       )
     }
   }
@@ -1063,8 +1063,8 @@ pub trait EnvoyRouteSpecifierConfig: Send + Sync {
   /// identifier is not declared.
   fn template_kind(&self, template_id: &str) -> RouteKind;
 
-  /// Whether a route action override with the given name is declared.
-  fn has_route_action_override(&self, name: &str) -> bool;
+  /// Whether a route override with the given override_id is declared.
+  fn has_route_override(&self, override_id: &str) -> bool;
 
   /// Whether the route specifier runs in shadow mode.
   fn is_shadow_mode(&self) -> bool;
@@ -1245,11 +1245,11 @@ impl EnvoyRouteSpecifierConfig for EnvoyRouteSpecifierConfigImpl {
     })
   }
 
-  fn has_route_action_override(&self, name: &str) -> bool {
+  fn has_route_override(&self, override_id: &str) -> bool {
     unsafe {
-      abi::envoy_dynamic_module_callback_route_specifier_config_has_route_action_override(
+      abi::envoy_dynamic_module_callback_route_specifier_config_has_route_override(
         self.raw,
-        crate::str_to_module_buffer(name),
+        crate::str_to_module_buffer(override_id),
       )
     }
   }

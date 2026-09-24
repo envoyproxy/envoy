@@ -1941,8 +1941,8 @@ WEAK_STUB(envoy_dynamic_module_type_route_specifier_route_kind,
           envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
-WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_config_has_route_action_override,
-          false, envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_config_has_route_override, false,
+          envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
 WEAK_STUB(envoy_dynamic_module_type_metrics_result,
@@ -2112,7 +2112,7 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_priority,
 WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_request_body_buffer_limit,
                envoy_dynamic_module_type_route_specifier_context_envoy_ptr, uint64_t)
 
-WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_action_override, false,
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_override, false,
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 

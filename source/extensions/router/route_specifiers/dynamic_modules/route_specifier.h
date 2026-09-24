@@ -77,11 +77,12 @@ struct RouteSpecifierStats {
 };
 
 /**
- * Route action properties built from a single route_action_overrides entry. These properties are
+ * Route properties built from a single route_overrides entry. These properties are
  * built from extensions and are read by the router through references that must outlive the
- * request, so they are built once at configuration time and selected by name on the request path.
+ * request, so they are built once at configuration time and selected by override_id on the request
+ * path.
  */
-struct RouteActionOverride {
+struct RouteOverride {
   Envoy::Router::RetryPolicyConstSharedPtr retry_policy;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria;
   std::vector<Envoy::Router::ShadowPolicyPtr> shadow_policies;
@@ -91,7 +92,7 @@ struct RouteActionOverride {
   std::unique_ptr<const Envoy::Router::CorsPolicy> cors_policy;
 };
 
-using RouteActionOverrideMap = absl::flat_hash_map<std::string, RouteActionOverride>;
+using RouteOverrideMap = absl::flat_hash_map<std::string, RouteOverride>;
 
 // A header mutation a module recorded for a request.
 struct HeaderMutation {
@@ -114,7 +115,7 @@ struct RouteOverrides {
   std::optional<Http::Code> cluster_not_found_response_code;
   // Points into the override map of the configuration, which is immutable after construction. Null
   // when the module selected none.
-  const RouteActionOverride* route_action_override{nullptr};
+  const RouteOverride* route_override{nullptr};
   // Metadata the module layered onto the route, keyed by namespace. Empty when the module set none.
   envoy::config::core::v3::Metadata route_metadata;
   absl::flat_hash_map<std::string, bool> filter_disabled;
@@ -146,7 +147,7 @@ struct RuntimeFraction {
 
 /**
  * Configuration for a dynamic module route specifier. This resolves and holds the symbols used to
- * resolve routes along with the in-module configuration, the route templates and the route action
+ * resolve routes along with the in-module configuration, the route templates and the route
  * overrides the module may select. It is shared by every route the specifier produces so that the
  * module and its configuration outlive all in-flight requests.
  *
@@ -180,11 +181,11 @@ public:
   const Template* routeTemplate(absl::string_view id) const;
 
   /**
-   * @param name the key of the entry in the route_action_overrides map.
+   * @param override_id the identifier of the entry in route_overrides.
    * @return the matching override, or nullptr when there is none. The returned pointer is valid for
    * the lifetime of this configuration.
    */
-  const RouteActionOverride* routeActionOverride(absl::string_view name) const;
+  const RouteOverride* routeOverride(absl::string_view override_id) const;
 
   /**
    * Registers a route template from a serialized Route, building it with the route builder of the
@@ -246,12 +247,12 @@ private:
   const std::string specifier_name_;
   const std::string specifier_config_;
   // Immutable after configuration load, so that the pointers routeTemplate() and
-  // routeActionOverride() hand out stay valid. A module may add templates during config creation
+  // routeOverride() hand out stay valid. A module may add templates during config creation
   // with registerRouteTemplate(). template_ids_ is a deque so that a template id buffer handed to
   // the module keeps its address when a later registration grows the container.
   absl::flat_hash_map<std::string, Template> templates_;
   std::deque<std::string> template_ids_;
-  RouteActionOverrideMap route_action_overrides_;
+  RouteOverrideMap route_overrides_;
   // Valid only while the in-module configuration is being created, so that the module can register
   // route templates Envoy builds with the route builder of the configuration.
   Envoy::Router::RouteBuilder* config_new_route_builder_{nullptr};
@@ -280,7 +281,7 @@ using DynamicModuleRouteSpecifierConfigSharedPtr =
  * @param dynamic_module the dynamic module to use.
  * @param context the factory context used to build the route templates.
  * @return a shared pointer to the new config object or an error if symbol resolution, route
- * template construction, route action override construction or in-module initialization failed.
+ * template construction, route override construction or in-module initialization failed.
  */
 absl::StatusOr<DynamicModuleRouteSpecifierConfigSharedPtr>
 newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& proto_config,

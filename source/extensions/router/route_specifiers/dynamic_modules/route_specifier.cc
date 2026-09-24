@@ -30,8 +30,8 @@ namespace {
 using Failure = envoy_dynamic_module_type_route_specifier_failure;
 using ModuleDecision = envoy_dynamic_module_type_route_specifier_decision;
 using RouteKind = envoy_dynamic_module_type_route_specifier_route_kind;
-using RouteActionOverrideProto =
-    envoy::extensions::router::route_specifiers::dynamic_modules::v3::RouteActionOverride;
+using RouteOverrideProto =
+    envoy::extensions::router::route_specifiers::dynamic_modules::v3::RouteOverride;
 
 // The names of the compared properties, indexed by CompareField, used for the mismatch counters.
 // The empty first entry keeps the index and the enum value aligned.
@@ -74,10 +74,10 @@ static_assert(
             CompareField_ARRAYSIZE, // NOLINT(readability-static-accessed-through-instance)
     "the compared properties must match the ones of the configuration");
 
-absl::StatusOr<RouteActionOverride>
-buildRouteActionOverride(const RouteActionOverrideProto& proto_override,
-                         Server::Configuration::ServerFactoryContext& context) {
-  RouteActionOverride entry;
+absl::StatusOr<RouteOverride>
+buildRouteOverride(const RouteOverrideProto& proto_override,
+                   Server::Configuration::ServerFactoryContext& context) {
+  RouteOverride entry;
   if (proto_override.has_retry_policy()) {
     auto policy_or_error = Envoy::Router::RetryPolicyImpl::create(
         proto_override.retry_policy(), context.messageValidationVisitor(), context);
@@ -128,13 +128,12 @@ buildRouteActionOverride(const RouteActionOverrideProto& proto_override,
   }
   // Validate what was built rather than what was configured. A metadata_match without an envoy.lb
   // entry contributes nothing, so a populated looking configuration can still build an override
-  // that replaces no property, which set_route_action_override would then accept as a decision.
+  // that replaces no property, which set_route_override would then accept as a decision.
   if (entry.retry_policy == nullptr && entry.metadata_match_criteria == nullptr &&
       entry.shadow_policies.empty() && entry.hash_policy == nullptr &&
       entry.hedge_policy == nullptr && entry.rate_limit_policy == nullptr &&
       entry.cors_policy == nullptr) {
-    return absl::InvalidArgumentError(
-        "Route action override must replace at least one route action property");
+    return absl::InvalidArgumentError("Route override must replace at least one property");
   }
   return entry;
 }
@@ -273,7 +272,7 @@ bool RouteOverrides::hasRouteEntryOverrides() const {
   return !cluster_name.empty() || timeout.has_value() || idle_timeout.has_value() ||
          max_stream_duration.has_value() || request_body_buffer_limit.has_value() ||
          priority.has_value() || cluster_not_found_response_code.has_value() ||
-         route_action_override != nullptr || path.has_value() || host.has_value() ||
+         route_override != nullptr || path.has_value() || host.has_value() ||
          !request_headers_to_add.empty() || !request_headers_to_remove.empty() ||
          !response_headers_to_add.empty() || !response_headers_to_remove.empty();
 }
@@ -335,10 +334,10 @@ DynamicModuleRouteSpecifierConfig::routeTemplate(absl::string_view id) const {
   return it != templates_.end() ? &it->second : nullptr;
 }
 
-const RouteActionOverride*
-DynamicModuleRouteSpecifierConfig::routeActionOverride(absl::string_view name) const {
-  const auto it = route_action_overrides_.find(name);
-  return it != route_action_overrides_.end() ? &it->second : nullptr;
+const RouteOverride*
+DynamicModuleRouteSpecifierConfig::routeOverride(absl::string_view override_id) const {
+  const auto it = route_overrides_.find(override_id);
+  return it != route_overrides_.end() ? &it->second : nullptr;
 }
 
 bool DynamicModuleRouteSpecifierConfig::registerRouteTemplate(absl::string_view id,
@@ -478,12 +477,17 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
     config->template_ids_.push_back(id);
   }
 
-  config->route_action_overrides_.reserve(proto_config.route_action_overrides().size());
-  for (const auto& [name, proto_override] : proto_config.route_action_overrides()) {
-    auto entry_or_error = buildRouteActionOverride(proto_override, context.serverFactoryContext());
+  config->route_overrides_.reserve(proto_config.route_overrides().size());
+  for (const auto& proto_override : proto_config.route_overrides()) {
+    const std::string& override_id = proto_override.override_id();
+    if (config->route_overrides_.contains(override_id)) {
+      return absl::InvalidArgumentError(
+          fmt::format("duplicate route override id '{}'", override_id));
+    }
+    auto entry_or_error = buildRouteOverride(proto_override, context.serverFactoryContext());
     if (!entry_or_error.ok()) {
       return absl::InvalidArgumentError(
-          fmt::format("route action override '{}': {}", name, entry_or_error.status().message()));
+          fmt::format("route override '{}': {}", override_id, entry_or_error.status().message()));
     }
     if (validate_clusters) {
       for (const auto& shadow_policy : entry_or_error.value().shadow_policies) {
@@ -492,12 +496,12 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
         if (!shadow_policy->cluster().empty() &&
             !context.serverFactoryContext().clusterManager().hasCluster(shadow_policy->cluster())) {
           return absl::InvalidArgumentError(
-              fmt::format("route action override '{}': unknown shadow cluster '{}'", name,
+              fmt::format("route override '{}': unknown shadow cluster '{}'", override_id,
                           shadow_policy->cluster()));
         }
       }
     }
-    config->route_action_overrides_.emplace(name, std::move(entry_or_error.value()));
+    config->route_overrides_.emplace(override_id, std::move(entry_or_error.value()));
   }
 
   envoy_dynamic_module_type_envoy_buffer name_buf = {.ptr = config->specifier_name_.data(),
@@ -605,46 +609,46 @@ Http::Code DynamicModuleRouteEntry::clusterNotFoundResponseCode() const {
 }
 
 const Envoy::Router::RetryPolicyConstSharedPtr& DynamicModuleRouteEntry::retryPolicy() const {
-  const RouteActionOverride* entry = overrides_.route_action_override;
+  const RouteOverride* entry = overrides_.route_override;
   return entry != nullptr && entry->retry_policy != nullptr ? entry->retry_policy
                                                             : DelegatingRouteEntry::retryPolicy();
 }
 
 const Envoy::Router::MetadataMatchCriteria* DynamicModuleRouteEntry::metadataMatchCriteria() const {
-  const RouteActionOverride* entry = overrides_.route_action_override;
+  const RouteOverride* entry = overrides_.route_override;
   return entry != nullptr && entry->metadata_match_criteria != nullptr
              ? entry->metadata_match_criteria.get()
              : DelegatingRouteEntry::metadataMatchCriteria();
 }
 
 const std::vector<Envoy::Router::ShadowPolicyPtr>& DynamicModuleRouteEntry::shadowPolicies() const {
-  const RouteActionOverride* entry = overrides_.route_action_override;
+  const RouteOverride* entry = overrides_.route_override;
   return entry != nullptr && !entry->shadow_policies.empty()
              ? entry->shadow_policies
              : DelegatingRouteEntry::shadowPolicies();
 }
 
 const Http::HashPolicy* DynamicModuleRouteEntry::hashPolicy() const {
-  const RouteActionOverride* entry = overrides_.route_action_override;
+  const RouteOverride* entry = overrides_.route_override;
   return entry != nullptr && entry->hash_policy != nullptr ? entry->hash_policy.get()
                                                            : DelegatingRouteEntry::hashPolicy();
 }
 
 const Envoy::Router::HedgePolicy& DynamicModuleRouteEntry::hedgePolicy() const {
-  const RouteActionOverride* entry = overrides_.route_action_override;
+  const RouteOverride* entry = overrides_.route_override;
   return entry != nullptr && entry->hedge_policy != nullptr ? *entry->hedge_policy
                                                             : DelegatingRouteEntry::hedgePolicy();
 }
 
 const Envoy::Router::RateLimitPolicy& DynamicModuleRouteEntry::rateLimitPolicy() const {
-  const RouteActionOverride* entry = overrides_.route_action_override;
+  const RouteOverride* entry = overrides_.route_override;
   return entry != nullptr && entry->rate_limit_policy != nullptr
              ? *entry->rate_limit_policy
              : DelegatingRouteEntry::rateLimitPolicy();
 }
 
 const Envoy::Router::CorsPolicy* DynamicModuleRouteEntry::corsPolicy() const {
-  const RouteActionOverride* entry = overrides_.route_action_override;
+  const RouteOverride* entry = overrides_.route_override;
   return entry != nullptr && entry->cors_policy != nullptr ? entry->cors_policy.get()
                                                            : DelegatingRouteEntry::corsPolicy();
 }

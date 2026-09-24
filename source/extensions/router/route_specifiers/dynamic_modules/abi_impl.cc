@@ -209,10 +209,11 @@ envoy_dynamic_module_callback_route_specifier_config_get_template_kind(
                                    : envoy_dynamic_module_type_route_specifier_route_kind_None;
 }
 
-bool envoy_dynamic_module_callback_route_specifier_config_has_route_action_override(
+bool envoy_dynamic_module_callback_route_specifier_config_has_route_override(
     envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer name) {
-  return routeSpecifierConfig(config_envoy_ptr)->routeActionOverride(toStringView(name)) != nullptr;
+    envoy_dynamic_module_type_module_buffer override_id) {
+  return routeSpecifierConfig(config_envoy_ptr)->routeOverride(toStringView(override_id)) !=
+         nullptr;
 }
 
 bool envoy_dynamic_module_callback_route_specifier_config_is_shadow_mode(
@@ -818,20 +819,18 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_respons
   return true;
 }
 
-bool envoy_dynamic_module_callback_route_specifier_set_route_action_override(
+bool envoy_dynamic_module_callback_route_specifier_set_route_override(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer name) {
+    envoy_dynamic_module_type_module_buffer override_id) {
   auto* context = routeSpecifierContext(context_envoy_ptr);
-  const auto* entry = context->config.routeActionOverride(toStringView(name));
+  const auto* entry = context->config.routeOverride(toStringView(override_id));
   if (entry == nullptr) {
-    ENVOY_LOG_MISC(debug,
-                   "dynamic module route specifier selected unknown route action override "
-                   "'{}'",
-                   toStringView(name));
+    ENVOY_LOG_MISC(debug, "dynamic module route specifier selected unknown route override '{}'",
+                   toStringView(override_id));
     return false;
   }
   if (context->setters_enabled) {
-    context->overrides.route_action_override = entry;
+    context->overrides.route_override = entry;
   }
   return true;
 }

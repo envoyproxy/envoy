@@ -61,15 +61,15 @@ unchanged. This is how a module is validated against the route table it replaces
 traffic. A specifier in shadow mode never changes the routing of a request, so ``failure_policy``
 is not required.
 
-Route action overrides
-----------------------
+Route overrides
+---------------
 
 The properties that are built from other extensions, such as the retry policy and the request
-mirroring policies, are declared as named
-:ref:`route_action_overrides <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.route_action_overrides>`.
+mirroring policies, are declared as
+:ref:`route_overrides <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.route_overrides>`.
 Each override is built and validated once when the specifier is configured, and the module selects
-one by name. An override that replaces no property is rejected, so a module can rely on a declared
-name changing something.
+one by ``override_id``. An override that replaces no property is rejected, so a module can rely on a
+declared override changing something.
 
 Notes
 -----

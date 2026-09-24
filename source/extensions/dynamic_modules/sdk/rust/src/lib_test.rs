@@ -10963,7 +10963,7 @@ struct StubRouteDecision {
   request_body_buffer_limit: Option<u64>,
   priority: Option<abi::envoy_dynamic_module_type_resource_priority>,
   cluster_not_found_response_code: Option<u32>,
-  route_action_override: Option<String>,
+  route_override: Option<String>,
   route_metadata_string: Option<(String, String, String)>,
   route_metadata_number: Option<(String, String, f64)>,
   route_metadata_bool: Option<(String, String, bool)>,
@@ -10996,7 +10996,7 @@ static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
     request_body_buffer_limit: None,
     priority: None,
     cluster_not_found_response_code: None,
-    route_action_override: None,
+    route_override: None,
     route_metadata_string: None,
     route_metadata_number: None,
     route_metadata_bool: None,
@@ -11057,7 +11057,7 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_get_templ
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_has_route_action_override(
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_has_route_override(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_module_buffer,
 ) -> bool {
@@ -11589,7 +11589,7 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_cluster_not_
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_action_override(
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_override(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
   name: abi::envoy_dynamic_module_type_module_buffer,
 ) -> bool {
@@ -11597,7 +11597,7 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_action
   if name != STUB_SPECIFIER_OVERRIDE_NAME {
     return false;
   }
-  STUB_ROUTE_DECISION.lock().unwrap().route_action_override = Some(name);
+  STUB_ROUTE_DECISION.lock().unwrap().route_override = Some(name);
   true
 }
 
@@ -12239,8 +12239,8 @@ fn test_route_specifier_context_records_decision() {
   ctx.set_priority(route_specifier::ResourcePriority::High);
   assert!(ctx.set_cluster_not_found_response_code(404));
   assert!(!ctx.set_cluster_not_found_response_code(99));
-  assert!(ctx.set_route_action_override(STUB_SPECIFIER_OVERRIDE_NAME));
-  assert!(!ctx.set_route_action_override("unknown"));
+  assert!(ctx.set_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
+  assert!(!ctx.set_route_override("unknown"));
   assert!(ctx.set_route_metadata_string("ns", "key", "value"));
   assert!(ctx.set_route_metadata_number("ns", "num", 1.5));
   assert!(ctx.set_route_metadata_bool("ns", "flag", true));
@@ -12297,7 +12297,7 @@ fn test_route_specifier_context_records_decision() {
   assert_eq!(Some(404), decision.cluster_not_found_response_code);
   assert_eq!(
     Some(STUB_SPECIFIER_OVERRIDE_NAME.to_string()),
-    decision.route_action_override
+    decision.route_override
   );
   assert_eq!(
     Some(("ns".to_string(), "key".to_string(), "value".to_string())),
@@ -12387,8 +12387,8 @@ fn test_envoy_route_specifier_config_impl() {
     route_specifier::RouteKind::None,
     config.template_kind("unknown")
   );
-  assert!(config.has_route_action_override(STUB_SPECIFIER_OVERRIDE_NAME));
-  assert!(!config.has_route_action_override("unknown"));
+  assert!(config.has_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
+  assert!(!config.has_route_override("unknown"));
   assert!(config.is_shadow_mode());
   assert!(config.register_route_template("built", &[1, 2, 3]));
   assert!(!config.register_route_template("", &[1, 2, 3]));

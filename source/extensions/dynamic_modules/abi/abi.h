@@ -16268,7 +16268,7 @@ typedef enum envoy_dynamic_module_type_route_specifier_compare_field {
  * return a pointer to the in-module route specifier configuration. The
  * envoy_dynamic_module_callback_route_specifier_config_define_* callbacks that define metrics may
  * only be called from inside this hook. The callbacks that read the declared templates, route
- * action overrides and shadow mode may be called from here or from the request path.
+ * overrides and shadow mode may be called from here or from the request path.
  *
  * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig object for the
  * corresponding config.
@@ -16394,18 +16394,18 @@ envoy_dynamic_module_callback_route_specifier_config_get_template_kind(
     envoy_dynamic_module_type_module_buffer template_id);
 
 /**
- * envoy_dynamic_module_callback_route_specifier_config_has_route_action_override is called by the
- * module to check whether a route action override is declared. This may be called from the config
+ * envoy_dynamic_module_callback_route_specifier_config_has_route_override is called by the
+ * module to check whether a route override is declared. This may be called from the config
  * hook or from the request path.
  *
  * @param config_envoy_ptr is the pointer to the route specifier configuration.
- * @param name is the name of the entry in the route_action_overrides map. The buffer is owned by
+ * @param override_id is the identifier of the entry in route_overrides. The buffer is owned by
  * the module.
- * @return true if the name is declared, false otherwise.
+ * @return true if the override_id is declared, false otherwise.
  */
-bool envoy_dynamic_module_callback_route_specifier_config_has_route_action_override(
+bool envoy_dynamic_module_callback_route_specifier_config_has_route_override(
     envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer name);
+    envoy_dynamic_module_type_module_buffer override_id);
 
 /**
  * envoy_dynamic_module_callback_route_specifier_config_is_shadow_mode is called by the module to
@@ -16829,7 +16829,7 @@ bool envoy_dynamic_module_callback_route_specifier_get_cluster_host_count(
  * A property the kind of the route does not carry is zero. The route entry properties are zero for
  * a route that answers the request directly, and response_code is zero for a route entry. A boolean
  * flag reports whether a route action property is configured, and the full value is read through
- * the route templates and route action overrides rather than on the request path. The buffers point
+ * the route templates and route overrides rather than on the request path. The buffers point
  * at storage Envoy owns which is valid for the duration of the event hook.
  */
 typedef struct envoy_dynamic_module_type_route_specifier_input_route {
@@ -17138,19 +17138,19 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_respons
     uint32_t status_code);
 
 /**
- * envoy_dynamic_module_callback_route_specifier_set_route_action_override selects a named route
- * action override declared in the route specifier configuration. It replaces the retry policy, the
- * metadata match criteria, the request mirroring policies, the hash policy and the hedge policy of
- * the route with the ones the override builds, for the properties that it sets.
+ * envoy_dynamic_module_callback_route_specifier_set_route_override selects a route override
+ * declared in the route specifier configuration by override_id. It replaces the retry policy,
+ * metadata match criteria, request mirroring policies, hash policy, hedge policy, rate limits and
+ * CORS policy of the route with the ones the override builds, for the properties that it sets.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
- * @param name is the name of the entry in the route_action_overrides map. The buffer is owned by
+ * @param override_id is the identifier of the entry in route_overrides. The buffer is owned by
  * the module.
- * @return true if the name is declared, false otherwise.
+ * @return true if the override_id is declared, false otherwise.
  */
-bool envoy_dynamic_module_callback_route_specifier_set_route_action_override(
+bool envoy_dynamic_module_callback_route_specifier_set_route_override(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer name);
+    envoy_dynamic_module_type_module_buffer override_id);
 
 /**
  * envoy_dynamic_module_callback_route_specifier_set_route_metadata_string records the string value

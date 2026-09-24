@@ -125,60 +125,60 @@ route_templates:
         disabled: true
     route:
       cluster: canary
-route_action_overrides:
-  slow:
-    retry_policy:
-      retry_on: 5xx
-      num_retries: 3
-  mirrored:
-    request_mirror_policies:
-    - cluster: canary
-  hashed:
-    hash_policy:
-    - header: {header_name: x-hash}
-  matched:
-    metadata_match:
-      filter_metadata:
-        envoy.lb:
-          version: canary
-  hedged_action:
-    hedge_policy:
-      hedge_on_per_try_timeout: true
-  rated:
-    rate_limits:
-    - actions: [{generic_key: {descriptor_value: rated}}]
-      limit: {rate_limit: {requests_per_unit: 5, unit: MINUTE}}
-  corsed:
-    cors:
-      allow_origin_string_match: [{exact: "example.com"}]
-      allow_methods: GET
-      allow_credentials: true
-      allow_private_network_access: false
-  complex_match:
-    hash_policy:
-    - cookie: {name: shadow-cookie, ttl: 5s, attributes: [{name: SameSite, value: Strict}]}
-    metadata_match:
-      filter_metadata:
-        envoy.lb: {version: complex}
-    request_mirror_policies:
-    - cluster: canary
-  complex_diff:
-    hash_policy:
-    - cookie: {name: other-cookie, ttl: 5s, attributes: [{name: SameSite, value: Strict}]}
-    metadata_match:
-      filter_metadata:
-        envoy.lb: {version: other}
-    request_mirror_policies:
-    - cluster: cluster_0
-  complex_meta_size:
-    metadata_match:
-      filter_metadata:
-        envoy.lb: {version: complex, region: us}
-  complex_mirror_headers:
-    request_mirror_policies:
-    - cluster: canary
-      request_headers_mutations:
-      - append: {header: {key: x-mirror, value: v}}
+route_overrides:
+- override_id: slow
+  retry_policy:
+    retry_on: 5xx
+    num_retries: 3
+- override_id: mirrored
+  request_mirror_policies:
+  - cluster: canary
+- override_id: hashed
+  hash_policy:
+  - header: {header_name: x-hash}
+- override_id: matched
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        version: canary
+- override_id: hedged_action
+  hedge_policy:
+    hedge_on_per_try_timeout: true
+- override_id: rated
+  rate_limits:
+  - actions: [{generic_key: {descriptor_value: rated}}]
+    limit: {rate_limit: {requests_per_unit: 5, unit: MINUTE}}
+- override_id: corsed
+  cors:
+    allow_origin_string_match: [{exact: "example.com"}]
+    allow_methods: GET
+    allow_credentials: true
+    allow_private_network_access: false
+- override_id: complex_match
+  hash_policy:
+  - cookie: {name: shadow-cookie, ttl: 5s, attributes: [{name: SameSite, value: Strict}]}
+  metadata_match:
+    filter_metadata:
+      envoy.lb: {version: complex}
+  request_mirror_policies:
+  - cluster: canary
+- override_id: complex_diff
+  hash_policy:
+  - cookie: {name: other-cookie, ttl: 5s, attributes: [{name: SameSite, value: Strict}]}
+  metadata_match:
+    filter_metadata:
+      envoy.lb: {version: other}
+  request_mirror_policies:
+  - cluster: cluster_0
+- override_id: complex_meta_size
+  metadata_match:
+    filter_metadata:
+      envoy.lb: {version: complex, region: us}
+- override_id: complex_mirror_headers
+  request_mirror_policies:
+  - cluster: canary
+    request_headers_mutations:
+    - append: {header: {key: x-mirror, value: v}}
 )EOF" + extra_specifier_yaml;
           DynamicModuleRouteSpecifierProto specifier_config;
           TestUtility::loadFromYaml(specifier_yaml, specifier_config);
@@ -535,7 +535,7 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverridesTimeout) {
   EXPECT_EQ("3000", upstream_headers->get_("x-envoy-expected-rq-timeout-ms"));
 }
 
-// A route action override that replaces the hedge policy differs from the route it was given, which
+// A route override that replaces the hedge policy differs from the route it was given, which
 // shadow mode reports on the hedge_policy counter.
 TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverridesHedgePolicy) {
   setupTest(R"EOF(
