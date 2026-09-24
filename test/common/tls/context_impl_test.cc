@@ -1987,7 +1987,7 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
 #ifdef NDEBUG
   Stats::CounterOptConstRef stat = store_.findCounterByString("ssl.ciphers.fallback");
   ASSERT_TRUE(stat.has_value());
-  EXPECT_EQ(1, stat->get().value());
+  EXPECT_EQ(1, stat->value());
 #endif
 }
 
