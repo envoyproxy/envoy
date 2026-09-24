@@ -13771,6 +13771,848 @@ virtual_hosts:
   EXPECT_EQ(empty_init_object->createVirtualHost(), nullptr);
 }
 
+TEST_F(RouteMatcherTest, DeferredVirtualHostRequiresProbeValidationExhaustiveBranches) {
+  factory_context_.cluster_manager_.initializeClusters({"cluster_1"}, {});
+  Init::ManagerImpl local_init_manager{"local_init"};
+  auto route_config = parseRouteConfigurationFromYaml(R"EOF(
+virtual_hosts:
+- name: base_vhost
+  domains: ["example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_1" }
+)EOF");
+  auto global_route_config_or_error =
+      CommonConfigImpl::create(route_config, factory_context_,
+                               ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
+  EXPECT_OK(global_route_config_or_error.status());
+  auto global_route_config = global_route_config_or_error.value();
+
+  const auto base_vhost = route_config.virtual_hosts(0);
+  EXPECT_FALSE(requiresProbeValidation(base_vhost, global_route_config, true, factory_context_));
+
+  // 1. Virtual host matchers
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_matcher();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+
+  // 2. Virtual host top-level features
+  {
+    auto vhost = base_vhost;
+    vhost.add_virtual_clusters()->set_name("vc");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.add_rate_limits();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_cors();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    (*vhost.mutable_typed_per_filter_config())["filter"].set_type_url(
+        "type.googleapis.com/google.protobuf.Struct");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.add_request_mirror_policies()->set_cluster("cluster_1");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_retry_policy();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_retry_policy_typed_config();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_hedge_policy();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_metadata();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.add_request_headers_to_add();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.add_request_headers_to_remove("x-remove");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.add_response_headers_to_add();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.add_response_headers_to_remove("x-remove");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.set_require_tls(
+        static_cast<envoy::config::route::v3::VirtualHost_TlsRequirementType>(-1));
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+
+  // 3. Global shadow cluster validation
+  {
+    auto route_config_with_shadow = parseRouteConfigurationFromYaml(R"EOF(
+virtual_hosts:
+- name: base_vhost
+  domains: ["example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_1" }
+request_mirror_policies:
+- cluster: unknown_cluster
+)EOF");
+    auto shadow_global_cfg_or_error =
+        CommonConfigImpl::create(route_config_with_shadow, factory_context_,
+                                 ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
+    EXPECT_OK(shadow_global_cfg_or_error.status());
+    EXPECT_TRUE(requiresProbeValidation(base_vhost, shadow_global_cfg_or_error.value(),
+                                        /*validate_clusters=*/true, factory_context_));
+    EXPECT_FALSE(requiresProbeValidation(base_vhost, shadow_global_cfg_or_error.value(),
+                                         /*validate_clusters=*/false, factory_context_));
+  }
+
+  // 4. Route action case: redirects, direct response, filter action
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_redirect()->set_host_redirect("other.com");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_direct_response()->set_status(200);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->clear_action();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+
+  // 5. Route-level headers, metadata, decorator, tracing
+  {
+    auto vhost = base_vhost;
+    (*vhost.mutable_routes(0)->mutable_typed_per_filter_config())["f"].set_type_url(
+        "type.googleapis.com/google.protobuf.Struct");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->add_request_headers_to_add();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->add_request_headers_to_remove("x-foo");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->add_response_headers_to_add();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->add_response_headers_to_remove("x-foo");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_metadata();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_decorator()->set_operation("op");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_tracing();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+
+  // 6. Path specifier cases
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->set_path("/exact");
+    EXPECT_FALSE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->set_path_separated_prefix("/path_sep");
+    EXPECT_FALSE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->mutable_safe_regex()->set_regex(".*");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->mutable_connect_matcher();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->mutable_path_match_policy();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->clear_path_specifier();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+
+  // 7. Route match parameters
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->add_headers()->set_name("hdr");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->add_query_parameters()->set_name("param");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->add_dynamic_metadata()->set_filter("fltr");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->mutable_grpc();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->mutable_tls_context();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->add_cookies();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->add_filter_state();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_match()->mutable_runtime_fraction();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+
+  // 8. Cluster specifiers and validation
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->clear_cluster();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_weighted_clusters()->add_clusters()->set_name(
+        "cluster_1");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_cluster_specifier_plugin("plugin");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_inline_cluster_specifier_plugin();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_cluster_header("x-cluster");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_cluster("unknown_cluster");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, /*validate_clusters=*/true,
+                                        factory_context_));
+    EXPECT_FALSE(requiresProbeValidation(vhost, global_route_config, /*validate_clusters=*/false,
+                                         factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
+        static_cast<envoy::config::route::v3::RouteAction_ClusterNotFoundResponseCode>(-1));
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_priority(
+        static_cast<envoy::config::core::v3::RoutingPriority>(-1));
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_internal_redirect_action(
+        envoy::config::route::v3::RouteAction::HANDLE_INTERNAL_REDIRECT);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+
+  // 9. Duration validations
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_timeout()->set_seconds(-1);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_idle_timeout()->set_seconds(-1);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_flush_timeout()->set_seconds(-1);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_max_grpc_timeout()->set_seconds(-1);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_grpc_timeout_offset()->set_seconds(-1);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)
+        ->mutable_route()
+        ->mutable_max_stream_duration()
+        ->mutable_max_stream_duration()
+        ->set_seconds(-1);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)
+        ->mutable_route()
+        ->mutable_max_stream_duration()
+        ->mutable_grpc_timeout_header_max()
+        ->set_seconds(-1);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)
+        ->mutable_route()
+        ->mutable_max_stream_duration()
+        ->mutable_grpc_timeout_header_offset()
+        ->set_seconds(-1);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+
+  // 10. Route rewrites, policies, and options
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_retry_policy();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_retry_policy_typed_config();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_hedge_policy();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_metadata_match();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_prefix_rewrite("/new_prefix");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_path_rewrite("/new_path");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_regex_rewrite();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_path_rewrite_policy();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_host_rewrite_literal("foo.com");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_auto_host_rewrite()->set_value(true);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_host_rewrite_header("x-host");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_host_rewrite_path_regex();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_host_rewrite("foo.com");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->set_append_x_forwarded_host(true);
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->add_request_mirror_policies()->set_cluster(
+        "cluster_1");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->add_rate_limits();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->add_hash_policy()->mutable_header()->set_header_name(
+        "h");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_cors();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->add_upgrade_configs()->set_upgrade_type("websocket");
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+  {
+    auto vhost = base_vhost;
+    vhost.mutable_routes(0)->mutable_route()->mutable_early_data_policy();
+    EXPECT_TRUE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
+  }
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostCreationFailureAndDomainEntryEviction) {
+  factory_context_.cluster_manager_.initializeClusters({"cluster_1"}, {});
+  Init::ManagerImpl local_init_manager{"local_init"};
+
+  // 1. On-demand creation failure with invalid safe_regex and invalid route specifier
+  auto route_config = parseRouteConfigurationFromYaml(R"EOF(
+virtual_hosts:
+- name: invalid_regex_vhost
+  domains: ["invalid.regex.com"]
+  routes:
+  - match:
+      safe_regex:
+        regex: "[a-z"
+    route:
+      cluster: cluster_1
+)EOF");
+  auto global_route_config_or_error =
+      CommonConfigImpl::create(route_config, factory_context_,
+                               ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
+  EXPECT_OK(global_route_config_or_error.status());
+  auto global_route_config = global_route_config_or_error.value();
+  auto vhost_scope = factory_context_.scope().scopeFromStatName(
+      factory_context_.routerContext().virtualClusterStatNames().vhost_);
+
+  auto init_object_with_bad_regex = std::make_shared<VirtualHostInitializationObject>(
+      route_config.virtual_hosts(0), global_route_config, factory_context_, vhost_scope,
+      ProtobufMessage::getStrictValidationVisitor(), local_init_manager, false);
+
+  EXPECT_THROW_WITH_REGEX(init_object_with_bad_regex->createVirtualHost(), EnvoyException,
+                          "missing \\]");
+
+  envoy::config::route::v3::VirtualHost bad_spec_vhost;
+  bad_spec_vhost.set_name("bad_spec_vhost");
+  bad_spec_vhost.add_domains("bad.spec.com");
+  auto* bad_r = bad_spec_vhost.add_routes();
+  bad_r->mutable_route()->set_cluster("cluster_1");
+
+  auto init_object_with_bad_spec = std::make_shared<VirtualHostInitializationObject>(
+      bad_spec_vhost, global_route_config, factory_context_, vhost_scope,
+      ProtobufMessage::getStrictValidationVisitor(), local_init_manager, false);
+
+  EXPECT_EQ(init_object_with_bad_spec->createVirtualHost(), nullptr);
+
+  DomainEntry bad_domain_entry(init_object_with_bad_spec);
+  EXPECT_EQ(bad_domain_entry.getOrCreateVirtualHost(factory_context_.timeSource()), nullptr);
+
+  // 2. Null safety in DomainEntry
+  DomainEntry null_domain_entry(VirtualHostInitObjectConstSharedPtr{nullptr});
+  EXPECT_EQ(null_domain_entry.getOrCreateVirtualHost(factory_context_.timeSource()), nullptr);
+  EXPECT_EQ(null_domain_entry.activeVirtualHost(), nullptr);
+  EXPECT_FALSE(null_domain_entry.evictIfIdle(1000, 500));
+
+  // 3. DomainEntry eviction edge cases
+  auto valid_route_config = parseRouteConfigurationFromYaml(R"EOF(
+virtual_hosts:
+- name: valid_vhost
+  domains: ["valid.example.com"]
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: cluster_1
+)EOF");
+  auto valid_global_route_config_or_error =
+      CommonConfigImpl::create(valid_route_config, factory_context_,
+                               ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
+  EXPECT_OK(valid_global_route_config_or_error.status());
+  auto valid_global_route_config = valid_global_route_config_or_error.value();
+
+  // (a) Eager entry
+  absl::Status vhost_creation_status = absl::OkStatus();
+  auto eager_vhost = std::make_shared<VirtualHostImpl>(
+      valid_route_config.virtual_hosts(0), valid_global_route_config, factory_context_,
+      *vhost_scope, ProtobufMessage::getStrictValidationVisitor(), local_init_manager, false,
+      vhost_creation_status);
+  EXPECT_OK(vhost_creation_status);
+  DomainEntry eager_entry(eager_vhost);
+  EXPECT_NE(eager_entry.activeVirtualHost(), nullptr);
+  EXPECT_EQ(eager_entry.initObject(), nullptr);
+  EXPECT_FALSE(eager_entry.evictIfIdle(10000, 100));
+
+  // (b) Dormant deferred entry
+  auto valid_init_object = std::make_shared<VirtualHostInitializationObject>(
+      valid_route_config.virtual_hosts(0), valid_global_route_config, factory_context_, vhost_scope,
+      ProtobufMessage::getStrictValidationVisitor(), local_init_manager, false);
+  DomainEntry deferred_entry(valid_init_object);
+  EXPECT_EQ(deferred_entry.activeVirtualHost(), nullptr);
+  EXPECT_FALSE(deferred_entry.evictIfIdle(10000, 100));
+
+  // (c) Inflate deferred entry at t = 1000ms
+  test_time_.setMonotonicTime(std::chrono::milliseconds(1000));
+  const auto* active_vhost = deferred_entry.getOrCreateVirtualHost(factory_context_.timeSource());
+  ASSERT_NE(active_vhost, nullptr);
+  EXPECT_EQ(deferred_entry.activeVirtualHost(), active_vhost);
+
+  // Access again at t = 1500ms
+  test_time_.setMonotonicTime(std::chrono::milliseconds(1500));
+  EXPECT_EQ(deferred_entry.getOrCreateVirtualHost(factory_context_.timeSource()), active_vhost);
+
+  // (d) Inflated unexpired entry: t = 1800ms, ttl = 500ms (elapsed 300ms < 500ms)
+  EXPECT_FALSE(deferred_entry.evictIfIdle(1800, 500));
+  EXPECT_EQ(deferred_entry.activeVirtualHost(), active_vhost);
+
+  // (e) Clock monotonic rollback / skew: t = 1200ms (< last_access = 1500ms)
+  EXPECT_FALSE(deferred_entry.evictIfIdle(1200, 500));
+  EXPECT_EQ(deferred_entry.activeVirtualHost(), active_vhost);
+
+  // (f) Expired entry: t = 2100ms, ttl = 500ms (elapsed 600ms >= 500ms) -> evicted!
+  EXPECT_TRUE(deferred_entry.evictIfIdle(2100, 500));
+  EXPECT_EQ(deferred_entry.activeVirtualHost(), nullptr);
+
+  // (g) Re-eviction on dormant entry returns false
+  EXPECT_FALSE(deferred_entry.evictIfIdle(2100, 500));
+
+  // (h) Re-inflation after eviction
+  test_time_.setMonotonicTime(std::chrono::milliseconds(2500));
+  const auto* reloaded_vhost = deferred_entry.getOrCreateVirtualHost(factory_context_.timeSource());
+  ASSERT_NE(reloaded_vhost, nullptr);
+  EXPECT_EQ(deferred_entry.activeVirtualHost(), reloaded_vhost);
+}
+
+TEST_F(RouteMatcherTest, ConfigImplRouteMatcherAndPrefixWildcardCoverage) {
+  factory_context_.cluster_manager_.initializeClusters(
+      {"cluster_service", "cluster_admin", "cluster_exact", "cluster_default"}, {});
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: exact_vhost
+  domains: ["service.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_exact" }
+- name: prefix_wildcard_vhost_1
+  domains: ["service.*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_service" }
+- name: prefix_wildcard_vhost_2
+  domains: ["admin.*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_admin" }
+- name: default_vhost
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_default" }
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_OK(creation_status_);
+
+  // Exact match takes precedence over prefix wildcard
+  EXPECT_EQ(
+      "cluster_exact",
+      config.route(genHeaders("service.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+
+  // Prefix wildcard matching
+  EXPECT_EQ(
+      "cluster_service",
+      config.route(genHeaders("service.internal.org", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("cluster_service",
+            config.route(genHeaders("SERVICE.NET", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("cluster_admin",
+            config.route(genHeaders("admin.local", "/", "GET"), 0)->routeEntry()->clusterName());
+
+  // Fallback to default wildcard
+  EXPECT_EQ(
+      "cluster_default",
+      config.route(genHeaders("other.domain.com", "/", "GET"), 0)->routeEntry()->clusterName());
+
+  // Duplicate prefix wildcard domain error
+  const std::string duplicate_yaml = R"EOF(
+virtual_hosts:
+- name: vhost1
+  domains: ["service.*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_service" }
+- name: vhost2
+  domains: ["service.*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_service" }
+)EOF";
+  creation_status_ = absl::OkStatus();
+  TestConfigImpl dup_config(parseRouteConfigurationFromYaml(duplicate_yaml), factory_context_, true,
+                            creation_status_);
+  EXPECT_THAT(creation_status_.message(),
+              testing::HasSubstr("Duplicate entry of domain service.*"));
+  creation_status_ = absl::OkStatus();
+
+  // Path parameter stripping with matrix URIs
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.strip_path_parameters_per_segment", "false"}});
+
+    EXPECT_EQ(RouteMatchContext::stripPathParams("/foo/bar"), std::nullopt);
+    EXPECT_EQ(RouteMatchContext::stripPathParams("/foo;param=1/bar"), "/foo");
+  }
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.strip_path_parameters_per_segment", "true"}});
+
+    EXPECT_EQ(RouteMatchContext::stripPathParams("/foo;param=1/bar;param2=2"), "/foo/bar");
+  }
+
+  // Routing with ignore_path_parameters_in_path_matching
+  const std::string matrix_yaml = R"EOF(
+ignore_path_parameters_in_path_matching: true
+virtual_hosts:
+- name: vhost
+  domains: ["*"]
+  routes:
+  - match: { path: "/user" }
+    route: { cluster: "cluster_exact" }
+)EOF";
+  TestConfigImpl matrix_config(parseRouteConfigurationFromYaml(matrix_yaml), factory_context_, true,
+                               creation_status_);
+  EXPECT_OK(creation_status_);
+  EXPECT_TRUE(matrix_config.ignorePathParametersInPathMatching());
+  EXPECT_EQ("cluster_exact",
+            matrix_config.route(genHeaders("example.com", "/user;session=abc", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  // evictIdleVirtualHosts accessors and overloads
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
+  const std::string multi_vhost_yaml = R"EOF(
+virtual_hosts:
+- name: vhost1
+  domains: ["v1.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_exact" }
+- name: vhost2
+  domains: ["v2.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_exact" }
+- name: vhost3
+  domains: ["v3.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_exact" }
+)EOF";
+
+  Init::ManagerImpl local_init_manager{"local_init"};
+  auto multi_rc = parseRouteConfigurationFromYaml(multi_vhost_yaml);
+  auto multi_global_cfg_or_error =
+      CommonConfigImpl::create(multi_rc, factory_context_,
+                               ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
+  EXPECT_OK(multi_global_cfg_or_error.status());
+
+  auto matcher_or_error = RouteMatcher::create(
+      multi_rc, multi_global_cfg_or_error.value(), factory_context_,
+      ProtobufMessage::getStrictValidationVisitor(), local_init_manager, false);
+  EXPECT_OK(matcher_or_error.status());
+  auto matcher = std::move(matcher_or_error.value());
+
+  EXPECT_EQ(matcher->totalDomainEntries(), 3);
+
+  // Inflate vhost1 and vhost2
+  test_time_.setMonotonicTime(std::chrono::milliseconds(1000));
+  EXPECT_NE(matcher->findVirtualHost(genHeaders("v1.example.com", "/", "GET")), nullptr);
+  EXPECT_NE(matcher->findVirtualHost(genHeaders("v2.example.com", "/", "GET")), nullptr);
+
+  // max_entries == 0 returns 0
+  size_t cursor = 0;
+  EXPECT_EQ(matcher->evictIdleVirtualHosts(5000, 100, 0, cursor), 0);
+  EXPECT_EQ(cursor, 0);
+
+  // cursor >= total resets cursor to 0
+  cursor = 100;
+  size_t evicted = matcher->evictIdleVirtualHosts(5000, 100, 1, cursor);
+  EXPECT_EQ(evicted, 1);
+  EXPECT_EQ(cursor, 1);
+
+  // 2-arg overload
+  evicted = matcher->evictIdleVirtualHosts(5000, 100);
+  EXPECT_EQ(evicted, 1);
+}
+
+TEST_F(RouteMatcherTest, NullConfigImplAndActionFactoryHelpersCoverage) {
+  NullConfigImpl null_config;
+  EXPECT_EQ(null_config.name(), "");
+  EXPECT_FALSE(null_config.usesVhds());
+  EXPECT_FALSE(null_config.mostSpecificHeaderMutationsWins());
+  EXPECT_EQ(null_config.maxDirectResponseBodySizeBytes(), 0);
+  EXPECT_FALSE(null_config.ignorePathParametersInPathMatching());
+  EXPECT_TRUE(null_config.internalOnlyHeaders().empty());
+  EXPECT_EQ(null_config.metadata().filter_metadata_size(), 0);
+  EXPECT_EQ(null_config.typedMetadata().get<Envoy::Config::TypedMetadata::Object>("any"), nullptr);
+
+  Http::TestRequestHeaderMapImpl headers{{":authority", "example.com"}, {":path", "/"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  auto route_res1 = null_config.route(headers, stream_info, 0);
+  EXPECT_EQ(route_res1.route, nullptr);
+  EXPECT_EQ(route_res1.vhost, nullptr);
+
+  auto route_res2 = null_config.route(
+      [](std::shared_ptr<const Route>, RouteEvalStatus) { return RouteMatchStatus::Accept; },
+      headers, stream_info, 0);
+  EXPECT_EQ(route_res2.route, nullptr);
+  EXPECT_EQ(route_res2.vhost, nullptr);
+
+  // RouteMatchActionFactory
+  RouteMatchActionFactory route_factory;
+  EXPECT_EQ(route_factory.name(), "route");
+  auto empty_route_proto = route_factory.createEmptyConfigProto();
+  ASSERT_NE(empty_route_proto, nullptr);
+  EXPECT_NE(dynamic_cast<envoy::config::route::v3::Route*>(empty_route_proto.get()), nullptr);
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster_1"}, {});
+  Init::ManagerImpl local_init_manager{"local_init"};
+  auto route_config = parseRouteConfigurationFromYaml(R"EOF(
+virtual_hosts:
+- name: base_vhost
+  domains: ["example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_1" }
+)EOF");
+  auto global_route_config_or_error =
+      CommonConfigImpl::create(route_config, factory_context_,
+                               ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
+  EXPECT_OK(global_route_config_or_error.status());
+  auto vhost_scope = factory_context_.scope().scopeFromStatName(
+      factory_context_.routerContext().virtualClusterStatNames().vhost_);
+
+  auto common_vhost_or_error = CommonVirtualHostImpl::create(
+      route_config.virtual_hosts(0), global_route_config_or_error.value(), factory_context_,
+      *vhost_scope, ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
+  EXPECT_OK(common_vhost_or_error.status());
+  auto common_vhost = common_vhost_or_error.value();
+
+  RouteActionContext route_action_context{common_vhost, factory_context_, local_init_manager};
+  auto action =
+      route_factory.createAction(route_config.virtual_hosts(0).routes(0), route_action_context,
+                                 ProtobufMessage::getStrictValidationVisitor());
+  ASSERT_NE(action, nullptr);
+  EXPECT_EQ(action->typeUrl(), RouteMatchAction::staticTypeUrl());
+
+  // RouteListMatchActionFactory & RouteListMatchAction
+  RouteListMatchActionFactory route_list_factory;
+  EXPECT_EQ(route_list_factory.name(), "route_match_action");
+  auto empty_route_list_proto = route_list_factory.createEmptyConfigProto();
+  ASSERT_NE(empty_route_list_proto, nullptr);
+  EXPECT_NE(dynamic_cast<envoy::config::route::v3::RouteList*>(empty_route_list_proto.get()),
+            nullptr);
+
+  envoy::config::route::v3::RouteList route_list_proto;
+  *route_list_proto.add_routes() = route_config.virtual_hosts(0).routes(0);
+
+  auto list_action = route_list_factory.createAction(route_list_proto, route_action_context,
+                                                     ProtobufMessage::getStrictValidationVisitor());
+  ASSERT_NE(list_action, nullptr);
+  EXPECT_EQ(list_action->typeUrl(), RouteListMatchAction::staticTypeUrl());
+
+  const auto& typed_list_action = list_action->getTyped<RouteListMatchAction>();
+  EXPECT_EQ(typed_list_action.routes().size(), 1);
+  EXPECT_EQ(typed_list_action.routes()[0]->routeEntry()->clusterName(), "cluster_1");
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
