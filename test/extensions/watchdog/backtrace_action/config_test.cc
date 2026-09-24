@@ -37,6 +37,7 @@ TEST(BacktraceActionFactoryTest, CanCreateAction) {
               "type_url": "type.googleapis.com/envoy.extensions.watchdog.backtrace_action.v3.BacktraceActionConfig",
               "value": {
                 "cooldown_duration": "20s",
+                "log_level": "WARN",
               }
             }
           },

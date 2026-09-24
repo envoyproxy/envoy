@@ -6,6 +6,7 @@
 #include <csignal>
 #include <cstdint>
 
+#include "envoy/common/logger.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/watchdog/backtrace_action/v3/backtrace_action.pb.h"
 #include "envoy/server/guarddog_config.h"
@@ -84,10 +85,16 @@ private:
 
   void onSlotTimer(int slot_index);
 
+  // Logs the thread ID of a traced thread at the configured log level.
+  void logThreadId(int64_t tid);
+
   static BacktraceActionStats generateStats(Stats::Scope& scope);
 
   // Minimum amount of time between backtraces for a given thread.
   std::chrono::milliseconds cooldown_duration_;
+
+  // Log level used for the backtrace and thread ID logs.
+  const spdlog::level::level_enum log_level_;
 
   BacktraceActionStats stats_;
 
