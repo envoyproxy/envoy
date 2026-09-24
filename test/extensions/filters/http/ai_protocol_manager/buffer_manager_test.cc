@@ -1173,6 +1173,38 @@ TEST_F(BufferManagerTest, SynchronousDetachDuringResumeSourceInOnDestroyDoesNotI
   EXPECT_EQ(bridge_->resume_source_calls_, 1);
 }
 
+// When a BufferManager holds a sub-WriteFlushThreshold pending backlog (> low_watermark_) while
+// ingestPaused() is false, and a second charger (such as ScopedUnacked or another BufferManager)
+// subsequently pushes unacked_ over high_watermark_, the bridge notifies registered BufferManagers
+// to flush their pending backlog so unacked_ can fall back below low_watermark_.
+TEST_F(BufferManagerTest, SubThresholdPendingFlushedWhenExternalChargerPausesIngest) {
+  // high_watermark = 40 KiB, low_watermark = 20 KiB, WriteFlushThreshold = 64 KiB.
+  bridge_buffer_limit_ = 40 * 1024;
+  PostingExternalBufferFactory posting_factory;
+  resetManager(posting_factory);
+
+  // 30 KiB (> low_watermark, < high_watermark, < WriteFlushThreshold): queued in pending_ without
+  // issuing a write because ingestPaused() is still false.
+  Buffer::OwnedImpl chunk(std::string(30 * 1024, 'a'));
+  manager_->onData(chunk);
+  EXPECT_FALSE(bridge_->ingestPaused());
+  EXPECT_EQ(posting_factory.last_->write_calls_, 0);
+
+  // An external charger (e.g. pending_items_ ScopedUnacked) pushes unacked_ to 50 KiB > 40 KiB.
+  // Transitioning to source_paused_ = true flushes manager_'s 30 KiB pending_ backlog.
+  {
+    FilterChainBridge::ScopedUnacked unacked(*bridge_, 20 * 1024);
+    EXPECT_TRUE(bridge_->ingestPaused());
+    EXPECT_EQ(posting_factory.last_->write_calls_, 1);
+    drain();
+  }
+
+  // Once both the external ScopedUnacked and the flushed write complete, unacked_ drops to 0 <= 20
+  // KiB and the source resumes instead of deadlocking at 30 KiB > 20 KiB.
+  EXPECT_FALSE(bridge_->ingestPaused());
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

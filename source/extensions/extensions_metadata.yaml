@@ -1193,7 +1193,7 @@ envoy.geoip_providers.maxmind:
   categories:
   - envoy.geoip_providers
   security_posture: unknown
-  status: wip
+  status: stable
   type_urls:
   - envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
 envoy.grpc_credentials.file_based_metadata:
@@ -1243,6 +1243,13 @@ envoy.health_checkers.thrift:
   status: alpha
   type_urls:
   - envoy.extensions.health_checkers.thrift.v3.Thrift
+envoy.health_checkers.udp:
+  categories:
+  - envoy.health_checkers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.health_checkers.udp.v3.UdpHealthCheck
 envoy.health_check.event_sinks.file:
   categories:
   - envoy.health_check.event_sinks

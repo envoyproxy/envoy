@@ -4,6 +4,7 @@
 #include <format>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -170,6 +171,26 @@ public:
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(PassthroughConfigFactory, "passthrough");
+
+// A filter factory whose create throws so the exception barrier around the filter constructor
+// export can be exercised. Without the barrier the exception would cross the ABI boundary and abort
+// the worker. The caught exception leaves a null filter, so the host fails the request closed with
+// a 500.
+class ThrowOnNewFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle&) override {
+    throw std::runtime_error("filter constructor failed on purpose");
+  }
+};
+
+class ThrowOnNewConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<ThrowOnNewFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(ThrowOnNewConfigFactory, "throw_on_filter_new");
 
 // Only records that its response-headers callback ran. Used to check that the callback still fires
 // when the response is a local reply the module did not send, such as a `direct_response` route.
