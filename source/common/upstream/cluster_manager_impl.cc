@@ -25,6 +25,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
@@ -226,14 +227,9 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
-      // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
-      // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
-      // avoid double pause ClusterLoadAssignment.
-      const std::vector<std::string> paused_xds_types{
-          Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-          Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
-          Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-      Config::ScopedResume resume_eds_leds_sds = xds_manager_.pause(paused_xds_types);
+      // Secondary cluster initialization may create EDS, LEDS, and SDS subscriptions.
+      const auto cluster_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+      Config::ScopedResume resume = xds_manager_.pause(Config::dependentTypeUrls(cluster_type_url));
       initializeSecondaryClusters();
     }
     return;
