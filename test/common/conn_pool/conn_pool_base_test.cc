@@ -958,5 +958,25 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflowLegacy) {
   closeStreamAndDrainClient();
 }
 
+// A pool scheduled for deferred deletion has already been removed from its
+// ConnPoolMap (or is about to be replaced by a successor registered under the
+// same key). Firing idle callbacks after deleteIsPending() would call
+// httpConnPoolIsIdle -> erasePool with a stale key and could evict that
+// successor, so the callbacks must stay silent once deletion is pending.
+TEST_F(ConnPoolImplBaseTest, NoIdleNotifyAfterDeleteIsPending) {
+  int early_calls = 0;
+  pool_.addIdleCallbackImpl([&early_calls]() { early_calls++; });
+
+  // Control: a live idle pool fires its callback exactly once.
+  pool_.checkForIdleAndNotify();
+  EXPECT_EQ(1, early_calls);
+
+  int late_calls = 0;
+  pool_.addIdleCallbackImpl([&late_calls]() { late_calls++; });
+  pool_.deleteIsPendingImpl();
+  pool_.checkForIdleAndNotify();
+  EXPECT_EQ(0, late_calls);
+}
+
 } // namespace ConnectionPool
 } // namespace Envoy
