@@ -1,11 +1,9 @@
 // Per-request cost of the Lua HTTP filter, broken down by the work the script asks for.
 //
-// The scripts below are the ones from an out-of-tree extension-mechanism benchmark, so that an
-// in-process number here and an end-to-end throughput number there describe the same unit of
-// work. Two of them exist only to be subtracted: `kNoopBoth` prices entering and leaving the VM
-// with no script work at all, and `kHeaderNoCarry` prices the same header read and write without
-// carrying a value between the two handlers, which is what envoy#4613 forces a real
-// filter to do.
+// Two of the scripts below exist only to be subtracted: `kNoopBoth` prices entering and leaving
+// the VM with no script work at all, and `kHeaderNoCarry` prices the same header read and write
+// without carrying a value between the two handlers, which is what envoy#4613 forces a real filter
+// to do.
 //
 // Every arm rebuilds the per-stream state -- header maps and stream info -- on each iteration,
 // because a benchmark that reuses them measures a second write to a warm map rather than the
@@ -46,7 +44,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
-// --- request shape, mirrored from the extension-mechanism benchmark's contract ---------------
+// --- request shape ---------------------------------------------------------------------------
 
 constexpr absl::string_view kInHeader = "x-bench-in";
 constexpr absl::string_view kHeaderValue = "bench";
@@ -331,8 +329,7 @@ function envoy_on_request(handle)
 end
 )EOF";
 
-// The request every arm receives. Mirrored from the extension-mechanism harness's contract so
-// that the two instruments describe the same unit of work.
+// The request every arm receives.
 using HeaderTable = std::vector<std::pair<Http::LowerCaseString, std::string>>;
 
 const HeaderTable& requestHeaderTable() {
