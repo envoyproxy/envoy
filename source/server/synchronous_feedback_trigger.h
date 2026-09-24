@@ -12,29 +12,30 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Combines a RealtimeResourceMonitor and its associated Trigger into a single
+ * Combines a SynchronousFeedbackResourceMonitor and its associated Trigger into a single
  * interface for synchronous hot-path evaluation and load admission notification.
  */
-class RealtimeTrigger {
+class SynchronousFeedbackTrigger {
 public:
-  RealtimeTrigger(TriggerPtr trigger, RealtimeResourceMonitorSharedPtr monitor)
+  SynchronousFeedbackTrigger(TriggerPtr trigger,
+                             SynchronousFeedbackResourceMonitorSharedPtr monitor)
       : trigger_(std::move(trigger)), monitor_(std::move(monitor)) {}
 
-  // Queries the real-time monitor's current resource usage and evaluates the
+  // Queries the synchronous feedback monitor's current resource usage and evaluates the
   // resulting shed probability without mutating trigger state.
   float shedProbability() const {
     const double pressure = monitor_->getResourceUsage().resource_pressure_;
     return trigger_->evaluate(pressure).value().value();
   }
 
-  // Notifies the underlying real-time monitor that load was accepted at the given point.
+  // Notifies the underlying synchronous feedback monitor that load was accepted at the given point.
   void onLoadAccepted(absl::string_view load_shed_point_name) const {
     monitor_->onLoadAccepted(load_shed_point_name);
   }
 
 private:
   TriggerPtr trigger_;
-  RealtimeResourceMonitorSharedPtr monitor_;
+  SynchronousFeedbackResourceMonitorSharedPtr monitor_;
 };
 
 } // namespace Server

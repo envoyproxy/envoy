@@ -17,7 +17,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
-#include "source/server/realtime_trigger.h"
+#include "source/server/synchronous_feedback_trigger.h"
 #include "source/server/trigger.h"
 
 #include "absl/container/node_hash_map.h"
@@ -50,8 +50,8 @@ private:
   Stats::Gauge& scale_percent_gauge_;
 };
 
-using RealtimeResourceMonitorMap =
-    absl::flat_hash_map<std::string, RealtimeResourceMonitorSharedPtr>;
+using SynchronousFeedbackResourceMonitorMap =
+    absl::flat_hash_map<std::string, SynchronousFeedbackResourceMonitorSharedPtr>;
 
 /**
  * Implement a LoadShedPoint which is a particular point in the connection /
@@ -62,7 +62,7 @@ public:
   static absl::StatusOr<std::unique_ptr<LoadShedPointImpl>>
   create(const envoy::config::overload::v3::LoadShedPoint& config, Stats::Scope& stats_scope,
          Random::RandomGenerator& random_generator,
-         const RealtimeResourceMonitorMap& realtime_resources);
+         const SynchronousFeedbackResourceMonitorMap& synchronous_feedback_resources);
   LoadShedPointImpl(const LoadShedPointImpl&) = delete;
   LoadShedPointImpl& operator=(const LoadShedPointImpl&) = delete;
 
@@ -80,7 +80,7 @@ public:
 private:
   LoadShedPointImpl(const envoy::config::overload::v3::LoadShedPoint& config,
                     Stats::Scope& stats_scope, Random::RandomGenerator& random_generator,
-                    const RealtimeResourceMonitorMap& realtime_resources,
+                    const SynchronousFeedbackResourceMonitorMap& synchronous_feedback_resources,
                     absl::Status& creation_status);
 
   // Helper to handle updating the probability to shed load given the triggers.
@@ -89,7 +89,7 @@ private:
   const std::string name_;
   absl::flat_hash_map<std::string, TriggerPtr> periodic_triggers_;
   std::atomic<float> periodic_shed_probability_{0};
-  std::vector<RealtimeTrigger> realtime_triggers_;
+  std::vector<SynchronousFeedbackTrigger> synchronous_feedback_triggers_;
   Stats::Gauge& scale_percent_;
   Stats::Counter& shed_load_counter_;
   Random::RandomGenerator& random_generator_;

@@ -58,15 +58,26 @@ using ResourceMonitorSharedPtr = std::shared_ptr<ResourceMonitor>;
 
 /**
  * A resource monitor that can be queried synchronously by LoadShedPoints on worker threads
- * in addition to periodic monitoring on the main thread.
+ * in addition to periodic monitoring on the main thread, and receives immediate feedback
+ * when load is admitted.
+ *
+ * Choosing between ProactiveResourceMonitor and SynchronousFeedbackResourceMonitor:
+ * - Use ProactiveResourceMonitor when tracking a discrete, bounded resource with a well-defined
+ *   lifecycle where units can be explicitly reserved on creation and released on teardown
+ *   (e.g., active downstream connections via `tryAllocateResource()` / `tryDeallocateResource()`).
+ * - Use SynchronousFeedbackResourceMonitor when shedding load via LoadShedPoints based on
+ *   continuous pressure (threshold or scaled triggers), where the monitor needs to be evaluated
+ *   synchronously on the worker hot path and update its pressure estimate immediately as work is
+ *   admitted (e.g., adjusting rate counters, token buckets, or estimated CPU/memory headroom
+ *   between background refreshes), without tracking when that work finishes.
  *
  * Implementations MUST be thread-safe, as getResourceUsage() and onLoadAccepted() are
  * invoked concurrently across worker threads (and the main thread) without external
  * synchronization.
  */
-class RealtimeResourceMonitor : public ResourceMonitor {
+class SynchronousFeedbackResourceMonitor : public ResourceMonitor {
 public:
-  ~RealtimeResourceMonitor() override = default;
+  ~SynchronousFeedbackResourceMonitor() override = default;
 
   /**
    * Synchronously returns the current resource usage.
@@ -76,7 +87,7 @@ public:
   virtual ResourceUsage getResourceUsage() = 0;
 
   /**
-   * Allows RealtimeResourceMonitor to also be used with OverloadActions and periodic
+   * Allows SynchronousFeedbackResourceMonitor to also be used with OverloadActions and periodic
    * pressure stats. Always called on the main thread.
    */
   void updateResourceUsage(ResourceUpdateCallbacks& callbacks) override {
@@ -92,8 +103,9 @@ public:
   }
 };
 
-using RealtimeResourceMonitorPtr = std::unique_ptr<RealtimeResourceMonitor>;
-using RealtimeResourceMonitorSharedPtr = std::shared_ptr<RealtimeResourceMonitor>;
+using SynchronousFeedbackResourceMonitorPtr = std::unique_ptr<SynchronousFeedbackResourceMonitor>;
+using SynchronousFeedbackResourceMonitorSharedPtr =
+    std::shared_ptr<SynchronousFeedbackResourceMonitor>;
 
 } // namespace Server
 } // namespace Envoy

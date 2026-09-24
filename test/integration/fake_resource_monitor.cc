@@ -19,14 +19,16 @@ absl::StatusOr<Server::ResourceMonitorPtr> FakeResourceMonitorFactory::createRes
   return monitor;
 }
 
-FakeRealtimeResourceMonitor::~FakeRealtimeResourceMonitor() { factory_.onMonitorDestroyed(); }
+FakeSynchronousFeedbackResourceMonitor::~FakeSynchronousFeedbackResourceMonitor() {
+  factory_.onMonitorDestroyed();
+}
 
-void FakeRealtimeResourceMonitorFactory::onMonitorDestroyed() { monitor_ = nullptr; }
+void FakeSynchronousFeedbackResourceMonitorFactory::onMonitorDestroyed() { monitor_ = nullptr; }
 
-absl::StatusOr<Server::RealtimeResourceMonitorPtr>
-FakeRealtimeResourceMonitorFactory::createRealtimeResourceMonitor(
+absl::StatusOr<Server::ResourceMonitorPtr>
+FakeSynchronousFeedbackResourceMonitorFactory::createResourceMonitor(
     const Protobuf::Message&, Server::Configuration::ResourceMonitorFactoryContext&) {
-  auto monitor = std::make_unique<FakeRealtimeResourceMonitor>(*this);
+  auto monitor = std::make_unique<FakeSynchronousFeedbackResourceMonitor>(*this);
   monitor_ = monitor.get();
   return monitor;
 }

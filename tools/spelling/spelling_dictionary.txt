@@ -1827,5 +1827,5 @@ MLKEM
 PQC
 quantum
 X25519MLKEM768
-RealtimeResourceMonitor
+SynchronousFeedbackResourceMonitor
 bernoulli

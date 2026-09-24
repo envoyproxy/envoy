@@ -475,21 +475,21 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
 
 OverloadActionState OverloadAction::getState() const { return state_; }
 
-absl::StatusOr<std::unique_ptr<LoadShedPointImpl>>
-LoadShedPointImpl::create(const envoy::config::overload::v3::LoadShedPoint& config,
-                          Stats::Scope& stats_scope, Random::RandomGenerator& random_generator,
-                          const RealtimeResourceMonitorMap& realtime_resources) {
+absl::StatusOr<std::unique_ptr<LoadShedPointImpl>> LoadShedPointImpl::create(
+    const envoy::config::overload::v3::LoadShedPoint& config, Stats::Scope& stats_scope,
+    Random::RandomGenerator& random_generator,
+    const SynchronousFeedbackResourceMonitorMap& synchronous_feedback_resources) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<LoadShedPointImpl>(new LoadShedPointImpl(
-      config, stats_scope, random_generator, realtime_resources, creation_status));
+      config, stats_scope, random_generator, synchronous_feedback_resources, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
-LoadShedPointImpl::LoadShedPointImpl(const envoy::config::overload::v3::LoadShedPoint& config,
-                                     Stats::Scope& stats_scope,
-                                     Random::RandomGenerator& random_generator,
-                                     const RealtimeResourceMonitorMap& realtime_resources,
-                                     absl::Status& creation_status)
+LoadShedPointImpl::LoadShedPointImpl(
+    const envoy::config::overload::v3::LoadShedPoint& config, Stats::Scope& stats_scope,
+    Random::RandomGenerator& random_generator,
+    const SynchronousFeedbackResourceMonitorMap& synchronous_feedback_resources,
+    absl::Status& creation_status)
     : name_(config.name()), scale_percent_(makeGauge(stats_scope, config.name(), "scale_percent",
                                                      Stats::Gauge::ImportMode::NeverImport)),
       shed_load_counter_(makeCounter(stats_scope, config.name(), "shed_load_count")),
@@ -503,8 +503,9 @@ LoadShedPointImpl::LoadShedPointImpl(const envoy::config::overload::v3::LoadShed
     }
     auto trigger_or_error = createTriggerFromConfig(trigger_config);
     SET_AND_RETURN_IF_NOT_OK(trigger_or_error.status(), creation_status);
-    if (auto it = realtime_resources.find(trigger_config.name()); it != realtime_resources.end()) {
-      realtime_triggers_.emplace_back(std::move(*trigger_or_error), it->second);
+    if (auto it = synchronous_feedback_resources.find(trigger_config.name());
+        it != synchronous_feedback_resources.end()) {
+      synchronous_feedback_triggers_.emplace_back(std::move(*trigger_or_error), it->second);
     } else {
       periodic_triggers_.emplace(trigger_config.name(), std::move(*trigger_or_error));
     }
@@ -535,7 +536,7 @@ void LoadShedPointImpl::updateProbabilityShedLoad() {
 
 bool LoadShedPointImpl::shouldShedLoad() {
   float probability = periodic_shed_probability_.load(std::memory_order_relaxed);
-  for (const auto& trigger : realtime_triggers_) {
+  for (const auto& trigger : synchronous_feedback_triggers_) {
     probability = std::max(probability, trigger.shedProbability());
   }
 
@@ -544,7 +545,7 @@ bool LoadShedPointImpl::shouldShedLoad() {
     return true;
   }
 
-  for (const auto& trigger : realtime_triggers_) {
+  for (const auto& trigger : synchronous_feedback_triggers_) {
     trigger.onLoadAccepted(name_);
   }
   return false;
@@ -579,7 +580,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
               absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>()) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, options, api,
                                                            validation_visitor, runtime);
-  RealtimeResourceMonitorMap realtime_resources;
+  SynchronousFeedbackResourceMonitorMap synchronous_feedback_resources;
   // We should hide impl details from users, for them there should be no distinction between
   // proactive and regular resource monitors in configuration API. But internally we will maintain
   // two distinct collections of proactive and regular resources. Proactive resources are not
@@ -605,22 +606,6 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
           proactive_resources_
               ->try_emplace(proactive_resource_it->second, name, std::move(monitor), stats_scope)
               .second;
-    } else if (auto* rt_factory = Config::Utility::getAndCheckFactory<
-                   Configuration::RealtimeResourceMonitorFactory>(resource, true);
-               rt_factory != nullptr) {
-      ENVOY_LOG(debug, "Adding realtime resource monitor for {}", name);
-      auto config =
-          Config::Utility::translateToFactoryConfig(resource, validation_visitor, *rt_factory);
-      auto monitor_or_error = rt_factory->createRealtimeResourceMonitor(*config, context);
-      if (!monitor_or_error.ok()) {
-        creation_status = monitor_or_error.status();
-        return;
-      }
-      RealtimeResourceMonitorSharedPtr rt_monitor = std::move(monitor_or_error.value());
-      result = resources_.try_emplace(name, name, rt_monitor, *this, stats_scope).second;
-      if (result) {
-        realtime_resources.emplace(name, std::move(rt_monitor));
-      }
     } else {
       ENVOY_LOG(debug, "Adding resource monitor for {}", name);
       auto& factory =
@@ -632,9 +617,15 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
         creation_status = monitor_or_error.status();
         return;
       }
-      result = resources_
-                   .try_emplace(name, name, std::move(monitor_or_error.value()), *this, stats_scope)
-                   .second;
+      ResourceMonitorSharedPtr monitor = std::move(monitor_or_error.value());
+      result = resources_.try_emplace(name, name, monitor, *this, stats_scope).second;
+      if (result) {
+        if (auto sf_monitor =
+                std::dynamic_pointer_cast<SynchronousFeedbackResourceMonitor>(monitor);
+            sf_monitor != nullptr) {
+          synchronous_feedback_resources.emplace(name, std::move(sf_monitor));
+        }
+      }
     }
     if (!result) {
       creation_status =
@@ -743,8 +734,8 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       }
     }
 
-    auto load_shed_or_error = LoadShedPointImpl::create(point, api.rootScope(),
-                                                        api.randomGenerator(), realtime_resources);
+    auto load_shed_or_error = LoadShedPointImpl::create(
+        point, api.rootScope(), api.randomGenerator(), synchronous_feedback_resources);
     SET_AND_RETURN_IF_NOT_OK(load_shed_or_error.status(), creation_status);
     const auto result = loadshed_points_.try_emplace(point.name(), *std::move(load_shed_or_error));
 

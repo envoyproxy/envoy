@@ -14,7 +14,7 @@ envoy::config::overload::v3::OverloadManager getBaseOverloadManagerConfig() {
           - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
             typed_config:
               "@type": type.googleapis.com/test.common.config.DummyConfig
-          - name: "envoy.resource_monitors.testonly.fake_realtime_resource_monitor"
+          - name: "envoy.resource_monitors.testonly.fake_synchronous_feedback_resource_monitor"
             typed_config:
               "@type": type.googleapis.com/google.protobuf.DoubleValue
       )EOF");

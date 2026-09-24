@@ -50,15 +50,16 @@ private:
   FakeResourceMonitor* monitor_{nullptr};
 };
 
-class FakeRealtimeResourceMonitorFactory;
+class FakeSynchronousFeedbackResourceMonitorFactory;
 
-class FakeRealtimeResourceMonitor : public Server::RealtimeResourceMonitor {
+class FakeSynchronousFeedbackResourceMonitor : public Server::SynchronousFeedbackResourceMonitor {
 public:
-  explicit FakeRealtimeResourceMonitor(FakeRealtimeResourceMonitorFactory& factory)
+  explicit FakeSynchronousFeedbackResourceMonitor(
+      FakeSynchronousFeedbackResourceMonitorFactory& factory)
       : factory_(factory) {}
-  ~FakeRealtimeResourceMonitor() override;
+  ~FakeSynchronousFeedbackResourceMonitor() override;
 
-  // Server::RealtimeResourceMonitor
+  // Server::SynchronousFeedbackResourceMonitor
   Server::ResourceUsage getResourceUsage() override {
     return {pressure_.load(std::memory_order_relaxed)};
   }
@@ -67,7 +68,7 @@ public:
     load_accepted_count_.fetch_add(1, std::memory_order_relaxed);
   }
 
-  void setRealtimePressure(double pressure) {
+  void setSynchronousFeedbackPressure(double pressure) {
     pressure_.store(pressure, std::memory_order_relaxed);
   }
   uint64_t loadAcceptedCount() const {
@@ -75,31 +76,33 @@ public:
   }
 
 private:
-  FakeRealtimeResourceMonitorFactory& factory_;
+  FakeSynchronousFeedbackResourceMonitorFactory& factory_;
   std::atomic<double> pressure_{0.0};
   std::atomic<uint64_t> load_accepted_count_{0};
 };
 
-class FakeRealtimeResourceMonitorFactory
-    : public Server::Configuration::RealtimeResourceMonitorFactory {
+class FakeSynchronousFeedbackResourceMonitorFactory
+    : public Server::Configuration::ResourceMonitorFactory {
 public:
-  // `Server::Configuration::RealtimeResourceMonitorFactory`
-  absl::StatusOr<Server::RealtimeResourceMonitorPtr> createRealtimeResourceMonitor(
-      const Protobuf::Message& config,
-      Server::Configuration::ResourceMonitorFactoryContext& context) override;
+  // `Server::Configuration::ResourceMonitorFactory`
+  absl::StatusOr<Server::ResourceMonitorPtr>
+  createResourceMonitor(const Protobuf::Message& config,
+                        Server::Configuration::ResourceMonitorFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::DoubleValue>();
   }
   std::string name() const override {
-    return "envoy.resource_monitors.testonly.fake_realtime_resource_monitor";
+    return "envoy.resource_monitors.testonly.fake_synchronous_feedback_resource_monitor";
   }
 
-  FakeRealtimeResourceMonitor* monitor() const { return monitor_.load(std::memory_order_relaxed); }
+  FakeSynchronousFeedbackResourceMonitor* monitor() const {
+    return monitor_.load(std::memory_order_relaxed);
+  }
   void onMonitorDestroyed();
 
 private:
-  std::atomic<FakeRealtimeResourceMonitor*> monitor_{nullptr};
+  std::atomic<FakeSynchronousFeedbackResourceMonitor*> monitor_{nullptr};
 };
 
 } // namespace Envoy

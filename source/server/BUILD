@@ -333,8 +333,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "realtime_trigger_lib",
-    hdrs = ["realtime_trigger.h"],
+    name = "synchronous_feedback_trigger_lib",
+    hdrs = ["synchronous_feedback_trigger.h"],
     deps = [
         ":trigger_lib",
         "//envoy/server:resource_monitor_interface",
@@ -347,7 +347,7 @@ envoy_cc_library(
     srcs = ["overload_manager_impl.cc"],
     hdrs = ["overload_manager_impl.h"],
     deps = [
-        ":realtime_trigger_lib",
+        ":synchronous_feedback_trigger_lib",
         ":trigger_lib",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/stats:stats_interface",

@@ -21,14 +21,14 @@ protected:
     monitor->setResourcePressure(pressure);
   }
 
-  void updateRealtimeResource(double pressure) {
-    auto* monitor = fake_realtime_resource_monitor_factory_.monitor();
+  void updateSynchronousFeedbackResource(double pressure) {
+    auto* monitor = fake_synchronous_feedback_resource_monitor_factory_.monitor();
     ASSERT(monitor != nullptr);
-    monitor->setRealtimePressure(pressure);
+    monitor->setSynchronousFeedbackPressure(pressure);
   }
 
-  uint64_t realtimeLoadAcceptedCount() const {
-    auto* monitor = fake_realtime_resource_monitor_factory_.monitor();
+  uint64_t synchronousFeedbackLoadAcceptedCount() const {
+    auto* monitor = fake_synchronous_feedback_resource_monitor_factory_.monitor();
     ASSERT(monitor != nullptr);
     return monitor->loadAcceptedCount();
   }
@@ -37,9 +37,9 @@ protected:
   FakeResourceMonitorFactory fake_resource_monitor_factory_;
   Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory> inject_factory_{
       fake_resource_monitor_factory_};
-  FakeRealtimeResourceMonitorFactory fake_realtime_resource_monitor_factory_;
-  Registry::InjectFactory<Server::Configuration::RealtimeResourceMonitorFactory>
-      inject_realtime_factory_{fake_realtime_resource_monitor_factory_};
+  FakeSynchronousFeedbackResourceMonitorFactory fake_synchronous_feedback_resource_monitor_factory_;
+  Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory>
+      inject_synchronous_feedback_factory_{fake_synchronous_feedback_resource_monitor_factory_};
 };
 
 } // namespace Envoy

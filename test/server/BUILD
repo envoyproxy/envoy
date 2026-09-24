@@ -346,11 +346,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "realtime_trigger_test",
-    srcs = ["realtime_trigger_test.cc"],
+    name = "synchronous_feedback_trigger_test",
+    srcs = ["synchronous_feedback_trigger_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
-        "//source/server:realtime_trigger_lib",
+        "//source/server:synchronous_feedback_trigger_lib",
         "//test/test_common:status_utility_lib",
     ],
 )

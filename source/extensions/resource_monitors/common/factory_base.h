@@ -66,35 +66,6 @@ private:
   const std::string name_;
 };
 
-template <class ConfigProto>
-class RealtimeFactoryBase : public Server::Configuration::RealtimeResourceMonitorFactory {
-public:
-  absl::StatusOr<Server::RealtimeResourceMonitorPtr> createRealtimeResourceMonitor(
-      const Protobuf::Message& config,
-      Server::Configuration::ResourceMonitorFactoryContext& context) override {
-    return createRealtimeResourceMonitorFromProtoTyped(
-        MessageUtil::downcastAndValidate<const ConfigProto&>(config,
-                                                             context.messageValidationVisitor()),
-        context);
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ConfigProto>();
-  }
-
-  std::string name() const override { return name_; }
-
-protected:
-  RealtimeFactoryBase(const std::string& name) : name_(name) {}
-
-private:
-  virtual absl::StatusOr<Server::RealtimeResourceMonitorPtr>
-  createRealtimeResourceMonitorFromProtoTyped(
-      const ConfigProto& config, Server::Configuration::ResourceMonitorFactoryContext& context) = 0;
-
-  const std::string name_;
-};
-
 } // namespace Common
 } // namespace ResourceMonitors
 } // namespace Extensions
