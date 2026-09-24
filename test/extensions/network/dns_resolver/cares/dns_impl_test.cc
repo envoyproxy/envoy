@@ -1824,6 +1824,22 @@ TEST_P(DnsImplTest, SuccessfulFallbackAfterError) {
   }
 }
 
+// With the runtime guard disabled, a no-records response from one family masks a failure from
+// the other family and the resolution completes with an empty result.
+TEST_P(DnsImplTest, NoRecordsMaskErrorWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.cares_dual_resolution_preserve_failure", "false"}});
+  server_->setErrorOnQtypeA(true);
+
+  // Auto sees no records on AAAA before the A error, while V4Preferred sees the A error first.
+  for (const auto family : {DnsLookupFamily::Auto, DnsLookupFamily::V4Preferred}) {
+    SCOPED_TRACE(static_cast<int>(family));
+    EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", family));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+}
+
 TEST_P(DnsImplTest, ErrorWithAcceptNodataEnabled) {
   server_->setErrorOnQtypeA(true);
   server_->setErrorOnQtypeAAAA(true);

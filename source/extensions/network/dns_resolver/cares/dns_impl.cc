@@ -365,7 +365,9 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 }
 
 void DnsResolverImpl::PendingResolution::finishResolve() {
-  if (had_resolution_failure_ && pending_response_.address_list_.empty()) {
+  if (had_resolution_failure_ && pending_response_.address_list_.empty() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.cares_dual_resolution_preserve_failure")) {
     pending_response_.status_ = ResolutionStatus::Failure;
   }
 
