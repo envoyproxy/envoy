@@ -13,7 +13,7 @@ uncomment.sh "$1" --comment \
   --uncomment-func-impl CBS_get_u64_decimal \
   --uncomment-func-impl cbs_get_length_prefixed \
   --uncomment-func-impl CBS_get_u16_length_prefixed \
-  --uncomment-func-impl parse_base128_integer \
+  --uncomment-func-impl CBS_get_asn1_oid_component \
   --uncomment-func-impl parse_asn1_tag \
   --uncomment-func-impl cbs_get_any_asn1_element \
   --uncomment-static-func-impl cbs_get_asn1 \
@@ -24,5 +24,6 @@ uncomment.sh "$1" --comment \
   --uncomment-func-impl CBS_get_optional_asn1 \
   --uncomment-func-impl CBS_asn1_oid_to_text \
   --uncomment-func-impl CBS_get_any_asn1_element \
+  --uncomment-func-impl CBS_peek_any_asn1_tag \
   --uncomment-func-impl CBS_peek_asn1_tag \
   --uncomment-func-impl CBS_get_asn1_bool

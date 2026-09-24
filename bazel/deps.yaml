@@ -1465,7 +1465,7 @@ zstd:
   project_name: "zstd"
   project_desc: "zstd compression library"
   project_url: "https://facebook.github.io/zstd"
-  release_date: "2025-02-19"
+  release_date: "2026-09-22"
   use_category:
   - dataplane_ext
   extensions:

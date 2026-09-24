@@ -70,6 +70,7 @@ lockfiles_generate() {
     for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/external/; do
         pushd "$module_dir" > /dev/null
         bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
+        bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
         popd > /dev/null
     done
 }

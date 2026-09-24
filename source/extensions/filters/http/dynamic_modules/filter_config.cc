@@ -146,13 +146,31 @@ DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
 }
 
 DynamicModuleHttpPerRouteFilterConfig::~DynamicModuleHttpPerRouteFilterConfig() {
-  (*destroy_)(config_);
+  if (main_dispatcher_.isThreadSafe()) {
+    (*destroy_)(config_);
+    return;
+  }
+  // The module builds its per-route configuration on the main thread, and the destroy hook is
+  // documented to run there as well: a module is free to use configuration callbacks from it, and
+  // those require the main thread. A route configuration can be released on a worker thread when
+  // an RDS update replaces it, so hand the in-module configuration to the main dispatcher, along
+  // with the module handle that has to outlive the call.
+  //
+  // If the main dispatcher has already exited then the posted callback is destroyed together with
+  // the dispatcher and the hook runs at that point instead, still on the main thread.
+  main_dispatcher_.post(
+      [config = config_, destroy = destroy_, module = std::move(dynamic_module_)]() mutable {
+        (*destroy)(config);
+        // The module is unloaded only after its destroy hook has returned.
+        module.reset();
+      });
 }
 
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
 newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
-                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module) {
+                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+                                   Event::Dispatcher& main_dispatcher) {
   auto constructor =
       dynamic_module
           ->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_per_route_config_new)>(
@@ -170,7 +188,7 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
   }
 
   return std::make_shared<const DynamicModuleHttpPerRouteFilterConfig>(
-      filter_config_envoy_ptr, destroy.value(), std::move(dynamic_module));
+      filter_config_envoy_ptr, destroy.value(), std::move(dynamic_module), main_dispatcher);
 }
 
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
