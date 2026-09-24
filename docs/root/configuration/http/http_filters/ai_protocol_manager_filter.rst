@@ -163,6 +163,13 @@ may read or modify the document, or reject the request with a local reply.
 Routes without a per-route request declaration, and requests without a body,
 run no AI filters.
 
+Once the AI filters finish, the parsed document is re-serialized as the
+request body by default. With :ref:`reserialize_body
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.reserialize_body>`
+set to ``DISABLE``, the received body is forwarded byte for byte instead, and
+edits AI filters make to the document are not sent; use it only with AI filters
+that read the request.
+
 Request info
 ~~~~~~~~~~~~
 
