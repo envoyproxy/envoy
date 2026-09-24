@@ -292,8 +292,9 @@ void EdsClusterImpl::update(
 
   const envoy::config::endpoint::v3::ClusterLoadAssignment* used_load_assignment;
   if (!cla_leds_configs.empty() || eds_resources_cache_.has_value()) {
-    cluster_load_assignment_ = std::make_unique<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        std::move(cluster_load_assignment));
+    cluster_load_assignment_ =
+        ArenaWrappedProto<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+            std::move(cluster_load_assignment));
     used_load_assignment = cluster_load_assignment_.get();
   } else {
     cluster_load_assignment_ = nullptr;
