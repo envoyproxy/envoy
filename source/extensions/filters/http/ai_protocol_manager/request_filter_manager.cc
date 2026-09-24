@@ -25,7 +25,7 @@ public:
              BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
              StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
              Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn,
-             bool always_serialize)
+             bool always_serialize = true)
       : TaskGroup(dispatcher), filters_(std::move(filters)),
         payload_index_(std::move(payload_index)), pipeline_(filters_.size()),
         buffer_manager_(buffer_manager), stream_info_(stream_info),
@@ -288,7 +288,7 @@ private:
   OnCompleteFn on_complete_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   LocalReplyFn local_reply_fn_;
-  const bool always_serialize_;
+  const bool always_serialize_{true};
   AiRequestPtr final_req_;
   std::vector<FilterHandoffStatus> filter_handoff_status_;
 };
