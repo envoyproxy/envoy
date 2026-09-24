@@ -40,6 +40,28 @@ the ``--config=openssl`` Bazel option. OpenSSL libraries are not statically link
 they must be present at runtime and are loaded dynamically. HTTP/3 (QUIC) is not available with OpenSSL builds.
 OpenSSL builds are not currently covered by the :repo:`Envoy security policy <SECURITY.md>`.
 
+.. _arch_overview_ssl_read_ahead:
+
+Ciphertext read-ahead
+--------------------
+
+Envoy can buffer encrypted data after a TCP TLS handshake completes to serve multiple reads by the
+TLS library. This can reduce socket read calls for record headers and bodies. TLS record processing
+and certificate verification are unchanged.
+
+The :ref:`read_ahead_buffer_size
+<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.read_ahead_buffer_size>` field
+in ``CommonTlsContext`` configures the buffer in bytes for both downstream and upstream TLS sockets.
+It defaults to ``0``, which disables read-ahead. Set it to a nonzero value to enable buffering. The
+buffer is allocated on the first read after the handshake and retained for the connection's lifetime.
+Larger buffers may reduce socket read calls further but consume more memory per connection. This
+ciphertext storage is separate from the connection's plaintext buffer limits and does not change TLS
+record size limits. QUIC does not use this buffer.
+
+Read-ahead can be temporarily disabled for new connections by setting
+``envoy.reloadable_features.tls_io_handle_read_ahead`` to ``false``. Established connections retain
+the setting selected when their transport socket was created.
+
 .. _arch_overview_ssl_fips:
 
 FIPS 140-2

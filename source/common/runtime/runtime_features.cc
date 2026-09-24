@@ -165,6 +165,8 @@ RUNTIME_GUARD(envoy_reloadable_features_tap_honor_tap_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_tls_inspector_enforce_client_tls_version);
+// Bounded TLS ciphertext read-ahead; latched per connection and enabled after its handshake.
+RUNTIME_GUARD(envoy_reloadable_features_tls_io_handle_read_ahead);
 RUNTIME_GUARD(envoy_reloadable_features_udp_hot_restart_session_handoff);
 RUNTIME_GUARD(envoy_reloadable_features_udp_send_zero_length_datagrams);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);

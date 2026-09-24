@@ -40,6 +40,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:io_socket_error_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
@@ -49,6 +50,7 @@ envoy_cc_test(
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
+        "//source/common/tls:io_handle_bio_lib",
         "//source/common/tls:server_context_config_lib",
         "//source/common/tls:server_context_lib",
         "//source/common/tls:ssl_socket_lib",
@@ -228,7 +230,9 @@ envoy_cc_test(
     deps = [
         ":ssl_test_utils",
         "//source/common/tls:ssl_socket_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/network:io_handle_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

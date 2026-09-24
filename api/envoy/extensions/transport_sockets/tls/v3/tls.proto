@@ -184,7 +184,7 @@ message TlsKeyLog {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -367,4 +367,15 @@ message CommonTlsContext {
 
   // TLS key log configuration
   TlsKeyLog key_log = 15;
+
+  // Size, in bytes, of the per-connection buffer used to read ahead encrypted TLS data from the
+  // socket after the handshake. Reading multiple TLS records at once can reduce socket reads.
+  //
+  // Defaults to 0, which disables read-ahead. When enabled, the buffer is allocated
+  // on the first read after the handshake and is separate from the connection's plaintext buffer
+  // limits.
+  //
+  // This setting applies to TLS over TCP. It does not affect QUIC or custom handshakers that
+  // perform their own socket I/O.
+  google.protobuf.UInt32Value read_ahead_buffer_size = 17;
 }

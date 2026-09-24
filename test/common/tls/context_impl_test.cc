@@ -1,3 +1,5 @@
+#include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -136,6 +138,86 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   ContextManagerImpl manager_{server_factory_context_};
 };
+
+TEST_F(SslContextImplTest, ClientReadAheadBufferSize) {
+  for (const std::optional<uint32_t> size :
+       std::vector<std::optional<uint32_t>>{std::nullopt, 0, 1, 32768, 65536}) {
+    SCOPED_TRACE(size.has_value() ? std::to_string(*size) : "default");
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    if (size.has_value()) {
+      tls_context.mutable_common_tls_context()->mutable_read_ahead_buffer_size()->set_value(*size);
+    }
+    auto config = ClientContextConfigImpl::create(tls_context, factory_context_);
+    ASSERT_OK(config.status());
+    EXPECT_EQ(size.value_or(0), (*config)->readAheadBufferSize());
+
+    auto context_or = manager_.createSslClientContext(*store_.rootScope(), **config);
+    ASSERT_OK(context_or.status());
+    Ssl::ClientContextSharedPtr context = *context_or;
+    auto cleanup = cleanUpHelper(context);
+    EXPECT_EQ(size.value_or(0), dynamic_cast<ContextImpl&>(*context).readAheadBufferSize());
+  }
+}
+
+TEST_F(SslContextImplTest, ServerReadAheadBufferSize) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+  )EOF";
+  for (const std::optional<uint32_t> size :
+       std::vector<std::optional<uint32_t>>{std::nullopt, 0, 1, 32768, 65536}) {
+    SCOPED_TRACE(size.has_value() ? std::to_string(*size) : "default");
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+    if (size.has_value()) {
+      tls_context.mutable_common_tls_context()->mutable_read_ahead_buffer_size()->set_value(*size);
+    }
+    auto config = ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+    ASSERT_OK(config.status());
+    EXPECT_EQ(size.value_or(0), (*config)->readAheadBufferSize());
+
+    auto context_or = manager_.createSslServerContext(*store_.rootScope(), **config, nullptr);
+    ASSERT_OK(context_or.status());
+    Ssl::ServerContextSharedPtr context = *context_or;
+    auto cleanup = cleanUpHelper(context);
+    EXPECT_EQ(size.value_or(0), dynamic_cast<ContextImpl&>(*context).readAheadBufferSize());
+  }
+}
+
+TEST_F(SslContextImplTest, ReadAheadBufferSizeFullRange) {
+  for (const uint32_t size : {65537u, std::numeric_limits<uint32_t>::max()}) {
+    SCOPED_TRACE(size);
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+    client_tls_context.mutable_common_tls_context()->mutable_read_ahead_buffer_size()->set_value(
+        size);
+    EXPECT_NO_THROW(TestUtility::validate(client_tls_context));
+    auto client_config = ClientContextConfigImpl::create(client_tls_context, factory_context_);
+    ASSERT_OK(client_config.status());
+    EXPECT_EQ(size, (*client_config)->readAheadBufferSize());
+
+    const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+    )EOF";
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), server_tls_context);
+    server_tls_context.mutable_common_tls_context()->mutable_read_ahead_buffer_size()->set_value(
+        size);
+    EXPECT_NO_THROW(TestUtility::validate(server_tls_context));
+    auto server_config =
+        ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
+    ASSERT_OK(server_config.status());
+    EXPECT_EQ(size, (*server_config)->readAheadBufferSize());
+  }
+}
 
 // The session context id binds resumption to the certificate validation configuration. Two contexts
 // that differ only in the trust anchor produce different ids, and an identical configuration

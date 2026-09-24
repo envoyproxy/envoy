@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
@@ -69,6 +70,11 @@ public:
    * @return The maximum TLS protocol version to negotiate.
    */
   virtual unsigned maxProtocolVersion() const PURE;
+
+  /**
+   * @return the ciphertext read-ahead buffer size in bytes, or zero to disable read-ahead.
+   */
+  virtual uint32_t readAheadBufferSize() const { return 0; }
 
   /**
    * @return true if the ContextConfig is able to provide secrets to create SSL context,
