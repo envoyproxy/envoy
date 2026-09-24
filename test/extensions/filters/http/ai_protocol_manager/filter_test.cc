@@ -6,16 +6,20 @@
 #include "envoy/data/ai/v3/token_usage.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/http/codes.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/coroutine/status_macros.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
@@ -2319,6 +2323,313 @@ TEST_F(AiProtocolManagerFilterTest,
   EXPECT_EQ(
       encoded_injected_.toString(),
       R"({"model":"gpt-4","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12},"tagged":true})");
+}
+
+// What the manager handed an AI filter factory for the stream.
+struct SeenContext {
+  LLMProtocol request_protocol;
+  LLMProtocol upstream_protocol;
+};
+
+AiFilterFactoryCb recordingContext(std::optional<SeenContext>& seen) {
+  return [&seen](const AiFilterContext& context) -> AiFilterSharedPtr {
+    seen = SeenContext{context.request_protocol, context.upstream_protocol};
+    return nullptr;
+  };
+}
+
+void setRequestProtocolState(StreamInfo::StreamInfo& stream_info, LLMProtocol protocol) {
+  stream_info.filterState()->setData(RequestLlmProtocol::kFilterStateKey,
+                                     std::make_shared<RequestLlmProtocol>(protocol),
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
+}
+
+class AiProtocolManagerRequestProtocolTest : public AiProtocolManagerFilterTest {
+public:
+  void setRouteProtocol(envoy::type::ai::v3::LLMProtocol protocol) {
+    PerRouteProto proto;
+    proto.mutable_request()->set_llm_protocol(protocol);
+    route_config_ = std::make_unique<RouteConfig>(proto);
+    ON_CALL(callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(testing::Return(route_config_.get()));
+  }
+
+  // Runs a chat completions payload through a filter recording the stream's context.
+  void runRecording() {
+    createFilterWithAiFilters({recordingContext(seen_)});
+    ASSERT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+    Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+    EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+    drain();
+    EXPECT_EQ(local_reply_calls_, 0);
+  }
+
+  LLMProtocol pinnedProtocol() {
+    return RequestLlmProtocol::fromFilterState(*callbacks_.stream_info_.filterState());
+  }
+
+  std::optional<SeenContext> seen_;
+};
+
+// Downstream, the route's protocol is pinned in filter state before any AI filter runs.
+TEST_F(AiProtocolManagerRequestProtocolTest, PinsTheRouteProtocolDownstream) {
+  setRouteProtocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  runRecording();
+
+  EXPECT_EQ(pinnedProtocol(), LLMProtocol::OpenAiChatCompletions);
+  ASSERT_TRUE(seen_.has_value());
+  EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen_->upstream_protocol, LLMProtocol::Unspecified);
+  EXPECT_EQ(counterValue("request_protocol_overridden"), 0);
+}
+
+// A route that declares a request without naming its API has nothing to pin.
+TEST_F(AiProtocolManagerRequestProtocolTest, RouteWithoutProtocolPinsNothing) {
+  setRouteProtocol(envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED);
+  runRecording();
+
+  EXPECT_FALSE(
+      callbacks_.stream_info_.filterState()->hasDataWithName(RequestLlmProtocol::kFilterStateKey));
+  ASSERT_TRUE(seen_.has_value());
+  EXPECT_EQ(seen_->request_protocol, LLMProtocol::Unspecified);
+}
+
+// A protocol in filter state makes the request an AI request even on a route that declares none,
+// and is parsed strictly.
+TEST_F(AiProtocolManagerRequestProtocolTest, FilterStateProtocolOnSilentRouteIsParsed) {
+  setRequestProtocolState(callbacks_.stream_info_, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body("{\"model\":");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(counterValue("request_parse_error"), 1);
+}
+
+TEST_F(AiProtocolManagerRequestProtocolTest, FilterStateProtocolRunsTheAiFilters) {
+  setRequestProtocolState(callbacks_.stream_info_, LLMProtocol::OpenAiChatCompletions);
+  runRecording();
+
+  ASSERT_TRUE(seen_.has_value());
+  EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
+}
+
+TEST_F(AiProtocolManagerRequestProtocolTest, FilterStateOverridesTheRoute) {
+  setRouteProtocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  setRequestProtocolState(callbacks_.stream_info_, LLMProtocol::OpenAiChatCompletions);
+  runRecording();
+
+  ASSERT_TRUE(seen_.has_value());
+  EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(pinnedProtocol(), LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(counterValue("request_protocol_overridden"), 1);
+}
+
+TEST_F(AiProtocolManagerRequestProtocolTest, AgreeingFilterStateIsNotAnOverride) {
+  setRouteProtocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  setRequestProtocolState(callbacks_.stream_info_, LLMProtocol::OpenAiChatCompletions);
+  runRecording();
+
+  EXPECT_EQ(counterValue("request_protocol_overridden"), 0);
+}
+
+// An object naming no protocol leaves the route's standing, and is not replaced.
+TEST_F(AiProtocolManagerRequestProtocolTest, UnspecifiedFilterStateDefersToTheRoute) {
+  setRouteProtocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  setRequestProtocolState(callbacks_.stream_info_, LLMProtocol::Unspecified);
+  runRecording();
+
+  ASSERT_TRUE(seen_.has_value());
+  EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(pinnedProtocol(), LLMProtocol::Unspecified);
+  EXPECT_EQ(counterValue("request_protocol_overridden"), 0);
+}
+
+class FakeUpstreamStreamFilterCallbacks : public Http::UpstreamStreamFilterCallbacks {
+public:
+  StreamInfo::StreamInfo& upstreamStreamInfo() override { return stream_info_; }
+  OptRef<Router::GenericUpstream> upstream() override { return {}; }
+  void dumpState(std::ostream&, int) const override {}
+  bool pausedForConnect() const override { return false; }
+  void setPausedForConnect(bool) override {}
+  bool pausedForWebsocketUpgrade() const override { return false; }
+  void setPausedForWebsocketUpgrade(bool) override {}
+  bool pausedForGenericUpgrade() const override { return false; }
+  void setPausedForGenericUpgrade(bool) override {}
+  void disableRouteTimeoutForWebsocketUpgrade() override {}
+  void disablePerTryTimeoutForWebsocketUpgrade() override {}
+  const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
+    return options_;
+  }
+  void addUpstreamCallbacks(Http::UpstreamCallbacks&) override {}
+  void setUpstreamToDownstream(Router::UpstreamToDownstream&) override {}
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  Http::ConnectionPool::Instance::StreamOptions options_{false, false};
+};
+
+void setFilterStateTarget(StreamInfo::StreamInfo& stream_info, absl::string_view json) {
+  const auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
+          UpstreamTargetState::kFilterStateKey);
+  ASSERT_NE(factory, nullptr);
+  std::shared_ptr<StreamInfo::FilterState::Object> object = factory->createFromBytes(json);
+  ASSERT_NE(object, nullptr);
+  stream_info.filterState()->setData(UpstreamTargetState::kFilterStateKey, std::move(object),
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
+}
+
+// The manager in a cluster's upstream filter chain.
+class AiProtocolManagerUpstreamTest : public AiProtocolManagerRequestProtocolTest {
+public:
+  AiProtocolManagerUpstreamTest() {
+    ON_CALL(callbacks_, upstreamCallbacks())
+        .WillByDefault(
+            testing::Return(OptRef<Http::UpstreamStreamFilterCallbacks>{upstream_callbacks_}));
+  }
+
+  FakeUpstreamStreamFilterCallbacks upstream_callbacks_;
+};
+
+// Without a target the upstream protocol is unspecified, and upstream never pins the protocol.
+TEST_F(AiProtocolManagerUpstreamTest, NoTarget) {
+  setRouteProtocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  runRecording();
+
+  ASSERT_TRUE(seen_.has_value());
+  EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen_->upstream_protocol, LLMProtocol::Unspecified);
+  EXPECT_FALSE(
+      callbacks_.stream_info_.filterState()->hasDataWithName(RequestLlmProtocol::kFilterStateKey));
+  EXPECT_EQ(counterValue("upstream_target_from_filter_state"), 0);
+}
+
+// The downstream's pinned protocol is the one the upstream parses.
+TEST_F(AiProtocolManagerUpstreamTest, ReadsThePinnedProtocol) {
+  setRouteProtocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  setRequestProtocolState(callbacks_.stream_info_, LLMProtocol::OpenAiChatCompletions);
+  runRecording();
+
+  ASSERT_TRUE(seen_.has_value());
+  EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
+}
+
+TEST_F(AiProtocolManagerUpstreamTest, TargetFromFilterState) {
+  setRouteProtocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  setFilterStateTarget(callbacks_.stream_info_, R"({"llm_protocol":"GEMINI_GENERATE_CONTENT"})");
+  runRecording();
+
+  ASSERT_TRUE(seen_.has_value());
+  EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen_->upstream_protocol, LLMProtocol::GeminiGenerateContent);
+  EXPECT_EQ(counterValue("upstream_target_from_filter_state"), 1);
+}
+
+// Something other than a target under the key, which only the factory could have validated, is
+// not a target.
+TEST_F(AiProtocolManagerUpstreamTest, ForeignFilterStateObjectIsIgnored) {
+  setRouteProtocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  callbacks_.stream_info_.filterState()->setData(
+      UpstreamTargetState::kFilterStateKey,
+      std::make_shared<Router::StringAccessorImpl>(R"({"llm_protocol":"GEMINI_GENERATE_CONTENT"})"),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  runRecording();
+
+  ASSERT_TRUE(seen_.has_value());
+  EXPECT_EQ(seen_->upstream_protocol, LLMProtocol::Unspecified);
+  EXPECT_EQ(counterValue("upstream_target_from_filter_state"), 0);
+}
+
+// The protocol token extraction reads a response as, seen on the record of a response too large to
+// parse.
+class AiProtocolManagerExtractionProtocolTest : public AiProtocolManagerFilterResponseTest {
+public:
+  void SetUp() override {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    auto* token_usage = proto_config.mutable_response_handling()->mutable_token_usage();
+    token_usage->set_include_unconfigured_routes(true);
+    token_usage->mutable_limits()->mutable_max_json_body_size()->set_value(64);
+    setupWithProto(proto_config);
+  }
+
+  // Runs the request side as an upstream instance, which has no request handling configured.
+  void placeUpstream() {
+    ON_CALL(decoder_callbacks_, upstreamCallbacks())
+        .WillByDefault(
+            testing::Return(OptRef<Http::UpstreamStreamFilterCallbacks>{upstream_callbacks_}));
+    Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/chat/completions"}};
+    EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/true),
+              Http::FilterHeadersStatus::Continue);
+  }
+
+  void setRequestProtocol(LLMProtocol protocol) {
+    setRequestProtocolState(encoder_callbacks_.stream_info_, protocol);
+  }
+
+  void setRouteResponseProtocol(envoy::type::ai::v3::LLMProtocol protocol) {
+    PerRouteProto proto;
+    proto.mutable_response()->set_llm_protocol(protocol);
+    setEncodeRouteConfig(proto);
+  }
+
+  envoy::type::ai::v3::LLMProtocol extractionProtocol() {
+    Http::TestResponseHeaderMapImpl headers{
+        {":status", "200"}, {"content-type", "application/json"}, {"content-length", "100"}};
+    EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
+    sendData(std::string(100, 'x'), true);
+    const auto typed = singleTypedWrite("envoy.ai.token_usage");
+    EXPECT_TRUE(typed.has_value());
+    return typed.has_value() ? typed->llm_protocol()
+                             : envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED;
+  }
+
+  FakeUpstreamStreamFilterCallbacks upstream_callbacks_;
+};
+
+TEST_F(AiProtocolManagerExtractionProtocolTest, RequestProtocolFromFilterState) {
+  setRequestProtocol(LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(extractionProtocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+}
+
+TEST_F(AiProtocolManagerExtractionProtocolTest, FilterStateProtocolWinsOverTheRouteRequest) {
+  PerRouteProto proto;
+  proto.mutable_request()->set_llm_protocol(envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  setEncodeRouteConfig(proto);
+  setRequestProtocol(LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(extractionProtocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+}
+
+TEST_F(AiProtocolManagerExtractionProtocolTest, RouteResponseProtocolWinsOverTheRequest) {
+  setRequestProtocol(LLMProtocol::AnthropicMessages);
+  setRouteResponseProtocol(envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  EXPECT_EQ(extractionProtocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+}
+
+// The upstream's raw response is in the target's protocol, whatever the client speaks.
+TEST_F(AiProtocolManagerExtractionProtocolTest, UpstreamTargetProtocolWins) {
+  setRequestProtocol(LLMProtocol::AnthropicMessages);
+  setRouteResponseProtocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  setFilterStateTarget(decoder_callbacks_.stream_info_,
+                       R"({"llm_protocol":"GEMINI_GENERATE_CONTENT"})");
+  placeUpstream();
+  EXPECT_EQ(extractionProtocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+}
+
+TEST_F(AiProtocolManagerExtractionProtocolTest, UpstreamWithoutTargetUsesTheRequestProtocol) {
+  setRequestProtocol(LLMProtocol::AnthropicMessages);
+  placeUpstream();
+  EXPECT_EQ(extractionProtocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+}
+
+TEST_F(AiProtocolManagerExtractionProtocolTest, DownstreamIgnoresTheTarget) {
+  setRequestProtocol(LLMProtocol::AnthropicMessages);
+  setFilterStateTarget(decoder_callbacks_.stream_info_,
+                       R"({"llm_protocol":"GEMINI_GENERATE_CONTENT"})");
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/chat/completions"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/true),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(extractionProtocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(counterValue("upstream_target_from_filter_state"), 0);
 }
 
 } // namespace

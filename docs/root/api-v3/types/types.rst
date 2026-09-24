@@ -6,6 +6,7 @@ Types
   :maxdepth: 2
 
   ../type/ai/v3/llm_protocol.proto
+  ../type/ai/v3/upstream_target.proto
   ../type/matcher/v3/http_inputs.proto
   ../type/tracing/v3/custom_tag.proto
   ../type/v3/hash_policy.proto

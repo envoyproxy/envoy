@@ -149,6 +149,64 @@ does not parse is forwarded unchanged.
       request_handling:
         parse_unconfigured_routes: true
 
+.. _config_http_filters_ai_protocol_manager_protocol_filter_state:
+
+Request and upstream APIs
+-------------------------
+
+Two filter state keys name the wire APIs of a stream: the client's and the upstream's. The filter
+reads ``envoy.ai.upstream_target`` when the request headers arrive. It reads
+``envoy.ai.llm_protocol.request`` then to parse the payload, and again when the response headers
+arrive to extract token usage. Place the filter that writes either key before it.
+
+``envoy.ai.llm_protocol.request``
+  The API the client's request follows, as an :ref:`LLMProtocol
+  <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` value name such as ``ANTHROPIC_MESSAGES``. It takes
+  precedence over the route's request declaration, and makes the request a declared AI endpoint
+  even on a route that declares none. It only decides how the client's own payload is parsed, so it
+  may be derived from the request, for example from a header. When the filter in the downstream
+  filter chain parses a request under the route's declared API and the key is unset, it writes that
+  API there. Parsing requires ``request_handling`` to be set and the request to have a body. An
+  instance in a cluster's upstream filter chain then parses the request the same way, even if a
+  later filter re-resolves the route.
+
+``envoy.ai.upstream_target``
+  In a cluster's upstream filter chain only, the :ref:`UpstreamTarget
+  <envoy_v3_api_msg_type.ai.v3.UpstreamTarget>` as JSON, such as
+  ``{"llm_protocol": "GEMINI_GENERATE_CONTENT"}``. It is the complete description of the upstream
+  the request is sent to, and carries the API that upstream speaks: token usage is extracted from
+  the upstream's response in that API. Because it describes where the request goes, only trusted,
+  configuration-driven writers may set it, and it must never be derived from request content. When
+  the :ref:`set_filter_state filter <config_http_filters_set_filter_state>` writes it, use a
+  constant JSON value with no substitution.
+
+.. code-block:: yaml
+
+  # A downstream filter, before the AI Protocol Manager.
+  - name: envoy.filters.http.set_filter_state
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+      on_request_headers:
+      - object_key: envoy.ai.llm_protocol.request
+        format_string:
+          text_format_source:
+            inline_string: ANTHROPIC_MESSAGES
+
+  # The route to a Gemini cluster whose upstream filter chain runs the AI Protocol Manager.
+  routes:
+  - match:
+      prefix: /
+    route:
+      cluster: gemini
+    typed_per_filter_config:
+      envoy.filters.http.set_filter_state:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+        on_request_headers:
+        - object_key: envoy.ai.upstream_target
+          format_string:
+            text_format_source:
+              inline_string: '{"llm_protocol": "GEMINI_GENERATE_CONTENT"}'
+
 .. _config_http_filters_ai_protocol_manager_ai_filters:
 
 AI filters
@@ -160,8 +218,8 @@ is replayed, the filter runs the configured :ref:`AI filters
 in order over the parsed document; they require ``request_handling``. An AI
 filter (category ``envoy.http.ai_filters``)
 may read or modify the document, or reject the request with a local reply.
-Routes without a per-route request declaration, and requests without a body,
-run no AI filters.
+Routes without a per-route request declaration or an ``envoy.ai.llm_protocol.request`` filter
+state, and requests without a body, run no AI filters.
 
 Request info
 ~~~~~~~~~~~~
@@ -185,8 +243,8 @@ tool counts as :ref:`envoy.data.ai.v3.RequestInfo
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
 
-Attributes are read according to the route's declared :ref:`wire API
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`:
+Attributes are read according to the request's :ref:`wire API
+<config_http_filters_ai_protocol_manager_protocol_filter_state>`:
 
 .. csv-table::
   :header: Attribute, OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, Gemini
@@ -304,8 +362,10 @@ Both streaming shapes are handled:
   body is a root-level JSON array of chunks.
 
 The response's :ref:`wire API <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` is
-resolved in precedence order: the route's declared response API, the route's
-declared request API, then :ref:`default_llm_protocol
+the :ref:`upstream target's <config_http_filters_ai_protocol_manager_protocol_filter_state>` in a
+cluster's upstream filter chain that has one. Otherwise it is resolved in precedence order: the
+route's declared response API, the request's API (the ``envoy.ai.llm_protocol.request`` filter
+state, else the route's declared request API), then :ref:`default_llm_protocol
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.default_llm_protocol>`;
 when none is declared it is auto-detected from the response shape (only
 strong, dialect-unique markers lock detection).
@@ -471,8 +531,10 @@ handling must live on the cluster — for example a dynamic-forward-proxy egress
 cluster whose destination is only known per request. The upstream installation
 is the full filter: the request-path offload/replay runs there too, once per
 retry or hedged attempt, with the caveats described under the request payload
-offload section above. Response token-usage extraction behaves identically in
-either chain.
+offload section above. Response token-usage extraction works the same in either
+chain, except that an upstream instance with an :ref:`upstream target
+<config_http_filters_ai_protocol_manager_protocol_filter_state>` extracts in the
+target's API.
 
 Typed dynamic metadata written from the upstream installation lands on the
 downstream stream's metadata and is visible to downstream typed-metadata
@@ -522,8 +584,10 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   request_parse_error, Counter, A declared AI endpoint's payload was not well-formed JSON and was rejected with a 400.
   request_schema_invalid, Counter, "A declared AI endpoint's payload parsed but violated its API's payload schema, and was rejected with a 400."
   request_passthrough, Counter, "A payload on an unconfigured route failed to parse under :ref:`parse_unconfigured_routes <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>` and was forwarded unchanged; never a request failure."
+  request_protocol_overridden, Counter, "The ``envoy.ai.llm_protocol.request`` filter state named a request API other than the one the route declares, and was used."
   request_external_buffer_error, Counter, The external buffer failed irrecoverably on the request path and the stream was answered with a 500.
   response_external_buffer_error, Counter, The external buffer failed irrecoverably on the response path and the stream was answered with a 500.
+  upstream_target_from_filter_state, Counter, An upstream instance took its upstream target from the ``envoy.ai.upstream_target`` filter state.
   token_usage_found, Counter, A response yielded token usage and metadata was written (includes ``PARTIAL`` records).
   token_usage_partial, Counter, A published record was flagged ``extraction_status: PARTIAL``.
   token_usage_failed, Counter, A status-only record was published (``extraction_status: FAILED``; no counts recovered).

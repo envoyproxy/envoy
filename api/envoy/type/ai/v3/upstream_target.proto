@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.type.ai.v3;
+
+import "envoy/type/ai/v3/llm_protocol.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.type.ai.v3";
+option java_outer_classname = "UpstreamTargetProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/ai/v3;aiv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: AI upstream target]
+
+// The complete description of the upstream a request is sent to. It describes where the request
+// goes, so only trusted, configuration-driven writers may set it, and it must never be derived from
+// request content.
+message UpstreamTarget {
+  // The protocol the upstream serves. Required: ``LLM_PROTOCOL_UNSPECIFIED`` is rejected.
+  LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
+}

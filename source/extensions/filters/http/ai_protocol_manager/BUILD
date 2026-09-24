@@ -123,6 +123,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "llm_protocol_state_lib",
+    srcs = ["llm_protocol_state.cc"],
+    hdrs = ["llm_protocol_state.h"],
+    deps = [
+        ":llm_protocol_conversion_lib",
+        ":token_usage_lib",
+        "//envoy/registry",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "llm_protocol_adapters_lib",
     srcs = ["llm_protocol_adapters.cc"],
     deps = [
@@ -410,6 +427,7 @@ envoy_cc_library(
         ":json_with_ext_buf_lib",
         ":json_with_ext_buf_parser_lib",
         ":llm_protocol_conversion_lib",
+        ":llm_protocol_state_lib",
         ":response_handler_lib",
         ":schema_lib",
         ":serializer_lib",
@@ -419,6 +437,7 @@ envoy_cc_library(
         "//envoy/router:router_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/stats:stats_interface",
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",

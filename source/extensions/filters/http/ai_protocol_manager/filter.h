@@ -154,6 +154,12 @@ private:
 // rules out gRPC and Connect streaming, upgrades, and CONNECT. A declared
 // endpoint carries no such gate.
 //
+// The request's wire API is the envoy.ai.llm_protocol.request filter state when set, which also
+// makes the request a declared AI endpoint, and the route's declaration otherwise; a downstream
+// instance pins the route's in that filter state so re-routing cannot change what was parsed. An
+// upstream instance also reads the wire API its upstream speaks from the envoy.ai.upstream_target
+// filter state.
+//
 // A declared wire API with a registered payload schema is validated at end of
 // payload (schema/schema_registry.h), then the configured AI filters run over the
 // parsed document (filter_manager.h); normalization comes later.
@@ -196,9 +202,15 @@ private:
   // Terminates the stream with a 400 for a payload that failed to parse.
   void rejectInvalidPayload(const absl::Status& status);
 
-  // Whether the route handed its request payload to the filter, which is also
-  // what makes a parse failure fatal.
-  bool isAiEndpoint() const { return route_has_request_; }
+  // Whether the route or the request's filter state handed its payload to the
+  // filter, which is also what makes a parse failure fatal.
+  bool isAiEndpoint() const { return route_has_request_ || protocol_from_filter_state_; }
+
+  // The client's wire API: the filter state's, otherwise the route's, which a
+  // downstream instance then pins in filter state.
+  void resolveRequestProtocol(LLMProtocol route_protocol);
+
+  void resolveUpstreamProtocol();
 
   // The inline-string threshold for this stream: the route's payload schema
   // when it pins one, otherwise the filter's configured default.
@@ -231,11 +243,15 @@ private:
   FilterChainBridgePtr encode_bridge_;
   BufferManagerPtr encode_manager_;
 
-  // Copied out of the route configuration rather than held by pointer: the route
-  // can be re-resolved mid-stream, which would leave a cached pointer dangling,
-  // and these are two scalars.
+  // Resolved in decodeHeaders() from the request's filter state or the route and
+  // copied rather than held by pointer: the route can be re-resolved mid-stream,
+  // which would leave a cached pointer dangling.
   bool route_has_request_{false};
-  LLMProtocol route_request_protocol_{LLMProtocol::Unspecified};
+  LLMProtocol request_protocol_{LLMProtocol::Unspecified};
+  bool protocol_from_filter_state_{false};
+
+  bool upstream_placement_{false};
+  LLMProtocol upstream_protocol_{LLMProtocol::Unspecified};
 
   JsonWithExtBuf request_json_;
   // Cleared once parsing is done with, whether it completed, was abandoned, or

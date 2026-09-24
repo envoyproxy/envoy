@@ -132,10 +132,14 @@ using AiFilterSharedPtr = std::shared_ptr<AiFilter>;
 struct AiFilterContext {
   StreamInfo::StreamInfo& stream_info;
   const Http::RequestHeaderMap& request_headers;
-  // Route-declared request wire API; Unspecified when the route named none.
+  // The client's wire API: the envoy.ai.llm_protocol.request filter state, otherwise the route's
+  // declaration; Unspecified when neither names one.
   LLMProtocol request_protocol;
   // Bytes of the buffered request payload, captured before replay drains it.
   uint64_t request_payload_bytes{0};
+  // The upstream's wire API from the envoy.ai.upstream_target filter state, in a cluster's
+  // upstream filter chain only; Unspecified downstream or when the filter state is unset.
+  LLMProtocol upstream_protocol{LLMProtocol::Unspecified};
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.

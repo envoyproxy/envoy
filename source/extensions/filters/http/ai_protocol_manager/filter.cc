@@ -5,6 +5,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/data/ai/v3/token_usage.pb.h"
 #include "envoy/http/codes.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
@@ -17,6 +18,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "absl/strings/match.h"
@@ -224,6 +226,10 @@ void AiProtocolManagerFilter::onDestroy() {
 Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                                  bool end_stream) {
   request_headers_ = &headers;
+  if (decoder_callbacks_->upstreamCallbacks().has_value()) {
+    upstream_placement_ = true;
+    resolveUpstreamProtocol();
+  }
   // Request-side processing is off entirely; per-route declarations still
   // matter to the encode path, which resolves them itself.
   if (!config_->requestHandlingEnabled()) {
@@ -239,15 +245,16 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
 
   // Copy what the route declared; see the note on route_has_request_ for why the
   // config is not held by pointer.
+  LLMProtocol route_protocol = LLMProtocol::Unspecified;
   if (const RouteConfig* route_config =
           Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(decoder_callbacks_);
       route_config != nullptr) {
     route_has_request_ = route_config->hasRequest();
-    route_request_protocol_ = route_config->requestProtocol();
-    if (route_has_request_) {
-      ENVOY_LOG(debug, "ai_protocol_manager: route declares request API {}",
-                llmProtocolName(route_request_protocol_));
-    }
+    route_protocol = route_config->requestProtocol();
+  }
+  resolveRequestProtocol(route_protocol);
+  if (isAiEndpoint()) {
+    ENVOY_LOG(debug, "ai_protocol_manager: request API {}", llmProtocolName(request_protocol_));
   }
 
   // A declared AI endpoint is parsed strictly. Any other route is parsed only if
@@ -284,13 +291,42 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   return Http::FilterHeadersStatus::StopIteration;
 }
 
+void AiProtocolManagerFilter::resolveRequestProtocol(LLMProtocol route_protocol) {
+  StreamInfo::FilterState& filter_state = *decoder_callbacks_->streamInfo().filterState();
+  if (const LLMProtocol state_protocol = RequestLlmProtocol::fromFilterState(filter_state);
+      state_protocol != LLMProtocol::Unspecified) {
+    if (route_protocol != LLMProtocol::Unspecified && route_protocol != state_protocol) {
+      config_->stats().request_protocol_overridden_.inc();
+    }
+    request_protocol_ = state_protocol;
+    protocol_from_filter_state_ = true;
+    return;
+  }
+  request_protocol_ = route_protocol;
+  if (!upstream_placement_ && route_protocol != LLMProtocol::Unspecified &&
+      !filter_state.hasDataWithName(RequestLlmProtocol::kFilterStateKey)) {
+    filter_state.setData(RequestLlmProtocol::kFilterStateKey,
+                         std::make_shared<RequestLlmProtocol>(route_protocol),
+                         StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+}
+
+void AiProtocolManagerFilter::resolveUpstreamProtocol() {
+  if (const auto* state =
+          decoder_callbacks_->streamInfo().filterState()->getDataReadOnly<UpstreamTargetState>(
+              UpstreamTargetState::kFilterStateKey);
+      state != nullptr) {
+    upstream_protocol_ = state->protocol();
+    config_->stats().upstream_target_from_filter_state_.inc();
+  }
+}
+
 uint32_t AiProtocolManagerFilter::inlineStringThresholdBytes() const {
   // The filter's configured value is the default. A declared endpoint's payload
   // schema may pin its own, because what has to stay inline for the payload to
   // validate is a property of the wire API, not of the deployment.
   if (isAiEndpoint()) {
-    if (const PayloadSchema* payload_schema =
-            AdapterRegistry::get(route_request_protocol_).schema();
+    if (const PayloadSchema* payload_schema = AdapterRegistry::get(request_protocol_).schema();
         payload_schema != nullptr) {
       if (const std::optional<uint32_t> pinned =
               payload_schema->requestInlineStringThresholdBytes();
@@ -342,8 +378,7 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
     if (isAiEndpoint()) {
       // TODO(penguingao): Support validating payload schema on the fly as the Wuffs parser
       // streams and parses chunks, rejecting invalid fields early before end_stream.
-      if (const PayloadSchema* payload_schema =
-              AdapterRegistry::get(route_request_protocol_).schema();
+      if (const PayloadSchema* payload_schema = AdapterRegistry::get(request_protocol_).schema();
           payload_schema != nullptr) {
         const absl::Status validation_status = payload_schema->validateRequest(request_json_);
         if (!validation_status.ok()) {
@@ -452,7 +487,7 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
     const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
-                                  route_request_protocol_, decode_manager_->length()};
+                                  request_protocol_, decode_manager_->length(), upstream_protocol_};
     std::vector<AiFilterSharedPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());
     for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
@@ -565,13 +600,23 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   }
 
   if (want_token_usage) {
-    // The wire API to extract against, in precedence order: the route's declared
-    // response API, the route's declared request API, the configured fallback;
-    // Unspecified auto-detects from the response shape.
+    // The wire API to extract against. An upstream instance with a target sees
+    // the upstream's raw response, in the target's API. Otherwise, in precedence
+    // order: the route's declared response API, the request's API, the configured
+    // fallback; Unspecified auto-detects from the response shape.
     LLMProtocol protocol = config_->defaultLLMProtocol();
-    if (route_config != nullptr &&
-        route_config->effectiveResponseProtocol() != LLMProtocol::Unspecified) {
-      protocol = route_config->effectiveResponseProtocol();
+    LLMProtocol request_protocol =
+        RequestLlmProtocol::fromFilterState(*encoder_callbacks_->streamInfo().filterState());
+    if (request_protocol == LLMProtocol::Unspecified && route_config != nullptr) {
+      request_protocol = route_config->requestProtocol();
+    }
+    if (upstream_protocol_ != LLMProtocol::Unspecified) {
+      protocol = upstream_protocol_;
+    } else if (route_config != nullptr &&
+               route_config->responseProtocol() != LLMProtocol::Unspecified) {
+      protocol = route_config->responseProtocol();
+    } else if (request_protocol != LLMProtocol::Unspecified) {
+      protocol = request_protocol;
     }
 
     // Observation buffers charge the stream's memory account when tracking is
