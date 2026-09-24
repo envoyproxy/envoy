@@ -5703,6 +5703,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
 }
 
 TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   enableRedirects();
   sendRequest(false);
 
