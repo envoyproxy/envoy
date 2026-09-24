@@ -8,6 +8,7 @@
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 
+#include "source/common/common/macros.h"
 #include "source/common/config/resource_name.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -15,25 +16,37 @@
 namespace Envoy {
 namespace Config {
 
+namespace {
+
+using DependentTypeUrls = absl::flat_hash_map<std::string, std::vector<std::string>>;
+
+const DependentTypeUrls& dependentTypeUrlsMap() {
+  CONSTRUCT_ON_FIRST_USE(
+      DependentTypeUrls,
+      DependentTypeUrls{
+          {Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
+           {Envoy::Config::getTypeUrl<envoy::config::route::v3::VirtualHost>()}},
+          {Envoy::Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
+           {Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>()}},
+          {Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+           {Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>()}},
+          {Envoy::Config::getTypeUrl<envoy::config::listener::v3::Listener>(),
+           {Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
+            Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
+            Config::getTypeUrl<envoy::config::route::v3::VirtualHost>(),
+            Config::getTypeUrl<envoy::config::listener::v3::FilterChain>(),
+            Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()}},
+          {Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(),
+           {Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
+            Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()}},
+      });
+}
+
+} // namespace
+
 const std::vector<std::string>& dependentTypeUrls(absl::string_view type_url) {
-  static const absl::flat_hash_map<std::string, std::vector<std::string>> dependent_type_urls = {
-      {Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
-       {Envoy::Config::getTypeUrl<envoy::config::route::v3::VirtualHost>()}},
-      {Envoy::Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
-       {Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>()}},
-      {Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-       {Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>()}},
-      {Envoy::Config::getTypeUrl<envoy::config::listener::v3::Listener>(),
-       {Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
-        Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
-        Config::getTypeUrl<envoy::config::route::v3::VirtualHost>(),
-        Config::getTypeUrl<envoy::config::listener::v3::FilterChain>(),
-        Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()}},
-      {Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(),
-       {Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-        Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
-        Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()}},
-  };
+  const auto& dependent_type_urls = dependentTypeUrlsMap();
   static const std::vector<std::string> empty;
 
   const auto it = dependent_type_urls.find(type_url);
