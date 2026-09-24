@@ -21,7 +21,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.rate_limit_descriptors.expr"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/protobuf:utility_lib",

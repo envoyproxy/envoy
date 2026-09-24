@@ -23,7 +23,7 @@ envoy_cc_test(
         "//conditions:default": ["-Wno-unused-parameter"],
     }),
     data = ["//test/common/tls/test_data:certs"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/quic/platform:quiche_flags_impl_lib",

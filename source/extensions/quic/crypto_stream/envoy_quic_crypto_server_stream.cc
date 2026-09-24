@@ -22,11 +22,19 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support");
   const bool keylog_support =
       Runtime::runtimeFeatureEnabled("envoy.restart_features.quic_keylog_support");
-  if (!transport_socket_factory.has_value() || (!ticket_support && !keylog_support)) {
+  if (!transport_socket_factory.has_value()) {
     return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
   }
 
   auto& factory = static_cast<const QuicServerTransportSocketFactory&>(*transport_socket_factory);
+  // The Envoy handshaker validates the downstream client certificate against the matched filter
+  // chain's context, so it is used whenever the chain requires or validates a client certificate.
+  const bool validates_client_cert =
+      factory.requiresClientCertificate() || factory.clientCertificateValidationConfigured();
+  if (!ticket_support && !keylog_support && !validates_client_cert) {
+    return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
+  }
+
   Ssl::ServerContextSharedPtr pinned_ssl_ctx = factory.sslCtx();
   bool disable_resumption = false;
   if (ticket_support) {

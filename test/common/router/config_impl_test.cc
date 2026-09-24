@@ -411,6 +411,9 @@ TEST(RouteMatchContextTest, NoQueryString) {
 }
 
 TEST(RouteMatchContextTest, SanitizedPathStripsPathParams) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strip_path_parameters_per_segment", "false"}});
   Http::TestRequestHeaderMapImpl headers{{":path", "/foo;env=prod;ver=2?a=1"}};
   RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
 
@@ -427,6 +430,36 @@ TEST(RouteMatchContextTest, SanitizedPathNoOpWhenNotConfigured) {
 
   EXPECT_EQ(ctx.sanitizedPath(), "/foo;env=prod?a=1");
   EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo;env=prod");
+}
+
+TEST(RouteMatchContextTest, SanitizedPathStripsPathParamsPerSegmentEnabled) {
+  {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/foo;param=1/bar;param2=2?a=1"}};
+    RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
+
+    EXPECT_EQ(ctx.sanitizedPath(), "/foo/bar?a=1");
+    EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo/bar");
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/foo;a=1;b=2/bar;c=3"}};
+    RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
+
+    EXPECT_EQ(ctx.sanitizedPath(), "/foo/bar");
+    EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo/bar");
+  }
+}
+
+TEST(RouteMatchContextTest, SanitizedPathStripsPathParamsPerSegmentDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strip_path_parameters_per_segment", "false"}});
+
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo;param=1/bar;param2=2?a=1"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
+
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
 }
 
 TEST(RouteMatchContextTest, IsGrpc) {

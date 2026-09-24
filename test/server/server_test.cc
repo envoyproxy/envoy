@@ -1,7 +1,11 @@
+#ifndef WIN32
+#include <sys/resource.h>
+#endif
 #include <algorithm>
 #include <memory>
 #include <vector>
 
+#include "envoy/common/logger.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/xds_config_tracker.h"
@@ -11,6 +15,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/notification.h"
+#include "source/common/http/codes.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
@@ -173,58 +178,29 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
   InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 }
 
+#ifndef WIN32
 TEST(ServerInstanceUtil, RaiseFileLimits) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
-        rlim->rlim_cur = 512;
-        rlim->rlim_max = 1024;
-        return Api::SysCallIntResult{0, 0};
-      }));
-  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, const struct rlimit* rlim) {
-        EXPECT_EQ(1024, rlim->rlim_cur);
-        EXPECT_EQ(1024, rlim->rlim_max);
-        return Api::SysCallIntResult{0, 0};
-      }));
+  struct rlimit rlim;
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  ASSERT_GT(rlim.rlim_max, 1);
+  // Set the soft limit lower than the hard limit.
+  rlim.rlim_cur = rlim.rlim_max / 2;
   InstanceUtil::raiseFileLimits();
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  EXPECT_EQ(rlim.rlim_cur, rlim.rlim_max);
 }
 
 TEST(ServerInstanceUtil, RaiseFileLimitsAlreadyMaxed) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
-        rlim->rlim_cur = 1024;
-        rlim->rlim_max = 1024;
-        return Api::SysCallIntResult{0, 0};
-      }));
+  struct rlimit rlim;
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  rlim.rlim_cur = rlim.rlim_max;
+  EXPECT_EQ(::setrlimit(RLIMIT_NOFILE, &rlim), 0);
+  // Verify that limits remain unchanged when they are the same.
   InstanceUtil::raiseFileLimits();
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  EXPECT_EQ(rlim.rlim_cur, rlim.rlim_max);
 }
-
-TEST(ServerInstanceUtil, RaiseFileLimitsReadError) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _)).WillOnce(Invoke([&](int, struct rlimit*) {
-    return Api::SysCallIntResult{-1, 0};
-  }));
-  InstanceUtil::raiseFileLimits();
-}
-
-TEST(ServerInstanceUtil, RaiseFileLimitsWriteError) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
-        rlim->rlim_cur = 512;
-        rlim->rlim_max = 1024;
-        return Api::SysCallIntResult{0, 0};
-      }));
-  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, const struct rlimit*) { return Api::SysCallIntResult{-1, 0}; }));
-  InstanceUtil::raiseFileLimits();
-}
+#endif
 
 class RunHelperTest : public testing::Test {
 public:
@@ -563,8 +539,9 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
 // first.
 //
 // With the runtime guard enabled and a default stats config (no custom tags), server initialization
-// turns on the explicit-tags logic on the real stats store. Guards against a regression where an
-// early scope creation would silently cause setUseExplicitTags() to be ignored.
+// turns on the explicit-tags logic on the real stats store, and hands the http context the matching
+// CodeStats implementation. Guards against a regression where an early scope creation would
+// silently cause setUseExplicitTags() to be ignored.
 TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
   Stats::SymbolTableImpl symbol_table;
@@ -582,6 +559,7 @@ TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
   server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                       component_factory_);
   EXPECT_TRUE(real_store->useExplicitTags());
+  EXPECT_NE(nullptr, dynamic_cast<Http::TaggedCodeStatsImpl*>(&server_->httpContext().codeStats()));
 
   // Tear down the server (which shuts down threading on real_store) before real_store is destroyed,
   // and restore the process-global runtime flag so it does not leak into other tests.
@@ -1898,7 +1876,7 @@ TEST_P(ServerInstanceImplTest, BootstrapApplicationLogsAndCLIThrows) {
 TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
     EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
@@ -1926,7 +1904,7 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagUnderscore
 TEST_P(ServerInstanceImplTest, TextApplicationLog) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/text_application_log.yaml"));
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));

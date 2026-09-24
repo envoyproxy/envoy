@@ -19,10 +19,12 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/ext_proc:config",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:status_utility_lib",
     ],
@@ -88,7 +90,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     shard_count = 8,
     tags = ["skip_on_windows"],
     deps = [
@@ -223,7 +225,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":filter_test_common_lib",
@@ -251,7 +253,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/network:address_lib",
@@ -280,7 +282,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["state_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/ext_proc",
@@ -292,7 +294,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["ordering_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":mock_server_lib",
@@ -311,7 +313,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["client_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/http:header_map_lib",
@@ -335,7 +337,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":utils_lib",
@@ -352,7 +354,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["save_processing_response_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
@@ -366,7 +368,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["logging_info_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/ext_proc",
@@ -379,7 +381,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["mutation_utils_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":utils_lib",
@@ -444,7 +446,7 @@ envoy_extension_cc_test(
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
     ],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     shard_count = 8,
     tags = [
         "cpu:3",
@@ -503,7 +505,7 @@ envoy_extension_cc_test(
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
     ],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -554,7 +556,7 @@ envoy_extension_cc_test(
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
     ],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     shard_count = 8,
     tags = [
         "cpu:3",
@@ -635,7 +637,7 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.http.ext_proc",
     ],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     tags = [
         "cpu:3",
         "skip_on_windows",
@@ -661,7 +663,7 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.http.ext_proc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     tags = ["skip_on_windows"],
     deps = [
         ":utils_lib",
@@ -687,7 +689,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
         "skip_on_windows",
@@ -808,7 +810,7 @@ envoy_extension_cc_fuzz_test(
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
@@ -819,7 +821,7 @@ envoy_extension_cc_fuzz_test(
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
@@ -828,7 +830,7 @@ envoy_extension_cc_test(
     name = "ext_proc_benchmark_test",
     srcs = ["ext_proc_benchmark_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "no_san",
         "nocoverage",

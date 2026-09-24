@@ -28,10 +28,11 @@ namespace RateLimitQuota {
 using TlsStore = GlobalTlsStores::TlsStore;
 
 absl::StatusOr<Http::FilterFactoryCb>
-RateLimitQuotaFilterFactory::createFilterFactoryFromProtoTyped(
+RateLimitQuotaFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig&
         filter_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   // Filter config const object is created on the main thread and shared between
   // worker threads.
   FilterConfigConstSharedPtr config = std::make_shared<
@@ -45,7 +46,7 @@ RateLimitQuotaFilterFactory::createFilterFactoryFromProtoTyped(
   RateLimitQuotaValidationVisitor visitor;
   visitor.setSupportKeepMatching(true);
   Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext> matcher_factory(
-      action_context, context.serverFactoryContext(), visitor);
+      action_context, context, visitor);
 
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher = nullptr;
   if (config->has_bucket_matchers()) {
@@ -65,13 +66,15 @@ RateLimitQuotaFilterFactory::createFilterFactoryFromProtoTyped(
   RETURN_IF_NOT_OK_REF(tls_store_or.status());
   std::shared_ptr<TlsStore> tls_store = std::move(tls_store_or.value());
 
-  return [&, config = std::move(config), config_with_hash_key, tls_store = std::move(tls_store),
+  return [&context, &validation_visitor = extra_context.visitor, config = std::move(config),
+          config_with_hash_key, tls_store = std::move(tls_store),
           matcher = std::move(matcher)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     std::unique_ptr<RateLimitClient> local_client =
         createLocalRateLimitClient(tls_store->global_client.get(), tls_store->buckets_tls);
 
     callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
-        config, context, std::move(local_client), config_with_hash_key, matcher));
+        config, context, validation_visitor, std::move(local_client), config_with_hash_key,
+        matcher));
   };
 }
 

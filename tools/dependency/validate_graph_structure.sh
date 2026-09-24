@@ -26,7 +26,7 @@ trap 'rm -rf "${tmpdir}"' EXIT
 cd "${ENVOY_SRCDIR}"
 
 query_repo_names() {
-  bazel query "${BAZEL_QUERY_OPTIONS[@]}" "$1" \
+  bazel cquery "${BAZEL_QUERY_OPTIONS[@]}" --output=label "$1" \
     | sed -n 's/^@*\([^/]*\)\/\/.*/\1/p' \
     | sort -u
 }
@@ -42,9 +42,12 @@ dependency_json_path() {
 echo "Validating dependency graph structure..."
 
 graph_gap_repos_path="${tmpdir}/graph_gap_repos.txt"
-query_repo_names \
-  'filter("^@", deps(//source/...)) except filter("^@", deps(//source/exe:envoy_main_common_with_core_extensions_lib)) except filter("^@", deps(//source/extensions/...))' \
-  > "${graph_gap_repos_path}"
+query_repo_names 'filter("^@", deps(//source/...))' > "${tmpdir}/all.txt"
+{
+  query_repo_names 'filter("^@", deps(//source/exe:envoy_main_common_with_core_extensions_lib))'
+  query_repo_names 'filter("^@", deps(//source/extensions/...))'
+} | sort -u > "${tmpdir}/roots.txt"
+comm -23 "${tmpdir}/all.txt" "${tmpdir}/roots.txt" > "${graph_gap_repos_path}"
 
 if [[ -s "${graph_gap_repos_path}" ]]; then
   {

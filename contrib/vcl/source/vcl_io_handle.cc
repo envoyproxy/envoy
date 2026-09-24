@@ -1,5 +1,6 @@
 #include "contrib/vcl/source/vcl_io_handle.h"
 
+#include <format>
 #include <optional>
 
 #include "source/common/buffer/buffer_impl.h"
@@ -92,7 +93,7 @@ Envoy::Network::Address::InstanceConstSharedPtr vclEndptToAddress(const vppcom_e
     // used to create socket. Wrong knowledge of dual stack support won't hurt.
     return *Envoy::Network::Address::addressFromSockAddr(addr, len, /*v6only=*/false);
   } catch (const EnvoyException& e) {
-    PANIC(fmt::format("Invalid remote address for fd: {}, error: {}", sh, e.what()));
+    PANIC(std::format("Invalid remote address for fd: {}, error: {}", sh, e.what()));
   }
 }
 

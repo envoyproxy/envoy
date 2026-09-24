@@ -4,6 +4,7 @@
 
 #include "source/common/listener_manager/active_stream_listener_base.h"
 #include "source/common/network/downstream_network_namespace.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
@@ -86,7 +87,11 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
   listener_filter_buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
       socket_->ioHandle(), listener_.dispatcher(),
       [this](bool error) {
+        in_listener_filter_callback_ = true;
         (*iter_)->onClose();
+        in_listener_filter_callback_ = false;
+        // The socket is closing, so a re-entrant continue from onClose has no effect.
+        deferred_continue_success_.reset();
         socket_->ioHandle().close();
         if (error) {
           listener_.stats_.downstream_listener_filter_error_.inc();
@@ -96,7 +101,15 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
         continueFilterChain(false);
       },
       [this](Network::ListenerFilterBufferImpl& filter_buffer) {
+        in_listener_filter_callback_ = true;
         Network::FilterStatus status = (*iter_)->onData(filter_buffer);
+        in_listener_filter_callback_ = false;
+        if (deferred_continue_success_.has_value()) {
+          const bool deferred_success = *deferred_continue_success_;
+          deferred_continue_success_.reset();
+          continueFilterChain(deferred_success);
+          return;
+        }
         if (status == Network::FilterStatus::StopIteration) {
           if (socket_->ioHandle().isOpen()) {
             // The listener filter should not wait for more data when it has already received
@@ -122,6 +135,17 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
 }
 
 void ActiveTcpSocket::continueFilterChain(bool success) {
+  if (in_listener_filter_callback_ &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.listener_filter_reentrant_continue_guard")) {
+    // A listener filter called `continueFilterChain` from inside its own hook. Record the outcome
+    // and apply it after the hook returns, so we never advance iterators, clear accept filters,
+    // or move the socket while the hook is still on the stack.
+    ENVOY_LOG(debug, "deferring re-entrant listener filter continueFilterChain call");
+    deferred_continue_success_ = success;
+    return;
+  }
+
   if (success) {
     bool no_error = true;
     if (iter_ == accept_filters_.end()) {
@@ -131,7 +155,21 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
     }
 
     for (; iter_ != accept_filters_.end(); iter_++) {
+      in_listener_filter_callback_ = true;
       Network::FilterStatus status = (*iter_)->onAccept(*this);
+      in_listener_filter_callback_ = false;
+
+      if (deferred_continue_success_.has_value()) {
+        const bool deferred_success = *deferred_continue_success_;
+        deferred_continue_success_.reset();
+        if (!deferred_success) {
+          no_error = false;
+          break;
+        }
+        // The filter continued the chain from inside its hook, so advance to the next filter.
+        continue;
+      }
+
       if (status == Network::FilterStatus::StopIteration) {
         // The filter is responsible for calling us again at a later time to continue the filter
         // chain from the next filter.

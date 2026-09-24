@@ -48,7 +48,7 @@ private:
   void emitLog(const Formatter::Context& context, const StreamInfo::StreamInfo& info) override;
 
   const TcpGrpcAccessLogConfigConstSharedPtr config_;
-  const ThreadLocal::SlotPtr tls_slot_;
+  const ThreadLocal::SlotSharedPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   const GrpcCommon::CommonPropertiesConfig common_properties_config_;
 };

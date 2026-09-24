@@ -107,7 +107,7 @@ protected:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::IsolatedStoreImpl stats_store_{server_factory_context_.serverScope().symbolTable()};
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
   HandshakerFactoryImplForTest handshaker_factory_;
   Registry::InjectFactory<Ssl::HandshakerFactory> registered_factory_;
@@ -260,7 +260,7 @@ protected:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::IsolatedStoreImpl stats_store_{server_factory_context_.serverScope().symbolTable()};
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context_;
   Ssl::HandshakerCapabilities capabilities_;

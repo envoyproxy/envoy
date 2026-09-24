@@ -326,24 +326,33 @@ message ProcessingResponse {
   // particular request/response only. Servers may use this to intelligently control how requests
   // are processed based on the headers and other metadata that they see.
   //
-  // This field is applicable when servers are responding to the header requests. If it is set
-  // in the response to the body or trailer requests, it will be ignored by the data plane.
+  // If set in a response to body or trailer requests, it will be ignored by the data plane.
   // It is also ignored by the data plane when the ext_proc filter config
   // :ref:`allow_mode_override <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
   // is set to ``false``, or
   // :ref:`send_body_without_waiting_for_header_response <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
   // is set to ``true``.
   //
-  // The external processing server can override the processing mode by returning a standalone ``mode_override``
-  // in the ``ProcessingResponse`` after receiving a ``ProcessingRequest`` for request headers. This standalone
-  // override must be sent before the request headers response is sent.
-  // Subsequent messages will adhere to this new mode.
+  // ``mode_override`` can be sent in the following scenarios:
   //
-  // Constraints:
+  // 1. Included in a header response:
+  //    The server can set this field when responding to request or response headers, i.e.,
+  //    alongside a ``request_headers`` or ``response_headers`` response.
   //
-  // 1. Request Path: A standalone ``mode_override`` only supports transitioning the body processing mode
-  //    from other mode to ``FULL_DUPLEX_STREAMED``, and the trailer mode must be set to ``SEND``.
-  // 2. Response Path: There are no restrictions on processing mode changes in this case.
+  // 2. Standalone ``mode_override`` response:
+  //    After receiving a ``ProcessingRequest`` for request headers, the server can send a
+  //    standalone ``mode_override`` response (i.e., a ``ProcessingResponse`` with only
+  //    ``mode_override`` populated and no ``response`` case set) before sending the
+  //    ``request_headers`` response. Subsequent messages will adhere to this new mode.
+  //
+  //    .. note::
+  //      Processing mode changes in a standalone ``mode_override`` have the following constraints:
+  //
+  //      * For request path: Only supports transitioning the request body processing mode from
+  //        ``NONE`` or ``STREAMED`` to ``FULL_DUPLEX_STREAMED``. Additionally, the request
+  //        trailer mode must be set to ``SEND``, which is required by ``FULL_DUPLEX_STREAMED``
+  //        mode. Responses that do not meet these constraints are treated as spurious and rejected.
+  //      * For Response path: There are no restrictions on processing mode changes.
   //
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
 
@@ -371,7 +380,7 @@ message ProcessingResponse {
   // 4. The ext_proc server continues processing all subsequent request body
   //    chunks until it sees the body chunk with the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
-  //    field set to true.  When sending back its response to that last body
+  //    field set to true. When sending back its response to that last body
   //    chunk, the ext_proc server will set the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.StreamedBodyResponse.drain_complete>`
   //    field to true to let the data plane know that it has finished draining.
@@ -414,7 +423,7 @@ message ProcessingResponse {
   // 4. The ext_proc server continues processing all subsequent response body
   //    chunks until it sees the body chunk with the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
-  //    field set to true.  When sending back its response to that last body
+  //    field set to true. When sending back its response to that last body
   //    chunk, the ext_proc server will set the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.StreamedBodyResponse.drain_complete>`
   //    field to true to let the data plane know that it has finished draining.
@@ -689,6 +698,10 @@ message HeaderMutation {
   // ``:authority``, ``:scheme``, or ``host`` headers will be ignored.
   // The header value is encoded in the
   // :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` field.
+  // Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>`
+  // defaults to false when used in this message.
+  // The :ref:`keep_empty_value field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>`
+  // is not supported.
   repeated config.core.v3.HeaderValueOption set_headers = 1;
 
   // Remove these HTTP headers. Attempts to remove system headers --
@@ -713,11 +726,17 @@ message StreamedBodyResponse {
   // messages sent by the client application.
   bool end_of_stream = 2;
 
-  // This field is used in ``GRPC`` body send mode when ``end_of_stream`` is ``true`` and ``body``
-  // is empty. Those values would normally indicate an empty message on the stream with the
-  // end-of-stream bit set. However, if the half-close happens after the last message on the stream
-  // was already sent, then this field will be ``true`` to indicate an end-of-stream with *no*
-  // message (as opposed to an empty message).
+  // This field is used only in ``GRPC`` body send mode. It is not used in any other body send
+  // mode.
+  //
+  // This field is used only when ``end_of_stream`` is true and ``body`` is empty.
+  // Normally, in ``GRPC`` body send mode, an empty ``body`` field indicates an empty message on
+  // the gRPC stream. However, it is possible that the gRPC client sends a half-close without
+  // actually sending a message on the stream, so we need a way to differentiate between
+  // an empty message being sent and no message being sent. If this field is true, then it
+  // indicates that no message has been sent; if it is false, then it indicates that an empty
+  // message has been sent.
+  // [#not-implemented-hide:]
   bool end_of_stream_without_message = 3;
 
   // This field is used in ``GRPC`` body send mode to indicate whether the message is compressed.

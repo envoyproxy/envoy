@@ -99,6 +99,7 @@ envoy_cc_library(
         "//source/common/common:fmt_lib",
         "//source/common/common:statusor_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -130,7 +131,7 @@ envoy_cc_library(
     name = "stream_info_formatter_extension_lib",
     srcs = ["stream_info_formatter.cc"],
     hdrs = ["stream_info_formatter.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":serializer_lib",
         ":substitution_format_utility_lib",

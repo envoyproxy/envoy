@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
@@ -183,6 +184,13 @@ public:
    * @return whether the listener is a Quic listener.
    */
   virtual bool isQuic() const PURE;
+
+  /**
+   * @return envoy::config::listener::v3::Listener::DrainType the drain type configured on this
+   * listener. DEFAULT listeners drain in response to /healthcheck/fail in addition to listener
+   * removal/modification and hot restart; MODIFY_ONLY listeners do not.
+   */
+  virtual envoy::config::listener::v3::Listener::DrainType drainType() const PURE;
 
   /**
    * @return bool whether the listener should bypass overload manager actions

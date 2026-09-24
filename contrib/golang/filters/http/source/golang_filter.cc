@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <optional>
 #include <string>
@@ -1819,7 +1820,7 @@ absl::Status FilterConfig::newGoPluginConfig() {
 
   if (config_id_ == 0) {
     return absl::InvalidArgumentError(
-        fmt::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
+        std::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
   }
 
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
@@ -1976,7 +1977,7 @@ RoutePluginConfig::RoutePluginConfig(
   config_id_ = getConfigId();
   if (config_id_ == 0) {
     throw EnvoyException(
-        fmt::format("golang filter failed to parse plugin config: {}", plugin_name_));
+        std::format("golang filter failed to parse plugin config: {}", plugin_name_));
   }
   ENVOY_LOG(debug, "golang filter new per route '{}' plugin config, id: {}", plugin_name_,
             config_id_);
@@ -2060,7 +2061,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return server_context.secretManager().findOrCreateGenericSecretProvider(
-        config.sds_config(), config.name(), server_context, init_manager);
+        config.sds_config(), config.name(), server_context, init_manager, true);
   } else {
     return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }

@@ -14,17 +14,16 @@
 #include "envoy/http/async_client.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/stats/utility.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/metric_registry.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -110,171 +109,16 @@ public:
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
 
   // ----------------------------- Metrics Support -----------------------------
-
-  class ModuleCounterHandle {
-  public:
-    ModuleCounterHandle(Stats::Counter& counter) : counter_(counter) {}
-    void add(uint64_t value) const { counter_.add(value); }
-
-  private:
-    Stats::Counter& counter_;
-  };
-
-  class ModuleCounterVecHandle {
-  public:
-    ModuleCounterVecHandle(Stats::StatName name, Stats::StatNameVec label_names)
-        : name_(name), label_names_(label_names) {}
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-  };
-
-  class ModuleGaugeHandle {
-  public:
-    ModuleGaugeHandle(Stats::Gauge& gauge) : gauge_(gauge) {}
-    void add(uint64_t value) const { gauge_.add(value); }
-    void sub(uint64_t value) const { gauge_.sub(value); }
-    void set(uint64_t value) const { gauge_.set(value); }
-
-  private:
-    Stats::Gauge& gauge_;
-  };
-
-  class ModuleGaugeVecHandle {
-  public:
-    ModuleGaugeVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
-                         Stats::Gauge::ImportMode import_mode)
-        : name_(name), label_names_(label_names), import_mode_(import_mode) {}
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).add(amount);
-    }
-    void sub(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).sub(amount);
-    }
-    void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-    Stats::Gauge::ImportMode import_mode_;
-  };
-
-  class ModuleHistogramHandle {
-  public:
-    ModuleHistogramHandle(Stats::Histogram& histogram) : histogram_(histogram) {}
-    void recordValue(uint64_t value) const { histogram_.recordValue(value); }
-
-  private:
-    Stats::Histogram& histogram_;
-  };
-
-  class ModuleHistogramVecHandle {
-  public:
-    ModuleHistogramVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
-                             Stats::Histogram::Unit unit)
-        : name_(name), label_names_(label_names), unit_(unit) {}
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-    void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                     uint64_t value) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-    Stats::Histogram::Unit unit_;
-  };
-
-// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
-// for our internal storage. These helper functions do that conversion.
-#define ID_TO_INDEX(id) ((id) - 1)
-
-  size_t addCounter(ModuleCounterHandle&& counter) {
-    counters_.push_back(std::move(counter));
-    return counters_.size();
-  }
-  size_t addCounterVec(ModuleCounterVecHandle&& counter) {
-    counter_vecs_.push_back(std::move(counter));
-    return counter_vecs_.size();
-  }
-
-  size_t addGauge(ModuleGaugeHandle&& gauge) {
-    gauges_.push_back(std::move(gauge));
-    return gauges_.size();
-  }
-  size_t addGaugeVec(ModuleGaugeVecHandle&& gauge) {
-    gauge_vecs_.push_back(std::move(gauge));
-    return gauge_vecs_.size();
-  }
-
-  size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    histograms_.push_back(std::move(histogram));
-    return histograms_.size();
-  }
-  size_t addHistogramVec(ModuleHistogramVecHandle&& histogram) {
-    histogram_vecs_.push_back(std::move(histogram));
-    return histogram_vecs_.size();
-  }
-
-  OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id == 0 || id > counters_.size()) {
-      return {};
-    }
-    return counters_[ID_TO_INDEX(id)];
-  }
-  OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
-    if (id == 0 || id > counter_vecs_.size()) {
-      return {};
-    }
-    return counter_vecs_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id == 0 || id > gauges_.size()) {
-      return {};
-    }
-    return gauges_[ID_TO_INDEX(id)];
-  }
-  OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
-    if (id == 0 || id > gauge_vecs_.size()) {
-      return {};
-    }
-    return gauge_vecs_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id == 0 || id > histograms_.size()) {
-      return {};
-    }
-    return histograms_[ID_TO_INDEX(id)];
-  }
-  OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
-    if (id == 0 || id > histogram_vecs_.size()) {
-      return {};
-    }
-    return histogram_vecs_[ID_TO_INDEX(id)];
-  }
-
-#undef ID_TO_INDEX
+  // The shared registry holding all module-defined metrics.
+  Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
+  const Extensions::DynamicModules::MetricRegistry& metrics() const { return metrics_; }
 
   const Stats::ScopeSharedPtr stats_scope_;
-  Stats::StatNamePool stat_name_pool_;
+  // Shared metrics registry composed from stats_scope_.
+  Extensions::DynamicModules::MetricRegistry metrics_;
   // We only allow the module to create stats during on_cluster_config_new, and not later from
-  // worker threads, so that we don't have to wrap stat_name_pool_ in a lock. Per-request label
-  // values use a stack-local Stats::StatNameDynamicPool in the increment callbacks (see
+  // worker threads, so that we don't have to wrap the metrics registry pool in a lock. Per-request
+  // label values use a stack-local Stats::StatNameDynamicPool in the increment callbacks (see
   // abi_impl.cc).
   bool stat_creation_frozen_ = false;
 
@@ -286,13 +130,6 @@ private:
   const std::string cluster_name_;
   const std::string cluster_config_;
   Envoy::Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
-
-  std::vector<ModuleCounterHandle> counters_;
-  std::vector<ModuleCounterVecHandle> counter_vecs_;
-  std::vector<ModuleGaugeHandle> gauges_;
-  std::vector<ModuleGaugeVecHandle> gauge_vecs_;
-  std::vector<ModuleHistogramHandle> histograms_;
-  std::vector<ModuleHistogramVecHandle> histogram_vecs_;
 };
 
 using DynamicModuleClusterConfigSharedPtr = std::shared_ptr<DynamicModuleClusterConfig>;
@@ -551,6 +388,63 @@ private:
 };
 
 /**
+ * Registry of the async host selections that are in flight for one load balancer, keyed by the
+ * LoadBalancerContext pointer that the module echoes back on completion.
+ *
+ * A load balancer serves many concurrent async selections, so the cancellation state cannot live
+ * in a single slot on the load balancer. It is keyed per selection here instead.
+ *
+ * The registry is shared between the load balancer and every `cancelable` it hands to the router,
+ * because the router may destroy one after the load balancer is gone. It is mutex guarded because a
+ * module may complete a selection from any thread while the owning worker thread starts new ones.
+ */
+class DynamicModuleAsyncHostSelectionRegistry {
+public:
+  /**
+   * Records a new in-flight selection. The caller keeps a copy of `cancelled` in the `cancelable`
+   * it returns to the router, so cancellation state outlives this entry.
+   */
+  void add(envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context,
+           const std::shared_ptr<std::atomic<bool>>& cancelled) {
+    absl::MutexLock lock(&mutex_);
+    entries_[context] = cancelled;
+  }
+
+  /** Drops the entry for `context`. Safe to call for a context that was never added. */
+  void remove(envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context) {
+    absl::MutexLock lock(&mutex_);
+    entries_.erase(context);
+  }
+
+  /**
+   * Returns the cancellation flag for `context`, or nullptr when no selection is in flight for it.
+   * A nullptr result means the selection was already completed or cancelled, so the caller must
+   * drop the event rather than touch the context.
+   */
+  std::shared_ptr<std::atomic<bool>>
+  find(envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context) const {
+    absl::MutexLock lock(&mutex_);
+    auto it = entries_.find(context);
+    return it == entries_.end() ? nullptr : it->second;
+  }
+
+  /** Number of in-flight selections. */
+  size_t sizeForTest() const {
+    absl::MutexLock lock(&mutex_);
+    return entries_.size();
+  }
+
+private:
+  mutable absl::Mutex mutex_;
+  absl::flat_hash_map<envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+                      std::shared_ptr<std::atomic<bool>>>
+      entries_ ABSL_GUARDED_BY(mutex_);
+};
+
+using DynamicModuleAsyncHostSelectionRegistrySharedPtr =
+    std::shared_ptr<DynamicModuleAsyncHostSelectionRegistry>;
+
+/**
  * Async host selection handle that bridges the dynamic module's async host selection to Envoy's
  * LoadBalancerContext::onAsyncHostSelection. This is created when the module returns an async
  * pending result from choose_host, and destroyed after the module delivers the result or the
@@ -558,12 +452,16 @@ private:
  */
 class DynamicModuleAsyncHostSelectionHandle : public Upstream::AsyncHostSelectionHandle {
 public:
+  // `registry` and `context` drop this selection's entry on destruction. Both may be null or unset
+  // in unit tests that exercise cancellation without a registry.
   DynamicModuleAsyncHostSelectionHandle(
       envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle,
       envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb,
-      OnClusterLbCancelHostSelectionType cancel_fn, std::shared_ptr<std::atomic<bool>> cancelled)
+      OnClusterLbCancelHostSelectionType cancel_fn, std::shared_ptr<std::atomic<bool>> cancelled,
+      DynamicModuleAsyncHostSelectionRegistrySharedPtr registry = nullptr,
+      envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context = nullptr)
       : async_handle_(async_handle), in_module_lb_(in_module_lb), cancel_fn_(cancel_fn),
-        cancelled_(std::move(cancelled)) {}
+        cancelled_(std::move(cancelled)), registry_(std::move(registry)), context_(context) {}
 
   ~DynamicModuleAsyncHostSelectionHandle() override;
 
@@ -573,7 +471,13 @@ private:
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_{nullptr};
   OnClusterLbCancelHostSelectionType cancel_fn_;
+  // Per-selection cancellation flag. The completion path reads the same object through the
+  // registry, so setting it here is observed there. The router may destroy this handle right after
+  // cancel(), which is why the flag is shared rather than owned.
   std::shared_ptr<std::atomic<bool>> cancelled_;
+  // Shared so a handle outliving its load balancer can still drop its entry.
+  DynamicModuleAsyncHostSelectionRegistrySharedPtr registry_;
+  envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_{nullptr};
 };
 
 /**
@@ -609,27 +513,24 @@ public:
   const DynamicModuleClusterHandleSharedPtr& handle() const { return handle_; }
 
   /**
-   * Returns the shared cancellation flag for the current async host selection. When the router
-   * cancels the selection (e.g., stream timeout), the flag is set so the posted completion
-   * callback becomes a no-op. Returns nullptr when there is no active async selection.
+   * Returns the registry of in-flight async host selections. The async completion callback in
+   * abi_impl.cc looks the completing selection up by its LoadBalancerContext pointer, so a
+   * cancellation on one selection cannot suppress the completion of another.
    */
-  std::shared_ptr<std::atomic<bool>> activeAsyncCancelled() const {
-    return active_async_cancelled_;
+  const DynamicModuleAsyncHostSelectionRegistrySharedPtr& asyncSelections() const {
+    return async_selections_;
   }
 
   /**
-   * Returns the worker thread's dispatcher captured during chooseHost. Used by the async
-   * completion callback in abi_impl.cc to post to the correct worker thread without accessing
-   * the LoadBalancerContext from a background thread.
-   */
-  Event::Dispatcher* activeAsyncDispatcher() const { return active_async_dispatcher_; }
-
-  /**
    * Returns the worker thread's dispatcher captured during chooseHost, or nullptr if no chooseHost
-   * has run on this worker yet. Used by the worker timer ABI callbacks to create timers on the
-   * correct worker dispatcher. The captured dispatcher is stable for the worker's lifetime.
+   * has run on this worker yet. Used by the async completion callback to post to the owning worker
+   * without touching the LoadBalancerContext from a background thread, and by the worker timer ABI
+   * callbacks to create timers on the correct dispatcher. Sticky and atomic, since the completion
+   * may read it from any thread while the worker writes it.
    */
-  Event::Dispatcher* workerDispatcher() const { return worker_dispatcher_; }
+  Event::Dispatcher* workerDispatcher() const {
+    return worker_dispatcher_.load(std::memory_order_acquire);
+  }
 
   // The cluster config holding the resolved module function pointers.
   const DynamicModuleClusterConfigSharedPtr& config() const { return handle_->cluster()->config(); }
@@ -664,16 +565,15 @@ private:
   const Upstream::PrioritySet& priority_set_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 
-  // Shared cancellation flag for the active async host selection. Set in chooseHost when the
-  // module returns AsyncPending, and read by the posted completion callback in abi_impl.cc.
-  std::shared_ptr<std::atomic<bool>> active_async_cancelled_;
+  // In-flight async host selections keyed by LoadBalancerContext pointer. Shared with every
+  // `cancelable` handed to the router so one outliving this load balancer stays safe.
+  const DynamicModuleAsyncHostSelectionRegistrySharedPtr async_selections_{
+      std::make_shared<DynamicModuleAsyncHostSelectionRegistry>()};
 
-  // Worker thread dispatcher captured during chooseHost for async completion posting.
-  Event::Dispatcher* active_async_dispatcher_{nullptr};
-
-  // Worker thread dispatcher captured during chooseHost, used to create worker timers. Sticky:
-  // once captured it is never cleared, since the worker dispatcher is stable for the worker's life.
-  Event::Dispatcher* worker_dispatcher_{nullptr};
+  // Worker thread dispatcher captured during chooseHost, used for async completion posting and to
+  // create worker timers. Sticky: once captured it is never cleared, since the worker dispatcher is
+  // stable for the worker's life. Atomic because a module completion may read it from any thread.
+  std::atomic<Event::Dispatcher*> worker_dispatcher_{nullptr};
 
   // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
   absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;

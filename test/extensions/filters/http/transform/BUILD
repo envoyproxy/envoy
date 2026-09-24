@@ -17,10 +17,11 @@ envoy_extension_cc_test(
         "transform_test.cc",
     ],
     extension_names = ["envoy.filters.http.transform"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/transform:config",
+        "//test/common/formatter:formatter_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
@@ -34,7 +35,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.transform"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/transform:config",
@@ -51,7 +52,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.http.transform"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/transform:config",

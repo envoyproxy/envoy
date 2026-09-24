@@ -12,13 +12,39 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "gemini_generate_content_test",
+    srcs = ["gemini_generate_content_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/schema:gemini_generate_content_lib",
+        "//test/test_common:status_utility_lib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "openai_chat_completions_test",
     srcs = ["openai_chat_completions_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/filters/http/ai_protocol_manager/schema:openai_chat_completions_lib",
+        "//test/test_common:status_utility_lib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "anthropic_messages_test",
+    srcs = ["anthropic_messages_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/schema:anthropic_messages_lib",
         "//test/test_common:status_utility_lib",
         "@nlohmann_json//:json",
     ],

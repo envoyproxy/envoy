@@ -446,6 +446,11 @@ public:
   virtual std::optional<Address::IpVersion> ipVersion() const PURE;
 
   /**
+   * Request RST on a subsequent close().
+   */
+  virtual void setAbortiveClose() PURE;
+
+  /**
    * Close the underlying socket.
    */
   virtual void close() PURE;

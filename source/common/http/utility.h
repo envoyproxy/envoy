@@ -231,6 +231,7 @@ absl::string_view findQueryStringStart(const HeaderString& path);
  * @return std::string the path without query string.
  */
 std::string stripQueryString(const HeaderString& path);
+absl::string_view stripQueryStringView(absl::string_view path);
 
 /**
  * Parse a particular value out of a cookie

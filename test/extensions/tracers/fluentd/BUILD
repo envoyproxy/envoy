@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "tracer_impl_test",
     srcs = ["tracer_impl_test.cc"],
     extension_names = ["envoy.tracers.fluentd"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     name = "tracer_integration_test",
     srcs = ["tracer_integration_test.cc"],
     extension_names = ["envoy.tracers.fluentd"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
@@ -60,7 +60,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.fluentd"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [

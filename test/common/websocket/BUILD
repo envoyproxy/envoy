@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "codec_test",
     srcs = ["codec_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/websocket:codec_lib",

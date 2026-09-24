@@ -10,6 +10,13 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_version \
   --uncomment-func-decl SSL_shutdown \
   --uncomment-func-decl SSL_set1_curves_list \
+  --uncomment-func-decl SSL_set1_sigalgs_list \
+  --uncomment-func-decl SSL_set_min_proto_version \
+  --uncomment-func-decl SSL_set_max_proto_version \
+  --uncomment-func-decl SSL_set_strict_cipher_list \
+  --uncomment-func-decl SSL_get_min_proto_version \
+  --uncomment-func-decl SSL_get_max_proto_version \
+  --uncomment-func-decl SSL_get_compliance_policy \
   --uncomment-func-decl SSL_set0_wbio \
   --uncomment-func-decl SSL_set0_rbio \
   --uncomment-func-decl SSL_set_verify \
@@ -103,7 +110,6 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_get_negotiated_group \
   --uncomment-func-decl SSL_get_peer_full_cert_chain \
   --uncomment-func-decl SSL_set_ocsp_response \
-  --uncomment-func-decl SSL_set_enforce_rsa_key_usage \
   --uncomment-func-decl SSL_set_renegotiate_mode \
   --uncomment-func-decl SSL_CTX_get0_certificate \
   --uncomment-func-decl SSL_enable_ocsp_stapling \
@@ -229,11 +235,10 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro SSL_GROUP_SECP521R1 \
   --uncomment-macro SSL_GROUP_X25519 \
   --uncomment-macro SSL_GROUP_X25519_MLKEM768 \
-  --uncomment-macro SSL_GROUP_X25519_KYBER768_DRAFT00 \
   --uncomment-func-decl SSL_CIPHER_get_handshake_digest \
   --uncomment-enum ssl_compliance_policy_t \
   --uncomment-func-decl SSL_CTX_set_compliance_policy \
-  --uncomment-func-decl SSL_was_key_usage_invalid \
+  --uncomment-func-decl SSL_set_compliance_policy \
   --uncomment-func-decl SSL_get_verify_result \
   --uncomment-func-decl SSL_CIPHER_get_version \
   --uncomment-func-decl SSL_set0_CA_names \

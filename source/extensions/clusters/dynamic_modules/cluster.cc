@@ -161,9 +161,9 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
 DynamicModuleClusterConfig::DynamicModuleClusterConfig(
     const std::string& cluster_name, const std::string& cluster_config,
     Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope)
-    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")),
-      stat_name_pool_(stats_scope_->symbolTable()), cluster_name_(cluster_name),
-      cluster_config_(cluster_config), dynamic_module_(std::move(module)) {}
+    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")), metrics_(*stats_scope_),
+      cluster_name_(cluster_name), cluster_config_(cluster_config),
+      dynamic_module_(std::move(module)) {}
 
 DynamicModuleClusterConfig::~DynamicModuleClusterConfig() {
   if (in_module_config_ != nullptr && on_cluster_config_destroy_ != nullptr) {
@@ -184,7 +184,7 @@ DynamicModuleClusterHandle::~DynamicModuleClusterHandle() {
   Event::Dispatcher& dispatcher = cluster->dispatcher_;
   // The lifecycle handle resets unregister from main-thread-owned notifiers. When the handle is
   // destroyed on a worker thread, post the full teardown onto the main dispatcher.
-  if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
+  if (!Thread::MainThread::isMainOrTestThread()) {
     dispatcher.post([cluster = std::move(cluster)]() mutable {
       cluster->server_initialized_handle_.reset();
       cluster->shutdown_handle_.reset();
@@ -465,7 +465,7 @@ bool DynamicModuleCluster::addHosts(
     auto host_result = Upstream::HostImpl::create(
         cluster_info, hostname, std::move(resolved_address), std::move(endpoint_metadata), nullptr,
         weights[i], std::move(locality),
-        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
+        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), priority,
         envoy::config::core::v3::UNKNOWN);
     if (!host_result.ok()) {
       ENVOY_LOG(error, "Failed to create host for address: {}.", addresses[i]); // LCOV_EXCL_LINE
@@ -595,10 +595,6 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
     return 0;
   }
 
-  // Build the remaining host list and update the priority set once.
-  ASSERT(!priority_set_.hostSetsPerPriority().empty());
-  const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-
   // Build a set of removed host pointers for O(1) lookup.
   absl::flat_hash_set<Upstream::Host*> removed_set;
   removed_set.reserve(removed_hosts.size());
@@ -606,18 +602,30 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
     removed_set.insert(h.get());
   }
 
-  Upstream::HostVectorSharedPtr remaining_hosts(new Upstream::HostVector());
-  for (const auto& h : first_host_set.hosts()) {
-    if (removed_set.find(h.get()) == removed_set.end()) {
-      remaining_hosts->emplace_back(h);
+  // Removed hosts can span multiple priorities, so rebuild and republish every priority that held
+  // at least one of them. Republishing only priority 0 would leave stale endpoints on the worker
+  // load balancers for higher priorities.
+  const auto& host_sets = priority_set_.hostSetsPerPriority();
+  for (uint32_t priority = 0; priority < host_sets.size(); ++priority) {
+    Upstream::HostVector removed_from_priority;
+    Upstream::HostVectorSharedPtr remaining_hosts(new Upstream::HostVector());
+    for (const auto& h : host_sets[priority]->hosts()) {
+      if (removed_set.find(h.get()) != removed_set.end()) {
+        removed_from_priority.emplace_back(h);
+      } else {
+        remaining_hosts->emplace_back(h);
+      }
     }
+    if (removed_from_priority.empty()) {
+      continue;
+    }
+
+    auto hosts_per_locality = buildHostsPerLocality(*remaining_hosts);
+    priority_set_.updateHosts(
+        priority,
+        Upstream::HostSetImpl::partitionHosts(remaining_hosts, std::move(hosts_per_locality)), {},
+        {}, removed_from_priority, std::nullopt, std::nullopt);
   }
-
-  auto hosts_per_locality = buildHostsPerLocality(*remaining_hosts);
-
-  priority_set_.updateHosts(
-      0, Upstream::HostSetImpl::partitionHosts(remaining_hosts, std::move(hosts_per_locality)), {},
-      {}, removed_hosts, std::nullopt, std::nullopt);
 
   ENVOY_LOG(debug, "Removed {} hosts from dynamic module cluster.", removed_hosts.size());
   return removed_hosts.size();
@@ -801,18 +809,22 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
-  // Pre-capture the worker dispatcher and prepare the cancellation flag before calling into the
-  // module. The module's choose_host may spawn a background thread that calls
-  // async_host_selection_complete, which reads these fields. Setting them beforehand establishes
-  // a happens-before relationship via the thread::spawn synchronization in the module.
+  // Pre-capture the worker dispatcher and register the per-selection cancellation flag before
+  // calling into the module. The module's choose_host may spawn a background thread that calls
+  // async_host_selection_complete, which reads both. Publishing them beforehand establishes a
+  // happens-before relationship via the thread::spawn synchronization in the module.
+  //
+  // The flag and the registry entry are keyed by `context`, not held in a single slot on this load
+  // balancer, because a worker serves many concurrent async selections. A single slot would let a
+  // cancellation on one selection suppress the completion of an unrelated one.
   const auto* connection = context != nullptr ? context->downstreamConnection() : nullptr;
-  active_async_dispatcher_ = connection != nullptr ? &connection->dispatcher() : nullptr;
-  // Capture the worker dispatcher for worker timer creation. Sticky: keep any previously captured
-  // dispatcher when this call has no connection, since the worker dispatcher is stable.
-  if (active_async_dispatcher_ != nullptr) {
-    worker_dispatcher_ = active_async_dispatcher_;
+  // Sticky: keep any previously captured dispatcher when this call has no connection, since the
+  // worker dispatcher is stable for the worker's life.
+  if (connection != nullptr) {
+    worker_dispatcher_.store(&connection->dispatcher(), std::memory_order_release);
   }
-  active_async_cancelled_ = std::make_shared<std::atomic<bool>>(false);
+  auto cancelled = std::make_shared<std::atomic<bool>>(false);
+  async_selections_->add(context, cancelled);
 
   envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
@@ -820,16 +832,17 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                                                           &async_handle);
 
   if (async_handle != nullptr) {
-    // Async pending: the module will call the completion callback later.
+    // Async pending: the module will call the completion callback later. The `cancelable` holds the
+    // registry so it can drop its entry even if it outlives this load balancer.
     auto cancelable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
         async_handle, in_module_lb_,
-        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_, active_async_cancelled_);
+        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_, std::move(cancelled),
+        async_selections_, context);
     return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
   }
 
-  // Synchronous result or no host. Clear the async state.
-  active_async_dispatcher_ = nullptr;
-  active_async_cancelled_ = nullptr;
+  // Synchronous result or no host. Nothing will complete for this context, so drop its entry.
+  async_selections_->remove(context);
 
   if (host_ptr == nullptr) {
     return {nullptr};
@@ -841,6 +854,11 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 }
 
 DynamicModuleAsyncHostSelectionHandle::~DynamicModuleAsyncHostSelectionHandle() {
+  // Drop the registry entry first. Once it is gone the completion callback drops the event instead
+  // of touching a LoadBalancerContext the router is about to reclaim.
+  if (registry_ != nullptr) {
+    registry_->remove(context_);
+  }
   // Free the module-side async handle. The cancel function takes ownership of the handle and
   // drops it, so this works for both cancellation and normal completion paths.
   if (async_handle_ != nullptr && cancel_fn_ != nullptr) {
@@ -903,12 +921,22 @@ DynamicModuleClusterFactory::createClusterWithConfig(
     const envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
 
-  // Validate that CLUSTER_PROVIDED LB policy is used.
-  if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+  // CLUSTER_PROVIDED uses the module's load balancer; the native policies use Envoy's factory
+  // load balancer, with the module supplying only host discovery.
+  const auto policy = cluster.lb_policy();
+  const bool is_module_lb = (policy == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+  const bool is_native_lb = (policy == envoy::config::cluster::v3::Cluster::LEAST_REQUEST ||
+                             policy == envoy::config::cluster::v3::Cluster::ROUND_ROBIN ||
+                             policy == envoy::config::cluster::v3::Cluster::RANDOM ||
+                             policy == envoy::config::cluster::v3::Cluster::RING_HASH ||
+                             policy == envoy::config::cluster::v3::Cluster::MAGLEV);
+
+  if (!is_module_lb && !is_native_lb) {
     return absl::InvalidArgumentError(
         fmt::format("cluster: LB policy {} is not valid for cluster type "
-                    "'envoy.clusters.dynamic_modules'. Only 'CLUSTER_PROVIDED' is allowed.",
-                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy())));
+                    "'envoy.clusters.dynamic_modules'. Supported policies are CLUSTER_PROVIDED, "
+                    "LEAST_REQUEST, ROUND_ROBIN, RANDOM, RING_HASH, and MAGLEV.",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(policy)));
   }
 
   Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
@@ -952,9 +980,13 @@ DynamicModuleClusterFactory::createClusterWithConfig(
       cluster, std::move(config_or_error.value()), context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
 
-  // Create the thread-aware load balancer.
-  auto handle = std::make_shared<DynamicModuleClusterHandle>(new_cluster);
-  auto lb = std::make_unique<DynamicModuleThreadAwareLoadBalancer>(handle);
+  // Create the thread-aware load balancer only if the module provides LB (CLUSTER_PROVIDED).
+  // For native LB policies, return nullptr so the cluster manager builds the native factory LB.
+  Upstream::ThreadAwareLoadBalancerPtr lb;
+  if (cluster.lb_policy() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+    auto handle = std::make_shared<DynamicModuleClusterHandle>(new_cluster);
+    lb = std::make_unique<DynamicModuleThreadAwareLoadBalancer>(handle);
+  }
 
   return std::make_pair(std::move(new_cluster), std::move(lb));
 }

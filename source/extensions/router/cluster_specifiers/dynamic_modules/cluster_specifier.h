@@ -1,23 +1,28 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/statusor.h"
+#include "source/common/config/metadata.h"
 #include "source/common/router/delegating_route_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/metric_registry.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -50,6 +55,10 @@ struct RouteActionOverride {
 
 using RouteActionOverrideMap = absl::flat_hash_map<std::string, RouteActionOverride>;
 
+// The default custom stat namespace which prepends all user-defined metrics.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
+
 /**
  * Configuration for a dynamic module cluster specifier. This resolves and holds the symbols used
  * for cluster selection along with the in-module configuration and the route action overrides the
@@ -66,7 +75,9 @@ public:
                                       absl::string_view specifier_config,
                                       Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                                       RouteActionOverrideMap route_action_overrides,
-                                      Upstream::ClusterManager& cluster_manager);
+                                      Upstream::ClusterManager& cluster_manager,
+                                      Stats::Scope& stats_scope,
+                                      absl::string_view metrics_namespace);
 
   ~DynamicModuleClusterSpecifierConfig();
 
@@ -97,6 +108,20 @@ public:
   // newDynamicModuleClusterSpecifierConfig() succeeds.
   OnClusterSpecifierConfigDestroyType on_config_destroy_{nullptr};
   OnClusterSpecifierSelectType on_select_{nullptr};
+
+  // ----------------------------- Metrics Support -----------------------------
+  // The shared registry holding all module-defined metrics.
+  Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
+
+  // Owns the scope the registry references. Must precede metrics_ so it initializes first.
+  const Stats::ScopeSharedPtr stats_scope_;
+  // Shared metrics registry composed from stats_scope_.
+  Extensions::DynamicModules::MetricRegistry metrics_;
+  // We only allow the module to create stats during on_cluster_specifier_config_new, and not later
+  // from worker threads, so that we don't have to wrap the metrics registry pool in a lock.
+  // Per-request label values use a stack-local Stats::StatNameDynamicPool in the record callbacks
+  // (see abi_impl.cc).
+  std::atomic<bool> stat_creation_frozen_{false};
 
 private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleClusterSpecifierConfig>>
@@ -147,6 +172,9 @@ struct ClusterSpecifierSelection {
   // Points into the override map of the cluster specifier configuration, which is immutable after
   // construction.
   const RouteActionOverride* route_action_override{nullptr};
+  // Metadata the module layered onto the matched route, keyed by namespace. Empty when the module
+  // set none, so metadata() and typedMetadata() fall back to the matched route.
+  envoy::config::core::v3::Metadata route_metadata;
 };
 
 /**
@@ -212,6 +240,14 @@ public:
     return entry != nullptr && entry->hash_policy != nullptr ? entry->hash_policy.get()
                                                              : DelegatingRouteEntry::hashPolicy();
   }
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return active_metadata_pack_ != nullptr ? active_metadata_pack_->proto_metadata_
+                                            : DelegatingRouteEntry::metadata();
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return active_metadata_pack_ != nullptr ? active_metadata_pack_->typed_metadata_
+                                            : DelegatingRouteEntry::typedMetadata();
+  }
   void refreshRouteCluster(const Http::RequestHeaderMap& headers,
                            const StreamInfo::StreamInfo& stream_info) const override;
 
@@ -220,6 +256,15 @@ private:
   const uint64_t random_value_;
   // Only accessed from the worker thread that owns the request, so no synchronization is needed.
   mutable ClusterSpecifierSelection selection_;
+  // Metadata packs built across refreshes. A pack is kept until the entry is destroyed so the
+  // reference that metadata() and typedMetadata() return stays valid past a refresh, the way
+  // cluster_name does. active_metadata_pack_ points at the pack of the current decision, or is null
+  // so both accessors fall back to the matched route. Only the worker thread that owns the request
+  // touches these.
+  mutable std::vector<Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory>>
+      metadata_packs_;
+  mutable const Envoy::Config::MetadataPack<Envoy::Router::HttpRouteTypedMetadataFactory>*
+      active_metadata_pack_{nullptr};
 };
 
 /**

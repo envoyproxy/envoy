@@ -15,7 +15,7 @@ envoy_cc_library(
     hdrs = ["kafka_stats_sink_impl.h"],
     tags = ["skip_on_windows"],
     deps = [
-        "//bazel/foreign_cc:librdkafka",
+        "//bazel/deps:librdkafka",
         "//envoy/stats:sink_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",

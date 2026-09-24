@@ -386,9 +386,7 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
-  if (parent_.validate_upstream_headers_) {
-    RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
-  }
+  RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
@@ -997,10 +995,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                               : 0),
       http2_include_cookies_in_limits_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_include_cookies_in_limits")),
-#ifndef ENVOY_ENABLE_UHV
-      validate_upstream_headers_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")),
-#endif
+      reject_frames_after_end_stream_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_reject_frames_after_end_stream")),
       protocol_constraints_(stats, http2_options,
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.http2_flood_protection_active_streams")),
@@ -1267,6 +1263,10 @@ Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t fla
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
 
+  if (reject_frames_after_end_stream_ && stream->remote_end_stream_) {
+    return codecProtocolError("Received DATA frame on a half-closed (remote) stream");
+  }
+
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   stream->decodeData();
   return okStatus();
@@ -1292,6 +1292,17 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
   stream->bytes_meter_->addHeaderBytesReceived(length + H2_FRAME_HEADER_SIZE);
+
+  // RFC 9113 Section 5.1: a peer that receives any frame other than PRIORITY, WINDOW_UPDATE or
+  // RST_STREAM for a stream in the "half-closed (remote)" state must treat it as an error. This is
+  // enforced here rather than in the codec adapter because the decoder that the frame would
+  // otherwise be dispatched to may already have been destroyed: for a client connection the
+  // CodecClient deletes the ActiveRequest (which owns the ResponseDecoder) as soon as the response
+  // completes, while oghttp2 keeps the stream alive until it is also half-closed locally. nghttp2
+  // already rejects these frames, so this only changes behavior for oghttp2.
+  if (reject_frames_after_end_stream_ && stream->remote_end_stream_) {
+    return codecProtocolError("Received HEADERS frame on a half-closed (remote) stream");
+  }
 
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   recordHistogramsForStream(*stream);
@@ -1668,8 +1679,8 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
 // The `histograms_recorded_` guard ensures we only record once (only for headers, not trailers).
 void ConnectionImpl::recordHistogramsForStream(StreamImpl& stream) {
   if (record_http2_histograms_ && !stream.histograms_recorded_) {
-    uint64_t headers_size = stream.headers().byteSize();
-    uint64_t headers_count = stream.headers().size();
+    uint64_t headers_size = stream.headers().byteSize() + stream.discarded_host_header_size_;
+    uint64_t headers_count = stream.headers().size() + stream.discarded_host_header_count_;
     uint64_t headers_with_cookies_size = headers_size + stream.cookies_.size();
     uint64_t headers_with_cookies_count = headers_count + stream.cookie_count_;
     stats_.header_list_size_.recordValue(headers_with_cookies_size);
@@ -1711,21 +1722,25 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
     stats_.cookies_total_bytes_too_large_.inc();
     return ERR_TEMPORAL_CALLBACK_FAILURE;
   }
-  uint64_t headers_size = stream->headers().byteSize();
-  uint64_t headers_count = stream->headers().size();
+  return checkHeaderLimits(*stream);
+}
+
+int ConnectionImpl::checkHeaderLimits(StreamImpl& stream) {
+  uint64_t headers_size = stream.headers().byteSize() + stream.discarded_host_header_size_;
+  uint64_t headers_count = stream.headers().size() + stream.discarded_host_header_count_;
 
   if (http2_include_cookies_in_limits_) {
-    headers_size += stream->cookies_.size();
-    headers_count += stream->cookie_count_;
+    headers_size += stream.cookies_.size();
+    headers_count += stream.cookie_count_;
   }
 
   if (headers_size > max_headers_kb_ * 1024) {
-    stream->setDetails(Http2ResponseCodeDetails::get().header_list_size_too_large);
+    stream.setDetails(Http2ResponseCodeDetails::get().header_list_size_too_large);
     stats_.header_list_size_too_large_.inc();
     return ERR_TEMPORAL_CALLBACK_FAILURE;
   }
   if (headers_count > max_headers_count_) {
-    stream->setDetails(Http2ResponseCodeDetails::get().too_many_headers);
+    stream.setDetails(Http2ResponseCodeDetails::get().too_many_headers);
     stats_.header_overflow_.inc();
     // This will cause the library to reset/close the stream.
     return ERR_TEMPORAL_CALLBACK_FAILURE;
@@ -1878,10 +1893,17 @@ void ConnectionImpl::onProtocolConstraintViolation() {
 }
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  // Notify the streams based on least recently encoding to the connection.
-  // NOLINTNEXTLINE(modernize-loop-convert)
+  // Snapshot the streams in least-recently-encoded order before invoking callbacks. A callback may
+  // encode on its stream and reorder active_streams_, invalidating the traversal. Stream deletion
+  // is deferred, so the pointers remain valid for the duration of this synchronous callback fanout.
+  std::vector<StreamImpl*> streams;
+  streams.reserve(active_streams_.size());
   for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
-    (*it)->runLowWatermarkCallbacks();
+    streams.push_back(it->get());
+  }
+
+  for (StreamImpl* stream : streams) {
+    stream->runLowWatermarkCallbacks();
   }
 }
 
@@ -2517,8 +2539,17 @@ int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
       // Check if there is already the :authority header
       const auto result = stream->headers().get(Http::Headers::get().Host);
       if (!result.empty()) {
-        // Discard the host header value
-        return 0;
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.http2_track_size_of_dropped_host_header")) {
+          // Discard the host header value but track its size for enforcing received header map
+          // limits.
+          stream->discarded_host_header_size_ += name.size() + value.size();
+          stream->discarded_host_header_count_++;
+          stream->bytes_meter_->addDecompressedHeaderBytesReceived(name.size() + value.size());
+          return checkHeaderLimits(*stream);
+        } else {
+          return 0;
+        }
       }
       // Otherwise use host value as :authority
     }

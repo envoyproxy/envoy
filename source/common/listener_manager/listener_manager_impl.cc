@@ -8,6 +8,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
@@ -27,6 +28,7 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
@@ -761,9 +763,13 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
 
   // Notify existing connections on this listener that draining has begun so that callbacks
   // (e.g. HTTP/2 codecs) can react before the drain timer expires and connections are
-  // forcibly closed.
+  // forcibly closed. The drain start time, duration and strategy are captured once here so that
+  // every connection shares a single, consistent drain timeline regardless of which worker it
+  // lives on or when it is notified.
+  const Network::ConnectionDrainEvent listener_drain_event{
+      server_.api().timeSource().monotonicTime(), server_.options().drainStrategy()};
   for (const auto& worker : workers_) {
-    worker->onListenerDrain(*draining_it->listener_);
+    worker->onListenerDrain(listener_tag, listener_drain_event);
   }
 
   // Start the drain sequence which completes when the listener's drain manager has completed
@@ -966,10 +972,28 @@ void ListenerManagerImpl::drainGroup(
 
   // Notify existing connections in the draining filter chains that draining has begun so
   // callbacks (e.g. HTTP/2 codecs) can react before the drain timer expires and the
-  // connections are forcibly closed.
+  // connections are forcibly closed. The drain start time is captured once here so that every
+  // connection shares a single, consistent drain timeline.
+  //
+  // The configured Server::Options::drainStrategy() is applied, so a gradual server drain ramps
+  // these connections up over the drain window in the same way it ramps a server drain. Note that
+  // unlike a server drain the configuration backing these connections is already gone, and at the
+  // end of the drain window removeFilterChains() hard-closes whatever is left, so connections that
+  // survive the ramp are closed abruptly rather than being given the whole window to finish.
+  //
+  // When the guard is disabled the strategy is forced to Immediate, which preserves the legacy
+  // behavior of PerFilterChainFactoryContextImpl::drainClose(): it returned true unconditionally
+  // once the filter chain was draining.
+  const Server::DrainStrategy drain_strategy =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.filter_chain_drain_uses_configured_strategy")
+          ? server_.options().drainStrategy()
+          : Server::DrainStrategy::Immediate;
+  const Network::ConnectionDrainEvent filter_chain_drain_event{
+      server_.api().timeSource().monotonicTime(), drain_strategy};
   for (const auto& worker : workers_) {
     worker->onFilterChainDrain(draining_group->getDrainingListenerTag(),
-                               draining_group->getDrainingFilterChains());
+                               draining_group->getDrainingFilterChains(), filter_chain_drain_event);
   }
 
   // Start the drain sequence which completes when the listener's drain manager has completed
@@ -1222,6 +1246,34 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
   }
 }
 
+void ListenerManagerImpl::onServerDrainStart(Network::DrainDirection direction,
+                                             Network::ConnectionDrainEvent drain_event) {
+  // Direction is honored by only notifying listeners whose traffic direction is covered by the
+  // drain, so the connection-level drain logic itself does not need to re-check direction. The
+  // event is supplied by the caller and passed through unchanged, so every connection covered by
+  // one drain shares a single, consistent timeline.
+  //
+  // Only active listeners are notified. Listeners that are themselves already draining are
+  // deliberately skipped: drainListener() has already notified all of their connections, and under
+  // the first-event-wins rule (see Network::Connection::onDrain()) those connections would drop
+  // this later event anyway, staying on the earlier timeline they are already draining on. The
+  // pre-existing pull model OR'd the listener's own drain decision with the server-wide one, which
+  // made drain-close marginally more likely for those connections; dropping the server-wide term
+  // loses a small amount of drain acceleration in that window and nothing else. Their hard
+  // deadline is unchanged, since the listener's own drain sequence still force-closes whatever
+  // remains, and under DrainStrategy::Immediate there is no difference at all.
+  for (Network::ListenerConfig& listener : listeners()) {
+    if (direction == Network::DrainDirection::InboundOnly &&
+        listener.listenerInfo()->direction() != envoy::config::core::v3::INBOUND) {
+      continue;
+    }
+    const uint64_t listener_tag = listener.listenerTag();
+    for (const auto& worker : workers_) {
+      worker->onListenerDrain(listener_tag, drain_event);
+    }
+  }
+}
+
 void ListenerManagerImpl::stopWorkers() {
   if (!workers_started_) {
     return;
@@ -1333,12 +1385,11 @@ absl::Status ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listen
 }
 
 void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
-  if (!listener.udpListenerConfig().has_value() ||
-      listener.udpListenerConfig()->listenerFactory().isTransportConnectionless()) {
+  if (!listener.udpListenerConfig().has_value()) {
     // Close the listen sockets right away to avoid leaving TCP connections in accept queue
-    // already waiting for long timeout. However, connection-oriented UDP listeners shouldn't
-    // close the socket because they need to receive packets for existing connections via the
-    // listen sockets.
+    // already waiting for long timeout. UDP listeners keep their sockets: QUIC listeners
+    // need them to receive packets for existing connections, raw UDP listeners need them
+    // so a hot restart parent can keep serving established sessions during drain.
     listener.closeAllSockets();
 
     // In case of this listener was in-place updated previously and in the filter chains draining

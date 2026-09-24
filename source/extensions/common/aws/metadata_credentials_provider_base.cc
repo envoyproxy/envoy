@@ -4,6 +4,9 @@
 
 #include "envoy/server/factory_context.h"
 
+#include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -34,7 +37,6 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
 };
 
 MetadataCredentialsProviderBase::~MetadataCredentialsProviderBase() {
-  cancel_credentials_update_callback_();
   if (metadata_fetcher_) {
     metadata_fetcher_->cancel();
   }
@@ -68,7 +70,15 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
   handleFetchDone();
 }
 
-bool MetadataCredentialsProviderBase::credentialsPending() { return credentials_pending_; }
+bool MetadataCredentialsProviderBase::credentialsPending() {
+  if (!tls_slot_->currentThreadRegistered()) {
+    ASSERT(false, "AWS credentials provider queried from a thread with no thread local storage");
+    return true;
+  }
+  auto cache = tls_slot_->get();
+  ASSERT(cache.has_value());
+  return !cache.has_value() || cache->credentials_pending_;
+}
 
 Credentials MetadataCredentialsProviderBase::getCredentials() {
   return *(*tls_slot_)->credentials_.get();
@@ -140,28 +150,82 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
 
   CredentialsConstSharedPtr shared_credentials = std::move(creds);
   if (tls_slot_ && !tls_slot_->isShutdown()) {
+    // A weak_ptr rather than a raw `this`, so that a completion callback still queued when the
+    // provider goes away becomes a no-op instead of a use-after-free.
+    std::weak_ptr<MetadataCredentialsProviderBase> weak_self = weak_from_this();
+
+    // Set the credentials and clear the pending flag as a single update, so that no thread can
+    // observe one without the other. This writes the main thread's slot synchronously and posts the
+    // same update to every registered worker dispatcher.
     tls_slot_->runOnAllThreads(
-        /* Set the credentials */ [shared_credentials](
-                                      OptRef<ThreadLocalCredentialsCache>
-                                          obj) { obj->credentials_ = shared_credentials; },
-        /* Notify waiting signers on completion of credential setting above */
-        CancelWrapper::cancelWrapped(
-            [this]() {
-              credentials_pending_.store(false);
-              std::list<std::weak_ptr<CredentialSubscriberCallbacks>> subscribers_copy;
-              {
-                Thread::LockGuard guard(mu_);
-                subscribers_copy = credentials_subscribers_;
-              }
-              for (auto& weak_cb : subscribers_copy) {
-                if (auto cb = weak_cb.lock()) {
-                  ENVOY_LOG(debug, "Notifying subscriber of credential update");
-                  cb->onCredentialUpdate();
-                }
-              }
-            },
-            &cancel_credentials_update_callback_));
+        [shared_credentials](OptRef<ThreadLocalCredentialsCache> obj) {
+          obj->credentials_ = shared_credentials;
+          obj->credentials_pending_ = false;
+        },
+        // Notify a second time once every worker has applied the update. Between the immediate
+        // notification below and a worker applying its update, that worker still reads
+        // `credentials_pending_ == true` from its own slot, so it can queue a pending callback
+        // after the immediate notification has already drained the queue. This notification is
+        // what wakes such a callback; without it the request stalls until the next successful
+        // refresh.
+        [weak_self]() {
+          if (auto self = weak_self.lock()) {
+            self->notifySubscribers();
+          }
+        });
+
+    // Notify waiting signers from this thread as well, rather than relying only on the
+    // all-threads-complete callback above. That callback does not run until every registered worker
+    // dispatcher has handled the posted update, and worker dispatchers do not start running until
+    // `startWorkers()`, which waits on server initialization. The main thread might like to use
+    // credentials before that point, and waiting for the workers would deadlock. (For example, a
+    // dynamic modules bootstrap extension might want to make an HTTP callout before it signals
+    // server init is complete.)
+    //
+    // For subscribers that post their wakeup to their own dispatcher (the AWS request signing and
+    // Lambda filters do), notifying here is ordered correctly: the credential update above is
+    // posted to each worker first, and dispatcher post queues are FIFO, so a worker applies the
+    // update before it runs the wakeup that reads it. Subscribers that instead run their callback
+    // inline rely on this being the main thread, whose slot `runOnAllThreads` has already updated.
+    //
+    // Note that unlike the completion callback, this notification runs on the caller's stack, which
+    // for a credential refresh is inside MetadataFetcher::onSuccess()/onMetadataError() and ahead
+    // of handleFetchDone(). No subscriber re-enters the provider today, but one that did would see
+    // a half-finished refresh.
+    notifySubscribers();
   }
+}
+
+void MetadataCredentialsProviderBase::notifySubscribers() {
+  std::list<std::weak_ptr<CredentialSubscriberCallbacks>> subscribers_copy;
+  {
+    Thread::LockGuard guard(mu_);
+    subscribers_copy = credentials_subscribers_;
+  }
+  for (auto& weak_cb : subscribers_copy) {
+    if (auto cb = weak_cb.lock()) {
+      ENVOY_LOG(debug, "Notifying subscriber of credential update");
+      cb->onCredentialUpdate();
+    }
+  }
+}
+
+void MetadataCredentialsProviderBase::setCredentialsPendingToAllThreads() {
+  // The dedup below reads the main thread's slot, so it is only meaningful on the main thread. Not
+  // relying on the assertion inside runOnAllThreads(), because the dedup can return before ever
+  // reaching it.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  if (!tls_slot_ || tls_slot_->isShutdown()) {
+    return;
+  }
+  // The main thread's slot is written synchronously by runOnAllThreads, so it always holds the most
+  // recently initiated update. If it already says pending then every other thread has the same
+  // update applied or queued, and there is nothing to broadcast.
+  if ((*tls_slot_)->credentials_pending_) {
+    return;
+  }
+  tls_slot_->runOnAllThreads(
+      [](OptRef<ThreadLocalCredentialsCache> obj) { obj->credentials_pending_ = true; });
 }
 
 CredentialSubscriberCallbacksHandlePtr

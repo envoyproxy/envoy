@@ -1563,6 +1563,18 @@ TEST(McpParserConfigTest, BuiltInMethodGroups) {
   EXPECT_EQ(config.getMethodGroup("custom/extension"), "unknown");
 }
 
+TEST(McpParserConfigTest, NameAttributePaths) {
+  McpParserConfig config;
+
+  EXPECT_EQ(config.getNameAttributePath("tools/call"), "params.name");
+  EXPECT_EQ(config.getNameAttributePath("prompts/get"), "params.name");
+  EXPECT_EQ(config.getNameAttributePath("resources/read"), "params.uri");
+  EXPECT_EQ(config.getNameAttributePath("tasks/get"), "params.taskId");
+  EXPECT_EQ(config.getNameAttributePath("tasks/update"), "params.taskId");
+  EXPECT_EQ(config.getNameAttributePath("tasks/cancel"), "params.taskId");
+  EXPECT_EQ(config.getNameAttributePath("logging/setLevel"), "");
+}
+
 TEST(McpParserConfigTest, MethodGroupFromProtoWithOverrides) {
   envoy::extensions::filters::http::mcp::v3::ParserConfig proto_config;
   proto_config.set_group_metadata_key("method_group");

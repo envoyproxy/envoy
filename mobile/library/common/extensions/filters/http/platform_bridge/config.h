@@ -16,15 +16,16 @@ namespace PlatformBridge {
  * Config registration for the platform bridge filter. @see NamedHttpFilterConfigFactory.
  */
 class PlatformBridgeFilterFactory
-    : public Common::FactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoymobile::extensions::filters::http::platform_bridge::PlatformBridge> {
 public:
-  PlatformBridgeFilterFactory() : FactoryBase("platform_bridge") {}
+  PlatformBridgeFilterFactory() : UnifiedFactoryBase("platform_bridge") {}
 
 private:
-  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<::Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::platform_bridge::PlatformBridge& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 DECLARE_FACTORY(PlatformBridgeFilterFactory);

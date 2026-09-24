@@ -6,6 +6,7 @@ load(
 )
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -15,7 +16,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "dynamic_modules_test",
     srcs = ["dynamic_modules_test.cc"],
     data = [
@@ -33,7 +34,7 @@ envoy_cc_test(
     ],
     # This is to test dlopen with the current working directory (rundir in Bazel).
     env = {"LD_LIBRARY_PATH": "."},
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":util",
         "//source/common/buffer:buffer_lib",
@@ -61,6 +62,15 @@ envoy_cc_test(
         "//source/extensions/dynamic_modules:abi_impl",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "metric_registry_test",
+    srcs = ["metric_registry_test.cc"],
+    deps = [
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
     ],
 )
 

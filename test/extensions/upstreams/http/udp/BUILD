@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/http:protocol_interface",
         "//envoy/router:router_interface",
@@ -38,7 +38,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/upstreams/http/udp:config",
         "//source/extensions/upstreams/http/udp:upstream_request_lib",

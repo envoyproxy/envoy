@@ -80,6 +80,41 @@ Http::Code zeroHttpCode() {
   return static_cast<Http::Code>(0);
 }
 
+absl::StatusOr<std::optional<Http::Utility::QueryParamsMulti>> modifyQueryParameters(
+    const Http::RequestHeaderMap& request_headers,
+    const std::vector<std::pair<std::string, std::string>>& query_parameters_to_set,
+    const std::vector<std::string>& query_parameters_to_remove, bool validate_mutations) {
+  if (query_parameters_to_set.empty() && query_parameters_to_remove.empty()) {
+    return std::optional<Http::Utility::QueryParamsMulti>();
+  }
+
+  if (request_headers.Path() == nullptr) {
+    if (validate_mutations) {
+      return absl::InvalidArgumentError("Query parameter mutations on a path-less request.");
+    }
+    return std::optional<Http::Utility::QueryParamsMulti>();
+  }
+
+  Http::Utility::QueryParamsMulti modified_query_parameters =
+      Http::Utility::QueryParamsMulti::parseQueryString(
+          request_headers.Path()->value().getStringView());
+
+  for (const auto& [key, value] : query_parameters_to_set) {
+    if (validate_mutations &&
+        (!Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(key) ||
+         !Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(value))) {
+      return absl::InvalidArgumentError("Invalid query parameter " + key + "=" + value + ".");
+    }
+    modified_query_parameters.overwrite(key, value);
+  }
+
+  for (const auto& key : query_parameters_to_remove) {
+    modified_query_parameters.remove(key);
+  }
+
+  return std::optional<Http::Utility::QueryParamsMulti>(std::move(modified_query_parameters));
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
@@ -142,6 +177,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       include_tls_session_(config.include_tls_session()),
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
@@ -196,6 +232,9 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   for (auto it = begin_it; it != end_it; ++it) {
     context_extensions_[it->first] = it->second;
   }
+  if (other.emit_client_span_.has_value()) {
+    emit_client_span_ = other.emit_client_span_;
+  }
 }
 
 // Constructor used for merging configurations from different levels (vhost, route, etc.)
@@ -209,7 +248,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       grpc_service_(more_specific.grpc_service_.has_value() ? more_specific.grpc_service_
                                                             : std::nullopt),
       http_service_(more_specific.http_service_.has_value() ? more_specific.http_service_
-                                                            : std::nullopt) {
+                                                            : std::nullopt),
+      emit_client_span_(more_specific.emit_client_span_.has_value()
+                            ? more_specific.emit_client_span_
+                            : less_specific.emit_client_span_) {
   // Merge context extensions from more specific configuration, overriding less specific ones.
   for (const auto& extension : more_specific.context_extensions_) {
     context_extensions_[extension.first] = extension.second;
@@ -394,6 +436,13 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server.", *decoder_callbacks_);
   // Store start time of ext_authz filter call
   start_time_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
+
+  bool emit_client_span = config_->emitClientSpan();
+  if (maybe_merged_per_route_config &&
+      maybe_merged_per_route_config->emitClientSpan().has_value()) {
+    emit_client_span = maybe_merged_per_route_config->emitClientSpan().value();
+  }
+  client_to_use->setEmitClientSpan(emit_client_span);
 
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
@@ -936,43 +985,19 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                              response->response_headers_to_overwrite_if_exists.end()};
     }
 
-    std::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
-    if (!response->query_parameters_to_set.empty()) {
-      modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
-          request_headers_->Path()->value().getStringView());
-      ENVOY_STREAM_LOG(
-          trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
-      for (const auto& [key, value] : response->query_parameters_to_set) {
-        if (config_->validateMutations() &&
-            (!Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(key) ||
-             !Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(value))) {
-          ENVOY_STREAM_LOG(trace, "Rejected invalid query parameter {}={}.", *decoder_callbacks_,
-                           key, value);
-          rejectResponse();
-          updateEffect(Effect::InvalidMutationRejected);
-          return;
-        }
-        ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
-        modified_query_parameters->overwrite(key, value);
-      }
+    auto status_or_query_parameters =
+        modifyQueryParameters(*request_headers_, response->query_parameters_to_set,
+                              response->query_parameters_to_remove, config_->validateMutations());
+    if (!status_or_query_parameters.ok()) {
+      ENVOY_STREAM_LOG(trace, "Rejected query parameter mutations: {}", *decoder_callbacks_,
+                       status_or_query_parameters.status().message());
+      rejectResponse();
+      updateEffect(Effect::InvalidMutationRejected);
+      return;
     }
 
-    if (!response->query_parameters_to_remove.empty()) {
-      if (!modified_query_parameters) {
-        modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
-            request_headers_->Path()->value().getStringView());
-      }
-      ENVOY_STREAM_LOG(trace, "ext_authz filter removed query parameter(s) from the request:",
-                       *decoder_callbacks_);
-      for (const auto& key : response->query_parameters_to_remove) {
-        ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
-        modified_query_parameters->remove(key);
-      }
-    }
-
-    // We modified the query parameters in some way, so regenerate the `path` header and set it
-    // here.
-    if (modified_query_parameters) {
+    auto& modified_query_parameters = status_or_query_parameters.value();
+    if (modified_query_parameters.has_value()) {
       const auto new_path =
           modified_query_parameters->replaceQueryString(request_headers_->Path()->value());
       ENVOY_STREAM_LOG(

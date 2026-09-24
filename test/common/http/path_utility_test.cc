@@ -4,6 +4,7 @@
 
 #include "source/common/http/path_utility.h"
 
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -51,15 +52,46 @@ TEST_F(PathUtilityTest, InvalidPaths) {
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, NormalizeValidPaths) {
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
-      {"/a/b/../c", "/a/c"},        // parent dir
-      {"/a/b/./c", "/a/b/c"},       // current dir
-      {"a/b/../c", "/a/c"},         // non / start
-      {"/a/b/../../../../c", "/c"}, // out number parent
-      {"/a/..\\c", "/c"},           // "..\\" canonicalization
-      {"/%c0%af", "/%c0%af"},       // 2 bytes unicode reserved characters
-      {"/%5c%25", "/%5c%25"},       // reserved characters
-      {"/a/b/%2E%2E/c", "/a/c"}     // %2E escape
-  };
+      {"/a/b/../c", "/a/c"},                       // parent dir
+      {"/a/b/./c", "/a/b/c"},                      // current dir
+      {"a/b/../c", "/a/c"},                        // non / start
+      {"/a/b/../../../../c", "/c"},                // out number parent
+      {"/a/..\\c", "/c"},                          // "..\\" canonicalization
+      {"/%c0%af", "/%c0%af"},                      // 2 bytes unicode reserved characters
+      {"/%5c%25", "/%5c%25"},                      // reserved characters
+      {"/a/b/%2E%2E/c", "/a/c"},                   // %2E escape
+      {"/xyz/..;foo=bar/abc", "/abc"},             // dotdot in the middle with parameters
+      {"/..;foo=bar/abc", "/abc"},                 // starting dotdot with parameters
+      {"/xyz/..;foo=bar", "/"},                    // ending dotdot with parameters
+      {"/xyz/.;foo=bar/abc", "/xyz/abc"},          // dot in the middle with parameters
+      {"/.;foo=bar/abc", "/abc"},                  // starting dot with parameters
+      {"/xyz/.;foo=bar", "/xyz/"},                 // ending dot with parameters
+      {"/xyz/..;foo=bar/.;v1=2,v2=3/abc", "/abc"}, // mixed dot segments with parameters
+      {"/..;foo=bar/abc/.;mmm", "/abc/"},          // mixed dot segments with parameters
+      {"/.;aaa/..;foo=bar/abc/.;mmm", "/abc/"},    // mixed dot segments with parameters
+      {"/xyz/..;foo=bar/.;fff=zzz", "/"},          // mixed dot segments with parameters
+      {"/xyz/..;foo=bar/.;fff=zzz?blah=woops",
+       "/?blah=woops"}, // mixed dot segments with parameters
+      {"/xyz/..;foo=bar/.;fff=zzz/remain;blah-bluh?query",
+       "/remain;blah-bluh?query"}}; // mixed dot segments with parameters
+
+  for (const auto& path_pair : non_normal_pairs) {
+    auto& path_header = pathHeaderEntry(path_pair.first);
+    const auto result = PathUtil::canonicalPath(headers_);
+    EXPECT_TRUE(result) << "original path: " << path_pair.first;
+    EXPECT_EQ(path_header.value().getStringView(), path_pair.second)
+        << "original path: " << path_pair.second;
+  }
+}
+
+TEST_F(PathUtilityTest, NormalizeValidPathsDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strip_dotdot_segments_with_parameters", "false"}});
+  const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
+      {"/xyz/..;foo=bar/abc", "/xyz/..;foo=bar/abc"},
+      {"/..;foo=bar/abc", "/..;foo=bar/abc"},
+      {"/xyz/..;foo=bar", "/xyz/..;foo=bar"}};
 
   for (const auto& path_pair : non_normal_pairs) {
     auto& path_header = pathHeaderEntry(path_pair.first);
@@ -112,6 +144,38 @@ TEST_F(PathUtilityTest, MergeSlashes) {
   EXPECT_EQ("/a/b?a=///c", mergeSlashes("/a//b?a=///c")); // slashes in the query are ignored
   EXPECT_EQ("/a/b?", mergeSlashes("/a//b?"));             // empty query
   EXPECT_EQ("/a/?b", mergeSlashes("//a/?b"));             // ends with slash + query
+}
+
+TEST_F(PathUtilityTest, StripDotSegmentWithParameters) {
+  auto stripDot = [this](const std::string& path_value) {
+    auto& path_header = pathHeaderEntry(path_value);
+    PathUtil::stripParametersFromDotSegments(headers_);
+    return std::string(path_header.value().getStringView());
+  };
+  EXPECT_EQ("", stripDot(""));
+  EXPECT_EQ("/xyz", stripDot("/xyz"));
+  EXPECT_EQ("/xyz/../abc", stripDot("/xyz/..;foo=bar/abc"));
+  EXPECT_EQ("/../abc", stripDot("/..;foo=bar/abc"));
+  EXPECT_EQ("/xyz/..", stripDot("/xyz/..;foo=bar"));
+  EXPECT_EQ("/xyz/..", stripDot("/xyz/..;"));
+  EXPECT_EQ("/a/../b/../c", stripDot("/a/..;foo/b/..;bar/c"));
+  EXPECT_EQ("/a/../b", stripDot("/a/..;param1;param2/b"));
+  EXPECT_EQ("/xyz/..foo", stripDot("/xyz/..foo"));
+  EXPECT_EQ("/xyz/...;foo", stripDot("/xyz/...;foo"));
+  EXPECT_EQ("/xyz/remove/..?param=/.;foo", stripDot("/xyz/remove/..;foo?param=/.;foo"));
+  EXPECT_EQ("/xyz/remove/..#frag=/.;foo", stripDot("/xyz/remove/..;foo#frag=/.;foo"));
+  EXPECT_EQ("/xyz?param=/..;foo", stripDot("/xyz?param=/..;foo"));
+  EXPECT_EQ("/xyz#frag=/..;foo", stripDot("/xyz#frag=/..;foo"));
+
+  EXPECT_EQ("/xyz/./abc", stripDot("/xyz/.;foo=bar/abc"));
+  EXPECT_EQ("/./abc", stripDot("/.;foo=bar/abc"));
+  EXPECT_EQ("/xyz/.", stripDot("/xyz/.;foo=bar"));
+  EXPECT_EQ("/xyz/.", stripDot("/xyz/.;"));
+  EXPECT_EQ("/a/./b/./c", stripDot("/a/.;foo/b/.;bar/c"));
+  EXPECT_EQ("/a/./b", stripDot("/a/.;param1;param2/b"));
+  EXPECT_EQ("/xyz/.foo", stripDot("/xyz/.foo"));
+  EXPECT_EQ("/xyz?param=/.;foo", stripDot("/xyz?param=/.;foo"));
+  EXPECT_EQ("/xyz#frag=/.;foo", stripDot("/xyz#frag=/.;foo"));
 }
 
 TEST_F(PathUtilityTest, RemoveQueryAndFragment) {
@@ -186,6 +250,30 @@ TEST_F(PathUtilityTest, UnescapeSlashes) {
   EXPECT_EQ(UnescapeResult("/a\\b/c\\?%2fabcd%5C%%2f%",
                            PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
             unescapeSlashes("%2fa%5Cb%2fc%5c?%2fabcd%5C%%2f%")); // query is untouched
+}
+
+TEST_F(PathUtilityTest, RemovePathParameters) {
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters(""));
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters("/"));
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters("/abc"));
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters("/abc/def"));
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters("/abc/def?param=1;2"));
+
+  EXPECT_EQ("/abc/def", *PathUtil::removePathParameters("/abc;param=1/def"));
+  EXPECT_EQ("/abc/def", *PathUtil::removePathParameters("/abc;p1=1;p2=2/def"));
+  EXPECT_EQ("/abc/def", *PathUtil::removePathParameters("/abc;p1=1/def;p2=2"));
+  EXPECT_EQ("/abc/def", *PathUtil::removePathParameters("/abc;/def"));
+  EXPECT_EQ("/abc", *PathUtil::removePathParameters("/abc;p=1"));
+  EXPECT_EQ("/abc/def?param=1;2", *PathUtil::removePathParameters("/abc;p=1/def?param=1;2"));
+  EXPECT_EQ("/abc/def#frag;2", *PathUtil::removePathParameters("/abc;p=1/def#frag;2"));
+  EXPECT_EQ("/abc/def?q=1#f;2", *PathUtil::removePathParameters("/abc;p=1/def?q=1#f;2"));
+
+  // Verify header map parameter overload
+  pathHeaderEntry("/foo/bar?query=val");
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters(headers_));
+
+  pathHeaderEntry("/foo;param=1/bar;param=2?query=val;123#frag");
+  EXPECT_EQ("/foo/bar?query=val;123#frag", *PathUtil::removePathParameters(headers_));
 }
 
 } // namespace Http

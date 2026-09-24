@@ -34,6 +34,57 @@ namespace Coroutine {
  * only live until C++26 is widely adopted, which provides STL support of
  * coroutine in `std::execution`. It is intentionally kept small and lean so
  * that it is easier to maintain and migrate off eventually.
+ *
+ * ===========================================================================
+ * Core Architectural & Lifecycle Design Invariants:
+ * ===========================================================================
+ * Coroutines in Envoy are NEVER destroyed while suspended.
+ *
+ * External handles (such as `DetachedHandle`) never invoke `destroy()` on suspended
+ * frames. Instead, cancellation in Envoy coroutines operates strictly via
+ * cooperative cancellation with structured synchronous stack unwinding:
+ *
+ * 1. Cooperative Cancellation:
+ *    When cancellation is requested (e.g. via `DetachedHandle::cancel()` or
+ *    `CancellationState::cancel()`), cancellation invokes the pending leaf awaitable's
+ *    `onCancel()` hook to cancel/disarm the underlying asynchronous operation (e.g.
+ *    disarming a timer), completes the awaitable with an aborted status
+ *    (`absl::CancelledError`), and resumes the coroutine synchronously via
+ *    `continuation_.resume()`.
+ *
+ * 2. Structured Synchronous Stack Unwinding:
+ *    Upon resumption, the coroutine receives the aborted status and unwinds through
+ *    standard structured C++ control flow (such as `CO_RETURN_IF_ERROR` or
+ *    `ASSIGN_OR_CO_RETURN`). As the call stack unwinds, all local variables and
+ *    RAII objects (including awaitables, cleanup guards, and locks) have
+ *    their destructors executed deterministically in reverse order of declaration,
+ *    propagating up to `co_return` and reaching `final_suspend()`.
+ *
+ * 3. Awaitable Lifecycle Implications:
+ *    - Awaitable destructors NEVER run mid-suspension: Because coroutine frames are
+ *      never destroyed while suspended, an awaitable object's destructor only runs
+ *      after the coroutine has resumed (either via normal event completion or via
+ *      cancellation resumption) and control flow leaves its lexical scope.
+ *    - Soundness of Defaulted Destructors: Because awaitables never destruct while
+ *      suspended waiting for an event, defaulted virtual destructors on awaitables
+ *      (`virtual ~LeafAwaitable() = default;`) are sound. Derived awaitables do not
+ *      need complex destructor logic to unhook themselves from event sources or
+ *      cancel in-flight operations during destruction; all cancellation and resource
+ *      disarming are handled cleanly through `onCancel()`.
+ *
+ * 4. Handle Ownership & Frame Management:
+ *    - DetachedHandle: `DetachedHandle` (returned by `launch()`) does not own the
+ *      coroutine frame; it only holds a shared reference to the `CancellationState`.
+ *      Dropping a `DetachedHandle` at any time is completely safe: it does not cancel
+ *      the coroutine nor destroy the suspended frame. The coroutine continues
+ *      executing to completion.
+ *    - RootTask: The root coroutine frame is self-owning and destroys itself only
+ *      when it completes at `final_suspend` (via `std::suspend_never` in
+ *      `RootTask::promise_type`), ensuring `on_done` always runs with the final status.
+ *    - Task<T>: For `Task<T>`, the only times `handle_.destroy()` is invoked are when
+ *      an unstarted `Task` is discarded before launch/await (at `initial_suspend()`),
+ *      or when an awaiting caller destroys a completed frame that has already reached
+ *      `final_suspend()`.
  */
 
 // ---------------------------------------------------------------------------

@@ -27,7 +27,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext config;
   auto cfg =
       *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(config, factory_context);
-  Stats::IsolatedStoreImpl store;
+  Stats::IsolatedStoreImpl store(server_.serverFactoryContext().serverScope().symbolTable());
   Envoy::Ssl::ClientContextSharedPtr client_ctx(
       *server_.sslContextManager().createSslClientContext(*store.rootScope(), *cfg));
 

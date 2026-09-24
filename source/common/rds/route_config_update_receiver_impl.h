@@ -11,6 +11,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/watcher_impl.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 
 #include "absl/strings/string_view.h"
 
@@ -42,7 +43,7 @@ public:
    * @param observer supplies the observer. This should have a lifetime that is at least as long as
    * the lifetime of this warmer.
    */
-  void setObserver(RouteConfigUpdateObserver& observer) { observer_.emplace(observer); }
+  void setObserver(OptRef<RouteConfigUpdateObserver> observer) { observer_ = observer; }
 
   /**
    * Creates the init manager that the resources of the update that is about to be built should warm
@@ -57,8 +58,8 @@ public:
   /**
    * Abort existing warming update to ensure the init watcher will never be notified.
    *
-   * NOTE: please ensure this is called before we update the warming state with the new update,
-   * because the destruction of the configuration may trigger the init manager to be notified
+   * NOTE: please ensure this is called before we update the warming state with the new update.
+   * Because the destruction of the configuration may trigger the init manager to be notified
    * synchronously and result in the onWarmed being called to a dirty/modifying warming state.
    */
   void abortWarming() {
@@ -113,7 +114,7 @@ private:
 // The state of one route configuration: the proto it was built from, the parsed configuration and
 // the bookkeeping that goes with them.
 struct WarmingConfigState {
-  ProtobufTypes::MessagePtr route_config_proto_;
+  ArenaWrappedProto<Protobuf::Message> route_config_proto_;
   ConfigConstSharedPtr config_;
   std::string version_info_;
   // This will be nullopt if the state is generated from VHDS updates.
@@ -121,7 +122,7 @@ struct WarmingConfigState {
   SystemTime last_updated_;
 
   void clear() {
-    route_config_proto_.reset();
+    route_config_proto_ = nullptr;
     config_.reset();
     version_info_.clear();
     last_config_hash_.reset();
@@ -134,6 +135,10 @@ class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver,
 public:
   RouteConfigUpdateReceiverImpl(ConfigTraits& config_traits, ProtoTraits& proto_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context);
+  ~RouteConfigUpdateReceiverImpl() override {
+    warmer_.setObserver({});
+    warmer_.abortWarming();
+  }
 
   uint64_t getHash(const Protobuf::Message& rc) const { return MessageUtil::hash(rc); }
   bool checkHash(uint64_t new_hash) const {
@@ -143,7 +148,7 @@ public:
   // Builds a new route configuration and installs the init manager that its resources warm up
   // with, but doesn't warm anything up or publish anything yet. The caller finishes applying the
   // update and then calls startWarming(), which eventually publishes it.
-  void updateConfig(std::unique_ptr<Protobuf::Message> route_config_proto,
+  void updateConfig(ArenaWrappedProto<Protobuf::Message> route_config_proto,
                     std::optional<uint64_t> hash, absl::string_view version_info);
   // Warms up the route configuration built by the last updateConfig() call and publishes it once
   // it's ready. Note that this may happen before this method returns, i.e. synchronously, if there
@@ -151,8 +156,14 @@ public:
   void startWarming() { warmer_.startWarming(); }
 
   // RouteConfigUpdateReceiver
-  bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
-  void setObserver(RouteConfigUpdateObserver& observer) override { warmer_.setObserver(observer); }
+  absl::Status onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
+  // The subscription gave up without publishing valid configuration.
+  // Recorded the same way a successful publish is, because from here on the two are
+  // equivalent: in both cases the owning init manager has stopped waiting.
+  void onRdsFailure() override { initialized_ = true; }
+  void setObserver(OptRef<RouteConfigUpdateObserver> observer) override {
+    warmer_.setObserver(observer);
+  }
   bool configWarming() const override { return warmer_.warming(); }
 
   uint64_t configHash() const override { return last_config_hash_; }
@@ -164,7 +175,7 @@ public:
 private:
   friend class Envoy::Router::RouteConfigUpdateReceiverImpl;
 
-  void updateState(std::unique_ptr<Protobuf::Message> route_config_proto,
+  void updateState(ArenaWrappedProto<Protobuf::Message> route_config_proto,
                    std::optional<uint64_t> hash, absl::string_view version_info,
                    ConfigConstSharedPtr config,
                    std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id);
@@ -175,13 +186,20 @@ private:
   ProtoTraits& proto_traits_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   TimeSource& time_source_;
-  ProtobufTypes::MessagePtr route_config_proto_;
+  ArenaWrappedProto<Protobuf::Message> route_config_proto_;
   uint64_t last_config_hash_{0ull};
   SystemTime last_updated_;
   std::optional<RouteConfigProvider::ConfigInfo> config_info_;
   ConfigConstSharedPtr config_;
   ConfigWarmer warmer_;
   WarmingConfigState warming_state_;
+  // Whether anything still warms up with this receiver, i.e. whether the owning init manager is
+  // still waiting on it. Set once a configuration has been published, and also when the
+  // subscription gives up without publishing one - see onRdsFailure(). Note this is NOT the same
+  // as "a configuration has been published": readiness can be signalled without one, and an update
+  // that arrives afterwards must not hold its configuration back to warm up, because by then
+  // nothing is waiting for it and the listener is already serving.
+  bool initialized_{false};
 };
 
 } // namespace Rds

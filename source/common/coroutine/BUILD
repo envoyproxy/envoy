@@ -14,6 +14,7 @@ envoy_cc_library(
     deps = [
         "//envoy/common:pure_lib",
         "//envoy/event:timer_interface",
+        "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
 
@@ -80,17 +81,51 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+    ],
+)
+
+envoy_cc_library(
+    name = "semaphore_lib",
+    srcs = ["semaphore.cc"],
+    hdrs = ["semaphore.h"],
+    deps = [
+        ":context_lib",
+        ":launch_lib",
+        ":leaf_awaitable_lib",
+        ":task_lib",
+        "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "async_queue_lib",
+    hdrs = ["async_queue.h"],
+    deps = [
+        ":leaf_awaitable_lib",
+        ":semaphore_lib",
+        ":status_macros_lib",
+        ":task_lib",
+        "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
 envoy_cc_library(
     name = "coroutine_lib",
     deps = [
+        ":async_queue_lib",
         ":context_lib",
         ":dispatcher_executor_lib",
         ":executor_lib",
         ":launch_lib",
         ":leaf_awaitable_lib",
+        ":semaphore_lib",
         ":status_macros_lib",
         ":task_lib",
     ],

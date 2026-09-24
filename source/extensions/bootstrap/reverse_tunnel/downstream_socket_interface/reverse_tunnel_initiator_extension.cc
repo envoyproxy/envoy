@@ -40,6 +40,8 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
   enable_detailed_stats_ = config.enable_detailed_stats();
   max_reconnect_backoff_ms_ =
       PROTOBUF_GET_MS_OR_DEFAULT(config, max_reconnect_backoff, kDefaultMaxReconnectBackoffMs);
+  maintain_interval_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(
+      config, maintain_interval, ReverseConnectionUtility::kDefaultMaintainIntervalMs);
   if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
     handshake_request_path_ = config.http_handshake().request_path();
   } else {

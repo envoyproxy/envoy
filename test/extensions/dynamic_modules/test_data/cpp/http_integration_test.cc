@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <format>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -169,6 +171,60 @@ public:
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(PassthroughConfigFactory, "passthrough");
+
+// A filter factory whose create throws so the exception barrier around the filter constructor
+// export can be exercised. Without the barrier the exception would cross the ABI boundary and abort
+// the worker. The caught exception leaves a null filter, so the host fails the request closed with
+// a 500.
+class ThrowOnNewFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle&) override {
+    throw std::runtime_error("filter constructor failed on purpose");
+  }
+};
+
+class ThrowOnNewConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<ThrowOnNewFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(ThrowOnNewConfigFactory, "throw_on_filter_new");
+
+// Only records that its response-headers callback ran. Used to check that the callback still fires
+// when the response is a local reply the module did not send, such as a `direct_response` route.
+class LocalReplyResponseHeadersFilter : public HttpFilter {
+public:
+  HeadersStatus onRequestHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool) override {
+    headers.set("on-response-headers", "called");
+    return HeadersStatus::Continue;
+  }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+};
+
+class LocalReplyResponseHeadersFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle&) override {
+    return std::make_unique<LocalReplyResponseHeadersFilter>();
+  }
+};
+
+class LocalReplyResponseHeadersConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<LocalReplyResponseHeadersFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(LocalReplyResponseHeadersConfigFactory,
+                                    "local_reply_response_headers");
 
 // -----------------------------------------------------------------------------
 // HeaderCallbacks
@@ -851,6 +907,62 @@ public:
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(HttpFilterSchedulerConfigFactory, "http_filter_scheduler");
+
+// -----------------------------------------------------------------------------
+// SpanAcrossCallbacks
+// -----------------------------------------------------------------------------
+
+// Spawns a child span in onRequestHeaders, starts off-thread work, and finishes the span from the
+// scheduled callback to show that a span can cover work that runs between event hooks.
+class SpanAcrossCallbacksFilter : public HttpFilter {
+public:
+  SpanAcrossCallbacksFilter(HttpFilterHandle& handle) : handle_(handle) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap&, bool) override {
+    auto span = handle_.getActiveSpan();
+    if (span != nullptr) {
+      child_span_ = span->spawnChild("off_thread_work");
+    }
+    auto sched = handle_.getScheduler();
+    sched->schedule([this]() {
+      if (child_span_ != nullptr) {
+        child_span_->setTag("completed", "true");
+        child_span_->finish();
+        child_span_.reset();
+      }
+      handle_.continueRequest();
+    });
+    return HeadersStatus::StopAllAndBuffer;
+  }
+
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+
+private:
+  HttpFilterHandle& handle_;
+  std::unique_ptr<ChildSpan> child_span_;
+};
+
+class SpanAcrossCallbacksFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<SpanAcrossCallbacksFilter>(handle);
+  }
+};
+
+class SpanAcrossCallbacksConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<SpanAcrossCallbacksFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(SpanAcrossCallbacksConfigFactory, "span_across_callbacks");
 
 // -----------------------------------------------------------------------------
 // FakeExternalCache
@@ -1909,6 +2021,76 @@ public:
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(GenericSecretCallbacksConfigFactory,
                                     "generic_secret_callbacks");
+
+// -----------------------------------------------------------------------------
+// RuntimeValues
+// -----------------------------------------------------------------------------
+
+// Reads every runtime type at config creation, which is where the runtime is reachable, and
+// echoes the cached values back as response headers so the integration test can confirm both the
+// configured-value and the fall-back-to-default paths.
+struct RuntimeValues {
+  bool bool_value;
+  uint64_t int_value;
+  double number_value;
+  bool missing_bool;
+  uint64_t missing_int;
+  double missing_number;
+};
+
+class RuntimeValuesFilter : public HttpFilter {
+public:
+  explicit RuntimeValuesFilter(const RuntimeValues& values) : values_(values) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool) override {
+    headers.set("x-runtime-bool", values_.bool_value ? "true" : "false");
+    headers.set("x-runtime-int", std::format("{}", values_.int_value));
+    headers.set("x-runtime-number", std::format("{}", values_.number_value));
+    headers.set("x-runtime-missing-bool", values_.missing_bool ? "true" : "false");
+    headers.set("x-runtime-missing-int", std::format("{}", values_.missing_int));
+    headers.set("x-runtime-missing-number", std::format("{}", values_.missing_number));
+    return HeadersStatus::Continue;
+  }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  const RuntimeValues values_;
+};
+
+class RuntimeValuesFilterFactory : public HttpFilterFactory {
+public:
+  explicit RuntimeValuesFilterFactory(const RuntimeValues& values) : values_(values) {}
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle&) override {
+    return std::make_unique<RuntimeValuesFilter>(values_);
+  }
+
+private:
+  const RuntimeValues values_;
+};
+
+class RuntimeValuesConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view) override {
+    const RuntimeValues values{
+        handle.getRuntimeBool("test.runtime_bool", false),
+        handle.getRuntimeInt("test.runtime_int", 7),
+        handle.getRuntimeNumber("test.runtime_number", 0.5),
+        handle.getRuntimeBool("test.runtime_missing_bool", true),
+        handle.getRuntimeInt("test.runtime_missing_int", 1234),
+        handle.getRuntimeNumber("test.runtime_missing_number", 2.5),
+    };
+    return std::make_unique<RuntimeValuesFilterFactory>(values);
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(RuntimeValuesConfigFactory, "runtime_values");
 
 } // namespace DynamicModules
 } // namespace Envoy

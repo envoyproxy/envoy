@@ -83,6 +83,8 @@ public:
       }
     }
   }
+  bool noTagExtraction() const override { return no_tag_extraction_; }
+  void markAsNoTagExtraction() override { no_tag_extraction_ = true; }
 
   TestUtil::TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;
@@ -120,6 +122,7 @@ private:
   std::string tag_extracted_name_;
   StatNamePool tag_pool_;
   std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
+  bool no_tag_extraction_{false};
 };
 
 template <class BaseClass> class MockStatWithRefcount : public MockMetric<BaseClass> {
@@ -322,19 +325,22 @@ public:
 
   // Override the lowest level of stat creation based on StatName to redirect
   // back to the old string-based mechanisms still on the MockStore object
-  // to allow tests to inject EXPECT_CALL hooks for those. The optional pre-built tagged_name is
-  // ignored.
+  // to allow tests to inject EXPECT_CALL hooks for those. The stat is named to those hooks by
+  // TestScope::statNameWithTags(), so an expectation always reads the flat name a real scope would
+  // have created, whether or not the caller attached tags explicitly.
   MOCK_METHOD(Counter&, counterFromTaggedName, (StatName, std::optional<StatNameTagSpan>, StatName),
               (override));
   // NOLINTNEXTLINE(readability-identifier-naming)
-  Counter& counterFromTaggedName_(StatName base_name, std::optional<StatNameTagSpan>, StatName);
+  Counter& counterFromTaggedName_(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                  StatName tagged_name);
 
-  Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan>, StatName,
-                             Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan>, StatName,
-                                     Histogram::Unit unit) override;
-  TextReadout& textReadoutFromTaggedName(StatName base_name, std::optional<StatNameTagSpan>,
-                                         StatName) override;
+  Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                             StatName tagged_name, Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                     StatName tagged_name, Histogram::Unit unit) override;
+  TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                         std::optional<StatNameTagSpan> name_tags,
+                                         StatName tagged_name) override;
 
   MockStore& mock_store_;
 };

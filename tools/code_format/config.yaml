@@ -2,7 +2,6 @@ suffixes:
   # Suffixes to include in checking
   included:
   - BUILD
-  - WORKSPACE
   - .bzl
   - .cc
   - .h
@@ -29,9 +28,6 @@ suffixes:
   proto:
   - .proto
 
-  repositories_bzl:
-  - bazel/repositories.bzl
-
 paths:
   # Path prefixes to exclude from checking
   # TODO(alyssawilk) unexclude mobile
@@ -41,6 +37,7 @@ paths:
   - bazel/external/cargo/remote/
   - bazel/external/http_parser/
   - bazel/rbe/toolchains/configs/
+  - bazel/tests/external/
   - bazel-
   - compat/openssl/
   - build
@@ -70,22 +67,6 @@ paths:
     - bazel/toolchains/
     - docs
 
-  # `build_urls`:
-  #   We want all URL references to exist in repository_locations.bzl files and have
-  #   metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
-  #   we have some exceptions for either infrastructure files or places we fall
-  #   short today (Rust).
-  #
-  # NB: Please DO NOT extend the `build_urls` allow list without consulting
-  # @envoyproxy/dependency-shepherds.
-  build_urls:
-    include:
-    - api/bazel/envoy_http_archive.bzl
-    - api/bazel/repository_locations.bzl
-    - bazel/external/cargo/remote/defs.bzl
-    - bazel/repository_locations.bzl
-    - docs/bazel/repository_locations.bzl
-
   exception:
     include:
     # Header files that can throw exceptions. These should be limited; the only
@@ -112,8 +93,6 @@ paths:
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
-    - source/common/formatter/http_specific_formatter.cc
-    - source/common/formatter/substitution_formatter.cc
     - source/common/stats/tag_extractor_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
@@ -172,6 +151,9 @@ paths:
     - source/extensions/common/matcher
     - source/extensions/common/tap
     - source/extensions/common/wasm
+    # Config validator interfaces reject updates by throwing per interface documentation.
+    - source/extensions/config/validators/dynamic_modules/config.cc
+    - source/extensions/config/validators/dynamic_modules/config_validator.cc
     - source/extensions/config/validators/minimum_clusters/minimum_clusters_validator.cc
     - source/extensions/config_subscription
     - source/extensions/content_parsers/json/config.cc
@@ -194,6 +176,7 @@ paths:
     - source/extensions/filters/udp
     - source/extensions/filters/listener
     - source/extensions/formatter
+    - source/extensions/geoip_providers/maxmind/config.cc
     - source/extensions/geoip_providers/maxmind/geoip_provider.cc
     - source/extensions/grpc_credentials
     - source/extensions/health_check/event_sinks/file/file_sink_impl.h
@@ -201,6 +184,7 @@ paths:
     - source/extensions/http/cache/file_system_http_cache/config.cc
     - source/extensions/http/custom_response
     - source/extensions/http/early_header_mutation
+    - source/extensions/http/header_formatters/dynamic_modules
     - source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/mapped_attribute_builder_factory.cc
     - source/extensions/http/injected_credentials
     - source/extensions/http/stateful_session
@@ -215,7 +199,6 @@ paths:
     - source/extensions/queue_policy/fifo/
     - source/extensions/quic/server_preferred_address
     - source/extensions/quic/connection_id_generator
-    - source/extensions/resource_monitors
     - source/extensions/router/cluster_specifiers/dynamic_modules/config.cc
     - source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.cc
     - source/extensions/string_matcher/lua/match.cc
@@ -335,6 +318,7 @@ paths:
     - test/tools/router_check/router_check.cc
     - source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.cc
     - test/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper_test.cc
+    - test/extensions/router/cluster_specifiers/dynamic_modules/cluster_specifier_test.cc
 
   # Files in these paths can use std::regex
   std_regex:
@@ -375,6 +359,8 @@ paths:
     - test/extensions/bootstrap/wasm/wasm_speed_test.cc
     - test/extensions/bootstrap/wasm/wasm_test.cc
     - test/extensions/common/wasm/wasm_test.cc
+    - test/extensions/dynamic_modules/test_data/cpp/early_header_mutation_integration_test.cc
+    - test/extensions/dynamic_modules/test_data/cpp/header_formatter_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http.cc
     - test/extensions/dynamic_modules/test_data/cpp/listener_integration_test.cc

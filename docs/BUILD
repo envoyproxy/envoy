@@ -1,7 +1,27 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
 licenses(["notice"])  # Apache 2
+
+# Emit `foo` rather than `foo.html` links. Off by default so PR previews,
+# local builds and anything rendered straight from a file/object store keep
+# working. envoy-website turns it on and serves `/foo` from `foo.html`.
+bool_flag(
+    name = "pretty_links",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "with_pretty_links",
+    flag_values = {":pretty_links": "True"},
+)
+
+_LINK_SUFFIX_ENV = select({
+    ":with_pretty_links": "export ENVOY_DOCS_LINK_SUFFIX=''; ",
+    "//conditions:default": "",
+})
 
 exports_files([
     "v2_mapping.json",
@@ -20,12 +40,12 @@ filegroup(
             "root/**/envoy-dynamic-filesystem-demo.yaml",
             "root/operations/_include/traffic_tapping_*.yaml",
             "root/configuration/http/http_filters/_include/checksum_filter.yaml",
+            "root/configuration/http/http_filters/_include/client_cert_filter.yaml",
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/configuration/http/http_filters/_include/geoip-filter.yaml",
             "root/configuration/listeners/network_filters/_include/geoip-network-filter.yaml",
             "root/configuration/http/http_filters/_include/http-cache-configuration-fs.yaml",
             "root/configuration/http/http_filters/_include/http-cache-v2-configuration-fs.yaml",
-            "root/configuration/other_features/_include/dlb.yaml",
             "root/configuration/other_features/_include/hyperscan_matcher.yaml",
             "root/configuration/other_features/_include/hyperscan_matcher_multiple.yaml",
             "root/configuration/other_features/_include/hyperscan_regex_engine.yaml",
@@ -51,6 +71,7 @@ filegroup(
     name = "contrib_configs",
     srcs = [
         "root/configuration/http/http_filters/_include/checksum_filter.yaml",
+        "root/configuration/http/http_filters/_include/client_cert_filter.yaml",
         "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
     ] + select({
         "@envoy//bazel:windows_x86_64": [],
@@ -158,6 +179,7 @@ pkg_files(
     name = "sphinx_root",
     srcs = glob([
         "root/**/*.css",
+        "root/**/*.html",
         "root/**/*.ico",
         "root/**/*.jpeg",
         "root/**/*.jpg",
@@ -250,9 +272,9 @@ genrule(
     # BUILD_SHA must be set in release builds
     # The Envoy workspace will provide this on stamped builds. For external builds
     # you must either pass an env var or pass it through the workspace's status.
-    cmd = """
+    cmd = _LINK_SUFFIX_ENV + """
     . $(location @envoy//bazel:volatile_env) \
-    && _BUILD_SHA=$${BUILD_DOCS_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${{BUILD_SCM_REVISION}}} \
+    && _BUILD_SHA=$${BUILD_DOCS_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${BUILD_SCM_REVISION}}} \
     && $(location //tools:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
          --build_sha="$$_BUILD_SHA" \
@@ -277,7 +299,7 @@ genrule(
 genrule(
     name = "html",
     outs = ["html.tar.gz"],
-    cmd = """
+    cmd = _LINK_SUFFIX_ENV + """
     $(location //tools:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
          --build_sha="$${BUILD_DOCS_SHA:-}" \

@@ -7,7 +7,6 @@ envoy_mobile_package()
 envoy_cc_test(
     name = "connectivity_manager_test",
     srcs = ["connectivity_manager_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common/network:connectivity_manager_lib",
         "//test/common/mocks/common:common_mocks",
@@ -19,7 +18,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "proxy_settings_test",
     srcs = ["proxy_settings_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common/network:connectivity_manager_lib",
     ],
@@ -28,7 +26,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "src_addr_socket_option_impl_test",
     srcs = ["src_addr_socket_option_impl_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common/network:src_addr_socket_option_lib",
         "@envoy//test/mocks/network:network_mocks",
@@ -39,7 +36,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "synthetic_address_impl_test",
     srcs = ["synthetic_address_impl_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common/network:synthetic_address_lib",
     ],
@@ -53,7 +49,6 @@ envoy_cc_test(
         ],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
             "//library/common/api:c_types",

@@ -28,7 +28,7 @@ namespace PeakEwma {
 // Simple ThreadLocal mock for testing
 class MockThreadLocalInstance : public ThreadLocal::SlotAllocator {
 public:
-  ThreadLocal::SlotPtr allocateSlot() override { return std::make_unique<MockSlot>(); }
+  ThreadLocal::SlotSharedPtr allocateSlot() override { return std::make_shared<MockSlot>(); }
 
 private:
   class MockSlot : public ThreadLocal::Slot {

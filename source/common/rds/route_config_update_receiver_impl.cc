@@ -62,7 +62,7 @@ RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
       warmer_(factory_context_.mainThreadDispatcher(), [this]() { onConfigWarmed(); }) {}
 
 void RouteConfigUpdateReceiverImpl::updateConfig(
-    std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
+    ArenaWrappedProto<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
     absl::string_view version_info) {
   std::string update_id =
       fmt::format("rds {}:{}", resourceName(proto_traits_, *route_config_proto), version_info);
@@ -78,7 +78,7 @@ void RouteConfigUpdateReceiverImpl::updateConfig(
 }
 
 void RouteConfigUpdateReceiverImpl::updateState(
-    std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
+    ArenaWrappedProto<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
     absl::string_view version_info, ConfigConstSharedPtr config,
     std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id) {
   // Abort a previous warming update first to ensure the init watcher will never be notified when
@@ -107,19 +107,24 @@ void RouteConfigUpdateReceiverImpl::updateState(
 }
 
 // Rds::RouteConfigUpdateReceiver
-bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
-                                                const std::string& version_info) {
+absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
+                                                        const std::string& version_info) {
   uint64_t new_hash = getHash(rc);
   if (!checkHash(new_hash)) {
-    return false;
+    // The route configuration is unchanged, so there is nothing to build, warm up or publish. An
+    // update that is still warming up is deliberately left alone.
+    return absl::OkStatus();
   }
 
   updateConfig(cloneProto(proto_traits_, rc), new_hash, version_info);
   startWarming();
-  return true;
+  return absl::OkStatus();
 }
 
 void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
+  // Mark that we have received at least one valid route configuration update.
+  initialized_ = true;
+
   if (warming_state_.route_config_proto_ != nullptr) {
     route_config_proto_ = std::move(warming_state_.route_config_proto_);
     config_ = std::move(warming_state_.config_);

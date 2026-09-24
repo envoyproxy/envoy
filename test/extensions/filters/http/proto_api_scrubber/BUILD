@@ -38,7 +38,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
         "//test/proto:apikeys_proto_descriptor",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/extensions/common/matcher:matcher_lib",
@@ -67,7 +67,7 @@ envoy_cc_test(
         "//test/proto:apikeys_proto_descriptor",
         "//test/proto:bookstore_proto_descriptor",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
@@ -104,7 +104,7 @@ envoy_extension_cc_test(
         "//test/proto:apikeys_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
@@ -145,6 +145,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+        "@benchmark",
         "@cel-cpp//parser",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
         "@xds//xds/type/matcher/v3:pkg_cc_proto",

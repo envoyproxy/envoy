@@ -64,7 +64,8 @@ absl::StatusOr<FilterFactoriesVector> createFilterFactoriesFromConfig(
 
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         filter_config, context.messageValidationVisitor(), factory);
-    auto callback_or_error = factory.createFilterFactoryFromProto(*message, stats_prefix, context);
+    auto callback_or_error =
+        Server::Configuration::createHttpFilterFactory(factory, *message, stats_prefix, context);
     RETURN_IF_NOT_OK_REF(callback_or_error.status());
 
     auto filter_config_provider =
@@ -108,9 +109,20 @@ FilterChainPerRouteConfig::FilterChainPerRouteConfig(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChainConfigPerRoute&
         proto_config,
     Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix,
-    OptRef<Init::Manager> init_manager, absl::Status& creation_status) {
+    OptRef<Init::Manager> init_manager, absl::Status& creation_status)
+    : main_dispatcher_(context.mainThreadDispatcher()) {
   filter_chain_ = std::make_shared<FilterChain>(proto_config.filter_chain(), context, stats_prefix,
                                                 init_manager, creation_status);
+}
+
+FilterChainPerRouteConfig::~FilterChainPerRouteConfig() {
+  if (filter_chain_ == nullptr || main_dispatcher_.isThreadSafe()) {
+    return;
+  }
+  // A route configuration may be released on a worker thread when an RDS update replaces it, but
+  // the embedded filter chain must be destroyed on the main thread.
+  main_dispatcher_.post(
+      [filter_chain = std::move(filter_chain_)]() mutable { filter_chain.reset(); });
 }
 
 FilterChainConfig::FilterChainConfig(const FilterChainConfigProto& proto_config,

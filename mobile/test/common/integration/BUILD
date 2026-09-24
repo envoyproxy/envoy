@@ -26,12 +26,12 @@ envoy_cc_test_with_engine_builder(
         ],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     shard_count = 6,
     deps = [
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",
         "//test/common/mocks/dns:mock_dns_resolver_lib",
+        "@envoy//envoy/common:logger",
         "@envoy//source/common/quic:active_quic_listener_lib",
         "@envoy//source/common/quic:client_connection_factory_lib",
         "@envoy//source/common/quic:quic_server_factory_lib",
@@ -57,7 +57,6 @@ envoy_cc_test_library_with_engine_builder(
     hdrs = [
         "base_client_integration_test.h",
     ],
-    repository = "@envoy",
     deps = [
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
@@ -81,7 +80,6 @@ envoy_cc_test_library(
     data = [
         "@envoy//test/config/integration/certs",
     ],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_common_lib",
         "@envoy//bazel:cpp_runfiles",
@@ -95,7 +93,6 @@ envoy_cc_test_library(
         "@envoy_build_config//:extension_registry",
     ] + envoy_select_signal_trace(
         ["@envoy//source/common/signal:sigaction_lib"],
-        "@envoy",
     ),
 )
 
@@ -107,7 +104,6 @@ envoy_cc_test_library(
     hdrs = [
         "test_server_interface.h",
     ],
-    repository = "@envoy",
     deps = [
         ":test_server_lib",
     ],
@@ -121,7 +117,6 @@ envoy_cc_test_library_with_engine_builder(
     hdrs = [
         "engine_with_test_server.h",
     ],
-    repository = "@envoy",
     deps = [
         ":test_server_lib",
     ],
@@ -129,17 +124,13 @@ envoy_cc_test_library_with_engine_builder(
 
 envoy_cc_test_with_engine_builder(
     name = "rtds_integration_test",
-    srcs = envoy_select_envoy_mobile_xds(
-        ["rtds_integration_test.cc"],
-        "@envoy",
-    ),
+    srcs = envoy_select_envoy_mobile_xds(["rtds_integration_test.cc"]),
     data = [
         "@envoy//test/config/integration/certs",
     ],
     external_deps = [
         "abseil_strings",
     ],
-    repository = "@envoy",
     deps = [
         ":xds_integration_test_lib",
         "//library/common/api:external_api_lib",
@@ -153,17 +144,13 @@ envoy_cc_test_with_engine_builder(
 
 envoy_cc_test_with_engine_builder(
     name = "cds_integration_test",
-    srcs = envoy_select_envoy_mobile_xds(
-        ["cds_integration_test.cc"],
-        "@envoy",
-    ),
+    srcs = envoy_select_envoy_mobile_xds(["cds_integration_test.cc"]),
     data = [
         "@envoy//test/config/integration/certs",
     ],
     external_deps = [
         "abseil_strings",
     ],
-    repository = "@envoy",
     deps = [
         ":xds_integration_test_lib",
         "@envoy//test/test_common:environment_lib",
@@ -175,14 +162,10 @@ envoy_cc_test_with_engine_builder(
 
 envoy_cc_test_with_engine_builder(
     name = "sds_integration_test",
-    srcs = envoy_select_envoy_mobile_xds(
-        ["sds_integration_test.cc"],
-        "@envoy",
-    ),
+    srcs = envoy_select_envoy_mobile_xds(["sds_integration_test.cc"]),
     data = [
         "@envoy//test/config/integration/certs",
     ],
-    repository = "@envoy",
     deps = [
         ":xds_integration_test_lib",
         "@envoy//source/common/config:protobuf_link_hacks",
@@ -206,7 +189,6 @@ envoy_cc_test_library_with_engine_builder(
     hdrs = [
         "xds_integration_test.h",
     ],
-    repository = "@envoy",
     deps = [
         ":base_client_integration_test_lib",
         "@envoy//source/common/config:api_version_lib",
@@ -227,7 +209,6 @@ envoy_cc_test_library(
     hdrs = [
         "xds_test_server.h",
     ],
-    repository = "@envoy",
     deps = [
         "@envoy//bazel:cpp_runfiles",
         "@envoy//source/common/event:libevent_lib",
@@ -244,8 +225,5 @@ envoy_cc_test_library(
         "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_build_config//:extension_registry",
-    ] + envoy_select_signal_trace(
-        ["@envoy//source/common/signal:sigaction_lib"],
-        "@envoy",
-    ),
+    ] + envoy_select_signal_trace(["@envoy//source/common/signal:sigaction_lib"]),
 )

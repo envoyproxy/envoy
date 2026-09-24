@@ -4,6 +4,7 @@ set -euo pipefail
 
 uncomment.sh "$1" --comment \
   --uncomment-regex '#include' \
+  --comment-regex '#include "\.\./mem_internal\.h"' \
   --uncomment-func-impl CBB_zero \
   --uncomment-func-impl cbb_init \
   --uncomment-func-impl CBB_init \

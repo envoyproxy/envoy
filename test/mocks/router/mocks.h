@@ -21,6 +21,8 @@
 #include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/router/route_config_update_receiver.h"
+#include "envoy/router/route_specifier.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/scopes.h"
@@ -642,12 +644,25 @@ public:
   MOCK_METHOD(uint32_t, maxDirectResponseBodySizeBytes, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
+  MOCK_METHOD(bool, ignorePathParametersInPathMatching, (), (const));
 
   std::shared_ptr<MockRoute> route_;
   std::vector<Http::LowerCaseString> internal_only_headers_;
   std::string name_{"fake_config"};
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;
+};
+
+class MockRouteSpecifier : public RouteSpecifier {
+public:
+  MockRouteSpecifier();
+  ~MockRouteSpecifier() override;
+
+  // Router::RouteSpecifier
+  MOCK_METHOD(OnRouteResult, onRoute,
+              (RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value),
+              (const));
 };
 
 class MockRouteConfigProvider : public RouteConfigProvider {
@@ -680,6 +695,17 @@ public:
               (const envoy::config::route::v3::RouteConfiguration& route_config,
                Server::Configuration::ServerFactoryContext& factory_context,
                Init::Manager& init_manager, ProtobufMessage::ValidationVisitor& validator));
+};
+
+class MockVhdsConfigUpdateReceiver : public VhdsConfigUpdateReceiver {
+public:
+  MockVhdsConfigUpdateReceiver();
+  ~MockVhdsConfigUpdateReceiver() override;
+
+  MOCK_METHOD(bool, onVhdsUpdate,
+              (const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+               const std::string& version_info));
 };
 
 class MockScopedConfig : public ScopedConfig {

@@ -17,6 +17,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
@@ -2375,6 +2376,131 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
 
+// requestHeaders() on the response path reads the request's headers, which envoy_on_response has
+// no other way to reach.
+TEST_F(LuaHttpFilterTest, RequestHeadersOnResponsePath) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      response_handle:logTrace(response_handle:requestHeaders():get(":path"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/request/path"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef{request_headers}));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "/request/path", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// On the request path requestHeaders() is the same map headers() returns, so a write through one
+// is visible through the other. This is what makes exposing the method on both handles coherent
+// rather than a second, subtly different accessor.
+TEST_F(LuaHttpFilterTest, RequestHeadersOnRequestPathIsTheSameMap) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:requestHeaders():add("x-added", "1")
+      request_handle:logTrace(request_handle:headers():get("x-added"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef{request_headers}));
+
+  EXPECT_LOG_CONTAINS("trace", "1", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+  EXPECT_EQ("1", request_headers.get_("x-added"));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// A second call returns the cached wrapper rather than building a new one, which is what keeps a
+// script that calls it in a loop from allocating per call.
+TEST_F(LuaHttpFilterTest, RequestHeadersWrapperIsCached) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local first = response_handle:requestHeaders()
+      first:add("x-marker", "set-on-first-handle")
+      response_handle:logTrace(response_handle:requestHeaders():get("x-marker"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef{request_headers}));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "set-on-first-handle", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// No request headers on the stream yields a real nil, not an absence of values, so a script can
+// pass the result straight to a function. Reached when a response is produced before the request
+// headers were fully received. This is the discriminating test for the push-nil implementation: a
+// lua_CFunction returning 0 makes `tostring(...)` raise "value expected", and because
+// scriptError() continues the chain the script would silently stop running.
+TEST_F(LuaHttpFilterTest, RequestHeadersAbsentIsNilInAnArgumentPosition) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      response_handle:logTrace(tostring(response_handle:requestHeaders()))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef{}));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "nil", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// The same absence read into a variable and compared, which is the shape a script that branches
+// on it actually uses.
+TEST_F(LuaHttpFilterTest, RequestHeadersAbsentComparesEqualToNil) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local request_headers = response_handle:requestHeaders()
+      if request_headers == nil then
+        response_handle:logTrace("no request headers")
+      else
+        response_handle:logTrace("unexpectedly present")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef{}));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "no request headers", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
 // Get the current protocol.
 TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
   const std::string SCRIPT{R"EOF(
@@ -3288,6 +3414,255 @@ TEST_F(LuaHttpFilterTest, LuaFilterContext) {
   }
 }
 
+// The filter-level filter_context is what a route which configures none of its own sees, and a
+// route that does configure one replaces it rather than merging into it.
+TEST_F(LuaHttpFilterTest, LuaFilterLevelFilterContext) {
+  const std::string SCRIPT_WITH_ACCESS_FILTER_CONTEXT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:filterContext():get("foo") == nil then
+        request_handle:logTrace("foo in filter context is nil")
+      else
+        request_handle:logTrace(request_handle:filterContext():get("foo"))
+      end
+    end
+    function envoy_on_response(response_handle)
+      if response_handle:filterContext():get("foo") == nil then
+        response_handle:logTrace("foo in filter context is nil")
+      else
+        response_handle:logTrace(response_handle:filterContext():get("foo"))
+      end
+    end
+  )EOF"};
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(SCRIPT_WITH_ACCESS_FILTER_CONTEXT);
+  (*proto_config.mutable_filter_context()->mutable_fields())["foo"].set_string_value(
+      "foo_value_in_filter_level_context");
+
+  // No per route configuration at all: the filter-level context is used, on both the request and
+  // the response path.
+  {
+    setupConfig(proto_config, {});
+    setupFilter();
+
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(nullptr));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    EXPECT_LOG_CONTAINS("trace", "foo_value_in_filter_level_context", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    });
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    EXPECT_LOG_CONTAINS("trace", "foo_value_in_filter_level_context", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->encodeHeaders(response_headers, true));
+    });
+    filter_->onDestroy();
+  }
+
+  // A per route configuration which does not set filter_context: still the filter-level context.
+  {
+    const envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+
+    setupConfig(proto_config, per_route_proto_config);
+    setupFilter();
+
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(per_route_config_.get()));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    EXPECT_LOG_CONTAINS("trace", "foo_value_in_filter_level_context", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    });
+    filter_->onDestroy();
+  }
+
+  // A per route filter_context replaces the filter-level one.
+  {
+    envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+    (*per_route_proto_config.mutable_filter_context()->mutable_fields())["foo"].set_string_value(
+        "foo_value_in_route_context");
+
+    setupConfig(proto_config, per_route_proto_config);
+    setupFilter();
+
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(per_route_config_.get()));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    EXPECT_LOG_CONTAINS("trace", "foo_value_in_route_context", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    });
+    filter_->onDestroy();
+  }
+
+  // An explicitly empty per route filter_context hides the filter-level one rather than falling
+  // back to it.
+  {
+    envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+    per_route_proto_config.mutable_filter_context();
+
+    setupConfig(proto_config, per_route_proto_config);
+    setupFilter();
+
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(per_route_config_.get()));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    EXPECT_LOG_CONTAINS("trace", "foo in filter context is nil", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    });
+  }
+}
+
+// The filter context is a wrapper object rather than a plain Lua table: a key is read with get(),
+// indexing by a key which is not one of the wrapper's methods is nil, and pairs() iterates it.
+TEST_F(LuaHttpFilterTest, LuaFilterContextIsReadWithGet) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local filter_context = request_handle:filterContext()
+      request_handle:logTrace("get=" .. tostring(filter_context:get("foo")))
+      request_handle:logTrace("index=" .. tostring(filter_context["foo"]))
+      local entries = {}
+      for key, value in pairs(filter_context) do
+        table.insert(entries, key .. "=" .. value)
+      end
+      request_handle:logTrace("pairs=" .. table.concat(entries, ","))
+    end
+  )EOF"};
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
+  (*proto_config.mutable_filter_context()->mutable_fields())["foo"].set_string_value("bar");
+
+  setupConfig(proto_config, {});
+  setupFilter();
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"trace", "get=bar"}, {"trace", "index=nil"}, {"trace", "pairs=foo=bar"}}),
+      {
+        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                  filter_->decodeHeaders(request_headers, true));
+      });
+}
+
+// Writes a module for a script to require, and returns the search pattern that finds it.
+std::string writeFilterTestModule() {
+  TestEnvironment::writeStringToFileForTest("lua_filter_test_module.lua", R"EOF(
+    local m = {}
+    function m.value()
+      return "from_the_module"
+    end
+    return m
+  )EOF");
+  return TestEnvironment::temporaryPath("?.lua");
+}
+
+const std::string REQUIRE_MODULE_SCRIPT{R"EOF(
+  local m = require("lua_filter_test_module")
+  function envoy_on_request(request_handle)
+    request_handle:headers():add("module_value", m.value())
+  end
+)EOF"};
+
+// A filter-level package path lets the default source code require a module from it.
+TEST_F(LuaHttpFilterTest, PackagePathsFromFilterConfig) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(REQUIRE_MODULE_SCRIPT);
+  proto_config.add_package_paths(writeFilterTestModule());
+
+  setupConfig(proto_config, {});
+  setupFilter();
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("from_the_module", request_headers.get_("module_value"));
+}
+
+// The same script without a package path is rejected when the configuration is loaded, rather than
+// failing once per request.
+TEST(LuaHttpFilterConfigTest, PackagePathsAbsentIsAConfigError) {
+  writeFilterTestModule();
+
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Api::MockApi> api;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(REQUIRE_MODULE_SCRIPT);
+
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua", 1,
+               creation_status);
+  EXPECT_THAT(creation_status,
+              StatusHelpers::HasStatusMessage(
+                  testing::AllOf(testing::HasSubstr("script load error"),
+                                 testing::HasSubstr("module 'lua_filter_test_module' not found"))));
+}
+
+// A script from the source_codes map is a separate VM from default_source_code's, and gets the
+// filter-level patterns as well.
+TEST_F(LuaHttpFilterTest, PackagePathsForNamedSourceCode) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(R"EOF(
+    function envoy_on_request(request_handle)
+    end
+  )EOF");
+  envoy::config::core::v3::DataSource named_source;
+  named_source.set_inline_string(REQUIRE_MODULE_SCRIPT);
+  proto_config.mutable_source_codes()->insert({"named.lua", named_source});
+  proto_config.add_package_paths(writeFilterTestModule());
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.set_name("named.lua");
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("from_the_module", request_headers.get_("module_value"));
+}
+
+// A route's inline source code gets its own VM, so it needs its own package path; the filter-level
+// one does not reach it.
+TEST_F(LuaHttpFilterTest, PackagePathsFromPerRouteConfig) {
+  const std::string pattern = writeFilterTestModule();
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(R"EOF(
+    function envoy_on_request(request_handle)
+    end
+  )EOF");
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.mutable_source_code()->set_inline_string(REQUIRE_MODULE_SCRIPT);
+  per_route_proto_config.add_package_paths(pattern);
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("from_the_module", request_headers.get_("module_value"));
+}
+
 // Test whether the route can directly reuse the Lua code in the global configuration.
 TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
@@ -3417,6 +3792,51 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
   EXPECT_LOG_CONTAINS("trace", "H4sIAAAAAAAA/8pIzcnJL88vykkBBAAA//+tIOv5CgAAAA==", {
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
   });
+}
+
+TEST_F(LuaHttpFilterTest, LuaFilterBase64Decode) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:base64Decode("Zm9vYmFy"))
+
+      -- Round trips with base64Escape.
+      request_handle:logTrace(request_handle:base64Decode(request_handle:base64Escape("round trip")))
+
+      -- Binary data survives, including embedded NULs: Lua strings are length counted, so the
+      -- length is the observable property rather than the content.
+      local nuls = request_handle:base64Decode("AGEA")
+      request_handle:logTrace("nul length " .. #nuls)
+
+      -- The empty string is valid base64 and decodes to the empty string, not nil.
+      local empty = request_handle:base64Decode("")
+      request_handle:logTrace("empty is nil: " .. tostring(empty == nil) .. " length " .. #empty)
+    end
+
+    function envoy_on_response(response_handle)
+      -- Invalid base64 yields nil rather than raising.
+      response_handle:logTrace("bad chars: " .. tostring(response_handle:base64Decode("!!!!")))
+      response_handle:logTrace("bad length: " .. tostring(response_handle:base64Decode("a")))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"trace", "foobar"},
+                                  {"trace", "round trip"},
+                                  {"trace", "nul length 3"},
+                                  {"trace", "empty is nil: false length 0"}}),
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->decodeHeaders(request_headers, true)));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"trace", "bad chars: nil"}, {"trace", "bad length: nil"}}),
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->encodeHeaders(response_headers, true)));
 }
 
 TEST_F(LuaHttpFilterTest, Timestamp_ReturnsFormatSet) {

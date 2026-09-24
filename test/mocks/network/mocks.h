@@ -131,6 +131,7 @@ public:
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
   MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const));
+  MOCK_METHOD(void, setAbortiveClose, ());
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion), (const));
@@ -402,6 +403,7 @@ public:
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
   MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const));
+  MOCK_METHOD(void, setAbortiveClose, ());
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr& option));
@@ -505,6 +507,7 @@ public:
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(bool, isQuic, (), (const));
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
+  MOCK_METHOD(envoy::config::listener::v3::Listener::DrainType, drainType, (), (const));
 };
 
 class MockListenerConfig : public ListenerConfig {
@@ -581,8 +584,10 @@ public:
               (uint64_t listener_tag, const Network::ExtraShutdownListenerOptions& options));
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, onFilterChainDrain,
-              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains));
-  MOCK_METHOD(void, onListenerDrain, (uint64_t listener_tag));
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
+               Network::ConnectionDrainEvent drain_event));
+  MOCK_METHOD(void, onListenerDrain,
+              (uint64_t listener_tag, Network::ConnectionDrainEvent drain_event));
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));
@@ -599,6 +604,13 @@ public:
   MOCK_METHOD(void, registerWorkerForListener, (UdpListenerCallbacks & listener));
   MOCK_METHOD(void, unregisterWorkerForListener, (UdpListenerCallbacks & listener));
   MOCK_METHOD(void, deliver, (uint32_t dest_worker_index, UdpRecvData&& data));
+};
+
+class MockNonDispatchedUdpPacketHandler : public NonDispatchedUdpPacketHandler {
+public:
+  ~MockNonDispatchedUdpPacketHandler() override;
+
+  MOCK_METHOD(void, handle, (uint32_t worker_index, const UdpRecvData& packet));
 };
 
 class MockIp : public Address::Ip {
@@ -712,6 +724,9 @@ public:
   ~MockUdpReadFilterCallbacks() override;
 
   MOCK_METHOD(UdpListener&, udpListener, ());
+  MOCK_METHOD(UdpHotRestartSessionHandlePtr, registerHotRestartSession,
+              (const Address::InstanceConstSharedPtr& local_address,
+               const Address::InstanceConstSharedPtr& peer_address));
 
   testing::NiceMock<MockUdpListener> udp_listener_;
 };
