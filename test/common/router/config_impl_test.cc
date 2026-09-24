@@ -114,22 +114,17 @@ public:
   }
 
   VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers) const {
-    if (!default_stream_info_) {
-      default_stream_info_ = std::make_unique<NiceMock<Envoy::StreamInfo::MockStreamInfo>>();
-    }
-    return route(cb, headers, *default_stream_info_, 0);
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    return route(cb, headers, stream_info, 0);
   }
 
   VirtualHostRoute route(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
-    if (!default_stream_info_) {
-      default_stream_info_ = std::make_unique<NiceMock<Envoy::StreamInfo::MockStreamInfo>>();
-    }
-    return route(headers, *default_stream_info_, random_value);
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    return route(headers, stream_info, random_value);
   }
 
   const envoy::config::route::v3::RouteConfiguration config_;
   absl::Status creation_statusi_ = absl::OkStatus();
-  mutable std::unique_ptr<NiceMock<Envoy::StreamInfo::MockStreamInfo>> default_stream_info_;
 };
 
 Http::TestRequestHeaderMapImpl genPathlessHeaders(const std::string& host,
@@ -13635,8 +13630,6 @@ virtual_hosts:
       timeout: { seconds: 15, nanos: 500000000 }
       idle_timeout: { seconds: 30 }
       flush_timeout: { seconds: 45 }
-      max_grpc_timeout: { seconds: 120 }
-      grpc_timeout_offset: { seconds: 1 }
       max_stream_duration:
         max_stream_duration: { seconds: 300 }
         grpc_timeout_header_max: { seconds: 60 }

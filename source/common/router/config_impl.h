@@ -45,9 +45,11 @@
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
 
+#include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Router {
@@ -609,7 +611,7 @@ public:
 
   /**
    * Returns the active VirtualHostImpl, instantiating and atomically publishing it via
-   * compare-and-swap if currently dormant. Updates the domain access timestamp for idle TTL
+   * double-checked locking if currently dormant. Updates the domain access timestamp for idle TTL
    * eviction.
    *
    * @param time_source time source used to record the domain access timestamp.
@@ -630,39 +632,29 @@ public:
       return nullptr;
     }
 
+    absl::MutexLock lock(&init_mutex_);
+    current = active_vhost_.load(std::memory_order_acquire);
+    if (current != nullptr) {
+      last_access_timestamp_.store(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                       time_source.monotonicTime().time_since_epoch())
+                                       .count(),
+                                   std::memory_order_relaxed);
+      return current;
+    }
+
     auto new_vhost = init_object_->createVirtualHost();
     if (!new_vhost) {
       return nullptr;
     }
 
-    // Uses a lock-free Compare-And-Swap (CAS) to publish the newly constructed VirtualHostImpl.
-    // - Fast path: `active_vhost_.load(std::memory_order_acquire)` allows concurrent worker threads
-    //   to read the active virtual host without mutexes or event loop contention.
-    // - Publication: `compare_exchange_strong` with `std::memory_order_acq_rel` guarantees that the
-    //   complete VirtualHostImpl initialization by the winning thread is visible to all threads
-    //   before the pointer is published.
-    // - Race resolution: If multiple worker threads compile the same dormant host concurrently,
-    // exactly
-    //   one succeeds the CAS and stores the lifetime-managing `active_vhost_ref_`. Losing threads
-    //   safely drop their redundant local allocation and return the winner's pointer loaded into
-    //   `expected`.
     const VirtualHostImpl* new_vhost_ptr = new_vhost.get();
-    const VirtualHostImpl* expected = nullptr;
-    if (active_vhost_.compare_exchange_strong(expected, new_vhost_ptr, std::memory_order_acq_rel,
-                                              std::memory_order_acquire)) {
-      active_vhost_ref_ = std::move(new_vhost);
-      last_access_timestamp_.store(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                       time_source.monotonicTime().time_since_epoch())
-                                       .count(),
-                                   std::memory_order_relaxed);
-      return new_vhost_ptr;
-    }
-
+    active_vhost_ref_ = std::move(new_vhost);
+    active_vhost_.store(new_vhost_ptr, std::memory_order_release);
     last_access_timestamp_.store(std::chrono::duration_cast<std::chrono::milliseconds>(
                                      time_source.monotonicTime().time_since_epoch())
                                      .count(),
                                  std::memory_order_relaxed);
-    return expected;
+    return new_vhost_ptr;
   }
 
   /**
@@ -692,11 +684,14 @@ public:
     }
     uint64_t last_access = last_access_timestamp_.load(std::memory_order_relaxed);
     if (current_time_ms > last_access && (current_time_ms - last_access) >= idle_ttl_ms) {
-      const VirtualHostImpl* expected = current;
-      if (active_vhost_.compare_exchange_strong(expected, nullptr, std::memory_order_acq_rel,
-                                                std::memory_order_acquire)) {
-        active_vhost_ref_.reset();
-        return true;
+      absl::MutexLock lock(&init_mutex_);
+      if (active_vhost_.load(std::memory_order_acquire) != nullptr) {
+        last_access = last_access_timestamp_.load(std::memory_order_relaxed);
+        if (current_time_ms > last_access && (current_time_ms - last_access) >= idle_ttl_ms) {
+          active_vhost_.store(nullptr, std::memory_order_release);
+          active_vhost_ref_.reset();
+          return true;
+        }
       }
     }
     return false;
@@ -710,8 +705,9 @@ public:
 
 private:
   const VirtualHostInitObjectConstSharedPtr init_object_;
+  mutable absl::Mutex init_mutex_;
   mutable std::atomic<const VirtualHostImpl*> active_vhost_{nullptr};
-  mutable std::shared_ptr<const VirtualHostImpl> active_vhost_ref_;
+  mutable std::shared_ptr<const VirtualHostImpl> active_vhost_ref_ ABSL_GUARDED_BY(init_mutex_);
   mutable std::atomic<uint64_t> last_access_timestamp_{0};
 };
 
