@@ -546,7 +546,7 @@ TEST_F(AbiImplTest, MetricsFrozenAfterInit) {
 }
 
 // Drives concurrent labeled increments from multiple threads to verify no data race in the
-// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+// registry's shared stat name pool. Run under `--config=tsan` to verify.
 TEST_F(AbiImplTest, MetricsConcurrentIncrementCounterVecNoRace) {
   envoy_dynamic_module_type_module_buffer name = {.ptr = "race_counter", .length = 12};
   std::string label_name_str = "status";

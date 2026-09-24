@@ -311,6 +311,7 @@ envoy_cc_library(
         "//source/common/network:connection_lib",
         "//source/common/network:downstream_network_namespace_lib",
         "//source/common/network:listener_filter_buffer_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:active_listener_base",
     ],

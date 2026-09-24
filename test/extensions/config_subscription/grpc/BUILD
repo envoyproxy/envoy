@@ -301,6 +301,7 @@ envoy_cc_benchmark_binary(
         "//source/extensions/config_subscription/grpc:eds_resources_cache_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@benchmark",
     ],
 )
 

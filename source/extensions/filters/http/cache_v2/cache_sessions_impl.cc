@@ -95,6 +95,13 @@ void ActiveLookupContext::getHeaders(GetHeadersCallback&& cb) {
         [ranges = std::move(ranges.value()), cl = content_length_,
          cb = std::move(cb)](Http::ResponseHeaderMapPtr headers, EndStream end_stream) mutable {
           ASSERT(headers != nullptr, "it should be impossible for headers to be null");
+          // The Range header field is evaluated after evaluating the precondition header
+          // fields defined in Section 13.1, and only if the result in absence of the Range
+          // header field would be a 200 (OK) response.
+          // https://httpwg.org/specs/rfc9110.html#field.range
+          if (Http::Utility::getResponseStatus(*headers) != enumToInt(Http::Code::OK)) {
+            return cb(std::move(headers), end_stream);
+          }
           if (cl == 0 && headers->ContentLength()) {
             absl::SimpleAtoi(headers->getContentLengthValue(), &cl) || (cl = 0);
           }

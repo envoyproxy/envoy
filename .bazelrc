@@ -28,7 +28,7 @@ run --color=yes
 build --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/ea7d3f2e84c102cda5ad4db645dbe156c807a77f
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/060f772cd4675d6598b5a020d3f51ecdca64e584
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -96,6 +96,9 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 coverage --config=coverage
 coverage --build_tests_only
 
+# Envoy deprecation
+common --@envoy//bazel:deprecated_repo_arg_allowed=false
+
 
 #############################################################################
 # global: deps
@@ -112,6 +115,7 @@ build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
 # grpc
 build --@grpc//third_party:ssl_lib=@envoy//bazel:ssl
 build --@grpc//third_party:crypto_lib=@envoy//bazel:crypto
+build --@grpc//third_party:zlib_lib=@envoy//bazel:zlib
 
 # kafka
 build --@librdkafka//:with_ssl=false

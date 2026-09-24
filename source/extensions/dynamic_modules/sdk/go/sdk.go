@@ -11,8 +11,10 @@ import (
 var httpFilterConfigFactoryRegistry = make(map[string]shared.HttpFilterConfigFactory)
 var listenerFilterConfigFactoryRegistry = make(map[string]shared.ListenerFilterConfigFactory)
 var networkFilterConfigFactoryRegistry = make(map[string]shared.NetworkFilterConfigFactory)
+var udpListenerFilterConfigFactoryRegistry = make(map[string]shared.UdpListenerFilterConfigFactory)
 var statSinkConfigFactoryRegistry = make(map[string]shared.StatSinkConfigFactory)
 var earlyHeaderMutationConfigFactoryRegistry = make(map[string]shared.EarlyHeaderMutationConfigFactory)
+var headerFormatterConfigFactoryRegistry = make(map[string]shared.HeaderFormatterConfigFactory)
 
 // NewHttpFilterFactory creates a new plugin factory for the given plugin name and unparsed config.
 func NewHttpFilterFactory(handle shared.HttpFilterConfigHandle, name string,
@@ -95,6 +97,36 @@ func RegisterNetworkFilterConfigFactories(factories map[string]shared.NetworkFil
 	}
 }
 
+// NewUdpListenerFilterFactory creates a new UDP listener filter factory for the given plugin name
+// and unparsed config.
+func NewUdpListenerFilterFactory(handle shared.UdpListenerFilterConfigHandle, name string,
+	unparsedConfig []byte) (shared.UdpListenerFilterFactory, error) {
+	configFactory := udpListenerFilterConfigFactoryRegistry[name]
+	if configFactory == nil {
+		return nil, fmt.Errorf("failed to get UDP listener filter config factory for %s", name)
+	}
+	return configFactory.Create(handle, unparsedConfig)
+}
+
+// GetUdpListenerFilterConfigFactory gets the UDP listener filter config factory for the given
+// plugin name.
+func GetUdpListenerFilterConfigFactory(name string) shared.UdpListenerFilterConfigFactory {
+	return udpListenerFilterConfigFactoryRegistry[name]
+}
+
+// RegisterUdpListenerFilterConfigFactories registers UDP listener filter config factories for
+// plugins in the composer binary itself. This function MUST only be called from init() functions.
+func RegisterUdpListenerFilterConfigFactories(
+	factories map[string]shared.UdpListenerFilterConfigFactory,
+) {
+	for name, factory := range factories {
+		if _, ok := udpListenerFilterConfigFactoryRegistry[name]; ok {
+			panic("UDP listener filter config factory already registered: " + name)
+		}
+		udpListenerFilterConfigFactoryRegistry[name] = factory
+	}
+}
+
 // NewStatSink creates a new StatSink for the given sink name and unparsed config bytes.
 func NewStatSink(handle shared.StatSinkHandle, name string,
 	unparsedConfig []byte) (shared.StatSink, error) {
@@ -130,6 +162,36 @@ func NewEarlyHeaderMutation(handle shared.EarlyHeaderMutationConfigHandle, name 
 		return nil, fmt.Errorf("failed to get early header mutation config factory for %s", name)
 	}
 	return configFactory.Create(handle, unparsedConfig)
+}
+
+// NewHeaderFormatterConfig creates a new HeaderFormatterConfig for the given formatter name and
+// unparsed config bytes.
+func NewHeaderFormatterConfig(handle shared.HeaderFormatterConfigHandle, name string,
+	unparsedConfig shared.UnsafeEnvoyBuffer) (shared.HeaderFormatterConfig, error) {
+	configFactory := headerFormatterConfigFactoryRegistry[name]
+	if configFactory == nil {
+		return nil, fmt.Errorf("failed to get header formatter config factory for %s", name)
+	}
+	return configFactory.Create(handle, unparsedConfig)
+}
+
+// GetHeaderFormatterConfigFactory gets the header formatter config factory for the given formatter
+// name.
+func GetHeaderFormatterConfigFactory(name string) shared.HeaderFormatterConfigFactory {
+	return headerFormatterConfigFactoryRegistry[name]
+}
+
+// RegisterHeaderFormatterConfigFactories registers header formatter config factories for plugins in
+// the composer binary itself. This function MUST only be called from init() functions.
+func RegisterHeaderFormatterConfigFactories(
+	factories map[string]shared.HeaderFormatterConfigFactory) {
+	for name, factory := range factories {
+		if _, ok := headerFormatterConfigFactoryRegistry[name]; ok {
+			// Same plugin name should only be register once in same lib.
+			panic("header formatter config factory already registered: " + name)
+		}
+		headerFormatterConfigFactoryRegistry[name] = factory
+	}
 }
 
 // GetEarlyHeaderMutationConfigFactory gets the early header mutation config factory for the given

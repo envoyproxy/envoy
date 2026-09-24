@@ -50,6 +50,7 @@ EXTENSIONS = {
     # Config validators
     #
 
+    "envoy.config.validators.dynamic_modules":                "//source/extensions/config/validators/dynamic_modules:config",
     "envoy.config.validators.minimum_clusters_validator":     "//source/extensions/config/validators/minimum_clusters:config",
 
     #
@@ -80,6 +81,7 @@ EXTENSIONS = {
     "envoy.health_checkers.dynamic_modules":            "//source/extensions/health_checkers/dynamic_modules:config",
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
     "envoy.health_checkers.thrift":                     "//source/extensions/health_checkers/thrift:config",
+    "envoy.health_checkers.udp":                        "//source/extensions/health_checkers/udp:health_checker_lib",
     "envoy.health_checkers.tcp":                        "//source/extensions/health_checkers/tcp:health_checker_lib",
     "envoy.health_checkers.http":                       "//source/extensions/health_checkers/http:health_checker_lib",
     "envoy.health_checkers.grpc":                       "//source/extensions/health_checkers/grpc:health_checker_lib",
@@ -457,6 +459,7 @@ EXTENSIONS = {
     # HTTP header formatters
     #
 
+    "envoy.http.stateful_header_formatters.dynamic_modules":    "//source/extensions/http/header_formatters/dynamic_modules:config",
     "envoy.http.stateful_header_formatters.preserve_case":       "//source/extensions/http/header_formatters/preserve_case:config",
 
     #
@@ -490,6 +493,11 @@ EXTENSIONS = {
     # External Processing Response Processors
     #
     "envoy.http.ext_proc.response_processors.save_processing_response":         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
+
+    #
+    # AI filters
+    #
+    "envoy.http.ai_filters.request_info":               "//source/extensions/http/ai_filters/request_info:config",
 
     #
     # Injected credentials
@@ -680,10 +688,10 @@ EXTENSIONS = {
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
 # need to directly reference Envoy extensions.
-EXTENSION_CONFIG_VISIBILITY = ["//:extension_config", "//:contrib_library", "//:mobile_library"]
-EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library", "//:contrib_library", "//:mobile_library"]
-CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]
-MOBILE_PACKAGE_VISIBILITY = ["//:mobile_library"]
+EXTENSION_CONFIG_VISIBILITY = ["@envoy//:extension_config", "@envoy//:contrib_library", "@envoy//:mobile_library"]
+EXTENSION_PACKAGE_VISIBILITY = ["@envoy//:extension_library", "@envoy//:contrib_library", "@envoy//:mobile_library"]
+CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["@envoy//:contrib_library"]
+MOBILE_PACKAGE_VISIBILITY = ["@envoy//:mobile_library"]
 
 # Set this variable to true to disable alwayslink for envoy_cc_library.
 # TODO(alyssawilk) audit uses of this in source/ and migrate all libraries to extensions.

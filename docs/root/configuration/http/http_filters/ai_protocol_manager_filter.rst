@@ -58,8 +58,9 @@ pins its own threshold uses that instead.
 
 Upon stream completion, the parsed document is validated against the payload
 schema of the route's declared :ref:`wire API
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.api_protocol>`,
-for APIs with a defined schema (currently ``OPENAI_CHAT_COMPLETIONS``).
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`,
+for APIs with a defined schema (currently ``OPENAI_CHAT_COMPLETIONS``, ``ANTHROPIC_MESSAGES``
+and ``GEMINI_GENERATE_CONTENT``).
 Validation checks required fields, data types, enum values, and offload rules
 -- ensuring metadata fields (like ``model`` and ``role``) remain inline in the
 DOM while permitting large message content to reside in external buffers. Any
@@ -69,8 +70,8 @@ schema validation failure triggers an immediate HTTP 400 response.
 
   On the request path the body is offloaded to an in-memory store. Request
   schema validation is supported for declared APIs with a defined schema
-  (currently OpenAI Chat Completions); schema transcoding is not implemented
-  yet.
+  (currently OpenAI Chat Completions, Anthropic Messages and Gemini GenerateContent).
+  transcoding is not implemented yet.
 
 The filter is a dual filter: besides the downstream HTTP filter chain shown
 below, it can also be placed in a cluster's upstream HTTP filter chain via
@@ -104,7 +105,7 @@ Which routes are AI endpoints is declared per route, with
 A route carrying a :ref:`request
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.request>`
 declaration names the :ref:`wire API
-<envoy_v3_api_enum_type.ai.v3.ApiProtocol>` its request payload follows, and
+<envoy_v3_api_enum_type.ai.v3.LLMProtocol>` its request payload follows, and
 (when ``request_handling`` is enabled) its payload is parsed and validated
 strictly: a malformed body — or one violating the declared API's payload
 schema, for APIs with a defined schema — is rejected with a 400. This is
@@ -122,7 +123,7 @@ normally attached to a route matching the provider's REST path, such as
       envoy.filters.http.ai_protocol_manager:
         "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
         request:
-          api_protocol: OPENAI_CHAT_COMPLETIONS
+          llm_protocol: OPENAI_CHAT_COMPLETIONS
 
 The request and response wire APIs are declared separately (an optional
 :ref:`response
@@ -147,6 +148,99 @@ does not parse is forwarded unchanged.
       "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
       request_handling:
         parse_unconfigured_routes: true
+
+.. _config_http_filters_ai_protocol_manager_ai_filters:
+
+AI filters
+----------
+
+After a declared AI endpoint's payload is parsed and validated, and before it
+is replayed, the filter runs the configured :ref:`AI filters
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`
+in order over the parsed document; they require ``request_handling``. An AI
+filter (category ``envoy.http.ai_filters``)
+may read or modify the document, or reject the request with a local reply.
+Routes without a per-route request declaration, and requests without a body,
+run no AI filters.
+
+Request info
+~~~~~~~~~~~~
+
+The :ref:`request info filter
+<envoy_v3_api_msg_extensions.http.ai_filters.request_info.v3.RequestInfo>` publishes
+the requested model, streaming preference, output token cap, and message and
+tool counts as :ref:`envoy.data.ai.v3.RequestInfo
+<envoy_v3_api_msg_data.ai.v3.RequestInfo>` typed dynamic metadata, under
+``envoy.ai.request_info`` by default. It never modifies or rejects the request.
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.ai_protocol_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+      request_handling: {}
+      filters:
+      - name: envoy.http.ai_filters.request_info
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+
+Attributes are read according to the route's declared :ref:`wire API
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`:
+
+.. csv-table::
+  :header: Attribute, OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, Gemini
+  :widths: 1, 1, 1, 1, 1
+
+  ``model``, ``model``, ``model``, ``model``, model segment of the request path
+  ``stream``, ``stream``, ``stream``, ``stream``, "``:generateContent`` (false) or ``:streamGenerateContent`` (true) operation in the request path"
+  ``max_output_tokens``, "``max_completion_tokens``, else ``max_tokens``", ``max_output_tokens``, ``max_tokens``, "``generationConfig.maxOutputTokens`` (camelCase or snake_case)"
+  ``message_count``, ``messages``, "``input`` (a string counts as one message)", ``messages``, ``contents``
+  ``tool_count``, ``tools``, ``tools``, ``tools``, ``tools``
+
+Without a declared API, only ``model`` and ``stream`` are read. Every value is
+client-declared and optional. A value Envoy cannot use (wrong type, out of
+range, or a string over 256 bytes) is ignored and counted by
+``request_info.partial``.
+
+Token estimation
+^^^^^^^^^^^^^^^^
+
+Configuring :ref:`token_estimation
+<envoy_v3_api_field_extensions.http.ai_filters.request_info.v3.RequestInfo.token_estimation>`
+adds ``estimated_input_tokens`` to the record, for consumers that must budget
+before the provider reports what it charged: a rate limit on tokens per minute,
+or a load balancer weighing queued work. It is ``ceil(tokens_per_byte *
+request payload bytes)`` over the body Envoy buffered, so it reads no JSON and
+is published whatever the route declares:
+
+.. code-block:: yaml
+
+  - name: envoy.http.ai_filters.request_info
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+      token_estimation:
+        tokens_per_byte: 0.5
+
+The ratio is a property of the payloads a deployment sees, and a size heuristic
+is not a tokenizer: an estimate does not replace the :ref:`token usage
+<envoy_v3_api_msg_data.ai.v3.TokenUsage>` the response reports. Rounding up
+keeps a sub-token payload from estimating zero.
+
+The record is written before the held request headers are released, so later
+decode filters see it from their first request-headers callback. An
+:ref:`ext_proc <config_http_filters_ext_proc>` filter listed after this one
+receives it through typed namespace forwarding:
+
+.. code-block:: yaml
+
+  metadata_options:
+    forwarding_namespaces:
+      typed:
+      - envoy.ai.request_info
+
+Only typed metadata is published. If the namespace already holds a record for
+the stream, the new one is skipped and counted by ``request_info.duplicate``.
 
 Response token-usage extraction
 -------------------------------
@@ -209,10 +303,10 @@ Both streaming shapes are handled:
 * JSON bodies, including Gemini's default (non-SSE) streaming whose complete
   body is a root-level JSON array of chunks.
 
-The response's :ref:`wire API <envoy_v3_api_enum_type.ai.v3.ApiProtocol>` is
+The response's :ref:`wire API <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` is
 resolved in precedence order: the route's declared response API, the route's
-declared request API, then :ref:`default_api_protocol
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.default_api_protocol>`;
+declared request API, then :ref:`default_llm_protocol
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.default_llm_protocol>`;
 when none is declared it is auto-detected from the response shape (only
 strong, dialect-unique markers lock detection).
 Cumulative streaming counters (Anthropic ``message_delta``, Gemini snapshots)
@@ -254,7 +348,7 @@ do not see this record; consume it through :ref:`ext_proc
 (``metadata_options.forwarding_namespaces.typed``) or a filter reading typed
 dynamic metadata, sharing the proto definition for safe parsing.
 
-``api_protocol`` names the wire API the response spoke, deliberately not a
+``llm_protocol`` names the wire API the response spoke, deliberately not a
 provider identity: shape detection cannot distinguish an OpenAI-compatible
 backend (vLLM, other gateways, Gemini's compatibility endpoint) from OpenAI
 itself. When the actual provider identity is needed, derive it from
@@ -272,7 +366,7 @@ Metadata is only published at a clean end of the HTTP response (a reset or
 abandoned stream publishes nothing). When extraction failed outright — the
 only usage-bearing event exceeded a cap, or every usage document was
 malformed, unparseable, or truncated — a **status-only** record is published
-(``api_protocol``, ``model`` when captured, and ``extraction_status:
+(``llm_protocol``, ``model`` when captured, and ``extraction_status:
 FAILED``, with no counts), so per-stream consumers can distinguish
 "extraction failed" from "the provider supplied no usage", which publishes
 nothing and counts ``token_usage_missing``. ``extraction_status`` reports
@@ -444,3 +538,6 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   sse_event_too_large, Counter, Pending or complete SSE event data exceeded ``max_sse_event_size``; that entire event was skipped.
   unsupported_content_encoding, Counter, The response carried a non-identity ``content-encoding``; extraction skipped.
   usage_trailers_synthesized, Counter, Empty response trailers were synthesized at end of stream to carry token usage to a downstream consumer.
+  request_info.published, Counter, The request info AI filter published an ``envoy.data.ai.v3.RequestInfo`` record.
+  request_info.partial, Counter, A published request info record ignored at least one value Envoy could not use.
+  request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.

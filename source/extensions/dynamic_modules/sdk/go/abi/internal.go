@@ -191,7 +191,7 @@ func hostLog(level shared.LogLevel, format string, args []any) {
 	// Skip hostLog and the public Log wrapper so the host reports the module call site instead of a
 	// location inside the SDK. An empty file is a fine fallback if the caller cannot be resolved.
 	_, sourceFile, sourceLine, _ := runtime.Caller(2)
-	C.envoy_dynamic_module_callback_log(
+	C.envoy_dynamic_module_callback_log_v2(
 		(C.envoy_dynamic_module_type_log_level)(logLevel),
 		stringToModuleBuffer(message),
 		stringToModuleBuffer(sourceFile),
@@ -412,6 +412,27 @@ func (s *dymSpan) SetTag(key, value string) {
 	)
 	runtime.KeepAlive(key)
 	runtime.KeepAlive(value)
+}
+
+func (s *dymSpan) SetTags(tags [][2]string) {
+	if s == nil || s.spanPtr == nil || len(tags) == 0 {
+		return
+	}
+	pairs := make([]C.envoy_dynamic_module_type_module_key_value_pair, len(tags))
+	for i, tag := range tags {
+		pairs[i] = C.envoy_dynamic_module_type_module_key_value_pair{
+			key_ptr:      (*C.char)(unsafe.Pointer(unsafe.StringData(tag[0]))),
+			key_length:   C.size_t(len(tag[0])),
+			value_ptr:    (*C.char)(unsafe.Pointer(unsafe.StringData(tag[1]))),
+			value_length: C.size_t(len(tag[1])),
+		}
+	}
+	C.envoy_dynamic_module_callback_http_span_set_tag_batch(
+		s.spanPtr,
+		&pairs[0],
+		C.size_t(len(pairs)),
+	)
+	runtime.KeepAlive(tags)
 }
 
 func (s *dymSpan) SetOperation(operation string) {
@@ -1649,6 +1670,8 @@ func newDymStreamPluginHandle(
 }
 
 type dymConfigHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr    C.envoy_dynamic_module_type_http_filter_config_envoy_ptr
 	calloutCallbacks map[uint64]shared.HttpCalloutCallback
 	streamCallbacks  map[uint64]shared.HttpStreamCallback
@@ -1980,7 +2003,9 @@ func (h *dymConfigHandle) GetScheduler() shared.Scheduler {
 	return h.scheduler
 }
 
-type dymRouteConfigHandle struct{}
+type dymRouteConfigHandle struct {
+	dymCommonHandle
+}
 
 func (h *dymRouteConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
 	hostLog(level, format, args)
@@ -2576,6 +2601,8 @@ type statSinkWrapper struct {
 // configuration pointer used to define and set gauges and, lazily, a scheduler
 // whose committed tasks run on the main thread.
 type dymStatSinkHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr C.envoy_dynamic_module_type_stat_sink_config_envoy_ptr
 	scheduler     *dymScheduler
 }
@@ -2690,6 +2717,175 @@ func (s *dymMetricSnapshot) GetTextReadout(index uint64, name, value []byte) ([]
 		runtime.KeepAlive(nameBuf)
 		runtime.KeepAlive(valueBuf)
 		return uint64(nameSize), uint64(valueSize), bool(ret)
+	})
+}
+
+func (s *dymMetricSnapshot) HistogramCount() uint64 {
+	return uint64(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(s.snapshotPtr))
+}
+
+func (s *dymMetricSnapshot) GetHistogram(index uint64, name []byte) ([]byte, shared.HistogramValue, bool) {
+	var sampleCount C.uint64_t
+	var sampleSum C.double
+	name, ok := buffer.Fill(name, func(buf []byte) (uint64, bool) {
+		var size C.size_t
+		ret := C.envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+			s.snapshotPtr, C.size_t(index), sliceDataPtr(buf), C.size_t(cap(buf)), &size, &sampleCount,
+			&sampleSum,
+		)
+		runtime.KeepAlive(buf)
+		return uint64(size), bool(ret)
+	})
+	if !ok {
+		return name, shared.HistogramValue{}, false
+	}
+	return name, shared.HistogramValue{SampleCount: uint64(sampleCount), SampleSum: float64(sampleSum)}, true
+}
+
+func (s *dymMetricSnapshot) HistogramBucketCount(index uint64) uint64 {
+	return uint64(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
+		s.snapshotPtr, C.size_t(index),
+	))
+}
+
+func (s *dymMetricSnapshot) GetHistogramBucket(index, bucketIndex uint64) (shared.HistogramBucket, bool) {
+	var upperBound C.double
+	var cumulativeCount C.uint64_t
+	ret := C.envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+		s.snapshotPtr, C.size_t(index), C.size_t(bucketIndex), &upperBound, &cumulativeCount,
+	)
+	if !bool(ret) {
+		return shared.HistogramBucket{}, false
+	}
+	return shared.HistogramBucket{UpperBound: float64(upperBound), CumulativeCount: uint64(cumulativeCount)}, true
+}
+
+// snapshotTagExtractedName is the shared body of the per-type tag-extracted-name getters. The call
+// closure invokes the type-specific Envoy callback and reports the full name size and whether the
+// index was valid.
+func snapshotTagExtractedName(name []byte, call func(buf []byte, size *C.size_t) bool) ([]byte, bool) {
+	return buffer.Fill(name, func(buf []byte) (uint64, bool) {
+		var size C.size_t
+		ok := call(buf, &size)
+		runtime.KeepAlive(buf)
+		return uint64(size), ok
+	})
+}
+
+// snapshotTagCount is the shared body of the per-type tag-count getters.
+func snapshotTagCount(call func(count *C.size_t) bool) (uint64, bool) {
+	var count C.size_t
+	if !call(&count) {
+		return 0, false
+	}
+	return uint64(count), true
+}
+
+// snapshotTag is the shared body of the per-type single-tag getters. The call closure invokes the
+// type-specific Envoy callback and reports the full name and value sizes and whether both indices
+// were valid.
+func snapshotTag(
+	name, value []byte,
+	call func(nameBuf, valueBuf []byte, nameSize, valueSize *C.size_t) bool,
+) ([]byte, []byte, bool) {
+	return buffer.FillTwo(name, value, func(nameBuf, valueBuf []byte) (uint64, uint64, bool) {
+		var nameSize, valueSize C.size_t
+		ok := call(nameBuf, valueBuf, &nameSize, &valueSize)
+		runtime.KeepAlive(nameBuf)
+		runtime.KeepAlive(valueBuf)
+		return uint64(nameSize), uint64(valueSize), ok
+	})
+}
+
+func (s *dymMetricSnapshot) GetCounterTagExtractedName(index uint64, name []byte) ([]byte, bool) {
+	return snapshotTagExtractedName(name, func(buf []byte, size *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+			s.snapshotPtr, C.size_t(index), sliceDataPtr(buf), C.size_t(cap(buf)), size))
+	})
+}
+
+func (s *dymMetricSnapshot) CounterTagCount(index uint64) (uint64, bool) {
+	return snapshotTagCount(func(count *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+			s.snapshotPtr, C.size_t(index), count))
+	})
+}
+
+func (s *dymMetricSnapshot) GetCounterTag(index, tagIndex uint64, name, value []byte) ([]byte, []byte, bool) {
+	return snapshotTag(name, value, func(nameBuf, valueBuf []byte, nameSize, valueSize *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+			s.snapshotPtr, C.size_t(index), C.size_t(tagIndex),
+			sliceDataPtr(nameBuf), C.size_t(cap(nameBuf)), nameSize,
+			sliceDataPtr(valueBuf), C.size_t(cap(valueBuf)), valueSize))
+	})
+}
+
+func (s *dymMetricSnapshot) GetGaugeTagExtractedName(index uint64, name []byte) ([]byte, bool) {
+	return snapshotTagExtractedName(name, func(buf []byte, size *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+			s.snapshotPtr, C.size_t(index), sliceDataPtr(buf), C.size_t(cap(buf)), size))
+	})
+}
+
+func (s *dymMetricSnapshot) GaugeTagCount(index uint64) (uint64, bool) {
+	return snapshotTagCount(func(count *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
+			s.snapshotPtr, C.size_t(index), count))
+	})
+}
+
+func (s *dymMetricSnapshot) GetGaugeTag(index, tagIndex uint64, name, value []byte) ([]byte, []byte, bool) {
+	return snapshotTag(name, value, func(nameBuf, valueBuf []byte, nameSize, valueSize *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+			s.snapshotPtr, C.size_t(index), C.size_t(tagIndex),
+			sliceDataPtr(nameBuf), C.size_t(cap(nameBuf)), nameSize,
+			sliceDataPtr(valueBuf), C.size_t(cap(valueBuf)), valueSize))
+	})
+}
+
+func (s *dymMetricSnapshot) GetTextReadoutTagExtractedName(index uint64, name []byte) ([]byte, bool) {
+	return snapshotTagExtractedName(name, func(buf []byte, size *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+			s.snapshotPtr, C.size_t(index), sliceDataPtr(buf), C.size_t(cap(buf)), size))
+	})
+}
+
+func (s *dymMetricSnapshot) TextReadoutTagCount(index uint64) (uint64, bool) {
+	return snapshotTagCount(func(count *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+			s.snapshotPtr, C.size_t(index), count))
+	})
+}
+
+func (s *dymMetricSnapshot) GetTextReadoutTag(index, tagIndex uint64, name, value []byte) ([]byte, []byte, bool) {
+	return snapshotTag(name, value, func(nameBuf, valueBuf []byte, nameSize, valueSize *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+			s.snapshotPtr, C.size_t(index), C.size_t(tagIndex),
+			sliceDataPtr(nameBuf), C.size_t(cap(nameBuf)), nameSize,
+			sliceDataPtr(valueBuf), C.size_t(cap(valueBuf)), valueSize))
+	})
+}
+
+func (s *dymMetricSnapshot) GetHistogramTagExtractedName(index uint64, name []byte) ([]byte, bool) {
+	return snapshotTagExtractedName(name, func(buf []byte, size *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+			s.snapshotPtr, C.size_t(index), sliceDataPtr(buf), C.size_t(cap(buf)), size))
+	})
+}
+
+func (s *dymMetricSnapshot) HistogramTagCount(index uint64) (uint64, bool) {
+	return snapshotTagCount(func(count *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+			s.snapshotPtr, C.size_t(index), count))
+	})
+}
+
+func (s *dymMetricSnapshot) GetHistogramTag(index, tagIndex uint64, name, value []byte) ([]byte, []byte, bool) {
+	return snapshotTag(name, value, func(nameBuf, valueBuf []byte, nameSize, valueSize *C.size_t) bool {
+		return bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+			s.snapshotPtr, C.size_t(index), C.size_t(tagIndex),
+			sliceDataPtr(nameBuf), C.size_t(cap(nameBuf)), nameSize,
+			sliceDataPtr(valueBuf), C.size_t(cap(valueBuf)), valueSize))
 	})
 }
 

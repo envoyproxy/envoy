@@ -2,7 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ai_protocol_manager.v3;
 
-import "envoy/type/ai/v3/api_protocol.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/type/ai/v3/llm_protocol.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -33,7 +34,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // Request and response processing are independently enabled by the presence
 // of ``request_handling`` and ``response_handling``. Which routes are AI
-// endpoints — and which :ref:`wire API <envoy_v3_api_enum_type.ai.v3.ApiProtocol>`
+// endpoints — and which :ref:`wire API <envoy_v3_api_enum_type.ai.v3.LLMProtocol>`
 // each speaks — is declared with the :ref:`per-route configuration
 // <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`.
 message AiProtocolManager {
@@ -44,6 +45,11 @@ message AiProtocolManager {
   // Response-side AI protocol processing. When unset, the encode path is a
   // pure passthrough.
   ResponseHandling response_handling = 2;
+
+  // AI filters, in order. They run over a declared AI endpoint's parsed request payload
+  // before it continues down the HTTP filter chain, and require ``request_handling``.
+  // [#extension-category: envoy.http.ai_filters]
+  repeated config.core.v3.TypedExtensionConfig filters = 3;
 }
 
 // Request-side processing configuration. A route that carries a
@@ -134,13 +140,13 @@ message TokenUsageExtraction {
 
   // Fallback wire API used when the route does not identify a response API.
   //
-  // ``API_PROTOCOL_UNSPECIFIED`` means auto-detect from the response shape
+  // ``LLM_PROTOCOL_UNSPECIFIED`` means auto-detect from the response shape
   // (only strongly shaped, value-validated markers lock a stream). This is a
   // fallback, not an override of per-route response configuration; see the
   // :ref:`per-route configuration
   // <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`
   // for the full precedence.
-  type.ai.v3.ApiProtocol default_api_protocol = 2 [(validate.rules).enum = {defined_only: true}];
+  type.ai.v3.LLMProtocol default_llm_protocol = 2 [(validate.rules).enum = {defined_only: true}];
 
   // Namespace for the emitted typed dynamic metadata.
   // Defaults to ``envoy.ai.token_usage``.
@@ -197,9 +203,9 @@ message TokenUsageExtractionLimits {
 // protocol translation can make the client-facing request API differ from
 // the provider's response API. For response token-usage extraction the
 // effective wire API is resolved in precedence order: per-route
-// ``response.api_protocol``, then per-route ``request.api_protocol``, then
-// :ref:`default_api_protocol
-// <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.default_api_protocol>`,
+// ``response.llm_protocol``, then per-route ``request.llm_protocol``, then
+// :ref:`default_llm_protocol
+// <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.default_llm_protocol>`,
 // then auto-detection.
 message AiProtocolManagerPerRoute {
   // Request-side route configuration. Its presence hands the request payload
@@ -209,7 +215,7 @@ message AiProtocolManagerPerRoute {
   RequestPerRoute request = 1;
 
   // Optional response-side route configuration. When absent, response
-  // processing inherits ``request.api_protocol`` when available, then the
+  // processing inherits ``request.llm_protocol`` when available, then the
   // global fallback.
   ResponsePerRoute response = 2;
 }
@@ -217,7 +223,7 @@ message AiProtocolManagerPerRoute {
 // Per-route request-side behavior.
 message RequestPerRoute {
   // The wire API a request payload on this route follows.
-  // ``API_PROTOCOL_UNSPECIFIED`` declares the endpoint without naming its
+  // ``LLM_PROTOCOL_UNSPECIFIED`` declares the endpoint without naming its
   // API.
   //
   // Payloads are validated against the declared API's schema when one is
@@ -227,13 +233,13 @@ message RequestPerRoute {
   // [#comment: Normalization is not implemented yet; a normalization knob
   // will be added here once the transformation and its output contract
   // exist.]
-  type.ai.v3.ApiProtocol api_protocol = 1 [(validate.rules).enum = {defined_only: true}];
+  type.ai.v3.LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Per-route response-side behavior.
 message ResponsePerRoute {
   // The wire API the response on this route follows. This can differ from
-  // ``request.api_protocol`` when the gateway performs protocol translation.
-  // ``API_PROTOCOL_UNSPECIFIED`` falls through the precedence chain above.
-  type.ai.v3.ApiProtocol api_protocol = 1 [(validate.rules).enum = {defined_only: true}];
+  // ``request.llm_protocol`` when the gateway performs protocol translation.
+  // ``LLM_PROTOCOL_UNSPECIFIED`` falls through the precedence chain above.
+  type.ai.v3.LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
 }

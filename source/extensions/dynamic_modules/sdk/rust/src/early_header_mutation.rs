@@ -10,9 +10,8 @@
 //! thread. [`EarlyHeaderMutationConfig::mutate`] is called concurrently on worker threads against
 //! that single object, so it takes `&self` and the trait requires `Send + Sync`.
 
-use crate::{abi, EnvoyBuffer};
+use crate::{abi, ffi_export, EnvoyBuffer};
 use std::ffi::c_void;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 /// Trait that the dynamic module implements to rewrite request headers before routing.
@@ -80,28 +79,21 @@ impl EarlyHeaderMutationContext {
       return Vec::new();
     }
 
-    let mut raw: Vec<abi::envoy_dynamic_module_type_envoy_http_header> = Vec::with_capacity(count);
+    // Fill the pairs in place as ABI headers to avoid a second allocation.
+    let mut headers: Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> = Vec::with_capacity(count);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_early_header_mutation_get_headers(
         self.envoy_ptr,
-        raw.as_mut_ptr(),
+        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
       )
     };
     if !success {
       return Vec::new();
     }
     unsafe {
-      raw.set_len(count);
+      headers.set_len(count);
     }
-    raw
-      .iter()
-      .map(|h| {
-        (
-          unsafe { EnvoyBuffer::new_from_raw(h.key_ptr as *const _, h.key_length) },
-          unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
-        )
-      })
-      .collect()
+    headers
   }
 
   /// Get the first value of the request header with the given key.
@@ -350,17 +342,16 @@ impl EarlyHeaderMutationContext {
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_early_header_mutation_config_new(
-  _config_envoy_ptr: abi::envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> *const c_void {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_early_header_mutation_config_new(
+    _config_envoy_ptr: abi::envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> *const c_void {
     // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
     // The helpers tolerate `(nullptr, 0)` empty inputs and substitute `U+FFFD` for malformed
     // UTF-8 rather than triggering UB.
@@ -377,14 +368,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_early_header_mutation_config_ne
         .get()
         .expect("NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION must be set"),
     )
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_early_header_mutation_config_new",
-      panic,
-    );
-    ptr::null()
-  })
+  }
+  on_panic = ptr::null()
 }
 
 /// Testable wrapper for [`envoy_dynamic_module_on_early_header_mutation_config_new`].
@@ -402,48 +387,34 @@ pub fn envoy_dynamic_module_on_early_header_mutation_config_new_impl(
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_early_header_mutation_config_destroy(
-  config_ptr: *const c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_early_header_mutation_config_destroy(
+    config_ptr: *const c_void,
+  ) {
     crate::drop_wrapped_c_void_ptr!(config_ptr, EarlyHeaderMutationConfig);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_early_header_mutation_config_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_early_header_mutation_mutate(
-  config_ptr: abi::envoy_dynamic_module_type_early_header_mutation_config_module_ptr,
-  envoy_ptr: abi::envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
-) -> bool {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_early_header_mutation_mutate(
+    config_ptr: abi::envoy_dynamic_module_type_early_header_mutation_config_module_ptr,
+    envoy_ptr: abi::envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+  ) -> bool {
     // The configuration is shared by all worker threads and is only ever borrowed immutably here,
     // which is why `EarlyHeaderMutationConfig` requires `Send + Sync`.
     let config = &*(config_ptr as *const Box<dyn EarlyHeaderMutationConfig>);
     let mut ctx = unsafe { EarlyHeaderMutationContext::new(envoy_ptr) };
     config.mutate(&mut ctx)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_early_header_mutation_mutate",
-      panic,
-    );
-    // The return value selects chain continuation, not success. A panicking module must not
-    // silently disable the extensions configured after it, so continue the chain.
-    true
-  })
+  }
+  // The return value selects chain continuation, not success. A panicking module must not
+  // silently disable the extensions configured after it, so continue the chain.
+  on_panic = true
 }

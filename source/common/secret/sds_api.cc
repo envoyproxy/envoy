@@ -30,9 +30,12 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
           {Stats::TagStringView{Envoy::Config::TagNames::get().XDS_RESOURCE_NAME, sds_config_name}},
           absl::StrCat("sds.", sds_config_name, "."))),
       sds_api_stats_(generateStats(*scope_)), resource_type_helper_(validation_visitor, "name"),
-      sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
-      clean_up_(std::move(destructor_cb)), subscription_factory_(subscription_factory),
-      time_source_(time_source),
+      sds_config_(std::move(sds_config)),
+      poll_interval_(sds_config_.has_path_config_source()
+                         ? PROTOBUF_GET_OPTIONAL_MS(sds_config_.path_config_source(), poll_interval)
+                         : std::nullopt),
+      sds_config_name_(sds_config_name), clean_up_(std::move(destructor_cb)),
+      subscription_factory_(subscription_factory), time_source_(time_source),
       secret_data_{sds_config_name_, "uninitialized", time_source_.systemTime()} {
   const auto resource_name = resource_type_helper_.getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
@@ -41,6 +44,13 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
                                 sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this,
                                 resource_type_helper_.resourceDecoder(), {}),
                             Config::SubscriptionPtr);
+  if (poll_interval_.has_value()) {
+    poll_timer_ = dispatcher_.createTimer([this]() {
+      // Re-enable before running callbacks because a callback may destroy this SDS provider.
+      poll_timer_->enableTimer(*poll_interval_);
+      onFilesystemUpdate();
+    });
+  }
 }
 
 void SdsApi::resolveDataSource(const FileContentMap& files,
@@ -52,7 +62,7 @@ void SdsApi::resolveDataSource(const FileContentMap& files,
   }
 }
 
-void SdsApi::onWatchUpdate() {
+void SdsApi::onFilesystemUpdate() {
   // Filesystem reads and update callbacks can fail if the key material is missing or bad. We're not
   // under an onConfigUpdate() context, so we need to catch these cases explicitly here.
   TRY_ASSERT_MAIN_THREAD {
@@ -118,12 +128,18 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     // tracking is available even if files don't exist yet.
     secret_data_.version_info_ = version_info;
 
-    // Set up per-file watchers before loadFiles() so that if loadFiles() fails, the watches
-    // are still setup for the next auto-recovery when files appear later.
-    // For watched_directory case, the callback is already set in setSecret().
-    if (getWatchedDirectory() == nullptr) {
-      // List DataSources that refer to files.
-      auto datasource_files = getDataSourceFilenames();
+    // Set up refresh triggers before loadFiles() so that if loadFiles() fails, the next poll or
+    // filesystem event can recover when files appear later.
+    auto datasource_files = getDataSourceFilenames();
+    if (poll_timer_ != nullptr) {
+      watcher_.reset();
+      if (datasource_files.empty()) {
+        poll_timer_->disableTimer();
+      } else {
+        poll_timer_->enableTimer(*poll_interval_);
+      }
+    } else if (getWatchedDirectory() == nullptr) {
+      // For watched_directory, the callback is already set in setSecret().
       if (!datasource_files.empty()) {
         // Create new watch, also destroys the old watch if any.
         watcher_ = dispatcher_.createFilesystemWatcher();
@@ -135,7 +151,7 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
           RETURN_IF_NOT_OK(watcher_->addWatch(absl::StrCat(result_or_error.value().directory_, "/"),
                                               Filesystem::Watcher::Events::MovedTo,
                                               [this](uint32_t) {
-                                                onWatchUpdate();
+                                                onFilesystemUpdate();
                                                 return absl::OkStatus();
                                               }));
         }
@@ -279,14 +295,14 @@ void TlsCertificateSdsApi::setSecret(
       std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>(
           secret.tls_certificate());
   resolved_tls_certificate_secrets_ = nullptr;
-  if (secret.tls_certificate().has_watched_directory()) {
+  if (secret.tls_certificate().has_watched_directory() && !filesystemPollingEnabled()) {
     watched_directory_ = THROW_OR_RETURN_VALUE(
         Config::WatchedDirectory::create(secret.tls_certificate().watched_directory(), dispatcher_),
         std::unique_ptr<Config::WatchedDirectory>);
     // Set the callback immediately so that if subsequent operations fail, the watch is
     // still active and can trigger recovery when files appear later.
     watched_directory_->setCallback([this]() {
-      onWatchUpdate();
+      onFilesystemUpdate();
       return absl::OkStatus();
     });
   } else {
@@ -331,7 +347,7 @@ void CertificateValidationContextSdsApi::setSecret(
       std::make_unique<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>(
           secret.validation_context());
   resolved_certificate_validation_context_secrets_ = nullptr;
-  if (secret.validation_context().has_watched_directory()) {
+  if (secret.validation_context().has_watched_directory() && !filesystemPollingEnabled()) {
     watched_directory_ =
         THROW_OR_RETURN_VALUE(Config::WatchedDirectory::create(
                                   secret.validation_context().watched_directory(), dispatcher_),
@@ -339,7 +355,7 @@ void CertificateValidationContextSdsApi::setSecret(
     // Set the callback immediately so that if subsequent operations fail, the watch is
     // still active and can trigger recovery when files appear later.
     watched_directory_->setCallback([this]() {
-      onWatchUpdate();
+      onFilesystemUpdate();
       return absl::OkStatus();
     });
   } else {

@@ -31,10 +31,9 @@ std::string SigV4ASignerImpl::createStringToSign(const absl::string_view canonic
                                                  const absl::string_view long_date,
                                                  const absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  return fmt::format(
-      SigV4ASignatureConstants::SigV4AStringToSignFormat, getAlgorithmString(), long_date,
-      credential_scope,
-      Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
+  return fmt::format(SigV4ASignatureConstants::SigV4AStringToSignFormat, getAlgorithmString(),
+                     long_date, credential_scope,
+                     Hex::encode(crypto_util.getSha256Digest(canonical_request)));
 }
 
 void SigV4ASignerImpl::addRegionHeader(Http::RequestHeaderMap& headers,
@@ -67,7 +66,7 @@ std::string SigV4ASignerImpl::createSignature(
   unsigned int signature_size;
 
   // Sign the SHA256 hash of our calculated string_to_sign
-  auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
+  auto hash = crypto_util.getSha256Digest(string_to_sign);
 
   ECDSA_sign(0, hash.data(), hash.size(), signature.data(), &signature_size, ec_key_or.value());
 

@@ -143,18 +143,19 @@ HickoryDnsResolverStats HickoryDnsResolver::generateHickoryDnsResolverStats(Stat
 }
 
 HickoryDnsResolver::HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config,
-                                       Event::Dispatcher& dispatcher, Stats::Scope& root_scope)
+                                       Event::Dispatcher& dispatcher, Stats::Scope& root_scope,
+                                       absl::Status& creation_status)
     : config_(std::move(config)), dispatcher_(dispatcher),
       scope_(root_scope.createScope("dns.hickory.")),
       stats_(generateHickoryDnsResolverStats(*scope_)) {
   resolver_module_ptr_ =
       config_->on_dns_resolver_new_(config_->in_module_config_, static_cast<const void*>(this));
-  // The Rust SDK only returns null if a panic propagates across the FFI boundary. Use
-  // `RELEASE_ASSERT` so production builds fail loudly instead of silently dereferencing
-  // a null pointer in subsequent FFI calls.
-  RELEASE_ASSERT(resolver_module_ptr_ != nullptr,
-                 "Hickory DNS module returned null from on_dns_resolver_new "
-                 "(likely a Rust panic during resolver creation).");
+  // A null result means the module could not create the resolver, for example under resource
+  // exhaustion. Reject the configuration instead of aborting the process.
+  if (resolver_module_ptr_ == nullptr) {
+    creation_status = absl::InvalidArgumentError(
+        "Hickory DNS module could not create the resolver from on_dns_resolver_new.");
+  }
 }
 
 HickoryDnsResolver::~HickoryDnsResolver() {
@@ -162,6 +163,11 @@ HickoryDnsResolver::~HickoryDnsResolver() {
   // skips posting to the dispatcher. The posted lambda also locks a `weak_ptr` to this
   // resolver as the final use-after-free guard.
   shutting_down_.store(true, std::memory_order_release);
+
+  // If construction could not create the module resolver, there is nothing to destroy or drain.
+  if (resolver_module_ptr_ == nullptr) {
+    return;
+  }
 
   // Step 2: Destroy the module resolver. The Rust `Drop` impl signals its own
   // shutting-down flag and then performs `runtime.shutdown_timeout(5s)`, waiting up to
@@ -298,7 +304,11 @@ absl::StatusOr<DnsResolverSharedPtr> HickoryDnsResolverFactory::createDnsResolve
   auto config_or = HickoryDnsResolverConfig::create(proto_config);
   RETURN_IF_NOT_OK_REF(config_or.status());
 
-  return std::make_shared<HickoryDnsResolver>(std::move(*config_or), dispatcher, api.rootScope());
+  absl::Status creation_status = absl::OkStatus();
+  auto resolver = std::make_shared<HickoryDnsResolver>(std::move(*config_or), dispatcher,
+                                                       api.rootScope(), creation_status);
+  RETURN_IF_NOT_OK(creation_status);
+  return resolver;
 }
 
 REGISTER_FACTORY(HickoryDnsResolverFactory, DnsResolverFactory);

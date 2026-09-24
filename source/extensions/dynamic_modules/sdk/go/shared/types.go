@@ -199,6 +199,10 @@ const (
 	AttributeIDHealthCheck
 	// upstream.server_name
 	AttributeIDUpstreamRequestedServerName
+	// xds.virtual_cluster_name
+	AttributeIDXdsVirtualClusterName
+	// upstream.protocol
+	AttributeIDUpstreamProtocol
 )
 
 // LogLevel is the log level for messages logged via the host environment's logging mechanism.

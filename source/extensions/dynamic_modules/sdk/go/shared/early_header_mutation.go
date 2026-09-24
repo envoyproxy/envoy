@@ -72,6 +72,8 @@ type EarlyHeaderMutationHandle interface {
 // EarlyHeaderMutationConfigFactory.Create and gives the factory access to host
 // services while the mutation is being built on the main thread.
 type EarlyHeaderMutationConfigHandle interface {
+	CommonHandle
+
 	// Log writes a message to Envoy's logger at the given level.
 	Log(level LogLevel, format string, args ...any)
 

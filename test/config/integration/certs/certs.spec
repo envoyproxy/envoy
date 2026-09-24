@@ -29,6 +29,12 @@ issuer = intermediate_ca
 out = intermediate_ca_2cert.pem
 info_header = intermediate_ca_2cert_info.h
 
+[cert long_intermediate_ca]
+key = long_intermediate_cakey.pem
+cfg = long_intermediate_cacert.cfg
+issuer = ca
+out = long_intermediate_cacert.pem
+
 [concat intermediate_ca_cert_chain.pem]
 parts = ca, intermediate_ca, intermediate_ca_2
 
@@ -58,10 +64,13 @@ info_header = servercert_info.h
 [cert long_server]
 key = long_serverkey.pem
 cfg = long_servercert.cfg
-issuer = ca
+issuer = long_intermediate_ca
 out = long_servercert.pem
 hash_header = long_servercert_hash.h
 info_header = long_servercert_info.h
+
+[concat long_server_chain.pem]
+parts = long_server, long_intermediate_ca
 
 [cert server2]
 key = server2key.pem
@@ -163,8 +172,8 @@ next_update_days = 730
 
 [ocsp long_server_ocsp_resp.der]
 cert = long_server
-issuer = ca
-responder = ca
+issuer = long_intermediate_ca
+responder = long_intermediate_ca
 status = unknown
 next_update_days = 730
 

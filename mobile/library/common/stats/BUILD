@@ -10,7 +10,6 @@ envoy_cc_library(
         "utility.cc",
     ],
     hdrs = ["utility.h"],
-    repository = "@envoy",
     deps = [
         "//library/common/bridge:utility_lib",
         "@envoy//source/common/stats:utility_lib",
