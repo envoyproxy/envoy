@@ -123,16 +123,35 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "llm_protocol_state_lib",
-    srcs = ["llm_protocol_state.cc"],
-    hdrs = ["llm_protocol_state.h"],
+    name = "endpoint_layout_lib",
+    srcs = ["endpoint_layout.cc"],
+    hdrs = ["endpoint_layout.h"],
     deps = [
+        "//source/common/common:macros",
+        "//source/common/http:header_utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "ai_filter_state_lib",
+    srcs = ["ai_filter_state.cc"],
+    hdrs = ["ai_filter_state.h"],
+    deps = [
+        ":endpoint_layout_lib",
         ":llm_protocol_conversion_lib",
         ":token_usage_lib",
         "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:logger_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/algorithm:container",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
@@ -364,6 +383,7 @@ envoy_cc_library(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
     ],
 )
 
@@ -420,6 +440,7 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":ai_filter_lib",
+        ":ai_filter_state_lib",
         ":buffer_manager_lib",
         ":external_buffer_interface",
         ":filter_chain_bridge_lib",
@@ -427,7 +448,6 @@ envoy_cc_library(
         ":json_with_ext_buf_lib",
         ":json_with_ext_buf_parser_lib",
         ":llm_protocol_conversion_lib",
-        ":llm_protocol_state_lib",
         ":response_handler_lib",
         ":schema_lib",
         ":serializer_lib",

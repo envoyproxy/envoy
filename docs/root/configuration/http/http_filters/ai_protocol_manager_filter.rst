@@ -151,61 +151,140 @@ does not parse is forwarded unchanged.
 
 .. _config_http_filters_ai_protocol_manager_protocol_filter_state:
 
-Request and upstream APIs
--------------------------
+Downstream API and upstream target
+----------------------------------
 
-Two filter state keys name the wire APIs of a stream: the client's and the upstream's. The filter
-reads ``envoy.ai.upstream_target`` when the request headers arrive. It reads
-``envoy.ai.llm_protocol.request`` then to parse the payload, and again when the response headers
-arrive to extract token usage. Place the filter that writes either key before it.
+Two filter state keys describe the two sides of a stream: how the client speaks to the gateway,
+and the upstream the request is sent to. The filter reads ``envoy.ai.upstream_target`` when the
+request headers arrive. It reads ``envoy.ai.downstream_api`` then to parse the payload, and again
+when the response headers arrive to extract token usage. Place the filter that writes either key
+before it. :ref:`AI filters <config_http_filters_ai_protocol_manager_ai_filters>` read both.
 
-``envoy.ai.llm_protocol.request``
-  The API the client's request follows, as an :ref:`LLMProtocol
-  <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` value name such as ``ANTHROPIC_MESSAGES``. It takes
-  precedence over the route's request declaration, and makes the request a declared AI endpoint
-  even on a route that declares none. It only decides how the client's own payload is parsed, so it
-  may be derived from the request, for example from a header. When the filter in the downstream
-  filter chain parses a request under the route's declared API and the key is unset, it writes that
-  API there. Parsing requires ``request_handling`` to be set and the request to have a body. An
-  instance in a cluster's upstream filter chain then parses the request the same way, even if a
-  later filter re-resolves the route.
+``envoy.ai.downstream_api``
+  The :ref:`DownstreamApi <envoy_v3_api_msg_type.ai.v3.DownstreamApi>` as JSON, or the bare
+  :ref:`LLMProtocol <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` value name such as
+  ``ANTHROPIC_MESSAGES`` as shorthand for ``{"llm_protocol": "ANTHROPIC_MESSAGES"}``. Its protocol
+  takes precedence over the route's request declaration, and makes the request a declared AI
+  endpoint even on a route that declares none. It only decides how the client's own request is
+  read, so it may be derived from the request, for example from a header. When the filter in the
+  downstream filter chain parses a request under the route's declared API and the key is unset, it
+  writes ``{"llm_protocol": <that API>}`` there. Parsing requires ``request_handling`` to be set
+  and the request to have a body. An instance in a cluster's upstream filter chain then parses the
+  request the same way, even if a later filter re-resolves the route.
 
 ``envoy.ai.upstream_target``
   In a cluster's upstream filter chain only, the :ref:`UpstreamTarget
-  <envoy_v3_api_msg_type.ai.v3.UpstreamTarget>` as JSON, such as
-  ``{"llm_protocol": "GEMINI_GENERATE_CONTENT"}``. It is the complete description of the upstream
-  the request is sent to, and carries the API that upstream speaks: token usage is extracted from
-  the upstream's response in that API. Because it describes where the request goes, only trusted,
-  configuration-driven writers may set it, and it must never be derived from request content. When
-  the :ref:`set_filter_state filter <config_http_filters_set_filter_state>` writes it, use a
-  constant JSON value with no substitution.
+  <envoy_v3_api_msg_type.ai.v3.UpstreamTarget>` as JSON: the protocol the upstream speaks, its
+  authority, endpoint and model, and the name of the credential to authenticate with. Token usage
+  is extracted from the upstream's response in its protocol.
+
+Both keys reject an invalid value as a whole: an undefined or unspecified protocol, an unknown
+field, or an endpoint that breaks the rules below.
+
+Trust
+~~~~~
+
+``envoy.ai.upstream_target`` describes where the request goes and which credential it carries, so
+only trusted, configuration-driven writers may set it, and it must never be derived from request
+content. When the :ref:`set_filter_state filter <config_http_filters_set_filter_state>` writes it,
+use a constant JSON value with no substitution. ``credential`` names a credential configured on
+the upstream AI Protocol Manager; it is never a secret itself. ``envoy.ai.downstream_api`` carries
+nothing that routes or authenticates the request.
+
+Dynamic forward proxy
+~~~~~~~~~~~~~~~~~~~~~
+
+The target's ``authority`` is exposed as a field, so one constant target can pick both the
+upstream API and, through the :ref:`dynamic forward proxy
+<config_http_filters_dynamic_forward_proxy>`, its host:
 
 .. code-block:: yaml
 
-  # A downstream filter, before the AI Protocol Manager.
-  - name: envoy.filters.http.set_filter_state
-    typed_config:
+  # A route to a dynamic forward proxy cluster whose upstream filter chain runs the AI Protocol
+  # Manager.
+  route:
+    cluster: dynamic_forward_proxy_cluster
+    host_rewrite: "%FILTER_STATE(envoy.ai.upstream_target:FIELD:authority)%"
+  typed_per_filter_config:
+    envoy.filters.http.set_filter_state:
       "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
       on_request_headers:
-      - object_key: envoy.ai.llm_protocol.request
+      - object_key: envoy.ai.upstream_target
         format_string:
           text_format_source:
-            inline_string: ANTHROPIC_MESSAGES
+            inline_string: |
+              {"llm_protocol": "GEMINI_GENERATE_CONTENT",
+               "authority": "us-central1-aiplatform.googleapis.com",
+               "endpoint": {"preset": "gcp_vertex_ai",
+                            "variables": {"project": "my-project", "location": "us-central1"}}}
+      - object_key: envoy.upstream.dynamic_host
+        format_string:
+          text_format_source:
+            inline_string: "%FILTER_STATE(envoy.ai.upstream_target:FIELD:authority)%"
 
-  # The route to a Gemini cluster whose upstream filter chain runs the AI Protocol Manager.
-  routes:
-  - match:
-      prefix: /
-    route:
-      cluster: gemini
-    typed_per_filter_config:
-      envoy.filters.http.set_filter_state:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
-        on_request_headers:
-        - object_key: envoy.ai.upstream_target
-          format_string:
-            text_format_source:
-              inline_string: '{"llm_protocol": "GEMINI_GENERATE_CONTENT"}'
+The dynamic forward proxy filter reads ``envoy.upstream.dynamic_host`` with
+:ref:`allow_dynamic_host_from_filter_state
+<envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>`
+set. That only picks the address, so the route's :ref:`host_rewrite
+<envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite>` sets ``Host``, and with it the SNI
+and SAN the cluster validates, to the same authority.
+
+Fields
+~~~~~~
+
+Both objects serialize as their JSON, and as the typed proto for ``TYPED`` access logs. Their
+fields, for ``%FILTER_STATE(<key>:FIELD:<name>)%`` and other field readers:
+
+* ``envoy.ai.downstream_api``: ``llm_protocol`` (the value name), ``preset``.
+* ``envoy.ai.upstream_target``: ``llm_protocol``, ``authority``, ``model``, ``preset``,
+  ``credential``.
+
+A field that is unset reads as empty; ``preset`` is empty for a template or no endpoint.
+
+.. _config_http_filters_ai_protocol_manager_endpoint_presets:
+
+Endpoints
+~~~~~~~~~
+
+An :ref:`Endpoint <envoy_v3_api_msg_type.ai.v3.Endpoint>` says where a service serves a protocol:
+a named ``preset``, or a ``custom`` template spelled out field by field. Either must serve the
+protocol it is paired with.
+
+.. csv-table::
+  :header: Preset, Protocols, Variables
+  :widths: 2, 4, 3
+
+  ``openai``, "``OPENAI_CHAT_COMPLETIONS`` (``/v1/chat/completions``), ``OPENAI_RESPONSES`` (``/v1/responses``)", none
+  ``anthropic``, "``ANTHROPIC_MESSAGES`` (``/v1/messages``, ``anthropic-version: 2023-06-01``)", none
+  ``gemini_api``, "``GEMINI_GENERATE_CONTENT`` (``/v1beta/models/{model}:{method}``)", none
+  ``gcp_vertex_ai``, "``GEMINI_GENERATE_CONTENT``, ``ANTHROPIC_MESSAGES`` (``rawPredict``), ``OPENAI_CHAT_COMPLETIONS`` (``endpoints/openapi``)", "``project``, ``location`` (required)"
+  ``gcp_vertex_ai_express``, "``GEMINI_GENERATE_CONTENT`` (API key, ``/v1/publishers/google/models``)", none
+  ``aws_bedrock``, "``ANTHROPIC_MESSAGES`` (``/model/{model}/{method}``, AWS event stream)", "``region`` (optional; for signing and the authority)"
+  ``azure_openai``, "``OPENAI_CHAT_COMPLETIONS`` (``/openai/deployments/{model}/chat/completions``)", "``api_version`` (required)"
+
+A preset rejects a variable it does not take. A ``custom`` :ref:`template
+<envoy_v3_api_msg_type.ai.v3.EndpointTemplate>` has these fields:
+
+* ``path_template``: the path, starting with ``/``. ``{model}`` is the model name and requires
+  ``model_placement: MODEL_IN_PATH``, which in turn requires it. ``{method}`` is the unary or stream
+  method and is required exactly when ``stream_placement`` is ``STREAM_IN_METHOD`` or
+  ``STREAM_IN_BODY_AND_METHOD``, which also require both methods. Any other ``{name}``, named
+  ``[a-z][a-z0-9_]*``, is a variable, and a variable no placeholder uses is rejected.
+* ``unary_method``, ``stream_method``: the ``{method}`` of a unary and a streaming request.
+* ``query_params``, ``stream_query_params``: added to every request, and to streaming requests.
+  Values may hold variable placeholders, but not ``{model}`` or ``{method}``.
+* ``model_placement``, ``stream_placement``, ``response_framing``: where the model and the
+  streaming choice go, and how a streamed response is framed.
+* ``set_body_fields``, ``remove_body_fields``: top-level body fields set or removed.
+* ``request_headers_to_add``, ``request_headers_to_remove``: lowercase header names; neither may
+  name a pseudo-header or ``host``, and the credential headers ``authorization``,
+  ``proxy-authorization``, ``x-api-key``, ``api-key``, ``x-goog-api-key`` and ``cookie`` may be
+  removed but not set.
+
+Variable values, the two methods, query parameter names, and query values after substitution, are
+1 to 256 bytes, are not ``.``, and hold no ``/``, ``?``, ``#``, ``%``, ``..``, whitespace, control
+or non-ASCII characters. Literal ``path_template`` text holds no ``?``, ``#``, whitespace, control
+or non-ASCII characters, and header values must be valid.
 
 .. _config_http_filters_ai_protocol_manager_ai_filters:
 
@@ -218,7 +297,7 @@ is replayed, the filter runs the configured :ref:`AI filters
 in order over the parsed document; they require ``request_handling``. An AI
 filter (category ``envoy.http.ai_filters``)
 may read or modify the document, or reject the request with a local reply.
-Routes without a per-route request declaration or an ``envoy.ai.llm_protocol.request`` filter
+Routes without a per-route request declaration or an ``envoy.ai.downstream_api`` filter
 state, and requests without a body, run no AI filters.
 
 Request info
@@ -364,7 +443,7 @@ Both streaming shapes are handled:
 The response's :ref:`wire API <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` is
 the :ref:`upstream target's <config_http_filters_ai_protocol_manager_protocol_filter_state>` in a
 cluster's upstream filter chain that has one. Otherwise it is resolved in precedence order: the
-route's declared response API, the request's API (the ``envoy.ai.llm_protocol.request`` filter
+route's declared response API, the request's API (the ``envoy.ai.downstream_api`` filter
 state, else the route's declared request API), then :ref:`default_llm_protocol
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.default_llm_protocol>`;
 when none is declared it is auto-detected from the response shape (only
@@ -584,7 +663,7 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   request_parse_error, Counter, A declared AI endpoint's payload was not well-formed JSON and was rejected with a 400.
   request_schema_invalid, Counter, "A declared AI endpoint's payload parsed but violated its API's payload schema, and was rejected with a 400."
   request_passthrough, Counter, "A payload on an unconfigured route failed to parse under :ref:`parse_unconfigured_routes <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>` and was forwarded unchanged; never a request failure."
-  request_protocol_overridden, Counter, "The ``envoy.ai.llm_protocol.request`` filter state named a request API other than the one the route declares, and was used."
+  request_protocol_overridden, Counter, "The ``envoy.ai.downstream_api`` filter state named a request API other than the one the route declares, and was used."
   request_external_buffer_error, Counter, The external buffer failed irrecoverably on the request path and the stream was answered with a 500.
   response_external_buffer_error, Counter, The external buffer failed irrecoverably on the response path and the stream was answered with a 500.
   upstream_target_from_filter_state, Counter, An upstream instance took its upstream target from the ``envoy.ai.upstream_target`` filter state.

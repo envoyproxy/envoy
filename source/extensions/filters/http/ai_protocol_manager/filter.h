@@ -12,6 +12,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
@@ -154,11 +155,10 @@ private:
 // rules out gRPC and Connect streaming, upgrades, and CONNECT. A declared
 // endpoint carries no such gate.
 //
-// The request's wire API is the envoy.ai.llm_protocol.request filter state when set, which also
-// makes the request a declared AI endpoint, and the route's declaration otherwise; a downstream
-// instance pins the route's in that filter state so re-routing cannot change what was parsed. An
-// upstream instance also reads the wire API its upstream speaks from the envoy.ai.upstream_target
-// filter state.
+// The request's wire API is the envoy.ai.downstream_api filter state when set, which also makes
+// the request a declared AI endpoint, and the route's declaration otherwise; a downstream instance
+// pins the route's in that filter state so re-routing cannot change what was parsed. An upstream
+// instance also reads the upstream it sends to from the envoy.ai.upstream_target filter state.
 //
 // A declared wire API with a registered payload schema is validated at end of
 // payload (schema/schema_registry.h), then the configured AI filters run over the
@@ -230,6 +230,10 @@ private:
 
   ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
+
+  // Backs the pointers in AiFilterContext; declared before everything that can hold an AI filter.
+  DownstreamApiConstSharedPtr downstream_api_;
+  UpstreamTargetConstSharedPtr upstream_target_;
 
   // Declared before decode_manager_, encode_manager_, and filter_manager_ so they outlive the
   // managers and coroutines that reference them.

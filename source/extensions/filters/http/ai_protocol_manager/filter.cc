@@ -18,7 +18,6 @@
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
-#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "absl/strings/match.h"
@@ -293,30 +292,34 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
 
 void AiProtocolManagerFilter::resolveRequestProtocol(LLMProtocol route_protocol) {
   StreamInfo::FilterState& filter_state = *decoder_callbacks_->streamInfo().filterState();
-  if (const LLMProtocol state_protocol = RequestLlmProtocol::fromFilterState(filter_state);
-      state_protocol != LLMProtocol::Unspecified) {
-    if (route_protocol != LLMProtocol::Unspecified && route_protocol != state_protocol) {
+  if (const DownstreamApiState* state = DownstreamApiState::fromFilterState(filter_state);
+      state != nullptr && state->protocol() != LLMProtocol::Unspecified) {
+    if (route_protocol != LLMProtocol::Unspecified && route_protocol != state->protocol()) {
       config_->stats().request_protocol_overridden_.inc();
     }
-    request_protocol_ = state_protocol;
+    request_protocol_ = state->protocol();
+    downstream_api_ = state->api();
     protocol_from_filter_state_ = true;
     return;
   }
   request_protocol_ = route_protocol;
   if (!upstream_placement_ && route_protocol != LLMProtocol::Unspecified &&
-      !filter_state.hasDataWithName(RequestLlmProtocol::kFilterStateKey)) {
-    filter_state.setData(RequestLlmProtocol::kFilterStateKey,
-                         std::make_shared<RequestLlmProtocol>(route_protocol),
+      !filter_state.hasDataWithName(DownstreamApiState::kFilterStateKey)) {
+    auto api = std::make_shared<envoy::type::ai::v3::DownstreamApi>();
+    api->set_llm_protocol(protocolToProto(route_protocol));
+    downstream_api_ = std::move(api);
+    filter_state.setData(DownstreamApiState::kFilterStateKey,
+                         std::make_shared<DownstreamApiState>(downstream_api_),
                          StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 }
 
 void AiProtocolManagerFilter::resolveUpstreamProtocol() {
-  if (const auto* state =
-          decoder_callbacks_->streamInfo().filterState()->getDataReadOnly<UpstreamTargetState>(
-              UpstreamTargetState::kFilterStateKey);
+  if (const UpstreamTargetState* state =
+          UpstreamTargetState::fromFilterState(*decoder_callbacks_->streamInfo().filterState());
       state != nullptr) {
     upstream_protocol_ = state->protocol();
+    upstream_target_ = state->target();
     config_->stats().upstream_target_from_filter_state_.inc();
   }
 }
@@ -486,8 +489,13 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
 
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
-    const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
-                                  request_protocol_, decode_manager_->length(), upstream_protocol_};
+    const AiFilterContext context{decoder_callbacks_->streamInfo(),
+                                  *request_headers_,
+                                  request_protocol_,
+                                  decode_manager_->length(),
+                                  upstream_protocol_,
+                                  downstream_api_.get(),
+                                  upstream_target_.get()};
     std::vector<AiFilterSharedPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());
     for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
@@ -605,8 +613,10 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     // order: the route's declared response API, the request's API, the configured
     // fallback; Unspecified auto-detects from the response shape.
     LLMProtocol protocol = config_->defaultLLMProtocol();
+    const DownstreamApiState* downstream_api =
+        DownstreamApiState::fromFilterState(*encoder_callbacks_->streamInfo().filterState());
     LLMProtocol request_protocol =
-        RequestLlmProtocol::fromFilterState(*encoder_callbacks_->streamInfo().filterState());
+        downstream_api != nullptr ? downstream_api->protocol() : LLMProtocol::Unspecified;
     if (request_protocol == LLMProtocol::Unspecified && route_config != nullptr) {
       request_protocol = route_config->requestProtocol();
     }

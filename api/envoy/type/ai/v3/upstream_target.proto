@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.type.ai.v3;
 
+import "envoy/type/ai/v3/endpoint.proto";
 import "envoy/type/ai/v3/llm_protocol.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -21,7 +22,29 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // The complete description of the upstream a request is sent to. It describes where the request
 // goes, so only trusted, configuration-driven writers may set it, and it must never be derived from
 // request content.
+// [#next-free-field: 6]
 message UpstreamTarget {
-  // The protocol the upstream serves. Required: ``LLM_PROTOCOL_UNSPECIFIED`` is rejected.
-  LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
+  // The protocol the upstream serves; token usage is extracted from its response in this
+  // protocol. Required: ``LLM_PROTOCOL_UNSPECIFIED`` is rejected.
+  LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+
+  // The ``host[:port]`` the request goes to, exposed as the ``authority`` field of the filter
+  // state object so a later filter can hand it to the dynamic forward proxy or rewrite the host
+  // with it. Optional.
+  string authority = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+  // Where the upstream serves ``llm_protocol``; it must serve that protocol. Unset: the protocol's
+  // default layout.
+  Endpoint endpoint = 3;
+
+  // The model the upstream is asked for. Optional: unset, the request's own model is used. It is
+  // percent-encoded when the endpoint puts it in the path.
+  string model = 4 [
+    (validate.rules).string = {max_bytes: 256 well_known_regex: HTTP_HEADER_VALUE strict: false}
+  ];
+
+  // The name of a credential configured on the upstream AI Protocol Manager, which authenticates
+  // the request. Never a secret itself. Optional.
+  string credential = 5 [(validate.rules).string = {max_len: 128 pattern: "^[A-Za-z0-9._-]*$"}];
 }

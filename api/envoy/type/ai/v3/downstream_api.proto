@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package envoy.type.ai.v3;
+
+import "envoy/type/ai/v3/endpoint.proto";
+import "envoy/type/ai/v3/llm_protocol.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.type.ai.v3";
+option java_outer_classname = "DownstreamApiProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/ai/v3;aiv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: AI downstream API]
+
+// How a client speaks to the gateway.
+message DownstreamApi {
+  // The protocol of the client's request; the AI Protocol Manager parses the payload in it.
+  // Required: ``LLM_PROTOCOL_UNSPECIFIED`` is rejected.
+  LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+
+  // Where the client puts the model and its streaming choice, and the response framing it expects.
+  // It must serve ``llm_protocol``. Unset: the protocol's default (model and stream in the body;
+  // Gemini: ``/models/{model}:{method}``).
+  Endpoint endpoint = 2;
+}

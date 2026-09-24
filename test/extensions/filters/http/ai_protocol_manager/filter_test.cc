@@ -11,9 +11,9 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/coroutine/status_macros.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
-#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
 
 #include "test/mocks/event/mocks.h"
@@ -2329,18 +2329,23 @@ TEST_F(AiProtocolManagerFilterTest,
 struct SeenContext {
   LLMProtocol request_protocol;
   LLMProtocol upstream_protocol;
+  const envoy::type::ai::v3::DownstreamApi* downstream_api;
+  const envoy::type::ai::v3::UpstreamTarget* upstream_target;
 };
 
 AiFilterFactoryCb recordingContext(std::optional<SeenContext>& seen) {
   return [&seen](const AiFilterContext& context) -> AiFilterSharedPtr {
-    seen = SeenContext{context.request_protocol, context.upstream_protocol};
+    seen = SeenContext{context.request_protocol, context.upstream_protocol, context.downstream_api,
+                       context.upstream_target};
     return nullptr;
   };
 }
 
 void setRequestProtocolState(StreamInfo::StreamInfo& stream_info, LLMProtocol protocol) {
-  stream_info.filterState()->setData(RequestLlmProtocol::kFilterStateKey,
-                                     std::make_shared<RequestLlmProtocol>(protocol),
+  auto api = std::make_shared<envoy::type::ai::v3::DownstreamApi>();
+  api->set_llm_protocol(protocolToProto(protocol));
+  stream_info.filterState()->setData(DownstreamApiState::kFilterStateKey,
+                                     std::make_shared<DownstreamApiState>(std::move(api)),
                                      StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
@@ -2364,8 +2369,13 @@ public:
     EXPECT_EQ(local_reply_calls_, 0);
   }
 
+  const DownstreamApiState* downstreamApiState() {
+    return DownstreamApiState::fromFilterState(*callbacks_.stream_info_.filterState());
+  }
+
   LLMProtocol pinnedProtocol() {
-    return RequestLlmProtocol::fromFilterState(*callbacks_.stream_info_.filterState());
+    const DownstreamApiState* state = downstreamApiState();
+    return state != nullptr ? state->protocol() : LLMProtocol::Unspecified;
   }
 
   std::optional<SeenContext> seen_;
@@ -2381,6 +2391,13 @@ TEST_F(AiProtocolManagerRequestProtocolTest, PinsTheRouteProtocolDownstream) {
   EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(seen_->upstream_protocol, LLMProtocol::Unspecified);
   EXPECT_EQ(counterValue("request_protocol_overridden"), 0);
+
+  // The pinned object names only the protocol, and is the one AI filters see.
+  const DownstreamApiState* state = downstreamApiState();
+  ASSERT_NE(state, nullptr);
+  EXPECT_EQ(state->serializeAsString(), R"({"llm_protocol":"OPENAI_CHAT_COMPLETIONS"})");
+  EXPECT_EQ(seen_->downstream_api, state->api().get());
+  EXPECT_EQ(seen_->upstream_target, nullptr);
 }
 
 // A route that declares a request without naming its API has nothing to pin.
@@ -2389,9 +2406,10 @@ TEST_F(AiProtocolManagerRequestProtocolTest, RouteWithoutProtocolPinsNothing) {
   runRecording();
 
   EXPECT_FALSE(
-      callbacks_.stream_info_.filterState()->hasDataWithName(RequestLlmProtocol::kFilterStateKey));
+      callbacks_.stream_info_.filterState()->hasDataWithName(DownstreamApiState::kFilterStateKey));
   ASSERT_TRUE(seen_.has_value());
   EXPECT_EQ(seen_->request_protocol, LLMProtocol::Unspecified);
+  EXPECT_EQ(seen_->downstream_api, nullptr);
 }
 
 // A protocol in filter state makes the request an AI request even on a route that declares none,
@@ -2412,6 +2430,28 @@ TEST_F(AiProtocolManagerRequestProtocolTest, FilterStateProtocolRunsTheAiFilters
 
   ASSERT_TRUE(seen_.has_value());
   EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen_->downstream_api, downstreamApiState()->api().get());
+}
+
+// The factory's object, as set_filter_state would write it, carries its endpoint to AI filters.
+TEST_F(AiProtocolManagerRequestProtocolTest, FilterStateFromTheFactory) {
+  setRouteProtocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  const auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
+          DownstreamApiState::kFilterStateKey);
+  ASSERT_NE(factory, nullptr);
+  std::shared_ptr<StreamInfo::FilterState::Object> object = factory->createFromBytes(
+      R"({"llm_protocol":"OPENAI_CHAT_COMPLETIONS","endpoint":{"preset":"openai"}})");
+  ASSERT_NE(object, nullptr);
+  callbacks_.stream_info_.filterState()->setData(DownstreamApiState::kFilterStateKey,
+                                                 std::move(object),
+                                                 StreamInfo::FilterState::LifeSpan::FilterChain);
+  runRecording();
+
+  ASSERT_TRUE(seen_.has_value());
+  ASSERT_NE(seen_->downstream_api, nullptr);
+  EXPECT_EQ(seen_->downstream_api->endpoint().preset(), "openai");
+  EXPECT_EQ(counterValue("request_protocol_overridden"), 0);
 }
 
 TEST_F(AiProtocolManagerRequestProtocolTest, FilterStateOverridesTheRoute) {
@@ -2441,6 +2481,7 @@ TEST_F(AiProtocolManagerRequestProtocolTest, UnspecifiedFilterStateDefersToTheRo
 
   ASSERT_TRUE(seen_.has_value());
   EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen_->downstream_api, nullptr);
   EXPECT_EQ(pinnedProtocol(), LLMProtocol::Unspecified);
   EXPECT_EQ(counterValue("request_protocol_overridden"), 0);
 }
@@ -2499,8 +2540,10 @@ TEST_F(AiProtocolManagerUpstreamTest, NoTarget) {
   ASSERT_TRUE(seen_.has_value());
   EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(seen_->upstream_protocol, LLMProtocol::Unspecified);
+  EXPECT_EQ(seen_->upstream_target, nullptr);
+  EXPECT_EQ(seen_->downstream_api, nullptr);
   EXPECT_FALSE(
-      callbacks_.stream_info_.filterState()->hasDataWithName(RequestLlmProtocol::kFilterStateKey));
+      callbacks_.stream_info_.filterState()->hasDataWithName(DownstreamApiState::kFilterStateKey));
   EXPECT_EQ(counterValue("upstream_target_from_filter_state"), 0);
 }
 
@@ -2512,17 +2555,28 @@ TEST_F(AiProtocolManagerUpstreamTest, ReadsThePinnedProtocol) {
 
   ASSERT_TRUE(seen_.has_value());
   EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen_->downstream_api, downstreamApiState()->api().get());
 }
 
 TEST_F(AiProtocolManagerUpstreamTest, TargetFromFilterState) {
   setRouteProtocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
-  setFilterStateTarget(callbacks_.stream_info_, R"({"llm_protocol":"GEMINI_GENERATE_CONTENT"})");
+  setFilterStateTarget(
+      callbacks_.stream_info_,
+      R"({"llm_protocol":"GEMINI_GENERATE_CONTENT","model":"gemini-2.5-flash","endpoint":)"
+      R"({"preset":"gcp_vertex_ai","variables":{"project":"p","location":"us-central1"}}})");
   runRecording();
 
   ASSERT_TRUE(seen_.has_value());
   EXPECT_EQ(seen_->request_protocol, LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(seen_->upstream_protocol, LLMProtocol::GeminiGenerateContent);
   EXPECT_EQ(counterValue("upstream_target_from_filter_state"), 1);
+
+  const UpstreamTargetState* state =
+      UpstreamTargetState::fromFilterState(*callbacks_.stream_info_.filterState());
+  ASSERT_NE(state, nullptr);
+  EXPECT_EQ(seen_->upstream_target, state->target().get());
+  EXPECT_EQ(seen_->upstream_target->model(), "gemini-2.5-flash");
+  EXPECT_EQ(seen_->upstream_target->endpoint().preset(), "gcp_vertex_ai");
 }
 
 // Something other than a target under the key, which only the factory could have validated, is
@@ -2537,6 +2591,7 @@ TEST_F(AiProtocolManagerUpstreamTest, ForeignFilterStateObjectIsIgnored) {
 
   ASSERT_TRUE(seen_.has_value());
   EXPECT_EQ(seen_->upstream_protocol, LLMProtocol::Unspecified);
+  EXPECT_EQ(seen_->upstream_target, nullptr);
   EXPECT_EQ(counterValue("upstream_target_from_filter_state"), 0);
 }
 

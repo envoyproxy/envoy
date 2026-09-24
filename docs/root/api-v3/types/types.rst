@@ -5,6 +5,8 @@ Types
   :glob:
   :maxdepth: 2
 
+  ../type/ai/v3/downstream_api.proto
+  ../type/ai/v3/endpoint.proto
   ../type/ai/v3/llm_protocol.proto
   ../type/ai/v3/upstream_target.proto
   ../type/matcher/v3/http_inputs.proto

@@ -14,6 +14,8 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/type/ai/v3/downstream_api.pb.h"
+#include "envoy/type/ai/v3/upstream_target.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/coroutine/task.h"
@@ -132,7 +134,7 @@ using AiFilterSharedPtr = std::shared_ptr<AiFilter>;
 struct AiFilterContext {
   StreamInfo::StreamInfo& stream_info;
   const Http::RequestHeaderMap& request_headers;
-  // The client's wire API: the envoy.ai.llm_protocol.request filter state, otherwise the route's
+  // The client's wire API: the envoy.ai.downstream_api filter state, otherwise the route's
   // declaration; Unspecified when neither names one.
   LLMProtocol request_protocol;
   // Bytes of the buffered request payload, captured before replay drains it.
@@ -140,6 +142,12 @@ struct AiFilterContext {
   // The upstream's wire API from the envoy.ai.upstream_target filter state, in a cluster's
   // upstream filter chain only; Unspecified downstream or when the filter state is unset.
   LLMProtocol upstream_protocol{LLMProtocol::Unspecified};
+  // The envoy.ai.downstream_api filter state, which AI filters read the client's endpoint from;
+  // null when absent. The manager holds it, and upstream_target, for the stream.
+  const envoy::type::ai::v3::DownstreamApi* downstream_api{nullptr};
+  // The envoy.ai.upstream_target filter state, which AI filters read the upstream's endpoint,
+  // model and credential from; in a cluster's upstream filter chain only, and null when absent.
+  const envoy::type::ai::v3::UpstreamTarget* upstream_target{nullptr};
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.

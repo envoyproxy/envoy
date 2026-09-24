@@ -143,16 +143,34 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "llm_protocol_state_test",
-    srcs = ["llm_protocol_state_test.cc"],
+    name = "ai_filter_state_test",
+    srcs = ["ai_filter_state_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_state_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:variant",
+        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "endpoint_layout_test",
+    srcs = ["endpoint_layout_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:endpoint_layout_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
     ],
 )
 
@@ -167,9 +185,9 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:serializer_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stats:stats_mocks",

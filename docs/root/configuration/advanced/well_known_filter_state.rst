@@ -104,24 +104,27 @@ The following lists the filter state object keys used by the Envoy extensions to
   request attributes when ``request_storage_mode`` is set to ``FILTER_STATE`` or
   ``DYNAMIC_METADATA_AND_FILTER_STATE``. The object stores extracted fields from the parsed request.
 
-``envoy.ai.llm_protocol.request``
-  The wire API of the request payload for the :ref:`AI Protocol Manager filter
-  <config_http_filters_ai_protocol_manager_protocol_filter_state>`, overriding the route's declaration.
-  Accepts an :ref:`LLMProtocol <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` value name such as
-  ``ANTHROPIC_MESSAGES`` as a constructor, and serializes as that name. Fields:
+``envoy.ai.downstream_api``
+  How the client speaks to the :ref:`AI Protocol Manager filter
+  <config_http_filters_ai_protocol_manager_protocol_filter_state>`, overriding the route's
+  declaration. Accepts the JSON of a :ref:`DownstreamApi <envoy_v3_api_msg_type.ai.v3.DownstreamApi>`,
+  or an :ref:`LLMProtocol <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` value name such as
+  ``ANTHROPIC_MESSAGES`` as shorthand, as a constructor, and serializes as JSON. Fields:
 
-  * ``llm_protocol``: the value name.
+  * ``llm_protocol``: the ``LLMProtocol`` value name;
+  * ``preset``: the endpoint preset, empty for a template or no endpoint.
 
 ``envoy.ai.upstream_target``
   The :ref:`upstream target <envoy_v3_api_msg_type.ai.v3.UpstreamTarget>` for the
   :ref:`AI Protocol Manager filter <config_http_filters_ai_protocol_manager_protocol_filter_state>`
   in a cluster's upstream filter chain: the complete description of the upstream the request is sent
-  to, which carries the API that upstream speaks. Only trusted, configuration-driven writers may set
-  it, and it must never be derived from request content; with the set_filter_state filter, use a
-  constant value with no substitution. Accepts the target's JSON as a constructor, and serializes as
-  JSON. Fields:
+  to. Only trusted, configuration-driven writers may set it, and it must never be derived from
+  request content; with the set_filter_state filter, use a constant value with no substitution.
+  Accepts the target's JSON as a constructor, and serializes as JSON. Fields:
 
-  * ``llm_protocol``: the target's ``LLMProtocol`` value name.
+  * ``llm_protocol``: the ``LLMProtocol`` value name;
+  * ``authority``: the ``host[:port]``, for example for ``envoy.upstream.dynamic_host``;
+  * ``model``, ``preset``, ``credential``: the target's model, endpoint preset and credential name.
 
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.

@@ -1,0 +1,136 @@
+syntax = "proto3";
+
+package envoy.type.ai.v3;
+
+import "google/protobuf/struct.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.type.ai.v3";
+option java_outer_classname = "EndpointProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/ai/v3;aiv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: AI endpoint layout]
+
+// Where an endpoint serves an :ref:`LLM protocol <envoy_v3_api_enum_type.ai.v3.LLMProtocol>`:
+// the request path, where the model and the streaming choice go, and how a streamed response is
+// framed. An endpoint that does not serve the protocol it is paired with is rejected.
+message Endpoint {
+  oneof layout {
+    option (validate.required) = true;
+
+    // A named layout of a well-known service, such as ``gcp_vertex_ai`` or ``aws_bedrock``. The
+    // :ref:`preset table <config_http_filters_ai_protocol_manager_endpoint_presets>` lists each
+    // preset, the protocols it serves and the variables it takes.
+    string preset = 1 [(validate.rules).string = {min_len: 1}];
+
+    // A layout spelled out field by field, as a template.
+    EndpointTemplate custom = 2;
+  }
+
+  // Values for the layout's variables, such as ``project`` and ``location``. A preset requires
+  // some and rejects names it does not take. A ``custom`` template's ``{name}`` placeholders take
+  // their values from here, and a variable no placeholder uses is rejected. Each value is
+  // non-empty, at most 256 bytes, is not ``.``, and holds no ``/``, ``?``, ``#``, ``%``, ``..``,
+  // whitespace, control or non-ASCII characters.
+  map<string, string> variables = 3;
+}
+
+// An endpoint layout spelled out field by field.
+// [#next-free-field: 13]
+message EndpointTemplate {
+  // Where the request carries the model name.
+  enum ModelPlacement {
+    // In the body's ``model`` field.
+    MODEL_IN_BODY = 0;
+
+    // In the path, at the ``{model}`` placeholder.
+    MODEL_IN_PATH = 1;
+  }
+
+  // Where the request carries whether the response streams.
+  enum StreamPlacement {
+    // In the body's ``stream`` field.
+    STREAM_IN_BODY = 0;
+
+    // In the path, as ``stream_method`` in place of ``unary_method`` at the ``{method}``
+    // placeholder.
+    STREAM_IN_METHOD = 1;
+
+    // In both the method and the body's ``stream`` field, which must agree.
+    STREAM_IN_BODY_AND_METHOD = 2;
+  }
+
+  // How the endpoint frames a streamed response.
+  enum ResponseFraming {
+    // Server-sent events.
+    SSE = 0;
+
+    // The AWS event stream binary framing.
+    AWS_EVENT_STREAM = 1;
+
+    // Newline-delimited JSON.
+    NDJSON = 2;
+
+    // One JSON array whose elements are the chunks.
+    JSON_ARRAY = 3;
+  }
+
+  // The request path, such as ``/model/{model}/{method}``. It starts with ``/`` and holds no
+  // ``?``, ``#``, whitespace, control or non-ASCII characters. ``{model}`` is the model name,
+  // allowed only with ``MODEL_IN_PATH``; ``{method}`` is ``unary_method`` or ``stream_method``,
+  // allowed only when the stream placement uses the method; any other ``{name}``, where the name
+  // matches ``[a-z][a-z0-9_]*``, is a :ref:`variable
+  // <envoy_v3_api_field_type.ai.v3.Endpoint.variables>`.
+  string path_template = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The ``{method}`` of a request whose response does not stream, such as ``generateContent``.
+  // Required when the stream placement uses the method. It follows the rules for a variable value.
+  string unary_method = 2;
+
+  // The ``{method}`` of a request whose response streams, such as ``streamGenerateContent``.
+  // Required when the stream placement uses the method. It follows the rules for a variable value.
+  string stream_method = 3;
+
+  // Query parameters added to every request. Names, and values after substitution, follow the
+  // rules for a variable value. A value may hold ``{name}`` variable placeholders, but not
+  // ``{model}`` or ``{method}``.
+  map<string, string> query_params = 4;
+
+  // Query parameters added to a request whose response streams, such as ``alt: sse``. Its names
+  // and values follow the same rules as ``query_params``, and a value may hold ``{name}`` variable
+  // placeholders.
+  map<string, string> stream_query_params = 5;
+
+  // Where the request carries the model name.
+  ModelPlacement model_placement = 6 [(validate.rules).enum = {defined_only: true}];
+
+  // Where the request carries whether the response streams.
+  StreamPlacement stream_placement = 7 [(validate.rules).enum = {defined_only: true}];
+
+  // How the endpoint frames a streamed response.
+  ResponseFraming response_framing = 8 [(validate.rules).enum = {defined_only: true}];
+
+  // Top-level fields set in the request body, replacing any the body holds, such as
+  // ``anthropic_version``.
+  google.protobuf.Struct set_body_fields = 9;
+
+  // Top-level fields removed from the request body, such as ``model`` when the path carries it.
+  repeated string remove_body_fields = 10
+      [(validate.rules).repeated = {items {string {min_len: 1}}}];
+
+  // Request headers set, replacing any the request holds. Names are lowercase; pseudo-headers,
+  // ``host`` and credential headers (``authorization``, ``proxy-authorization``, ``x-api-key``,
+  // ``api-key``, ``x-goog-api-key``, ``cookie``) are rejected. Values must be valid header values,
+  // with no CR, LF or NUL.
+  map<string, string> request_headers_to_add = 11;
+
+  // Request headers removed. Names are lowercase; pseudo-headers and ``host`` are rejected.
+  repeated string request_headers_to_remove = 12;
+}
