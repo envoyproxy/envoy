@@ -627,6 +627,7 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
+  void resetConnectionIdleTimer();
   Tracing::Tracer& tracer() { return *config_->tracer(); }
   void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
                             StreamInfo::CoreResponseFlag response_flag);
@@ -697,6 +698,7 @@ private:
   TimeSource& time_source_;
   bool go_away_sent_{false};
   bool remote_close_{};
+  bool connection_close_started_{};
   // Hop by hop headers should always be cleared for Envoy-as-a-proxy but will
   // not be for Envoy-mobile.
   bool clear_hop_by_hop_response_headers_{true};

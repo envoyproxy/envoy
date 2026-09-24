@@ -174,6 +174,9 @@ public:
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   std::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  std::optional<std::chrono::milliseconds> drainIdleTimeout() const override {
+    return drain_idle_timeout_;
+  }
   bool isRoutable() const override { return true; }
   std::optional<std::chrono::milliseconds> maxConnectionDuration() const override;
   bool http1SafeMaxConnectionDuration() const override {
@@ -339,6 +342,7 @@ private:
   const uint32_t max_request_headers_kb_;
   const uint32_t max_request_headers_count_;
   std::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> drain_idle_timeout_;
   std::optional<std::chrono::milliseconds> max_connection_duration_;
   std::optional<double> max_connection_duration_jitter_percentage_;
   const bool http1_safe_max_connection_duration_;

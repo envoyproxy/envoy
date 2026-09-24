@@ -659,6 +659,7 @@ public:
   MOCK_METHOD(uint32_t, maxRequestHeadersKb, (), (const));
   MOCK_METHOD(uint32_t, maxRequestHeadersCount, (), (const));
   MOCK_METHOD(std::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(std::optional<std::chrono::milliseconds>, drainIdleTimeout, (), (const));
   MOCK_METHOD(bool, isRoutable, (), (const));
   MOCK_METHOD(std::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
   MOCK_METHOD(bool, http1SafeMaxConnectionDuration, (), (const));

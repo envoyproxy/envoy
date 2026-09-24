@@ -49,6 +49,9 @@ public:
   std::optional<std::chrono::milliseconds> idleTimeout() const override {
     return parent_.idleTimeout();
   }
+  std::optional<std::chrono::milliseconds> drainIdleTimeout() const override {
+    return parent_.drainIdleTimeout();
+  }
   bool isRoutable() const override { return parent_.isRoutable(); }
   std::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return parent_.maxConnectionDuration();

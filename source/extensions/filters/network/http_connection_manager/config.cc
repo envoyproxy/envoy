@@ -392,6 +392,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           context.serverFactoryContext().runtime().snapshot().getInteger(
               Http::MaxRequestHeadersCountOverrideKey, Http::DEFAULT_MAX_HEADERS_COUNT))),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
+      drain_idle_timeout_(
+          PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), drain_idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
       max_connection_duration_jitter_percentage_(

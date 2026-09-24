@@ -415,6 +415,96 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_idle_timeout_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, DrainWithoutIdleTimeoutOverridePreservesIdleDeadline) {
+  delete codec_;
+  idle_timeout_ = std::chrono::milliseconds(10);
+  Event::MockTimer* idle_timer = setUpTimer();
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
+  setup();
+
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+}
+
+TEST_F(HttpConnectionManagerImplTest, ConnectionCloseDoesNotRecreateIdleTimer) {
+  idle_timeout_ = std::chrono::milliseconds(10);
+  Event::MockTimer* idle_timer = setUpTimer();
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
+  EXPECT_CALL(*idle_timer, disableTimer()).Times(2);
+  setup();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    conn_manager_->newStream(response_encoder_);
+    return codecProtocolError("protocol error");
+  }));
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_)).Times(2);
+  EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createScaledTypedTimer_(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, ZeroDrainIdleTimeoutDisablesExistingTimer) {
+  delete codec_;
+  idle_timeout_ = std::chrono::milliseconds(10);
+  drain_idle_timeout_ = std::chrono::milliseconds(0);
+  Event::MockTimer* idle_timer = setUpTimer();
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
+  setup();
+
+  EXPECT_CALL(*idle_timer, disableTimer());
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+}
+
+TEST_F(HttpConnectionManagerImplTest, DrainIdleTimeoutOverridesExistingTimer) {
+  delete codec_;
+  idle_timeout_ = std::chrono::milliseconds(10);
+  drain_idle_timeout_ = std::chrono::milliseconds(20);
+  Event::MockTimer* idle_timer = setUpTimer();
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
+  setup();
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(20), _));
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+}
+
+TEST_F(HttpConnectionManagerImplTest, DrainIdleTimeoutStartsAfterActiveStreamCompletes) {
+  drain_idle_timeout_ = std::chrono::milliseconds(20);
+  setup();
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+  EXPECT_CALL(*filter, decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter, decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  startRequest(true, "hello");
+
+  filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+      test_time_.timeSystem().monotonicTime(), Server::DrainStrategy::Gradual});
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+  Event::MockTimer* idle_timer = setUpTimer();
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(20), _));
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
 TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   idle_timeout_ = (std::chrono::milliseconds(10));
   Event::MockTimer* idle_timer = setUpTimer();

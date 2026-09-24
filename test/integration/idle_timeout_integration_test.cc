@@ -31,6 +31,15 @@ public:
             hcm.mutable_stream_idle_timeout()->set_seconds(0);
             hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
           }
+          if (enable_drain_idle_timeout_) {
+            auto* protocol_options = hcm.mutable_common_http_protocol_options();
+            protocol_options->mutable_idle_timeout()->CopyFrom(
+                ProtobufUtil::TimeUtil::SecondsToDuration(30));
+            protocol_options->mutable_drain_idle_timeout()->CopyFrom(
+                ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainIdleTimeoutMs));
+            hcm.mutable_drain_timeout()->CopyFrom(
+                ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainTimeoutMs));
+          }
           if (enable_per_stream_idle_timeout_) {
             auto* route_config = hcm.mutable_route_config();
             auto* virtual_host = route_config->mutable_virtual_hosts(0);
@@ -127,7 +136,10 @@ public:
 
   static constexpr uint64_t IdleTimeoutMs = 300 * TIMEOUT_FACTOR;
   static constexpr uint64_t RequestTimeoutMs = 200 * TIMEOUT_FACTOR;
+  static constexpr uint64_t DrainIdleTimeoutMs = 100 * TIMEOUT_FACTOR;
+  static constexpr uint64_t DrainTimeoutMs = 50 * TIMEOUT_FACTOR;
   bool enable_global_idle_timeout_{false};
+  bool enable_drain_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
   bool enable_route_timeout_{false};
@@ -138,6 +150,26 @@ public:
 INSTANTIATE_TEST_SUITE_P(Protocols, IdleTimeoutIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(IdleTimeoutIntegrationTest, DrainIdleTimeout) {
+  enable_drain_idle_timeout_ = true;
+  autonomous_upstream_ = true;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_TRUE(codec_client_->connected());
+
+  startServerDrain();
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  test_server_->waitForCounter("http.config_test.downstream_cx_idle_timeout", Ge(1));
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  }
+}
 
 // Tests idle timeout behaviour with single request and validates that idle timer kicks in
 // after given timeout.
