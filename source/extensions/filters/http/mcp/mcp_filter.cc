@@ -834,7 +834,7 @@ McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() 
 
   const auto& fields = meta->struct_value().fields();
   const auto it =
-      fields.find(std::string(Filters::Common::Mcp::McpConstants::PROTOCOL_VERSION_META_KEY));
+      fields.find(std::string(Filters::Common::Mcp::McpConstants::MCP_META_PROTOCOL_VERSION_FIELD));
 
   if (it == fields.end()) {
     return ProtocolVersionValidationResult::Missing;
