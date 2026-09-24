@@ -29,8 +29,8 @@ void DynamicModuleStatsSink::onHistogramComplete(const Stats::Histogram& histogr
   const auto stat_name = histogram.statName();
   // Serialize into the reused buffer and retry only when it must grow, so the common case walks the
   // symbol table once instead of once to size and once to fill.
-  size_t required_size = symbol_table.serializeToBuffer(stat_name, histogram_name_buffer.data(),
-                                                        histogram_name_buffer.size());
+  const size_t required_size = symbol_table.serializeToBuffer(
+      stat_name, histogram_name_buffer.data(), histogram_name_buffer.size());
   if (required_size > histogram_name_buffer.size()) {
     histogram_name_buffer.resize(required_size);
     symbol_table.serializeToBuffer(stat_name, histogram_name_buffer.data(),

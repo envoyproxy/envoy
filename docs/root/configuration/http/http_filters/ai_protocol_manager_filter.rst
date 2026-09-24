@@ -203,6 +203,30 @@ client-declared and optional. A value Envoy cannot use (wrong type, out of
 range, or a string over 256 bytes) is ignored and counted by
 ``request_info.partial``.
 
+Token estimation
+^^^^^^^^^^^^^^^^
+
+Configuring :ref:`token_estimation
+<envoy_v3_api_field_extensions.http.ai_filters.request_info.v3.RequestInfo.token_estimation>`
+adds ``estimated_input_tokens`` to the record, for consumers that must budget
+before the provider reports what it charged: a rate limit on tokens per minute,
+or a load balancer weighing queued work. It is ``ceil(tokens_per_byte *
+request payload bytes)`` over the body Envoy buffered, so it reads no JSON and
+is published whatever the route declares:
+
+.. code-block:: yaml
+
+  - name: envoy.http.ai_filters.request_info
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+      token_estimation:
+        tokens_per_byte: 0.5
+
+The ratio is a property of the payloads a deployment sees, and a size heuristic
+is not a tokenizer: an estimate does not replace the :ref:`token usage
+<envoy_v3_api_msg_data.ai.v3.TokenUsage>` the response reports. Rounding up
+keeps a sub-token payload from estimating zero.
+
 The record is written before the held request headers are released, so later
 decode filters see it from their first request-headers callback. An
 :ref:`ext_proc <config_http_filters_ext_proc>` filter listed after this one
