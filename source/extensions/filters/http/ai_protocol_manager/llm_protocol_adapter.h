@@ -23,11 +23,11 @@ class PayloadSchema;
 //
 // Adapters are stateless singletons owned by AdapterRegistry; all per-stream
 // state lives in the caller (TokenUsage accumulation, detection lock).
-class ApiProtocolAdapter {
+class LLMProtocolAdapter {
 public:
-  virtual ~ApiProtocolAdapter() = default;
+  virtual ~LLMProtocolAdapter() = default;
 
-  virtual ApiProtocol protocol() const PURE;
+  virtual LLMProtocol protocol() const PURE;
 
   // The declarative payload contract for this dialect, or nullptr when none
   // is defined yet. Drives request validation (and, later, offload planning
@@ -43,7 +43,7 @@ public:
   // protocol, and the dialect fills in its counts via extractUsageInto().
   ExtractionResult extractUsage(const nlohmann::json& json) const {
     ExtractionResult result;
-    result.usage.api_protocol = protocol();
+    result.usage.llm_protocol = protocol();
     extractUsageInto(json, result);
     return result;
   }
@@ -69,19 +69,19 @@ protected:
   virtual void extractUsageInto(const nlohmann::json& json, ExtractionResult& result) const PURE;
 };
 
-// The registry mapping each ApiProtocol to its adapter, plus shape detection.
+// The registry mapping each LLMProtocol to its adapter, plus shape detection.
 // get() is total: undefined and Unspecified protocols resolve to a no-op
 // adapter (no schema, no usage, no terminal events), so callers need no null
 // checks.
 class AdapterRegistry {
 public:
-  static const ApiProtocolAdapter& get(ApiProtocol protocol);
+  static const LLMProtocolAdapter& get(LLMProtocol protocol);
 
   // Detect the API dialect from a response document's shape. Detection is
   // stream-global once locked, so only strongly shaped, value-validated
   // markers decide; anything else stays Unspecified for a later document.
   // Marker checks are ordered from most to least structurally distinctive.
-  static ApiProtocol detect(const nlohmann::json& json);
+  static LLMProtocol detect(const nlohmann::json& json);
 };
 
 // Canonicalizes a finalized accumulation with its own protocol's adapter --

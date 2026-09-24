@@ -8,6 +8,7 @@
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 #include "test/integration/http_integration.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/synchronization/notification.h"
 #include "nlohmann/json.hpp"
 
@@ -26,7 +27,8 @@ public:
     test_processor_.shutdown();
   }
 
-  void initializeWithExtProc() {
+  // `request_info_fields` is appended to the request info filter's typed config.
+  void initializeWithExtProc(absl::string_view request_info_fields = "") {
     // Observability mode: the processor records the request-headers message, never responds.
     test_processor_.start(
         GetParam(),
@@ -65,7 +67,7 @@ public:
     config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
       envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
           per_route;
-      per_route.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+      per_route.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
       auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
       std::ignore =
           (*route->mutable_typed_per_filter_config())["envoy.filters.http.ai_protocol_manager"]
@@ -87,7 +89,7 @@ public:
     std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(ext_proc);
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
 
-    config_helper_.prependFilter(R"EOF(
+    config_helper_.prependFilter(absl::StrCat(R"EOF(
 name: envoy.filters.http.ai_protocol_manager
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
@@ -96,7 +98,8 @@ typed_config:
   - name: envoy.http.ai_filters.request_info
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
-)EOF");
+)EOF",
+                                              request_info_fields));
 
     initialize();
   }
@@ -146,7 +149,7 @@ TEST_P(RequestInfoIntegrationTest, PublishesRecordBeforeReleasingHeaders) {
 
   ASSERT_TRUE(headers_seen_.WaitForNotificationWithTimeout(absl::Seconds(5)));
   ASSERT_TRUE(record_present_);
-  EXPECT_EQ(captured_.input_api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(captured_.input_llm_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   EXPECT_EQ(captured_.model(), "gpt-4o");
   ASSERT_TRUE(captured_.has_stream());
   EXPECT_FALSE(captured_.stream().value());
@@ -155,6 +158,29 @@ TEST_P(RequestInfoIntegrationTest, PublishesRecordBeforeReleasingHeaders) {
   EXPECT_EQ(captured_.tool_count().value(), 1);
   EXPECT_EQ(counterValue("ai_protocol_manager.request_info.published"), 1);
   EXPECT_EQ(counterValue("ai_protocol_manager.request_info.partial"), 0);
+}
+
+TEST_P(RequestInfoIntegrationTest, PublishesEstimatedInputTokens) {
+  initializeWithExtProc("      token_estimation:\n        tokens_per_byte: 0.5\n");
+
+  const std::string payload = R"({"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]})";
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/v1/chat/completions"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-type", "application/json"}},
+      payload);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  ASSERT_TRUE(headers_seen_.WaitForNotificationWithTimeout(absl::Seconds(5)));
+  ASSERT_TRUE(record_present_);
+  EXPECT_EQ(captured_.estimated_input_tokens().value(), (payload.size() + 1) / 2);
 }
 
 } // namespace

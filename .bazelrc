@@ -28,7 +28,7 @@ run --color=yes
 build --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/46a6e8eb4441355e25faad6a226681b241dcdc5c
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/86a8df39ed58dd94239aa7a3f9098c63e0d5502d
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -95,6 +95,9 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 # Coverage options
 coverage --config=coverage
 coverage --build_tests_only
+
+# Envoy deprecation
+common --@envoy//bazel:deprecated_repo_arg_allowed=false
 
 
 #############################################################################
