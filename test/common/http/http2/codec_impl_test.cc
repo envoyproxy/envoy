@@ -238,6 +238,8 @@ public:
     }
   }
 
+  bool isLegacyNghttp2() const { return http2_implementation_ == Http2Impl::Nghttp2; }
+
   static Status onConnBeginHeaders(ConnectionImpl* conn, int stream_id) {
     return conn->onBeginHeaders(stream_id);
   }
@@ -915,11 +917,22 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
   EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
   driveToCompletion();
 
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
+  // nghttp2 1.68.1 now terminates the connection from
+  // session_after_header_block_received() (lib/nghttp2_session.c:3701-3748) instead of honoring
+  // override_stream_error_on_invalid_http_message for this invalid 100-with-END_STREAM response.
+  EXPECT_CALL(request_callbacks,
+              onResetStream(isLegacyNghttp2() ? StreamResetReason::ConnectionTermination
+                                              : StreamResetReason::ProtocolError,
+                            _));
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   response_encoder_->encodeHeaders(continue_headers, true);
   driveToCompletion();
-  EXPECT_OK(client_wrapper_->status_);
+  if (isLegacyNghttp2()) {
+    EXPECT_THAT(client_wrapper_->status_, Not(IsOk()));
+    EXPECT_TRUE(isCodecProtocolError(client_wrapper_->status_));
+  } else {
+    EXPECT_OK(client_wrapper_->status_);
+  }
 
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
   expectDetailsRequest("http2.violation.of.messaging.rule");
@@ -990,10 +1003,21 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
   response_encoder_->encode1xxHeaders(continue_headers);
   driveToCompletion();
 
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
+  // nghttp2 1.68.1 now terminates the connection from
+  // session_after_header_block_received() (lib/nghttp2_session.c:3701-3748) instead of honoring
+  // override_stream_error_on_invalid_http_message for this repeated 100 response.
+  EXPECT_CALL(request_callbacks,
+              onResetStream(isLegacyNghttp2() ? StreamResetReason::ConnectionTermination
+                                              : StreamResetReason::ProtocolError,
+                            _));
   response_encoder_->encodeHeaders(continue_headers, true);
   driveToCompletion();
-  EXPECT_OK(client_wrapper_->status_);
+  if (isLegacyNghttp2()) {
+    EXPECT_THAT(client_wrapper_->status_, Not(IsOk()));
+    EXPECT_TRUE(isCodecProtocolError(client_wrapper_->status_));
+  } else {
+    EXPECT_OK(client_wrapper_->status_);
+  }
 
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
   expectDetailsRequest("http2.violation.of.messaging.rule");
@@ -1063,11 +1087,24 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
     response_headers.addCopy(std::to_string(i), std::to_string(i));
   }
 
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ProtocolError, _));
+  // nghttp2_http_on_header() rejects non-zero content-length on 204 responses
+  // (lib/nghttp2_http.c:258-268). nghttp2 >= 1.67 still closes the connection after that
+  // error_callback2 path, so override_stream_error_on_invalid_http_message cannot keep it open.
+  EXPECT_CALL(request_callbacks,
+              onResetStream(isLegacyNghttp2() ? StreamResetReason::ConnectionTermination
+                                              : StreamResetReason::ProtocolError,
+                            _));
+  if (!isLegacyNghttp2()) {
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ProtocolError, _));
+  }
   response_encoder_->encodeHeaders(response_headers, false);
   driveToCompletion();
-  EXPECT_OK(client_wrapper_->status_);
+  if (isLegacyNghttp2()) {
+    EXPECT_THAT(client_wrapper_->status_, Not(IsOk()));
+    EXPECT_TRUE(isCodecProtocolError(client_wrapper_->status_));
+  } else {
+    EXPECT_OK(client_wrapper_->status_);
+  }
 
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
   expectDetailsRequest("http2.invalid.header.field");

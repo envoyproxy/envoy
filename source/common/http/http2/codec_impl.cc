@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <ostream>
 #include <vector>
@@ -1091,6 +1092,8 @@ bool ConnectionImpl::slowContainsStreamId(int32_t stream_id) const {
 Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
+  on_invalid_frame_called_during_dispatch_ = false;
+  last_inbound_stream_id_.reset();
   // Make sure that dispatching_ is set to false after dispatching, even when
   // ConnectionImpl::dispatch returns early or throws an exception (consider removing if there is a
   // single return after exception removal (#10878)).
@@ -1098,6 +1101,8 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
     dispatching_ = false;
     current_slice_ = nullptr;
     current_stream_id_.reset();
+    last_inbound_stream_id_.reset();
+    on_invalid_frame_called_during_dispatch_ = false;
   });
   last_received_data_time_ = connection_.dispatcher().timeSource().monotonicTime();
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
@@ -1204,6 +1209,7 @@ Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, u
   ASSERT(connection_.state() == Network::Connection::State::Open);
 
   current_stream_id_ = stream_id;
+  last_inbound_stream_id_ = stream_id;
   if (type == OGHTTP2_PING_FRAME_TYPE && (flags & FLAG_ACK)) {
     return okStatus();
   }
@@ -1378,6 +1384,38 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   case OGHTTP2_GOAWAY_FRAME_TYPE: {
     ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, error_code);
     if (error_code != OGHTTP2_NO_ERROR) {
+#ifdef ENVOY_NGHTTP2
+      if (!use_oghttp2_library_ && !on_invalid_frame_called_during_dispatch_) {
+        std::optional<int> recovered_error_code;
+        switch (error_code) {
+        case OGHTTP2_PROTOCOL_ERROR:
+          recovered_error_code = ERR_HTTP_MESSAGING;
+          break;
+        case OGHTTP2_FLOW_CONTROL_ERROR:
+          recovered_error_code = ERR_FLOW_CONTROL;
+          break;
+        default:
+          break;
+        }
+
+        if (recovered_error_code.has_value()) {
+          // nghttp2 1.68.1 promotes several HTTP messaging and flow-control violations to direct
+          // connection termination without calling on_invalid_frame_recv_callback or
+          // error_callback2: lib/nghttp2_session.c:3701-3748
+          // (session_after_header_block_received), 4945-4949
+          // (nghttp2_session_on_data_received -> nghttp2_http_on_remote_end_stream),
+          // 6774-6783 (nghttp2_session_mem_recv2 -> nghttp2_http_on_data_chunk), 4371-4388 /
+          // 4681-4684 (SETTINGS/WINDOW_UPDATE overflow), and 2695-2699 together with
+          // 4073-4135 (automatic stream window updates). For these nghttp2-only paths the queued
+          // GOAWAY is the only signal Envoy receives. At this point nghttp2 has already committed
+          // to GOAWAY (iframe.state = IGN_ALL), so override_stream_error_on_invalid_http_message
+          // can no longer convert the violation back into a stream error.
+          handleInvalidFrame(last_inbound_stream_id_.value_or(stream_id),
+                             recovered_error_code.value(),
+                             /*allow_stream_error_override=*/false);
+        }
+      }
+#endif
       // TODO(mattklein123): Returning this error code abandons standard nghttp2 frame accounting.
       // As such, it is not reliable to call sendPendingFrames() again after this and we assume
       // that the connection is going to get torn down immediately. One byproduct of this is that
@@ -1431,7 +1469,15 @@ int ConnectionImpl::onError(absl::string_view error) {
 int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, codecStrError(error_code),
                  stream_id);
+  on_invalid_frame_called_during_dispatch_ = true;
 
+  return handleInvalidFrame(stream_id, error_code, /*allow_stream_error_override=*/true)
+             ? ERR_CALLBACK_FAILURE
+             : 0;
+}
+
+bool ConnectionImpl::handleInvalidFrame(int32_t stream_id, int error_code,
+                                        bool allow_stream_error_override) {
   // Set details of error_code in the stream whenever we have one.
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (stream != nullptr) {
@@ -1442,19 +1488,19 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   case ERR_REFUSED_STREAM:
 
     stats_.stream_refused_errors_.inc();
-    return 0;
+    return false;
 
   case ERR_HTTP_HEADER:
   case ERR_HTTP_MESSAGING:
     stats_.rx_messaging_error_.inc();
-    if (stream_error_on_invalid_http_messaging_) {
+    if (allow_stream_error_override && stream_error_on_invalid_http_messaging_) {
       // The stream is about to be closed due to an invalid header or messaging. Don't kill the
       // entire connection if one stream has bad headers or messaging.
       if (stream != nullptr) {
         // See comment below in onStreamClose() for why we do this.
         stream->reset_due_to_messaging_error_ = true;
       }
-      return 0;
+      return false;
     }
     break;
 
@@ -1470,8 +1516,7 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
     break;
   }
 
-  // Cause dispatch to return with an error code.
-  return ERR_CALLBACK_FAILURE;
+  return true;
 }
 
 int ConnectionImpl::onBeforeFrameSend(int32_t /*stream_id*/, size_t /*length*/, uint8_t type,
@@ -2230,6 +2275,11 @@ ConnectionImpl::Http2Options::Http2Options(
   // on this mitigation, set back to the old 10K number to avoid any changes in the HTTP/2 codec
   // behavior.
   nghttp2_option_set_max_outbound_ack(options_, 10000);
+  // nghttp2 v1.67 added a "glitch" rate limiter that sends GOAWAY(ENHANCE_YOUR_CALM) when it
+  // observes bursts of suspicious-but-legal frames. Envoy already has its own HTTP/2 flood
+  // protection, and we want that logic (and its associated test coverage) to remain authoritative.
+  nghttp2_option_set_glitch_rate_limit(options_, std::numeric_limits<uint64_t>::max(),
+                                       std::numeric_limits<uint64_t>::max());
 
   // nghttp2 REQUIRES setting max number of CONTINUATION frames.
   // 512 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
