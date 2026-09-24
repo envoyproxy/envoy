@@ -140,10 +140,11 @@ Envoy::Formatter::CommandParserPtr GenericSecretFormatterFactory::createCommandP
       }
     }
 
-    auto tls_provider = THROW_OR_RETURN_VALUE(
-        Secret::ThreadLocalGenericSecretProvider::create(
-            std::move(provider), server_context.threadLocal(), server_context.api()),
-        std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>);
+    auto tls_provider =
+        THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                  std::move(provider), server_context.threadLocal(),
+                                  server_context.api(), server_context.mainThreadDispatcher()),
+                              Secret::ThreadLocalGenericSecretProviderPtr);
 
     providers.emplace(
         name, std::shared_ptr<Secret::ThreadLocalGenericSecretProvider>(std::move(tls_provider)));
