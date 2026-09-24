@@ -292,9 +292,15 @@ TEST_P(McpFilterIntegrationTest, InvalidJsonBodyPassedThrough) {
 
 // Test that a body that is not JSON at all is rejected as soon as it fails to parse. Unlike the
 // incomplete body above, which is only rejected once the stream ends, this increments the
-// 'invalid_json' counter.
+// 'invalid_json' counter. The rejection itself requires REJECT_NO_MCP mode; in PASS_THROUGH mode
+// the counter is incremented but the request continues upstream.
 TEST_P(McpFilterIntegrationTest, ImmediateInvalidJsonRejected) {
-  initializeFilter();
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+      traffic_mode: REJECT_NO_MCP
+  )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
