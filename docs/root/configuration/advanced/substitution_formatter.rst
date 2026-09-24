@@ -979,8 +979,19 @@ Current supported substitution commands include:
   HTTP
     An HTTP request header where ``X`` is the main HTTP header, ``Y`` is the alternative one, and ``Z`` is an
     optional parameter denoting string truncation up to ``Z`` characters long. The value is taken from
+    the HTTP request header named ``X`` first and if it's not set, then request header ``Y`` is used. Only the
+    first occurrence of the header is logged. If none of the headers are present ``"-"`` symbol will be in the log.
+
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%REQUEST_HEADER_MULTI(X?Y):Z%`` / ``%REQ_MULTI(X?Y):Z%``
+  HTTP
+    An HTTP request header where ``X`` is the main HTTP header, ``Y`` is the alternative one, and ``Z`` is an
+    optional parameter denoting string truncation up to ``Z`` characters long. The value is taken from
     the HTTP request header named ``X`` first and if it's not set, then request header ``Y`` is used. If
-    none of the headers are present ``"-"`` symbol will be in the log.
+    none of the headers are present ``"-"`` symbol will be in the log. Unlike ``REQUEST_HEADER`` and ``REQ``,
+    this command will log all occurrences of the resolved header delimited by the header name.
 
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
@@ -992,9 +1003,23 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%RESPONSE_HEADER_MULTI(X?Y):Z%`` / ``%RESP_MULTI(X?Y):Z%``
+  HTTP
+    Same as ``%REQUEST_HEADER_MULTI(X?Y):Z%`` but taken from HTTP response headers.
+
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%RESPONSE_TRAILER(X?Y):Z%`` / ``%TRAILER(X?Y):Z%``
   HTTP
     Same as ``%REQUEST_HEADER(X?Y):Z%`` but taken from HTTP response trailers.
+
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%RESPONSE_TRAILER_MULTI(X?Y):Z%`` / ``%TRAILER_MULTI(X?Y):Z%``
+  HTTP
+    Same as ``%REQUEST_HEADER_MULTI(X?Y):Z%`` but taken from HTTP response trailers.
 
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
