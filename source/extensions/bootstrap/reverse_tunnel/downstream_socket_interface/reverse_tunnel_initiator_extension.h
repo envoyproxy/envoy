@@ -6,11 +6,13 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/admin.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -20,6 +22,7 @@
 #include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,6 +31,18 @@ namespace ReverseConnection {
 
 // Forward declarations
 class DownstreamSocketThreadLocal;
+class ReverseConnectionIOHandle;
+
+struct AttachedTunnelsRequest {
+  AttachedTunnelsRequest(Server::AdminStream* stream, uint32_t concurrency)
+      : admin_stream(stream), active_tunnels(concurrency) {}
+
+  void resultsReady();
+
+  Server::AdminStream* admin_stream;
+  absl::InlinedVector<absl::flat_hash_map<std::string, size_t>, 3> active_tunnels;
+};
+using AttachedTunnelsRequestSharedPtr = std::shared_ptr<AttachedTunnelsRequest>;
 
 struct HandshakeHeader {
   Http::LowerCaseString key;
@@ -195,6 +210,13 @@ public:
     tls_slot_ = std::move(slot);
   }
 
+  void activeTunnels(
+      const std::function<void()>& callback,
+      absl::InlinedVector<absl::flat_hash_map<std::string, size_t>, 3>& active_tunnels) const;
+
+  Http::Code tunnelsHandler(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                            Server::AdminStream& admin_stream);
+
 private:
   Server::Configuration::ServerFactoryContext& context_;
   // Captured in onServerInitialized() to reach hotRestart(); not owned. Null until then.
@@ -244,9 +266,23 @@ public:
    */
   Stats::Scope& scope() { return scope_; }
 
+  void activeTunnels(absl::flat_hash_map<std::string, size_t>& active_tunnels) const;
+
+  void registerIoHandle(const ReverseConnectionIOHandle* io_handle) {
+    io_handles_.insert(io_handle);
+  }
+
+  void unregisterIoHandle(const ReverseConnectionIOHandle* io_handle) {
+    io_handles_.erase(io_handle);
+  }
+
+  std::optional<size_t> index() const;
+
 private:
   Event::Dispatcher& dispatcher_;
   Stats::Scope& scope_;
+  absl::flat_hash_set<const ReverseConnectionIOHandle*> io_handles_;
+  static constexpr absl::string_view dispatcher_prefix_{"worker_"};
 };
 
 } // namespace ReverseConnection
