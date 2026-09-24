@@ -28,7 +28,7 @@ run --color=yes
 build --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/0356d0d4d2c15e42a09c3632c1b4bff29ee26834
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/3d87dc99c966eefbb571078245e4a623a78ad130
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -117,8 +117,10 @@ build --@grpc//third_party:ssl_lib=@envoy//bazel:ssl
 build --@grpc//third_party:crypto_lib=@envoy//bazel:crypto
 
 # kafka
+build --@librdkafka//:with_curl=false
 build --@librdkafka//:with_ssl=false
 build --@librdkafka//:with_zlib=false
+build --@librdkafka//:with_zstd=false
 build --per_file_copt=contrib/kafka/.*\.cc@-Wno-old-style-cast
 
 # protobuf
