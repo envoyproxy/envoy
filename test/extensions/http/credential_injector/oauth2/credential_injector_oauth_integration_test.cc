@@ -181,21 +181,10 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Regression test: a client_secret containing '+', '/' and '=' (a realistic base64-encoded
-// IdP-issued secret, e.g. Keycloak) must be fully percent-encoded on the wire.
-//
-// This asserts on the raw bytes of request_body_ directly, NOT via the HasClientSecret matcher
-// used elsewhere in this file: that matcher decodes via QueryParamsMulti::parseParameters ->
-// PercentEncoding::decode(), which only handles %XX sequences and does NOT implement the
-// x-www-form-urlencoded '+' -> space substitution -- so it cannot
-// distinguish a raw, unescaped '+' from a correctly-encoded one and would pass either way. The
-// real token endpoint on the other end of this request *does* implement that substitution (this
-// was independently confirmed against a live Keycloak instance), so the wire bytes are what
-// actually matters here, not what this test suite's own simplified decoder reports.
-//
-// '/' and '=' are included alongside '+' as a control: PercentEncoding::encode(value, ":/=&?")
-// (the pre-fix code) already encodes those two correctly, so their presence in the assertion
-// confirms this test isn't trivially passing on unrelated grounds.
+// A client_secret containing '+', '/' and '=' must be fully percent-encoded on the wire.
+// The assertion is on the raw request body rather than the HasClientSecret matcher, because the
+// matcher decodes with PercentEncoding::decode(), which does not map '+' to a space and so
+// cannot distinguish an unencoded '+' from an encoded one.
 TEST_P(CredentialInjectorIntegrationTest, InjectCredentialSecretWithSpecialCharacters) {
   const std::string filter_config =
       R"EOF(
