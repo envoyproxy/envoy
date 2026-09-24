@@ -53,7 +53,7 @@ absl::Duration SessionIdleList::MinTimeBeforeTerminationAllowed(bool is_saturate
             "envoy.reloadable_features.session_idle_list_min_timeout_when_saturated")) {
       // Leave some time for session to complete handshake and possibly serve some
       // requests. Handshake rejection should be the responsibility of the health
-      // check handler and not the load shedder.
+      // check handler and not the idle session list.
       return absl::Seconds(10);
     }
     return absl::ZeroDuration();
