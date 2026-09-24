@@ -822,5 +822,6 @@ envoy_cc_test(
         "//source/common/http:session_idle_list_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
