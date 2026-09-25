@@ -1319,6 +1319,268 @@ TEST(TranscodingEngineTest, TranscodeRejectsStreamEventAndUnregisteredLegs) {
 }
 
 // ---------------------------------------------------------------------------
+// Unary response legs of the default packs.
+
+constexpr TranscodeLeg kGeminiResponseToIr{PayloadKind::Response, TranscodeDirection::ToIr,
+                                           LLMProtocol::GeminiGenerateContent};
+constexpr TranscodeLeg kIrResponseToGemini{PayloadKind::Response, TranscodeDirection::FromIr,
+                                           LLMProtocol::GeminiGenerateContent};
+constexpr TranscodeLeg kAnthropicResponseToIr{PayloadKind::Response, TranscodeDirection::ToIr,
+                                              LLMProtocol::AnthropicMessages};
+constexpr TranscodeLeg kIrResponseToAnthropic{PayloadKind::Response, TranscodeDirection::FromIr,
+                                              LLMProtocol::AnthropicMessages};
+
+// Each candidate becomes a choice with its answer text joined: thought summaries are the model's
+// reasoning, not its answer. Gemini's exclusive counts become the IR's inclusive ones.
+TEST(TranscodingEngineTest, TranscodesGeminiResponseToIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json doc = nlohmann::json::parse(R"({
+    "candidates": [
+      {"content": {"role": "model", "parts": [
+         {"text": "Let me think.", "thought": true}, {"text": "Hello, "}, {"text": "world"}]},
+       "finishReason": "STOP", "safetyRatings": [], "avgLogprobs": -0.5},
+      {"index": 5, "content": {"role": "model", "parts": [{"text": "Hi"}]},
+       "finishReason": "RECITATION"},
+      {"finishReason": "MALFORMED_FUNCTION_CALL"}
+    ],
+    "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5, "thoughtsTokenCount": 3,
+                      "toolUsePromptTokenCount": 2, "cachedContentTokenCount": 4,
+                      "totalTokenCount": 20, "trafficType": "ON_DEMAND"},
+    "modelVersion": "gemini-2.5-flash",
+    "createTime": "2026-09-25T03:00:00.000000Z",
+    "responseId": "resp-1"
+  })");
+  TranscodeContext ctx;
+  ctx.request_model = "gemini-2.5-pro";
+  ctx.now_unix_seconds = 1700000000;
+  ASSERT_THAT(engine.transcode(kGeminiResponseToIr, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({
+    "id": "resp-1",
+    "object": "chat.completion",
+    "created": 1700000000,
+    "model": "gemini-2.5-flash",
+    "choices": [
+      {"index": 0, "message": {"role": "assistant", "content": "Hello, world"},
+       "finish_reason": "stop"},
+      {"index": 5, "message": {"role": "assistant", "content": "Hi"},
+       "finish_reason": "content_filter"},
+      {"index": 2, "message": {"role": "assistant", "content": ""}, "finish_reason": "stop"}
+    ],
+    "usage": {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20,
+              "prompt_tokens_details": {"cached_tokens": 4},
+              "completion_tokens_details": {"reasoning_tokens": 3}}
+  })"));
+}
+
+// The message becomes the IR's only choice with its text blocks joined, and Anthropic's input
+// count, which excludes both cache buckets, becomes the IR's inclusive prompt count.
+TEST(TranscodingEngineTest, TranscodesAnthropicResponseToIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json doc = nlohmann::json::parse(R"({
+    "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-sonnet-4-5",
+    "content": [{"type": "text", "text": "Part 1. "},
+                {"type": "tool_use", "id": "toolu_1", "name": "f", "input": {}},
+                {"type": "text", "text": "Part 2."}],
+    "stop_reason": "max_tokens", "stop_sequence": null,
+    "usage": {"input_tokens": 70, "output_tokens": 20, "cache_read_input_tokens": 30,
+              "cache_creation_input_tokens": 10}
+  })");
+  TranscodeContext ctx;
+  ctx.request_model = "claude-opus-4-1";
+  ctx.now_unix_seconds = 1700000000;
+  ASSERT_THAT(engine.transcode(kAnthropicResponseToIr, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({
+    "id": "msg_1",
+    "object": "chat.completion",
+    "created": 1700000000,
+    "model": "claude-sonnet-4-5",
+    "choices": [{"index": 0, "message": {"role": "assistant", "content": "Part 1. Part 2."},
+                 "finish_reason": "length"}],
+    "usage": {"prompt_tokens": 110, "completion_tokens": 20, "total_tokens": 130,
+              "prompt_tokens_details": {"cached_tokens": 30, "cache_write_tokens": 10}}
+  })"));
+}
+
+// A message carries one answer, so only the first choice survives; the input count excludes the
+// cache buckets again.
+TEST(TranscodingEngineTest, TranscodesIrResponseToAnthropic) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json doc = nlohmann::json::parse(R"({
+    "id": "chatcmpl-1", "object": "chat.completion", "created": 1699999999, "model": "gpt-4o",
+    "system_fingerprint": "fp_1",
+    "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hi", "refusal": null},
+                 "logprobs": null, "finish_reason": "length"},
+                {"index": 1, "message": {"role": "assistant", "content": "ignored"},
+                 "finish_reason": "stop"}],
+    "usage": {"prompt_tokens": 100, "completion_tokens": 7, "total_tokens": 107,
+              "prompt_tokens_details": {"cached_tokens": 60}}
+  })");
+  TranscodeContext ctx;
+  ASSERT_THAT(engine.transcode(kIrResponseToAnthropic, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({
+    "id": "chatcmpl-1", "type": "message", "role": "assistant", "model": "gpt-4o",
+    "content": [{"type": "text", "text": "Hi"}],
+    "stop_reason": "max_tokens",
+    "usage": {"input_tokens": 40, "output_tokens": 7, "cache_read_input_tokens": 60}
+  })"));
+
+  // What the IR leaves out is defaulted: the model from the request, an unknown finish reason
+  // as an ordinary end of turn.
+  nlohmann::json bare = nlohmann::json::parse(R"({
+    "choices": [{"message": {"role": "assistant", "content": null}, "finish_reason": "weird"}]
+  })");
+  TranscodeContext with_model;
+  with_model.request_model = "claude-sonnet-4-5";
+  ASSERT_THAT(engine.transcode(kIrResponseToAnthropic, with_model, bare), IsOk());
+  EXPECT_EQ(bare, nlohmann::json::parse(R"({
+    "id": "msg_transcoded", "type": "message", "role": "assistant", "model": "claude-sonnet-4-5",
+    "content": [{"type": "text", "text": ""}], "stop_reason": "end_turn"
+  })"));
+}
+
+// Each choice becomes a candidate with one text part; the completion count excludes reasoning
+// again.
+TEST(TranscodingEngineTest, TranscodesIrResponseToGemini) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json doc = nlohmann::json::parse(R"({
+    "id": "chatcmpl-2", "object": "chat.completion", "created": 1699999999,
+    "model": "gemini-2.5-flash",
+    "choices": [
+      {"index": 0, "message": {"role": "assistant", "content": "A"}, "finish_reason": "length"},
+      {"message": {"role": "assistant", "content": null}, "finish_reason": "tool_calls"}
+    ],
+    "usage": {"prompt_tokens": 12, "completion_tokens": 98, "total_tokens": 110,
+              "prompt_tokens_details": {"cached_tokens": 4},
+              "completion_tokens_details": {"reasoning_tokens": 29}}
+  })");
+  TranscodeContext ctx;
+  ASSERT_THAT(engine.transcode(kIrResponseToGemini, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({
+    "candidates": [
+      {"index": 0, "content": {"role": "model", "parts": [{"text": "A"}]},
+       "finishReason": "MAX_TOKENS"},
+      {"index": 1, "content": {"role": "model", "parts": [{"text": ""}]}, "finishReason": "STOP"}
+    ],
+    "modelVersion": "gemini-2.5-flash",
+    "usageMetadata": {"promptTokenCount": 12, "candidatesTokenCount": 69, "totalTokenCount": 110,
+                      "cachedContentTokenCount": 4, "thoughtsTokenCount": 29}
+  })"));
+}
+
+// The IR requires `model` and `created`; a response that carries neither gets them from the
+// caller, and a placeholder model when the caller has none either.
+TEST(TranscodingEngineTest, ResponseLegsFillTheIrEnvelopeFromTheContext) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const nlohmann::json gemini =
+      nlohmann::json::parse(R"({"candidates": [{"content": {"parts": [{"text": "Hi"}]}}]})");
+  nlohmann::json doc = gemini;
+  TranscodeContext ctx;
+  ctx.request_model = "gemini-2.5-pro";
+  ctx.now_unix_seconds = 1700000000;
+  ASSERT_THAT(engine.transcode(kGeminiResponseToIr, ctx, doc), IsOk());
+  EXPECT_EQ(doc["id"], "chatcmpl-transcoded");
+  EXPECT_EQ(doc["created"], 1700000000);
+  EXPECT_EQ(doc["model"], "gemini-2.5-pro");
+
+  doc = gemini;
+  TranscodeContext no_model;
+  no_model.now_unix_seconds = 1700000000;
+  ASSERT_THAT(engine.transcode(kGeminiResponseToIr, no_model, doc), IsOk());
+  EXPECT_EQ(doc["model"], "transcoded-model");
+
+  nlohmann::json anthropic =
+      nlohmann::json::parse(R"({"content": [{"type": "text", "text": "Hi"}]})");
+  ASSERT_THAT(engine.transcode(kAnthropicResponseToIr, ctx, anthropic), IsOk());
+  EXPECT_EQ(anthropic["id"], "chatcmpl-transcoded");
+  EXPECT_EQ(anthropic["created"], 1700000000);
+  EXPECT_EQ(anthropic["model"], "gemini-2.5-pro");
+  EXPECT_EQ(anthropic["choices"][0]["message"]["role"], "assistant");
+  EXPECT_EQ(anthropic["choices"][0]["finish_reason"], "stop");
+}
+
+// Each leg checks the member its rules depend on, so a payload that is not a response of the
+// dialect (an error body, say) is refused whole rather than half converted.
+TEST(TranscodingEngineTest, ResponseLegsRefuseAPayloadThatIsNotAResponse) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const struct {
+    TranscodeLeg leg;
+    std::string payload;
+    std::string field;
+  } cases[] = {
+      {kGeminiResponseToIr, R"({"promptFeedback": {"blockReason": "SAFETY"}})", "candidates"},
+      {kAnthropicResponseToIr, R"({"type": "error", "error": {"type": "overloaded_error"}})",
+       "content"},
+      {kIrResponseToGemini, R"({"id": "chatcmpl-3", "choices": []})", "choices"},
+      {kIrResponseToAnthropic, R"({"error": {"message": "Rate limit reached"}})", "choices"},
+  };
+  for (const auto& c : cases) {
+    const nlohmann::json original = nlohmann::json::parse(c.payload);
+    nlohmann::json doc = original;
+    TranscodeContext ctx;
+    const absl::Status status = engine.transcode(c.leg, ctx, doc);
+    EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument) << c.payload;
+    EXPECT_THAT(status.message(), testing::HasSubstr(c.field)) << c.payload;
+    EXPECT_EQ(doc, original);
+  }
+
+  nlohmann::json not_an_object = nlohmann::json::array();
+  TranscodeContext ctx;
+  EXPECT_EQ(engine.transcode(kGeminiResponseToIr, ctx, not_an_object).code(),
+            absl::StatusCode::kInvalidArgument);
+}
+
+// A response that goes into the IR and back out to its own dialect keeps its answer, finish
+// reason and token counts.
+TEST(TranscodingEngineTest, ResponseLegsRoundTripThroughTheIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  TranscodeContext ctx;
+  ctx.now_unix_seconds = 1700000000;
+
+  const nlohmann::json gemini = nlohmann::json::parse(R"({
+    "candidates": [{"index": 0, "content": {"role": "model", "parts": [{"text": "Paris"}]},
+                    "finishReason": "MAX_TOKENS"}],
+    "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5, "thoughtsTokenCount": 3,
+                      "cachedContentTokenCount": 4, "totalTokenCount": 18},
+    "modelVersion": "gemini-2.5-flash"
+  })");
+  nlohmann::json doc = gemini;
+  ASSERT_THAT(engine.transcode(kGeminiResponseToIr, ctx, doc), IsOk());
+  ASSERT_THAT(engine.transcode(kIrResponseToGemini, ctx, doc), IsOk());
+  EXPECT_EQ(doc, gemini);
+
+  const nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-sonnet-4-5",
+    "content": [{"type": "text", "text": "Hello!"}], "stop_reason": "max_tokens",
+    "usage": {"input_tokens": 70, "output_tokens": 20, "cache_read_input_tokens": 30,
+              "cache_creation_input_tokens": 10}
+  })");
+  doc = anthropic;
+  ASSERT_THAT(engine.transcode(kAnthropicResponseToIr, ctx, doc), IsOk());
+  ASSERT_THAT(engine.transcode(kIrResponseToAnthropic, ctx, doc), IsOk());
+  EXPECT_EQ(doc, anthropic);
+}
+
+// ---------------------------------------------------------------------------
 // Rule ops for response and stream legs.
 
 TEST(TranscodeRuleTest, SetConstReplacesWhileSetFromContextOnlyFillsGaps) {

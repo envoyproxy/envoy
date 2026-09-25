@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -102,8 +103,6 @@ private:
   absl::Status moveTargetToGeminiPath(nlohmann::json& json);
 
   absl::Status transcodeResponse(nlohmann::json& json);
-  absl::Status transcodeResponseToIr(nlohmann::json& json);
-  absl::Status transcodeResponseFromIr(nlohmann::json& json);
 
   absl::Status transcodeSseEvent(HttpFilters::AiProtocolManager::SseEvent& event,
                                  bool& should_drop);
@@ -122,6 +121,12 @@ private:
   // Copied rather than referenced: `AiFilterContext`'s referents belong to the stream and must
   // not be read after the request is propagated.
   const std::string request_path_;
+  // When the stream started, in seconds since the Unix epoch: the `created` time of an IR
+  // response whose dialect does not carry one.
+  const int64_t created_;
+  // The model the request named, for a response that does not name its own: the Gemini path's
+  // model, until a request leg reports the IR's.
+  std::string request_model_;
   std::string sse_stream_id_{"chatcmpl-transcoded"};
   std::string sse_stream_model_;
   bool sse_done_emitted_{false};

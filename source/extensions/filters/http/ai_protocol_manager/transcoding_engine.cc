@@ -619,11 +619,92 @@ TranscodeRuleSet anthropicRequestFromIr() {
       });
 }
 
+// The IR requires every response to name a model. When neither the response nor the request did,
+// this placeholder keeps the document valid.
+constexpr char kUnknownModel[] = "transcoded-model";
+
+// Anthropic `stop_reason` -> IR `finish_reason`, at `path`.
+TranscodeRule anthropicStopReasonToIr(std::string path) {
+  return TranscodeRule::valueMap(std::move(path),
+                                 {{"end_turn", "stop"},
+                                  {"stop_sequence", "stop"},
+                                  {"max_tokens", "length"},
+                                  {"tool_use", "tool_calls"}},
+                                 TranscodeRule::ValueFallback{"stop"});
+}
+
+// IR `finish_reason` -> Anthropic `stop_reason`, at `path`.
+TranscodeRule irFinishReasonToAnthropic(std::string path) {
+  return TranscodeRule::valueMap(
+      std::move(path), {{"stop", "end_turn"}, {"length", "max_tokens"}, {"tool_calls", "tool_use"}},
+      TranscodeRule::ValueFallback{"end_turn"});
+}
+
+// Anthropic Messages response -> IR response.
+TranscodeRuleSet anthropicResponseToIr() {
+  return TranscodeRuleSet(
+      LLMProtocol::AnthropicMessages, TranscodingEngine::kIrProtocol,
+      {
+          TranscodeRule::require("content", JsonShape::Array),
+          // 1. The IR envelope: `id`, `object`, `created` and `model` are all required.
+          TranscodeRule::setDefault("id", "chatcmpl-transcoded"),
+          TranscodeRule::setConst("object", "chat.completion"),
+          TranscodeRule::setFromContext("created", TranscodeRule::ContextField::NowUnixSeconds),
+          TranscodeRule::setFromContext("model", TranscodeRule::ContextField::RequestModel),
+          TranscodeRule::setDefault("model", kUnknownModel),
+          // 2. Anthropic's input count excludes both cache buckets; the IR's includes them.
+          TranscodeRule::convertUsage(LLMProtocol::AnthropicMessages,
+                                      TranscodingEngine::kIrProtocol),
+          // 3. The message becomes the IR's only choice, its text blocks joined into
+          //    `message.content`.
+          TranscodeRule::collectText("content", "text", "choice.message.content",
+                                     TranscodePredicate::fieldEquals("type", "text")),
+          TranscodeRule::move("role", "choice.message.role"),
+          TranscodeRule::setDefault("choice.message.role", "assistant"),
+          TranscodeRule::move("stop_reason", "choice.finish_reason"),
+          anthropicStopReasonToIr("choice.finish_reason"),
+          TranscodeRule::setDefault("choice.finish_reason", "stop"),
+          TranscodeRule::setConst("choice.index", 0),
+          TranscodeRule::move("choice", "choices"),
+          TranscodeRule::ensureArray("choices"),
+          TranscodeRule::retainOnly("", {"id", "object", "created", "model", "choices", "usage"}),
+      });
+}
+
+// IR response -> Anthropic Messages response.
+TranscodeRuleSet anthropicResponseFromIr() {
+  return TranscodeRuleSet(
+      TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
+      {
+          TranscodeRule::require("choices", JsonShape::NonEmptyArray),
+          // 1. The Message envelope.
+          TranscodeRule::setDefault("id", "msg_transcoded"),
+          TranscodeRule::setConst("type", "message"),
+          TranscodeRule::setConst("role", "assistant"),
+          TranscodeRule::setFromContext("model", TranscodeRule::ContextField::RequestModel),
+          TranscodeRule::setDefault("model", kUnknownModel),
+          // 2. The IR's input count includes both cache buckets; Anthropic's excludes them.
+          TranscodeRule::convertUsage(TranscodingEngine::kIrProtocol,
+                                      LLMProtocol::AnthropicMessages),
+          // 3. A message carries one answer: the first choice's content becomes a text block.
+          TranscodeRule::takeFirst("choices", "choice"),
+          TranscodeRule::setDefault("choice.message.content", ""),
+          TranscodeRule::wrapInArrayObject("choice.message.content", "content", "text"),
+          TranscodeRule::forEach("content", {TranscodeRule::setConst("type", "text")}),
+          TranscodeRule::move("choice.finish_reason", "stop_reason"),
+          irFinishReasonToAnthropic("stop_reason"),
+          TranscodeRule::setDefault("stop_reason", "end_turn"),
+          TranscodeRule::retainOnly(
+              "", {"id", "type", "role", "model", "content", "stop_reason", "usage"}),
+      });
+}
+
 // Builds the declarative transcoding pack for Anthropic Messages <-> IR (OpenAI Chat).
 DialectTranscodePack createAnthropicTranscodePack() {
   return DialectTranscodePack{
       .protocol = LLMProtocol::AnthropicMessages,
       .request = {.to_ir = anthropicRequestToIr(), .from_ir = anthropicRequestFromIr()},
+      .response = {.to_ir = anthropicResponseToIr(), .from_ir = anthropicResponseFromIr()},
   };
 }
 
@@ -738,11 +819,98 @@ TranscodeRuleSet geminiRequestFromIr() {
       });
 }
 
+// Gemini `finishReason` -> IR `finish_reason`, at `path`.
+TranscodeRule geminiFinishReasonToIr(std::string path) {
+  return TranscodeRule::valueMap(std::move(path),
+                                 {{"STOP", "stop"},
+                                  {"MAX_TOKENS", "length"},
+                                  {"SAFETY", "content_filter"},
+                                  {"RECITATION", "content_filter"},
+                                  {"BLOCKLIST", "content_filter"}},
+                                 TranscodeRule::ValueFallback{"stop"});
+}
+
+// IR `finish_reason` -> Gemini `finishReason`, at `path`.
+TranscodeRule irFinishReasonToGemini(std::string path) {
+  return TranscodeRule::valueMap(
+      std::move(path), {{"stop", "STOP"}, {"length", "MAX_TOKENS"}, {"content_filter", "SAFETY"}},
+      TranscodeRule::ValueFallback{"STOP"});
+}
+
+// Gemini GenerateContent response -> IR response.
+TranscodeRuleSet geminiResponseToIr() {
+  return TranscodeRuleSet(
+      LLMProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
+      {
+          TranscodeRule::require("candidates", JsonShape::Array),
+          // 1. The IR envelope: `id`, `object`, `created` and `model` are all required.
+          TranscodeRule::move("responseId", "id"),
+          TranscodeRule::setDefault("id", "chatcmpl-transcoded"),
+          TranscodeRule::setConst("object", "chat.completion"),
+          TranscodeRule::setFromContext("created", TranscodeRule::ContextField::NowUnixSeconds),
+          TranscodeRule::move("modelVersion", "model"),
+          TranscodeRule::setFromContext("model", TranscodeRule::ContextField::RequestModel),
+          TranscodeRule::setDefault("model", kUnknownModel),
+          // 2. Gemini's prompt and candidates counts exclude tool-use and thought tokens; the
+          //    IR's include them.
+          TranscodeRule::convertUsage(LLMProtocol::GeminiGenerateContent,
+                                      TranscodingEngine::kIrProtocol),
+          // 3. Each candidate becomes a choice, its text parts joined into `message.content`.
+          //    Thought summaries are the model's reasoning, not its answer, so they stay out.
+          TranscodeRule::move("candidates", "choices"),
+          TranscodeRule::enumerate("choices", "index"),
+          TranscodeRule::forEach(
+              "choices",
+              {
+                  TranscodeRule::collectText(
+                      "content.parts", "text", "message.content",
+                      TranscodePredicate::negate(TranscodePredicate::fieldEquals("thought", true))),
+                  TranscodeRule::setDefault("message.content", ""),
+                  TranscodeRule::setConst("message.role", "assistant"),
+                  TranscodeRule::move("finishReason", "finish_reason"),
+                  geminiFinishReasonToIr("finish_reason"),
+                  TranscodeRule::setDefault("finish_reason", "stop"),
+                  TranscodeRule::retainOnly("", {"index", "message", "finish_reason"}),
+              }),
+          TranscodeRule::retainOnly("", {"id", "object", "created", "model", "choices", "usage"}),
+      });
+}
+
+// IR response -> Gemini GenerateContent response.
+TranscodeRuleSet geminiResponseFromIr() {
+  return TranscodeRuleSet(
+      TranscodingEngine::kIrProtocol, LLMProtocol::GeminiGenerateContent,
+      {
+          TranscodeRule::require("choices", JsonShape::NonEmptyArray),
+          TranscodeRule::move("model", "modelVersion"),
+          // 1. The IR's prompt and completion counts include tool-use and reasoning tokens;
+          //    Gemini's exclude them.
+          TranscodeRule::convertUsage(TranscodingEngine::kIrProtocol,
+                                      LLMProtocol::GeminiGenerateContent),
+          // 2. Each choice becomes a candidate, its content a single text part.
+          TranscodeRule::move("choices", "candidates"),
+          TranscodeRule::enumerate("candidates", "index"),
+          TranscodeRule::forEach(
+              "candidates",
+              {
+                  TranscodeRule::setDefault("message.content", ""),
+                  TranscodeRule::wrapInArrayObject("message.content", "content.parts", "text"),
+                  TranscodeRule::setConst("content.role", "model"),
+                  TranscodeRule::move("finish_reason", "finishReason"),
+                  irFinishReasonToGemini("finishReason"),
+                  TranscodeRule::setDefault("finishReason", "STOP"),
+                  TranscodeRule::retainOnly("", {"index", "content", "finishReason"}),
+              }),
+          TranscodeRule::retainOnly("", {"candidates", "modelVersion", "usageMetadata"}),
+      });
+}
+
 // Builds the declarative transcoding pack for Gemini GenerateContent <-> IR (OpenAI Chat).
 DialectTranscodePack createGeminiTranscodePack() {
   return DialectTranscodePack{
       .protocol = LLMProtocol::GeminiGenerateContent,
       .request = {.to_ir = geminiRequestToIr(), .from_ir = geminiRequestFromIr()},
+      .response = {.to_ir = geminiResponseToIr(), .from_ir = geminiResponseFromIr()},
   };
 }
 

@@ -1,6 +1,7 @@
 #include "source/extensions/http/ai_filters/transcoder/filter.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -35,10 +36,13 @@ using HttpFilters::AiProtocolManager::FlattenJsonField;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
+using HttpFilters::AiProtocolManager::PayloadKind;
 using HttpFilters::AiProtocolManager::SseEvent;
 using HttpFilters::AiProtocolManager::SseEventPtr;
 using HttpFilters::AiProtocolManager::SseStreamPropagator;
 using HttpFilters::AiProtocolManager::SseStreamReceiver;
+using HttpFilters::AiProtocolManager::TranscodeContext;
+using HttpFilters::AiProtocolManager::TranscodeDirection;
 using HttpFilters::AiProtocolManager::TranscodingEngine;
 using TranscoderProto = envoy::extensions::http::ai_filters::transcoder::v3::Transcoder;
 namespace Keys = HttpFilters::AiProtocolManager::Keys;
@@ -293,8 +297,14 @@ TranscoderFilter::TranscoderFilter(TranscoderFilterConfigSharedPtr config,
                                    const AiFilterContext& context)
     : config_(std::move(config)), source_protocol_(context.request_protocol),
       route_target_protocol_(context.response_protocol), request_headers_(context.request_headers),
-      request_path_(std::string(context.request_headers.getPathValue())) {
+      request_path_(std::string(context.request_headers.getPathValue())),
+      created_(std::chrono::duration_cast<std::chrono::seconds>(
+                   context.stream_info.startTime().time_since_epoch())
+                   .count()) {
   const std::optional<GeminiTarget> gemini_target = geminiTargetFromPath(request_path_);
+  if (gemini_target.has_value()) {
+    request_model_ = gemini_target->model;
+  }
   sse_stream_model_ = gemini_target.has_value() ? gemini_target->model : "transcoded-model";
 }
 
@@ -426,9 +436,15 @@ absl::Status TranscoderFilter::transcodeToIr(nlohmann::json& json) {
     }
   }
 
-  const absl::Status status = config_->engine().transcodeToIr(source_protocol_, json);
+  TranscodeContext ctx;
+  const absl::Status status = config_->engine().transcode(
+      {PayloadKind::Request, TranscodeDirection::ToIr, source_protocol_}, ctx, json);
   if (!status.ok()) {
     config_->stats().failed_.inc();
+    return status;
+  }
+  if (!ctx.ir_model.empty()) {
+    request_model_ = std::move(ctx.ir_model);
   }
   return status;
 }
@@ -443,12 +459,18 @@ absl::Status TranscoderFilter::transcodeFromIr(nlohmann::json& json) {
 
   // Validation against the target's schema happens inside the engine, so a document the upstream
   // would reject fails here rather than over the network.
-  absl::Status status = config_->engine().transcodeFromIr(target, json);
+  TranscodeContext ctx;
+  absl::Status status = config_->engine().transcode(
+      {PayloadKind::Request, TranscodeDirection::FromIr, target}, ctx, json);
   if (status.ok() && target == LLMProtocol::GeminiGenerateContent) {
     status = moveTargetToGeminiPath(json);
   }
   if (!status.ok()) {
     config_->stats().failed_.inc();
+    return status;
+  }
+  if (!ctx.ir_model.empty()) {
+    request_model_ = std::move(ctx.ir_model);
   }
   return status;
 }
@@ -473,179 +495,30 @@ absl::Status TranscoderFilter::moveTargetToGeminiPath(nlohmann::json& json) {
   return absl::OkStatus();
 }
 
+// A `TO_IR` response comes back from the backend in the target's dialect; a `FROM_IR` one goes
+// back to the client in the dialect the route declared. Every dialect rule is the engine's: the
+// filter only picks the leg and hands over what the payload does not carry.
 absl::Status TranscoderFilter::transcodeResponse(nlohmann::json& json) {
-  return config_->responseHandling() == TranscoderProto::TO_IR ? transcodeResponseToIr(json)
-                                                               : transcodeResponseFromIr(json);
-}
-
-absl::Status TranscoderFilter::transcodeResponseToIr(nlohmann::json& json) {
-  const LLMProtocol target = effectiveTargetProtocol();
-  if (target == LLMProtocol::Unspecified) {
+  const bool to_ir = config_->responseHandling() == TranscoderProto::TO_IR;
+  const LLMProtocol dialect = to_ir ? effectiveTargetProtocol() : source_protocol_;
+  if (dialect == LLMProtocol::Unspecified) {
     config_->stats().unresolved_.inc();
     return absl::InvalidArgumentError(
-        "transcoder: no target backend protocol is set for response TO_IR transcoding");
+        to_ir ? "transcoder: no target backend protocol is set for response TO_IR transcoding"
+              : "transcoder: the route declared no wire API for response FROM_IR transcoding");
   }
 
-  if (target == LLMProtocol::OpenAiChatCompletions) {
-    return absl::OkStatus();
-  }
-
-  if (target == LLMProtocol::GeminiGenerateContent) {
-    if (!json.is_object() || !json.contains("candidates") || !json["candidates"].is_array()) {
-      config_->stats().failed_.inc();
-      return absl::InvalidArgumentError("transcoder: Gemini response missing `candidates` array");
-    }
-    nlohmann::json out = nlohmann::json::object();
-    out["id"] = json.value("responseId", "chatcmpl-transcoded");
-    out["object"] = "chat.completion";
-    out["model"] = json.value("modelVersion", sse_stream_model_);
-    nlohmann::json choices = nlohmann::json::array();
-    for (size_t i = 0; i < json["candidates"].size(); ++i) {
-      const auto& cand = json["candidates"][i];
-      nlohmann::json choice = nlohmann::json::object();
-      choice["index"] = cand.value("index", static_cast<int>(i));
-      std::string text;
-      if (cand.contains("content") && cand["content"].is_object() &&
-          cand["content"].contains("parts") && cand["content"]["parts"].is_array()) {
-        for (const auto& part : cand["content"]["parts"]) {
-          if (part.is_object() && part.contains("text") && part["text"].is_string()) {
-            text.append(part["text"].get<std::string>());
-          }
-        }
-      }
-      choice["message"] = {{"role", "assistant"}, {"content", std::move(text)}};
-      if (cand.contains("finishReason") && cand["finishReason"].is_string()) {
-        choice["finish_reason"] =
-            mapGeminiFinishReasonToIr(cand["finishReason"].get<std::string>());
-      } else {
-        choice["finish_reason"] = "stop";
-      }
-      choices.push_back(std::move(choice));
-    }
-    out["choices"] = std::move(choices);
-    transcodeGeminiUsageToIr(json, out);
-    json = std::move(out);
-    return absl::OkStatus();
-  }
-
-  if (target == LLMProtocol::AnthropicMessages) {
-    if (!json.is_object() || !json.contains("content") || !json["content"].is_array()) {
-      config_->stats().failed_.inc();
-      return absl::InvalidArgumentError("transcoder: Anthropic response missing `content` array");
-    }
-    nlohmann::json out = nlohmann::json::object();
-    out["id"] = json.value("id", "chatcmpl-transcoded");
-    out["object"] = "chat.completion";
-    out["model"] = json.value("model", sse_stream_model_);
-    std::string text;
-    for (const auto& block : json["content"]) {
-      if (block.is_object() && block.value("type", "") == "text" && block.contains("text") &&
-          block["text"].is_string()) {
-        text.append(block["text"].get<std::string>());
-      }
-    }
-    std::string finish_reason = "stop";
-    if (json.contains("stop_reason") && json["stop_reason"].is_string()) {
-      finish_reason = mapAnthropicStopReasonToIr(json["stop_reason"].get<std::string>());
-    }
-    out["choices"] = nlohmann::json::array(
-        {{{"index", 0},
-          {"message", {{"role", json.value("role", "assistant")}, {"content", std::move(text)}}},
-          {"finish_reason", std::move(finish_reason)}}});
-    if (json.contains("usage") && json["usage"].is_object()) {
-      const auto& u = json["usage"];
-      const int prompt_tokens = u.value("input_tokens", 0);
-      const int completion_tokens = u.value("output_tokens", 0);
-      out["usage"] = {{"prompt_tokens", prompt_tokens},
-                      {"completion_tokens", completion_tokens},
-                      {"total_tokens", prompt_tokens + completion_tokens}};
-    }
-    json = std::move(out);
-    return absl::OkStatus();
-  }
-
-  config_->stats().failed_.inc();
-  return absl::InvalidArgumentError("transcoder: unsupported target protocol for response TO_IR");
-}
-
-absl::Status TranscoderFilter::transcodeResponseFromIr(nlohmann::json& json) {
-  if (source_protocol_ == LLMProtocol::Unspecified) {
-    config_->stats().unresolved_.inc();
-    return absl::InvalidArgumentError(
-        "transcoder: the route declared no wire API for response FROM_IR transcoding");
-  }
-
-  if (source_protocol_ == LLMProtocol::OpenAiChatCompletions) {
-    return absl::OkStatus();
-  }
-
-  if (!json.is_object() || !json.contains("choices") || !json["choices"].is_array() ||
-      json["choices"].empty()) {
+  TranscodeContext ctx;
+  ctx.request_model = request_model_;
+  ctx.now_unix_seconds = created_;
+  const absl::Status status = config_->engine().transcode(
+      {PayloadKind::Response, to_ir ? TranscodeDirection::ToIr : TranscodeDirection::FromIr,
+       dialect},
+      ctx, json);
+  if (!status.ok()) {
     config_->stats().failed_.inc();
-    return absl::InvalidArgumentError("transcoder: IR response missing non-empty `choices` array");
   }
-
-  if (source_protocol_ == LLMProtocol::GeminiGenerateContent) {
-    nlohmann::json out = nlohmann::json::object();
-    nlohmann::json candidates = nlohmann::json::array();
-    for (size_t i = 0; i < json["choices"].size(); ++i) {
-      const auto& choice = json["choices"][i];
-      std::string text;
-      if (choice.contains("message") && choice["message"].is_object() &&
-          choice["message"].contains("content") && choice["message"]["content"].is_string()) {
-        text = choice["message"]["content"].get<std::string>();
-      }
-      nlohmann::json cand = nlohmann::json::object();
-      cand["index"] = choice.value("index", static_cast<int>(i));
-      cand["content"] = {{"role", "model"},
-                         {"parts", nlohmann::json::array({{{"text", std::move(text)}}})}};
-      if (choice.contains("finish_reason") && choice["finish_reason"].is_string()) {
-        cand["finishReason"] =
-            mapIrFinishReasonToGemini(choice["finish_reason"].get<std::string>());
-      } else {
-        cand["finishReason"] = "STOP";
-      }
-      candidates.push_back(std::move(cand));
-    }
-    out["candidates"] = std::move(candidates);
-    if (json.contains("model") && json["model"].is_string()) {
-      out["modelVersion"] = json["model"];
-    }
-    transcodeIrUsageToGemini(json, out);
-    json = std::move(out);
-    return absl::OkStatus();
-  }
-
-  if (source_protocol_ == LLMProtocol::AnthropicMessages) {
-    const auto& first_choice = json["choices"][0];
-    std::string text;
-    if (first_choice.contains("message") && first_choice["message"].is_object() &&
-        first_choice["message"].contains("content") &&
-        first_choice["message"]["content"].is_string()) {
-      text = first_choice["message"]["content"].get<std::string>();
-    }
-    std::string stop_reason = "end_turn";
-    if (first_choice.contains("finish_reason") && first_choice["finish_reason"].is_string()) {
-      stop_reason = mapIrFinishReasonToAnthropic(first_choice["finish_reason"].get<std::string>());
-    }
-    nlohmann::json out = nlohmann::json::object();
-    out["id"] = json.value("id", "msg_transcoded");
-    out["type"] = "message";
-    out["role"] = "assistant";
-    out["model"] = json.value("model", sse_stream_model_);
-    out["content"] = nlohmann::json::array({{{"type", "text"}, {"text", std::move(text)}}});
-    out["stop_reason"] = std::move(stop_reason);
-    if (json.contains("usage") && json["usage"].is_object()) {
-      const auto& u = json["usage"];
-      out["usage"] = {{"input_tokens", u.value("prompt_tokens", 0)},
-                      {"output_tokens", u.value("completion_tokens", 0)}};
-    }
-    json = std::move(out);
-    return absl::OkStatus();
-  }
-
-  config_->stats().failed_.inc();
-  return absl::InvalidArgumentError("transcoder: unsupported source protocol for response FROM_IR");
+  return status;
 }
 
 absl::Status TranscoderFilter::transcodeSseEvent(SseEvent& event, bool& should_drop) {
