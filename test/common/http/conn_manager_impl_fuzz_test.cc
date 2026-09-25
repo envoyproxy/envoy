@@ -144,6 +144,9 @@ public:
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   std::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  std::optional<std::chrono::milliseconds> drainIdleTimeout() const override {
+    return std::nullopt;
+  }
   bool isRoutable() const override { return true; }
   std::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;

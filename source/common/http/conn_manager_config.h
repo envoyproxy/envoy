@@ -286,6 +286,11 @@ public:
   virtual std::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return optional idle timeout for incoming connections while draining.
+   */
+  virtual std::optional<std::chrono::milliseconds> drainIdleTimeout() const PURE;
+
+  /**
    * @return if the connection manager does routing base on router config, e.g. a Server::Admin impl
    * has no route config.
    */

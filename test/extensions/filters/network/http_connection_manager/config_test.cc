@@ -1285,6 +1285,27 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
   EXPECT_EQ(1000, config.idleTimeout().value().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolDrainIdleTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    drain_idle_timeout: 2s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
+  EXPECT_EQ(2000, config.drainIdleTimeout().value().count());
+}
+
 // Validate that idle_timeout defaults to 1h
 TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutDefault) {
   const std::string yaml_string = R"EOF(
@@ -1303,6 +1324,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutDefault) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
   EXPECT_EQ(std::chrono::hours(1), config.idleTimeout().value());
+  EXPECT_FALSE(config.drainIdleTimeout().has_value());
 }
 
 // Validate that idle_timeouts can be turned off
@@ -1325,6 +1347,28 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutOff) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
   EXPECT_FALSE(config.idleTimeout().has_value());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolDrainIdleTimeoutOff) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    drain_idle_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
+  ASSERT_TRUE(config.drainIdleTimeout().has_value());
+  EXPECT_EQ(0, config.drainIdleTimeout()->count());
 }
 
 // Check that the default max request header count is 100.

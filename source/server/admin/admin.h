@@ -151,6 +151,9 @@ public:
   bool preserveExternalRequestId() const override { return false; }
   bool alwaysSetRequestIdInResponse() const override { return false; }
   std::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  std::optional<std::chrono::milliseconds> drainIdleTimeout() const override {
+    return std::nullopt;
+  }
   bool isRoutable() const override { return false; }
   std::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;

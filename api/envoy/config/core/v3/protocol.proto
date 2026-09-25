@@ -284,7 +284,7 @@ message AlternateProtocolsCacheOptions {
   repeated string canonical_suffixes = 5;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HttpProtocolOptions";
@@ -330,6 +330,13 @@ message HttpProtocolOptions {
   // is configured, this timeout is scaled for downstream connections according to the value for
   // :ref:`HTTP_DOWNSTREAM_CONNECTION_IDLE <envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_IDLE>`.
   google.protobuf.Duration idle_timeout = 1;
+
+  // The idle timeout for downstream connections while the HTTP connection manager is draining.
+  // If specified, this overrides ``idle_timeout`` after draining begins. If not specified,
+  // ``idle_timeout`` remains in effect and its current deadline is preserved when draining begins.
+  // To disable the idle timeout while draining, set this to ``0``. This field has no effect on
+  // upstream connections.
+  google.protobuf.Duration drain_idle_timeout = 9;
 
   // The maximum duration of a connection. The duration is defined as a period since a connection
   // was established. If not set, there is no max duration. When max_connection_duration is reached,
