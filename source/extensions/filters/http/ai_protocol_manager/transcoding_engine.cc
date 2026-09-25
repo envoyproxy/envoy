@@ -128,6 +128,108 @@ nlohmann::json toContentBlockArray(nlohmann::json&& content) {
   return arr;
 }
 
+// Read-only lookup for predicates. Unlike `findNodeByPath`, a numeric segment indexes into an
+// array, so a predicate can look at e.g. `choices.0.finish_reason`.
+const nlohmann::json* peekNodeByPath(const nlohmann::json& root,
+                                     absl::Span<const std::string> parts) {
+  const nlohmann::json* curr = &root;
+  for (const std::string& part : parts) {
+    if (curr->is_object()) {
+      auto it = curr->find(part);
+      if (it == curr->end()) {
+        return nullptr;
+      }
+      curr = &(*it);
+    } else if (curr->is_array()) {
+      size_t index = 0;
+      if (!absl::SimpleAtoi(part, &index) || index >= curr->size()) {
+        return nullptr;
+      }
+      curr = &(*curr)[index];
+    } else {
+      return nullptr;
+    }
+  }
+  return curr;
+}
+
+bool hasShape(const nlohmann::json& node, JsonShape shape) {
+  switch (shape) {
+  case JsonShape::Object:
+    return node.is_object();
+  case JsonShape::Array:
+    return node.is_array();
+  case JsonShape::NonEmptyArray:
+    return node.is_array() && !node.empty();
+  case JsonShape::String:
+    return node.is_string();
+  case JsonShape::Text:
+    return node.is_string() || JsonWithExtBuf::isExternalRef(node);
+  }
+  return false;
+}
+
+// True if `node` is, or holds anywhere inside it, an `ExternalRef`.
+bool containsExternalRef(const nlohmann::json& node) {
+  if (JsonWithExtBuf::isExternalRef(node)) {
+    return true;
+  }
+  if (node.is_structured()) {
+    for (const nlohmann::json& child : node) {
+      if (containsExternalRef(child)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+absl::string_view shapeDescription(JsonShape shape) {
+  switch (shape) {
+  case JsonShape::Object:
+    return "an object";
+  case JsonShape::Array:
+    return "an array";
+  case JsonShape::NonEmptyArray:
+    return "a non-empty array";
+  case JsonShape::String:
+    return "a string";
+  case JsonShape::Text:
+    break;
+  }
+  return "text";
+}
+
+// Writes finalized canonical `usage` onto `json` in `dialect`'s native shape, at the dialect's
+// usage member. Writes nothing for a dialect without one, or when there is nothing to render.
+void writeUsage(nlohmann::json& json, const TokenUsage& usage, LLMProtocol dialect) {
+  const LLMProtocolAdapter& adapter = AdapterRegistry::get(dialect);
+  const absl::string_view usage_path = adapter.usagePath();
+  if (usage_path.empty()) {
+    return;
+  }
+  nlohmann::json rendered = adapter.renderUsage(usage);
+  if (rendered.empty()) {
+    return;
+  }
+  json[std::string(usage_path)] = std::move(rendered);
+}
+
+// Reads `json`'s usage as `dialect` and removes the dialect's usage member.
+TokenUsage takeUsage(nlohmann::json& json, LLMProtocol dialect) {
+  const LLMProtocolAdapter& adapter = AdapterRegistry::get(dialect);
+  TokenUsage usage = adapter.extractUsage(json).usage;
+  if (const absl::string_view usage_path = adapter.usagePath(); !usage_path.empty()) {
+    json.erase(std::string(usage_path));
+  }
+  return usage;
+}
+
+absl::Status missingStreamState(absl::string_view rule_name) {
+  return absl::FailedPreconditionError(
+      absl::StrCat(rule_name, " rule needs per-stream state and can only run on a stream leg"));
+}
+
 std::string joinRulePath(absl::string_view prefix, absl::string_view relative_path) {
   if (prefix.empty()) {
     return std::string(relative_path);
@@ -186,6 +288,73 @@ void dropOffloadablePaths(absl::flat_hash_set<std::string>& offloadable_set,
       ++it;
     }
   }
+}
+
+// Mirrors `RetainOnly`: drops every offloadable path inside the object at `object_path` (empty for
+// the root) that sits under a member not in `kept_keys`.
+void retainOffloadablePaths(absl::flat_hash_set<std::string>& offloadable_set,
+                            absl::string_view object_path,
+                            const std::vector<std::string>& kept_keys) {
+  for (auto it = offloadable_set.begin(); it != offloadable_set.end();) {
+    absl::string_view path = *it;
+    if (!object_path.empty()) {
+      if (!absl::StartsWith(path, object_path) || path.size() <= object_path.size() ||
+          path[object_path.size()] != '.') {
+        ++it;
+        continue;
+      }
+      path.remove_prefix(object_path.size() + 1);
+    }
+    const absl::string_view member = path.substr(0, path.find_first_of(".["));
+    if (std::find(kept_keys.begin(), kept_keys.end(), member) == kept_keys.end()) {
+      offloadable_set.erase(it++);
+    } else {
+      ++it;
+    }
+  }
+}
+
+// A predicate path in the verifier's notation, under `prefix`: numeric segments, which index an
+// array, become `[]` (`choices.0.delta.content` -> `choices[].delta.content`).
+std::string predicateVerifierPath(absl::string_view prefix, absl::string_view path) {
+  std::string out(prefix);
+  for (absl::string_view segment : absl::StrSplit(path, '.', absl::SkipEmpty())) {
+    size_t index = 0;
+    if (absl::SimpleAtoi(segment, &index)) {
+      absl::StrAppend(&out, "[]");
+    } else {
+      absl::StrAppend(&out, out.empty() ? "" : ".", segment);
+    }
+  }
+  return out;
+}
+
+// Rejects a predicate that reads the value of a field which may arrive offloaded. An `ExternalRef`
+// equals nothing and is not a `String`, so such a test would quietly take the wrong branch for
+// exactly the large payloads offloading exists for.
+absl::Status verifyPredicate(const TranscodePredicate& predicate, absl::string_view prefix,
+                             const absl::flat_hash_set<std::string>& offloadable_set) {
+  switch (predicate.kind()) {
+  case TranscodePredicate::Kind::Always:
+    return absl::OkStatus();
+  case TranscodePredicate::Kind::Not:
+    return verifyPredicate(predicate.operands().front(), prefix, offloadable_set);
+  case TranscodePredicate::Kind::FieldIs:
+    if (predicate.shape() != JsonShape::String) {
+      return absl::OkStatus();
+    }
+    break;
+  case TranscodePredicate::Kind::FieldEquals:
+    break;
+  }
+  const std::string path = predicateVerifierPath(prefix, predicate.path());
+  if (offloadable_set.contains(path)) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "transcoding verifier error: predicate cannot read the value of offloadable field '", path,
+        "' because large values are represented as ExternalRef nodes; test for JsonShape::Text "
+        "instead"));
+  }
+  return absl::OkStatus();
 }
 
 // Walks `rules` in execution order, evolving `offloadable_set` as structural rules relocate fields
@@ -285,8 +454,80 @@ absl::Status verifyRulesTrackProvenance(const std::vector<TranscodeRule>& rules,
                                /*keep_source=*/true);
       break;
     }
+    case TranscodeRule::Op::SetConst:
+      // Unconditional, so whatever sat there is gone. (Conditional writes below leave an existing
+      // value, offloaded or not, where it is.)
+      dropOffloadablePaths(offloadable_set, joinRulePath(prefix, rule.targetPath()));
+      break;
+    case TranscodeRule::Op::RetainOnly:
+      retainOffloadablePaths(offloadable_set,
+                             rule.targetPath().empty() ? std::string(prefix)
+                                                       : joinRulePath(prefix, rule.targetPath()),
+                             rule.matchValues());
+      break;
+    case TranscodeRule::Op::TakeFirst: {
+      const std::string array = joinRulePath(prefix, rule.sourcePath());
+      relocateOffloadablePaths(offloadable_set, absl::StrCat(array, "[]"),
+                               joinRulePath(prefix, rule.targetPath()));
+      dropOffloadablePaths(offloadable_set, array);
+      break;
+    }
+    case TranscodeRule::Op::CollectText: {
+      const std::string array = joinRulePath(prefix, rule.sourcePath());
+      const std::string element = absl::StrCat(array, "[]");
+      absl::Status status = verifyPredicate(rule.predicate(), element, offloadable_set);
+      if (!status.ok()) {
+        return status;
+      }
+      // A single match is moved as is, so the destination may hold an `ExternalRef`.
+      relocateOffloadablePaths(offloadable_set, absl::StrCat(element, ".", rule.extractSubpath()),
+                               joinRulePath(prefix, rule.targetPath()));
+      dropOffloadablePaths(offloadable_set, array);
+      break;
+    }
+    case TranscodeRule::Op::When: {
+      absl::Status status = verifyPredicate(rule.predicate(), prefix, offloadable_set);
+      if (!status.ok()) {
+        return status;
+      }
+      // The rules may or may not run, so afterwards a field is offloadable if it is on either
+      // path.
+      absl::flat_hash_set<std::string> branch = offloadable_set;
+      status = verifyRulesTrackProvenance(rule.subRules(), prefix, branch);
+      if (!status.ok()) {
+        return status;
+      }
+      offloadable_set.insert(branch.begin(), branch.end());
+      break;
+    }
+    case TranscodeRule::Op::Require: {
+      absl::Status status = verifyPredicate(rule.predicate(), prefix, offloadable_set);
+      if (!status.ok()) {
+        return status;
+      }
+      break;
+    }
+    case TranscodeRule::Op::CaptureToState: {
+      // The captured value outlives the event, so it must neither be nor hold a reference into
+      // the event's buffer.
+      const std::string source = joinRulePath(prefix, rule.sourcePath());
+      for (const std::string& path : offloadable_set) {
+        if (rewritePathPrefix(path, source, "").has_value()) {
+          return absl::InvalidArgumentError(absl::StrCat(
+              "transcoding verifier error: capture_to_state rule cannot capture '", source,
+              "' because offloadable field '", path,
+              "' may be an ExternalRef into a buffer that does not outlive the event"));
+        }
+      }
+      break;
+    }
     case TranscodeRule::Op::SetDefault:
     case TranscodeRule::Op::CoerceNumeric:
+    case TranscodeRule::Op::SetFromContext:
+    case TranscodeRule::Op::SetFromState:
+    case TranscodeRule::Op::Enumerate:
+    case TranscodeRule::Op::ConvertUsage:
+    case TranscodeRule::Op::AccumulateUsage:
       break;
     }
   }
@@ -518,6 +759,48 @@ DialectTranscodePack createOpenAiChatTranscodePack() {
 
 } // namespace
 
+TranscodePredicate TranscodePredicate::always() { return TranscodePredicate(Kind::Always); }
+
+TranscodePredicate TranscodePredicate::fieldEquals(std::string path, nlohmann::json value) {
+  TranscodePredicate predicate(Kind::FieldEquals);
+  predicate.segments_ = splitPath(path);
+  predicate.path_ = std::move(path);
+  predicate.value_ = std::move(value);
+  return predicate;
+}
+
+TranscodePredicate TranscodePredicate::fieldIs(std::string path, JsonShape shape) {
+  TranscodePredicate predicate(Kind::FieldIs);
+  predicate.segments_ = splitPath(path);
+  predicate.path_ = std::move(path);
+  predicate.shape_ = shape;
+  return predicate;
+}
+
+TranscodePredicate TranscodePredicate::negate(TranscodePredicate predicate) {
+  TranscodePredicate negation(Kind::Not);
+  negation.operands_.push_back(std::move(predicate));
+  return negation;
+}
+
+bool TranscodePredicate::matches(const nlohmann::json& json) const {
+  switch (kind_) {
+  case Kind::Always:
+    return true;
+  case Kind::FieldEquals: {
+    const nlohmann::json* node = peekNodeByPath(json, segments_);
+    return node != nullptr && *node == value_;
+  }
+  case Kind::FieldIs: {
+    const nlohmann::json* node = peekNodeByPath(json, segments_);
+    return node != nullptr && hasShape(*node, shape_);
+  }
+  case Kind::Not:
+    return !operands_.front().matches(json);
+  }
+  return false;
+}
+
 TranscodeRule TranscodeRule::move(std::string from_path, std::string to_path) {
   TranscodeRule rule(Op::Move);
   rule.source_segments_ = splitPath(from_path);
@@ -606,12 +889,29 @@ TranscodeRule TranscodeRule::valueMap(std::string path,
   return rule;
 }
 
+TranscodeRule TranscodeRule::valueMap(std::string path, std::vector<ValueMapping> mappings,
+                                      ValueFallback fallback) {
+  TranscodeRule rule(Op::ValueMap);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  for (ValueMapping& m : mappings) {
+    rule.value_mappings_.emplace(std::move(m.from), std::move(m.to));
+  }
+  rule.unknown_policy_ = UnknownValuePolicy::Fallback;
+  rule.default_value_ = std::move(fallback.value);
+  return rule;
+}
+
 TranscodeRule TranscodeRule::forEach(std::string array_path,
                                      std::initializer_list<TranscodeRule> rules) {
+  return forEach(std::move(array_path), std::vector<TranscodeRule>(rules));
+}
+
+TranscodeRule TranscodeRule::forEach(std::string array_path, std::vector<TranscodeRule> rules) {
   TranscodeRule rule(Op::ForEach);
   rule.target_segments_ = splitPath(array_path);
   rule.target_path_ = std::move(array_path);
-  rule.sub_rules_.assign(rules.begin(), rules.end());
+  rule.sub_rules_ = std::move(rules);
   return rule;
 }
 
@@ -679,7 +979,111 @@ TranscodeRule TranscodeRule::mergeConsecutiveByKey(std::string array_path, std::
   return rule;
 }
 
-absl::Status TranscodeRule::apply(nlohmann::json& json) const {
+TranscodeRule TranscodeRule::setConst(std::string path, nlohmann::json value) {
+  TranscodeRule rule(Op::SetConst);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  rule.default_value_ = std::move(value);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::setFromContext(std::string path, ContextField field) {
+  TranscodeRule rule(Op::SetFromContext);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  rule.context_field_ = field;
+  return rule;
+}
+
+TranscodeRule TranscodeRule::enumerate(std::string array_path, std::string key) {
+  TranscodeRule rule(Op::Enumerate);
+  rule.target_segments_ = splitPath(array_path);
+  rule.target_path_ = std::move(array_path);
+  rule.extract_subpath_ = std::move(key);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::retainOnly(std::string path, std::initializer_list<std::string> keys) {
+  TranscodeRule rule(Op::RetainOnly);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  rule.match_values_.assign(keys.begin(), keys.end());
+  return rule;
+}
+
+TranscodeRule TranscodeRule::takeFirst(std::string array_path, std::string to_path) {
+  TranscodeRule rule(Op::TakeFirst);
+  rule.source_segments_ = splitPath(array_path);
+  rule.source_path_ = std::move(array_path);
+  rule.target_segments_ = splitPath(to_path);
+  rule.target_path_ = std::move(to_path);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::collectText(std::string array_path, std::string key,
+                                         std::string to_path, TranscodePredicate where) {
+  TranscodeRule rule(Op::CollectText);
+  rule.source_segments_ = splitPath(array_path);
+  rule.source_path_ = std::move(array_path);
+  rule.extract_subpath_segments_ = splitPath(key);
+  rule.extract_subpath_ = std::move(key);
+  rule.target_segments_ = splitPath(to_path);
+  rule.target_path_ = std::move(to_path);
+  rule.predicate_ = std::move(where);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::when(TranscodePredicate predicate,
+                                  std::initializer_list<TranscodeRule> rules) {
+  return when(std::move(predicate), std::vector<TranscodeRule>(rules));
+}
+
+TranscodeRule TranscodeRule::when(TranscodePredicate predicate, std::vector<TranscodeRule> rules) {
+  TranscodeRule rule(Op::When);
+  rule.predicate_ = std::move(predicate);
+  rule.sub_rules_ = std::move(rules);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::require(std::string path, JsonShape shape) {
+  TranscodeRule rule(Op::Require);
+  rule.predicate_ = TranscodePredicate::fieldIs(path, shape);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::captureToState(std::string path, std::string slot) {
+  TranscodeRule rule(Op::CaptureToState);
+  rule.source_segments_ = splitPath(path);
+  rule.source_path_ = std::move(path);
+  rule.slot_ = std::move(slot);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::setFromState(std::string path, std::string slot) {
+  TranscodeRule rule(Op::SetFromState);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  rule.slot_ = std::move(slot);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::convertUsage(LLMProtocol from, LLMProtocol to) {
+  TranscodeRule rule(Op::ConvertUsage);
+  rule.usage_from_ = from;
+  rule.usage_to_ = to;
+  return rule;
+}
+
+TranscodeRule TranscodeRule::accumulateUsage(LLMProtocol from, LLMProtocol render_to) {
+  TranscodeRule rule(Op::AccumulateUsage);
+  rule.usage_from_ = from;
+  rule.usage_to_ = render_to;
+  return rule;
+}
+
+absl::Status TranscodeRule::apply(nlohmann::json& json, TranscodeContext* ctx) const {
   if (!json.is_object()) {
     return absl::InvalidArgumentError("transcoding target must be a JSON object");
   }
@@ -815,6 +1219,9 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
     case UnknownValuePolicy::Reject:
       return absl::InvalidArgumentError(
           absl::StrCat("unmapped value '", current_val, "' at field '", target_path_, "'"));
+    case UnknownValuePolicy::Fallback:
+      *node = default_value_;
+      return absl::OkStatus();
     }
     return absl::OkStatus();
   }
@@ -829,7 +1236,7 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
         continue;
       }
       for (const TranscodeRule& sub_rule : sub_rules_) {
-        absl::Status status = sub_rule.apply(item);
+        absl::Status status = sub_rule.apply(item, ctx);
         if (!status.ok()) {
           return status;
         }
@@ -1016,13 +1423,205 @@ absl::Status TranscodeRule::apply(nlohmann::json& json) const {
     *arr = std::move(merged);
     return absl::OkStatus();
   }
+
+  case Op::SetConst: {
+    nlohmann::json value = default_value_;
+    setNodeByPath(json, target_segments_, std::move(value));
+    return absl::OkStatus();
+  }
+
+  case Op::SetFromContext: {
+    const nlohmann::json* existing = findNodeByPath(json, target_segments_);
+    if (ctx == nullptr || (existing != nullptr && !existing->is_null())) {
+      return absl::OkStatus();
+    }
+    switch (context_field_) {
+    case ContextField::RequestModel:
+      if (!ctx->request_model.empty()) {
+        setNodeByPath(json, target_segments_, std::string(ctx->request_model));
+      }
+      break;
+    case ContextField::NowUnixSeconds:
+      if (ctx->now_unix_seconds > 0) {
+        setNodeByPath(json, target_segments_, ctx->now_unix_seconds);
+      }
+      break;
+    }
+    return absl::OkStatus();
+  }
+
+  case Op::Enumerate: {
+    nlohmann::json* arr = findNodeByPath(json, target_segments_);
+    if (arr == nullptr || !arr->is_array()) {
+      return absl::OkStatus();
+    }
+    for (size_t i = 0; i < arr->size(); ++i) {
+      nlohmann::json& elem = (*arr)[i];
+      if (!elem.is_object()) {
+        continue;
+      }
+      if (auto it = elem.find(extract_subpath_); it == elem.end() || it->is_null()) {
+        elem[extract_subpath_] = static_cast<int64_t>(i);
+      }
+    }
+    return absl::OkStatus();
+  }
+
+  case Op::RetainOnly: {
+    nlohmann::json* node = findNodeByPath(json, target_segments_);
+    if (node == nullptr || !node->is_object()) {
+      return absl::OkStatus();
+    }
+    for (auto it = node->begin(); it != node->end();) {
+      if (std::find(match_values_.begin(), match_values_.end(), it.key()) == match_values_.end()) {
+        it = node->erase(it);
+      } else {
+        ++it;
+      }
+    }
+    return absl::OkStatus();
+  }
+
+  case Op::TakeFirst: {
+    nlohmann::json* arr = findNodeByPath(json, source_segments_);
+    if (arr == nullptr || !arr->is_array()) {
+      return absl::OkStatus();
+    }
+    std::optional<nlohmann::json> first;
+    if (!arr->empty()) {
+      first = std::move(arr->front());
+    }
+    extractNodeByPath(json, source_segments_);
+    if (first.has_value()) {
+      setNodeByPath(json, target_segments_, std::move(*first));
+    }
+    return absl::OkStatus();
+  }
+
+  case Op::CollectText: {
+    nlohmann::json* arr = findNodeByPath(json, source_segments_);
+    if (arr == nullptr || !arr->is_array()) {
+      return absl::OkStatus();
+    }
+    std::vector<nlohmann::json*> texts;
+    for (nlohmann::json& elem : *arr) {
+      if (!elem.is_object() || !predicate_.matches(elem)) {
+        continue;
+      }
+      nlohmann::json* text = findNodeByPath(elem, extract_subpath_segments_);
+      if (text != nullptr && hasShape(*text, JsonShape::Text)) {
+        texts.push_back(text);
+      }
+    }
+    nlohmann::json collected;
+    if (texts.size() == 1) {
+      // Moved, not copied, so an `ExternalRef` stays a reference.
+      collected = std::move(*texts.front());
+    } else {
+      std::string joined;
+      for (const nlohmann::json* text : texts) {
+        if (!text->is_string()) {
+          return absl::UnimplementedError(
+              absl::StrCat("cannot join the text in '", source_path_,
+                           "' because part of it is held by reference (ExternalRef)"));
+        }
+        joined.append(text->get_ref<const std::string&>());
+      }
+      collected = std::move(joined);
+    }
+    extractNodeByPath(json, source_segments_);
+    setNodeByPath(json, target_segments_, std::move(collected));
+    return absl::OkStatus();
+  }
+
+  case Op::When: {
+    if (!predicate_.matches(json)) {
+      return absl::OkStatus();
+    }
+    for (const TranscodeRule& sub_rule : sub_rules_) {
+      absl::Status status = sub_rule.apply(json, ctx);
+      if (!status.ok()) {
+        return status;
+      }
+    }
+    return absl::OkStatus();
+  }
+
+  case Op::Require: {
+    if (predicate_.matches(json)) {
+      return absl::OkStatus();
+    }
+    return absl::InvalidArgumentError(absl::StrCat("expected field '", target_path_, "' to be ",
+                                                   shapeDescription(predicate_.shape())));
+  }
+
+  case Op::CaptureToState: {
+    if (ctx == nullptr || ctx->stream_state == nullptr) {
+      return missingStreamState("capture_to_state");
+    }
+    const nlohmann::json* node = findNodeByPath(json, source_segments_);
+    if (node == nullptr || node->is_null()) {
+      return absl::OkStatus();
+    }
+    // A reference points into this event's buffer, which is gone by the time a later event reads
+    // the slot.
+    if (containsExternalRef(*node)) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("cannot capture offloaded ExternalRef at '", source_path_, "'"));
+    }
+    ctx->stream_state->slots.insert_or_assign(slot_, *node);
+    return absl::OkStatus();
+  }
+
+  case Op::SetFromState: {
+    if (ctx == nullptr || ctx->stream_state == nullptr) {
+      return missingStreamState("set_from_state");
+    }
+    const nlohmann::json* existing = findNodeByPath(json, target_segments_);
+    if (existing != nullptr && !existing->is_null()) {
+      return absl::OkStatus();
+    }
+    const auto slot = ctx->stream_state->slots.find(slot_);
+    if (slot == ctx->stream_state->slots.end()) {
+      return absl::OkStatus();
+    }
+    nlohmann::json value = slot->second;
+    setNodeByPath(json, target_segments_, std::move(value));
+    return absl::OkStatus();
+  }
+
+  case Op::ConvertUsage: {
+    TokenUsage usage = takeUsage(json, usage_from_);
+    if (!usage.hasAny()) {
+      return absl::OkStatus();
+    }
+    finalizeUsage(usage);
+    writeUsage(json, usage, usage_to_);
+    return absl::OkStatus();
+  }
+
+  case Op::AccumulateUsage: {
+    if (ctx == nullptr || ctx->stream_state == nullptr) {
+      return missingStreamState("accumulate_usage");
+    }
+    TokenUsage& total = ctx->stream_state->usage;
+    total.merge(takeUsage(json, usage_from_));
+    if (usage_to_ == LLMProtocol::Unspecified || !total.hasAny()) {
+      return absl::OkStatus();
+    }
+    // Finalizing is one-shot and the stream is not over, so render a finalized copy.
+    TokenUsage snapshot = total;
+    finalizeUsage(snapshot);
+    writeUsage(json, snapshot, usage_to_);
+    return absl::OkStatus();
+  }
   }
   return absl::OkStatus();
 }
 
-absl::Status TranscodeRuleSet::execute(nlohmann::json& json) const {
+absl::Status TranscodeRuleSet::execute(nlohmann::json& json, TranscodeContext* ctx) const {
   for (const TranscodeRule& rule : rules_) {
-    absl::Status status = rule.apply(json);
+    absl::Status status = rule.apply(json, ctx);
     if (!status.ok()) {
       return status;
     }
@@ -1105,7 +1704,7 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
   const bool is_ir = pack.protocol == TranscodingEngine::kIrProtocol;
   if (direction == TranscodeDirection::ToIr) {
     if (!is_ir) {
-      absl::Status status = pack.request.to_ir.execute(json);
+      absl::Status status = pack.request.to_ir.execute(json, &ctx);
       if (!status.ok()) {
         return status;
       }
@@ -1116,7 +1715,7 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
 
   ctx.ir_model = irModel(json);
   if (!is_ir) {
-    absl::Status status = pack.request.from_ir.execute(json);
+    absl::Status status = pack.request.from_ir.execute(json, &ctx);
     if (!status.ok()) {
       return status;
     }
@@ -1128,7 +1727,7 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
 }
 
 absl::Status transcodeResponse(const DialectTranscodePack& pack, TranscodeDirection direction,
-                               nlohmann::json& json) {
+                               TranscodeContext& ctx, nlohmann::json& json) {
   if (pack.protocol == TranscodingEngine::kIrProtocol) {
     return absl::OkStatus();
   }
@@ -1138,7 +1737,7 @@ absl::Status transcodeResponse(const DialectTranscodePack& pack, TranscodeDirect
   // caller's document intact. `ExternalRef` nodes are small handles, so the copy never touches
   // offloaded bytes.
   nlohmann::json working = json;
-  absl::Status status = rules.execute(working);
+  absl::Status status = rules.execute(working, &ctx);
   if (!status.ok()) {
     return status;
   }
@@ -1158,7 +1757,7 @@ absl::Status TranscodingEngine::transcode(const TranscodeLeg& leg, TranscodeCont
   case PayloadKind::Request:
     return transcodeRequest(**pack, leg.direction, ctx, json);
   case PayloadKind::Response:
-    return transcodeResponse(**pack, leg.direction, json);
+    return transcodeResponse(**pack, leg.direction, ctx, json);
   case PayloadKind::StreamEvent:
     break;
   }

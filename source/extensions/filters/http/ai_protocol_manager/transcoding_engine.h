@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 #include <utility>
@@ -12,12 +13,78 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
+
+struct TranscodeContext;
+
+// The shape a `TranscodePredicate::fieldIs()` test or a `TranscodeRule::require()` rule expects of
+// a node.
+enum class JsonShape {
+  Object,
+  Array,
+  // An array with at least one element.
+  NonEmptyArray,
+  // An inline string. An offloaded `ExternalRef` is not one; see `Text`.
+  String,
+  // Text of any size: an inline string, or an `ExternalRef` to a large string held outside the
+  // DOM. Use this, not `String`, for any field a schema declares `.offloadable()`.
+  Text,
+};
+
+// A read-only test on a JSON object, which makes a rule conditional (`when`, `collectText`,
+// `require`). Predicates never move data, so unlike rule paths, their dot-separated paths may index
+// arrays with numeric segments (e.g. `choices.0.delta.content`). A default-constructed predicate
+// matches everything.
+class TranscodePredicate {
+public:
+  enum class Kind {
+    Always,
+    FieldEquals,
+    FieldIs,
+    Not,
+  };
+
+  TranscodePredicate() = default;
+
+  // Matches everything.
+  static TranscodePredicate always();
+
+  // Matches when `path` holds a value equal to `value`. An offloaded `ExternalRef` equals nothing,
+  // which is why the startup verifier rejects this on offloadable fields.
+  static TranscodePredicate fieldEquals(std::string path, nlohmann::json value);
+
+  // Matches when `path` holds a value of `shape`.
+  static TranscodePredicate fieldIs(std::string path, JsonShape shape);
+
+  // Matches when `predicate` does not.
+  static TranscodePredicate negate(TranscodePredicate predicate);
+
+  bool matches(const nlohmann::json& json) const;
+
+  // Introspection accessors (used by the startup verifier):
+  Kind kind() const { return kind_; }
+  const std::string& path() const { return path_; }
+  const nlohmann::json& value() const { return value_; }
+  JsonShape shape() const { return shape_; }
+  const std::vector<TranscodePredicate>& operands() const { return operands_; }
+
+private:
+  explicit TranscodePredicate(Kind kind) : kind_(kind) {}
+
+  Kind kind_{Kind::Always};
+  std::string path_;
+  std::vector<std::string> segments_;
+  nlohmann::json value_;
+  JsonShape shape_{JsonShape::Object};
+  // The negated predicate, for `Not`.
+  std::vector<TranscodePredicate> operands_;
+};
 
 // Declarative, schema-backed JSON transcoding rule specification.
 //
@@ -74,17 +141,60 @@ public:
     // Merges consecutive elements in array `target_path` that share the same `key_field`
     // value, combining their `merge_field` values.
     MergeConsecutiveByKey,
+    // Writes `default_value` to `target_path`, replacing whatever is there.
+    SetConst,
+    // Writes the caller-supplied `context_field` to `target_path` if `target_path` is absent or
+    // null and the caller supplied a value.
+    SetFromContext,
+    // Sets `element_key` on each object element of array `target_path` to the element's position,
+    // unless the element already carries it.
+    Enumerate,
+    // Removes every member of the object at `target_path` whose key is not in `match_values`.
+    RetainOnly,
+    // Replaces array `source_path` with its first element, moved to `target_path`.
+    TakeFirst,
+    // Gathers the text at `extract_subpath` of every element of array `source_path` that matches
+    // `predicate` into `target_path`, then removes `source_path`.
+    CollectText,
+    // Applies `sub_rules` to the current object if it matches `predicate`.
+    When,
+    // Fails unless the current object matches `predicate` (a `fieldIs` test on `target_path`).
+    Require,
+    // Copies the value at `source_path` into the stream state slot named `slot`.
+    CaptureToState,
+    // Writes stream state slot `slot` to `target_path` if `target_path` is absent or null.
+    SetFromState,
+    // Re-renders a payload's token usage from `usage_from`'s shape into `usage_to`'s.
+    ConvertUsage,
+    // Merges a stream event's token usage into the stream's running total, and optionally renders
+    // that total in `usage_to`'s shape.
+    AccumulateUsage,
   };
 
   enum class UnknownValuePolicy {
     Passthrough,
     Drop,
     Reject,
+    // Replaces the unmapped value with a fixed fallback (see `ValueFallback`).
+    Fallback,
   };
 
   struct ValueMapping {
     std::string from;
     std::string to;
+  };
+
+  // The value a `valueMap` writes for a string none of its mappings cover.
+  struct ValueFallback {
+    std::string value;
+  };
+
+  // A value the caller supplies through `TranscodeContext` because the payload does not carry it.
+  enum class ContextField {
+    // The model the request named (`TranscodeContext::request_model`).
+    RequestModel,
+    // The current time in seconds since the Unix epoch (`TranscodeContext::now_unix_seconds`).
+    NowUnixSeconds,
   };
 
   // Static factory builders for declarative rule construction:
@@ -134,8 +244,14 @@ public:
   valueMap(std::string path, std::initializer_list<ValueMapping> mappings,
            UnknownValuePolicy unknown_policy = UnknownValuePolicy::Passthrough);
 
+  // As above, but a string none of `mappings` covers becomes `fallback.value`. Non-string values
+  // are left alone.
+  static TranscodeRule valueMap(std::string path, std::vector<ValueMapping> mappings,
+                                ValueFallback fallback);
+
   // Runs `rules` on each element of the array at `array_path`.
   static TranscodeRule forEach(std::string array_path, std::initializer_list<TranscodeRule> rules);
+  static TranscodeRule forEach(std::string array_path, std::vector<TranscodeRule> rules);
 
   // Extracts elements from `array_path` whose `predicate_field` matches any of `match_values`.
   // The matched element's `extract_subpath` is moved to `target_path` (removing the element
@@ -163,6 +279,71 @@ public:
   static TranscodeRule mergeConsecutiveByKey(std::string array_path, std::string key_field,
                                              std::string merge_field);
 
+  // Sets `path` to `value`, replacing any existing value. For members whose value is fixed by the
+  // destination dialect (e.g. OpenAI's `object: "chat.completion"`).
+  static TranscodeRule setConst(std::string path, nlohmann::json value);
+
+  // Sets `path` from the caller-supplied `field` if `path` is missing or null. A field the caller
+  // left empty (or zero) writes nothing, so a later `setDefault` can still apply.
+  static TranscodeRule setFromContext(std::string path, ContextField field);
+
+  // Sets `key` on each object element of the array at `array_path` to the element's position,
+  // unless the element already carries a non-null `key`.
+  static TranscodeRule enumerate(std::string array_path, std::string key);
+
+  // Removes every member of the object at `path` (empty for the current object) whose key is not
+  // in `keys`. Ends a mapping into a dialect that rejects, or must not leak, unknown members.
+  static TranscodeRule retainOnly(std::string path, std::initializer_list<std::string> keys);
+
+  // Replaces the array at `array_path` with its first element, moved to `to_path`. An empty array
+  // is removed and writes nothing. For destinations that carry one of what the IR has a list of
+  // (e.g. IR `choices[0]` -> the root of an Anthropic message).
+  static TranscodeRule takeFirst(std::string array_path, std::string to_path);
+
+  // Gathers `element[key]` from every object element of the array at `array_path` that matches
+  // `where` and holds text, writes it to `to_path`, and removes the array. A single match is moved,
+  // so an offloaded `ExternalRef` survives without being materialized; several inline strings are
+  // concatenated; no match yields "". Several matches that include an `ExternalRef` cannot be
+  // joined without materializing it, so that is an `Unimplemented` error, raised before anything
+  // is modified. An absent or non-array `array_path` is left alone.
+  static TranscodeRule collectText(std::string array_path, std::string key, std::string to_path,
+                                   TranscodePredicate where = TranscodePredicate());
+
+  // Runs `rules` on the current object if it matches `predicate`.
+  static TranscodeRule when(TranscodePredicate predicate,
+                            std::initializer_list<TranscodeRule> rules);
+  static TranscodeRule when(TranscodePredicate predicate, std::vector<TranscodeRule> rules);
+
+  // Fails with `InvalidArgument` unless `path` holds a value of `shape`. Guards the rules that
+  // follow, which would otherwise quietly skip a payload that is not what the dialect promises.
+  static TranscodeRule require(std::string path, JsonShape shape);
+
+  // Copies the value at `path` into the stream state slot `slot`, for a later event's
+  // `setFromState`. Only valid on stream legs; fails without `TranscodeContext::stream_state`. A
+  // value that is or holds an offloaded `ExternalRef` cannot be captured, since the buffer it
+  // points into does not outlive the event.
+  static TranscodeRule captureToState(std::string path, std::string slot);
+
+  // Sets `path` from the stream state slot `slot` if `path` is missing or null and the slot was
+  // captured. Only valid on stream legs; fails without `TranscodeContext::stream_state`.
+  static TranscodeRule setFromState(std::string path, std::string slot);
+
+  // Re-renders the payload's token usage from dialect `from` into dialect `to`, through the
+  // canonical `TokenUsage` both adapters agree on (`LLMProtocolAdapter::extractUsage()`, then
+  // `renderUsage()`). `from`'s root usage member (`usagePath()`) is removed; `to`'s is written only
+  // if there was usage.
+  static TranscodeRule convertUsage(LLMProtocol from, LLMProtocol to);
+
+  // Merges the stream event's token usage, read as dialect `from`, into the stream's running total
+  // (`TranscodeStreamState::usage`) and removes `from`'s root usage member. Usage the adapter reads
+  // from elsewhere (Anthropic `message_start` nests it under `message`) is left for the event's
+  // other rules. When `render_to` is set, the running total so far is written in that dialect's
+  // shape. For dialects that report usage in pieces across a stream (Anthropic: input in
+  // `message_start`, output in `message_delta`). Only valid on stream legs; fails without
+  // `TranscodeContext::stream_state`.
+  static TranscodeRule accumulateUsage(LLMProtocol from,
+                                       LLMProtocol render_to = LLMProtocol::Unspecified);
+
   // Introspection accessors (used by the startup Verifier and Executor):
   Op op() const { return op_; }
   const std::string& sourcePath() const { return source_path_; }
@@ -177,9 +358,15 @@ public:
   }
   UnknownValuePolicy unknownValuePolicy() const { return unknown_policy_; }
   const std::vector<TranscodeRule>& subRules() const { return sub_rules_; }
+  const TranscodePredicate& predicate() const { return predicate_; }
+  ContextField contextField() const { return context_field_; }
+  const std::string& slot() const { return slot_; }
+  LLMProtocol usageFrom() const { return usage_from_; }
+  LLMProtocol usageTo() const { return usage_to_; }
 
-  // Executes this rule in-place on `json`.
-  absl::Status apply(nlohmann::json& json) const;
+  // Executes this rule in-place on `json`. `ctx` supplies what `setFromContext` and the stream
+  // state rules read and write; rules that need none of it run without one.
+  absl::Status apply(nlohmann::json& json, TranscodeContext* ctx = nullptr) const;
 
 private:
   explicit TranscodeRule(Op op) : op_(op) {}
@@ -195,11 +382,17 @@ private:
   std::string extract_subpath_;
   std::vector<std::string> extract_subpath_segments_;
   std::vector<std::string> match_values_;
+  // The value `SetDefault` / `SetConst` write, or a `ValueMap`'s fallback.
   nlohmann::json default_value_;
   absl::flat_hash_map<std::string, std::string> value_mappings_;
   UnknownValuePolicy unknown_policy_{UnknownValuePolicy::Passthrough};
   bool integral_{false};
   std::vector<TranscodeRule> sub_rules_;
+  TranscodePredicate predicate_;
+  ContextField context_field_{ContextField::RequestModel};
+  std::string slot_;
+  LLMProtocol usage_from_{LLMProtocol::Unspecified};
+  LLMProtocol usage_to_{LLMProtocol::Unspecified};
 };
 
 // A compiled, immutable sequence of declarative `TranscodeRule`s that transforms a payload
@@ -219,9 +412,11 @@ public:
   LLMProtocol targetProtocol() const { return target_protocol_; }
   const std::vector<TranscodeRule>& rules() const { return rules_; }
 
-  // Executes all rules in order on `payload`.
-  absl::Status execute(JsonWithExtBuf& payload) const { return execute(payload.json()); }
-  absl::Status execute(nlohmann::json& json) const;
+  // Executes all rules in order on `payload`; see `TranscodeRule::apply()` for `ctx`.
+  absl::Status execute(JsonWithExtBuf& payload, TranscodeContext* ctx = nullptr) const {
+    return execute(payload.json(), ctx);
+  }
+  absl::Status execute(nlohmann::json& json, TranscodeContext* ctx = nullptr) const;
 
 private:
   LLMProtocol source_protocol_{LLMProtocol::Unspecified};
@@ -254,9 +449,30 @@ struct TranscodeLeg {
   LLMProtocol dialect{LLMProtocol::Unspecified};
 };
 
+// Per-stream memory for one streamed response, owned by the caller (one per stream, never shared)
+// and handed to each of the stream's events through `TranscodeContext::stream_state`.
+struct TranscodeStreamState {
+  // Values `captureToState` saved for a later event's `setFromState`.
+  absl::flat_hash_map<std::string, nlohmann::json> slots{};
+  // The native usage `accumulateUsage` has merged so far. Never finalized itself: renders
+  // finalize a copy.
+  TokenUsage usage{};
+};
+
 // What a leg needs beyond the payload, and what it produces outside the payload. The engine reads
 // no headers and no clocks itself; the caller passes in what it has and applies what comes back.
 struct TranscodeContext {
+  // Inputs.
+  // The model the request named, for a response that does not name its own (see
+  // `TranscodeRule::ContextField::RequestModel`).
+  absl::string_view request_model{};
+  // The current time, for a response the IR requires a `created` timestamp on but the dialect
+  // does not carry one (see `TranscodeRule::ContextField::NowUnixSeconds`).
+  int64_t now_unix_seconds{0};
+  // The stream's memory, required by stream-state and usage-accumulation rules.
+  TranscodeStreamState* stream_state{nullptr};
+
+  // Outputs.
   // Set by request legs to the request's IR `model` (read after a `ToIr` leg and before a
   // `FromIr` one), so the caller can hand it back as the fallback model on the response legs.
   std::string ir_model{};
