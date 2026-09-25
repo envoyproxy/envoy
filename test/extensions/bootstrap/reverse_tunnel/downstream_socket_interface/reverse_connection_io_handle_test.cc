@@ -1,12 +1,11 @@
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
@@ -100,8 +99,9 @@ protected:
   createTestIOHandle(const ReverseConnectionSocketConfig& config,
                      ReverseTunnelInitiatorExtension* extension_override = nullptr) {
     // Create a test socket file descriptor.
-    int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    EXPECT_GE(test_fd, 0);
+    const os_fd_t test_fd =
+        Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, 0).return_value_;
+    EXPECT_TRUE(SOCKET_VALID(test_fd));
 
     // Create the IO handle.
     ReverseTunnelInitiatorExtension* extension_ptr =
@@ -193,9 +193,19 @@ protected:
 
   void createTriggerPipe() { io_handle_->createTriggerPipe(); }
 
-  int getTriggerPipeReadFd() const { return io_handle_->trigger_pipe_read_fd_; }
+  os_fd_t getTriggerPipeReadFd() const { return io_handle_->trigger_pipe_read_fd_; }
 
-  int getTriggerPipeWriteFd() const { return io_handle_->trigger_pipe_write_fd_; }
+  os_fd_t getTriggerPipeWriteFd() const { return io_handle_->trigger_pipe_write_fd_; }
+
+  ssize_t receiveTriggerByte(os_fd_t fd, char& trigger_byte) const {
+    return Api::OsSysCallsSingleton::get().recv(fd, &trigger_byte, 1, 0).return_value_;
+  }
+
+  ssize_t sendTriggerByte(char& trigger_byte) const {
+    return Api::OsSysCallsSingleton::get()
+        .send(getTriggerPipeWriteFd(), &trigger_byte, 1, 0)
+        .return_value_;
+  }
 
   // Connection Management Helpers.
 
@@ -405,7 +415,7 @@ TEST_F(ReverseConnectionIOHandleTest, BasicSetup) {
   EXPECT_NE(io_handle_, nullptr);
 
   // Verify the IO handle has a valid file descriptor.
-  EXPECT_GE(io_handle_->fdDoNotUse(), 0);
+  EXPECT_TRUE(SOCKET_VALID(io_handle_->fdDoNotUse()));
 }
 
 TEST_F(ReverseConnectionIOHandleTest, RequestPathDefaultsAndOverrides) {
@@ -450,8 +460,8 @@ TEST_F(ReverseConnectionIOHandleTest, IsTriggerPipeReady) {
   EXPECT_TRUE(isTriggerPipeReady());
 
   // Verify the file descriptors are valid.
-  EXPECT_GE(getTriggerPipeReadFd(), 0);
-  EXPECT_GE(getTriggerPipeWriteFd(), 0);
+  EXPECT_TRUE(SOCKET_VALID(getTriggerPipeReadFd()));
+  EXPECT_TRUE(SOCKET_VALID(getTriggerPipeWriteFd()));
 }
 
 // Test createTriggerPipe() basic pipe creation.
@@ -468,8 +478,8 @@ TEST_F(ReverseConnectionIOHandleTest, CreateTriggerPipe) {
 
   // Verify that the trigger pipe was created successfully.
   EXPECT_TRUE(isTriggerPipeReady());
-  EXPECT_GE(getTriggerPipeReadFd(), 0);
-  EXPECT_GE(getTriggerPipeWriteFd(), 0);
+  EXPECT_TRUE(SOCKET_VALID(getTriggerPipeReadFd()));
+  EXPECT_TRUE(SOCKET_VALID(getTriggerPipeWriteFd()));
 
   // Verify getPipeMonitorFd returns the correct file descriptor.
   EXPECT_EQ(io_handle_->getPipeMonitorFd(), getTriggerPipeReadFd());
@@ -496,8 +506,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventCreatesTriggerPipe) {
 
   // Verify that the trigger pipe was created successfully.
   EXPECT_TRUE(isTriggerPipeReady());
-  EXPECT_GE(getTriggerPipeReadFd(), 0);
-  EXPECT_GE(getTriggerPipeWriteFd(), 0);
+  EXPECT_TRUE(SOCKET_VALID(getTriggerPipeReadFd()));
+  EXPECT_TRUE(SOCKET_VALID(getTriggerPipeWriteFd()));
 
   // Verify getPipeMonitorFd returns the correct file descriptor.
   EXPECT_EQ(io_handle_->getPipeMonitorFd(), getTriggerPipeReadFd());
@@ -521,10 +531,10 @@ TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventDoesNotCreateNewPipes) 
 
   // Verify that the trigger pipe was created.
   EXPECT_TRUE(isTriggerPipeReady());
-  int first_read_fd = getTriggerPipeReadFd();
-  int first_write_fd = getTriggerPipeWriteFd();
-  EXPECT_GE(first_read_fd, 0);
-  EXPECT_GE(first_write_fd, 0);
+  const os_fd_t first_read_fd = getTriggerPipeReadFd();
+  const os_fd_t first_write_fd = getTriggerPipeWriteFd();
+  EXPECT_TRUE(SOCKET_VALID(first_read_fd));
+  EXPECT_TRUE(SOCKET_VALID(first_write_fd));
 
   // Second call to initializeFileEvent - should NOT create new pipes because.
   // is_reverse_conn_started_ is true
@@ -1973,12 +1983,12 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccess) {
   EXPECT_EQ(getEstablishedConnectionsSize(), 1);
 
   // Verify that trigger mechanism was executed.
-  // Read 1 byte from the pipe to verify the trigger was written.
+  // Receive 1 byte from the socket pair to verify the trigger was sent.
   char trigger_byte;
-  int pipe_read_fd = getTriggerPipeReadFd();
-  EXPECT_GE(pipe_read_fd, 0);
+  const os_fd_t pipe_read_fd = getTriggerPipeReadFd();
+  EXPECT_TRUE(SOCKET_VALID(pipe_read_fd));
 
-  ssize_t bytes_read = ::read(pipe_read_fd, &trigger_byte, 1);
+  const ssize_t bytes_read = receiveTriggerByte(pipe_read_fd, trigger_byte);
   EXPECT_EQ(bytes_read, 1) << "Expected to read 1 byte from trigger pipe, got " << bytes_read;
   EXPECT_EQ(trigger_byte, 1) << "Expected trigger byte to be 1, got "
                              << static_cast<int>(trigger_byte);
@@ -1992,10 +2002,10 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccessTriggerWriteFailure
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  // Prepare trigger pipe, then close write end so ::write fails.
+  // Prepare the trigger socket pair, then close the write end so send() fails.
   createTriggerPipe();
   EXPECT_TRUE(isTriggerPipeReady());
-  ::close(getTriggerPipeWriteFd());
+  Api::OsSysCallsSingleton::get().close(getTriggerPipeWriteFd());
 
   // Mock cluster and single host.
   auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
@@ -2314,10 +2324,10 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
 
   // Verify that trigger mechanism was executed.
   char trigger_byte;
-  int pipe_read_fd = getTriggerPipeReadFd();
-  EXPECT_GE(pipe_read_fd, 0);
+  const os_fd_t pipe_read_fd = getTriggerPipeReadFd();
+  EXPECT_TRUE(SOCKET_VALID(pipe_read_fd));
 
-  ssize_t bytes_read = ::read(pipe_read_fd, &trigger_byte, 1);
+  const ssize_t bytes_read = receiveTriggerByte(pipe_read_fd, trigger_byte);
   EXPECT_EQ(bytes_read, 1) << "Expected to read 1 byte from trigger pipe, got " << bytes_read;
   EXPECT_EQ(trigger_byte, 1) << "Expected trigger byte to be 1, got "
                              << static_cast<int>(trigger_byte);
@@ -2500,14 +2510,14 @@ TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithoutTriggerPipe) {
   EXPECT_FALSE(isTriggerPipeReady());
 
   // Get initial file descriptor (this is the original socket FD)
-  int initial_fd = io_handle_->fdDoNotUse();
-  EXPECT_GE(initial_fd, 0);
+  const os_fd_t initial_fd = io_handle_->fdDoNotUse();
+  EXPECT_TRUE(SOCKET_VALID(initial_fd));
 
   // Call close() - should close only the original socket FD and delegate to base class.
   auto result = io_handle_->close();
 
-  // After close(), the FD should be -1.
-  EXPECT_EQ(io_handle_->fdDoNotUse(), -1);
+  // After close(), the socket should be invalid.
+  EXPECT_TRUE(SOCKET_INVALID(io_handle_->fdDoNotUse()));
 }
 
 // Test ReverseConnectionIOHandle::close() method with trigger pipe.
@@ -2517,8 +2527,8 @@ TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithTriggerPipe) {
   EXPECT_NE(io_handle_, nullptr);
 
   // Get the original socket FD before creating trigger pipe.
-  int original_socket_fd = io_handle_->fdDoNotUse();
-  EXPECT_GE(original_socket_fd, 0);
+  const os_fd_t original_socket_fd = io_handle_->fdDoNotUse();
+  EXPECT_TRUE(SOCKET_VALID(original_socket_fd));
 
   // Create trigger pipe and initialize file event to set up the scenario where fd_ points to.
   // trigger pipe Mock file event callback
@@ -2530,8 +2540,8 @@ TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithTriggerPipe) {
   EXPECT_TRUE(isTriggerPipeReady());
 
   // Get the pipe monitor FD (this becomes the monitored fd_ after initializeFileEvent)
-  int pipe_monitor_fd = getTriggerPipeReadFd();
-  EXPECT_GE(pipe_monitor_fd, 0);
+  const os_fd_t pipe_monitor_fd = getTriggerPipeReadFd();
+  EXPECT_TRUE(SOCKET_VALID(pipe_monitor_fd));
   EXPECT_NE(original_socket_fd, pipe_monitor_fd); // Should be different FDs
 
   // Verify that the active FD is now the pipe monitor FD.
@@ -2543,7 +2553,7 @@ TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithTriggerPipe) {
 
   auto result = io_handle_->close();
   EXPECT_EQ(result.return_value_, 0);
-  EXPECT_EQ(io_handle_->fdDoNotUse(), -1);
+  EXPECT_TRUE(SOCKET_INVALID(io_handle_->fdDoNotUse()));
 }
 
 // Test ReverseConnectionIOHandle::cleanup() method.
@@ -2555,8 +2565,8 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupMethod) {
   // Set up initial state with trigger pipe.
   createTriggerPipe();
   EXPECT_TRUE(isTriggerPipeReady());
-  EXPECT_GE(getTriggerPipeReadFd(), 0);
-  EXPECT_GE(getTriggerPipeWriteFd(), 0);
+  EXPECT_TRUE(SOCKET_VALID(getTriggerPipeReadFd()));
+  EXPECT_TRUE(SOCKET_VALID(getTriggerPipeWriteFd()));
 
   // Add some host connection info.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 2);
@@ -2569,10 +2579,10 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupMethod) {
   // Call cleanup() - should reset all resources.
   cleanup();
 
-  // Verify that trigger pipe FDs are reset to -1.
+  // Verify that trigger pipe sockets are invalidated.
   EXPECT_FALSE(isTriggerPipeReady());
-  EXPECT_EQ(getTriggerPipeReadFd(), -1);
-  EXPECT_EQ(getTriggerPipeWriteFd(), -1);
+  EXPECT_TRUE(SOCKET_INVALID(getTriggerPipeReadFd()));
+  EXPECT_TRUE(SOCKET_INVALID(getTriggerPipeWriteFd()));
 
   // Verify that host connection info is cleared.
   EXPECT_EQ(getHostToConnInfoMap().size(), 0);
@@ -2582,7 +2592,7 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupMethod) {
   EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
 
   // Verify that the base class fd_ is still valid (cleanup doesn't close the main socket)
-  EXPECT_GE(io_handle_->fdDoNotUse(), 0);
+  EXPECT_TRUE(SOCKET_VALID(io_handle_->fdDoNotUse()));
 }
 
 // Test cleanup() closes any established connections in the queue.
@@ -2628,15 +2638,15 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupResetsFileEventsBeforeClosingPipe) 
                                   Event::FileReadyType::Read);
 
   EXPECT_TRUE(isTriggerPipeReady());
-  EXPECT_GE(getTriggerPipeReadFd(), 0);
-  EXPECT_GE(getTriggerPipeWriteFd(), 0);
+  EXPECT_TRUE(SOCKET_VALID(getTriggerPipeReadFd()));
+  EXPECT_TRUE(SOCKET_VALID(getTriggerPipeWriteFd()));
   EXPECT_EQ(io_handle_->fdDoNotUse(), getTriggerPipeReadFd());
 
   cleanup();
 
   EXPECT_FALSE(isTriggerPipeReady());
-  EXPECT_EQ(getTriggerPipeReadFd(), -1);
-  EXPECT_EQ(getTriggerPipeWriteFd(), -1);
+  EXPECT_TRUE(SOCKET_INVALID(getTriggerPipeReadFd()));
+  EXPECT_TRUE(SOCKET_INVALID(getTriggerPipeWriteFd()));
 
   // Verify the file event callback is not triggered after cleanup (no busy loop).
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
@@ -2653,7 +2663,7 @@ TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventSkipWhenAlreadyStarted)
   io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level, 0);
 
   // Call again; should skip without changing fd or creating a new pipe.
-  const int fd_before = io_handle_->fdDoNotUse();
+  const os_fd_t fd_before = io_handle_->fdDoNotUse();
   io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level, 0);
   EXPECT_EQ(fd_before, io_handle_->fdDoNotUse());
 }
@@ -2809,8 +2819,9 @@ TEST_F(ReverseConnectionIOHandleTest, OnBelowWriteBufferLowWatermark) {
 TEST_F(ReverseConnectionIOHandleTest, UpdateStateGaugeWithNullExtension) {
   // Create a test IO handle with null extension BEFORE setting up thread local slot.
   auto config = createDefaultTestConfig();
-  int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
-  EXPECT_GE(test_fd, 0);
+  const os_fd_t test_fd =
+      Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, 0).return_value_;
+  EXPECT_TRUE(SOCKET_VALID(test_fd));
 
   auto io_handle_null_extension = std::make_unique<ReverseConnectionIOHandle>(
       test_fd, config, cluster_manager_, nullptr, *stats_scope_);
@@ -2886,14 +2897,14 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodTriggerPipeEdgeCases) {
   result = io_handle_->accept(nullptr, nullptr);
   EXPECT_EQ(result, nullptr);
 
-  // Test Case 3: Trigger pipe closed (read returns 0) - should return nullptr.
-  ::close(getTriggerPipeWriteFd());
+  // Test Case 3: Trigger socket closed (recv returns 0) - should return nullptr.
+  Api::OsSysCallsSingleton::get().close(getTriggerPipeWriteFd());
   result = io_handle_->accept(nullptr, nullptr);
   EXPECT_EQ(result, nullptr);
   createTriggerPipe();
 
-  // Test Case 4: Trigger pipe read error (not EAGAIN/EWOULDBLOCK) - should return nullptr.
-  ::close(getTriggerPipeReadFd());
+  // Test Case 4: Trigger socket receive error (not EAGAIN/EWOULDBLOCK) - should return nullptr.
+  Api::OsSysCallsSingleton::get().close(getTriggerPipeReadFd());
   result = io_handle_->accept(nullptr, nullptr);
   EXPECT_EQ(result, nullptr);
   createTriggerPipe();
@@ -2901,7 +2912,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodTriggerPipeEdgeCases) {
   // Test Case 5: Trigger pipe ready, data read, but no established connections - should return
   // nullptr.
   char trigger_byte = 1;
-  ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
+  const ssize_t bytes_written = sendTriggerByte(trigger_byte);
   EXPECT_EQ(bytes_written, 1);
 
   result = io_handle_->accept(nullptr, nullptr);
@@ -2943,7 +2954,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSuccessfulWithAddress) {
 
   // Write trigger byte.
   char trigger_byte = 1;
-  ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
+  const ssize_t bytes_written = sendTriggerByte(trigger_byte);
   EXPECT_EQ(bytes_written, 1);
 
   // Test accept with address parameters.
@@ -2988,7 +2999,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
     addConnectionToEstablishedQueue(std::move(mock_connection));
 
     char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
+    const ssize_t bytes_written = sendTriggerByte(trigger_byte);
     EXPECT_EQ(bytes_written, 1);
 
     struct sockaddr_in addr;
@@ -3017,7 +3028,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
     addConnectionToEstablishedQueue(std::move(mock_connection));
 
     char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
+    const ssize_t bytes_written = sendTriggerByte(trigger_byte);
     EXPECT_EQ(bytes_written, 1);
 
     struct sockaddr_in addr;
@@ -3048,7 +3059,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
     addConnectionToEstablishedQueue(std::move(mock_connection));
 
     char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
+    const ssize_t bytes_written = sendTriggerByte(trigger_byte);
     EXPECT_EQ(bytes_written, 1);
 
     struct sockaddr_in addr;
@@ -3092,7 +3103,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSuccessfulScenarios) {
     addConnectionToEstablishedQueue(std::move(mock_connection));
 
     char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
+    const ssize_t bytes_written = sendTriggerByte(trigger_byte);
     EXPECT_EQ(bytes_written, 1);
 
     auto result = io_handle_->accept(nullptr, nullptr);
@@ -3154,7 +3165,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSocketAndFdFailures) {
     addConnectionToEstablishedQueue(std::move(mock_connection));
 
     char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
+    const ssize_t bytes_written = sendTriggerByte(trigger_byte);
     EXPECT_EQ(bytes_written, 1);
 
     auto result = io_handle_->accept(nullptr, nullptr);
@@ -3202,7 +3213,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSocketAndFdFailures) {
     addConnectionToEstablishedQueue(std::move(mock_connection));
 
     char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
+    const ssize_t bytes_written = sendTriggerByte(trigger_byte);
     EXPECT_EQ(bytes_written, 1);
 
     auto result = io_handle_->accept(nullptr, nullptr);
@@ -3368,8 +3379,9 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionDynamicCastFa
 // fd_.
 TEST_F(ReverseConnectionIOHandleTest, CloseNoDoubleCloseWhenOriginalEqualsFd) {
   auto config = createDefaultTestConfig();
-  int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
-  ASSERT_GE(test_fd, 0);
+  const os_fd_t test_fd =
+      Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, 0).return_value_;
+  ASSERT_TRUE(SOCKET_VALID(test_fd));
 
   NiceMock<Api::MockOsSysCalls> mock_os_syscalls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
@@ -3388,11 +3400,7 @@ TEST_F(ReverseConnectionIOHandleTest, CloseNoDoubleCloseWhenOriginalEqualsFd) {
 TEST_F(ReverseConnectionIOHandleTest, CloseNoDoubleCloseWithPipeFds) {
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
-
-  NiceMock<Api::MockOsSysCalls> mock_os_syscalls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
-  EXPECT_CALL(mock_os_syscalls, close(io_handle_->fdDoNotUse()))
-      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  const os_fd_t original_fd = io_handle_->fdDoNotUse();
 
   Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
@@ -3400,8 +3408,12 @@ TEST_F(ReverseConnectionIOHandleTest, CloseNoDoubleCloseWithPipeFds) {
 
   ASSERT_TRUE(isTriggerPipeReady());
 
-  os_fd_t pipe_read_fd = getTriggerPipeReadFd();
-  os_fd_t pipe_write_fd = getTriggerPipeWriteFd();
+  const os_fd_t pipe_read_fd = getTriggerPipeReadFd();
+  const os_fd_t pipe_write_fd = getTriggerPipeWriteFd();
+  NiceMock<Api::MockOsSysCalls> mock_os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
+  EXPECT_CALL(mock_os_syscalls, close(original_fd))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(mock_os_syscalls, close(pipe_read_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(mock_os_syscalls, close(pipe_write_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
 
