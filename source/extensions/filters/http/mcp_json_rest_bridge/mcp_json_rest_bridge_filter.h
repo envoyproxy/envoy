@@ -202,6 +202,12 @@ private:
   void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
                        const McpJsonRestBridgePerRouteConfig* per_route_config);
 
+  // Validates the "MCP-Protocol-Version" request header against the JSON-RPC request body.
+  // Sends a local error response and returns an error status if validation fails.
+  absl::Status validateMcpProtocolVersionHeader(const nlohmann::json& json_rpc,
+                                                absl::string_view method,
+                                                Http::RequestHeaderMapOptConstRef request_headers);
+
   // Validates that the "Mcp-Method" request header is present and matches the JSON-RPC "method"
   // field. Returns true when the header is valid. Otherwise sends a local error response and
   // returns false.

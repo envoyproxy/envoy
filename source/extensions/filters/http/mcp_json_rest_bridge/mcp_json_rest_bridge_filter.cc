@@ -64,14 +64,23 @@ const Http::LowerCaseString& baggageHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "baggage");
 }
 
-bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
-  static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> supported_mcp_versions({
-      McpConstants::MCP_VERSION_2024_11_05,
-      McpConstants::MCP_VERSION_2025_03_26,
-      McpConstants::MCP_VERSION_2025_06_18,
-      McpConstants::MCP_VERSION_2025_11_25,
-  });
-  return supported_mcp_versions->contains(protocol_version);
+bool isStatelessMcpProtocolVersionSupported(absl::string_view protocol_version) {
+  static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>>
+      supported_stateless_mcp_versions({
+          McpConstants::MCP_VERSION_2026_07_28,
+      });
+  return supported_stateless_mcp_versions->contains(protocol_version);
+}
+
+bool isLegacyMcpProtocolVersionSupported(absl::string_view protocol_version) {
+  static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>>
+      supported_legacy_mcp_versions({
+          McpConstants::MCP_VERSION_2024_11_05,
+          McpConstants::MCP_VERSION_2025_03_26,
+          McpConstants::MCP_VERSION_2025_06_18,
+          McpConstants::MCP_VERSION_2025_11_25,
+      });
+  return supported_legacy_mcp_versions->contains(protocol_version);
 }
 
 bool isStatelessProtocolRequest(const json& json_rpc,
@@ -139,7 +148,7 @@ json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response,
 json generateInitializeResponse(const json& session_id, absl::string_view server_name,
                                 absl::string_view protocol_version) {
   absl::string_view negotiated_protocol_version = McpConstants::MCP_VERSION_2025_11_25;
-  if (isMcpProtocolVersionSupported(protocol_version)) {
+  if (isLegacyMcpProtocolVersionSupported(protocol_version)) {
     negotiated_protocol_version = protocol_version;
   }
 
@@ -163,6 +172,24 @@ json generateErrorJsonResponse(int error_code, absl::string_view error_message) 
   return json{
       {McpConstants::ERROR_CODE_FIELD, error_code},
       {McpConstants::ERROR_MESSAGE_FIELD, error_message},
+  };
+}
+
+json generateUnsupportedProtocolVersionError(absl::string_view requested_version) {
+  return json{
+      {McpConstants::ERROR_CODE_FIELD, McpConstants::MCP_UNSUPPORTED_PROTOCOL_VERSION_ERROR_CODE},
+      {McpConstants::ERROR_MESSAGE_FIELD, "Unsupported protocol version"},
+      {McpConstants::ERROR_DATA_FIELD,
+       {
+           {McpConstants::REQUESTED_FIELD, requested_version},
+           {McpConstants::SUPPORTED_FIELD, json::array({
+                                               McpConstants::MCP_VERSION_2026_07_28,
+                                               McpConstants::MCP_VERSION_2025_11_25,
+                                               McpConstants::MCP_VERSION_2025_06_18,
+                                               McpConstants::MCP_VERSION_2025_03_26,
+                                               McpConstants::MCP_VERSION_2024_11_05,
+                                           })},
+       }},
   };
 }
 
@@ -197,7 +224,7 @@ bool validateRequestMcpVersion(absl::string_view method,
     }
   }
 
-  return isMcpProtocolVersionSupported(protocol_version);
+  return isLegacyMcpProtocolVersionSupported(protocol_version);
 }
 
 std::optional<absl::string_view>
@@ -207,7 +234,8 @@ getRequestHeaderValue(Http::RequestHeaderMapOptConstRef request_headers,
     return std::nullopt;
   }
   auto headers = request_headers->get(header);
-  if (headers.empty()) {
+  // Reject requests that are missing the header or carry multiple copies of it.
+  if (headers.size() != 1) {
     return std::nullopt;
   }
   return headers[0]->value().getStringView();
@@ -227,6 +255,14 @@ getRequestMcpNameHeader(Http::RequestHeaderMapOptConstRef request_headers) {
       McpConstants::MCP_NAME_HEADER);
 
   return getRequestHeaderValue(request_headers, *mcp_name_header);
+}
+
+std::optional<absl::string_view>
+getRequestMcpProtocolVersionHeader(Http::RequestHeaderMapOptConstRef request_headers) {
+  static const absl::NoDestructor<Http::LowerCaseString> mcp_protocol_version_header(
+      McpConstants::MCP_PROTOCOL_VERSION_HEADER);
+
+  return getRequestHeaderValue(request_headers, *mcp_protocol_version_header);
 }
 
 std::optional<std::string> decodeMcpHeaderValue(absl::string_view value) {
@@ -983,6 +1019,55 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
       Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_tools_list");
 }
 
+absl::Status McpJsonRestBridgeFilter::validateMcpProtocolVersionHeader(
+    const nlohmann::json& json_rpc, absl::string_view method,
+    Http::RequestHeaderMapOptConstRef request_headers) {
+  const nlohmann::json& params = json_rpc.contains(McpConstants::PARAMS_FIELD)
+                                     ? json_rpc[McpConstants::PARAMS_FIELD]
+                                     : json::object();
+  if (!is_stateless_request_) {
+    if (!validateRequestMcpVersion(method, request_headers, config_->fallbackProtocolVersion())) {
+      sendErrorResponse(Http::Code::OK, BridgeStatus::RequestUnsupportedMcpVersion,
+                        generateErrorJsonResponse(-32602, "Unsupported MCP version").dump(),
+                        nullptr, method, params);
+      return absl::InvalidArgumentError("Unsupported MCP version");
+    }
+    return absl::OkStatus();
+  }
+
+  const std::optional<absl::string_view> header_protocol_version =
+      getRequestMcpProtocolVersionHeader(request_headers);
+  const absl::string_view body_protocol_version =
+      json_rpc[McpConstants::PARAMS_FIELD][McpConstants::META_FIELD]
+              [McpConstants::MCP_META_PROTOCOL_VERSION_FIELD]
+                  .get<absl::string_view>();
+
+  if (!header_protocol_version.has_value() || *header_protocol_version != body_protocol_version) {
+    ENVOY_STREAM_LOG(debug,
+                     "MCP-Protocol-Version header '{}' does not match the JSON-RPC protocol "
+                     "version '{}'.",
+                     *decoder_callbacks_, header_protocol_version.value_or(""),
+                     body_protocol_version);
+    sendErrorResponse(
+        Http::Code::BadRequest, BridgeStatus::RequestMcpHeaderMismatch,
+        generateErrorJsonResponse(
+            McpConstants::MCP_HEADER_MISMATCH_ERROR_CODE,
+            "Header mismatch: MCP-Protocol-Version header does not match request body")
+            .dump(),
+        nullptr, method, params);
+    return absl::InvalidArgumentError("MCP-Protocol-Version header mismatch");
+  }
+
+  if (!isStatelessMcpProtocolVersionSupported(*header_protocol_version)) {
+    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestUnsupportedMcpVersion,
+                      generateUnsupportedProtocolVersionError(*header_protocol_version).dump(),
+                      nullptr, method, params);
+    return absl::InvalidArgumentError("Unsupported protocol version");
+  }
+
+  return absl::OkStatus();
+}
+
 bool McpJsonRestBridgeFilter::validateMcpMethodHeader(
     const nlohmann::json& json_rpc, absl::string_view method,
     Http::RequestHeaderMapOptRef request_headers) {
@@ -1043,12 +1128,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
 
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
 
-  if (!validateRequestMcpVersion(method, request_headers, config_->fallbackProtocolVersion())) {
-    sendErrorResponse(
-        Http::Code::OK, BridgeStatus::RequestUnsupportedMcpVersion,
-        generateErrorJsonResponse(-32602, "Unsupported MCP version").dump(), nullptr, method,
-        json_rpc.contains(McpConstants::PARAMS_FIELD) ? json_rpc[McpConstants::PARAMS_FIELD]
-                                                      : json::object());
+  if (!validateMcpProtocolVersionHeader(json_rpc, method, request_headers).ok()) {
     return;
   }
 

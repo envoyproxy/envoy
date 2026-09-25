@@ -35,6 +35,11 @@ constexpr absl::string_view IS_ERROR_FIELD = "isError";
 constexpr absl::string_view RESULT_TYPE_FIELD = "resultType";
 constexpr absl::string_view RESULT_TYPE_COMPLETE = "complete";
 constexpr absl::string_view ERROR_FIELD = "error";
+constexpr absl::string_view ERROR_DATA_FIELD = "data";
+constexpr absl::string_view REQUESTED_FIELD = "requested";
+constexpr absl::string_view SUPPORTED_FIELD = "supported";
+
+constexpr int MCP_UNSUPPORTED_PROTOCOL_VERSION_ERROR_CODE = -32022;
 
 constexpr int MCP_HEADER_MISMATCH_ERROR_CODE = -32020;
 
