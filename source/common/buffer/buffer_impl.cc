@@ -436,7 +436,7 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
 
     Slice::SizedStorage storage = slices_owner->newStorage();
     ASSERT(storage.len_ == size);
-    const RawSlice raw_slice{storage.mem_.get(), size};
+    const RawSlice raw_slice{storage.mem_, size};
     slices_owner->owned_storages_.emplace_back(std::move(storage));
     reservation_slices.push_back(raw_slice);
     bytes_remaining -= std::min<uint64_t>(raw_slice.len_, bytes_remaining);
@@ -472,7 +472,7 @@ ReservationSingleSlice OwnedImpl::reserveSingleSlice(uint64_t length, bool separ
   } else {
     slice_owner->owned_storage_ = Slice::newStorage(length);
     ASSERT(slice_owner->owned_storage_.len_ >= length);
-    reservation_slice = {slice_owner->owned_storage_.mem_.get(), static_cast<size_t>(length)};
+    reservation_slice = {slice_owner->owned_storage_.mem_, static_cast<size_t>(length)};
   }
 
   reservation.bufferImplUseOnlySliceOwner() = std::move(slice_owner);
