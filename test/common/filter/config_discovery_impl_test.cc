@@ -695,6 +695,46 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
       config_discovery_test.store_.counter("extension_config_discovery.foo.config_reload").value());
 }
 
+class FilterConfigDiscoveryShutdownTest : public testing::Test,
+                                          public HttpFilterConfigDiscoveryImplTest {
+};
+
+// This test deterministically simulates the Use-After-Free condition where the
+// FilterConfigProviderManager is destroyed while an ECDS configuration update is in-flight.
+TEST_F(FilterConfigDiscoveryShutdownTest, ShutdownDuringInFlightUpdate) {
+  // Initialize the provider and subscription
+  setup();
+
+  EXPECT_CALL(init_watcher_, ready());
+
+  // Intercept runOnAllThreads and capture the main thread completion callback
+  std::function<void()> pending_completion_callback;
+  EXPECT_CALL(server_factory_context_.thread_local_, runOnAllThreads(_, _))
+      .WillOnce(Invoke([&](std::function<void()>, std::function<void()> completion_cb) {
+        pending_completion_callback = completion_cb;
+      }))
+      .WillRepeatedly(Invoke(&server_factory_context_.thread_local_, &ThreadLocal::MockInstance::runOnAllThreads2));
+
+  // Send the ECDS configuration update to trigger the update
+  const auto response = createResponse("1", "foo");
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  ASSERT_OK(callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()));
+
+  // Ensure that the completion callback was successfully captured (update is in-flight)
+  ASSERT_NE(pending_completion_callback, nullptr);
+
+  // Destroy the provider and the provider manager (simulating server shutdown)
+  provider_.reset();
+  filter_config_provider_manager_.reset();
+
+  // Invoke the completion callback (simulating worker threads finishing the update)
+  // This will destruct the Cleanup object, which drops the subscription's reference count to 0,
+  // invoking ~FilterConfigSubscription().
+  // Ensure clean exit by not erasing from the destroyed manager.
+  pending_completion_callback();
+}
+
 // TCP listener filter matcher test.
 class TcpListenerFilterConfigMatcherTest : public testing::Test,
                                            public TcpListenerFilterConfigDiscoveryImplTest {
