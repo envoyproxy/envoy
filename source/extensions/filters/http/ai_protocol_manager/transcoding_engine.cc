@@ -1099,6 +1099,19 @@ TranscodeRuleSet geminiRequestFromIr() {
           TranscodeRule::ensureArray("stop"),
           TranscodeRule::move("stop", "generationConfig.stopSequences"),
           TranscodeRule::move("seed", "generationConfig.seed"),
+          // Gemini asks for JSON with a response MIME type, and for JSON of a given shape with
+          // a schema as well. Plain text is what it produces anyway.
+          TranscodeRule::when(
+              TranscodePredicate::fieldEquals("response_format.type", "json_object"),
+              {TranscodeRule::setConst("generationConfig.responseMimeType", "application/json")}),
+          TranscodeRule::when(
+              TranscodePredicate::fieldEquals("response_format.type", "json_schema"),
+              {
+                  TranscodeRule::setConst("generationConfig.responseMimeType", "application/json"),
+                  TranscodeRule::move("response_format.json_schema.schema",
+                                      "generationConfig.responseJsonSchema"),
+              }),
+          TranscodeRule::drop("response_format"),
           // 4. Map `tool_choice` to `toolConfig.functionCallingConfig`. Without this the
           //    field rides through as an unknown member: Gemini's root schema sets
           //    `allowUnknownFields(true)`, so it passes validation here, and Gemini then

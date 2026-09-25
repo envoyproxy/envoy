@@ -876,6 +876,41 @@ TEST(TranscodingEngineTest, MapsSeedBetweenTheIrAndGemini) {
   }
 }
 
+// Gemini refused `response_format` as an unknown field. It spells JSON mode as a response MIME
+// type, with the schema beside it when there is one; plain text is its default.
+TEST(TranscodingEngineTest, MapsResponseFormatToGeminiJsonMode) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const PayloadSchema* gemini_schema =
+      AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).schema();
+  const auto transcoded = [&](const char* response_format) {
+    nlohmann::json payload = nlohmann::json::parse(R"({
+      "model": "gemini-2.5-flash", "messages": [{"role": "user", "content": "List two colors."}]
+    })");
+    payload["response_format"] = nlohmann::json::parse(response_format);
+    EXPECT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+    EXPECT_THAT(gemini_schema->validateRequest(payload), IsOk());
+    EXPECT_FALSE(payload.contains("response_format"));
+    return payload.value("generationConfig", nlohmann::json());
+  };
+
+  EXPECT_EQ(transcoded(R"({"type": "json_object"})"),
+            nlohmann::json::parse(R"({"responseMimeType": "application/json"})"));
+  EXPECT_EQ(transcoded(R"({"type": "json_schema", "json_schema": {
+              "name": "colors", "strict": true,
+              "schema": {"type": "object", "properties": {"colors": {"type": "array"}},
+                         "required": ["colors"], "additionalProperties": false}}})"),
+            nlohmann::json::parse(R"({
+              "responseMimeType": "application/json",
+              "responseJsonSchema": {"type": "object", "properties": {"colors": {"type": "array"}},
+                                     "required": ["colors"], "additionalProperties": false}
+            })"));
+  EXPECT_EQ(transcoded(R"({"type": "json_schema", "json_schema": {"name": "anything"}})"),
+            nlohmann::json::parse(R"({"responseMimeType": "application/json"})"));
+  EXPECT_TRUE(transcoded(R"({"type": "text"})").is_null());
+}
+
 // Regression: Gemini renders proto numbers through ProtoJSON, so these fields can arrive quoted.
 // `firstOf` preserves the JSON type, so the string landed in an IR field declared numeric.
 TEST(TranscodingEngineTest, CoercesQuotedGeminiNumbersWhenEnteringTheIr) {
