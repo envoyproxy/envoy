@@ -34,8 +34,9 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
     Server::Configuration::ServerFactoryContext& context,
     const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
         DownstreamReverseConnectionSocketInterface& config)
-    : context_(context), config_(config) {
-  stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_initiator");
+    : context_(context), config_(config),
+      stat_prefix_(PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_initiator")),
+      tunnel_setup_time_(getHistogram("tunnel_setup_time", context_.scope())) {
   // Configure detailed stats flag (defaults to false).
   enable_detailed_stats_ = config.enable_detailed_stats();
   max_reconnect_backoff_ms_ =
@@ -474,6 +475,14 @@ void ReverseTunnelInitiatorExtension::incrementHandshakeStats(const std::string&
             "reverse_tunnel: incremented handshake stat {} with tags worker={}, cluster={}, "
             "result={}, failure_reason={}",
             base_stat_name, dispatcher_name, cluster_id, result_value, failure_reason);
+}
+
+Stats::Histogram& ReverseTunnelInitiatorExtension::getHistogram(absl::string_view name,
+                                                                Stats::Scope& stats_store) {
+  std::string stat_name = fmt::format("{}.{}", stat_prefix_, name);
+  Stats::StatNameManagedStorage stat_name_storage(stat_name, stats_store.symbolTable());
+  return stats_store.histogramFromStatName(stat_name_storage.statName(),
+                                           Stats::Histogram::Unit::Milliseconds);
 }
 
 } // namespace ReverseConnection

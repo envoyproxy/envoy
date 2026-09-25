@@ -212,6 +212,9 @@ private:
   HandshakeHeadersConstSharedPtr handshake_headers_;
   AccessLog::InstanceSharedPtrVector access_logs_;
 
+  // Makes a histogram with the given name and stats store.
+  Stats::Histogram& getHistogram(absl::string_view name, Stats::Scope& stats_store);
+
   /**
    * Update per-worker connection stats for debugging purposes.
    * Creates worker-specific stats. This is an internal function called only from
@@ -223,6 +226,10 @@ private:
    */
   void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
                                       const std::string& state_suffix, bool increment);
+
+public:
+  // Keep at the end as it depends on stat prefix.
+  Stats::Histogram& tunnel_setup_time_;
 };
 
 /**
