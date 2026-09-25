@@ -15,6 +15,7 @@
 #include "test/common/quic/test_utils.h"
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
 #include "test/common/upstream/test_cluster_manager.h"
+#include "test/common/upstream/utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/conn_pool.h"
@@ -22,6 +23,8 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
+#include "test/mocks/upstream/cluster_update_callbacks_handle.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
 #include "test/test_common/status_utility.h"
@@ -2780,6 +2783,867 @@ TEST_F(ClusterManagerImplTest, LocalInterfaceNameForUpstreamConnectionThrowsInWi
 }
 #endif
 
+namespace {
+
+envoy::config::cluster::v3::Cluster
+makeStaticCluster(absl::string_view name, uint32_t port = 11001,
+                  absl::string_view connect_timeout = "0.250s") {
+  return parseClusterFromV3Yaml(fmt::format(R"EOF(
+    name: {}
+    connect_timeout: {}
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: {}
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: {}
+  )EOF",
+                                            name, connect_timeout, name, port));
+}
+
+envoy::config::cluster::v3::Cluster makeMultiPriorityCluster(absl::string_view name,
+                                                             const std::vector<uint32_t>& ports) {
+  std::string endpoints_yaml;
+  for (size_t i = 0; i < ports.size(); ++i) {
+    endpoints_yaml += fmt::format(R"EOF(
+      - priority: {}
+        lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: {}
+    )EOF",
+                                  i, ports[i]);
+  }
+  return parseClusterFromV3Yaml(fmt::format(R"EOF(
+    name: {}
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: {}
+      endpoints:
+{}
+  )EOF",
+                                            name, name, endpoints_yaml));
+}
+
+} // namespace
+
+// Verifies that dynamic cluster additions within an RAII batch successfully defer
+// and apply thread-local cluster creation upon batch destruction.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesBasic) {
+  createWithBasicStaticCluster();
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, batch);
+    EXPECT_TRUE(
+        *cluster_manager_->addOrUpdateCluster(makeStaticCluster("added_via_api"), "v1", true));
+    EXPECT_TRUE(cluster_manager_->hasCluster("added_via_api"));
+  }
+
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("added_via_api"));
+}
+
+// Verifies that nested RAII batches properly increment and decrement the active batch
+// counter, ensuring that pending thread-local actions are only flushed when the outermost
+// batch exits its scope.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesNested) {
+  createWithBasicStaticCluster();
+
+  {
+    auto outer_batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, outer_batch);
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+        makeStaticCluster("nested_outer_cluster", 11015), "v1", true));
+
+    {
+      auto inner_batch = cluster_manager_->createSourceBatch();
+      EXPECT_NE(nullptr, inner_batch);
+      EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+          makeStaticCluster("nested_inner_cluster", 11016), "v1", true));
+    }
+    EXPECT_TRUE(cluster_manager_->hasCluster("nested_outer_cluster"));
+    EXPECT_TRUE(cluster_manager_->hasCluster("nested_inner_cluster"));
+  }
+
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("nested_outer_cluster"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("nested_inner_cluster"));
+}
+
+// Verifies that when the batching runtime feature flag is disabled, createSourceBatch()
+// returns nullptr and cluster additions/removals fall back to immediate unbatched thread-local
+// dispatch.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesDisabledByRuntime) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.batch_cluster_updates", "false"}});
+
+  createWithBasicStaticCluster();
+  EXPECT_EQ(nullptr, cluster_manager_->createSourceBatch());
+
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("immediate_cluster", 11002),
+                                                    "v1", true));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("immediate_cluster"));
+
+  EXPECT_TRUE(cluster_manager_->removeCluster("immediate_cluster", true));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("immediate_cluster"));
+}
+
+// Verifies that creating and destroying an RAII batch without any cluster modifications
+// is a safe no-op and does not disrupt existing thread-local clusters.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesEmptyBatch) {
+  createWithBasicStaticCluster();
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, batch);
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("cluster_1"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
+}
+
+// Verifies that cluster removals performed within an active RAII batch defer thread-local
+// cluster destruction and update callback notifications until batch destruction.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesRemoval) {
+  createWithBasicStaticCluster();
+  EXPECT_TRUE(
+      *cluster_manager_->addOrUpdateCluster(makeStaticCluster("added_via_api"), "v1", true));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("added_via_api"));
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, batch);
+    EXPECT_TRUE(cluster_manager_->removeCluster("added_via_api", true));
+    EXPECT_FALSE(cluster_manager_->hasCluster("added_via_api"));
+  }
+
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("added_via_api"));
+}
+
+// Verifies that multiple deeply nested empty batch scopes properly track active batch counts
+// and return early without scheduling unnecessary thread-local dispatches.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesDeeplyNestedEmptyBatches) {
+  createWithBasicStaticCluster();
+
+  {
+    auto b1 = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, b1);
+    {
+      auto b2 = cluster_manager_->createSourceBatch();
+      EXPECT_NE(nullptr, b2);
+      {
+        auto b3 = cluster_manager_->createSourceBatch();
+        EXPECT_NE(nullptr, b3);
+        {
+          auto b4 = cluster_manager_->createSourceBatch();
+          EXPECT_NE(nullptr, b4);
+        }
+      }
+    }
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("cluster_1"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
+}
+
+// Verifies that ADS mux startup is deferred when primary clusters are initialized in a batch
+// and starts immediately upon outermost batch destruction.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesDeferredAdsMuxStartup) {
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
+      std::make_shared<NiceMock<Config::MockGrpcMux>>();
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+
+  const std::string yaml = R"EOF(
+  dynamic_resources:
+    ads_config:
+      api_type: GRPC
+      transport_api_version: V3
+      grpc_services:
+      - envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: cluster_0
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11000
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  EXPECT_CALL(*ads_mux, start());
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("cluster_0"));
+  EXPECT_TRUE(cluster_manager_->hasCluster("ads_cluster"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("ads_cluster"));
+}
+
+// Verifies that adding and removing the same cluster within a single batch correctly
+// processes both actions in order without stale worker thread state.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesInterleavedAddAndRemoveSameCluster) {
+  createWithBasicStaticCluster();
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, batch);
+
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("ephemeral_cluster", 11003),
+                                                      "v1", true));
+    EXPECT_TRUE(cluster_manager_->hasCluster("ephemeral_cluster"));
+
+    EXPECT_TRUE(cluster_manager_->removeCluster("ephemeral_cluster", true));
+    EXPECT_FALSE(cluster_manager_->hasCluster("ephemeral_cluster"));
+  }
+
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("ephemeral_cluster"));
+}
+
+// Verifies that removing and subsequently re-adding a cluster in the same batch
+// leaves the cluster active and healthy on thread-local instances.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesRemoveAndReAddSameCluster) {
+  createWithBasicStaticCluster();
+
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+      makeStaticCluster("readd_cluster", 11000, "0.250s"), "v1", true));
+  EXPECT_TRUE(cluster_manager_->hasCluster("readd_cluster"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("readd_cluster"));
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, batch);
+
+    EXPECT_TRUE(cluster_manager_->removeCluster("readd_cluster", true));
+    EXPECT_FALSE(cluster_manager_->hasCluster("readd_cluster"));
+
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+        makeStaticCluster("readd_cluster", 11004, "0.500s"), "v2", true));
+    EXPECT_TRUE(cluster_manager_->hasCluster("readd_cluster"));
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("readd_cluster"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("readd_cluster"));
+}
+
+// Verifies that batches containing multiple cluster additions, updates, and removals across
+// multiple priorities are applied correctly in bulk to worker threads.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesMultiClusterMultiPriority) {
+  createWithBasicStaticCluster();
+
+  EXPECT_TRUE(
+      *cluster_manager_->addOrUpdateCluster(makeStaticCluster("cluster_to_remove"), "v1", true));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("cluster_to_update", 11001),
+                                                    "v1", true));
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, batch);
+
+    EXPECT_TRUE(cluster_manager_->removeCluster("cluster_to_remove", true));
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+        makeMultiPriorityCluster("cluster_added", {11005, 11006}), "v1", true));
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+        makeMultiPriorityCluster("cluster_to_update", {11007, 11008}), "v2", true));
+  }
+
+  EXPECT_FALSE(cluster_manager_->hasCluster("cluster_to_remove"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_to_remove"));
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("cluster_added"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_added"));
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("cluster_to_update"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_to_update"));
+}
+
+// Verifies that cluster update callbacks are invoked in the exact order that actions were batched.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesCallbackOrdering) {
+  createWithBasicStaticCluster();
+
+  EXPECT_TRUE(
+      *cluster_manager_->addOrUpdateCluster(makeStaticCluster("initial_cluster"), "v1", true));
+
+  std::vector<std::string> callback_events;
+  MockClusterUpdateCallbacks callbacks;
+  EXPECT_CALL(callbacks, onClusterAddOrUpdate(_, _))
+      .WillRepeatedly(
+          Invoke([&callback_events](absl::string_view cluster_name, ThreadLocalClusterCommand&) {
+            callback_events.push_back(fmt::format("add/update:{}", cluster_name));
+          }));
+  EXPECT_CALL(callbacks, onClusterRemoval(_))
+      .WillRepeatedly(Invoke([&callback_events](absl::string_view cluster_name) {
+        callback_events.push_back(fmt::format("remove:{}", cluster_name));
+      }));
+
+  auto handle = cluster_manager_->addThreadLocalClusterUpdateCallbacks(callbacks);
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(
+        *cluster_manager_->addOrUpdateCluster(makeStaticCluster("batch_c1", 11009), "v1", true));
+    EXPECT_TRUE(cluster_manager_->removeCluster("initial_cluster", true));
+    EXPECT_TRUE(
+        *cluster_manager_->addOrUpdateCluster(makeStaticCluster("batch_c2", 11010), "v1", true));
+  }
+
+  const std::vector<std::string> expected = {
+      "add/update:batch_c1",
+      "remove:initial_cluster",
+      "add/update:batch_c2",
+  };
+  EXPECT_EQ(callback_events, expected);
+}
+
+// Verifies that a callback that removes itself during a batched callback loop does not invalidate
+// the callback list iterator.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesSelfRemovingCallback) {
+  createWithBasicStaticCluster();
+
+  ClusterUpdateCallbacksHandlePtr handle;
+  MockClusterUpdateCallbacks callbacks;
+  EXPECT_CALL(callbacks, onClusterAddOrUpdate(_, _))
+      .WillOnce(Invoke([&handle](absl::string_view, ThreadLocalClusterCommand&) {
+        // Reset the handle during the callback invocation to test self-removal safety.
+        handle.reset();
+      }));
+
+  handle = cluster_manager_->addThreadLocalClusterUpdateCallbacks(callbacks);
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(
+        *cluster_manager_->addOrUpdateCluster(makeStaticCluster("batch_c1", 11011), "v1", true));
+    EXPECT_TRUE(
+        *cluster_manager_->addOrUpdateCluster(makeStaticCluster("batch_c2", 11012), "v1", true));
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("batch_c1"));
+  EXPECT_TRUE(cluster_manager_->hasCluster("batch_c2"));
+}
+
+// Verifies that multiple sequential RAII batch update scopes execute correctly on the same
+// cluster manager instance and that pending actions are cleared after each batch flush.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesSequentialBatches) {
+  createWithBasicStaticCluster();
+
+  // First batch adds seq_cluster_1
+  {
+    auto b1 = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("seq_cluster_1", 11013),
+                                                      "v1", true));
+  }
+  EXPECT_TRUE(cluster_manager_->hasCluster("seq_cluster_1"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("seq_cluster_1"));
+
+  // Second batch adds seq_cluster_2 and removes seq_cluster_1
+  {
+    auto b2 = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("seq_cluster_2", 11014),
+                                                      "v1", true));
+    EXPECT_TRUE(cluster_manager_->removeCluster("seq_cluster_1", true));
+  }
+  EXPECT_FALSE(cluster_manager_->hasCluster("seq_cluster_1"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("seq_cluster_1"));
+  EXPECT_TRUE(cluster_manager_->hasCluster("seq_cluster_2"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("seq_cluster_2"));
+}
+
+// Verifies that batching removal of a non-existent cluster handles safely without crashing or
+// corrupting thread-local maps.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesRemovalNonExistent) {
+  createWithBasicStaticCluster();
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_FALSE(cluster_manager_->removeCluster("unknown_cluster", true));
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("cluster_1"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
+}
+
+// Verifies that when enable_batch_aware_update is disabled, batch cluster updates
+// fall back cleanly to sequential per-priority updateClusterMembership calls.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesSequentialFallbackWhenBatchAwareUpdateDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_batch_aware_update", "false"}});
+
+  createWithBasicStaticCluster();
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+        makeMultiPriorityCluster("fallback_cluster", {11017, 11018}), "v1", true));
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("fallback_cluster"));
+  auto* thread_local_cluster = cluster_manager_->getThreadLocalCluster("fallback_cluster");
+  ASSERT_NE(nullptr, thread_local_cluster);
+  EXPECT_EQ(2, thread_local_cluster->prioritySet().hostSetsPerPriority().size());
+}
+
+// Verifies drop overload and drop category parameter updates on existing TLS clusters during batch
+// updates.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesDropOverloadAndCategoryExistingCluster) {
+  createWithBasicStaticCluster();
+
+  // Initial add in batch
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+        makeStaticCluster("drop_cluster", 11019, "0.250s"), "v1", true));
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("drop_cluster"));
+
+  // Subsequent update in batch modifying cluster parameters
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+        makeStaticCluster("drop_cluster", 11019, "0.500s"), "v2", true));
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("drop_cluster"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("drop_cluster"));
+}
+
+// Verifies multiple update callbacks on a deferred cluster where the first callback inflates the
+// cluster inline and subsequent callbacks observe and reuse the already inflated instance.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesDeferredMultipleCallbacksInlineInflation) {
+  const std::string bootstrap_yaml = R"EOF(
+  cluster_manager:
+    enable_deferred_cluster_creation: true
+  static_resources:
+    clusters:
+    - name: bootstrap_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: bootstrap_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11000
+  )EOF";
+  create(parseBootstrapFromV3Yaml(bootstrap_yaml));
+
+  std::vector<std::string> callback_order;
+  MockClusterUpdateCallbacks cb1;
+  EXPECT_CALL(cb1, onClusterAddOrUpdate(_, _))
+      .WillRepeatedly(
+          Invoke([&callback_order](absl::string_view name, ThreadLocalClusterCommand& cmd) {
+            callback_order.push_back(fmt::format("cb1:{}", name));
+            // First callback forces inline inflation by invoking the command
+            auto& cluster = cmd();
+            EXPECT_EQ(name, cluster.info()->name());
+          }));
+
+  MockClusterUpdateCallbacks cb2;
+  EXPECT_CALL(cb2, onClusterAddOrUpdate(_, _))
+      .WillRepeatedly(
+          Invoke([&callback_order](absl::string_view name, ThreadLocalClusterCommand& cmd) {
+            callback_order.push_back(fmt::format("cb2:{}", name));
+            // Second callback accesses the command and reuses the existing inflated cluster
+            auto& cluster = cmd();
+            EXPECT_EQ(name, cluster.info()->name());
+          }));
+
+  auto handle1 = cluster_manager_->addThreadLocalClusterUpdateCallbacks(cb1);
+  auto handle2 = cluster_manager_->addThreadLocalClusterUpdateCallbacks(cb2);
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("deferred_cluster", 11020),
+                                                      "v1", true));
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("deferred_cluster"));
+  const std::vector<std::string> expected_order = {"cb2:deferred_cluster", "cb1:deferred_cluster"};
+  EXPECT_EQ(callback_order, expected_order);
+}
+
+// Verifies that accumulating clusters in a batch triggers an intermediate flush when reaching
+// DefaultMaxClusterUpdateBatchSize (32), making the first 32 clusters visible in thread-local
+// storage before the batch scope even exits.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesDefaultCapacityFlush) {
+  createWithBasicStaticCluster();
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, batch);
+
+    // Queue 31 clusters; since batch size is 32, no intermediate flush has happened yet.
+    for (int i = 0; i < 31; ++i) {
+      EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+          makeStaticCluster(fmt::format("cap_cluster_{}", i), 11100 + i), "v1", true));
+    }
+    // Verify none of the 31 clusters have been dispatched to TLS yet.
+    for (int i = 0; i < 31; ++i) {
+      EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster(fmt::format("cap_cluster_{}", i)));
+    }
+
+    // Adding the 32nd cluster hits DefaultMaxClusterUpdateBatchSize (32) and triggers an
+    // intermediate flush.
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("cap_cluster_31", 11131),
+                                                      "v1", true));
+
+    // All 32 clusters should now be available in TLS while the batch scope is still active.
+    for (int i = 0; i < 32; ++i) {
+      EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster(fmt::format("cap_cluster_{}", i)));
+    }
+
+    // Adding a 33rd cluster queues into the next batch window and is not immediately visible.
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("cap_cluster_32", 11132),
+                                                      "v1", true));
+    EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cap_cluster_32"));
+  }
+
+  // Once the batch scope exits, the remaining queued cluster (cluster 32) is flushed.
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cap_cluster_32"));
+}
+
+// Verifies that a callback that removes itself during onClusterRemoval in a batched flush does not
+// cause memory corruption or invalidate callback iteration.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesSelfRemovingCallbackOnRemoval) {
+  createWithBasicStaticCluster();
+
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("cluster_to_remove", 11025),
+                                                    "v1", true));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_to_remove"));
+
+  ClusterUpdateCallbacksHandlePtr handle;
+  MockClusterUpdateCallbacks callbacks;
+  EXPECT_CALL(callbacks, onClusterRemoval("cluster_to_remove"))
+      .WillOnce(Invoke([&handle](absl::string_view) {
+        // Reset the handle during callback execution to verify safe self-removal.
+        handle.reset();
+      }));
+
+  handle = cluster_manager_->addThreadLocalClusterUpdateCallbacks(callbacks);
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_TRUE(cluster_manager_->removeCluster("cluster_to_remove", true));
+  }
+
+  EXPECT_FALSE(cluster_manager_->hasCluster("cluster_to_remove"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_to_remove"));
+}
+
+// Verifies that disabling the batch cluster updates runtime feature flag mid-batch maintains
+// consistent state: queued batch actions flush cleanly upon batch destruction, and subsequent
+// operations fallback to unbatched execution.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesMidBatchRuntimeDisable) {
+  TestScopedRuntime scoped_runtime;
+  createWithBasicStaticCluster();
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, batch);
+
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("mid_batch_c1", 11030),
+                                                      "v1", true));
+
+    // Disable the runtime flag mid-batch while batch is still active.
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.batch_cluster_updates", "false"}});
+
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("mid_batch_c2", 11031),
+                                                      "v1", true));
+    // Since batch is active, actions were queued and are not yet in TLS.
+    EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("mid_batch_c1"));
+    EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("mid_batch_c2"));
+  }
+
+  // Batch destruction flushed all pending actions regardless of mid-batch runtime flag flip.
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("mid_batch_c1"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("mid_batch_c2"));
+
+  // New batch creation now returns nullptr due to runtime flag being disabled.
+  EXPECT_EQ(nullptr, cluster_manager_->createSourceBatch());
+
+  // Subsequent updates are applied immediately unbatched.
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
+      makeStaticCluster("immediate_after_disable", 11032), "v1", true));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("immediate_after_disable"));
+}
+// Verifies that ADS mux startup is deferred when creating a batch prior to initialize(), and
+// starts upon outermost batch destruction.
+TEST_F(ClusterManagerImplTest, BatchClusterUpdatesDeferredAdsMuxStartupInActiveBatch) {
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
+      std::make_shared<NiceMock<Config::MockGrpcMux>>();
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+
+  const std::string yaml = R"EOF(
+  dynamic_resources:
+    ads_config:
+      api_type: GRPC
+      transport_api_version: V3
+      grpc_services:
+      - envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: cluster_0
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11000
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  const auto bootstrap = parseBootstrapFromV3Yaml(yaml);
+  cluster_manager_ = TestClusterManagerImpl::createTestClusterManager(bootstrap, factory_,
+                                                                      factory_.server_context_);
+  ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
+
+  EXPECT_CALL(*ads_mux, start()).Times(0);
+
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, batch);
+    THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
+    cluster_manager_->setPrimaryClustersInitializedCb([this, &bootstrap]() {
+      THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
+    });
+
+    Mock::VerifyAndClearExpectations(ads_mux.get());
+    EXPECT_CALL(*ads_mux, start());
+  }
+
+  EXPECT_TRUE(cluster_manager_->hasCluster("cluster_0"));
+  EXPECT_TRUE(cluster_manager_->hasCluster("ads_cluster"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
+  EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("ads_cluster"));
+}
+
+// Verifies that onClusterAddOrUpdate command closures return valid cluster references in both
+// batched and unbatched paths for eager clusters.
+TEST_F(ClusterManagerImplTest, EagerClusterCallbackCommandBatchedAndUnbatched) {
+  createWithBasicStaticCluster();
+
+  std::vector<std::string> callback_invocations;
+  MockClusterUpdateCallbacks callbacks;
+  EXPECT_CALL(callbacks, onClusterAddOrUpdate(_, _))
+      .WillRepeatedly(
+          Invoke([&callback_invocations](absl::string_view name, ThreadLocalClusterCommand& cmd) {
+            callback_invocations.push_back(std::string(name));
+            auto& cluster = cmd();
+            EXPECT_EQ(name, cluster.info()->name());
+          }));
+
+  auto handle = cluster_manager_->addThreadLocalClusterUpdateCallbacks(callbacks);
+
+  // 1. Unbatched path
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("unbatched_eager", 11050),
+                                                    "v1", true));
+  EXPECT_EQ(callback_invocations, std::vector<std::string>{"unbatched_eager"});
+
+  // 2. Batched path
+  {
+    auto batch = cluster_manager_->createSourceBatch();
+    EXPECT_NE(nullptr, batch);
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(makeStaticCluster("batched_eager", 11051),
+                                                      "v1", true));
+    EXPECT_EQ(callback_invocations.size(), 1);
+  }
+
+  const std::vector<std::string> expected = {"unbatched_eager", "batched_eager"};
+  EXPECT_EQ(callback_invocations, expected);
+}
+
+// Verifies drainConnections overloads for a specific cluster, a non-existent cluster, and all
+// clusters.
+TEST_F(ClusterManagerImplTest, DrainConnectionsAllVariants) {
+  createWithBasicStaticCluster();
+
+  // 1. Drain connections for an existing cluster
+  cluster_manager_->drainConnections("cluster_1", [](const Host&) { return true; });
+
+  // 2. Drain connections for a non-existent cluster
+  cluster_manager_->drainConnections("non_existent_cluster", [](const Host&) { return true; });
+
+  // 3. Drain connections for all clusters with DrainExistingConnections
+  cluster_manager_->drainConnections([](const Host&) { return true; },
+                                     ConnectionPool::DrainBehavior::DrainExistingConnections);
+
+  // 4. Drain connections for all clusters with DrainAndDelete
+  cluster_manager_->drainConnections([](const Host&) { return true; },
+                                     ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+// Verifies edsResourcesCache() accessor returns the ADS mux cache when available and std::nullopt
+// when ADS mux is null.
+TEST_F(ClusterManagerImplTest, EdsResourcesCache) {
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
+      std::make_shared<NiceMock<Config::MockGrpcMux>>();
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+
+  createWithBasicStaticCluster();
+
+  EXPECT_CALL(*ads_mux, edsResourcesCache());
+  cluster_manager_->edsResourcesCache();
+
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(nullptr));
+  EXPECT_FALSE(cluster_manager_->edsResourcesCache().has_value());
+}
+
+// Verifies dumpClusterConfigs() correctly dumps dynamic warming clusters and respects matchers.
+TEST_F(ClusterManagerImplTest, ConfigDumpWithDynamicWarmingCluster) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  createWithBasicStaticCluster();
+
+  const std::string warming_cluster_yaml = R"EOF(
+    name: warming_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    wait_for_warm_on_init: true
+    load_assignment:
+      cluster_name: warming_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11000
+  )EOF";
+  const auto warming_cluster_config = parseClusterFromV3Yaml(warming_cluster_yaml);
+
+  std::shared_ptr<MockClusterMockPrioritySet> warming_cluster =
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  warming_cluster->info_->name_ = "warming_cluster";
+  std::function<void()> cluster_init_callback;
+  EXPECT_CALL(*warming_cluster, initialize(_)).WillOnce(SaveArg<0>(&cluster_init_callback));
+  EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(warming_cluster_config), _, true))
+      .WillOnce(Return(std::make_pair(warming_cluster, nullptr)));
+
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(warming_cluster_config, "version1"));
+
+  const std::string expected_dump = R"EOF(
+static_clusters:
+  - cluster:
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_active_clusters:
+dynamic_warming_clusters:
+  - version_info: version1
+    cluster:
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: warming_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      wait_for_warm_on_init: true
+      load_assignment:
+        cluster_name: warming_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11000
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+)EOF";
+
+  checkConfigDump(expected_dump);
+
+  Matchers::MockStringMatcher mock_matcher;
+  EXPECT_CALL(mock_matcher, match("cluster_1")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("warming_cluster")).WillOnce(Return(false));
+  checkConfigDump(R"EOF(
+static_clusters:
+dynamic_active_clusters:
+dynamic_warming_clusters:
+)EOF",
+                  mock_matcher);
+}
+
+// Verifies notifyMissingCluster, notifyExpiredDiscovery, and createAndSwapClusterDiscoveryManager.
+TEST_F(ClusterManagerImplTest, OdcdsStatusAndDiscoveryManager) {
+  createWithBasicStaticCluster();
+
+  // Test notifyMissingCluster and notifyExpiredDiscovery for unrequested cluster
+  cluster_manager_->notifyMissingCluster("unknown_cluster");
+  cluster_manager_->notifyExpiredDiscovery("unknown_cluster");
+
+  // Test createAndSwapClusterDiscoveryManager
+  auto swapped_cdm = cluster_manager_->createAndSwapClusterDiscoveryManager("test_worker");
+  auto restored_cdm = cluster_manager_->createAndSwapClusterDiscoveryManager("main_thread");
+}
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
