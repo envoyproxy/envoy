@@ -29,6 +29,7 @@ func init() {
 		"span_across_callbacks":        &SpanAcrossCallbacksConfigFactory{},
 		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
 		"stats_callbacks":              &StatsCallbacksConfigFactory{},
+		"stream_timing":                &StreamTimingConfigFactory{},
 		"streaming_terminal_filter":    &StreamingTerminalConfigFactory{},
 		"buffer_limit_filter":          &BufferLimitConfigFactory{},
 		"http_stream_basic":            &HttpStreamBasicConfigFactory{},
@@ -959,6 +960,44 @@ func (p *StatsCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap, endOf
 
 func (p *StatsCallbacksFilter) OnStreamComplete() {
 	p.handle.DecrementGaugeValue(p.ids.epPending, 1, "on_response_headers", p.method)
+}
+
+// -----------------------------------------------------------------------------
+// StreamTiming
+// -----------------------------------------------------------------------------
+
+type StreamTimingConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *StreamTimingConfigFactory) Create(h shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	timingObservedTotal, result := h.DefineCounter("stream_timing_observed_total")
+	assertEq(result, shared.MetricsSuccess, "timing counter definition")
+	return &StreamTimingFilterFactory{timingObservedTotal: timingObservedTotal}, nil
+}
+
+type StreamTimingFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	timingObservedTotal shared.MetricID
+}
+
+func (f *StreamTimingFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &StreamTimingFilter{handle: h, timingObservedTotal: f.timingObservedTotal}
+}
+
+type StreamTimingFilter struct {
+	shared.EmptyHttpFilter
+	handle              shared.HttpFilterHandle
+	timingObservedTotal shared.MetricID
+}
+
+func (f *StreamTimingFilter) OnStreamComplete() {
+	timing := f.handle.GetTimingInfo()
+	assert(timing.StartTimeUnixNs > 0, "start time")
+	assert(timing.RequestCompleteDurationNs >= 0, "request complete duration")
+	assertEq(f.handle.IncrementCounterValue(f.timingObservedTotal, 1), shared.MetricsSuccess,
+		"timing counter")
 }
 
 // -----------------------------------------------------------------------------

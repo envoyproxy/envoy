@@ -959,6 +959,21 @@ func (h *dymHttpFilterHandle) GetAttributeBool(
 	return bool(value), true
 }
 
+func (h *dymHttpFilterHandle) GetTimingInfo() shared.TimingInfo {
+	var info C.envoy_dynamic_module_type_timing_info
+	C.envoy_dynamic_module_callback_http_get_timing_info(h.hostPluginPtr, &info)
+	return shared.TimingInfo{
+		StartTimeUnixNs:               int64(info.start_time_unix_ns),
+		RequestCompleteDurationNs:     int64(info.request_complete_duration_ns),
+		FirstUpstreamTxByteSentNs:     int64(info.first_upstream_tx_byte_sent_ns),
+		LastUpstreamTxByteSentNs:      int64(info.last_upstream_tx_byte_sent_ns),
+		FirstUpstreamRxByteReceivedNs: int64(info.first_upstream_rx_byte_received_ns),
+		LastUpstreamRxByteReceivedNs:  int64(info.last_upstream_rx_byte_received_ns),
+		FirstDownstreamTxByteSentNs:   int64(info.first_downstream_tx_byte_sent_ns),
+		LastDownstreamTxByteSentNs:    int64(info.last_downstream_tx_byte_sent_ns),
+	}
+}
+
 func (h *dymHttpFilterHandle) GetFilterStateTyped(key string) (shared.UnsafeEnvoyBuffer, bool) {
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
 
