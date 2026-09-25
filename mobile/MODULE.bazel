@@ -28,15 +28,15 @@ bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
 bazel_dep(name = "pybind11_bazel", version = "3.0.0")
 bazel_dep(name = "quiche", version = "0.0.0-260922-7f07dc4.envoy")
 bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
-bazel_dep(name = "rules_android", version = "0.7.2")
+bazel_dep(name = "rules_android", version = "0.7.3")
 bazel_dep(name = "rules_android_ndk", version = "0.1.5")
 bazel_dep(name = "rules_apple", version = "5.1.0")
-bazel_dep(name = "rules_robolectric", version = "4.16")
+bazel_dep(name = "rules_robolectric", version = "4.17")
 bazel_dep(name = "rules_cc", version = "0.2.25")
-bazel_dep(name = "rules_detekt", version = "0.8.1.2")
+bazel_dep(name = "rules_detekt", version = "0.8.2.3")
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_jvm_external", version = "7.1")
-bazel_dep(name = "rules_kotlin", version = "2.3.20")
+bazel_dep(name = "rules_kotlin", version = "2.4.20")
 bazel_dep(name = "rules_python", version = "2.2.0")
 bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
@@ -125,9 +125,9 @@ maven.install(
         "com.google.protobuf:protobuf-java:4.35.1",
         "com.google.protobuf:protobuf-javalite:4.35.1",
         "org.jetbrains:annotations:23.0.0",
-        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.23",
-        "org.jetbrains.kotlin:kotlin-stdlib-common:1.9.23",
-        "org.jetbrains.kotlin:kotlin-stdlib:1.9.23",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.20",
+        "org.jetbrains.kotlin:kotlin-stdlib-common:2.4.20",
+        "org.jetbrains.kotlin:kotlin-stdlib:2.4.20",
         "androidx.recyclerview:recyclerview:1.1.0",
         "androidx.core:core:1.3.2",
         "org.jetbrains.dokka:dokka-cli:1.5.31",
@@ -144,7 +144,7 @@ maven.install(
         "androidx.test:runner:1.5.0",
         "androidx.test:monitor:1.5.0",
         "androidx.test.ext:junit:1.1.5",
-        "org.robolectric:robolectric:4.16",
+        "org.robolectric:robolectric:4.17",
         "org.hamcrest:hamcrest:3.0",
     ],
     version_conflict_policy = "pinned",
@@ -159,6 +159,13 @@ maven.artifact(
     group = "com.google.protobuf",
     artifact = "protobuf-java",
     version = "4.35.1",
+    force_version = True,
+)
+maven.artifact(
+    name = "rules_android_maven",
+    group = "com.android.tools",
+    artifact = "r8",
+    version = "9.1.43",
     force_version = True,
 )
 # This is to workaround upstream bug/noise

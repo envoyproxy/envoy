@@ -44,6 +44,8 @@ build: --copt=-fno-exceptions
 
 # https://github.com/bazelbuild/rules_jvm_external/issues/445
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
+build --java_runtime_version=remotejdk_21
+build --tool_java_runtime_version=remotejdk_21
 build --define disable_known_issue_asserts=true
 # Unset per_object_debug_info. Causes failures on Android Linux release builds.
 build --features=-per_object_debug_info

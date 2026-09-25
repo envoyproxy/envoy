@@ -1,8 +1,64 @@
 load("@envoy_mobile//bazel:dokka.bzl", "sources_javadocs")
 load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
 load("@rules_android//android:rules.bzl", "android_binary")
+load("@rules_android//providers:providers.bzl", "AndroidSdkInfo")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_java//java:defs.bzl", "java_binary")
+load("@rules_java//java/common:java_info.bzl", "JavaInfo")
+
+ANDROID_MIN_API = 26
+
+def _merged_classes_jar_impl(ctx):
+    java_info = ctx.attr.android_library[JavaInfo]
+    out = ctx.actions.declare_file(ctx.label.name + ".jar")
+    program_jars = []
+    classpath_jars = []
+    for jar in java_info.transitive_runtime_jars.to_list():
+        if jar.owner == None or not jar.owner.workspace_name:
+            program_jars.append(jar)
+        else:
+            classpath_jars.append(jar)
+    args = ctx.actions.args()
+    args.add("--output", out)
+    args.add("--exclude_build_data")
+    args.add("--dont_change_compression")
+    args.add("--normalize")
+    args.add_all("--sources", program_jars)
+    ctx.actions.run(
+        executable = ctx.executable._singlejar,
+        arguments = [args],
+        inputs = program_jars,
+        outputs = [out],
+        mnemonic = "AarClassesJar",
+        progress_message = "Merging aar classes for %{label}",
+    )
+    return [
+        DefaultInfo(files = depset([out])),
+        OutputGroupInfo(classpath = depset(classpath_jars)),
+    ]
+
+# Merges workspace-produced jars from an android_library's transitive runtime closure into
+# a single program jar and exposes external runtime jars as a classpath output group.
+#
+# NOTE: this must *not* be derived from an android_binary deploy jar - that has already
+# been through D8 desugaring in intermediate mode, and newer D8 tags synthesized lambda
+# classes (`$$ExternalSyntheticLambda*`) as intermediate artifacts. Shipping those in an
+# aar makes downstream R8 fail with "Attempt at compiling intermediate artifact without
+# its context". Instead we desugar ourselves in D8 final `--classfile` mode so the shipped
+# classes.jar contains desugared classfiles for min-api = ANDROID_MIN_API. (A java_binary
+# deploy jar doesn't work either: it needs a JVM runtime toolchain, which doesn't exist
+# under the Android platform transition.)
+_merged_classes_jar = rule(
+    implementation = _merged_classes_jar_impl,
+    attrs = {
+        "android_library": attr.label(providers = [JavaInfo], mandatory = True),
+        "_singlejar": attr.label(
+            default = "@rules_java//toolchains:singlejar",
+            executable = True,
+            cfg = "exec",
+        ),
+    },
+)
 
 # This file is based on https://github.com/aj-michael/aar_with_jni which is
 # subject to the following copyright and license:
@@ -28,7 +84,111 @@ load("@rules_java//java:defs.bzl", "java_binary")
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-def android_artifacts(name, android_library, manifest, archive_name, native_deps = [], proguard_rules = "", visibility = [], substitutions = {}):
+
+def _desugared_classes_jar_impl(ctx):
+    android_jar = ctx.attr._android_sdk[AndroidSdkInfo].android_jar
+    out = ctx.actions.declare_file(ctx.label.name + ".jar")
+    args = ctx.actions.args()
+    args.add("--classfile")
+    args.add("--release")
+    args.add("--min-api", str(ANDROID_MIN_API))
+    args.add("--lib", android_jar)
+    args.add_all(ctx.files.classpath_jars, before_each = "--classpath")
+    args.add("--output", out)
+    args.add(ctx.file.program_jar)
+    ctx.actions.run(
+        executable = ctx.executable.d8_tool,
+        arguments = [args],
+        inputs = [ctx.file.program_jar, android_jar] + ctx.files.classpath_jars,
+        outputs = [out],
+        mnemonic = "AarClassesD8",
+        progress_message = "Desugaring aar classes for %{label}",
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+_desugared_classes_jar = rule(
+    implementation = _desugared_classes_jar_impl,
+    attrs = {
+        "program_jar": attr.label(allow_single_file = True, mandatory = True),
+        "classpath_jars": attr.label_list(allow_files = True),
+        "d8_tool": attr.label(
+            executable = True,
+            cfg = "exec",
+            mandatory = True,
+        ),
+        "_android_sdk": attr.label(
+            default = "@androidsdk//:sdk",
+            providers = [AndroidSdkInfo],
+        ),
+    },
+)
+
+def _filtered_classes_jar_impl(ctx):
+    out = ctx.actions.declare_file(ctx.attr.output_name)
+    ctx.actions.run_shell(
+        inputs = [ctx.file.input_jar, ctx.file.metadata_jar],
+        outputs = [out],
+        mnemonic = "AarClassesFilter",
+        progress_message = "Filtering aar classes for %{label}",
+        arguments = [ctx.file.input_jar.path, ctx.file.metadata_jar.path, out.path],
+        command = """
+set -euo pipefail
+
+input_jar="$1"
+metadata_jar="$2"
+output_jar="$3"
+original_directory="$PWD"
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+# Keep only Envoy classes plus Kotlin module metadata needed for Kotlin consumers to resolve
+# top-level declarations in io.envoyproxy.envoymobile packages, while dropping generated R
+# classes from the published aar classes.jar.
+mapfile -t keep_entries < <(
+  unzip -Z1 "$original_directory/$input_jar" \
+    | grep -E '^io/envoyproxy/' \
+    | grep -Ev '(^|/)R(\\$[^/]+)?\\.class$' || true
+)
+
+mapfile -t kotlin_module_entries < <(
+  unzip -Z1 "$original_directory/$metadata_jar" \
+    | grep -E '^META-INF/[^/]+\\.kotlin_module$' || true
+)
+
+if [ "${#keep_entries[@]}" -eq 0 ] && [ "${#kotlin_module_entries[@]}" -eq 0 ]; then
+  echo "classes.jar filter matched no entries" >&2
+  exit 1
+fi
+
+printf '%s\n' "${keep_entries[@]}" | grep -q '^io/envoyproxy/' || {
+  echo "classes.jar has no io/envoyproxy classes" >&2
+  exit 1
+}
+
+(
+  cd "$tmp_dir"
+  if [ "${#keep_entries[@]}" -gt 0 ]; then
+    unzip -qq "$original_directory/$input_jar" "${keep_entries[@]}"
+  fi
+  if [ "${#kotlin_module_entries[@]}" -gt 0 ]; then
+    unzip -qq "$original_directory/$metadata_jar" "${kotlin_module_entries[@]}"
+  fi
+  zip -q -r "$original_directory/$output_jar" .
+)
+""",
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+_filtered_classes_jar = rule(
+    implementation = _filtered_classes_jar_impl,
+    attrs = {
+        "input_jar": attr.label(allow_single_file = True, mandatory = True),
+        "metadata_jar": attr.label(allow_single_file = True, mandatory = True),
+        "output_name": attr.string(mandatory = True),
+    },
+)
+
+def android_artifacts(name, android_library, archive_name, native_deps = [], proguard_rules = "", visibility = [], substitutions = {}):
     """
     NOTE: The bazel android_library's implicit aar output doesn't flatten its transitive
     dependencies. Additionally, when using the kotlin rules, the kt_android_library rule
@@ -50,9 +210,9 @@ def android_artifacts(name, android_library, manifest, archive_name, native_deps
     """
 
     # Create the aar
-    _classes_jar = _create_classes_jar(name, manifest, android_library)
+    _classes_jar = _create_classes_jar(name, android_library)
     _jni_archive = _create_jni_library(name, native_deps)
-    _aar_output = _create_aar(name, archive_name, _classes_jar, _jni_archive, proguard_rules, visibility)
+    _aar_output = _create_aar(name, _classes_jar, _jni_archive, proguard_rules, visibility)
 
     native.filegroup(
         name = name + "_objdump_collector",
@@ -103,7 +263,7 @@ def android_artifacts(name, android_library, manifest, archive_name, native_deps
         """,
     )
 
-def _create_aar(name, archive_name, classes_jar, jni_archive, proguard_rules, visibility):
+def _create_aar(name, classes_jar, jni_archive, proguard_rules, visibility):
     """
     This macro rule manually creates an aar artifact.
 
@@ -119,7 +279,6 @@ def _create_aar(name, archive_name, classes_jar, jni_archive, proguard_rules, vi
 
 
     :param name Name of the aar generation rule.
-    :param archive_name Name of the resulting aar archive.
     :param classes_jar The classes.jar file which contains all the kotlin/java classes.
     :param jni_archive The apk with the desired jni libraries.
     :param proguard_rules The proguard.txt file.
@@ -210,45 +369,52 @@ def _create_jni_library(name, native_deps = []):
 
     return jni_archive_name + "_unsigned.apk"
 
-def _create_classes_jar(name, manifest, android_library):
+def _create_classes_jar(name, android_library):
     """
     Creates the classes.jar which contains all the kotlin/java classes
 
     :param name The name of the top level macro
-    :param manifest The manifest file used to create the initial apk
     :param android_library The android library target
     """
-    android_binary_name = name + "_bin"
-
-    # This creates bazel-bin/library/kotlin/io/envoyproxy/envoymobile/{name}_bin_deploy.jar
-    # This jar has all the classes needed for our aar and will be our `classes.jar`
-    android_binary(
-        name = android_binary_name,
-        manifest = manifest,
-        custom_package = "does.not.matter",
-        srcs = [],
-        deps = [android_library],
+    merged_name = name + "_merged_classes"
+    _merged_classes_jar(
+        name = merged_name,
+        android_library = android_library,
+    )
+    classpath_name = merged_name + "_classpath"
+    native.filegroup(
+        name = classpath_name,
+        srcs = [merged_name],
+        output_group = "classpath",
     )
 
-    native.genrule(
+    # Desugar to plain classfiles in D8 *final* mode (no --intermediate). This removes
+    # invokedynamic lambdas (which rules_android's ImportDepsChecker cannot resolve against
+    # its android bootclasspath - java.lang.invoke.MethodHandle -> java.lang.constant.Constable)
+    # without emitting the intermediate synthetic markers that break downstream R8.
+    d8_name = name + "_d8"
+    java_binary(
+        name = d8_name,
+        main_class = "com.android.tools.r8.D8",
+        runtime_deps = ["@android_gmaven_r8//jar"],
+    )
+
+    desugared_name = name + "_desugared_classes"
+    _desugared_classes_jar(
+        name = desugared_name,
+        classpath_jars = [classpath_name],
+        d8_tool = d8_name,
+        program_jar = merged_name,
+    )
+
+    _filtered_classes_jar(
         name = name + "_classes_jar",
-        outs = [name + "_classes.jar"],
-        srcs = [android_binary_name + "_deploy.jar"],
-        cmd = """
-        original_directory=$$PWD
-        classes_dir=$$(mktemp -d)
-        echo "Creating classes.jar from $(SRCS)"
-        pushd $$classes_dir
-        unzip $$original_directory/$(SRCS) "io/envoyproxy/*" "META-INF/" > /dev/null
-        find . -name "R.class" -type f -exec rm {} \\;
-        find . -name "R\\$$*.class" -type f -exec rm {} \\;
-        zip -r classes.jar * > /dev/null
-        popd
-        cp $$classes_dir/classes.jar $@
-        """,
+        input_jar = desugared_name,
+        metadata_jar = merged_name,
+        output_name = name + "_classes.jar",
     )
 
-    return name + "_classes.jar"
+    return name + "_classes_jar"
 
 def _create_sources_javadocs(name, android_library):
     """
@@ -309,7 +475,7 @@ def _manifest(package_name):
     package="{}" >
 
     <uses-sdk
-            android:minSdkVersion="24"
+            android:minSdkVersion="{}"
             android:targetSdkVersion="29"/>
 </manifest>
-""".format(package_name)
+""".format(package_name, ANDROID_MIN_API)
