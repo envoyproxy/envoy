@@ -63,9 +63,6 @@ public:
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
 
-  uint64_t serverDiscoveryCacheTtlMs() const { return server_discovery_cache_ttl_ms_; }
-  absl::string_view serverDiscoveryCacheScope() const { return server_discovery_cache_scope_; }
-
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::RequestStorageMode
   requestStorageMode() const {
     return proto_config_.request_storage_mode();
@@ -126,9 +123,6 @@ private:
   std::string max_supported_protocol_version_;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
-  uint64_t server_discovery_cache_ttl_ms_;
-
-  absl::string_view server_discovery_cache_scope_;
   bool clear_route_cache_;
 };
 
@@ -300,8 +294,6 @@ private:
     ToolsCall = 6,
     // MCP operation failed.
     OperationFailed = 7,
-    // Clients send a server/discover request that is handled locally.
-    ServerDiscover = 8,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   std::optional<nlohmann::json> session_id_;

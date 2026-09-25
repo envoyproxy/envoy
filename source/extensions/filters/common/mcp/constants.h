@@ -48,7 +48,6 @@ constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
 constexpr absl::string_view META_FIELD = "_meta";
 constexpr absl::string_view MCP_META_PROTOCOL_VERSION_FIELD =
     "io.modelcontextprotocol/protocolVersion";
-constexpr absl::string_view MCP_META_SERVER_INFO_FIELD = "io.modelcontextprotocol/serverInfo";
 constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
 constexpr absl::string_view TOOLS_FIELD = "tools";
 constexpr absl::string_view LIST_CHANGED_FIELD = "listChanged";
@@ -56,13 +55,6 @@ constexpr absl::string_view SERVER_INFO_FIELD = "serverInfo";
 constexpr absl::string_view NAME_FIELD = "name";
 constexpr absl::string_view VERSION_FIELD = "version";
 constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
-
-// MCP server/discover constants
-constexpr absl::string_view SUPPORTED_VERSIONS_FIELD = "supportedVersions";
-constexpr absl::string_view TTL_MS_FIELD = "ttlMs";
-constexpr absl::string_view CACHE_SCOPE_FIELD = "cacheScope";
-constexpr absl::string_view CACHE_SCOPE_PUBLIC = "public";
-constexpr absl::string_view CACHE_SCOPE_PRIVATE = "private";
 
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
 constexpr absl::string_view IS_EXCEEDING_LIMIT = "is_exceeding_limit";
