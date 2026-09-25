@@ -813,8 +813,8 @@ TEST(TranscodingEngineTest, MapsAnthropicPinnedToolChoiceBackToAnIrObject) {
             nlohmann::json::parse(R"({"type": "function", "function": {"name": "lookup_doc"}})"));
 }
 
-// Gemini accepts unknown root fields, so an unmapped `tool_choice` was forwarded and ignored:
-// the caller's constraint disappeared without any error.
+// Envoy's Gemini schema accepts unknown root fields, so an unmapped `tool_choice` was forwarded,
+// and Gemini refused the whole request for naming a field it does not know.
 TEST(TranscodingEngineTest, MapsStringToolChoiceToGeminiFunctionCallingConfig) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
@@ -847,6 +847,33 @@ TEST(TranscodingEngineTest, MapsPinnedToolChoiceToGeminiAllowedFunctionNames) {
   const nlohmann::json& config = payload["toolConfig"]["functionCallingConfig"];
   EXPECT_EQ(config["mode"], "ANY");
   EXPECT_EQ(config["allowedFunctionNames"], nlohmann::json::array({"lookup_doc"}));
+}
+
+// Gemini refused a root `seed` as an unknown field: it takes the seed in `generationConfig`, where
+// a Gemini client may also quote it, as ProtoJSON allows.
+TEST(TranscodingEngineTest, MapsSeedBetweenTheIrAndGemini) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json ir = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-flash", "seed": 42, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, ir), IsOk());
+  EXPECT_FALSE(ir.contains("seed"));
+  EXPECT_EQ(ir["generationConfig"], nlohmann::json::parse(R"({"seed": 42})"));
+  EXPECT_THAT(AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).schema()->validateRequest(ir),
+              IsOk());
+
+  for (const char* gemini_request : {
+           R"({"contents": [{"parts": [{"text": "Hi"}]}], "generationConfig": {"seed": "42"}})",
+           R"({"contents": [{"parts": [{"text": "Hi"}]}], "generation_config": {"seed": 42}})",
+       }) {
+    nlohmann::json gemini = nlohmann::json::parse(gemini_request);
+    ASSERT_THAT(engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, gemini), IsOk());
+    EXPECT_TRUE(gemini["seed"].is_number_integer()) << gemini_request;
+    EXPECT_EQ(gemini["seed"], 42) << gemini_request;
+  }
 }
 
 // Regression: Gemini renders proto numbers through ProtoJSON, so these fields can arrive quoted.

@@ -1054,8 +1054,10 @@ TranscodeRuleSet geminiRequestToIr() {
               {"generationConfig.stopSequences", "generationConfig.stop_sequences",
                "generation_config.stopSequences", "generation_config.stop_sequences"},
               "stop"),
+          TranscodeRule::firstOf({"generationConfig.seed", "generation_config.seed"}, "seed"),
+          TranscodeRule::toInteger("seed"),
           // Dropping the rest of `generationConfig` also masks a latent version of the
-          // coercion above: `candidateCount`, `topK`, `seed`, `presencePenalty`,
+          // coercion above: `candidateCount`, `topK`, `presencePenalty`,
           // `frequencyPenalty`, `logprobs` and `thinkingConfig.thinkingBudget` are all
           // declared number-or-string too. Whoever makes the IR lossless must coerce them
           // on the way through, or they reach the destination quoted.
@@ -1096,10 +1098,11 @@ TranscodeRuleSet geminiRequestFromIr() {
           // `stopSequences` is array-only, while the IR also allows a bare string.
           TranscodeRule::ensureArray("stop"),
           TranscodeRule::move("stop", "generationConfig.stopSequences"),
+          TranscodeRule::move("seed", "generationConfig.seed"),
           // 4. Map `tool_choice` to `toolConfig.functionCallingConfig`. Without this the
-          //    field rides through as an unknown member: Gemini's root sets
-          //    `allowUnknownFields(true)`, so the request is accepted and the caller's
-          //    constraint is silently ignored rather than rejected.
+          //    field rides through as an unknown member: Gemini's root schema sets
+          //    `allowUnknownFields(true)`, so it passes validation here, and Gemini then
+          //    rejects the whole request for naming a field it does not know.
           //    A pinned tool becomes `mode: ANY` plus a single-entry allow-list, which is
           //    how Gemini spells "call exactly this function".
           TranscodeRule::ensureObject("tool_choice", "type"),
