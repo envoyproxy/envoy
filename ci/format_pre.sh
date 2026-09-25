@@ -55,13 +55,16 @@ CURRENT=spelling
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/spelling:check_spelling_pedantic -- --mark check --target_root="$PWD"
 
 CURRENT=rustfmt
-RUSTFMT_PRE="$(git diff | md5sum)"
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @rules_rust//:rustfmt
-RUSTFMT_POST="$(git diff | md5sum)"
-if [[ "$RUSTFMT_PRE" != "$RUSTFMT_POST" ]]; then
-    echo "ERROR: rustfmt produced changes — Rust code is unformatted." >&2
-    echo "Run: bazel run @rules_rust//:rustfmt" >&2
-    false
+CURRENT=rustfmt
+# rustfmt_aspect only attaches to rust rules - scope to them so we don't analyze the whole tree
+RUST_TARGETS="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query "${BAZEL_GLOBAL_OPTIONS[@]}" \
+    'kind("rust_(binary|library|test|shared_library|static_library|proc_macro)", //...)')"
+if [[ -n "$RUST_TARGETS" ]]; then
+    # shellcheck disable=SC2086
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" \
+        --aspects=@rules_rust//rust:defs.bzl%rustfmt_aspect \
+        --output_groups=rustfmt_checks \
+        -- $RUST_TARGETS
 fi
 
 CURRENT=check_format
