@@ -32,7 +32,6 @@ using Envoy::Config::ConfigProvider;
 using Envoy::Config::ConfigProviderInstanceType;
 using Envoy::Config::ConfigProviderManager;
 using Envoy::Config::ConfigProviderPtr;
-using Envoy::Config::ScopedResume;
 
 namespace Envoy {
 namespace Router {
@@ -420,24 +419,17 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
-  // Destruction of resume_rds will lift the floodgate for new RDS subscriptions.
   // Note in the case of partial acceptance, accepted RDS subscriptions should be started
   // despite of any error.
-  ScopedResume resume_rds;
   // If new route config sources come after the local init manager's initialize() been
   // called, the init manager can't accept new targets. Instead we use a local override which will
   // start new subscriptions but not wait on them to be ready.
   std::unique_ptr<Init::ManagerImpl> srds_init_mgr;
-  // NOTE: This should be defined after srds_init_mgr and resume_rds, as it depends on the
-  // srds_init_mgr, and we want a single RDS discovery request to be sent to management
+  // NOTE: This should be defined after srds_init_mgr, as it depends on the srds_init_mgr, and we
+  // want a single RDS discovery request to be sent to management
   // server.
   std::unique_ptr<Cleanup> srds_initialization_continuation;
   ASSERT(localInitManager().state() > Init::Manager::State::Uninitialized);
-  const auto type_url = Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
-  // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
-  // In the case that localInitManager is uninitialized, RDS is already paused
-  // either by Server init or LDS init.
-  resume_rds = factory_context_.xdsManager().pause(type_url);
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
     srds_init_mgr =
