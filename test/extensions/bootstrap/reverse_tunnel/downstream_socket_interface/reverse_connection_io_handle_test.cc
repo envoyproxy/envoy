@@ -3412,8 +3412,7 @@ TEST_F(ReverseConnectionIOHandleTest, CloseNoDoubleCloseWithPipeFds) {
   const os_fd_t pipe_write_fd = getTriggerPipeWriteFd();
   NiceMock<Api::MockOsSysCalls> mock_os_syscalls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
-  EXPECT_CALL(mock_os_syscalls, close(original_fd))
-      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(mock_os_syscalls, close(original_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(mock_os_syscalls, close(pipe_read_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(mock_os_syscalls, close(pipe_write_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
 
