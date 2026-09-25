@@ -99,6 +99,9 @@ type Span interface {
 	// SetTag sets a key/value tag on the span.
 	SetTag(key, value string)
 
+	// SetTags sets multiple key/value tags on the span.
+	SetTags(tags [][2]string)
+
 	// SetOperation sets the operation name on the span.
 	SetOperation(operation string)
 
@@ -546,6 +549,8 @@ type HttpFilterHandle interface {
 // implementations. It supports config-scoped logging, metric definition, generic secret
 // subscription, and async I/O via HttpCallout / StartHttpStream from the main thread.
 type HttpFilterConfigHandle interface {
+	CommonHandle
+
 	// Log will log the given message via the host environment's logging mechanism.
 	Log(level LogLevel, format string, args ...any)
 

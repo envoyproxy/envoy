@@ -556,7 +556,7 @@ private:
   WriteBufferImpl write_buffer_;
 };
 
-class NetworkFilterConfigHandleImpl : public NetworkFilterConfigHandle {
+class NetworkFilterConfigHandleImpl : public CommonHandleImpl<NetworkFilterConfigHandle> {
 public:
   explicit NetworkFilterConfigHandleImpl(
       envoy_dynamic_module_type_network_filter_config_envoy_ptr host_config_ptr)
@@ -629,85 +629,104 @@ envoy_dynamic_module_type_network_filter_config_module_ptr
 envoy_dynamic_module_on_network_filter_config_new(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
-  auto config_handle = std::make_unique<NetworkFilterConfigHandleImpl>(filter_config_envoy_ptr);
-  const std::string_view name_view(name.ptr, name.length);
-  const std::string_view config_view(config.ptr, config.length);
+  return failClosed(
+      "envoy_dynamic_module_on_network_filter_config_new", nullptr,
+      [&]() -> envoy_dynamic_module_type_network_filter_config_module_ptr {
+        auto config_handle =
+            std::make_unique<NetworkFilterConfigHandleImpl>(filter_config_envoy_ptr);
+        const std::string_view name_view(name.ptr, name.length);
+        const std::string_view config_view(config.ptr, config.length);
 
-  auto config_factory = NetworkFilterConfigFactoryRegistry::getRegistry().find(name_view);
-  if (config_factory == NetworkFilterConfigFactoryRegistry::getRegistry().end()) {
-    DYM_LOG((*config_handle), LogLevel::Warn,
-            "Network plugin config factory not found for name: {}", name_view);
-    return nullptr;
-  }
+        auto config_factory = NetworkFilterConfigFactoryRegistry::getRegistry().find(name_view);
+        if (config_factory == NetworkFilterConfigFactoryRegistry::getRegistry().end()) {
+          DYM_LOG((*config_handle), LogLevel::Warn,
+                  "Network plugin config factory not found for name: {}", name_view);
+          return nullptr;
+        }
 
-  auto plugin_factory = config_factory->second->create(*config_handle, config_view);
-  if (!plugin_factory) {
-    DYM_LOG((*config_handle), LogLevel::Warn,
-            "Failed to create network plugin factory for name: {}", name_view);
-    return nullptr;
-  }
+        auto plugin_factory = config_factory->second->create(*config_handle, config_view);
+        if (!plugin_factory) {
+          DYM_LOG((*config_handle), LogLevel::Warn,
+                  "Failed to create network plugin factory for name: {}", name_view);
+          return nullptr;
+        }
 
-  auto factory = std::make_unique<NetworkFilterFactoryWrapper>();
-  factory->config_handle_ = std::move(config_handle);
-  factory->factory_ = std::move(plugin_factory);
-  return wrapPointer(factory.release());
+        auto factory = std::make_unique<NetworkFilterFactoryWrapper>();
+        factory->config_handle_ = std::move(config_handle);
+        factory->factory_ = std::move(plugin_factory);
+        return wrapPointer(factory.release());
+      });
 }
 
 void envoy_dynamic_module_on_network_filter_config_destroy(
     envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr) {
-  auto* factory_wrapper = unwrapPointer<NetworkFilterFactoryWrapper>(filter_config_ptr);
-  if (factory_wrapper == nullptr) {
-    return;
-  }
-  if (factory_wrapper->factory_) {
-    factory_wrapper->factory_->onDestroy();
-  }
-  delete factory_wrapper;
+  failClosedVoid("envoy_dynamic_module_on_network_filter_config_destroy", [&]() {
+    auto* factory_wrapper = unwrapPointer<NetworkFilterFactoryWrapper>(filter_config_ptr);
+    if (factory_wrapper == nullptr) {
+      return;
+    }
+    if (factory_wrapper->factory_) {
+      factory_wrapper->factory_->onDestroy();
+    }
+    delete factory_wrapper;
+  });
 }
 
 envoy_dynamic_module_type_network_filter_module_ptr envoy_dynamic_module_on_network_filter_new(
     envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr,
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
-  auto* factory_wrapper = unwrapPointer<NetworkFilterFactoryWrapper>(filter_config_ptr);
-  if (factory_wrapper == nullptr) {
-    return nullptr;
-  }
+  return failClosed(
+      "envoy_dynamic_module_on_network_filter_new", nullptr,
+      [&]() -> envoy_dynamic_module_type_network_filter_module_ptr {
+        auto* factory_wrapper = unwrapPointer<NetworkFilterFactoryWrapper>(filter_config_ptr);
+        if (factory_wrapper == nullptr) {
+          return nullptr;
+        }
 
-  auto plugin_handle = std::make_unique<NetworkFilterHandleImpl>(filter_envoy_ptr);
-  auto plugin = factory_wrapper->factory_->create(*plugin_handle);
-  if (plugin == nullptr) {
-    DYM_LOG((*plugin_handle), LogLevel::Warn, "Failed to create network plugin instance");
-    return nullptr;
-  }
-  plugin_handle->plugin_ = std::move(plugin);
-  return wrapPointer(plugin_handle.release());
+        auto plugin_handle = std::make_unique<NetworkFilterHandleImpl>(filter_envoy_ptr);
+        auto plugin = factory_wrapper->factory_->create(*plugin_handle);
+        if (plugin == nullptr) {
+          DYM_LOG((*plugin_handle), LogLevel::Warn, "Failed to create network plugin instance");
+          return nullptr;
+        }
+        plugin_handle->plugin_ = std::move(plugin);
+        return wrapPointer(plugin_handle.release());
+      });
 }
 
 envoy_dynamic_module_type_on_network_filter_data_status
 envoy_dynamic_module_on_network_filter_new_connection(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
-  if (plugin_handle == nullptr) {
-    return envoy_dynamic_module_type_on_network_filter_data_status_Continue;
-  }
-  return static_cast<envoy_dynamic_module_type_on_network_filter_data_status>(
-      plugin_handle->plugin_->onNewConnection());
+  return failClosed("envoy_dynamic_module_on_network_filter_new_connection",
+                    envoy_dynamic_module_type_on_network_filter_data_status_StopIteration, [&]() {
+                      static_cast<void>(filter_envoy_ptr);
+                      auto* plugin_handle =
+                          unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
+                      if (plugin_handle == nullptr) {
+                        return envoy_dynamic_module_type_on_network_filter_data_status_Continue;
+                      }
+                      return static_cast<envoy_dynamic_module_type_on_network_filter_data_status>(
+                          plugin_handle->plugin_->onNewConnection());
+                    });
 }
 
 envoy_dynamic_module_type_on_network_filter_data_status envoy_dynamic_module_on_network_filter_read(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, size_t data_length,
     bool end_stream) {
-  static_cast<void>(filter_envoy_ptr);
-  static_cast<void>(data_length);
-  auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
-  if (plugin_handle == nullptr) {
-    return envoy_dynamic_module_type_on_network_filter_data_status_Continue;
-  }
-  return static_cast<envoy_dynamic_module_type_on_network_filter_data_status>(
-      plugin_handle->plugin_->onRead(plugin_handle->readBuffer(), end_stream));
+  return failClosed("envoy_dynamic_module_on_network_filter_read",
+                    envoy_dynamic_module_type_on_network_filter_data_status_StopIteration, [&]() {
+                      static_cast<void>(filter_envoy_ptr);
+                      static_cast<void>(data_length);
+                      auto* plugin_handle =
+                          unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
+                      if (plugin_handle == nullptr) {
+                        return envoy_dynamic_module_type_on_network_filter_data_status_Continue;
+                      }
+                      return static_cast<envoy_dynamic_module_type_on_network_filter_data_status>(
+                          plugin_handle->plugin_->onRead(plugin_handle->readBuffer(), end_stream));
+                    });
 }
 
 envoy_dynamic_module_type_on_network_filter_data_status
@@ -715,36 +734,44 @@ envoy_dynamic_module_on_network_filter_write(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, size_t data_length,
     bool end_stream) {
-  static_cast<void>(filter_envoy_ptr);
-  static_cast<void>(data_length);
-  auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
-  if (plugin_handle == nullptr) {
-    return envoy_dynamic_module_type_on_network_filter_data_status_Continue;
-  }
-  return static_cast<envoy_dynamic_module_type_on_network_filter_data_status>(
-      plugin_handle->plugin_->onWrite(plugin_handle->writeBuffer(), end_stream));
+  return failClosed(
+      "envoy_dynamic_module_on_network_filter_write",
+      envoy_dynamic_module_type_on_network_filter_data_status_StopIteration, [&]() {
+        static_cast<void>(filter_envoy_ptr);
+        static_cast<void>(data_length);
+        auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
+        if (plugin_handle == nullptr) {
+          return envoy_dynamic_module_type_on_network_filter_data_status_Continue;
+        }
+        return static_cast<envoy_dynamic_module_type_on_network_filter_data_status>(
+            plugin_handle->plugin_->onWrite(plugin_handle->writeBuffer(), end_stream));
+      });
 }
 
 void envoy_dynamic_module_on_network_filter_event(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr,
     envoy_dynamic_module_type_network_connection_event event) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
-  if (plugin_handle == nullptr) {
-    return;
-  }
-  plugin_handle->plugin_->onEvent(static_cast<NetworkConnectionEvent>(event));
+  failClosedVoid("envoy_dynamic_module_on_network_filter_event", [&]() {
+    static_cast<void>(filter_envoy_ptr);
+    auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
+    if (plugin_handle == nullptr) {
+      return;
+    }
+    plugin_handle->plugin_->onEvent(static_cast<NetworkConnectionEvent>(event));
+  });
 }
 
 void envoy_dynamic_module_on_network_filter_destroy(
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr) {
-  auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
-  if (plugin_handle == nullptr) {
-    return;
-  }
-  plugin_handle->plugin_->onDestroy();
-  delete plugin_handle;
+  failClosedVoid("envoy_dynamic_module_on_network_filter_destroy", [&]() {
+    auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
+    if (plugin_handle == nullptr) {
+      return;
+    }
+    plugin_handle->plugin_->onDestroy();
+    delete plugin_handle;
+  });
 }
 
 void envoy_dynamic_module_on_network_filter_http_callout_done(
@@ -753,66 +780,76 @@ void envoy_dynamic_module_on_network_filter_http_callout_done(
     envoy_dynamic_module_type_http_callout_result result,
     envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle) {
-    return;
-  }
+  failClosedVoid("envoy_dynamic_module_on_network_filter_http_callout_done", [&]() {
+    static_cast<void>(filter_envoy_ptr);
+    auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
+    if (!plugin_handle) {
+      return;
+    }
 
-  auto it = plugin_handle->callout_callbacks_.find(callout_id);
-  if (it != plugin_handle->callout_callbacks_.end()) {
-    auto* typed_headers = reinterpret_cast<HeaderView*>(headers);
-    auto* typed_body_chunks = reinterpret_cast<BufferView*>(body_chunks);
-    auto* callback = it->second;
-    plugin_handle->callout_callbacks_.erase(it);
-    callback->onHttpCalloutDone(static_cast<HttpCalloutResult>(result),
-                                {typed_headers, headers_size},
-                                {typed_body_chunks, body_chunks_size});
-  }
+    auto it = plugin_handle->callout_callbacks_.find(callout_id);
+    if (it != plugin_handle->callout_callbacks_.end()) {
+      auto* typed_headers = reinterpret_cast<HeaderView*>(headers);
+      auto* typed_body_chunks = reinterpret_cast<BufferView*>(body_chunks);
+      auto* callback = it->second;
+      plugin_handle->callout_callbacks_.erase(it);
+      callback->onHttpCalloutDone(static_cast<HttpCalloutResult>(result),
+                                  {typed_headers, headers_size},
+                                  {typed_body_chunks, body_chunks_size});
+    }
+  });
 }
 
 void envoy_dynamic_module_on_network_filter_scheduled(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, uint64_t event_id) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle || !plugin_handle->scheduler_) {
-    return;
-  }
-  plugin_handle->scheduler_->onScheduled(event_id);
+  failClosedVoid("envoy_dynamic_module_on_network_filter_scheduled", [&]() {
+    static_cast<void>(filter_envoy_ptr);
+    auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
+    if (!plugin_handle || !plugin_handle->scheduler_) {
+      return;
+    }
+    plugin_handle->scheduler_->onScheduled(event_id);
+  });
 }
 
 void envoy_dynamic_module_on_network_filter_config_scheduled(
     envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr,
     uint64_t event_id) {
-  auto* factory_wrapper = unwrapPointer<NetworkFilterFactoryWrapper>(filter_config_ptr);
-  if (factory_wrapper == nullptr || factory_wrapper->config_handle_ == nullptr ||
-      factory_wrapper->config_handle_->scheduler_ == nullptr) {
-    return;
-  }
-  factory_wrapper->config_handle_->scheduler_->onScheduled(event_id);
+  failClosedVoid("envoy_dynamic_module_on_network_filter_config_scheduled", [&]() {
+    auto* factory_wrapper = unwrapPointer<NetworkFilterFactoryWrapper>(filter_config_ptr);
+    if (factory_wrapper == nullptr || factory_wrapper->config_handle_ == nullptr ||
+        factory_wrapper->config_handle_->scheduler_ == nullptr) {
+      return;
+    }
+    factory_wrapper->config_handle_->scheduler_->onScheduled(event_id);
+  });
 }
 
 void envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle) {
-    return;
-  }
-  plugin_handle->plugin_->onAboveWriteBufferHighWatermark();
+  failClosedVoid("envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark", [&]() {
+    static_cast<void>(filter_envoy_ptr);
+    auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
+    if (!plugin_handle) {
+      return;
+    }
+    plugin_handle->plugin_->onAboveWriteBufferHighWatermark();
+  });
 }
 
 void envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle) {
-    return;
-  }
-  plugin_handle->plugin_->onBelowWriteBufferLowWatermark();
+  failClosedVoid("envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark", [&]() {
+    static_cast<void>(filter_envoy_ptr);
+    auto* plugin_handle = unwrapPointer<NetworkFilterHandleImpl>(filter_module_ptr);
+    if (!plugin_handle) {
+      return;
+    }
+    plugin_handle->plugin_->onBelowWriteBufferLowWatermark();
+  });
 }
 
 } // extern "C"

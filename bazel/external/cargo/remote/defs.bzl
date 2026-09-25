@@ -416,7 +416,7 @@ def crate_repositories():
         type = "tar.gz",
         urls = ["https://static.crates.io/crates/protobuf/2.28.0/download"],
         strip_prefix = "protobuf-2.28.0",
-        build_file = Label("@envoy//bazel/external/cargo/remote:BUILD.protobuf-2.28.0.bazel"),
+        build_file = Label("//bazel/external/cargo/remote:BUILD.protobuf-2.28.0.bazel"),
     )
 
     return [

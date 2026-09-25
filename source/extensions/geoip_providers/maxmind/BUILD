@@ -23,10 +23,13 @@ envoy_cc_extension(
     tags = ["skip_on_windows"],
     deps = [
         ":provider_impl",
+        "//envoy/common:exception_lib",
         "//envoy/geoip:geoip_provider_driver_interface",
+        "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/geoip_providers/common:factory_base_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/geoip_providers/maxmind/v3:pkg_cc_proto",
     ],
 )
@@ -43,8 +46,11 @@ envoy_cc_library(
     deps = [
         "//bazel/deps:maxmind_linux_darwin",
         "//envoy/geoip:geoip_provider_driver_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/common:enum_to_int",
         "//source/common/common:thread_synchronizer_lib",
+        "//source/common/stats:utility_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/geoip_providers/maxmind/v3:pkg_cc_proto",
     ],
 )

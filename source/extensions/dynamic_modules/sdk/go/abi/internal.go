@@ -414,6 +414,27 @@ func (s *dymSpan) SetTag(key, value string) {
 	runtime.KeepAlive(value)
 }
 
+func (s *dymSpan) SetTags(tags [][2]string) {
+	if s == nil || s.spanPtr == nil || len(tags) == 0 {
+		return
+	}
+	pairs := make([]C.envoy_dynamic_module_type_module_key_value_pair, len(tags))
+	for i, tag := range tags {
+		pairs[i] = C.envoy_dynamic_module_type_module_key_value_pair{
+			key_ptr:      (*C.char)(unsafe.Pointer(unsafe.StringData(tag[0]))),
+			key_length:   C.size_t(len(tag[0])),
+			value_ptr:    (*C.char)(unsafe.Pointer(unsafe.StringData(tag[1]))),
+			value_length: C.size_t(len(tag[1])),
+		}
+	}
+	C.envoy_dynamic_module_callback_http_span_set_tag_batch(
+		s.spanPtr,
+		&pairs[0],
+		C.size_t(len(pairs)),
+	)
+	runtime.KeepAlive(tags)
+}
+
 func (s *dymSpan) SetOperation(operation string) {
 	if s == nil || s.spanPtr == nil {
 		return
@@ -1649,6 +1670,8 @@ func newDymStreamPluginHandle(
 }
 
 type dymConfigHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr    C.envoy_dynamic_module_type_http_filter_config_envoy_ptr
 	calloutCallbacks map[uint64]shared.HttpCalloutCallback
 	streamCallbacks  map[uint64]shared.HttpStreamCallback
@@ -1980,7 +2003,9 @@ func (h *dymConfigHandle) GetScheduler() shared.Scheduler {
 	return h.scheduler
 }
 
-type dymRouteConfigHandle struct{}
+type dymRouteConfigHandle struct {
+	dymCommonHandle
+}
 
 func (h *dymRouteConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
 	hostLog(level, format, args)
@@ -2576,6 +2601,8 @@ type statSinkWrapper struct {
 // configuration pointer used to define and set gauges and, lazily, a scheduler
 // whose committed tasks run on the main thread.
 type dymStatSinkHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr C.envoy_dynamic_module_type_stat_sink_config_envoy_ptr
 	scheduler     *dymScheduler
 }

@@ -1,6 +1,8 @@
 #include <cstddef>
 #include <string>
 
+#include "envoy/common/logger.h"
+
 #include "source/common/protobuf/protobuf.h"
 
 #include "library/cc/mobile_engine_builder.h"
@@ -31,7 +33,7 @@ extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM*, void* /* reserved */) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jclass, jint level) {
-  Envoy::Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(level));
+  Envoy::Logger::Context::changeAllLogLevels(static_cast<Envoy::Logger::Levels>(level));
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(

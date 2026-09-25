@@ -18,6 +18,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`bootstrap extension <envoy_v3_api_msg_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension>`
   (:ref:`configuration <config_bootstrap_extensions_dynamic_modules>`).
 * As a :ref:`cluster <envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig>`.
+* As an :ref:`xDS config validator <envoy_v3_api_msg_extensions.config.validators.dynamic_modules.v3.DynamicModuleConfigValidator>`.
 * As a :ref:`listener filter <envoy_v3_api_msg_extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter>`.
 * As a :ref:`UDP listener filter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`
   (:ref:`configuration <config_udp_listener_filters_dynamic_modules>`).
@@ -29,6 +30,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
 * As an :ref:`HTTP early header mutation <envoy_v3_api_msg_extensions.http.early_header_mutation.dynamic_modules.v3.DynamicModuleEarlyHeaderMutation>`.
+* As an :ref:`HTTP/1 header formatter <envoy_v3_api_msg_extensions.http.header_formatters.dynamic_modules.v3.DynamicModuleHeaderFormatter>`.
 * As an :ref:`HTTP matching data input <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`.
 * As an :ref:`input matcher <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
 * As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
@@ -145,8 +147,9 @@ The repository is available at `envoyproxy/dynamic-modules-examples <https://git
 Statistics
 ---------------------------
 
-All dynamic-module extension types emit the following statistics in the shared ``dynamic_modules.`` namespace.
-These stats track failures encountered while loading the extension's configuration. Each one is tagged with
+Dynamic-module extension types that receive a factory context emit the following statistics in the shared ``dynamic_modules.`` namespace.
+These stats track failures encountered while loading the extension's configuration. Extension points created without a factory context, such
+as config validators and the upstream HTTP TCP bridge, cannot emit these shared counters. Each one is tagged with
 ``config_name``, set to the configured name of the dynamic-module extension instance — for example the
 :ref:`filter_name
 <envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_name>`
@@ -163,8 +166,8 @@ load-balancing policy, ``tracer_name`` for the tracer or ``cluster_name`` for th
   remote_fetch_error, Counter, "Total failures fetching or loading a remote module source, including rejected cache misses when ``nack_on_cache_miss`` is set. Only the HTTP filter supports remote module sources."
   per_route_config_error, Counter, "Total per-route configurations that failed to load or initialize. Only emitted by the HTTP filter."
 
-In addition to the counters above, a module may define its own custom metrics. These are emitted
-under the configurable :ref:`metrics_namespace
+In addition to the counters above, a module can define its own custom metrics when its extension
+type receives a factory context. These are emitted under the configurable :ref:`metrics_namespace
 <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>`
 (``dynamicmodulescustom`` by default), separately from the ``dynamic_modules.`` namespace above.
 

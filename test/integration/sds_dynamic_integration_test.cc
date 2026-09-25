@@ -296,9 +296,18 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
 
-    // Modify the listener ssl cert to use SDS from sds_cluster
+    // Modify the listener TLS certificate to use SDS.
     auto* secret_config_rsa = common_tls_context.add_tls_certificate_sds_secret_configs();
-    setUpSdsConfig(secret_config_rsa, server_cert_rsa_);
+    if (filesystem_sds_path_.empty()) {
+      setUpSdsConfig(secret_config_rsa, server_cert_rsa_);
+    } else {
+      secret_config_rsa->set_name(server_cert_rsa_);
+      auto* config_source = secret_config_rsa->mutable_sds_config();
+      config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* path_config_source = config_source->mutable_path_config_source();
+      path_config_source->set_path(filesystem_sds_path_);
+      path_config_source->mutable_poll_interval()->set_nanos(50'000'000);
+    }
 
     // Add an additional SDS config for an EC cert (the base test has SDS config for an RSA cert).
     // This is done via the filesystem instead of gRPC to simplify the test setup.
@@ -444,6 +453,15 @@ resources:
     TestEnvironment::writeStringToFileForTest("session_ticket_keys.sds.yaml", sds_content, false);
   }
 
+  void usePollingSds(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) {
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
+    discovery_response.set_version_info("initial");
+    discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
+    std::ignore = discovery_response.add_resources()->PackFrom(secret);
+    filesystem_sds_path_ = TestEnvironment::writeStringToFileForTest(
+        "server_cert_rsa.sds.yaml", MessageUtil::getYamlStringFromMessage(discovery_response));
+  }
+
 protected:
   Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
   bool dual_cert_{false};
@@ -455,6 +473,7 @@ protected:
   bool configure_keylog_{false};
   const std::string keylog_path_{TestEnvironment::temporaryPath(TestUtility::uniqueFilename())};
   std::string context_cipher_suite_;
+  std::string filesystem_sds_path_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
@@ -511,6 +530,55 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
   // First request with server_ecdsa{cert,key}.pem.
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+}
+
+TEST_P(SdsDynamicKeyRotationIntegrationTest, PollingRotation) {
+  v3_resource_api_ = true;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("root/current"));
+  TestEnvironment::writeStringToFileForTest(
+      TestEnvironment::temporaryPath("root/current/servercert.pem"),
+      TestEnvironment::readFileToStringForTest(
+          TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem")),
+      true);
+  TestEnvironment::writeStringToFileForTest(
+      TestEnvironment::temporaryPath("root/current/serverkey.pem"),
+      TestEnvironment::readFileToStringForTest(
+          TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")),
+      true);
+
+  // Use polling without a watched-directory fallback for either SDS or its certificate files.
+  auto secret = getCurrentServerSecret();
+  secret.mutable_tls_certificate()->clear_watched_directory();
+  usePollingSds(secret);
+  initialize();
+  waitForSdsUpdateStats(1);
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+  cleanupUpstreamAndDownstream();
+
+  // Overwrite both files in place so no move event can trigger the rotation.
+  TestEnvironment::writeStringToFileForTest(
+      TestEnvironment::temporaryPath("root/current/servercert.pem"),
+      TestEnvironment::readFileToStringForTest(
+          TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsacert.pem")),
+      true, false);
+  TestEnvironment::writeStringToFileForTest(
+      TestEnvironment::temporaryPath("root/current/serverkey.pem"),
+      TestEnvironment::readFileToStringForTest(
+          TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsakey.pem")),
+      true, false);
+  waitForSdsUpdateStats(2);
+
+  // An ECDSA-only handshake proves the polled certificate and key reached the TLS context.
+  client_ssl_ctx_ = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions()
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"}),
+      context_manager_, *api_, &server_factory_context_.serverScope());
   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 }
 

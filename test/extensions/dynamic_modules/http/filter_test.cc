@@ -102,6 +102,77 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   filter->onDestroy();
 }
 
+TEST_P(DynamicModuleTestLanguages, NullInModuleFilterFailsClosed) {
+  // A module whose filter constructor returns null must fail the request closed rather than call a
+  // null filter. initializeInModuleFilter() is intentionally skipped so in_module_filter_ stays
+  // null, which is the same state the filter is in after a failed constructor.
+  const auto language = GetParam();
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
+  EXPECT_OK(dynamic_module);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "foo", "bar", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+      *stats_store.createScope(""), context);
+  EXPECT_OK(filter_config_or_status);
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  // decodeHeaders sends a 500 with the init-failed details and stops the request.
+  EXPECT_CALL(decoder_callbacks,
+              sendLocalReply(Code::InternalServerError, _, _, _,
+                             absl::string_view("dynamic_module_filter_init_failed")));
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
+
+  // No remaining hook calls into the null filter.
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter->decodeData(data, false));
+  TestRequestTrailerMapImpl trailers;
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter->decodeTrailers(trailers));
+  TestResponseHeaderMapImpl response_headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(data, false));
+  TestResponseTrailerMapImpl response_trailers;
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
+  filter->onStreamComplete();
+  filter->onDestroy();
+}
+
+TEST_P(DynamicModuleTestLanguages, NullInModuleFilterEncodePassesThrough) {
+  // A null in-module filter on the encode path passes the response through instead of calling a
+  // null filter. This covers the encode guard on its own, without a prior decode local reply.
+  const auto language = GetParam();
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
+  EXPECT_OK(dynamic_module);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "foo", "bar", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+      *stats_store.createScope(""), context);
+  EXPECT_OK(filter_config_or_status);
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  TestResponseHeaderMapImpl response_headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(data, false));
+  TestResponseTrailerMapImpl response_trailers;
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
+  filter->onDestroy();
+}
+
 #ifndef __SANITIZE_ADDRESS__
 // TODO(wbpcode): address sanitizer cannot handle the cross shared libraries vptr casts.
 // and we need to figure out a way to fix it.
@@ -848,6 +919,8 @@ TEST_P(DynamicModuleHttpLanguageTests, SpanCallbacks) {
   auto* child_span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(callbacks, activeSpan()).WillRepeatedly(testing::ReturnRef(span));
   EXPECT_CALL(span, setTag("key", "value"));
+  EXPECT_CALL(span, setTag("batch.key1", "batch.value1"));
+  EXPECT_CALL(span, setTag("batch.key2", "batch.value2"));
   EXPECT_CALL(span, setOperation("operation"));
   EXPECT_CALL(span, log(_, "event"));
   EXPECT_CALL(span, setSampled(true));
@@ -2359,7 +2432,8 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigLifetimes) {
     const std::string route_filter_config_str = "router config";
     auto route_filter_config_or_status =
         Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-            filter_name, route_filter_config_str, std::move(dynamic_module_for_route.value()));
+            filter_name, route_filter_config_str, std::move(dynamic_module_for_route.value()),
+            context.mainThreadDispatcher());
     EXPECT_OK(route_filter_config_or_status);
     auto route_filter_config = std::move(route_filter_config_or_status.value());
 
@@ -2383,6 +2457,41 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigLifetimes) {
                 ->value()
                 .getStringView(),
             "router config");
+}
+
+// A per-route configuration released off the main thread defers the module's destroy hook to the
+// main dispatcher, because the module may use configuration callbacks that require that thread.
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigDestroyedOnMainThread) {
+  const std::string filter_name = "per_route_config";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
+  EXPECT_OK(dynamic_module);
+
+  ON_CALL(context.dispatcher_, isThreadSafe()).WillByDefault(testing::Return(false));
+
+  auto config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
+          filter_name, "router config", std::move(dynamic_module.value()),
+          context.mainThreadDispatcher());
+  EXPECT_OK(config_or_status);
+  auto config = std::move(config_or_status.value());
+
+  Event::PostCb posted;
+  EXPECT_CALL(context.dispatcher_, post(_)).WillOnce([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  });
+  config.reset();
+  ASSERT_TRUE(posted != nullptr);
+
+  // Running the posted callback invokes the module's destroy hook on the main thread and then
+  // unloads the module.
+  posted();
 }
 
 TEST(HttpFilter, HeaderMapGetter) {

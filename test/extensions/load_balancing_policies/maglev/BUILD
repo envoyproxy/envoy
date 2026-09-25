@@ -98,6 +98,7 @@ envoy_cc_benchmark_binary(
         "//source/extensions/load_balancing_policies/maglev:maglev_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
         "//test/test_common:status_utility_lib",
+        "@benchmark",
     ],
 )
 

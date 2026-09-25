@@ -506,6 +506,7 @@ public:
     auto span = handle_.getActiveSpan();
     if (span != nullptr) {
       span->setTag("key", "value");
+      span->setTags({{"batch.key1", "batch.value1"}, {"batch.key2", "batch.value2"}});
       span->setOperation("operation");
       span->log("event");
       span->setSampled(true);

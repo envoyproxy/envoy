@@ -1596,6 +1596,25 @@ TEST_F(ProtobufUtilityTest, KnownAnyToBytes) {
     ASSERT_THAT(result, IsOkAndHolds(R"({"key":"value"})"));
   }
   {
+    xds::type::v3::TypedStruct source;
+    source.set_type_url("type.googleapis.com/example.FilterConfig");
+    (*source.mutable_value()->mutable_fields())["key"].set_string_value("value");
+    Protobuf::Any source_any;
+    std::ignore = source_any.PackFrom(source);
+
+    EXPECT_THAT(MessageUtil::knownAnyToBytes(source_any), IsOkAndHolds(R"({"key":"value"})"));
+    EXPECT_THAT(
+        MessageUtil::getJsonStringFromMessage(source_any),
+        IsOkAndHolds(
+            R"({"@type":"type.googleapis.com/xds.type.v3.TypedStruct","type_url":"type.googleapis.com/example.FilterConfig","value":{"key":"value"}})"));
+  }
+  {
+    Protobuf::Any source_any;
+    source_any.set_type_url("type.googleapis.com/xds.type.v3.TypedStruct");
+    source_any.set_value("\x0a");
+    EXPECT_THAT(MessageUtil::knownAnyToBytes(source_any), Not(IsOk()));
+  }
+  {
     envoy::config::cluster::v3::Filter filter;
     Protobuf::Any source_any;
     std::ignore = source_any.PackFrom(filter);

@@ -7,8 +7,8 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/thread.h"
-#include "source/common/coroutine/leaf_awaitable.h"
 #include "source/common/coroutine/status_macros.h"
+#include "source/extensions/filters/http/ai_protocol_manager/replay_awaitable.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -38,51 +38,10 @@ enum class SerializationMode {
   Emit,
 };
 
-class ReplayAwaitable : public Coroutine::LeafAwaitable<absl::Status> {
-public:
-  ReplayAwaitable(BufferManager& buffer_manager, uint64_t offset, uint64_t length)
-      : buffer_manager_(buffer_manager), offset_(offset), length_(length), is_in_memory_(false) {}
-
-  ReplayAwaitable(BufferManager& buffer_manager, Buffer::Instance& data)
-      : buffer_manager_(buffer_manager), is_in_memory_(true) {
-    data_.move(data);
-  }
-
-protected:
-  // Fast path: complete immediately without suspending if nothing needs to be replayed.
-  std::optional<absl::Status> tryImmediate() override {
-    if ((is_in_memory_ && data_.length() == 0) || (!is_in_memory_ && length_ == 0)) {
-      return absl::OkStatus();
-    }
-    return std::nullopt;
-  }
-
-  // TODO(penguingao): Consider updating LeafAwaitable::onStart to return a bool (indicating
-  // whether to suspend) so that if buffer_manager_.replay completes synchronously on-stack, we can
-  // avoid await_suspend as defense-in-depth without splitting state across tryImmediate.
-  void onStart() override {
-    if (is_in_memory_) {
-      buffer_manager_.replay(data_, [this](absl::Status status) { complete(std::move(status)); });
-    } else {
-      buffer_manager_.replay(offset_, length_,
-                             [this](absl::Status status) { complete(std::move(status)); });
-    }
-  }
-
-  void onCancel() override { buffer_manager_.cancelReplay(); }
-
-private:
-  BufferManager& buffer_manager_;
-  uint64_t offset_{0};
-  uint64_t length_{0};
-  bool is_in_memory_{false};
-  Buffer::OwnedImpl data_;
-};
-
 class SerializerImpl {
 public:
-  SerializerImpl(BufferManager* buffer_manager, SerializationMode mode)
-      : buffer_manager_(buffer_manager), mode_(mode) {}
+  SerializerImpl(BufferManager* out, BufferManager* ref_source, SerializationMode mode)
+      : out_(out), ref_source_(ref_source), mode_(mode) {}
 
   Coroutine::Task<absl::Status> serialize(const nlohmann::json& node, nlohmann::json& new_node) {
     CO_RETURN_IF_ERROR(co_await serializeNode(node, new_node));
@@ -106,15 +65,12 @@ private:
       byte_counter_ += small_buf_.length();
       switch (mode_) {
       case SerializationMode::Emit:
-        if (buffer_manager_ == nullptr) {
-          co_return absl::InternalError("buffer_manager is null during flushBuffer");
-        }
         // TODO(penguingao): if the replay becomes too fragmented between
         // external buffer and re-serialization, we could change the interface to
         // BufferManager take hint from the serializer's potential next replay
         // ranges, this way, it can then internally coalescing reads to save
         // I/O.
-        CO_RETURN_IF_ERROR(co_await ReplayAwaitable(*buffer_manager_, small_buf_));
+        CO_RETURN_IF_ERROR(co_await ReplayAwaitable(*out_, small_buf_));
         break;
       case SerializationMode::Counting:
         small_buf_.drain(small_buf_.length());
@@ -128,14 +84,13 @@ private:
                                                      nlohmann::json& new_node) {
     ASSIGN_OR_CO_RETURN(const JsonWithExtBuf::ExternalRef ref, JsonWithExtBuf::externalRef(node));
     if (mode_ == SerializationMode::Emit) {
-      if (buffer_manager_ == nullptr) {
-        co_return absl::InternalError("buffer_manager is null for ExternalRef node");
+      if (ref_source_ == nullptr) {
+        co_return absl::InternalError("no buffer manager holds the bytes an ExternalRef names");
       }
-      if (ref.offset > buffer_manager_->length() ||
-          ref.length > buffer_manager_->length() - ref.offset) {
+      if (ref.offset > ref_source_->length() || ref.length > ref_source_->length() - ref.offset) {
         co_return absl::InvalidArgumentError(
             absl::StrCat("external buffer reference [", ref.offset, ", ", ref.offset + ref.length,
-                         ") exceeds buffer length ", buffer_manager_->length()));
+                         ") exceeds buffer length ", ref_source_->length()));
       }
     }
     small_buf_.add("\"");
@@ -146,7 +101,7 @@ private:
       byte_counter_ += ref.length;
       switch (mode_) {
       case SerializationMode::Emit:
-        CO_RETURN_IF_ERROR(co_await ReplayAwaitable(*buffer_manager_, ref.offset, ref.length));
+        CO_RETURN_IF_ERROR(co_await ReplayAwaitable(*ref_source_, ref.offset, ref.length));
         break;
       case SerializationMode::Counting:
         break;
@@ -235,7 +190,8 @@ private:
     co_return absl::OkStatus();
   }
 
-  BufferManager* buffer_manager_{nullptr};
+  BufferManager* out_{nullptr};
+  BufferManager* ref_source_{nullptr};
   SerializationMode mode_{SerializationMode::Emit};
   Buffer::OwnedImpl small_buf_;
   uint64_t byte_counter_{0};
@@ -245,7 +201,7 @@ private:
 
 Coroutine::Task<absl::StatusOr<Serializer::SerializedOffsets>>
 Serializer::calculateSerializedOffsets(const JsonWithExtBuf& doc) {
-  SerializerImpl impl(nullptr, SerializationMode::Counting);
+  SerializerImpl impl(nullptr, nullptr, SerializationMode::Counting);
   nlohmann::json new_json;
   CO_RETURN_IF_ERROR(co_await impl.serialize(doc.json(), new_json));
 
@@ -255,11 +211,11 @@ Serializer::calculateSerializedOffsets(const JsonWithExtBuf& doc) {
 }
 
 Coroutine::Task<absl::StatusOr<JsonWithExtBuf>>
-Serializer::serialize(const JsonWithExtBuf& doc, BufferManager* buffer_manager) {
-  if (buffer_manager == nullptr) {
-    co_return absl::InvalidArgumentError("buffer_manager must not be null for serialize");
+Serializer::serialize(const JsonWithExtBuf& doc, BufferManager* out, BufferManager* ref_source) {
+  if (out == nullptr) {
+    co_return absl::InvalidArgumentError("out must not be null for serialize");
   }
-  SerializerImpl impl(buffer_manager, SerializationMode::Emit);
+  SerializerImpl impl(out, ref_source, SerializationMode::Emit);
   nlohmann::json new_json;
   CO_RETURN_IF_ERROR(co_await impl.serialize(doc.json(), new_json));
 

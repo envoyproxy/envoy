@@ -65,6 +65,7 @@ envoy_cc_benchmark_binary(
         "//source/common/json:json_internal_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/protobuf:utility_lib",
+        "@benchmark",
     ],
 )
 

@@ -195,7 +195,8 @@ build:rules_xcodeproj --features=-swift.use_global_index_store
 build:mobile-macos --host_platform=@envoy//bazel/platforms/rbe:macos
 build:mobile-macos --platforms=@envoy//bazel/platforms/rbe:macos
 build:mobile-macos --extra_execution_platforms=@envoy//bazel/platforms/rbe:macos
-build:mobile-macos --xcode_version_config=//ci:xcode_config
+# Let Bazel/xcode-locator pick the canonical Xcode version so rules_swift 4.x
+# system_sdk selects match the active Xcode exactly.
 build:mobile-macos --remote_download_toplevel
 build:mobile-macos --config=ci
 build:mobile-macos --config=remote

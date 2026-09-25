@@ -336,8 +336,9 @@ bool EnvoyQuicClientSession::ShouldKeepConnectionAlive() const {
 
 void EnvoyQuicClientSession::OnProofVerifyDetailsAvailable(
     const quic::ProofVerifyDetails& verify_details) {
-  if (static_cast<const CertVerifyResult&>(verify_details).isValid()) {
-    quic_ssl_info_->onCertValidated();
+  const auto& cert_verify_result = static_cast<const CertVerifyResult&>(verify_details);
+  if (cert_verify_result.isValid()) {
+    quic_ssl_info_->onCertValidated(cert_verify_result.validatedChain());
   }
 }
 

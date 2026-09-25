@@ -78,6 +78,7 @@ envoy_cc_benchmark_binary(
         "//source/extensions/load_balancing_policies/ring_hash:ring_hash_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
         "//test/test_common:status_utility_lib",
+        "@benchmark",
     ],
 )
 

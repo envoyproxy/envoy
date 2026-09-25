@@ -26,8 +26,12 @@ In that case, *per packet load balancing* is enabled. It means that upstream hos
 received by udp proxy using currently used load balancing policy.
 
 The UDP proxy listener filter also can operate as a *transparent* proxy if the
-:ref:`use_original_src_ip <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
-field is set to true. But please keep in mind that it does not forward the port to upstreams. It forwards only the IP address to upstreams.
+:ref:`use_original_src_ip
+<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_original_src_ip>`
+field is set to true. This mode preserves only the downstream source IP; it does not preserve the
+source port. On Linux, it requires the ``CAP_NET_ADMIN`` capability. Because upstream replies are
+addressed to the original downstream IP, the deployment must use Direct Server Return or configure
+the return routing described in the API documentation.
 
 Load balancing and unhealthy host handling
 ------------------------------------------
