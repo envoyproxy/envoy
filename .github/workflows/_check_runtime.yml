@@ -52,3 +52,5 @@ jobs:
         - target: cpu-detection
           name: CPU detection
           docker-cpus: 2
+        - target: execution-context
+          name: Execution context tests
