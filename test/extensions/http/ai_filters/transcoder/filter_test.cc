@@ -104,14 +104,9 @@ public:
   TranscoderFilterTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
         bridge_(*dispatcher_), buffer_manager_(BufferManager::Config{}, factory_, bridge_),
-        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {
-    TranscoderFilter::setTargetProtocol(LLMProtocol::Unspecified);
-  }
+        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
 
-  ~TranscoderFilterTest() override {
-    TranscoderFilter::setTargetProtocol(LLMProtocol::Unspecified);
-    buffer_manager_.onDestroy();
-  }
+  ~TranscoderFilterTest() override { buffer_manager_.onDestroy(); }
 
   TranscoderFilterConfigSharedPtr makeConfig(
       TranscoderProto::Direction request_handling,
@@ -123,6 +118,15 @@ public:
     EXPECT_TRUE(engine.ok()) << engine.status();
     return std::make_shared<const TranscoderFilterConfig>(proto, std::move(*engine),
                                                           *stats_store_.rootScope());
+  }
+
+  // What the AI Protocol Manager hands each filter of the stream: the client's dialect, as the
+  // route's request protocol, and the backend's, as its response protocol (`target_protocol_`).
+  AiFilterContext makeContext(LLMProtocol source_protocol) {
+    return AiFilterContext{.stream_info = stream_info_,
+                           .request_headers = request_headers_,
+                           .request_protocol = source_protocol,
+                           .response_protocol = target_protocol_};
   }
 
   void runDecodeChain(std::vector<AiFilterSharedPtr> filters, const std::string& payload) {
@@ -153,9 +157,8 @@ public:
     request_headers_ =
         Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", std::string(path)}};
     std::vector<AiFilterSharedPtr> filters;
-    filters.push_back(std::make_shared<TranscoderFilter>(
-        makeConfig(request_handling),
-        AiFilterContext{stream_info_, request_headers_, source_protocol}));
+    filters.push_back(std::make_shared<TranscoderFilter>(makeConfig(request_handling),
+                                                         makeContext(source_protocol)));
     runDecodeChain(std::move(filters), payload);
   }
 
@@ -175,6 +178,8 @@ public:
   StreamInfo::StreamInfoImpl stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Http::TestRequestHeaderMapImpl request_headers_;
+  // The backend's dialect, as the route declares it for the filters `makeContext()` builds.
+  LLMProtocol target_protocol_{LLMProtocol::Unspecified};
 
   absl::Status status_;
   bool completed_{false};
@@ -236,7 +241,7 @@ TEST_F(TranscoderFilterTest, ToIrLiftsGeminiStreamingModeFromPath) {
 // `FROM_IR` to Gemini moves `model` and `stream` into `:path` and drops `stream_options`, none of
 // which Gemini accepts in the body.
 TEST_F(TranscoderFilterTest, FromIrMovesModelAndStreamIntoGeminiPath) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
 
   runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
     "model": "gemini-2.5-flash",
@@ -258,11 +263,11 @@ TEST_F(TranscoderFilterTest, FromIrMovesModelAndStreamIntoGeminiPath) {
 
 // A Gemini client through both legs keeps its model and streaming mode.
 TEST_F(TranscoderFilterTest, GeminiStreamingRequestRoundTripsThroughBothLegs) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
   request_headers_ = Http::TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", "/v1beta/models/gemini-2.5-flash:streamGenerateContent"}};
 
-  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::GeminiGenerateContent};
+  const AiFilterContext context = makeContext(LLMProtocol::GeminiGenerateContent);
   runDecodeChain(
       {std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::TO_IR), context),
        std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::FROM_IR), context)},
@@ -278,7 +283,7 @@ TEST_F(TranscoderFilterTest, GeminiStreamingRequestRoundTripsThroughBothLegs) {
 }
 
 TEST_F(TranscoderFilterTest, FromIrUsesGenerateContentWhenNotStreaming) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
 
   runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
     "model": "gemini-2.5-flash",
@@ -292,7 +297,7 @@ TEST_F(TranscoderFilterTest, FromIrUsesGenerateContentWhenNotStreaming) {
 }
 
 TEST_F(TranscoderFilterTest, FromIrRejectsModelThatIsNotAGeminiPathSegment) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
 
   runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
     "model": "../gemini-2.5-flash:generateContent?key=x#",
@@ -305,10 +310,10 @@ TEST_F(TranscoderFilterTest, FromIrRejectsModelThatIsNotAGeminiPathSegment) {
   EXPECT_EQ(counterValue("failed"), 1);
 }
 
-// `FROM_IR` reads the static target backend protocol and rewrites the IR payload into the backend
+// `FROM_IR` reads the route's target backend protocol and rewrites the IR payload into the backend
 // schema (Anthropic Messages).
 TEST_F(TranscoderFilterTest, FromIrRewritesCanonicalPayloadToTargetProtocol) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::AnthropicMessages);
+  target_protocol_ = LLMProtocol::AnthropicMessages;
 
   runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
     "model": "claude-sonnet-4-5",
@@ -333,11 +338,11 @@ TEST_F(TranscoderFilterTest, FromIrRewritesCanonicalPayloadToTargetProtocol) {
 // Client (Gemini) -> Transcoder(request_handling: TO_IR) -> IrInspectingAiFilter ->
 // Transcoder(request_handling: FROM_IR) -> Backend (Anthropic).
 TEST_F(TranscoderFilterTest, TwoInstanceDecodeChainTranscodesToIrAppliesAiFilterAndFromIr) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::AnthropicMessages);
+  target_protocol_ = LLMProtocol::AnthropicMessages;
   request_headers_ = Http::TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", "/v1beta/models/claude-sonnet-4-5:generateContent"}};
 
-  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::GeminiGenerateContent};
+  const AiFilterContext context = makeContext(LLMProtocol::GeminiGenerateContent);
   auto to_ir_filter =
       std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::TO_IR), context);
   auto mid_filter = std::make_shared<IrInspectingAiFilter>();
@@ -375,15 +380,15 @@ TEST_F(TranscoderFilterTest, TwoInstanceDecodeChainTranscodesToIrAppliesAiFilter
 // FilterManager runs the response chain in reverse order (`N-1 .. 0`).
 // With `[client_boundary_filter(request: TO_IR, response: FROM_IR), mid_filter,
 // backend_boundary_filter(request: FROM_IR, response: TO_IR)]`, the response from the Gemini
-// backend (`targetProtocol() == GeminiGenerateContent`) first hits `backend_boundary_filter`
+// backend (`target_protocol_ == GeminiGenerateContent`) first hits `backend_boundary_filter`
 // (converting Gemini -> OpenAI IR via `response_handling: TO_IR`), then passes through
 // `mid_filter`, and finally hits `client_boundary_filter` (converting OpenAI IR -> Anthropic
 // Messages for the client via `response_handling: FROM_IR`).
 TEST_F(TranscoderFilterTest, EncodeUnaryTranscodesGeminiResponseToIrAndFromIrToAnthropic) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
   request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/messages"}};
 
-  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::AnthropicMessages};
+  const AiFilterContext context = makeContext(LLMProtocol::AnthropicMessages);
   auto client_boundary_filter = std::make_shared<TranscoderFilter>(
       makeConfig(TranscoderProto::TO_IR, TranscoderProto::FROM_IR), context);
   auto mid_filter = std::make_shared<IrInspectingAiFilter>();
@@ -433,17 +438,17 @@ TEST_F(TranscoderFilterTest, EncodeUnaryTranscodesGeminiResponseToIrAndFromIrToA
 // Bidirectional streaming SSE response transcoding:
 // With `[client_boundary_filter(request: TO_IR, response: FROM_IR), mid_filter,
 // backend_boundary_filter(request: FROM_IR, response: TO_IR)]`, Anthropic SSE frames from the
-// backend (`targetProtocol() == AnthropicMessages`) first hit `backend_boundary_filter`
+// backend (`target_protocol_ == AnthropicMessages`) first hit `backend_boundary_filter`
 // (`response_handling: TO_IR` at backend boundary, converting Anthropic -> OpenAI
 // `chat.completion.chunk` IR frames), pass through `mid_filter`, and finally hit
 // `client_boundary_filter` (`response_handling: FROM_IR` at client boundary, converting OpenAI IR
 // -> Gemini SSE frames for `source_protocol_ == GeminiGenerateContent`, dropping `[DONE]`).
 TEST_F(TranscoderFilterTest, EncodeSseTranscodesAnthropicSseToIrAndFromIrToGemini) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::AnthropicMessages);
+  target_protocol_ = LLMProtocol::AnthropicMessages;
   request_headers_ = Http::TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", "/v1beta/models/gemini-2.5-pro:streamGenerateContent"}};
 
-  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::GeminiGenerateContent};
+  const AiFilterContext context = makeContext(LLMProtocol::GeminiGenerateContent);
   auto client_boundary_filter = std::make_shared<TranscoderFilter>(
       makeConfig(TranscoderProto::TO_IR, TranscoderProto::FROM_IR), context);
   auto mid_filter = std::make_shared<IrInspectingAiFilter>();
@@ -489,11 +494,11 @@ TEST_F(TranscoderFilterTest, EncodeSseTranscodesAnthropicSseToIrAndFromIrToGemin
 // Gemini's candidate and prompt counts exclude thought and tool-use prompt tokens, which the IR's
 // inclusive counts carry.
 TEST_F(TranscoderFilterTest, EncodeUnaryCountsGeminiThoughtsAsCompletionTokens) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
   request_headers_ =
       Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
 
-  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::OpenAiChatCompletions};
+  const AiFilterContext context = makeContext(LLMProtocol::OpenAiChatCompletions);
   auto backend_boundary_filter = std::make_shared<TranscoderFilter>(
       makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context);
 
@@ -531,11 +536,11 @@ TEST_F(TranscoderFilterTest, EncodeUnaryCountsGeminiThoughtsAsCompletionTokens) 
 // A Gemini SSE chunk whose text is past the inline string threshold reaches the filter as an
 // external reference rather than a string; it must still come out as the chunk's delta.
 TEST_F(TranscoderFilterTest, EncodeSseKeepsGeminiTextHeldByReference) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
   request_headers_ =
       Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
 
-  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::OpenAiChatCompletions};
+  const AiFilterContext context = makeContext(LLMProtocol::OpenAiChatCompletions);
   auto backend_boundary_filter = std::make_shared<TranscoderFilter>(
       makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context);
 
@@ -574,10 +579,10 @@ TEST_F(TranscoderFilterTest, EncodeSseKeepsGeminiTextHeldByReference) {
 // When `response_handling` is unset (`DIRECTION_UNSPECIFIED`), the filter splices out of the
 // response pipeline and passes responses through untouched.
 TEST_F(TranscoderFilterTest, UnsetResponseHandlingPassesResponsesThroughUntouched) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
   request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/messages"}};
 
-  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::AnthropicMessages};
+  const AiFilterContext context = makeContext(LLMProtocol::AnthropicMessages);
   // Only `request_handling` is set; `response_handling` defaults to `DIRECTION_UNSPECIFIED`.
   auto client_boundary_filter =
       std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::TO_IR), context);
@@ -621,9 +626,9 @@ TEST_F(TranscoderFilterTest, RejectsToIrWhenSourceProtocolIsUnspecified) {
   EXPECT_EQ(counterValue("transcoded"), 0);
 }
 
-// Rejects `FROM_IR` when the target backend protocol is `Unspecified`.
+// Rejects `FROM_IR` when the route declared no response protocol, so the target backend protocol
+// is `Unspecified`.
 TEST_F(TranscoderFilterTest, RejectsFromIrWhenTargetProtocolIsUnspecified) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::Unspecified);
   runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
                   R"({"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"}]})");
 
@@ -635,7 +640,7 @@ TEST_F(TranscoderFilterTest, RejectsFromIrWhenTargetProtocolIsUnspecified) {
 
 // Rejects `FROM_IR` when the transcoded document violates the target schema.
 TEST_F(TranscoderFilterTest, RejectsPayloadTheTargetSchemaWouldReject) {
-  TranscoderFilter::setTargetProtocol(LLMProtocol::AnthropicMessages);
+  target_protocol_ = LLMProtocol::AnthropicMessages;
   runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
                   R"({"model":"claude-sonnet-4-5"})");
 

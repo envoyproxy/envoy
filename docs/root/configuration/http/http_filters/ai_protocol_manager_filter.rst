@@ -71,7 +71,8 @@ schema validation failure triggers an immediate HTTP 400 response.
   On the request path the body is offloaded to an in-memory store. Request
   schema validation is supported for declared APIs with a defined schema
   (currently OpenAI Chat Completions, Anthropic Messages and Gemini GenerateContent).
-  transcoding is not implemented yet.
+  Payloads are converted between these APIs by the :ref:`transcoder AI filter
+  <envoy_v3_api_msg_extensions.http.ai_filters.transcoder.v3.Transcoder>`.
 
 The filter is a dual filter: besides the downstream HTTP filter chain shown
 below, it can also be placed in a cluster's upstream HTTP filter chain via
@@ -282,9 +283,23 @@ canonical IR and the target backend's schema. Filters configured between the two
 ever see the canonical form. Leaving either ``request_handling`` or ``response_handling`` unset
 (``DIRECTION_UNSPECIFIED``) disables transcoding on that leg so payloads pass through untouched.
 
-The rewritten payload is validated against the target's schema before it is
+The client-boundary instance converts from and to the API the route declares for the
+:ref:`request <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.request>`,
+and the backend-boundary instance to and from the one it declares for the
+:ref:`response <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.response>`.
+A leg whose API the route does not declare cannot be transcoded, which is counted by
+``transcoder.unresolved``.
+
+The rewritten request is validated against the target's schema before it is
 replayed, so a document the upstream would reject fails locally rather than over the
 network. Such a rejection is counted by ``transcoder.failed``.
+
+Responses are converted one unary body or one SSE event at a time. An event may become none
+(Anthropic's ``ping``, for example) or several, and a stream that ends without the terminator
+the client's API expects is given one: an OpenAI client of a Gemini backend, whose streams just
+end, still receives ``data: [DONE]``. A response or event that cannot be converted is forwarded
+untranslated, since part of the response may already be on its way to the client, and is
+counted by ``transcoder.failed``.
 
 .. note::
 
@@ -596,6 +611,6 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   request_info.published, Counter, The request info AI filter published an ``envoy.data.ai.v3.RequestInfo`` record.
   request_info.partial, Counter, A published request info record ignored at least one value Envoy could not use.
   request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.
-  transcoder.transcoded, Counter, The transcoder AI filter converted a payload into the canonical IR or into the target schema.
-  transcoder.unresolved, Counter, "A payload was rejected because the protocol for its leg was unspecified: the route declared no wire API for ``TO_IR``, or no target backend protocol is set for ``FROM_IR``."
-  transcoder.failed, Counter, A payload was rejected because the conversion rules failed or the converted payload failed the target schema.
+  transcoder.transcoded, Counter, "The transcoder AI filter converted a payload (a request, a unary response or an SSE event) into or out of the canonical IR."
+  transcoder.unresolved, Counter, "A payload could not be transcoded because the route declared no wire API for its leg. A request is rejected; a response is forwarded untranslated and counted once, however many SSE events it has."
+  transcoder.failed, Counter, "A payload could not be converted: its rules failed, or a converted request failed the target schema. A request is rejected; a response or SSE event is forwarded untranslated."

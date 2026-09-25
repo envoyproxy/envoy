@@ -3,12 +3,14 @@
 #include <algorithm>
 #include <cstdint>
 #include <optional>
+#include <utility>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
+#include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
@@ -538,6 +540,134 @@ absl::Status verifyRulesTrackProvenance(const std::vector<TranscodeRule>& rules,
     }
   }
   return absl::OkStatus();
+}
+
+// Appends every rule in `rules` to `out`, each followed by the rules nested in it (`forEach`,
+// `when`), so a check can look at all of them however deeply they are nested.
+void flattenRules(const std::vector<TranscodeRule>& rules, std::vector<const TranscodeRule*>& out) {
+  for (const TranscodeRule& rule : rules) {
+    out.push_back(&rule);
+    flattenRules(rule.subRules(), out);
+  }
+}
+
+std::vector<const TranscodeRule*> flattenRules(const TranscodeRuleSet& rules) {
+  std::vector<const TranscodeRule*> out;
+  flattenRules(rules.rules(), out);
+  return out;
+}
+
+absl::Status legVerifierError(absl::string_view leg, absl::string_view message) {
+  return absl::InvalidArgumentError(
+      absl::StrCat("transcoding verifier error: ", leg, " ", message));
+}
+
+// The name of `op` if it reads or writes per-stream state, which only a stream leg has; empty for
+// any other op.
+absl::string_view streamStateOpName(TranscodeRule::Op op) {
+  switch (op) {
+  case TranscodeRule::Op::CaptureToState:
+    return "capture_to_state";
+  case TranscodeRule::Op::SetFromState:
+    return "set_from_state";
+  case TranscodeRule::Op::AccumulateUsage:
+    return "accumulate_usage";
+  default:
+    return "";
+  }
+}
+
+// Rejects a request or response rule that needs per-stream state: those legs have none, so the
+// rule would fail every payload.
+absl::Status verifyNoStreamState(const TranscodeRuleSet& rules, absl::string_view leg) {
+  for (const TranscodeRule* rule : flattenRules(rules)) {
+    if (const absl::string_view op = streamStateOpName(rule->op()); !op.empty()) {
+      return legVerifierError(
+          leg, absl::StrCat("rules cannot use ", op, ", which needs per-stream state"));
+    }
+  }
+  return absl::OkStatus();
+}
+
+// An SSE `event:` name a grammar writes must fit on its `event:` line.
+absl::Status verifyEventName(absl::string_view leg, absl::string_view name) {
+  if (name.find_first_of("\r\n") == absl::string_view::npos) {
+    return absl::OkStatus();
+  }
+  return legVerifierError(leg, absl::StrCat("grammar writes SSE event name '", absl::CEscape(name),
+                                            "', which contains a CR or LF"));
+}
+
+// Rejects what a stream grammar would otherwise only find out event by event:
+// - a `Transcode` case that matches events without a JSON payload, which cannot be transcoded;
+// - an SSE `event:` name with a CR or LF in it, or raw data with a CR in it, either of which
+//   would break the framing of the events the grammar writes (Envoy treats both as bugs);
+// - a `setFromState` whose slot no `captureToState` in the grammar writes, which never sets
+//   anything.
+absl::Status verifyStreamGrammar(const StreamGrammar& grammar, absl::string_view leg) {
+  absl::flat_hash_set<std::string> captured_slots;
+  std::vector<const TranscodeRule*> slot_readers;
+  for (size_t i = 0; i < grammar.cases.size(); ++i) {
+    const StreamEventCase& event_case = grammar.cases[i];
+    const StreamEventMatch::Kind kind = event_case.match.kind();
+    if (event_case.disposition == StreamDisposition::Transcode &&
+        (kind == StreamEventMatch::Kind::IsDone || kind == StreamEventMatch::Kind::NotJson)) {
+      return legVerifierError(leg, absl::StrCat("grammar case ", i,
+                                                " transcodes events without a JSON payload, which "
+                                                "cannot be transcoded"));
+    }
+    if (absl::Status status = verifyEventName(leg, event_case.output_event); !status.ok()) {
+      return status;
+    }
+    for (const TranscodeRule* rule : flattenRules(event_case.rules)) {
+      if (rule->op() == TranscodeRule::Op::CaptureToState) {
+        captured_slots.insert(rule->slot());
+      } else if (rule->op() == TranscodeRule::Op::SetFromState) {
+        slot_readers.push_back(rule);
+      }
+    }
+  }
+  for (const std::vector<StreamEmit>* emits : {&grammar.on_terminate, &grammar.on_source_end}) {
+    for (const StreamEmit& emit : *emits) {
+      if (absl::Status status = verifyEventName(leg, emit.event); !status.ok()) {
+        return status;
+      }
+      if (emit.raw_data.find('\r') != std::string::npos) {
+        return legVerifierError(leg, "grammar writes raw SSE data that contains a CR");
+      }
+    }
+  }
+  for (const TranscodeRule* reader : slot_readers) {
+    if (!captured_slots.contains(reader->slot())) {
+      return legVerifierError(leg, absl::StrCat("set_from_state reads slot '", reader->slot(),
+                                                "', which no capture_to_state in the grammar "
+                                                "writes"));
+    }
+  }
+  return absl::OkStatus();
+}
+
+// Checks that each of `pack`'s rule sets and grammars can run on the leg it is registered for.
+absl::Status verifyPackLegs(const DialectTranscodePack& pack) {
+  const absl::string_view protocol = llmProtocolName(pack.protocol);
+  const std::pair<absl::string_view, const TranscodeRuleSet*> rule_sets[] = {
+      {"request to_ir", &pack.request.to_ir},
+      {"request from_ir", &pack.request.from_ir},
+      {"response to_ir", &pack.response.to_ir},
+      {"response from_ir", &pack.response.from_ir},
+  };
+  for (const auto& [leg, rules] : rule_sets) {
+    absl::Status status = verifyNoStreamState(*rules, absl::StrCat(protocol, " ", leg));
+    if (!status.ok()) {
+      return status;
+    }
+  }
+  absl::Status status =
+      verifyStreamGrammar(pack.stream.to_ir, absl::StrCat(protocol, " stream to_ir"));
+  if (!status.ok()) {
+    return status;
+  }
+  return verifyStreamGrammar(pack.stream.from_ir, absl::StrCat(protocol, " stream from_ir"));
 }
 
 // Anthropic requires `max_tokens`, but it is optional for every other dialect. When a client omits
@@ -2151,6 +2281,10 @@ absl::Status TranscodingEngine::registerPack(DialectTranscodePack pack,
   if (!from_ir_status.ok()) {
     return from_ir_status;
   }
+  absl::Status legs_status = verifyPackLegs(pack);
+  if (!legs_status.ok()) {
+    return legs_status;
+  }
   const LLMProtocol protocol = pack.protocol;
   packs_.insert_or_assign(protocol, std::move(pack));
   return absl::OkStatus();
@@ -2447,6 +2581,7 @@ TranscodingEngine::transcodeStreamEvent(const TranscodeLeg& leg, TranscodeContex
     break;
   }
 
+  // A backstop: `registerPack()` refuses a `Transcode` case that can match any other event.
   if (!event->is_json()) {
     return absl::InvalidArgumentError("only an SSE event with a JSON payload can be transcoded");
   }

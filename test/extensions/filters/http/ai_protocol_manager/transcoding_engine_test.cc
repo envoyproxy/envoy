@@ -2036,17 +2036,6 @@ TEST(TranscodingEngineTest, StreamEventLegsRefuseWhatTheyCannotRun) {
   EXPECT_EQ(engine.finishStream(kGeminiStreamToIr, without_state).status().code(),
             absl::StatusCode::kFailedPrecondition);
   EXPECT_FALSE(state.terminated);
-
-  // A case that transcodes can only transcode JSON.
-  TranscodingEngine custom;
-  DialectTranscodePack pack{
-      .protocol = LLMProtocol::OpenAiResponses,
-      .stream = {.to_ir = {.cases = {{.match = StreamEventMatch::notJson()}}}},
-  };
-  ASSERT_THAT(custom.registerPack(std::move(pack)), IsOk());
-  EXPECT_EQ(
-      runStream(custom, responses_stream_to_ir, nlohmann::json::parse(R"([{"raw": "text"}])")),
-      nlohmann::json::parse(R"([{"untranslated": {"raw": "text"}}])"));
 }
 
 // A stream already in the IR needs no conversion either way, and gains no terminator.
@@ -2801,6 +2790,112 @@ TEST(TranscodingEngineTest, VerifierFollowsOffloadableFieldsThroughResponseRuleO
   EXPECT_THAT(capture_text.message(), testing::HasSubstr("capture_to_state"));
   EXPECT_EQ(verify({TranscodeRule::captureToState("contents", "slot")}).code(), kRejected);
   EXPECT_THAT(verify({TranscodeRule::captureToState("model", "slot")}), IsOk());
+}
+
+// Matches a registration the verifier refused, and why.
+auto refusedBecause(absl::string_view why) {
+  return StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                  testing::HasSubstr(std::string(why)));
+}
+
+// A pack whose rules could never run on their leg is refused when it is registered, rather than
+// failing every payload once traffic arrives. Only stream legs have per-stream state, so a request
+// or response rule that needs it is refused, however deeply it is nested.
+TEST(TranscodingEngineTest, RegisterPackRefusesStreamStateOutsideStreamLegs) {
+  const auto nested = [](TranscodeRule rule) {
+    return TranscodeRuleSet(
+        LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+        {TranscodeRule::forEach("items",
+                                {TranscodeRule::when(TranscodePredicate(), {std::move(rule)})})});
+  };
+  const TranscodeRuleSet capture = nested(TranscodeRule::captureToState("id", "id"));
+  const TranscodeRuleSet restore = nested(TranscodeRule::setFromState("id", "id"));
+  const TranscodeRuleSet accumulate =
+      nested(TranscodeRule::accumulateUsage(LLMProtocol::OpenAiChatCompletions));
+  const auto registered = [](DialectTranscodePack pack) {
+    TranscodingEngine engine;
+    return engine.registerPack(std::move(pack));
+  };
+
+  EXPECT_THAT(registered({.protocol = LLMProtocol::OpenAiResponses, .request = {.to_ir = capture}}),
+              refusedBecause("OPENAI_RESPONSES request to_ir rules cannot use capture_to_state"));
+  EXPECT_THAT(
+      registered({.protocol = LLMProtocol::OpenAiResponses, .request = {.from_ir = restore}}),
+      refusedBecause("OPENAI_RESPONSES request from_ir rules cannot use set_from_state"));
+  EXPECT_THAT(
+      registered({.protocol = LLMProtocol::OpenAiResponses, .response = {.to_ir = accumulate}}),
+      refusedBecause("OPENAI_RESPONSES response to_ir rules cannot use accumulate_usage"));
+  EXPECT_THAT(
+      registered({.protocol = LLMProtocol::OpenAiResponses, .response = {.from_ir = capture}}),
+      refusedBecause("OPENAI_RESPONSES response from_ir rules cannot use capture_to_state"));
+
+  // Stream legs are what these rules are for.
+  EXPECT_THAT(registered({.protocol = LLMProtocol::OpenAiResponses,
+                          .stream = {.to_ir = {.cases = {{.rules = capture},
+                                                         {.rules = restore},
+                                                         {.rules = accumulate}}}}}),
+              IsOk());
+}
+
+// A stream grammar is refused if a case would transcode events that cannot be transcoded, if an
+// event it writes would break the SSE framing, or if it reads a slot it never writes.
+TEST(TranscodingEngineTest, RegisterPackRefusesStreamGrammarsThatCannotRun) {
+  const auto registered = [](StreamGrammar grammar) {
+    TranscodingEngine engine;
+    return engine.registerPack(DialectTranscodePack{.protocol = LLMProtocol::OpenAiResponses,
+                                                    .stream = {.from_ir = std::move(grammar)}});
+  };
+
+  // Only a JSON payload can be transcoded. Other events can still be passed through, dropped, or
+  // end the stream.
+  EXPECT_THAT(registered({.cases = {{.match = StreamEventMatch::isDone()}}}),
+              refusedBecause("OPENAI_RESPONSES stream from_ir grammar case 0 transcodes events "
+                             "without a JSON payload"));
+  EXPECT_THAT(registered({.cases = {{.match = StreamEventMatch::isDone(),
+                                     .disposition = StreamDisposition::Terminate},
+                                    {.match = StreamEventMatch::notJson()}}}),
+              refusedBecause("grammar case 1 transcodes events without a JSON payload"));
+  EXPECT_THAT(registered({.cases = {{.match = StreamEventMatch::isDone(),
+                                     .disposition = StreamDisposition::Drop},
+                                    {.match = StreamEventMatch::notJson(),
+                                     .disposition = StreamDisposition::Passthrough},
+                                    {.match = StreamEventMatch::eventType("delta")},
+                                    {.match = StreamEventMatch::json()}}}),
+              IsOk());
+
+  // An SSE event name must not end its line early, and raw data must not carry a CR. A LF in raw
+  // data is fine: each line goes out as a `data:` line of its own.
+  EXPECT_THAT(registered({.cases = {{.output_event = "chunk\ndata: forged"}}}),
+              refusedBecause(R"(grammar writes SSE event name 'chunk\ndata: forged')"));
+  EXPECT_THAT(registered({.on_terminate = {{.event = "end\r"}}}),
+              refusedBecause(R"(grammar writes SSE event name 'end\r')"));
+  EXPECT_THAT(registered({.on_source_end = {{.raw_data = "[DONE]\r"}}}),
+              refusedBecause("grammar writes raw SSE data that contains a CR"));
+  EXPECT_THAT(registered({.on_source_end = {{.raw_data = "one\ntwo"}}}), IsOk());
+
+  // A slot must be written somewhere in the grammar that reads it, however deeply nested either
+  // rule is.
+  const auto event_case = [](std::vector<TranscodeRule> rules) {
+    return StreamEventCase{.rules =
+                               TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                                LLMProtocol::OpenAiResponses, std::move(rules))};
+  };
+  const TranscodeRule restore = TranscodeRule::when(
+      TranscodePredicate(), {TranscodeRule::setFromState("message.id", "message_id")});
+  const TranscodeRule capture =
+      TranscodeRule::forEach("items", {TranscodeRule::captureToState("id", "message_id")});
+  EXPECT_THAT(registered({.cases = {event_case({restore})}}),
+              refusedBecause("OPENAI_RESPONSES stream from_ir set_from_state reads slot "
+                             "'message_id', which no capture_to_state in the grammar writes"));
+  EXPECT_THAT(registered({.cases = {event_case({restore}), event_case({capture})}}), IsOk());
+
+  // The pack's other grammar is another stream, so a slot it writes does not count.
+  TranscodingEngine engine;
+  EXPECT_THAT(engine.registerPack(
+                  DialectTranscodePack{.protocol = LLMProtocol::OpenAiResponses,
+                                       .stream = {.to_ir = {.cases = {event_case({capture})}},
+                                                  .from_ir = {.cases = {event_case({restore})}}}}),
+              refusedBecause("stream from_ir set_from_state reads slot 'message_id'"));
 }
 
 } // namespace

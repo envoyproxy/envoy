@@ -560,7 +560,8 @@ struct StreamEmit {
   std::string raw_data{};
 };
 
-// One row of a stream grammar: the events it matches, and what becomes of them.
+// One row of a stream grammar: the events it matches, and what becomes of them. Only a JSON
+// payload can be transcoded, so a `Transcode` case must match with `json()` or `eventType()`.
 struct StreamEventCase {
   StreamEventMatch match{};
   StreamDisposition disposition{StreamDisposition::Transcode};
@@ -662,7 +663,12 @@ public:
   static absl::Status validateRulesAgainstSchema(const TranscodeRuleSet& rules,
                                                  const PayloadSchema* source_schema = nullptr);
 
-  // Registers a `DialectTranscodePack` after statically verifying its rule sets.
+  // Registers a `DialectTranscodePack` after statically verifying it. The request rule sets are
+  // checked against the schemas (see `validateRulesAgainstSchema()`), and every leg is checked for
+  // what would otherwise fail on each payload it applies to: a request or response rule that needs
+  // per-stream state, a stream case that transcodes events without a JSON payload, a
+  // `setFromState` whose slot no `captureToState` in its grammar writes, and an SSE event name or
+  // raw data a grammar writes that would break the event's framing.
   //
   // `dialect_schema` and `ir_schema` override the corresponding fields on `pack` when
   // non-null; when null, whatever `pack` already carries is kept. This lets a caller either

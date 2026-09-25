@@ -82,21 +82,6 @@ nlohmann::json unflattenFields(const std::vector<FlattenJsonField>& fields) {
 
 } // namespace
 
-std::atomic<LLMProtocol> TranscoderFilter::target_protocol_{LLMProtocol::Unspecified};
-
-void TranscoderFilter::setTargetProtocol(LLMProtocol protocol) {
-  target_protocol_.store(protocol, std::memory_order_relaxed);
-}
-
-LLMProtocol TranscoderFilter::targetProtocol() {
-  return target_protocol_.load(std::memory_order_relaxed);
-}
-
-LLMProtocol TranscoderFilter::effectiveTargetProtocol() const {
-  const LLMProtocol override_protocol = targetProtocol();
-  return override_protocol != LLMProtocol::Unspecified ? override_protocol : route_target_protocol_;
-}
-
 TranscoderFilterConfig::TranscoderFilterConfig(const TranscoderProto& proto,
                                                TranscodingEngine engine, Stats::Scope& scope)
     : stats_(TranscoderFilterStats{ALL_TRANSCODER_FILTER_STATS(
@@ -107,7 +92,7 @@ TranscoderFilterConfig::TranscoderFilterConfig(const TranscoderProto& proto,
 TranscoderFilter::TranscoderFilter(TranscoderFilterConfigSharedPtr config,
                                    const AiFilterContext& context)
     : config_(std::move(config)), source_protocol_(context.request_protocol),
-      route_target_protocol_(context.response_protocol), request_headers_(context.request_headers),
+      target_protocol_(context.response_protocol), request_headers_(context.request_headers),
       request_path_(std::string(context.request_headers.getPathValue())),
       created_(std::chrono::duration_cast<std::chrono::seconds>(
                    context.stream_info.startTime().time_since_epoch())
@@ -238,7 +223,7 @@ Coroutine::Task<absl::Status> TranscoderFilter::encodeSSE(SseStreamReceiver rece
 // down to what a dialect names in the request path rather than the body.
 absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json) {
   const bool to_ir = config_->requestHandling() == TranscoderProto::TO_IR;
-  const LLMProtocol dialect = to_ir ? source_protocol_ : effectiveTargetProtocol();
+  const LLMProtocol dialect = to_ir ? source_protocol_ : target_protocol_;
   if (dialect == LLMProtocol::Unspecified) {
     config_->stats().unresolved_.inc();
     return absl::InvalidArgumentError(
@@ -278,7 +263,7 @@ std::optional<TranscodeLeg> TranscoderFilter::responseLeg(PayloadKind kind) {
     return std::nullopt;
   }
   const bool to_ir = handling == TranscoderProto::TO_IR;
-  const LLMProtocol dialect = to_ir ? effectiveTargetProtocol() : source_protocol_;
+  const LLMProtocol dialect = to_ir ? target_protocol_ : source_protocol_;
   if (dialect == LLMProtocol::Unspecified) {
     config_->stats().unresolved_.inc();
     ENVOY_LOG(debug, "transcoder: forwarding the response untranslated: {}",

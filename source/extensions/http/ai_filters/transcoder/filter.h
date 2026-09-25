@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -76,11 +75,6 @@ public:
   TranscoderFilter(TranscoderFilterConfigSharedPtr config,
                    const HttpFilters::AiProtocolManager::AiFilterContext& context);
 
-  // Target backend protocol override used in unit tests; when Unspecified, falls back to the
-  // per-route response protocol (`AiProtocolManagerPerRoute.response.llm_protocol`).
-  static void setTargetProtocol(HttpFilters::AiProtocolManager::LLMProtocol protocol);
-  static HttpFilters::AiProtocolManager::LLMProtocol targetProtocol();
-
   // HttpFilters::AiProtocolManager::AiFilter
   Coroutine::Task<absl::Status>
   decode(HttpFilters::AiProtocolManager::AiRequestReceiver receive_request,
@@ -96,8 +90,6 @@ public:
       HttpFilters::AiProtocolManager::AiResponseStreamPropagator propagate_response) override;
 
 private:
-  HttpFilters::AiProtocolManager::LLMProtocol effectiveTargetProtocol() const;
-
   absl::Status transcodeRequest(nlohmann::json& json);
 
   // The engine leg that transcodes this stream's response as `kind`, or `std::nullopt` when the
@@ -107,11 +99,12 @@ private:
   // What the response legs need beyond the payload.
   HttpFilters::AiProtocolManager::TranscodeContext responseContext() const;
 
-  static std::atomic<HttpFilters::AiProtocolManager::LLMProtocol> target_protocol_;
-
   TranscoderFilterConfigSharedPtr config_;
+  // The client's dialect: the route's request protocol.
   const HttpFilters::AiProtocolManager::LLMProtocol source_protocol_;
-  const HttpFilters::AiProtocolManager::LLMProtocol route_target_protocol_;
+  // The backend's dialect: the route's response protocol
+  // (`AiProtocolManagerPerRoute.response.llm_protocol`).
+  const HttpFilters::AiProtocolManager::LLMProtocol target_protocol_;
   // Only touched by decode() before the request is propagated; see `AiFilterContext`.
   Http::RequestHeaderMap& request_headers_;
   // Copied rather than referenced: `AiFilterContext`'s referents belong to the stream and must
