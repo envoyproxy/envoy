@@ -2421,8 +2421,8 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
   codec_client_->sendTrailers(*request_encoder_,
                               Http::TestRequestTrailerMapImpl{{"trailer", "value"}});
 
-  // Inconsistency in content-length header and the actually body length should be treated as a
-  // stream error.
+  // nghttp2 1.68.1 now terminates the connection from nghttp2_http_on_remote_end_stream()
+  // (lib/nghttp2_session.c:4945-4949) instead of issuing a stream reset for this mismatch.
   ASSERT_TRUE(response->waitForReset());
   // http3.inconsistent_content_length.
   if (downstreamProtocol() == Http::CodecType::HTTP3) {

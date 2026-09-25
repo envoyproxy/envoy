@@ -741,6 +741,10 @@ protected:
   // Tracks the stream id of the current stream we're processing.
   // This should only be set while we're in the context of dispatching to nghttp2.
   std::optional<int32_t> current_stream_id_;
+  // Tracks the most recent inbound frame stream id for the current dispatch(), including the frame
+  // that caused nghttp2 to queue a connection-closing GOAWAY which is only sent later from
+  // sendPendingFrames().
+  std::optional<int32_t> last_inbound_stream_id_;
   std::unique_ptr<http2::adapter::Http2VisitorInterface> visitor_;
   std::unique_ptr<http2::adapter::Http2Adapter> adapter_;
 
@@ -811,6 +815,7 @@ private:
   int onError(absl::string_view error);
   virtual int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
+  bool handleInvalidFrame(int32_t stream_id, int error_code, bool allow_stream_error_override);
   // Pass through invoking with the actual stream.
   Status onStreamClose(int32_t stream_id, uint32_t error_code);
   // Should be invoked directly in buffered onStreamClose scenarios
@@ -836,6 +841,7 @@ private:
   // after the stream has been removed from the active list.
   std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
   bool dispatching_ : 1 = false;
+  bool on_invalid_frame_called_during_dispatch_ : 1 = false;
   bool raised_goaway_ : 1 = false;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;

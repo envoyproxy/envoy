@@ -2951,6 +2951,9 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
+    // nghttp2_http_on_header() rejects invalid content-length values
+    // (lib/nghttp2_http.c:184-190) and nghttp2 >= 1.67 closes the connection after that
+    // error_callback2 path instead of honoring override_stream_error_on_invalid_http_message.
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
@@ -2960,7 +2963,11 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP2 &&
+               GetParam().http2_implementation == Http2Impl::Nghttp2)
+                  ? Http::StreamResetReason::ConnectionTermination
+                  : Http::StreamResetReason::ProtocolError,
+              response->resetReason());
   }
 }
 
@@ -3004,6 +3011,9 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
+    // nghttp2_http_on_header() rejects duplicate content-length values
+    // (lib/nghttp2_http.c:184-190) and nghttp2 >= 1.67 closes the connection after that
+    // error_callback2 path instead of honoring override_stream_error_on_invalid_http_message.
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
@@ -3013,7 +3023,11 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP2 &&
+               GetParam().http2_implementation == Http2Impl::Nghttp2)
+                  ? Http::StreamResetReason::ConnectionTermination
+                  : Http::StreamResetReason::ProtocolError,
+              response->resetReason());
   }
 }
 
@@ -5454,10 +5468,15 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
     EXPECT_EQ("200", response->headers().getStatusValue());
     EXPECT_TRUE(response->complete());
   } else {
-    // Inconsistency in content-length header and the actually body length should be treated as a
-    // stream error.
+    // nghttp2 1.68.1 now returns GOAWAY(PROTOCOL_ERROR) from
+    // nghttp2_session_mem_recv2() -> nghttp2_http_on_data_chunk()
+    // (lib/nghttp2_session.c:6774-6783) for this mismatch.
     ASSERT_TRUE(response->waitForReset());
-    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+    EXPECT_EQ((downstreamProtocol() == Http::CodecType::HTTP2 &&
+               GetParam().http2_implementation == Http2Impl::Nghttp2)
+                  ? Http::StreamResetReason::ConnectionTermination
+                  : Http::StreamResetReason::ProtocolError,
+              response->resetReason());
   }
 }
 
@@ -5483,10 +5502,15 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
                                      {"content-length", "1025"}},
       1024);
 
-  // Inconsistency in content-length header and the actually body length should be treated as a
-  // stream error.
+  // nghttp2 1.68.1 now returns GOAWAY(PROTOCOL_ERROR) from
+  // nghttp2_session_on_data_received() -> nghttp2_http_on_remote_end_stream()
+  // (lib/nghttp2_session.c:4945-4949) for this mismatch.
   ASSERT_TRUE(response->waitForReset());
-  EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+  EXPECT_EQ((downstreamProtocol() == Http::CodecType::HTTP2 &&
+             GetParam().http2_implementation == Http2Impl::Nghttp2)
+                ? Http::StreamResetReason::ConnectionTermination
+                : Http::StreamResetReason::ProtocolError,
+            response->resetReason());
 }
 
 class NoUdpGso : public Api::OsSysCallsImpl {
