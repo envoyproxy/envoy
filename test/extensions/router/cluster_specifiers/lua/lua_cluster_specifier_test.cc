@@ -337,6 +337,33 @@ TEST_F(LuaClusterSpecifierPluginTest, Logging) {
                              { plugin_->route(mock_route, headers, stream_info_, 0); });
 }
 
+// A header the request does not carry is nil in the script.
+TEST_F(LuaClusterSpecifierPluginTest, HeaderNotFound) {
+  setUpTest(normal_lua_config_yaml_);
+
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
+  auto route = plugin_->route(mock_route, headers, stream_info_, 0);
+  // headers():get() returned nil, so the script fell through to its own default.
+  EXPECT_EQ("web_service", route->routeEntry()->clusterName());
+
+  // Force the runtime to gc and destroy all the userdata.
+  config_->perLuaCodeSetup()->runtimeGC();
+}
+
+// Code that does not parse is rejected when the config is created.
+TEST_F(LuaClusterSpecifierPluginTest, LuaCodeDoesNotParse) {
+  const std::string config = R"EOF(
+  source_code:
+    inline_string: |
+      function envoy_on_route(route_handle)
+        return "web_service"
+  default_cluster: default_service
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(setUpTest(config), Envoy::EnvoyException, "script load error:.*");
+}
+
 } // namespace Lua
 } // namespace Router
 } // namespace Extensions
