@@ -298,209 +298,221 @@ absl::Status verifyRulesTrackProvenance(const std::vector<TranscodeRule>& rules,
 // TODO(ginama): make this configurable per route rather than a compiled-in default.
 constexpr int kDefaultAnthropicMaxTokens = 4096;
 
+// Anthropic Messages request -> IR request.
+TranscodeRuleSet anthropicRequestToIr() {
+  return TranscodeRuleSet(
+      LLMProtocol::AnthropicMessages, TranscodingEngine::kIrProtocol,
+      {
+          // 1. Prepend top-level `system` prompt into `messages[]` as `{role: "system", ...}`
+          TranscodeRule::prependToArray("system", "messages", "role", "system", "content"),
+          // 2. Map Anthropic `max_tokens` and `stop_sequences` to IR (OpenAI Chat) names
+          TranscodeRule::move("max_tokens", "max_completion_tokens"),
+          TranscodeRule::move("stop_sequences", "stop"),
+          // 3. Map Anthropic `tools[]` (`{name, description, input_schema}`) to OpenAI
+          //    `tools[]` (`{type: "function", function: {name, description, parameters}}`)
+          TranscodeRule::forEach("tools",
+                                 {
+                                     TranscodeRule::move("name", "function.name"),
+                                     TranscodeRule::move("description", "function.description"),
+                                     TranscodeRule::move("input_schema", "function.parameters"),
+                                     TranscodeRule::setDefault("type", "function"),
+                                 }),
+          // 4. Convert Anthropic `tool_choice` (always an object) to OpenAI IR:
+          //      {"type": "auto"|"none"}        -> "auto" | "none"
+          //      {"type": "any"}                -> "required"
+          //      {"type": "tool", "name": "fn"} -> {"type": "function", "function": {"name":
+          //      "fn"}}
+          //    `disable_parallel_tool_use` has no OpenAI equivalent and must be dropped first
+          //    so `unwrapSingleKeyObject` sees a single-key `{"type": "..."}` object and
+          //    collapses it to a string (leaving two-key `{"type": "function", "function":
+          //    {...}}` intact).
+          TranscodeRule::drop("tool_choice.disable_parallel_tool_use"),
+          TranscodeRule::valueMap("tool_choice.type", {{"any", "required"}, {"tool", "function"}}),
+          TranscodeRule::move("tool_choice.name", "tool_choice.function.name"),
+          TranscodeRule::unwrapSingleKeyObject("tool_choice", "type"),
+      });
+}
+
+// IR request -> Anthropic Messages request.
+TranscodeRuleSet anthropicRequestFromIr() {
+  return TranscodeRuleSet(
+      TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
+      {
+          // 1. Extract `system` / `developer` messages from `messages[]` into top-level
+          // `system`
+          TranscodeRule::extractFromArray("messages", "role", {"system", "developer"}, "content",
+                                          "system"),
+          // 2. Map OpenAI `tool` / `function` roles to `user` and merge adjacent same-role
+          //    messages (Anthropic requires strictly alternating `user` / `assistant` roles)
+          TranscodeRule::forEach(
+              "messages",
+              {
+                  TranscodeRule::valueMap("role", {{"tool", "user"}, {"function", "user"}}),
+              }),
+          TranscodeRule::mergeConsecutiveByKey("messages", "role", "content"),
+          // 3. Map token cap (`max_completion_tokens` or `max_tokens`) and apply Anthropic's
+          //    required `max_tokens` default if the client omitted both
+          TranscodeRule::firstOf({"max_completion_tokens", "max_tokens"}, "max_tokens"),
+          TranscodeRule::setDefault("max_tokens", kDefaultAnthropicMaxTokens),
+          // 4. Map `stop` -> `stop_sequences`. The IR accepts either a bare string or an
+          //    array here, while `stop_sequences` is array-only, so normalize first.
+          TranscodeRule::ensureArray("stop"),
+          TranscodeRule::move("stop", "stop_sequences"),
+          // 5. Map OpenAI `tools[]` (`function.{name, description, parameters}`) to Anthropic
+          //    `tools[]` (`{name, description, input_schema}`)
+          TranscodeRule::forEach("tools",
+                                 {
+                                     TranscodeRule::move("function.name", "name"),
+                                     TranscodeRule::move("function.description", "description"),
+                                     TranscodeRule::move("function.parameters", "input_schema"),
+                                     TranscodeRule::drop("type"),
+                                     TranscodeRule::drop("function"),
+                                 }),
+          // 6. Map `tool_choice` into Anthropic's object-only form. The wrap turns the IR's
+          //    bare `"auto"` / `"none"` / `"required"` into `{"type": ...}`; the pinned-tool
+          //    object is already an object and passes through the wrap untouched.
+          TranscodeRule::ensureObject("tool_choice", "type"),
+          TranscodeRule::valueMap("tool_choice.type", {{"required", "any"}, {"function", "tool"}}),
+          TranscodeRule::move("tool_choice.function.name", "tool_choice.name"),
+          TranscodeRule::drop("tool_choice.function"),
+      });
+}
+
 // Builds the declarative transcoding pack for Anthropic Messages <-> IR (OpenAI Chat).
 DialectTranscodePack createAnthropicTranscodePack() {
   return DialectTranscodePack{
-      /*protocol=*/LLMProtocol::AnthropicMessages,
-      /*to_IR=*/
-      TranscodeRuleSet(
-          LLMProtocol::AnthropicMessages, TranscodingEngine::kIrProtocol,
-          {
-              // 1. Prepend top-level `system` prompt into `messages[]` as `{role: "system", ...}`
-              TranscodeRule::prependToArray("system", "messages", "role", "system", "content"),
-              // 2. Map Anthropic `max_tokens` and `stop_sequences` to IR (OpenAI Chat) names
-              TranscodeRule::move("max_tokens", "max_completion_tokens"),
-              TranscodeRule::move("stop_sequences", "stop"),
-              // 3. Map Anthropic `tools[]` (`{name, description, input_schema}`) to OpenAI
-              //    `tools[]` (`{type: "function", function: {name, description, parameters}}`)
-              TranscodeRule::forEach("tools",
-                                     {
-                                         TranscodeRule::move("name", "function.name"),
-                                         TranscodeRule::move("description", "function.description"),
-                                         TranscodeRule::move("input_schema", "function.parameters"),
-                                         TranscodeRule::setDefault("type", "function"),
-                                     }),
-              // 4. Convert Anthropic `tool_choice` (always an object) to OpenAI IR:
-              //      {"type": "auto"|"none"}        -> "auto" | "none"
-              //      {"type": "any"}                -> "required"
-              //      {"type": "tool", "name": "fn"} -> {"type": "function", "function": {"name":
-              //      "fn"}}
-              //    `disable_parallel_tool_use` has no OpenAI equivalent and must be dropped first
-              //    so `unwrapSingleKeyObject` sees a single-key `{"type": "..."}` object and
-              //    collapses it to a string (leaving two-key `{"type": "function", "function":
-              //    {...}}` intact).
-              TranscodeRule::drop("tool_choice.disable_parallel_tool_use"),
-              TranscodeRule::valueMap("tool_choice.type",
-                                      {{"any", "required"}, {"tool", "function"}}),
-              TranscodeRule::move("tool_choice.name", "tool_choice.function.name"),
-              TranscodeRule::unwrapSingleKeyObject("tool_choice", "type"),
-          }),
-      /*from_IR=*/
-      TranscodeRuleSet(
-          TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
-          {
-              // 1. Extract `system` / `developer` messages from `messages[]` into top-level
-              // `system`
-              TranscodeRule::extractFromArray("messages", "role", {"system", "developer"},
-                                              "content", "system"),
-              // 2. Map OpenAI `tool` / `function` roles to `user` and merge adjacent same-role
-              //    messages (Anthropic requires strictly alternating `user` / `assistant` roles)
-              TranscodeRule::forEach(
-                  "messages",
-                  {
-                      TranscodeRule::valueMap("role", {{"tool", "user"}, {"function", "user"}}),
-                  }),
-              TranscodeRule::mergeConsecutiveByKey("messages", "role", "content"),
-              // 3. Map token cap (`max_completion_tokens` or `max_tokens`) and apply Anthropic's
-              //    required `max_tokens` default if the client omitted both
-              TranscodeRule::firstOf({"max_completion_tokens", "max_tokens"}, "max_tokens"),
-              TranscodeRule::setDefault("max_tokens", kDefaultAnthropicMaxTokens),
-              // 4. Map `stop` -> `stop_sequences`. The IR accepts either a bare string or an
-              //    array here, while `stop_sequences` is array-only, so normalize first.
-              TranscodeRule::ensureArray("stop"),
-              TranscodeRule::move("stop", "stop_sequences"),
-              // 5. Map OpenAI `tools[]` (`function.{name, description, parameters}`) to Anthropic
-              //    `tools[]` (`{name, description, input_schema}`)
-              TranscodeRule::forEach("tools",
-                                     {
-                                         TranscodeRule::move("function.name", "name"),
-                                         TranscodeRule::move("function.description", "description"),
-                                         TranscodeRule::move("function.parameters", "input_schema"),
-                                         TranscodeRule::drop("type"),
-                                         TranscodeRule::drop("function"),
-                                     }),
-              // 6. Map `tool_choice` into Anthropic's object-only form. The wrap turns the IR's
-              //    bare `"auto"` / `"none"` / `"required"` into `{"type": ...}`; the pinned-tool
-              //    object is already an object and passes through the wrap untouched.
-              TranscodeRule::ensureObject("tool_choice", "type"),
-              TranscodeRule::valueMap("tool_choice.type",
-                                      {{"required", "any"}, {"function", "tool"}}),
-              TranscodeRule::move("tool_choice.function.name", "tool_choice.name"),
-              TranscodeRule::drop("tool_choice.function"),
-          }),
+      .protocol = LLMProtocol::AnthropicMessages,
+      .request = {.to_ir = anthropicRequestToIr(), .from_ir = anthropicRequestFromIr()},
   };
+}
+
+// Gemini GenerateContent request -> IR request.
+TranscodeRuleSet geminiRequestToIr() {
+  return TranscodeRuleSet(
+      LLMProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
+      {
+          // 1. Unwrap `systemInstruction.parts[0].text` -> `system`, then prepend to
+          //    `contents` before renaming `contents` -> `messages`
+          TranscodeRule::unwrapArrayObject("systemInstruction.parts", "text", "system"),
+          TranscodeRule::drop("systemInstruction"),
+          TranscodeRule::unwrapArrayObject("system_instruction.parts", "text", "system"),
+          TranscodeRule::drop("system_instruction"),
+          // 2. Move `contents` -> `messages`, unwrap `parts[0].text` -> `content`, and map
+          //    Gemini role `"model"` -> `"assistant"`
+          TranscodeRule::move("contents", "messages"),
+          TranscodeRule::forEach(
+              "messages",
+              {
+                  // Gemini leaves `role` optional and Vertex defaults it to `user`. Both
+                  // other dialects require it, so materialize the source default here
+                  // rather than let an otherwise valid request fail their role check.
+                  TranscodeRule::setDefault("role", "user"),
+                  TranscodeRule::valueMap("role", {{"model", "assistant"}}),
+                  TranscodeRule::unwrapArrayObject("parts", "text", "content"),
+              }),
+          TranscodeRule::prependToArray("system", "messages", "role", "system", "content"),
+          // 3. Hoist `generationConfig` / `generation_config` parameters to top-level IR
+          //    fields. Gemini renders proto numbers through ProtoJSON, so each of these may
+          //    arrive quoted (`"maxOutputTokens": "256"`). The IR and both other dialects
+          //    declare them as real numbers, so coerce after the hoist: the destination path
+          //    is single, while each source has up to four spellings.
+          TranscodeRule::firstOf(
+              {"generationConfig.maxOutputTokens", "generationConfig.max_output_tokens",
+               "generation_config.maxOutputTokens", "generation_config.max_output_tokens"},
+              "max_completion_tokens"),
+          TranscodeRule::toInteger("max_completion_tokens"),
+          TranscodeRule::firstOf({"generationConfig.temperature", "generation_config.temperature"},
+                                 "temperature"),
+          TranscodeRule::toNumber("temperature"),
+          TranscodeRule::firstOf({"generationConfig.topP", "generationConfig.top_p",
+                                  "generation_config.topP", "generation_config.top_p"},
+                                 "top_p"),
+          TranscodeRule::toNumber("top_p"),
+          // `stopSequences` is already an array of strings in both dialects.
+          TranscodeRule::firstOf(
+              {"generationConfig.stopSequences", "generationConfig.stop_sequences",
+               "generation_config.stopSequences", "generation_config.stop_sequences"},
+              "stop"),
+          // Dropping the rest of `generationConfig` also masks a latent version of the
+          // coercion above: `candidateCount`, `topK`, `seed`, `presencePenalty`,
+          // `frequencyPenalty`, `logprobs` and `thinkingConfig.thinkingBudget` are all
+          // declared number-or-string too. Whoever makes the IR lossless must coerce them
+          // on the way through, or they reach the destination quoted.
+          TranscodeRule::drop("generationConfig"),
+          TranscodeRule::drop("generation_config"),
+          // TODO(ginama): Map `toolConfig.functionCallingConfig` -> `tool_choice`.
+          // Gemini uses `mode: "ANY"` for both `"required"` (when `allowedFunctionNames` is
+          // omitted) and `{"type": "function", "function": {"name": "fn"}}` (when
+          // `allowedFunctionNames` is set), which requires conditional mapping support.
+      });
+}
+
+// IR request -> Gemini GenerateContent request.
+TranscodeRuleSet geminiRequestFromIr() {
+  return TranscodeRuleSet(
+      TranscodingEngine::kIrProtocol, LLMProtocol::GeminiGenerateContent,
+      {
+          // 1. Extract `system` / `developer` messages from `messages[]` and wrap into
+          //    `systemInstruction.parts[{text: ...}]`
+          TranscodeRule::extractFromArray("messages", "role", {"system", "developer"}, "content",
+                                          "systemInstruction.content"),
+          TranscodeRule::wrapInArrayObject("systemInstruction.content", "systemInstruction.parts",
+                                           "text"),
+          // 2. Transform `messages[]` -> `contents[]`, mapping `"assistant"` -> `"model"`
+          //    and wrapping `content` -> `parts: [{text: <moved_node>}]`
+          TranscodeRule::forEach(
+              "messages",
+              {
+                  TranscodeRule::valueMap("role", {{"assistant", "model"}, {"tool", "user"}}),
+                  TranscodeRule::wrapInArrayObject("content", "parts", "text"),
+              }),
+          TranscodeRule::move("messages", "contents"),
+          // 3. Nest generation parameters under `generationConfig`
+          TranscodeRule::firstOf({"max_completion_tokens", "max_tokens"},
+                                 "generationConfig.maxOutputTokens"),
+          TranscodeRule::move("temperature", "generationConfig.temperature"),
+          TranscodeRule::move("top_p", "generationConfig.topP"),
+          // `stopSequences` is array-only, while the IR also allows a bare string.
+          TranscodeRule::ensureArray("stop"),
+          TranscodeRule::move("stop", "generationConfig.stopSequences"),
+          // 4. Map `tool_choice` to `toolConfig.functionCallingConfig`. Without this the
+          //    field rides through as an unknown member: Gemini's root sets
+          //    `allowUnknownFields(true)`, so the request is accepted and the caller's
+          //    constraint is silently ignored rather than rejected.
+          //    A pinned tool becomes `mode: ANY` plus a single-entry allow-list, which is
+          //    how Gemini spells "call exactly this function".
+          TranscodeRule::ensureObject("tool_choice", "type"),
+          TranscodeRule::move("tool_choice.function.name",
+                              "toolConfig.functionCallingConfig.allowedFunctionNames"),
+          TranscodeRule::ensureArray("toolConfig.functionCallingConfig.allowedFunctionNames"),
+          TranscodeRule::valueMap(
+              "tool_choice.type",
+              {{"auto", "AUTO"}, {"none", "NONE"}, {"required", "ANY"}, {"function", "ANY"}}),
+          TranscodeRule::move("tool_choice.type", "toolConfig.functionCallingConfig.mode"),
+          TranscodeRule::drop("tool_choice"),
+          // 5. Keep `model` and `stream` in the JSON body. Gemini encodes these in the URL
+          //    path (`/v1beta/models/{model}:generateContent` or `:streamGenerateContent`),
+          //    and the transcoding filter moves them into `:path` (Gemini's schema allows
+          //    unknown root fields).
+      });
 }
 
 // Builds the declarative transcoding pack for Gemini GenerateContent <-> IR (OpenAI Chat).
 DialectTranscodePack createGeminiTranscodePack() {
   return DialectTranscodePack{
-      /*protocol=*/LLMProtocol::GeminiGenerateContent,
-      /*to_IR=*/
-      TranscodeRuleSet(
-          LLMProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
-          {
-              // 1. Unwrap `systemInstruction.parts[0].text` -> `system`, then prepend to
-              //    `contents` before renaming `contents` -> `messages`
-              TranscodeRule::unwrapArrayObject("systemInstruction.parts", "text", "system"),
-              TranscodeRule::drop("systemInstruction"),
-              TranscodeRule::unwrapArrayObject("system_instruction.parts", "text", "system"),
-              TranscodeRule::drop("system_instruction"),
-              // 2. Move `contents` -> `messages`, unwrap `parts[0].text` -> `content`, and map
-              //    Gemini role `"model"` -> `"assistant"`
-              TranscodeRule::move("contents", "messages"),
-              TranscodeRule::forEach(
-                  "messages",
-                  {
-                      // Gemini leaves `role` optional and Vertex defaults it to `user`. Both
-                      // other dialects require it, so materialize the source default here
-                      // rather than let an otherwise valid request fail their role check.
-                      TranscodeRule::setDefault("role", "user"),
-                      TranscodeRule::valueMap("role", {{"model", "assistant"}}),
-                      TranscodeRule::unwrapArrayObject("parts", "text", "content"),
-                  }),
-              TranscodeRule::prependToArray("system", "messages", "role", "system", "content"),
-              // 3. Hoist `generationConfig` / `generation_config` parameters to top-level IR
-              //    fields. Gemini renders proto numbers through ProtoJSON, so each of these may
-              //    arrive quoted (`"maxOutputTokens": "256"`). The IR and both other dialects
-              //    declare them as real numbers, so coerce after the hoist: the destination path
-              //    is single, while each source has up to four spellings.
-              TranscodeRule::firstOf(
-                  {"generationConfig.maxOutputTokens", "generationConfig.max_output_tokens",
-                   "generation_config.maxOutputTokens", "generation_config.max_output_tokens"},
-                  "max_completion_tokens"),
-              TranscodeRule::toInteger("max_completion_tokens"),
-              TranscodeRule::firstOf(
-                  {"generationConfig.temperature", "generation_config.temperature"}, "temperature"),
-              TranscodeRule::toNumber("temperature"),
-              TranscodeRule::firstOf({"generationConfig.topP", "generationConfig.top_p",
-                                      "generation_config.topP", "generation_config.top_p"},
-                                     "top_p"),
-              TranscodeRule::toNumber("top_p"),
-              // `stopSequences` is already an array of strings in both dialects.
-              TranscodeRule::firstOf(
-                  {"generationConfig.stopSequences", "generationConfig.stop_sequences",
-                   "generation_config.stopSequences", "generation_config.stop_sequences"},
-                  "stop"),
-              // Dropping the rest of `generationConfig` also masks a latent version of the
-              // coercion above: `candidateCount`, `topK`, `seed`, `presencePenalty`,
-              // `frequencyPenalty`, `logprobs` and `thinkingConfig.thinkingBudget` are all
-              // declared number-or-string too. Whoever makes the IR lossless must coerce them
-              // on the way through, or they reach the destination quoted.
-              TranscodeRule::drop("generationConfig"),
-              TranscodeRule::drop("generation_config"),
-              // TODO(ginama): Map `toolConfig.functionCallingConfig` -> `tool_choice`.
-              // Gemini uses `mode: "ANY"` for both `"required"` (when `allowedFunctionNames` is
-              // omitted) and `{"type": "function", "function": {"name": "fn"}}` (when
-              // `allowedFunctionNames` is set), which requires conditional mapping support.
-          }),
-      /*from_IR=*/
-      TranscodeRuleSet(
-          TranscodingEngine::kIrProtocol, LLMProtocol::GeminiGenerateContent,
-          {
-              // 1. Extract `system` / `developer` messages from `messages[]` and wrap into
-              //    `systemInstruction.parts[{text: ...}]`
-              TranscodeRule::extractFromArray("messages", "role", {"system", "developer"},
-                                              "content", "systemInstruction.content"),
-              TranscodeRule::wrapInArrayObject("systemInstruction.content",
-                                               "systemInstruction.parts", "text"),
-              // 2. Transform `messages[]` -> `contents[]`, mapping `"assistant"` -> `"model"`
-              //    and wrapping `content` -> `parts: [{text: <moved_node>}]`
-              TranscodeRule::forEach(
-                  "messages",
-                  {
-                      TranscodeRule::valueMap("role", {{"assistant", "model"}, {"tool", "user"}}),
-                      TranscodeRule::wrapInArrayObject("content", "parts", "text"),
-                  }),
-              TranscodeRule::move("messages", "contents"),
-              // 3. Nest generation parameters under `generationConfig`
-              TranscodeRule::firstOf({"max_completion_tokens", "max_tokens"},
-                                     "generationConfig.maxOutputTokens"),
-              TranscodeRule::move("temperature", "generationConfig.temperature"),
-              TranscodeRule::move("top_p", "generationConfig.topP"),
-              // `stopSequences` is array-only, while the IR also allows a bare string.
-              TranscodeRule::ensureArray("stop"),
-              TranscodeRule::move("stop", "generationConfig.stopSequences"),
-              // 4. Map `tool_choice` to `toolConfig.functionCallingConfig`. Without this the
-              //    field rides through as an unknown member: Gemini's root sets
-              //    `allowUnknownFields(true)`, so the request is accepted and the caller's
-              //    constraint is silently ignored rather than rejected.
-              //    A pinned tool becomes `mode: ANY` plus a single-entry allow-list, which is
-              //    how Gemini spells "call exactly this function".
-              TranscodeRule::ensureObject("tool_choice", "type"),
-              TranscodeRule::move("tool_choice.function.name",
-                                  "toolConfig.functionCallingConfig.allowedFunctionNames"),
-              TranscodeRule::ensureArray("toolConfig.functionCallingConfig.allowedFunctionNames"),
-              TranscodeRule::valueMap(
-                  "tool_choice.type",
-                  {{"auto", "AUTO"}, {"none", "NONE"}, {"required", "ANY"}, {"function", "ANY"}}),
-              TranscodeRule::move("tool_choice.type", "toolConfig.functionCallingConfig.mode"),
-              TranscodeRule::drop("tool_choice"),
-              // 5. Keep `model` and `stream` in the JSON body. Gemini encodes these in the URL
-              //    path (`/v1beta/models/{model}:generateContent` or `:streamGenerateContent`),
-              //    and the transcoding filter moves them into `:path` (Gemini's schema allows
-              //    unknown root fields).
-          }),
+      .protocol = LLMProtocol::GeminiGenerateContent,
+      .request = {.to_ir = geminiRequestToIr(), .from_ir = geminiRequestFromIr()},
   };
 }
 
 // Builds the identity/normalization pack for OpenAI Chat Completions (the IR protocol).
 DialectTranscodePack createOpenAiChatTranscodePack() {
   return DialectTranscodePack{
-      /*protocol=*/LLMProtocol::OpenAiChatCompletions,
-      /*to_IR=*/
-      TranscodeRuleSet(LLMProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol, {}),
-      /*from_IR=*/
-      TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiChatCompletions, {}),
+      .protocol = LLMProtocol::OpenAiChatCompletions,
+      .request = {.to_ir = TranscodeRuleSet(LLMProtocol::OpenAiChatCompletions,
+                                            TranscodingEngine::kIrProtocol, {}),
+                  .from_ir = TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                              LLMProtocol::OpenAiChatCompletions, {})},
   };
 }
 
@@ -1040,11 +1052,11 @@ absl::Status TranscodingEngine::registerPack(DialectTranscodePack pack,
   if (ir_schema != nullptr) {
     pack.ir_schema = ir_schema;
   }
-  absl::Status to_ir_status = validateRulesAgainstSchema(pack.to_ir, pack.dialect_schema);
+  absl::Status to_ir_status = validateRulesAgainstSchema(pack.request.to_ir, pack.dialect_schema);
   if (!to_ir_status.ok()) {
     return to_ir_status;
   }
-  absl::Status from_ir_status = validateRulesAgainstSchema(pack.from_ir, pack.ir_schema);
+  absl::Status from_ir_status = validateRulesAgainstSchema(pack.request.from_ir, pack.ir_schema);
   if (!from_ir_status.ok()) {
     return from_ir_status;
   }
@@ -1068,6 +1080,91 @@ absl::StatusOr<TranscodingEngine> TranscodingEngine::createDefault() {
   return engine;
 }
 
+absl::StatusOr<const DialectTranscodePack*> TranscodingEngine::findPack(LLMProtocol dialect) const {
+  auto it = packs_.find(dialect);
+  if (it == packs_.end()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("no transcoding pack registered for ", llmProtocolName(dialect)));
+  }
+  return &it->second;
+}
+
+namespace {
+
+// The IR's `model`, which a request leg reports back through `TranscodeContext::ir_model`.
+std::string irModel(const nlohmann::json& json) {
+  if (!json.is_object()) {
+    return "";
+  }
+  const auto model = json.find("model");
+  return model != json.end() && model->is_string() ? model->get<std::string>() : "";
+}
+
+absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirection direction,
+                              TranscodeContext& ctx, nlohmann::json& json) {
+  const bool is_ir = pack.protocol == TranscodingEngine::kIrProtocol;
+  if (direction == TranscodeDirection::ToIr) {
+    if (!is_ir) {
+      absl::Status status = pack.request.to_ir.execute(json);
+      if (!status.ok()) {
+        return status;
+      }
+    }
+    ctx.ir_model = irModel(json);
+    return absl::OkStatus();
+  }
+
+  ctx.ir_model = irModel(json);
+  if (!is_ir) {
+    absl::Status status = pack.request.from_ir.execute(json);
+    if (!status.ok()) {
+      return status;
+    }
+  }
+  if (pack.dialect_schema != nullptr) {
+    return pack.dialect_schema->validateRequest(json);
+  }
+  return absl::OkStatus();
+}
+
+absl::Status transcodeResponse(const DialectTranscodePack& pack, TranscodeDirection direction,
+                               nlohmann::json& json) {
+  if (pack.protocol == TranscodingEngine::kIrProtocol) {
+    return absl::OkStatus();
+  }
+  const TranscodeRuleSet& rules =
+      direction == TranscodeDirection::ToIr ? pack.response.to_ir : pack.response.from_ir;
+  // Rules rewrite in place, so they run on a copy: a failure part way through then leaves the
+  // caller's document intact. `ExternalRef` nodes are small handles, so the copy never touches
+  // offloaded bytes.
+  nlohmann::json working = json;
+  absl::Status status = rules.execute(working);
+  if (!status.ok()) {
+    return status;
+  }
+  json = std::move(working);
+  return absl::OkStatus();
+}
+
+} // namespace
+
+absl::Status TranscodingEngine::transcode(const TranscodeLeg& leg, TranscodeContext& ctx,
+                                          nlohmann::json& json) const {
+  absl::StatusOr<const DialectTranscodePack*> pack = findPack(leg.dialect);
+  if (!pack.ok()) {
+    return pack.status();
+  }
+  switch (leg.kind) {
+  case PayloadKind::Request:
+    return transcodeRequest(**pack, leg.direction, ctx, json);
+  case PayloadKind::Response:
+    return transcodeResponse(**pack, leg.direction, json);
+  case PayloadKind::StreamEvent:
+    break;
+  }
+  return absl::InvalidArgumentError("stream events are transcoded one at a time, as SSE events");
+}
+
 // TODO(ginama): Address the IR data-loss problem where dialect-specific fields not modeled by
 // `OpenAiChatCompletions` are dropped when converting to the IR.
 absl::Status TranscodingEngine::transcodeToIr(LLMProtocol source_protocol,
@@ -1075,15 +1172,8 @@ absl::Status TranscodingEngine::transcodeToIr(LLMProtocol source_protocol,
   if (source_protocol == LLMProtocol::Unspecified) {
     return absl::OkStatus();
   }
-  auto it = packs_.find(source_protocol);
-  if (it == packs_.end()) {
-    return absl::InvalidArgumentError(absl::StrCat("no transcoding pack registered for source ",
-                                                   llmProtocolName(source_protocol)));
-  }
-  if (source_protocol == kIrProtocol) {
-    return absl::OkStatus();
-  }
-  return it->second.to_ir.execute(json);
+  TranscodeContext ctx;
+  return transcode({PayloadKind::Request, TranscodeDirection::ToIr, source_protocol}, ctx, json);
 }
 
 absl::Status TranscodingEngine::transcodeFromIr(LLMProtocol target_protocol,
@@ -1091,21 +1181,8 @@ absl::Status TranscodingEngine::transcodeFromIr(LLMProtocol target_protocol,
   if (target_protocol == LLMProtocol::Unspecified) {
     return absl::OkStatus();
   }
-  auto it = packs_.find(target_protocol);
-  if (it == packs_.end()) {
-    return absl::InvalidArgumentError(absl::StrCat("no transcoding pack registered for target ",
-                                                   llmProtocolName(target_protocol)));
-  }
-  if (target_protocol != kIrProtocol) {
-    absl::Status status = it->second.from_ir.execute(json);
-    if (!status.ok()) {
-      return status;
-    }
-  }
-  if (it->second.dialect_schema != nullptr) {
-    return it->second.dialect_schema->validateRequest(json);
-  }
-  return absl::OkStatus();
+  TranscodeContext ctx;
+  return transcode({PayloadKind::Request, TranscodeDirection::FromIr, target_protocol}, ctx, json);
 }
 
 } // namespace AiProtocolManager

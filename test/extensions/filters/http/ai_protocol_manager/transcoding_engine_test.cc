@@ -3,6 +3,7 @@
 
 #include "test/test_common/status_utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 
@@ -367,30 +368,34 @@ TEST(TranscodingEngineTest, CustomInboundAndOutboundConfiguration) {
   TranscodingEngine engine;
 
   DialectTranscodePack custom_pack{
-      /*protocol=*/LLMProtocol::OpenAiResponses,
-      /*to_IR=*/
-      TranscodeRuleSet(
-          LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+      .protocol = LLMProtocol::OpenAiResponses,
+      .request =
           {
-              TranscodeRule::move("input", "messages"),
-              TranscodeRule::forEach("messages",
-                                     {
-                                         TranscodeRule::valueMap("role", {{"bot", "assistant"}}),
-                                     }),
-              TranscodeRule::move("max_output_tokens", "max_completion_tokens"),
-          }),
-      /*from_IR=*/
-      TranscodeRuleSet(
-          TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiResponses,
-          {
-              TranscodeRule::forEach("messages",
-                                     {
-                                         TranscodeRule::valueMap("role", {{"assistant", "bot"}}),
-                                     }),
-              TranscodeRule::move("messages", "input"),
-              TranscodeRule::firstOf({"max_completion_tokens", "max_tokens"}, "max_output_tokens"),
-              TranscodeRule::setDefault("max_output_tokens", 1024),
-          }),
+              .to_ir = TranscodeRuleSet(
+                  LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+                  {
+                      TranscodeRule::move("input", "messages"),
+                      TranscodeRule::forEach(
+                          "messages",
+                          {
+                              TranscodeRule::valueMap("role", {{"bot", "assistant"}}),
+                          }),
+                      TranscodeRule::move("max_output_tokens", "max_completion_tokens"),
+                  }),
+              .from_ir = TranscodeRuleSet(
+                  TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiResponses,
+                  {
+                      TranscodeRule::forEach(
+                          "messages",
+                          {
+                              TranscodeRule::valueMap("role", {{"assistant", "bot"}}),
+                          }),
+                      TranscodeRule::move("messages", "input"),
+                      TranscodeRule::firstOf({"max_completion_tokens", "max_tokens"},
+                                             "max_output_tokens"),
+                      TranscodeRule::setDefault("max_output_tokens", 1024),
+                  }),
+          },
   };
 
   ASSERT_THAT(engine.registerPack(std::move(custom_pack)), IsOk());
@@ -939,13 +944,16 @@ TEST(TranscodingEngineTest, RegisterPackKeepsSchemasAlreadySetOnThePack) {
   ASSERT_NE(anthropic_schema, nullptr);
 
   DialectTranscodePack pack{
-      /*protocol=*/LLMProtocol::AnthropicMessages,
-      /*to_IR=*/
-      TranscodeRuleSet(LLMProtocol::AnthropicMessages, TranscodingEngine::kIrProtocol, {}),
-      /*from_IR=*/
-      TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages, {}),
-      /*dialect_schema=*/anthropic_schema,
-      /*IR_schema=*/nullptr,
+      .protocol = LLMProtocol::AnthropicMessages,
+      .request =
+          {
+              .to_ir = TranscodeRuleSet(LLMProtocol::AnthropicMessages,
+                                        TranscodingEngine::kIrProtocol, {}),
+              .from_ir = TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                          LLMProtocol::AnthropicMessages, {}),
+          },
+      .dialect_schema = anthropic_schema,
+      .ir_schema = nullptr,
   };
 
   // No schemas are passed as arguments, so the pack's own `dialect_schema` must survive.
@@ -1130,41 +1138,184 @@ TEST(TranscodingEngineTest, CoversAllRuleAndEngineEdgeCases) {
       AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
   TranscodingEngine custom_engine;
   DialectTranscodePack bad_to_ir_pack{
-      /*protocol=*/LLMProtocol::OpenAiChatCompletions,
-      /*to_IR=*/
-      TranscodeRuleSet(
-          LLMProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol,
-          {TranscodeRule::forEach("messages", {TranscodeRule::valueMap("content", {{"a", "b"}})})}),
-      /*from_IR=*/
-      TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiChatCompletions, {}),
+      .protocol = LLMProtocol::OpenAiChatCompletions,
+      .request =
+          {
+              .to_ir = TranscodeRuleSet(
+                  LLMProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol,
+                  {TranscodeRule::forEach("messages",
+                                          {TranscodeRule::valueMap("content", {{"a", "b"}})})}),
+              .from_ir = TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                          LLMProtocol::OpenAiChatCompletions, {}),
+          },
   };
   EXPECT_FALSE(
       custom_engine.registerPack(std::move(bad_to_ir_pack), openai_schema, openai_schema).ok());
 
   DialectTranscodePack bad_from_ir_pack{
-      /*protocol=*/LLMProtocol::OpenAiChatCompletions,
-      /*to_IR=*/
-      TranscodeRuleSet(LLMProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol, {}),
-      /*from_IR=*/
-      TranscodeRuleSet(
-          TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiChatCompletions,
-          {TranscodeRule::forEach("messages", {TranscodeRule::valueMap("content", {{"a", "b"}})})}),
+      .protocol = LLMProtocol::OpenAiChatCompletions,
+      .request =
+          {
+              .to_ir = TranscodeRuleSet(LLMProtocol::OpenAiChatCompletions,
+                                        TranscodingEngine::kIrProtocol, {}),
+              .from_ir = TranscodeRuleSet(
+                  TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiChatCompletions,
+                  {TranscodeRule::forEach("messages",
+                                          {TranscodeRule::valueMap("content", {{"a", "b"}})})}),
+          },
   };
   EXPECT_FALSE(
       custom_engine.registerPack(std::move(bad_from_ir_pack), openai_schema, openai_schema).ok());
 
   DialectTranscodePack strict_from_ir_pack{
-      /*protocol=*/LLMProtocol::OpenAiResponses,
-      /*to_IR=*/
-      TranscodeRuleSet(LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol, {}),
-      /*from_IR=*/
-      TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiResponses,
-                       {TranscodeRule::valueMap("mode", {{"ok", "yes"}},
-                                                TranscodeRule::UnknownValuePolicy::Reject)}),
+      .protocol = LLMProtocol::OpenAiResponses,
+      .request =
+          {
+              .to_ir = TranscodeRuleSet(LLMProtocol::OpenAiResponses,
+                                        TranscodingEngine::kIrProtocol, {}),
+              .from_ir = TranscodeRuleSet(
+                  TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiResponses,
+                  {TranscodeRule::valueMap("mode", {{"ok", "yes"}},
+                                           TranscodeRule::UnknownValuePolicy::Reject)}),
+          },
   };
   ASSERT_THAT(custom_engine.registerPack(std::move(strict_from_ir_pack)), IsOk());
   nlohmann::json bad_mode = nlohmann::json::parse(R"({"mode": "invalid"})");
   EXPECT_FALSE(custom_engine.transcodeFromIr(LLMProtocol::OpenAiResponses, bad_mode).ok());
+}
+
+// A request leg reports the request's IR `model` back through the context: read after the rules
+// on a `ToIr` leg and before them on a `FromIr` leg, so it is always the IR spelling.
+TEST(TranscodingEngineTest, TranscodeRequestLegsReportTheIrModel) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5",
+    "max_tokens": 64,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext to_ir_ctx;
+  ASSERT_THAT(engine.transcode(
+                  {PayloadKind::Request, TranscodeDirection::ToIr, LLMProtocol::AnthropicMessages},
+                  to_ir_ctx, payload),
+              IsOk());
+  EXPECT_EQ(to_ir_ctx.ir_model, "claude-sonnet-4-5");
+  EXPECT_EQ(payload["max_completion_tokens"], 64);
+
+  TranscodeContext from_ir_ctx;
+  ASSERT_THAT(engine.transcode({PayloadKind::Request, TranscodeDirection::FromIr,
+                                LLMProtocol::GeminiGenerateContent},
+                               from_ir_ctx, payload),
+              IsOk());
+  EXPECT_EQ(from_ir_ctx.ir_model, "claude-sonnet-4-5");
+  EXPECT_EQ(payload["contents"][0]["parts"][0]["text"], "Hi");
+  EXPECT_EQ(payload["generationConfig"]["maxOutputTokens"], 64);
+
+  // A Gemini body carries no model, so there is none to report, and nothing stale survives.
+  nlohmann::json gemini = nlohmann::json::parse(R"({
+    "contents": [{"role": "user", "parts": [{"text": "Hello"}]}]
+  })");
+  TranscodeContext gemini_ctx;
+  gemini_ctx.ir_model = "stale";
+  ASSERT_THAT(engine.transcode({PayloadKind::Request, TranscodeDirection::ToIr,
+                                LLMProtocol::GeminiGenerateContent},
+                               gemini_ctx, gemini),
+              IsOk());
+  EXPECT_EQ(gemini_ctx.ir_model, "");
+}
+
+// A response leg runs on a copy, so a rule that fails part way through leaves the caller's
+// document exactly as it was, and the caller can still forward it untranslated.
+TEST(TranscodingEngineTest, TranscodeResponseLegIsAllOrNothing) {
+  TranscodingEngine engine;
+  DialectTranscodePack pack{
+      .protocol = LLMProtocol::OpenAiResponses,
+      .request = {.to_ir = TranscodeRuleSet(LLMProtocol::OpenAiResponses,
+                                            TranscodingEngine::kIrProtocol, {}),
+                  .from_ir = TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                              LLMProtocol::OpenAiResponses, {})},
+      .response = {.to_ir = TranscodeRuleSet(
+                       LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+                       {
+                           TranscodeRule::move("output", "choices"),
+                           TranscodeRule::valueMap("status", {{"completed", "stop"}},
+                                                   TranscodeRule::UnknownValuePolicy::Reject),
+                       }),
+                   .from_ir = TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                               LLMProtocol::OpenAiResponses,
+                                               {TranscodeRule::move("choices", "output")})},
+  };
+  ASSERT_THAT(engine.registerPack(std::move(pack)), IsOk());
+  const TranscodeLeg to_ir{PayloadKind::Response, TranscodeDirection::ToIr,
+                           LLMProtocol::OpenAiResponses};
+  const TranscodeLeg from_ir{PayloadKind::Response, TranscodeDirection::FromIr,
+                             LLMProtocol::OpenAiResponses};
+
+  // The `move` succeeds before the `valueMap` rejects, so an in-place run would leave `choices`.
+  const nlohmann::json original =
+      nlohmann::json::parse(R"({"output": [{"text": "Hi"}], "status": "incomplete"})");
+  nlohmann::json doc = original;
+  TranscodeContext ctx;
+  EXPECT_EQ(engine.transcode(to_ir, ctx, doc).code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(doc, original);
+
+  doc["status"] = "completed";
+  ASSERT_THAT(engine.transcode(to_ir, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({"choices": [{"text": "Hi"}], "status": "stop"})"));
+
+  ASSERT_THAT(engine.transcode(from_ir, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({"output": [{"text": "Hi"}], "status": "stop"})"));
+}
+
+// A response already in the IR needs no conversion either way.
+TEST(TranscodingEngineTest, TranscodeResponseLegForTheIrIsTheIdentity) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const nlohmann::json original = nlohmann::json::parse(R"({
+    "id": "chatcmpl-1",
+    "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hi"}}]
+  })");
+  for (TranscodeDirection direction : {TranscodeDirection::ToIr, TranscodeDirection::FromIr}) {
+    nlohmann::json doc = original;
+    TranscodeContext ctx;
+    ASSERT_THAT(engine.transcode({PayloadKind::Response, direction, TranscodingEngine::kIrProtocol},
+                                 ctx, doc),
+                IsOk());
+    EXPECT_EQ(doc, original);
+  }
+}
+
+TEST(TranscodingEngineTest, TranscodeRejectsStreamEventAndUnregisteredLegs) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const nlohmann::json original = nlohmann::json::parse(R"({"choices": []})");
+  nlohmann::json doc = original;
+  TranscodeContext ctx;
+  EXPECT_EQ(engine
+                .transcode({PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                            LLMProtocol::GeminiGenerateContent},
+                           ctx, doc)
+                .code(),
+            absl::StatusCode::kInvalidArgument);
+
+  absl::Status status = engine.transcode(
+      {PayloadKind::Response, TranscodeDirection::ToIr, LLMProtocol::OpenAiResponses}, ctx, doc);
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(status.message(), testing::HasSubstr("no transcoding pack registered"));
+
+  // Unlike the `transcodeToIr()` / `transcodeFromIr()` wrappers, a leg must name a dialect.
+  EXPECT_FALSE(
+      engine
+          .transcode({PayloadKind::Request, TranscodeDirection::ToIr, LLMProtocol::Unspecified},
+                     ctx, doc)
+          .ok());
+  EXPECT_EQ(doc, original);
 }
 
 } // namespace

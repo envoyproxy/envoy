@@ -229,30 +229,72 @@ private:
   std::vector<TranscodeRule> rules_;
 };
 
-// Declarative dialect pack pairing a protocol's `to_ir` (Protocol -> OpenAiChatCompletions)
-// and `from_ir` (OpenAiChatCompletions -> Protocol) rule sets.
+// A payload's place in the exchange.
+enum class PayloadKind {
+  // A request body.
+  Request,
+  // A unary (non-streamed) response body.
+  Response,
+  // One SSE event of a streamed response.
+  StreamEvent,
+};
+
+// Which way one hop converts. The engine is single-hop: `ToIr` converts a dialect payload into the
+// IR, and `FromIr` converts an IR payload into the dialect.
+enum class TranscodeDirection {
+  ToIr,
+  FromIr,
+};
+
+// One hop the engine can run: which payload, which way, and which dialect sits on the non-IR side
+// of the hop (the source for `ToIr`, the destination for `FromIr`).
+struct TranscodeLeg {
+  PayloadKind kind{PayloadKind::Request};
+  TranscodeDirection direction{TranscodeDirection::ToIr};
+  LLMProtocol dialect{LLMProtocol::Unspecified};
+};
+
+// What a leg needs beyond the payload, and what it produces outside the payload. The engine reads
+// no headers and no clocks itself; the caller passes in what it has and applies what comes back.
+struct TranscodeContext {
+  // Set by request legs to the request's IR `model` (read after a `ToIr` leg and before a
+  // `FromIr` one), so the caller can hand it back as the fallback model on the response legs.
+  std::string ir_model{};
+};
+
+// The rule sets for one payload kind of a dialect: `to_ir` converts the dialect into the IR
+// (`OpenAiChatCompletions`) and `from_ir` converts the IR into the dialect. A leg left empty is
+// the identity.
+struct LegRules {
+  TranscodeRuleSet to_ir{};
+  TranscodeRuleSet from_ir{};
+};
+
+// Declarative dialect pack: every rule needed to move one dialect's payloads to and from the IR.
 //
-// `dialect_schema` is the protocol's own `PayloadSchema`; it is what a payload converted out of
+// `dialect_schema` is the protocol's own `PayloadSchema`; it is what a request converted out of
 // the IR is validated against before it is handed to the upstream. `ir_schema` is only used for
 // static rule verification at registration time -- see `TranscodingEngine::transcodeToIr()` for
 // why the IR document itself is not validated at runtime.
 struct DialectTranscodePack {
   LLMProtocol protocol{LLMProtocol::Unspecified};
-  TranscodeRuleSet to_ir;
-  TranscodeRuleSet from_ir;
+  // Request bodies.
+  LegRules request{};
+  // Unary response bodies.
+  LegRules response{};
   const PayloadSchema* dialect_schema{nullptr};
   const PayloadSchema* ir_schema{nullptr};
 };
 
 // The Transcoding Engine: manages registered `DialectTranscodePack`s, verifies them against
 // `PayloadSchema` definitions at startup, and converts payloads between any registered dialect
-// schema and the intermediate representation (`transcodeToIr` / `transcodeFromIr`).
+// and the intermediate representation, one `TranscodeLeg` at a time.
 //
 // The engine is a single-hop tool (`Dialect -> IR` or `IR -> Dialect`) and does not chain
 // `Dialect A -> IR -> Dialect B` or infer target wire protocols from model names. Orchestrating
 // transcoding legs, selecting target wire protocols from route/endpoint configuration, and
 // bypassing conversion when source and target protocols match are the responsibility of the
-// calling transcoding filter.
+// calling transcoding filter. Every rule about what a dialect's payloads look like lives here.
 //
 // TODO(ginama): Address the IR data-loss problem where dialect-specific fields not modeled by
 // `OpenAiChatCompletions` (e.g. unmapped `generationConfig` fields) are dropped when converting
@@ -284,8 +326,22 @@ public:
                             const PayloadSchema* dialect_schema = nullptr,
                             const PayloadSchema* ir_schema = nullptr);
 
-  // Converts `payload` from `source_protocol` into the intermediate representation
-  // (`OpenAiChatCompletions`). A no-op when `source_protocol` is already the IR protocol.
+  // Runs one leg on `json`.
+  //
+  // A `Request` leg rewrites `json` in place, so a failure part way through leaves it neither in
+  // the source shape nor in the target one; the caller must not forward it. A `Response` leg is
+  // all-or-nothing: it runs on a copy and replaces `json` only on success, so after a failure the
+  // caller still holds the original and can forward it untranslated. `StreamEvent` legs go
+  // through `transcodeStreamEvent()` instead.
+  //
+  // A leg whose dialect is the IR is the identity, except that a request `FromIr` leg still
+  // validates the payload against the IR's schema.
+  absl::Status transcode(const TranscodeLeg& leg, TranscodeContext& ctx,
+                         nlohmann::json& json) const;
+
+  // Converts request `payload` from `source_protocol` into the intermediate representation
+  // (`OpenAiChatCompletions`). A no-op when `source_protocol` is already the IR protocol or is
+  // `Unspecified`.
   //
   // The result is deliberately NOT validated against the IR schema. Two reasons: the source
   // payload was already validated against its own schema by the AI Protocol Manager before the
@@ -297,16 +353,19 @@ public:
   }
   absl::Status transcodeToIr(LLMProtocol source_protocol, nlohmann::json& json) const;
 
-  // Converts `payload` out of the intermediate representation into `target_protocol`,
+  // Converts request `payload` out of the intermediate representation into `target_protocol`,
   // then validates it against that protocol's schema so a payload the upstream would reject is
   // caught here instead of over the network. Rule execution is skipped when `target_protocol`
-  // is the IR protocol, but validation still runs.
+  // is the IR protocol, but validation still runs. A no-op when `target_protocol` is
+  // `Unspecified`.
   absl::Status transcodeFromIr(LLMProtocol target_protocol, JsonWithExtBuf& payload) const {
     return transcodeFromIr(target_protocol, payload.json());
   }
   absl::Status transcodeFromIr(LLMProtocol target_protocol, nlohmann::json& json) const;
 
 private:
+  absl::StatusOr<const DialectTranscodePack*> findPack(LLMProtocol dialect) const;
+
   absl::flat_hash_map<LLMProtocol, DialectTranscodePack> packs_;
 };
 
