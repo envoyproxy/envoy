@@ -1453,7 +1453,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const RouteMatchContext& route
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
     return clusterEntry(route_match_context.headers(), stream_info, random_value);
   }
   return nullptr;
@@ -1487,7 +1487,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const RouteMatchContext& route_m
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
     return clusterEntry(route_match_context.headers(), stream_info, random_value);
   }
 
@@ -1529,7 +1529,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const RouteMatchContext& route_
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    if (path_matcher_->match(route_match_context.sanitizedPath())) {
+    if (path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
       return clusterEntry(route_match_context.headers(), stream_info, random_value);
     }
   }
@@ -1602,7 +1602,7 @@ PathSeparatedPrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_
   const absl::string_view sanitized_path = route_match_context.sanitizedPathWithoutQuery();
   const size_t sanitized_size = sanitized_path.size();
   const size_t matcher_size = matcher().size();
-  if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
+  if (sanitized_size >= matcher_size && path_matcher_->matchPathWithoutQuery(sanitized_path) &&
       (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
     return clusterEntry(route_match_context.headers(), stream_info, random_value);
   }
