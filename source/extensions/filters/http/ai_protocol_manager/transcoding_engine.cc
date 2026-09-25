@@ -189,6 +189,40 @@ bool containsExternalRef(const nlohmann::json& node) {
   return false;
 }
 
+// The deepest nesting `parseJson` accepts: the default of Envoy's own JSON loader
+// (`Json::Factory::loadFromString`). The document a rule parses joins the payload, which is later
+// serialized by recursive walks, so hostile text must not build one deep enough to exhaust the
+// stack.
+constexpr size_t kMaxParsedJsonDepth = 1000;
+
+// True if `text`, read as JSON, nests arrays and objects deeper than `kMaxParsedJsonDepth`.
+// Brackets inside strings do not count.
+bool exceedsParsedJsonDepth(absl::string_view text) {
+  size_t depth = 0;
+  bool in_string = false;
+  bool escaped = false;
+  for (const char c : text) {
+    if (in_string) {
+      if (escaped) {
+        escaped = false;
+      } else if (c == '\\') {
+        escaped = true;
+      } else if (c == '"') {
+        in_string = false;
+      }
+    } else if (c == '"') {
+      in_string = true;
+    } else if (c == '[' || c == '{') {
+      if (++depth > kMaxParsedJsonDepth) {
+        return true;
+      }
+    } else if ((c == ']' || c == '}') && depth > 0) {
+      --depth;
+    }
+  }
+  return false;
+}
+
 absl::string_view shapeDescription(JsonShape shape) {
   switch (shape) {
   case JsonShape::Object:
@@ -426,6 +460,18 @@ absl::Status verifyRulesTrackProvenance(const std::vector<TranscodeRule>& rules,
                                /*keep_source=*/true);
       break;
     }
+    case TranscodeRule::Op::MoveElements: {
+      const std::string from_element = absl::StrCat(joinRulePath(prefix, rule.sourcePath()), "[]");
+      absl::Status status = verifyPredicate(rule.predicate(), from_element, offloadable_set);
+      if (!status.ok()) {
+        return status;
+      }
+      // Elements that do not match stay, so their fields remain offloadable where they were.
+      relocateOffloadablePaths(offloadable_set, from_element,
+                               absl::StrCat(joinRulePath(prefix, rule.targetPath()), "[]"),
+                               /*keep_source=*/true);
+      break;
+    }
     case TranscodeRule::Op::PrependToArray:
       relocateOffloadablePaths(
           offloadable_set, joinRulePath(prefix, rule.sourcePath()),
@@ -467,6 +513,29 @@ absl::Status verifyRulesTrackProvenance(const std::vector<TranscodeRule>& rules,
       // value, offloaded or not, where it is.)
       dropOffloadablePaths(offloadable_set, joinRulePath(prefix, rule.targetPath()));
       break;
+    case TranscodeRule::Op::ParseJson:
+    case TranscodeRule::Op::SerializeJson:
+      // Either fails on an `ExternalRef` or leaves a value built from inline text in its place.
+      dropOffloadablePaths(offloadable_set, joinRulePath(prefix, rule.targetPath()));
+      break;
+    case TranscodeRule::Op::LookupEarlier: {
+      const std::string element = absl::StrCat(joinRulePath(prefix, rule.targetPath()), "[]");
+      const std::string entry = absl::StrCat(element, ".", rule.sourcePath(), "[]");
+      // Keys are compared as strings, which an `ExternalRef` is not, so an offloaded key would
+      // quietly match nothing.
+      for (const std::string& key : {absl::StrCat(element, ".", rule.predicateField()),
+                                     absl::StrCat(entry, ".", rule.entryKey())}) {
+        if (offloadable_set.contains(key)) {
+          return absl::InvalidArgumentError(absl::StrCat(
+              "transcoding verifier error: lookup_earlier rule cannot compare offloadable field '",
+              key, "' because large values are represented as ExternalRef nodes"));
+        }
+      }
+      relocateOffloadablePaths(offloadable_set, absl::StrCat(entry, ".", rule.extractSubpath()),
+                               absl::StrCat(element, ".", rule.writePath()),
+                               /*keep_source=*/true);
+      break;
+    }
     case TranscodeRule::Op::RetainOnly:
       retainOffloadablePaths(offloadable_set,
                              rule.targetPath().empty() ? std::string(prefix)
@@ -562,16 +631,18 @@ absl::Status legVerifierError(absl::string_view leg, absl::string_view message) 
       absl::StrCat("transcoding verifier error: ", leg, " ", message));
 }
 
-// The name of `op` if it reads or writes per-stream state, which only a stream leg has; empty for
-// any other op.
-absl::string_view streamStateOpName(TranscodeRule::Op op) {
-  switch (op) {
+// The name of `rule`'s op if it reads or writes per-stream state, which only a stream leg has;
+// empty for any other rule.
+absl::string_view streamStateOpName(const TranscodeRule& rule) {
+  switch (rule.op()) {
   case TranscodeRule::Op::CaptureToState:
     return "capture_to_state";
   case TranscodeRule::Op::SetFromState:
     return "set_from_state";
   case TranscodeRule::Op::AccumulateUsage:
     return "accumulate_usage";
+  case TranscodeRule::Op::Enumerate:
+    return rule.slot().empty() ? "" : "enumerate_across_stream";
   default:
     return "";
   }
@@ -581,7 +652,7 @@ absl::string_view streamStateOpName(TranscodeRule::Op op) {
 // rule would fail every payload.
 absl::Status verifyNoStreamState(const TranscodeRuleSet& rules, absl::string_view leg) {
   for (const TranscodeRule* rule : flattenRules(rules)) {
-    if (const absl::string_view op = streamStateOpName(rule->op()); !op.empty()) {
+    if (const absl::string_view op = streamStateOpName(*rule); !op.empty()) {
       return legVerifierError(
           leg, absl::StrCat("rules cannot use ", op, ", which needs per-stream state"));
     }
@@ -1514,6 +1585,20 @@ TranscodeRule TranscodeRule::toInteger(std::string path) {
   return rule;
 }
 
+TranscodeRule TranscodeRule::parseJson(std::string path) {
+  TranscodeRule rule(Op::ParseJson);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::serializeJson(std::string path) {
+  TranscodeRule rule(Op::SerializeJson);
+  rule.target_segments_ = splitPath(path);
+  rule.target_path_ = std::move(path);
+  return rule;
+}
+
 TranscodeRule TranscodeRule::valueMap(std::string path,
                                       std::initializer_list<ValueMapping> mappings,
                                       UnknownValuePolicy unknown_policy) {
@@ -1566,6 +1651,17 @@ TranscodeRule TranscodeRule::extractFromArray(std::string array_path, std::strin
   rule.extract_subpath_ = std::move(extract_subpath);
   rule.target_segments_ = splitPath(target_path);
   rule.target_path_ = std::move(target_path);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::moveElements(std::string from_array_path, std::string to_array_path,
+                                          TranscodePredicate where) {
+  TranscodeRule rule(Op::MoveElements);
+  rule.source_segments_ = splitPath(from_array_path);
+  rule.source_path_ = std::move(from_array_path);
+  rule.target_segments_ = splitPath(to_array_path);
+  rule.target_path_ = std::move(to_array_path);
+  rule.predicate_ = std::move(where);
   return rule;
 }
 
@@ -1633,11 +1729,37 @@ TranscodeRule TranscodeRule::setFromContext(std::string path, ContextField field
   return rule;
 }
 
-TranscodeRule TranscodeRule::enumerate(std::string array_path, std::string key) {
+TranscodeRule TranscodeRule::enumerate(std::string array_path, std::string key,
+                                       std::string prefix) {
   TranscodeRule rule(Op::Enumerate);
   rule.target_segments_ = splitPath(array_path);
   rule.target_path_ = std::move(array_path);
   rule.extract_subpath_ = std::move(key);
+  rule.prefix_ = std::move(prefix);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::enumerateAcrossStream(std::string array_path, std::string key,
+                                                   std::string slot, std::string prefix) {
+  TranscodeRule rule = enumerate(std::move(array_path), std::move(key), std::move(prefix));
+  rule.slot_ = std::move(slot);
+  return rule;
+}
+
+TranscodeRule TranscodeRule::lookupEarlier(std::string array_path, std::string key,
+                                           std::string entries_path, std::string entry_key,
+                                           std::string entry_value_path, std::string to_path) {
+  TranscodeRule rule(Op::LookupEarlier);
+  rule.target_segments_ = splitPath(array_path);
+  rule.target_path_ = std::move(array_path);
+  rule.predicate_field_ = std::move(key);
+  rule.source_segments_ = splitPath(entries_path);
+  rule.source_path_ = std::move(entries_path);
+  rule.entry_key_ = std::move(entry_key);
+  rule.extract_subpath_segments_ = splitPath(entry_value_path);
+  rule.extract_subpath_ = std::move(entry_value_path);
+  rule.write_segments_ = splitPath(to_path);
+  rule.write_path_ = std::move(to_path);
   return rule;
 }
 
@@ -1831,6 +1953,53 @@ absl::Status TranscodeRule::apply(nlohmann::json& json, TranscodeContext* ctx) c
     return absl::OkStatus();
   }
 
+  case Op::ParseJson: {
+    nlohmann::json* node = findNodeByPath(json, target_segments_);
+    if (node == nullptr) {
+      return absl::OkStatus();
+    }
+    if (JsonWithExtBuf::isExternalRef(*node)) {
+      return absl::UnimplementedError(
+          absl::StrCat("cannot parse the JSON text in '", target_path_,
+                       "' because it is held by reference (ExternalRef)"));
+    }
+    if (!node->is_string()) {
+      return absl::OkStatus();
+    }
+    const std::string& text = node->get_ref<const std::string&>();
+    if (absl::StripAsciiWhitespace(text).empty()) {
+      *node = nullptr;
+      return absl::OkStatus();
+    }
+    if (exceedsParsedJsonDepth(text)) {
+      return absl::InvalidArgumentError(absl::StrCat("the JSON text in '", target_path_,
+                                                     "' nests deeper than ", kMaxParsedJsonDepth,
+                                                     " levels"));
+    }
+    nlohmann::json parsed = nlohmann::json::parse(text, nullptr, /*allow_exceptions=*/false);
+    if (parsed.is_discarded()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("field '", target_path_, "' does not hold valid JSON text"));
+    }
+    *node = std::move(parsed);
+    return absl::OkStatus();
+  }
+
+  case Op::SerializeJson: {
+    nlohmann::json* node = findNodeByPath(json, target_segments_);
+    if (node == nullptr) {
+      return absl::OkStatus();
+    }
+    if (containsExternalRef(*node)) {
+      return absl::UnimplementedError(
+          absl::StrCat("cannot write '", target_path_,
+                       "' as JSON text because it holds a reference (ExternalRef)"));
+    }
+    // `replace` writes invalid UTF-8 as U+FFFD rather than throwing.
+    *node = node->dump(-1, ' ', /*ensure_ascii=*/false, nlohmann::json::error_handler_t::replace);
+    return absl::OkStatus();
+  }
+
   case Op::ValueMap: {
     nlohmann::json* node = findNodeByPath(json, target_segments_);
     if (node == nullptr || node->is_null()) {
@@ -1929,6 +2098,42 @@ absl::Status TranscodeRule::apply(nlohmann::json& json, TranscodeContext* ctx) c
       }
     }
     setNodeByPath(json, target_segments_, std::move(blocks));
+    return absl::OkStatus();
+  }
+
+  case Op::MoveElements: {
+    nlohmann::json* from = findNodeByPath(json, source_segments_);
+    if (from == nullptr || !from->is_array() || source_path_ == target_path_) {
+      return absl::OkStatus();
+    }
+    // Checked before anything moves, so a failure leaves the payload as it was.
+    if (const nlohmann::json* to = findNodeByPath(json, target_segments_);
+        to != nullptr && !to->is_null() && !to->is_array()) {
+      return absl::InvalidArgumentError(absl::StrCat("cannot move elements of '", source_path_,
+                                                     "' into '", target_path_,
+                                                     "', which is not an array"));
+    }
+    nlohmann::json kept = nlohmann::json::array();
+    nlohmann::json moved = nlohmann::json::array();
+    for (nlohmann::json& elem : *from) {
+      if (elem.is_object() && predicate_.matches(elem)) {
+        moved.push_back(std::move(elem));
+      } else {
+        kept.push_back(std::move(elem));
+      }
+    }
+    *from = std::move(kept);
+    if (moved.empty()) {
+      return absl::OkStatus();
+    }
+    nlohmann::json* to = findNodeByPath(json, target_segments_);
+    if (to == nullptr || to->is_null()) {
+      setNodeByPath(json, target_segments_, std::move(moved));
+      return absl::OkStatus();
+    }
+    for (nlohmann::json& elem : moved) {
+      to->push_back(std::move(elem));
+    }
     return absl::OkStatus();
   }
 
@@ -2089,6 +2294,16 @@ absl::Status TranscodeRule::apply(nlohmann::json& json, TranscodeContext* ctx) c
   }
 
   case Op::Enumerate: {
+    int64_t base = 0;
+    if (!slot_.empty()) {
+      if (ctx == nullptr || ctx->stream_state == nullptr) {
+        return missingStreamState("enumerate_across_stream");
+      }
+      if (const auto slot = ctx->stream_state->slots.find(slot_);
+          slot != ctx->stream_state->slots.end() && slot->second.is_number_integer()) {
+        base = slot->second.get<int64_t>();
+      }
+    }
     nlohmann::json* arr = findNodeByPath(json, target_segments_);
     if (arr == nullptr || !arr->is_array()) {
       return absl::OkStatus();
@@ -2099,7 +2314,60 @@ absl::Status TranscodeRule::apply(nlohmann::json& json, TranscodeContext* ctx) c
         continue;
       }
       if (auto it = elem.find(extract_subpath_); it == elem.end() || it->is_null()) {
-        elem[extract_subpath_] = static_cast<int64_t>(i);
+        const int64_t position = base + static_cast<int64_t>(i);
+        if (prefix_.empty()) {
+          elem[extract_subpath_] = position;
+        } else {
+          elem[extract_subpath_] = absl::StrCat(prefix_, position);
+        }
+      }
+    }
+    if (!slot_.empty()) {
+      ctx->stream_state->slots.insert_or_assign(slot_, base + static_cast<int64_t>(arr->size()));
+    }
+    return absl::OkStatus();
+  }
+
+  case Op::LookupEarlier: {
+    nlohmann::json* arr = findNodeByPath(json, target_segments_);
+    if (arr == nullptr || !arr->is_array()) {
+      return absl::OkStatus();
+    }
+    // What each entry key names, as of the nearest earlier element that holds it.
+    absl::flat_hash_map<std::string, nlohmann::json> earlier;
+    for (nlohmann::json& elem : *arr) {
+      if (!elem.is_object()) {
+        continue;
+      }
+      // Looked up before the element's own entries are recorded, so it only sees earlier ones.
+      if (const auto key = elem.find(predicate_field_); key != elem.end() && key->is_string()) {
+        const nlohmann::json* existing = findNodeByPath(elem, write_segments_);
+        const auto found = earlier.find(key->get_ref<const std::string&>());
+        if ((existing == nullptr || existing->is_null()) && found != earlier.end()) {
+          nlohmann::json value = found->second;
+          setNodeByPath(elem, write_segments_, std::move(value));
+        }
+      }
+      nlohmann::json* entries = findNodeByPath(elem, source_segments_);
+      if (entries == nullptr || !entries->is_array()) {
+        continue;
+      }
+      for (nlohmann::json& entry : *entries) {
+        if (!entry.is_object()) {
+          continue;
+        }
+        const auto entry_key = entry.find(entry_key_);
+        if (entry_key == entry.end() || !entry_key->is_string()) {
+          continue;
+        }
+        const std::string& name = entry_key->get_ref<const std::string&>();
+        if (const nlohmann::json* value = findNodeByPath(entry, extract_subpath_segments_);
+            value != nullptr && !value->is_null()) {
+          earlier.insert_or_assign(name, *value);
+        } else {
+          // A later entry that reuses the key hides what an earlier one said.
+          earlier.erase(name);
+        }
       }
     }
     return absl::OkStatus();

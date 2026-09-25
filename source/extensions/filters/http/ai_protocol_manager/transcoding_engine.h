@@ -122,6 +122,10 @@ public:
     // Parses a numeric string at `target_path` into a real JSON number, as an integer when
     // `integral` is set. A no-op when the field is absent, already numeric, or does not parse.
     CoerceNumeric,
+    // Replaces the JSON text at `target_path` with the value it spells.
+    ParseJson,
+    // Replaces the value at `target_path` with its JSON text.
+    SerializeJson,
     // Translates scalar string values at `target_path` according to `value_map`.
     ValueMap,
     // Applies `sub_rules` to every object element of the array at `target_path`.
@@ -130,6 +134,9 @@ public:
     // `match_values`, moving their `extract_subpath` into `target_path` and keeping
     // remaining elements in `source_path`.
     ExtractFromArray,
+    // Moves the object elements of array `source_path` that match `predicate` to the end of array
+    // `target_path`, leaving the rest in place.
+    MoveElements,
     // Prepends an object element into array `target_path` constructed from `source_path`
     // (removing `source_path`), setting `predicate_field` = `role_value` and
     // `extract_subpath` = moved value.
@@ -149,8 +156,13 @@ public:
     // null and the caller supplied a value.
     SetFromContext,
     // Sets `element_key` on each object element of array `target_path` to the element's position,
-    // unless the element already carries it.
+    // unless the element already carries it. A `prefix` writes the position as a string after it,
+    // and a stream state `slot` carries the count on across a stream's events.
     Enumerate,
+    // For each object element of array `target_path` whose `predicate_field` names an entry of an
+    // earlier element's array `source_path` (by the entry's `entry_key`), copies that entry's
+    // `extract_subpath` to the element's `write_path`.
+    LookupEarlier,
     // Removes every member of the object at `target_path` whose key is not in `match_values`.
     RetainOnly,
     // Replaces array `source_path` with its first element, moved to `target_path`.
@@ -241,6 +253,19 @@ public:
   // As `toNumber`, but yields an integer, for destinations that declare the field as such.
   static TranscodeRule toInteger(std::string path);
 
+  // Replaces the JSON text at `path` with the value it spells, for a dialect that carries as text
+  // what another carries as a value (OpenAI's tool call `arguments` against Gemini's `args`).
+  // Text that is empty or only whitespace becomes null. Text that is not JSON, or that nests
+  // deeper than Envoy's JSON loader allows, is an `InvalidArgument` error. An offloaded
+  // `ExternalRef` could only be parsed by materializing it, so it is an `Unimplemented` error.
+  // Anything else at `path`, or nothing, is left alone.
+  static TranscodeRule parseJson(std::string path);
+
+  // Replaces the value at `path` with its compact JSON text: the inverse of `parseJson`. A value
+  // that is or holds an offloaded `ExternalRef` could only be written out by materializing it, so
+  // it is an `Unimplemented` error. An absent `path` is left alone.
+  static TranscodeRule serializeJson(std::string path);
+
   // Maps string values at `path` using `mappings` ("this value should be interpreted as that").
   static TranscodeRule
   valueMap(std::string path, std::initializer_list<ValueMapping> mappings,
@@ -261,6 +286,15 @@ public:
   static TranscodeRule extractFromArray(std::string array_path, std::string predicate_field,
                                         std::initializer_list<std::string> match_values,
                                         std::string extract_subpath, std::string target_path);
+
+  // Moves each object element of the array at `from_array_path` that matches `where` to the end
+  // of the array at `to_array_path`, in order, and leaves the rest where they were: for a dialect
+  // that keeps in a list of its own what another mixes in with other elements (OpenAI's
+  // `tool_calls` against Gemini's function call parts). `to_array_path` is created if anything
+  // moves. One that holds anything but an array or null is an `InvalidArgument` error, raised
+  // before anything moves. An absent or non-array `from_array_path` is left alone.
+  static TranscodeRule moveElements(std::string from_array_path, std::string to_array_path,
+                                    TranscodePredicate where = TranscodePredicate());
 
   // Moves `source_path` into a new element prepended to `array_path`. The new element maps
   // `key_field` to `key_value` and holds the moved node under `value_subpath`.
@@ -290,8 +324,27 @@ public:
   static TranscodeRule setFromContext(std::string path, ContextField field);
 
   // Sets `key` on each object element of the array at `array_path` to the element's position,
-  // unless the element already carries a non-null `key`.
-  static TranscodeRule enumerate(std::string array_path, std::string key);
+  // unless the element already carries a non-null `key`. A non-empty `prefix` writes the position
+  // as a string after it (`call_0`) rather than as a number.
+  static TranscodeRule enumerate(std::string array_path, std::string key, std::string prefix = "");
+
+  // As `enumerate`, but numbering runs on across a stream's events rather than restarting in each:
+  // an event's positions start after the elements of the events before it, as counted in stream
+  // state slot `slot`. Every element counts, numbered or not, so rules numbering different keys
+  // of the same array stay in step. Only valid on stream legs; fails without
+  // `TranscodeContext::stream_state`.
+  static TranscodeRule enumerateAcrossStream(std::string array_path, std::string key,
+                                             std::string slot, std::string prefix = "");
+
+  // For each object element of the array at `array_path` that holds a string `key` but nothing at
+  // `to_path`, finds the nearest earlier element whose array `entries_path` holds an object with
+  // that string as its `entry_key`, and copies that entry's `entry_value_path` to `to_path`. For
+  // a dialect that repeats what another only refers to: an OpenAI tool result names the call it
+  // answers by id, a Gemini function response by the function's name as well. An element whose
+  // key no earlier entry holds is left alone.
+  static TranscodeRule lookupEarlier(std::string array_path, std::string key,
+                                     std::string entries_path, std::string entry_key,
+                                     std::string entry_value_path, std::string to_path);
 
   // Removes every member of the object at `path` (empty for the current object) whose key is not
   // in `keys`. Ends a mapping into a dialect that rejects, or must not leak, unknown members.
@@ -363,6 +416,9 @@ public:
   const TranscodePredicate& predicate() const { return predicate_; }
   ContextField contextField() const { return context_field_; }
   const std::string& slot() const { return slot_; }
+  const std::string& prefix() const { return prefix_; }
+  const std::string& entryKey() const { return entry_key_; }
+  const std::string& writePath() const { return write_path_; }
   LLMProtocol usageFrom() const { return usage_from_; }
   LLMProtocol usageTo() const { return usage_to_; }
 
@@ -393,6 +449,13 @@ private:
   TranscodePredicate predicate_;
   ContextField context_field_{ContextField::RequestModel};
   std::string slot_;
+  // What an `Enumerate` position written as a string follows.
+  std::string prefix_;
+  // For `LookupEarlier`: the member of a referenced entry that holds its key, and where in the
+  // referring element the entry's value is written.
+  std::string entry_key_;
+  std::string write_path_;
+  std::vector<std::string> write_segments_;
   LLMProtocol usage_from_{LLMProtocol::Unspecified};
   LLMProtocol usage_to_{LLMProtocol::Unspecified};
 };
