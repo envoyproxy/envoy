@@ -1318,6 +1318,12 @@ ClusterInfoImpl::ClusterInfoImpl(
                     config.preconnect_policy().preconnect_enabled_metadata(),
                     factory_context.serverFactoryContext())
               : nullptr),
+      eager_preconnect_floor_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(), eager_preconnect_floor, 0)),
+      eager_preconnect_floor_failure_threshold_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.preconnect_policy(), eager_preconnect_floor_failure_threshold, 3)),
+      eager_preconnect_floor_jitter_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+          config.preconnect_policy(), eager_preconnect_floor_jitter, 60000))),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       traffic_stats_(generateStats(
           stats_scope_, factory_context.serverFactoryContext().clusterManager().clusterStatNames(),
@@ -1448,6 +1454,15 @@ ClusterInfoImpl::ClusterInfoImpl(
         config.queuing_policies().pending_rq_policy(), *stats_scope_, server_context);
     SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
     pending_rq_queue_policy_ = std::move(*policy_or_error);
+  }
+
+  // eager_preconnect_floor warms and refills a set of upstream connections per host.
+  // Not compatible with connection_pool_per_downstream_connection, where each pool is bound
+  // to a single downstream connection and torn down when it closes.
+  if (connection_pool_per_downstream_connection_ && eager_preconnect_floor_ > 0) {
+    creation_status = absl::InvalidArgumentError("eager_preconnect_floor is incompatible with "
+                                                 "connection_pool_per_downstream_connection");
+    return;
   }
 
   if (config.has_load_balancing_policy() ||
