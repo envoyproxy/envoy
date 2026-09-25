@@ -126,7 +126,10 @@ public:
                            const StreamInfo::StreamInfo& info,
                            Filters::Common::RateLimit::RateLimitDescriptors& descriptors) const {
     ASSERT(rate_limit_config_ != nullptr);
-    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors);
+    // Local rate limiting runs on the decode path only; no response headers are available to the
+    // formatter (and %RESP()% in hits_addend.format resolves empty, as before).
+    rate_limit_config_->populateDescriptors(headers, /*response_headers=*/nullptr, info,
+                                            local_info_.clusterName(), descriptors);
   }
 
 private:
