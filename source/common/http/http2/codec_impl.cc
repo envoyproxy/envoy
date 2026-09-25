@@ -2408,10 +2408,12 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (!use_oghttp2_library_) {
 #ifdef ENVOY_NGHTTP2
     adapter_ = http2_session_factory.create(base(), client_http2_options.options());
+    stats_.nghttp2_upstream_connections_.inc();
 #endif
   }
   if (!adapter_) {
     adapter_ = http2_session_factory.create(base(), client_http2_options.ogOptions());
+    stats_.oghttp2_upstream_connections_.inc();
   }
   http2_session_factory.init(base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
@@ -2495,6 +2497,7 @@ ServerConnectionImpl::ServerConnectionImpl(
 #endif
     visitor_ = std::move(direct_visitor);
     adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
+    stats_.oghttp2_downstream_connections_.inc();
 #ifdef ENVOY_NGHTTP2
   } else {
     auto adapter =
@@ -2505,6 +2508,7 @@ ServerConnectionImpl::ServerConnectionImpl(
     direct_visitor->setStreamCloseListener(std::move(stream_close_listener));
     visitor_ = std::move(direct_visitor);
     adapter_ = std::move(adapter);
+    stats_.nghttp2_downstream_connections_.inc();
   }
 #endif
   sendSettings(http2_options, false);
