@@ -775,6 +775,14 @@ case $CI_TARGET in
               //test/server:cgroup_cpu_simple_integration_test
         ;;
 
+    execution-context)
+        setup_clang_toolchain
+        bazel test \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              --define=execution_context=enabled \
+              //test/common/common:execution_context_test
+        ;;
+
     debug)
         setup_clang_toolchain
         echo "Testing ${TEST_TARGETS[*]}"
