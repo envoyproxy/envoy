@@ -37,6 +37,13 @@ copy an affinity key from the downstream request, and configure the external pro
 with a matching
 :ref:`cluster-level hash policy <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.hash_policy>`.
 
+.. note::
+
+   Session affinity applies to the endpoint selected by the external processor cluster. If that
+   endpoint is an intermediate proxy that performs further load balancing, this configuration alone
+   does not ensure affinity to the final processor. Each such proxy must preserve the affinity key
+   and use an appropriate affinity policy when selecting its upstream endpoint.
+
 For example, the filter can copy a session header into the gRPC request:
 
 .. literalinclude:: /_configs/repo/ext-proc-session-affinity-header.yaml
