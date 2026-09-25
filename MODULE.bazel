@@ -403,6 +403,48 @@ use_repo(buf, "rules_buf_toolchains")
 
 register_toolchains("@envoy_toolshed//pgp:sq_toolchain")
 
+protobuf = use_extension("@protobuf//:extensions.bzl", "protobuf")
+protobuf.deps(zlib = "@envoy//bazel:zlib")
+
+# gRPC
+grpc = use_extension("@grpc//:extensions.bzl", "grpc")
+grpc.deps(
+    crypto = "@envoy//bazel:crypto",
+    ssl = "@envoy//bazel:ssl",
+    zlib = "@envoy//bazel:zlib",
+)
+
+# quiche
+quiche = use_extension("@quiche//:extensions.bzl", "quiche")
+quiche.deps(
+    mobile_quiche_bug_tracker_impl_lib = "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
+    quic_base_impl_lib = "@envoy//source/common/quic/platform:quic_base_impl_lib",
+    quiche_export_impl_lib = "@envoy//source/common/quic/platform:quiche_export_impl_lib",
+    quiche_flags_impl_lib = "@envoy//source/common/quic/platform:quiche_flags_impl_lib",
+    quiche_logging_impl_lib = "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
+    quiche_lower_case_string_impl_lib = "@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib",
+    quiche_platform_iovec_impl_lib = "@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib",
+    quiche_stack_trace_impl_lib = "@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib",
+    quiche_time_utils_impl_lib = "@envoy//source/common/quic/platform:quiche_time_utils_impl_lib",
+    ssl_lib = "@envoy//bazel:ssl",
+    zlib = "@envoy//bazel:zlib",
+)
+
+quiche_dev = use_extension("@quiche//:extensions.bzl", "quiche", dev_dependency = True)
+quiche_dev.deps(
+    quiche_expect_bug_impl_lib = "@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib",
+    quiche_test_helpers_impl_lib = "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
+    quiche_test_impl_lib = "@envoy//test/common/quic/platform:quiche_test_impl_lib",
+    quiche_test_output_impl_lib = "@envoy//test/common/quic/platform:quiche_test_output_impl_lib",
+    quiche_thread_impl_lib = "@envoy//test/common/quic/platform:quiche_thread_impl_lib",
+)
+
+proxy_wasm_cpp_host = use_extension("@proxy-wasm-cpp-host//:extensions.bzl", "proxy_wasm_cpp_host")
+proxy_wasm_cpp_host.deps(crypto_lib = "@envoy//bazel:crypto")
+
+libsxg = use_extension("@libsxg//:extensions.bzl", "libsxg")
+libsxg.deps(crypto_lib = "@envoy//bazel:crypto")
+
 ####################################################################################
 # repo: Extensions
 ####################################################################################
