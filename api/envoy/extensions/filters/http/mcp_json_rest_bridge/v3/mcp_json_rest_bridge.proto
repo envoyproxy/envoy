@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.mcp_json_rest_bridge.v3;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -18,6 +19,18 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: MCP JSON REST Bridge]
 // [#extension: envoy.filters.http.mcp_json_rest_bridge]
+
+// The cache scope of a cacheable MCP result, emitted as the ``cacheScope`` result field.
+enum CacheScope {
+  // Unspecified. Treated as ``CACHE_SCOPE_PUBLIC``.
+  CACHE_SCOPE_UNSPECIFIED = 0;
+
+  // The result may be stored in a shared cache and reused across clients.
+  CACHE_SCOPE_PUBLIC = 1;
+
+  // The result may only be stored in a per-client cache.
+  CACHE_SCOPE_PRIVATE = 2;
+}
 
 // Configuration for the MCP MCP JSON REST Bridge.
 //
@@ -155,6 +168,19 @@ message McpJsonRestBridge {
 message TraceContextExtractionOptions {
 }
 
+// Cache configuration for a locally-generated, cacheable MCP result.
+message CacheConfig {
+  // How long the result may be reused, emitted as the MCP ``ttlMs`` result field.
+  //
+  // If not provided: Defaults to 0, meaning clients should revalidate before reusing the result.
+  google.protobuf.Duration ttl = 1 [(validate.rules).duration = {gte {}}];
+
+  // The cache scope of the result.
+  //
+  // If not provided: Defaults to ``CACHE_SCOPE_PUBLIC``.
+  CacheScope cache_scope = 2 [(validate.rules).enum = {defined_only: true}];
+}
+
 // Configuration for the server metadata.
 message ServerInfo {
   // The maximum MCP protocol version supported by this MCP endpoint.
@@ -181,6 +207,11 @@ message ServerInfo {
   //   as the fallback protocol version.
   //   See https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http#protocol-version-header
   google.protobuf.StringValue fallback_protocol_version = 3;
+
+  // Cache configuration advertised in locally-generated ``server/discover`` responses.
+  //
+  // If not provided: the response advertises ``ttlMs: 0`` and ``cacheScope: public``.
+  CacheConfig server_discovery_cache_config = 4;
 }
 
 // Configuration for sending locally-generated responses to tools/list requests.
