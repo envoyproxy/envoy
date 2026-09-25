@@ -451,34 +451,63 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuStatFile) {
   EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to read CPU times")));
 }
 
-TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadEffectiveCpusFile) {
+// Absent cpuset.cpus.effective falls back to the host online CPU count. A low
+// cpu.max quota keeps the result deterministic (min(host_cpus, 0.5) == 0.5).
+TEST_F(LinuxContainerCpuStatsReaderV2Test, EffectiveCpusFileAbsentUsesFallback) {
   TimeSource& test_time_source = timeSource();
   Api::ApiPtr api = Api::createApiForTest();
 
   setV2CpuStat("usage_usec 500000\n");
-  setV2CpuMax("200000 100000\n");
+  setV2CpuMax("50000 100000\n"); // 0.5 core quota
   const std::string nonexistent_effective = TestEnvironment::temporaryPath("nonexistent_effective");
 
   CgroupV2CpuStatsReader container_stats_reader(
       api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), nonexistent_effective);
   CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
 
-  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 0.5);
 }
 
-TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuMaxFile) {
+// Both files absent: fall back to host CPU count with no limit. Core count is
+// host dependent, so only assert validity and a sane lower bound; the first
+// getUtilization call returns zero.
+TEST_F(LinuxContainerCpuStatsReaderV2Test, EffectiveCpusAndCpuMaxAbsentUseFallback) {
   TimeSource& test_time_source = timeSource();
   Api::ApiPtr api = Api::createApiForTest();
 
   setV2CpuStat("usage_usec 500000\n");
-  setV2CpuEffective("0-3\n");
+  const std::string nonexistent_effective = TestEnvironment::temporaryPath("nonexistent_effective");
+  const std::string nonexistent_max = TestEnvironment::temporaryPath("nonexistent_max");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), nonexistent_max, nonexistent_effective);
+  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_GE(envoy_container_stats.effective_cores, 1.0);
+
+  // The first call establishes the baseline and returns zero.
+  auto result = container_stats_reader.getUtilization();
+  ASSERT_OK(result);
+  EXPECT_DOUBLE_EQ(result.value(), 0.0);
+}
+
+// Absent cpu.max means no limit, so effective cores equal the cpuset CPU count.
+TEST_F(LinuxContainerCpuStatsReaderV2Test, CpuMaxFileAbsentAssumesNoLimit) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuEffective("0-3\n"); // 4 CPUs
   const std::string nonexistent_max = TestEnvironment::temporaryPath("nonexistent_max");
 
   CgroupV2CpuStatsReader container_stats_reader(
       api->fileSystem(), test_time_source, v2CpuStatPath(), nonexistent_max, v2CpuEffectivePath());
   CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
 
-  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 4.0);
 }
 
 TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationFirstCallReturnsZero) {
@@ -514,9 +543,8 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV2ReaderWhenV2FilesExist) {
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
   Filesystem::MockInstance mock_fs;
+  // Keyed only on cpu.stat; the optional v2 files are not probed.
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillOnce(Return(true));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective")).WillOnce(Return(true));
 
   auto reader_or_error = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
   EXPECT_TRUE(reader_or_error.ok());
@@ -533,14 +561,8 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV1ReaderWhenOnlyV1FilesExis
 
   Filesystem::MockInstance mock_fs;
 
-  // V2 files don't exist
+  // V2 not detected (cpu.stat missing).
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max"))
-      .Times(testing::AtMost(1))
-      .WillRepeatedly(Return(false));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective"))
-      .Times(testing::AtMost(1))
-      .WillRepeatedly(Return(false));
 
   // V1 files exist
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(true));
@@ -551,7 +573,9 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV1ReaderWhenOnlyV1FilesExis
   EXPECT_NE(reader_or_error.value(), nullptr);
 }
 
-TEST(LinuxContainerCpuStatsReaderFactoryTest, ReturnsErrorWhenNoCgroupFilesExist) {
+// With no cgroup v1/v2 available, create() returns a fail-open reader reporting
+// zero utilization instead of failing.
+TEST(LinuxContainerCpuStatsReaderFactoryTest, ReturnsFallbackReaderWhenNoCgroupFilesExist) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::MockDispatcher dispatcher;
   Server::MockOptions options;
@@ -561,14 +585,8 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, ReturnsErrorWhenNoCgroupFilesExist
 
   Filesystem::MockInstance mock_fs;
 
-  // No V2 files
+  // No V2 files (cpu.stat missing).
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max"))
-      .Times(testing::AtMost(1))
-      .WillRepeatedly(Return(false));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective"))
-      .Times(testing::AtMost(1))
-      .WillRepeatedly(Return(false));
 
   // No V1 files
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(false));
@@ -577,8 +595,13 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, ReturnsErrorWhenNoCgroupFilesExist
       .WillRepeatedly(Return(false));
 
   auto result = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(std::string(result.status().message()), ::testing::Eq(NoSupportedCGroupMessage));
+  ASSERT_TRUE(result.ok());
+  ASSERT_NE(result.value(), nullptr);
+
+  // The fallback reader always succeeds and reports zero utilization.
+  auto util = result.value()->getUtilization();
+  ASSERT_OK(util);
+  EXPECT_DOUBLE_EQ(util.value(), 0.0);
 }
 
 // =============================================================================
