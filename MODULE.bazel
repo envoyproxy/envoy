@@ -29,7 +29,7 @@ bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.4.15.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.0.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "fmt", version = "12.2.0")
 bazel_dep(name = "gazelle", version = "0.47.0")
@@ -99,7 +99,6 @@ bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
 bazel_dep(name = "rules_swift", version = "4.0.1")
 bazel_dep(name = "spdlog", version = "1.17.0")
-bazel_dep(name = "sq", version = "1.4.0.envoy")
 bazel_dep(name = "sql-parser", version = "0.0.0-260715-52e5ad1.envoy")
 bazel_dep(name = "su-exec", version = "0.3")
 bazel_dep(name = "tclap", version = "1.2.5.bcr.1")
@@ -157,12 +156,19 @@ single_version_override(
 #     module_name = "envoy_toolshed",
 #     path = "../toolshed/bazel",
 # )
-
+#
 # git_override(
 #     module_name = "envoy_toolshed",
-#     commit = "0f2dbc8122e776c57901bcd835e9f2526c03cf4d",
+#     commit = "4c200b2990500e3bebf3f202e096894a957a1876",
 #     remote = "https://github.com/envoyproxy/toolshed",
 #     strip_prefix = "bazel",
+# )
+#
+# git_override(
+#     module_name = "envoy_toolshed_jq",
+#     commit = "4c200b2990500e3bebf3f202e096894a957a1876",
+#     remote = "https://github.com/envoyproxy/toolshed",
+#     strip_prefix = "jq",
 # )
 
 ####################################################################################
@@ -400,8 +406,6 @@ buf.toolchains(
     version = "v1.61.0",
 )
 use_repo(buf, "rules_buf_toolchains")
-
-register_toolchains("@envoy_toolshed//pgp:sq_toolchain")
 
 protobuf = use_extension("@protobuf//:extensions.bzl", "protobuf")
 protobuf.deps(zlib = "@envoy//bazel:zlib")
