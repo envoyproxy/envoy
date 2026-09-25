@@ -221,7 +221,7 @@ private:
   // to only while ``secret_subscription_frozen_`` is false, and read-only afterwards, which is what
   // makes the reads from worker threads safe. Each entry keeps its own thread local copy of the
   // value so that a read is a thread local lookup rather than a lock.
-  std::vector<std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>> generic_secrets_;
+  std::vector<Secret::ThreadLocalGenericSecretProviderPtr> generic_secrets_;
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
