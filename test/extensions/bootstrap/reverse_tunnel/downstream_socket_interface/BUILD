@@ -74,6 +74,7 @@ envoy_cc_test(
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/common/tls:mock_ssl_handshaker_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
