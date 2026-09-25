@@ -33,14 +33,15 @@ parseHttpConnectionManagerFromYaml(const std::string& yaml) {
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
-  HttpConnectionManagerConfigTest() {}
+  HttpConnectionManagerConfigTest()
+      : filter_config_provider_manager_(std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {}
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_{
       context_.server_factory_context_.mainThreadDispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
   NiceMock<Tracing::MockTracerManager> tracer_manager_;
-  Filter::HttpFilterConfigProviderManagerImpl filter_config_provider_manager_;
+  std::shared_ptr<Filter::HttpFilterConfigProviderManagerImpl> filter_config_provider_manager_;
   std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_{
       std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TestScopedRuntime scoped_runtime_;
@@ -49,7 +50,7 @@ public:
     [[maybe_unused]] HttpConnectionManagerConfig config(
         parseHttpConnectionManagerFromYaml(yaml), context_, date_provider_,
         route_config_provider_manager_, &scoped_routes_config_provider_manager_, tracer_manager_,
-        filter_config_provider_manager_, creation_status_);
+        *filter_config_provider_manager_, creation_status_);
     THROW_IF_NOT_OK(creation_status_);
   }
   absl::Status creation_status_{absl::OkStatus()};

@@ -203,7 +203,7 @@ public:
     ON_CALL(factory_context_, serverFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
     ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
-    filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();
+    filter_config_provider_manager_ = std::make_shared<CfgProviderMgrImpl>();
   }
 
   // Create listener filter config provider callbacks.
@@ -280,8 +280,7 @@ public:
   NiceMock<MockFactoryCtx> factory_context_;
   FilterFactory filter_factory_;
   Registry::InjectFactory<FilterCategory> inject_factory_;
-  std::unique_ptr<FilterConfigProviderManager<FactoryCb, FactoryCtx>>
-      filter_config_provider_manager_;
+  std::shared_ptr<CfgProviderMgrImpl> filter_config_provider_manager_;
   DynamicFilterConfigProviderPtr<FactoryCb> provider_;
   Config::SubscriptionCallbacks* callbacks_{};
 };
@@ -725,6 +724,46 @@ TEST_F(TcpListenerFilterConfigMatcherTest, TcpListenerFilterAnyMatcher) {
   setup();
   EXPECT_EQ(provider_->getListenerFilterMatcher(), matcher);
   EXPECT_CALL(init_watcher_, ready());
+}
+
+class FilterConfigDiscoveryShutdownTest : public testing::Test,
+                                          public HttpFilterConfigDiscoveryImplTest {
+};
+
+// This test deterministically simulates the condition where the
+// FilterConfigProviderManager is destroyed while an ECDS configuration update is in-flight.
+TEST_F(FilterConfigDiscoveryShutdownTest, ShutdownDuringInFlightUpdate) {
+  // Initialize the provider and subscription
+  setup();
+
+  EXPECT_CALL(init_watcher_, ready());
+
+  // Intercept runOnAllThreads and capture the main thread completion callback
+  std::function<void()> pending_completion_callback;
+  EXPECT_CALL(server_factory_context_.thread_local_, runOnAllThreads(_, _))
+      .WillOnce(Invoke([&](std::function<void()>, std::function<void()> completion_cb) {
+        pending_completion_callback = completion_cb;
+      }))
+      .WillRepeatedly(Invoke(&server_factory_context_.thread_local_, &ThreadLocal::MockInstance::runOnAllThreads2));
+
+  // Send the ECDS configuration update to trigger the update
+  const auto response = createResponse("1", "foo");
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  ASSERT_OK(callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()));
+
+  // Ensure that the completion callback was successfully captured (update is in-flight)
+  ASSERT_NE(pending_completion_callback, nullptr);
+
+  // Destroy the provider and the provider manager (simulating server shutdown)
+  provider_.reset();
+  filter_config_provider_manager_.reset();
+
+  // Invoke the completion callback (simulating worker threads finishing the update)
+  // This will destruct the Cleanup object, which drops the subscription's reference count to 0,
+  // invoking ~FilterConfigSubscription().
+  // Ensure clean exit because the manager is kept alive by the subscription's shared_ptr.
+  pending_completion_callback();
 }
 
 } // namespace
