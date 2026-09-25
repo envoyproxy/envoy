@@ -543,16 +543,6 @@ struct VirtualHostInitializationObject : Logger::Loggable<Logger::Id::router> {
         factory_context_(factory_context), vhost_stats_scope_(std::move(vhost_stats_scope)),
         validator_(validator), init_manager_(init_manager), validate_clusters_(validate_clusters) {}
 
-  VirtualHostInitializationObject(
-      ArenaWrappedProto<envoy::config::route::v3::VirtualHost> vhost_proto,
-      const CommonConfigSharedPtr& global_route_config,
-      Server::Configuration::ServerFactoryContext& factory_context,
-      Stats::ScopeSharedPtr vhost_stats_scope, ProtobufMessage::ValidationVisitor& validator,
-      Init::Manager& init_manager, bool validate_clusters)
-      : vhost_proto_(std::move(vhost_proto)), global_route_config_(global_route_config),
-        factory_context_(factory_context), vhost_stats_scope_(std::move(vhost_stats_scope)),
-        validator_(validator), init_manager_(init_manager), validate_clusters_(validate_clusters) {}
-
   std::shared_ptr<const VirtualHostImpl> createVirtualHost() const {
     if (!vhost_proto_) {
       return nullptr;
@@ -590,7 +580,8 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
                              Server::Configuration::ServerFactoryContext& factory_context);
 
 /**
- * Manages the transition between dormant VirtualHostInitializationObject and active VirtualHostImpl.
+ * Manages the transition between dormant VirtualHostInitializationObject and active
+ * VirtualHostImpl.
  */
 class DomainEntry {
 public:

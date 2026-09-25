@@ -413,7 +413,7 @@ buf.toolchains(
 )
 use_repo(buf, "rules_buf_toolchains")
 
-# register_toolchains("@envoy_toolshed//pgp:sq_toolchain")
+register_toolchains("@envoy_toolshed//pgp:sq_toolchain")
 
 ####################################################################################
 # repo: Extensions

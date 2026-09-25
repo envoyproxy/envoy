@@ -13526,7 +13526,8 @@ virtual_hosts:
   const std::vector<TestCase> cases = {
       {"InvalidRoute", invalid_route_yaml, "route: unknown cluster 'non_existent_cluster'"},
       {"InvalidMatcher", invalid_matcher_yaml, "missing ]"},
-      {"MissingClusterSpecifierPlugin", missing_plugin_yaml, ""},
+      {"MissingClusterSpecifierPlugin", missing_plugin_yaml,
+       "Didn't find a registered implementation for 'custom'"},
       {"InvalidPolicy", invalid_policy_yaml,
        "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy"},
       {"NegativeTimeout", negative_timeout_yaml, "Expected positive duration"},
@@ -13704,83 +13705,6 @@ TEST_F(RouteMatcherTest, DeferredVirtualHostFastPathSafetyInvariant) {
     TestConfigImpl config(route_config, factory_context_, true, creation_status_);
     EXPECT_OK(creation_status_);
   }
-}
-
-TEST_F(RouteMatcherTest, DeferredVirtualHostArenaWrappedProto) {
-  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
-      true);
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: arena_vhost
-  domains: ["arena.example.com"]
-  routes:
-  - match: { prefix: "/api" }
-    route: { cluster: "cluster_1" }
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"cluster_1"}, {});
-  auto route_config = parseRouteConfigurationFromYaml(yaml);
-  const auto& vhost_proto = route_config.virtual_hosts(0);
-
-  Init::ManagerImpl local_init_manager{"local_init"};
-  auto global_route_config_or_error =
-      CommonConfigImpl::create(route_config, factory_context_,
-                               ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
-  EXPECT_OK(global_route_config_or_error.status());
-  auto global_route_config = global_route_config_or_error.value();
-
-  auto vhost_scope = factory_context_.scope().scopeFromStatName(
-      factory_context_.routerContext().virtualClusterStatNames().vhost_);
-
-  // 1. Direct VirtualHostInitializationObject construction from const VirtualHost&
-  auto init_object = std::make_shared<VirtualHostInitializationObject>(
-      vhost_proto, global_route_config, factory_context_, vhost_scope,
-      ProtobufMessage::getStrictValidationVisitor(), local_init_manager, true);
-
-  EXPECT_NE(init_object->vhost_proto_.arena(), nullptr);
-  EXPECT_NE(init_object->vhost_proto_.get(), nullptr);
-  EXPECT_EQ(init_object->vhost_proto_.get()->GetArena(), init_object->vhost_proto_.arena());
-  EXPECT_EQ(init_object->vhost_proto_->name(), "arena_vhost");
-  EXPECT_EQ(init_object->vhost_proto_->routes(0).match().prefix(), "/api");
-  EXPECT_EQ(init_object->vhost_proto_->routes(0).route().cluster(), "cluster_1");
-
-  // 2. DomainEntry holding VirtualHostInitializationObject
-  DomainEntry domain_entry(init_object);
-  EXPECT_EQ(domain_entry.initObject(), init_object);
-  EXPECT_EQ(domain_entry.activeVirtualHost(), nullptr);
-
-  // 3. VirtualHostImpl creation from ArenaWrappedProto
-  const auto* vhost = domain_entry.getOrCreateVirtualHost(factory_context_.timeSource());
-  ASSERT_NE(vhost, nullptr);
-  EXPECT_EQ(domain_entry.activeVirtualHost(), vhost);
-  EXPECT_EQ(vhost->virtualHost()->name(), "arena_vhost");
-
-  // 4. Move construction of VirtualHostInitializationObject with ArenaWrappedProto
-  ArenaWrappedProto<envoy::config::route::v3::VirtualHost> custom_wrapped(vhost_proto);
-  Protobuf::Arena* original_arena = custom_wrapped.arena();
-  EXPECT_NE(original_arena, nullptr);
-
-  auto moved_init_object = std::make_shared<VirtualHostInitializationObject>(
-      std::move(custom_wrapped), global_route_config, factory_context_, vhost_scope,
-      ProtobufMessage::getStrictValidationVisitor(), local_init_manager, true);
-
-  EXPECT_EQ(moved_init_object->vhost_proto_.arena(), original_arena);
-  EXPECT_EQ(moved_init_object->vhost_proto_.get()->GetArena(), original_arena);
-  EXPECT_EQ(moved_init_object->vhost_proto_->name(), "arena_vhost");
-
-  auto moved_vhost = moved_init_object->createVirtualHost();
-  ASSERT_NE(moved_vhost, nullptr);
-  EXPECT_EQ(moved_vhost->virtualHost()->name(), "arena_vhost");
-
-  // 5. Empty/null ArenaWrappedProto handling
-  ArenaWrappedProto<envoy::config::route::v3::VirtualHost> empty_wrapped(nullptr);
-  auto empty_init_object = std::make_shared<VirtualHostInitializationObject>(
-      std::move(empty_wrapped), global_route_config, factory_context_, vhost_scope,
-      ProtobufMessage::getStrictValidationVisitor(), local_init_manager, true);
-  EXPECT_EQ(empty_init_object->vhost_proto_.arena(), nullptr);
-  EXPECT_EQ(empty_init_object->vhost_proto_.get(), nullptr);
-  EXPECT_EQ(empty_init_object->createVirtualHost(), nullptr);
 }
 
 TEST_F(RouteMatcherTest, DeferredVirtualHostRequiresProbeValidationExhaustiveBranches) {
