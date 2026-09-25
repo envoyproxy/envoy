@@ -590,8 +590,7 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
                              Server::Configuration::ServerFactoryContext& factory_context);
 
 /**
- * Manages the transition between dormant VirtualHostInitializationObject and active VirtualHostImpl
- * using a shared lock-free CAS architecture.
+ * Manages the transition between dormant VirtualHostInitializationObject and active VirtualHostImpl.
  */
 class DomainEntry {
 public:

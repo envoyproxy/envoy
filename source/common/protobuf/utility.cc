@@ -775,10 +775,6 @@ uint64_t DurationUtil::durationToMilliseconds(const Protobuf::Duration& duration
   return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
 }
 
-absl::Status DurationUtil::validateDurationNoThrow(const Protobuf::Duration& duration) {
-  return validateDurationNoThrowHelper(duration);
-}
-
 absl::StatusOr<uint64_t>
 DurationUtil::durationToMillisecondsNoThrow(const Protobuf::Duration& duration) {
   const absl::Status result = validateDurationNoThrowHelper(duration);
@@ -791,6 +787,10 @@ DurationUtil::durationToMillisecondsNoThrow(const Protobuf::Duration& duration) 
 uint64_t DurationUtil::durationToSeconds(const Protobuf::Duration& duration) {
   validateDuration(duration);
   return Protobuf::util::TimeUtil::DurationToSeconds(duration);
+}
+
+absl::Status DurationUtil::validateDurationNoThrow(const Protobuf::Duration& duration) {
+  return validateDurationNoThrowHelper(duration);
 }
 
 void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,

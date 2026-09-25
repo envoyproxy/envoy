@@ -751,13 +751,6 @@ public:
   static uint64_t durationToMilliseconds(const Protobuf::Duration& duration);
 
   /**
-   * Validates that the duration is valid, positive, and does not exceed maximum seconds/nanos.
-   * @param duration protobuf duration.
-   * @return OkStatus if valid, or an OutOfRangeError status.
-   */
-  static absl::Status validateDurationNoThrow(const Protobuf::Duration& duration);
-
-  /**
    * Same as DurationUtil::durationToMilliseconds but does not throw an exception.
    * @param duration protobuf.
    * @return duration in milliseconds or an error status.
@@ -772,6 +765,13 @@ public:
    * @throw EnvoyException when duration is out-of-range.
    */
   static uint64_t durationToSeconds(const Protobuf::Duration& duration);
+
+  /**
+   * Validates that the duration is valid, positive, and does not exceed maximum seconds/nanos.
+   * @param duration protobuf duration.
+   * @return OkStatus if valid, or an OutOfRangeError status.
+   */
+  static absl::Status validateDurationNoThrow(const Protobuf::Duration& duration);
 };
 
 class TimestampUtil {
