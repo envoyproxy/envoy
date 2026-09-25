@@ -8,6 +8,8 @@
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -34,17 +36,27 @@ struct RateLimitOnMatchActionContext {};
 class RateLimitOnMatchAction : public Matcher::ActionBase<BucketId>,
                                public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
-  explicit RateLimitOnMatchAction(RateLimitQuotaBucketSettings settings)
-      : setting_(std::move(settings)) {}
+  // Data inputs for the bucket id builders that use custom_value, keyed by bucket id key.
+  using CustomValueInputs =
+      absl::flat_hash_map<std::string, Matcher::DataInputPtr<Http::HttpMatchingData>>;
 
-  absl::StatusOr<BucketId> generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
-                                            ProtobufMessage::ValidationVisitor& validation_visitor,
-                                            RateLimitQuotaValidationVisitor& visitor) const;
+  RateLimitOnMatchAction(RateLimitQuotaBucketSettings settings,
+                         CustomValueInputs custom_value_inputs)
+      : setting_(std::move(settings)), custom_value_inputs_(std::move(custom_value_inputs)) {}
+
+  // Creates the data inputs for the custom_value bucket id builders in the settings. This parses
+  // the input configurations, so it runs when the action is created rather than per request.
+  static CustomValueInputs
+  createCustomValueInputs(const RateLimitQuotaBucketSettings& settings,
+                          ProtobufMessage::ValidationVisitor& validation_visitor);
+
+  absl::StatusOr<BucketId> generateBucketId(const Http::Matching::HttpMatchingDataImpl& data) const;
 
   const RateLimitQuotaBucketSettings& bucketSettings() const { return setting_; }
 
 private:
-  RateLimitQuotaBucketSettings setting_;
+  const RateLimitQuotaBucketSettings setting_;
+  const CustomValueInputs custom_value_inputs_;
 };
 
 class RateLimitOnMatchActionFactory : public Matcher::ActionFactory<RateLimitOnMatchActionContext> {
@@ -55,11 +67,13 @@ public:
   createAction(const Protobuf::Message& config, RateLimitOnMatchActionContext&,
                ProtobufMessage::ValidationVisitor& validation_visitor) override {
     // Validate and then retrieve the bucket settings from config.
-    const auto bucket_settings =
+    const auto& bucket_settings =
         MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::rate_limit_quota::
                                              v3::RateLimitQuotaBucketSettings&>(config,
                                                                                 validation_visitor);
-    return std::make_shared<RateLimitOnMatchAction>(std::move(bucket_settings));
+    return std::make_shared<RateLimitOnMatchAction>(
+        bucket_settings,
+        RateLimitOnMatchAction::createCustomValueInputs(bucket_settings, validation_visitor));
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
