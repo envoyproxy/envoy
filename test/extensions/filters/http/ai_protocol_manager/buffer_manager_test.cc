@@ -82,6 +82,7 @@ private:
 
 class PostingExternalBufferFactory : public ExternalBufferFactory {
 public:
+  using ExternalBufferFactory::createBuffer;
   ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
     auto buffer = std::make_unique<PostingExternalBuffer>(dispatcher);
     last_ = buffer.get();
@@ -146,6 +147,7 @@ private:
 
 class FailingExternalBufferFactory : public ExternalBufferFactory {
 public:
+  using ExternalBufferFactory::createBuffer;
   explicit FailingExternalBufferFactory(FailingExternalBuffer::FailMode mode) : mode_(mode) {}
   ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
     return std::make_unique<FailingExternalBuffer>(dispatcher, mode_);

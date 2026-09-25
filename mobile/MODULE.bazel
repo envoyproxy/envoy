@@ -10,7 +10,7 @@ bazel_dep(name = "protoc-gen-validate", version = "1.3.3.envoy")
 bazel_dep(name = "envoy", version = "1.40.0-dev")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev.20260903.16b0d47.envoy")
 bazel_dep(name = "envoy_build_config", version = "1.40.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.4.15.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.0.envoy")
 bazel_dep(name = "gazelle", version = "0.47.0")
 bazel_dep(name = "google_bazel_common", version = "0.0.1")
 bazel_dep(name = "googleapis", version = "0.0.0-20251003-2193a2bf")
@@ -38,7 +38,7 @@ bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_jvm_external", version = "7.1")
 bazel_dep(name = "rules_kotlin", version = "2.3.20")
 bazel_dep(name = "rules_python", version = "2.2.0")
-bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
+bazel_dep(name = "rules_rust", version = "0.74.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
 bazel_dep(name = "rules_swift", version = "4.0.1", repo_name = "build_bazel_rules_swift")
 bazel_dep(name = "rules_xcodeproj", version = "2.4.0", repo_name = "com_github_buildbuddy_io_rules_xcodeproj")
@@ -173,3 +173,17 @@ maven.install(
 
 extra_sources = use_extension("//bazel:extensions.bzl", "envoy_mobile_extra_sources_extension")
 use_repo(extra_sources, "envoy_mobile_extra_swift_sources", "envoy_mobile_extra_jni_deps")
+
+quiche = use_extension("@quiche//:extensions.bzl", "quiche")
+quiche.deps(
+    mobile_quiche_bug_tracker_impl_lib = "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
+)
+
+quiche_dev = use_extension("@quiche//:extensions.bzl", "quiche", dev_dependency = True)
+quiche_dev.deps(
+    quiche_expect_bug_impl_lib = "@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib",
+    quiche_test_helpers_impl_lib = "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
+    quiche_test_impl_lib = "@envoy//test/common/quic/platform:quiche_test_impl_lib",
+    quiche_test_output_impl_lib = "@envoy//test/common/quic/platform:quiche_test_output_impl_lib",
+    quiche_thread_impl_lib = "@envoy//test/common/quic/platform:quiche_thread_impl_lib",
+)

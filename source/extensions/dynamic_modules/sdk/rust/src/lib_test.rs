@@ -2194,6 +2194,42 @@ fn test_http_get_upstream_connection_id_unavailable() {
   assert_eq!(filter.get_upstream_connection_id(), 0);
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_timing_info(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  timing_out: *mut abi::envoy_dynamic_module_type_timing_info,
+) {
+  unsafe {
+    *timing_out = abi::envoy_dynamic_module_type_timing_info {
+      start_time_unix_ns: 1,
+      request_complete_duration_ns: 2,
+      first_upstream_tx_byte_sent_ns: 3,
+      last_upstream_tx_byte_sent_ns: 4,
+      first_upstream_rx_byte_received_ns: 5,
+      last_upstream_rx_byte_received_ns: 6,
+      first_downstream_tx_byte_sent_ns: 7,
+      last_downstream_tx_byte_sent_ns: 8,
+    };
+  }
+}
+
+#[test]
+fn test_http_get_timing_info() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  let timing: access_log::TimingInfo = filter.get_timing_info();
+  assert_eq!(timing.start_time_unix_ns, 1);
+  assert_eq!(timing.request_complete_duration_ns, 2);
+  assert_eq!(timing.first_upstream_tx_byte_sent_ns, 3);
+  assert_eq!(timing.last_upstream_tx_byte_sent_ns, 4);
+  assert_eq!(timing.first_upstream_rx_byte_received_ns, 5);
+  assert_eq!(timing.last_upstream_rx_byte_received_ns, 6);
+  assert_eq!(timing.first_downstream_tx_byte_sent_ns, 7);
+  assert_eq!(timing.last_downstream_tx_byte_sent_ns, 8);
+}
+
 const HTTP_UPSTREAM_ATTEMPTS_AVAILABLE: usize = 1;
 const HTTP_UPSTREAM_ATTEMPTS_EMPTY: usize = 2;
 const HTTP_UPSTREAM_ATTEMPTS_DATA_FAILURE: usize = 3;

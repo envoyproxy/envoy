@@ -2864,6 +2864,75 @@ TEST(ABIImpl, GetHttpSizeAttributesWithoutHeaderMaps) {
   EXPECT_EQ(43, result);
 }
 
+TEST_F(DynamicModuleHttpFilterTest, GetTimingInfo) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_monotonic_ = MonotonicTime(std::chrono::seconds(1));
+  stream_info.start_time_ = SystemTime(std::chrono::seconds(10));
+  stream_info.end_time_ = std::chrono::nanoseconds(5'000'000);
+  stream_info.downstream_timing_.first_downstream_tx_byte_sent_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(2);
+  stream_info.downstream_timing_.last_downstream_tx_byte_sent_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(3);
+
+  auto* upstream_info =
+      dynamic_cast<NiceMock<StreamInfo::MockUpstreamInfo>*>(stream_info.upstream_info_.get());
+  ASSERT_NE(upstream_info, nullptr);
+  upstream_info->upstream_timing_.first_upstream_tx_byte_sent_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(4);
+  upstream_info->upstream_timing_.last_upstream_tx_byte_sent_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(5);
+  upstream_info->upstream_timing_.first_upstream_rx_byte_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(6);
+  upstream_info->upstream_timing_.last_upstream_rx_byte_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(7);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  envoy_dynamic_module_type_timing_info timing;
+  envoy_dynamic_module_callback_http_get_timing_info(filter_.get(), &timing);
+
+  EXPECT_EQ(10'000'000'000, timing.start_time_unix_ns);
+  EXPECT_EQ(5'000'000, timing.request_complete_duration_ns);
+  EXPECT_EQ(4'000'000, timing.first_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(5'000'000, timing.last_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(6'000'000, timing.first_upstream_rx_byte_received_ns);
+  EXPECT_EQ(7'000'000, timing.last_upstream_rx_byte_received_ns);
+  EXPECT_EQ(2'000'000, timing.first_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(3'000'000, timing.last_downstream_tx_byte_sent_ns);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoWithMissingMarkers) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  envoy_dynamic_module_type_timing_info timing;
+  envoy_dynamic_module_callback_http_get_timing_info(filter_.get(), &timing);
+
+  EXPECT_EQ(-1, timing.request_complete_duration_ns);
+  EXPECT_EQ(-1, timing.first_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.last_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.first_upstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_upstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.first_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.last_downstream_tx_byte_sent_ns);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoNoCallbacks) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter(nullptr, symbol_table, 0);
+
+  envoy_dynamic_module_type_timing_info timing;
+  envoy_dynamic_module_callback_http_get_timing_info(&filter, &timing);
+
+  EXPECT_EQ(-1, timing.start_time_unix_ns);
+  EXPECT_EQ(-1, timing.request_complete_duration_ns);
+  EXPECT_EQ(-1, timing.first_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.last_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.first_upstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_upstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.first_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.last_downstream_tx_byte_sent_ns);
+}
+
 TEST(ABIImpl, HttpCallout) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};

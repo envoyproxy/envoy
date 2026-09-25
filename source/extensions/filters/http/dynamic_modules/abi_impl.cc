@@ -2104,6 +2104,13 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
   return ok;
 }
 
+void envoy_dynamic_module_callback_http_get_timing_info(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_timing_info* timing_out) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  ContextAccessor::getTimingInfo(filter->streamInfo(), timing_out);
+}
+
 void envoy_dynamic_module_callback_http_add_custom_flag(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer flag) {

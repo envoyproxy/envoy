@@ -891,6 +891,17 @@ TEST_P(DynamicModulesIntegrationTest, ReentrantStreamCompleteRunsUnderCatchUnwin
                                testing::Eq(1));
 }
 
+TEST_P(DynamicModulesIntegrationTest, StreamTimingIsAvailableOnStreamComplete) {
+  initializeFilter("stream_timing");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 10, default_response_headers_, 10);
+
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounter("dynamicmodulescustom.stream_timing_observed_total", testing::Eq(1));
+}
+
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
   initializeFilter("http_callouts", "missing");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

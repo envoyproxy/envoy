@@ -33,6 +33,9 @@ public:
   // The whole index, external-buffer references included; only serialization needs it.
   const JsonWithExtBuf& request_index() const { return request_index_; }
 
+  // Hands the index to the sink once the filters are done with the request.
+  JsonWithExtBuf takeRequestIndex() { return std::move(request_index_); }
+
   // TODO(penguingao): Implement field streaming (AiRequest::stream, FieldStreamingSpec,
   // and FieldStreamingSession).
 
