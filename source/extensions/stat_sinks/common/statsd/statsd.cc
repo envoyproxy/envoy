@@ -64,12 +64,11 @@ std::optional<double> scaledTimerMilliseconds(const Stats::Histogram& histogram,
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
                              const std::string& prefix, std::optional<uint64_t> buffer_size,
-                             const Statsd::TagFormat& tag_format)
+                             const Statsd::TagFormat& tag_format, const bool scale_histogram_units)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
       prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix),
       buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format),
-      scale_histogram_units_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.statsd_scale_histogram_units")) {
+      scale_histogram_units_(scale_histogram_units) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<WriterImpl>(*this);
   });
@@ -214,11 +213,11 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-                             absl::Status& creation_status, const std::string& prefix)
+                             absl::Status& creation_status, const std::string& prefix,
+                             const bool scale_histogram_units)
     : prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix),
-      scale_histogram_units_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.statsd_scale_histogram_units")),
-      tls_(tls.allocateSlot()), cluster_manager_(cluster_manager),
+      scale_histogram_units_(scale_histogram_units), tls_(tls.allocateSlot()),
+      cluster_manager_(cluster_manager),
       cx_overflow_stat_(scope.counterFromStatName(
           Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName())) {
   SET_AND_RETURN_IF_NOT_OK(Config::Utility::checkLocalInfo("tcp statsd", local_info),
@@ -236,10 +235,12 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
 absl::StatusOr<std::unique_ptr<TcpStatsdSink>>
 TcpStatsdSink::create(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
                       ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-                      Stats::Scope& scope, const std::string& prefix) {
+                      Stats::Scope& scope, const std::string& prefix,
+                      const bool scale_histogram_units) {
   absl::Status creation_status;
-  auto sink = std::unique_ptr<TcpStatsdSink>(new TcpStatsdSink(
-      local_info, cluster_name, tls, cluster_manager, scope, creation_status, prefix));
+  auto sink = std::unique_ptr<TcpStatsdSink>(
+      new TcpStatsdSink(local_info, cluster_name, tls, cluster_manager, scope, creation_status,
+                        prefix, scale_histogram_units));
   RETURN_IF_NOT_OK_REF(creation_status);
   return sink;
 }

@@ -15,7 +15,6 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -38,10 +37,15 @@ public:
   TcpStatsdSinkTest() {
     cluster_manager_.initializeClusters({"fake_cluster"}, {});
     cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    createSink(/*scale_histogram_units=*/false);
+  }
+
+  void createSink(bool scale_histogram_units) {
     sink_ =
         TcpStatsdSink::create(
             local_info_, "fake_cluster", tls_, cluster_manager_,
-            *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()))
+            *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()),
+            getDefaultPrefix(), scale_histogram_units)
             .value();
   }
 
@@ -124,6 +128,7 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 }
 
 TEST_F(TcpStatsdSinkTest, SiSuffix) {
+  createSink(/*scale_histogram_units=*/true);
   InSequence s;
   expectCreateConnection();
 
@@ -170,15 +175,8 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
   tls_.shutdownThread();
 }
 
-// With the runtime guard disabled every sample is reported unscaled, as before unit scaling.
-TEST_F(TcpStatsdSinkTest, HistogramUnitScalingDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.statsd_scale_histogram_units", "false"}});
-  // The guard is latched at construction, so recreate the sink under the override.
-  sink_ = TcpStatsdSink::create(
-              local_info_, "fake_cluster", tls_, cluster_manager_,
-              *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()))
-              .value();
+// Unit scaling is off by default: every sample is reported unscaled with an ms suffix.
+TEST_F(TcpStatsdSinkTest, HistogramUnitScalingOffByDefault) {
   InSequence s;
   expectCreateConnection();
 

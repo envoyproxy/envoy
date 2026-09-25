@@ -14,7 +14,6 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -382,7 +381,8 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_, writer_ptr, false);
+  UdpStatsdSink sink(tls_, writer_ptr, false, getDefaultPrefix(), std::nullopt,
+                     getDefaultTagFormat(), /*scale_histogram_units=*/true);
 
   NiceMock<Stats::MockHistogram> items;
   items.name_ = "items";
@@ -434,10 +434,8 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   tls_.shutdownThread();
 }
 
-// With the runtime guard disabled every sample is reported unscaled, as before unit scaling.
-TEST(UdpStatsdSinkTest, HistogramUnitScalingDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.statsd_scale_histogram_units", "false"}});
+// Unit scaling is off by default: every sample is reported unscaled with an ms suffix.
+TEST(UdpStatsdSinkTest, HistogramUnitScalingOffByDefault) {
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;
   UdpStatsdSink sink(tls_, writer_ptr, false);
@@ -517,7 +515,8 @@ TEST(UdpStatsdSinkWithTagsTest, SiSuffix) {
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_, writer_ptr, true);
+  UdpStatsdSink sink(tls_, writer_ptr, true, getDefaultPrefix(), std::nullopt,
+                     getDefaultTagFormat(), /*scale_histogram_units=*/true);
 
   std::vector<Stats::Tag> tags = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
 

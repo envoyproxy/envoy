@@ -17,7 +17,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/macros.h"
 #include "source/common/network/io_socket_handle_impl.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/stat_sinks/common/statsd/tag_formats.h"
 
 namespace Envoy {
@@ -60,17 +59,18 @@ public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
                 std::optional<uint64_t> buffer_size = std::nullopt,
-                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat());
+                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat(),
+                const bool scale_histogram_units = false);
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
                 std::optional<uint64_t> buffer_size = std::nullopt,
-                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat())
+                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat(),
+                const bool scale_histogram_units = false)
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
         buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format),
-        scale_histogram_units_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.statsd_scale_histogram_units")) {
+        scale_histogram_units_(scale_histogram_units) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -81,6 +81,7 @@ public:
 
   bool getUseTagForTest() { return use_tag_; }
   uint64_t getBufferSizeForTest() { return buffer_size_; }
+  bool getScaleHistogramUnitsForTest() { return scale_histogram_units_; }
   const std::string& getPrefix() { return prefix_; }
 
 private:
@@ -116,8 +117,8 @@ private:
   const std::string prefix_;
   const uint64_t buffer_size_;
   const Statsd::TagFormat tag_format_;
-  // Latched at construction: whether histogram samples are scaled to milliseconds according to
-  // the histogram's unit before being reported as timers.
+  // Whether histogram samples are scaled to milliseconds according to the histogram's unit before
+  // being reported as timers.
   const bool scale_histogram_units_;
 };
 
@@ -132,19 +133,22 @@ public:
   static absl::StatusOr<std::unique_ptr<TcpStatsdSink>>
   create(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
          ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-         Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
+         Stats::Scope& scope, const std::string& prefix = getDefaultPrefix(),
+         const bool scale_histogram_units = false);
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
   const std::string& getPrefix() { return prefix_; }
+  bool getScaleHistogramUnitsForTest() { return scale_histogram_units_; }
 
 protected:
   TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
                 ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
                 Stats::Scope& scope, absl::Status& creation_status,
-                const std::string& prefix = getDefaultPrefix());
+                const std::string& prefix = getDefaultPrefix(),
+                const bool scale_histogram_units = false);
 
 private:
   // 16KiB intermediate buffer for flushing.
