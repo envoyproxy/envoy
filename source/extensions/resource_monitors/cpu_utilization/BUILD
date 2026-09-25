@@ -20,6 +20,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cgroup_path_resolver",
+    srcs = ["cgroup_path_resolver.cc"],
+    hdrs = ["cgroup_path_resolver.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/filesystem:filesystem_interface",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "cpu_utilization_monitor",
     srcs = ["cpu_utilization_monitor.cc"],
     hdrs = [
@@ -45,12 +56,14 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        ":cgroup_path_resolver",
         ":cpu_paths",
         "//envoy/common:exception_lib",
         "//envoy/filesystem:filesystem_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg_cc_proto",
     ],

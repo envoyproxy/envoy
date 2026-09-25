@@ -36,6 +36,8 @@ envoy_extension_cc_test(
         "//test/mocks/server:options_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -55,6 +57,20 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:options_mocks",
         "@envoy_api//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "cgroup_path_resolver_test",
+    srcs = ["cgroup_path_resolver_test.cc"],
+    extension_names = ["envoy.resource_monitors.cpu_utilization"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/resource_monitors/cpu_utilization:cgroup_path_resolver",
+        "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

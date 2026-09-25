@@ -1146,6 +1146,7 @@ mmdb
 mmsg
 mmsghdr
 mongo
+mountinfo
 moveable
 mru
 msec

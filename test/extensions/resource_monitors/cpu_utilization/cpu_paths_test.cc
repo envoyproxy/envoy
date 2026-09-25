@@ -49,6 +49,19 @@ TEST(CpuPathsV2Test, GetEffectiveCpusPathReturnsCorrectPath) {
   EXPECT_EQ(CpuPaths::V2::getEffectiveCpusPath(), "/sys/fs/cgroup/cpuset.cpus.effective");
 }
 
+TEST(CpuPathsV2Test, GetBasePathReturnsMountPoint) {
+  EXPECT_EQ(CpuPaths::V2::getBasePath(), "/sys/fs/cgroup");
+}
+
+// Paths are relative to a caller-supplied cgroup directory so a resolved container cgroup can be
+// read instead of the mount point.
+TEST(CpuPathsV2Test, PathsAreRelativeToSuppliedBase) {
+  const std::string base = "/sys/fs/cgroup/kubepods.slice/pod.slice/container.scope";
+  EXPECT_EQ(CpuPaths::V2::getStatPath(base), base + "/cpu.stat");
+  EXPECT_EQ(CpuPaths::V2::getMaxPath(base), base + "/cpu.max");
+  EXPECT_EQ(CpuPaths::V2::getEffectiveCpusPath(base), base + "/cpuset.cpus.effective");
+}
+
 // =============================================================================
 // CpuPaths::isV1() Detection Tests
 // =============================================================================
@@ -90,13 +103,22 @@ TEST(CpuPathsDetectionTest, IsV1ReturnsFalseWhenUsageFileMissing) {
 // CpuPaths::isV2() Detection Tests
 // =============================================================================
 
-TEST(CpuPathsDetectionTest, IsV2ReturnsTrueWhenAllFilesExist) {
+TEST(CpuPathsDetectionTest, IsV2ReturnsTrueWhenStatFileExists) {
   Filesystem::MockInstance mock_fs;
 
-  // Mock all three required V2 files as existing
+  // Keyed only on cpu.stat; the optional v2 files must not be probed.
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillOnce(Return(true));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective")).WillOnce(Return(true));
+
+  EXPECT_TRUE(CpuPaths::isV2(mock_fs));
+}
+
+TEST(CpuPathsDetectionTest, IsV2ReturnsTrueWhenOnlyStatFileExists) {
+  Filesystem::MockInstance mock_fs;
+
+  // A normal v2 pod may expose only cpu.stat; detection must still succeed.
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).Times(0);
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective")).Times(0);
 
   EXPECT_TRUE(CpuPaths::isV2(mock_fs));
 }
@@ -104,31 +126,17 @@ TEST(CpuPathsDetectionTest, IsV2ReturnsTrueWhenAllFilesExist) {
 TEST(CpuPathsDetectionTest, IsV2ReturnsFalseWhenStatFileMissing) {
   Filesystem::MockInstance mock_fs;
 
-  // Mock stat file missing
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
-  // Short-circuit evaluation - other file checks may not be called
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max"))
-      .Times(testing::AtMost(1))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective"))
-      .Times(testing::AtMost(1))
-      .WillRepeatedly(Return(true));
 
   EXPECT_FALSE(CpuPaths::isV2(mock_fs));
 }
 
-TEST(CpuPathsDetectionTest, IsV2ReturnsFalseWhenMaxFileMissing) {
+TEST(CpuPathsDetectionTest, IsV2ProbesSuppliedBase) {
   Filesystem::MockInstance mock_fs;
 
-  // Mock max file missing
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillOnce(Return(false));
-  // Short-circuit evaluation - effective_cpus check may not be called
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective"))
-      .Times(testing::AtMost(1))
-      .WillRepeatedly(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/pod.slice/cpu.stat")).WillOnce(Return(true));
 
-  EXPECT_FALSE(CpuPaths::isV2(mock_fs));
+  EXPECT_TRUE(CpuPaths::isV2(mock_fs, "/sys/fs/cgroup/pod.slice"));
 }
 
 } // namespace

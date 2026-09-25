@@ -5,6 +5,7 @@
 #include "envoy/filesystem/filesystem.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,15 +40,23 @@ struct CpuPaths {
   };
 
   struct V2 {
+    // Returns the cgroup v2 mount point, used when the container's own cgroup directory cannot be
+    // resolved. It is only the container's own cgroup under a private cgroup namespace.
+    static absl::string_view getBasePath() { return CGROUP_V2_BASE; }
+
     // Returns the full path to the CPU stat file (cpu.stat).
-    static std::string getStatPath() { return absl::StrCat(CGROUP_V2_BASE, STAT); }
+    static std::string getStatPath(absl::string_view base = CGROUP_V2_BASE) {
+      return absl::StrCat(base, STAT);
+    }
 
     // Returns the full path to the CPU max file (cpu.max).
-    static std::string getMaxPath() { return absl::StrCat(CGROUP_V2_BASE, MAX); }
+    static std::string getMaxPath(absl::string_view base = CGROUP_V2_BASE) {
+      return absl::StrCat(base, MAX);
+    }
 
     // Returns the full path to the effective CPUs file (cpuset.cpus.effective).
-    static std::string getEffectiveCpusPath() {
-      return absl::StrCat(CGROUP_V2_BASE, EFFECTIVE_CPUS);
+    static std::string getEffectiveCpusPath(absl::string_view base = CGROUP_V2_BASE) {
+      return absl::StrCat(base, EFFECTIVE_CPUS);
     }
 
   private:
@@ -57,10 +66,10 @@ struct CpuPaths {
     static constexpr const char* const EFFECTIVE_CPUS = "/cpuset.cpus.effective";
   };
 
-  // Returns whether cgroup v2 CPU subsystem is available.
-  static bool isV2(Filesystem::Instance& fs) {
-    return fs.fileExists(V2::getStatPath()) && fs.fileExists(V2::getMaxPath()) &&
-           fs.fileExists(V2::getEffectiveCpusPath());
+  // Keyed only on cpu.stat: cpu.max and cpuset.cpus.effective are optional (often
+  // absent on Kubernetes v2 pods) and handled with fallbacks by the reader.
+  static bool isV2(Filesystem::Instance& fs, absl::string_view base = V2::getBasePath()) {
+    return fs.fileExists(V2::getStatPath(base));
   }
 
   // Returns whether cgroup v1 CPU subsystem is available.
