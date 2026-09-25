@@ -522,7 +522,7 @@ public:
   static StreamEventMatch isDone();
   static StreamEventMatch notJson();
 
-  // Takes a mutable `event` because reading a raw payload linearizes its buffer.
+  // Takes a mutable `event` because reading a raw payload may linearize its buffer.
   bool matches(SseEvent& event) const;
 
   // Introspection accessors (used by the startup verifier):

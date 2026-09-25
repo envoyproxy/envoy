@@ -48,7 +48,7 @@ using HttpFilters::AiProtocolManager::TranscodingEngine;
 using TranscoderProto = envoy::extensions::http::ai_filters::transcoder::v3::Transcoder;
 
 // Response-side golden cases: every unary and SSE leg for every dialect, with the expected output
-// the transcoder produces. The corpus lives in testdata/response_goldens.json.
+// the transcoder produces. The corpus lives in `testdata/response_goldens.json`.
 //
 // Each case runs one transcoder instance whose `response_handling` is the case's `handling`. The
 // case's `dialect` is the non-IR side of that hop: the backend for `TO_IR`, the client for
@@ -135,8 +135,8 @@ public:
     proto.set_response_handling(to_ir ? TranscoderProto::TO_IR : TranscoderProto::FROM_IR);
     absl::StatusOr<TranscodingEngine> engine = TranscodingEngine::createDefault();
     EXPECT_TRUE(engine.ok()) << engine.status();
-    auto config =
-        std::make_shared<const TranscoderFilterConfig>(proto, std::move(*engine), *stats_.rootScope());
+    auto config = std::make_shared<const TranscoderFilterConfig>(proto, std::move(*engine),
+                                                                 *stats_.rootScope());
 
     StreamInfo::StreamInfoImpl stream_info(api_->timeSource(), nullptr,
                                            StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -199,8 +199,8 @@ TEST_F(TranscoderGoldenTest, ResponsesMatchGoldens) {
     if (print) {
       std::cout << "GOLDEN_ACTUAL\t" << name << "\t" << actual.dump() << std::endl;
     }
-    EXPECT_EQ(actual, golden["expected"]) << "actual:   " << actual.dump()
-                                          << "\nexpected: " << golden["expected"].dump();
+    EXPECT_EQ(actual, golden["expected"])
+        << "actual:   " << actual.dump() << "\nexpected: " << golden["expected"].dump();
   }
 }
 

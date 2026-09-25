@@ -2840,10 +2840,14 @@ TEST(TranscodingEngineTest, RegisterPackRefusesStreamStateOutsideStreamLegs) {
 // A stream grammar is refused if a case would transcode events that cannot be transcoded, if an
 // event it writes would break the SSE framing, or if it reads a slot it never writes.
 TEST(TranscodingEngineTest, RegisterPackRefusesStreamGrammarsThatCannotRun) {
-  const auto registered = [](StreamGrammar grammar) {
+  const auto registered = [](StreamGrammar grammar,
+                             TranscodeDirection direction = TranscodeDirection::FromIr) {
+    DialectTranscodePack pack{.protocol = LLMProtocol::OpenAiResponses};
+    StreamGrammar& leg =
+        direction == TranscodeDirection::ToIr ? pack.stream.to_ir : pack.stream.from_ir;
+    leg = std::move(grammar);
     TranscodingEngine engine;
-    return engine.registerPack(DialectTranscodePack{.protocol = LLMProtocol::OpenAiResponses,
-                                                    .stream = {.from_ir = std::move(grammar)}});
+    return engine.registerPack(std::move(pack));
   };
 
   // Only a JSON payload can be transcoded. Other events can still be passed through, dropped, or
@@ -2851,6 +2855,10 @@ TEST(TranscodingEngineTest, RegisterPackRefusesStreamGrammarsThatCannotRun) {
   EXPECT_THAT(registered({.cases = {{.match = StreamEventMatch::isDone()}}}),
               refusedBecause("OPENAI_RESPONSES stream from_ir grammar case 0 transcodes events "
                              "without a JSON payload"));
+  EXPECT_THAT(
+      registered({.cases = {{.match = StreamEventMatch::notJson()}}}, TranscodeDirection::ToIr),
+      refusedBecause("OPENAI_RESPONSES stream to_ir grammar case 0 transcodes events without a "
+                     "JSON payload"));
   EXPECT_THAT(registered({.cases = {{.match = StreamEventMatch::isDone(),
                                      .disposition = StreamDisposition::Terminate},
                                     {.match = StreamEventMatch::notJson()}}}),
