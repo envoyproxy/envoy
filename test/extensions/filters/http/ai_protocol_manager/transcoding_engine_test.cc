@@ -3078,6 +3078,76 @@ TEST(TranscodingEngineTest, VerifierFollowsOffloadableFieldsThroughResponseRuleO
   EXPECT_THAT(verify({TranscodeRule::captureToState("model", "slot")}), IsOk());
 }
 
+// The verifier follows offloadable fields through the ops that map tool calls.
+TEST(TranscodingEngineTest, VerifierFollowsOffloadableFieldsThroughToolCallRuleOps) {
+  // In the IR, `messages[].content` and `messages[].tool_calls[].function.arguments` are
+  // offloadable.
+  const PayloadSchema* ir_schema = AdapterRegistry::get(TranscodingEngine::kIrProtocol).schema();
+  ASSERT_NE(ir_schema, nullptr);
+  const auto verify = [ir_schema](std::vector<TranscodeRule> rules) {
+    return TranscodingEngine::validateRulesAgainstSchema(
+        TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::GeminiGenerateContent,
+                         std::move(rules)),
+        ir_schema);
+  };
+  constexpr absl::StatusCode kRejected = absl::StatusCode::kInvalidArgument;
+  const TranscodeRule map_arguments = TranscodeRule::valueMap("function.arguments", {{"a", "b"}});
+  const auto for_each_call = [](std::vector<TranscodeRule> rules) {
+    return TranscodeRule::forEach("messages",
+                                  {TranscodeRule::forEach("tool_calls", std::move(rules))});
+  };
+  EXPECT_EQ(verify({for_each_call({map_arguments})}).code(), kRejected);
+
+  // `parseJson` and `serializeJson` either fail on a reference or leave inline text behind.
+  EXPECT_THAT(
+      verify({for_each_call({TranscodeRule::parseJson("function.arguments"), map_arguments})}),
+      IsOk());
+  EXPECT_THAT(
+      verify({for_each_call({TranscodeRule::serializeJson("function.arguments"), map_arguments})}),
+      IsOk());
+
+  // `moveElements` relocates the elements that match and leaves the rest where they were...
+  const TranscodeRule move_calls =
+      TranscodeRule::forEach("messages", {TranscodeRule::moveElements("tool_calls", "parts")});
+  EXPECT_EQ(verify({move_calls, TranscodeRule::forEach(
+                                    "messages", {TranscodeRule::forEach("parts", {map_arguments})})})
+                .code(),
+            kRejected);
+  EXPECT_EQ(verify({move_calls, for_each_call({map_arguments})}).code(), kRejected);
+  // ...and its predicate may not read an offloadable value.
+  const auto move_calls_where = [](TranscodePredicate where) {
+    return TranscodeRule::forEach(
+        "messages", {TranscodeRule::moveElements("tool_calls", "parts", std::move(where))});
+  };
+  EXPECT_EQ(
+      verify({move_calls_where(TranscodePredicate::fieldEquals("function.arguments", "{}"))})
+          .code(),
+      kRejected);
+  EXPECT_THAT(verify({move_calls_where(TranscodePredicate::fieldEquals("type", "function"))}),
+              IsOk());
+
+  // `lookupEarlier` compares keys as strings, so it refuses an offloadable key...
+  const absl::Status offloadable_key = verify({TranscodeRule::lookupEarlier(
+      "messages", "content", "tool_calls", "id", "function.name", "name")});
+  EXPECT_EQ(offloadable_key.code(), kRejected);
+  EXPECT_THAT(offloadable_key.message(),
+              testing::HasSubstr(
+                  "lookup_earlier rule cannot compare offloadable field 'messages[].content'"));
+  EXPECT_EQ(verify({TranscodeRule::lookupEarlier("messages", "tool_call_id", "content", "text",
+                                                 "type", "name")})
+                .code(),
+            kRejected);
+  // ...and what it copies may be a reference where it lands.
+  const TranscodeRule copy_arguments = TranscodeRule::lookupEarlier(
+      "messages", "tool_call_id", "tool_calls", "id", "function.arguments", "arguments");
+  EXPECT_THAT(verify({copy_arguments}), IsOk());
+  EXPECT_EQ(verify({copy_arguments,
+                    TranscodeRule::forEach("messages", {TranscodeRule::valueMap(
+                                                           "arguments", {{"a", "b"}})})})
+                .code(),
+            kRejected);
+}
+
 // Matches a registration the verifier refused, and why.
 auto refusedBecause(absl::string_view why) {
   return StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
@@ -3098,6 +3168,8 @@ TEST(TranscodingEngineTest, RegisterPackRefusesStreamStateOutsideStreamLegs) {
   const TranscodeRuleSet restore = nested(TranscodeRule::setFromState("id", "id"));
   const TranscodeRuleSet accumulate =
       nested(TranscodeRule::accumulateUsage(LLMProtocol::OpenAiChatCompletions));
+  const TranscodeRuleSet enumerate_across =
+      nested(TranscodeRule::enumerateAcrossStream("calls", "index", "call_index"));
   const auto registered = [](DialectTranscodePack pack) {
     TranscodingEngine engine;
     return engine.registerPack(std::move(pack));
@@ -3114,12 +3186,21 @@ TEST(TranscodingEngineTest, RegisterPackRefusesStreamStateOutsideStreamLegs) {
   EXPECT_THAT(
       registered({.protocol = LLMProtocol::OpenAiResponses, .response = {.from_ir = capture}}),
       refusedBecause("OPENAI_RESPONSES response from_ir rules cannot use capture_to_state"));
+  EXPECT_THAT(
+      registered(
+          {.protocol = LLMProtocol::OpenAiResponses, .response = {.to_ir = enumerate_across}}),
+      refusedBecause("OPENAI_RESPONSES response to_ir rules cannot use enumerate_across_stream"));
+  // Numbering within one payload needs no state.
+  EXPECT_THAT(registered({.protocol = LLMProtocol::OpenAiResponses,
+                          .response = {.to_ir = nested(TranscodeRule::enumerate("calls", "index"))}}),
+              IsOk());
 
   // Stream legs are what these rules are for.
   EXPECT_THAT(registered({.protocol = LLMProtocol::OpenAiResponses,
                           .stream = {.to_ir = {.cases = {{.rules = capture},
                                                          {.rules = restore},
-                                                         {.rules = accumulate}}}}}),
+                                                         {.rules = accumulate},
+                                                         {.rules = enumerate_across}}}}}),
               IsOk());
 }
 
