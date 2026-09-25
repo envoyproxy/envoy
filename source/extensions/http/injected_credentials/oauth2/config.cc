@@ -57,7 +57,8 @@ OAuth2CredentialInjectorFactory::createOauth2ClientCredentialInjector(
       throw EnvoyException("Invalid oauth2 client secret configuration");
     }
     secret_reader = std::make_shared<const Common::SDSSecretReader>(
-        std::move(client_secret_provider), context.threadLocal(), context.api());
+        std::move(client_secret_provider), context.threadLocal(), context.api(),
+        context.mainThreadDispatcher());
   }
 
   auto token_reader = std::make_shared<const TokenProvider>(
