@@ -10,6 +10,7 @@
 #include "source/common/coroutine/status_macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -30,6 +31,7 @@ using HttpFilters::AiProtocolManager::AiResponseStreamReceiver;
 using HttpFilters::AiProtocolManager::FieldPathSegment;
 using HttpFilters::AiProtocolManager::FlatteningJsonDecoder;
 using HttpFilters::AiProtocolManager::FlattenJsonField;
+using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::SseEvent;
@@ -81,6 +83,33 @@ bool isGeminiModelId(absl::string_view model) {
   return !model.empty() && std::all_of(model.begin(), model.end(), [](char c) {
     return absl::ascii_isalnum(c) || c == '-' || c == '.' || c == '_';
   });
+}
+
+// Joins a Gemini candidate's text parts. A lone part is moved rather than copied: text past the
+// inline string threshold is a reference into the SSE frame's payload, not a string.
+absl::StatusOr<nlohmann::json> takeGeminiText(nlohmann::json& parts) {
+  std::vector<nlohmann::json*> texts;
+  for (nlohmann::json& part : parts) {
+    if (!part.is_object()) {
+      continue;
+    }
+    if (const auto text = part.find("text");
+        text != part.end() && (text->is_string() || JsonWithExtBuf::isExternalRef(*text))) {
+      texts.push_back(&*text);
+    }
+  }
+  if (texts.size() == 1) {
+    return std::move(*texts.front());
+  }
+  std::string joined;
+  for (const nlohmann::json* text : texts) {
+    if (!text->is_string()) {
+      return absl::UnimplementedError(
+          "transcoder: cannot join Gemini text parts held by reference");
+    }
+    joined.append(text->get_ref<const std::string&>());
+  }
+  return nlohmann::json(std::move(joined));
 }
 
 // Reconstructs a JSON document from a sequence of flattened leaf fields.
@@ -635,20 +664,19 @@ absl::Status TranscoderFilter::transcodeSseEventToIr(SseEvent& event, bool& shou
     chunk["model"] = doc.value("modelVersion", sse_stream_model_);
     nlohmann::json choices = nlohmann::json::array();
     for (size_t i = 0; i < doc["candidates"].size(); ++i) {
-      const auto& cand = doc["candidates"][i];
+      auto& cand = doc["candidates"][i];
       nlohmann::json choice = nlohmann::json::object();
       choice["index"] = cand.value("index", static_cast<int>(i));
       nlohmann::json delta = nlohmann::json::object();
       if (cand.contains("content") && cand["content"].is_object() &&
           cand["content"].contains("parts") && cand["content"]["parts"].is_array()) {
-        std::string text;
-        for (const auto& part : cand["content"]["parts"]) {
-          if (part.is_object() && part.contains("text") && part["text"].is_string()) {
-            text.append(part["text"].get<std::string>());
-          }
+        absl::StatusOr<nlohmann::json> text = takeGeminiText(cand["content"]["parts"]);
+        if (!text.ok()) {
+          config_->stats().failed_.inc();
+          return text.status();
         }
         delta["role"] = "assistant";
-        delta["content"] = std::move(text);
+        delta["content"] = std::move(*text);
       }
       choice["delta"] = std::move(delta);
       if (cand.contains("finishReason") && cand["finishReason"].is_string()) {

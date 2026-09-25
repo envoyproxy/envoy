@@ -21,6 +21,7 @@ envoy_cc_library(
         "//source/common/coroutine:task_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/filters/http/ai_protocol_manager:transcoding_engine_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",

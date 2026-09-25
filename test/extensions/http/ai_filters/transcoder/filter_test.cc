@@ -19,6 +19,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 
@@ -482,6 +483,49 @@ TEST_F(TranscoderFilterTest, EncodeSseTranscodesAnthropicSseToIrAndFromIrToGemin
   EXPECT_THAT(resp_bridge.injected_.toString(), testing::HasSubstr("chunk"));
   EXPECT_THAT(resp_bridge.injected_.toString(), testing::Not(testing::HasSubstr("[DONE]")));
   EXPECT_EQ(counterValue("failed"), 0);
+  resp_out_buffer.onDestroy();
+}
+
+// A Gemini SSE chunk whose text is past the inline string threshold reaches the filter as an
+// external reference rather than a string; it must still come out as the chunk's delta.
+TEST_F(TranscoderFilterTest, EncodeSseKeepsGeminiTextHeldByReference) {
+  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+
+  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::OpenAiChatCompletions};
+  auto backend_boundary_filter = std::make_shared<TranscoderFilter>(
+      makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context);
+
+  FilterManager manager({backend_boundary_filter});
+  FakeBridge resp_bridge(*dispatcher_);
+  BufferManager resp_out_buffer(BufferManager::Config{}, factory_, resp_bridge);
+  absl::Status resp_status;
+  bool resp_done = false;
+  manager.startSseResponse(factory_, resp_bridge, resp_out_buffer, [&](absl::Status s) {
+    resp_status = std::move(s);
+    resp_done = true;
+  });
+
+  const std::string text = std::string(3000, 'a') + "\\n" + std::string(10, 'b');
+  Buffer::OwnedImpl sse_data(absl::StrCat(
+      R"(data: {"candidates":[{"content":{"role":"model","parts":[{"text":")", text,
+      R"("}]},"finishReason":"STOP"}],"modelVersion":"gemini-2.5-flash"})", "\r\n\r\n"));
+  manager.onResponseData(sse_data, /*end_stream=*/true);
+  for (int i = 0; i < 20; ++i) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  ASSERT_TRUE(resp_done);
+  ASSERT_TRUE(resp_status.ok()) << resp_status;
+  const std::string out = resp_bridge.injected_.toString();
+  const std::string first_payload = out.substr(6, out.find('\n') - 6);
+  nlohmann::json chunk = nlohmann::json::parse(first_payload);
+  EXPECT_EQ(chunk["object"], "chat.completion.chunk");
+  EXPECT_EQ(chunk["choices"][0]["delta"]["content"],
+            std::string(3000, 'a') + "\n" + std::string(10, 'b'));
+  EXPECT_EQ(chunk["choices"][0]["finish_reason"], "stop");
+  EXPECT_THAT(out, testing::HasSubstr("data: [DONE]"));
   resp_out_buffer.onDestroy();
 }
 
