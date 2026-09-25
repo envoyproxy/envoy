@@ -18,6 +18,7 @@
 #include "envoy/upstream/locality.h"
 
 #include "source/common/config/resource_type_helper.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/eds/leds.h"
@@ -69,7 +70,7 @@ private:
   }
 
   // Updates the internal data structures with a given cluster load assignment.
-  void update(envoy::config::endpoint::v3::ClusterLoadAssignment&& cluster_load_assignment);
+  void update(const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
 
   // EdsResourceRemovalCallback
   void onCachedResourceRemoved(absl::string_view resource_name) override;
@@ -120,7 +121,7 @@ private:
   // TODO(adisuissa): Avoid saving the entire cluster load assignment, only the
   // relevant parts of the config for each locality. Note that this field must
   // be set when LEDS is used.
-  std::unique_ptr<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
+  ArenaWrappedProto<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
 
   // An optional cache for the EDS resources.
   // Upon a (warming) timeout, a cached resource will be used.
