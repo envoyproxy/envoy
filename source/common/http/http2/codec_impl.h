@@ -261,6 +261,10 @@ protected:
       uint8_t flags;
     };
     FrameHeaderInfo current_frame_ = {};
+    // Latched to avoid runtime lookup on the per-frame hot path.
+    // TODO: remove when removing
+    // `envoy.reloadable_features.http2_mask_continuation_flags`.
+    const bool mask_continuation_flags_;
     size_t padding_length_ = 0;
     size_t remaining_data_payload_ = 0;
     // TODO: remove when removing `envoy.reloadable_features.http2_use_oghttp2`.
