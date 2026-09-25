@@ -1253,6 +1253,18 @@ TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
   }
 }
 
+TEST_P(DynamicModulesIntegrationTest, UpstreamConnectionAttemptsAreAvailableOnStreamComplete) {
+  initializeFilter("upstream_connection_attempts");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 10, default_response_headers_, 10);
+
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounter("dynamicmodulescustom.upstream_connection_attempts_observed_total",
+                               testing::Eq(1));
+}
+
 TEST_P(DynamicModulesIntegrationTest, CustomMetricsNamespace) {
   // Skip for non-Rust languages to avoid duplication.
   if (GetParam() != "rust") {

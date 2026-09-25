@@ -4005,6 +4005,94 @@ TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionIdNoUpstreamInfo) {
   EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_id(filter_.get()));
 }
 
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionAttemptsNoUpstreamInfo) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_upstream_remote_address(filter_.get(), &address));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(filter_.get()));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(filter_.get(), nullptr));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+                   filter_.get()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+      filter_.get(), nullptr));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionAttemptsEmpty) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  upstream_info->setUpstreamRemoteAddress(nullptr);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_upstream_remote_address(filter_.get(), &address));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(filter_.get()));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(filter_.get(), nullptr));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+                   filter_.get()));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+      filter_.get(), nullptr));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamRemoteAddressUsesConnectedSocket) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  auto selected_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  selected_host->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 443);
+  upstream_info->setUpstreamHost(selected_host);
+  upstream_info->setUpstreamRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2", 8443));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_upstream_remote_address(filter_.get(), &address));
+  EXPECT_EQ("10.0.0.2:8443", std::string(address.ptr, address.length));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionAttemptHistories) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  auto first_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto missing_address_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto second_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  first_host->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 443);
+  missing_address_host->address_ = nullptr;
+  second_host->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2", 8443);
+  ON_CALL(*first_host, address()).WillByDefault(testing::Return(first_host->address_));
+  ON_CALL(*missing_address_host, address()).WillByDefault(testing::Return(nullptr));
+  ON_CALL(*second_host, address()).WillByDefault(testing::Return(second_host->address_));
+  upstream_info->upstream_hosts_attempted_ = {first_host, nullptr, missing_address_host,
+                                              second_host};
+  upstream_info->upstream_connection_ids_attempted_ = {10, 20, 30};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  EXPECT_EQ(2, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(filter_.get()));
+  envoy_dynamic_module_type_envoy_buffer hosts[2];
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(filter_.get(), hosts));
+  EXPECT_EQ("10.0.0.1:443", std::string(hosts[0].ptr, hosts[0].length));
+  EXPECT_EQ("10.0.0.2:8443", std::string(hosts[1].ptr, hosts[1].length));
+
+  EXPECT_EQ(3, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+                   filter_.get()));
+  uint64_t connection_ids[3];
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+      filter_.get(), connection_ids));
+  EXPECT_EQ(10, connection_ids[0]);
+  EXPECT_EQ(20, connection_ids[1]);
+  EXPECT_EQ(30, connection_ids[2]);
+}
+
 // Test GetClusterHostCount with a properly configured filter and mocked cluster manager.
 // This fixture creates a filter with a real config that has a mocked cluster manager.
 class DynamicModuleHttpFilterWithConfigTest : public testing::Test {

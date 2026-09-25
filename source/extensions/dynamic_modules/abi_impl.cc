@@ -3077,6 +3077,21 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_http_set_upstream_override_host, f
 WEAK_STUB(uint64_t, envoy_dynamic_module_callback_http_get_upstream_connection_id, 0,
           envoy_dynamic_module_type_http_filter_envoy_ptr)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_upstream_remote_address, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(size_t, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size, 0,
+          envoy_dynamic_module_type_http_filter_envoy_ptr)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(size_t, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size, 0,
+          envoy_dynamic_module_type_http_filter_envoy_ptr)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr, uint64_t*)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_filter_reset_stream,
                envoy_dynamic_module_type_http_filter_envoy_ptr,
                envoy_dynamic_module_type_http_filter_stream_reset_reason,

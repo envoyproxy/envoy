@@ -767,6 +767,21 @@ public:
   virtual std::optional<ClusterHostCounts> getClusterHostCounts(uint32_t priority) = 0;
 
   /**
+   * Retrieves the remote address of the upstream connection, including the port.
+   */
+  virtual std::optional<std::string_view> getUpstreamRemoteAddress() = 0;
+
+  /**
+   * Retrieves the upstream host addresses attempted for the current request in attempt order.
+   */
+  virtual std::vector<std::string_view> getUpstreamHostsAttempted() = 0;
+
+  /**
+   * Retrieves the upstream connection IDs attempted for the current request in attempt order.
+   */
+  virtual std::vector<uint64_t> getUpstreamConnectionIdsAttempted() = 0;
+
+  /**
    * Sets an upstream override host for the selected cluster.
    */
   virtual bool setUpstreamOverrideHost(std::string_view host, bool strict) = 0;

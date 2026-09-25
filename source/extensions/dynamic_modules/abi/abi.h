@@ -3588,6 +3588,62 @@ bool envoy_dynamic_module_callback_http_set_upstream_override_host(
 uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
+/**
+ * Get the remote address of the upstream connection, including the port.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param result is the pointer to store the address. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if the upstream remote address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_upstream_remote_address(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the number of upstream host addresses attempted for the current request.
+ *
+ * Hosts without an address are excluded from the count.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the number of attempted host addresses, or 0 if upstream information is unavailable.
+ */
+size_t envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * Get the upstream host addresses attempted for the current request in attempt order. The module
+ * should first call get_upstream_hosts_attempted_size and allocate the output array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param hosts_out is a module-owned array where Envoy will store buffers owned by Envoy. The
+ * buffers are valid until the end of the current event hook.
+ * @return true if upstream information is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* hosts_out);
+
+/**
+ * Get the number of upstream connection IDs attempted for the current request.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the number of attempted connection IDs, or 0 if upstream information is unavailable.
+ */
+size_t envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * Get the upstream connection IDs attempted for the current request in attempt order. The module
+ * should first call get_upstream_connection_ids_attempted_size and allocate the output array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param connection_ids_out is a module-owned array where Envoy will copy the connection IDs.
+ * @return true if upstream information is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* connection_ids_out);
+
 // ------------------- Stream Control Callbacks -------------------------
 
 /**

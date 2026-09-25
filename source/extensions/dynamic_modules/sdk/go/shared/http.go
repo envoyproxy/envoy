@@ -1,4 +1,4 @@
-//go:generate mockgen -source=http.go -destination=mocks/mock_http.go -package=mocks
+//go:generate mockgen -source=http.go -destination=mocks/mock_http.go -package=mocks -aux_files=github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared=common.go
 package shared
 
 // HTTP filter SDK surface for dynamic modules — handle, buffer, header, span, and watermark
@@ -364,6 +364,17 @@ type HttpFilterHandle interface {
 	// GetClusterHostCounts returns the host counts for the routed cluster at the given priority.
 	// Returns host counts and true if successful, otherwise a zero-valued struct and false.
 	GetClusterHostCounts(priority uint32) (ClusterHostCounts, bool)
+
+	// GetUpstreamRemoteAddress returns the remote address of the upstream connection, including
+	// the port. The buffer is owned by Envoy and is valid until the current event hook returns.
+	GetUpstreamRemoteAddress() (UnsafeEnvoyBuffer, bool)
+
+	// GetUpstreamHostsAttempted returns the upstream host addresses in attempt order. The buffers
+	// are owned by Envoy and are valid until the current event hook returns.
+	GetUpstreamHostsAttempted() []UnsafeEnvoyBuffer
+
+	// GetUpstreamConnectionIDsAttempted returns the upstream connection IDs in attempt order.
+	GetUpstreamConnectionIDsAttempted() []uint64
 
 	// SetUpstreamOverrideHost sets a host that the upstream load balancer should select first
 	// if it exists in the routed cluster. Useful for sticky sessions or host affinity. When

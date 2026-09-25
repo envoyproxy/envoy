@@ -1211,6 +1211,66 @@ public:
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(StatsCallbacksConfigFactory, "stats_callbacks");
 
 // -----------------------------------------------------------------------------
+// UpstreamConnectionAttempts
+// -----------------------------------------------------------------------------
+
+class UpstreamConnectionAttemptsFilter : public HttpFilter {
+public:
+  UpstreamConnectionAttemptsFilter(HttpFilterHandle& handle, MetricID observed_total)
+      : handle_(handle), observed_total_(observed_total) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+
+  void onStreamComplete() override {
+    const auto remote_address = handle_.getUpstreamRemoteAddress();
+    assertTrue(remote_address.has_value() && !remote_address->empty(), "upstream remote address");
+    assertEq(handle_.getUpstreamHostsAttempted().size(), 1, "upstream hosts attempted");
+    assertEq(handle_.getUpstreamConnectionIdsAttempted().size(), 1,
+             "upstream connection IDs attempted");
+    assertEq(static_cast<size_t>(handle_.incrementCounterValue(observed_total_, 1)),
+             static_cast<size_t>(MetricsResult::Success), "upstream attempts counter");
+  }
+
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+  MetricID observed_total_;
+};
+
+class UpstreamConnectionAttemptsFilterFactory : public HttpFilterFactory {
+public:
+  UpstreamConnectionAttemptsFilterFactory(MetricID observed_total)
+      : observed_total_(observed_total) {}
+
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<UpstreamConnectionAttemptsFilter>(handle, observed_total_);
+  }
+
+private:
+  MetricID observed_total_;
+};
+
+class UpstreamConnectionAttemptsConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view) override {
+    const auto result = handle.defineCounter("upstream_connection_attempts_observed_total");
+    assertEq(static_cast<size_t>(result.second), static_cast<size_t>(MetricsResult::Success),
+             "upstream attempts counter definition");
+    return std::make_unique<UpstreamConnectionAttemptsFilterFactory>(result.first);
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(UpstreamConnectionAttemptsConfigFactory,
+                                    "upstream_connection_attempts");
+
+// -----------------------------------------------------------------------------
 // StreamingTerminal
 // -----------------------------------------------------------------------------
 
