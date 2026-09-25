@@ -1830,3 +1830,4 @@ MLKEM
 PQC
 quantum
 X25519MLKEM768
+cpaths
