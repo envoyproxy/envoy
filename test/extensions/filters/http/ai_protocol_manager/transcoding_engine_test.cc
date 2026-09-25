@@ -2393,6 +2393,230 @@ TEST(TranscodeRuleTest, EnumerateNumbersElementsThatCarryNoIndex) {
   EXPECT_EQ(not_array, before);
 }
 
+TEST(TranscodeRuleTest, EnumerateWritesAPrefixedPositionAsAString) {
+  const TranscodeRule ids = TranscodeRule::enumerate("tool_calls", "id", "call_");
+  EXPECT_EQ(ids.prefix(), "call_");
+  nlohmann::json doc =
+      nlohmann::json::parse(R"({"tool_calls": [{}, {"id": "call_abc"}, {"id": null}]})");
+  ASSERT_THAT(ids.apply(doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(
+                     R"({"tool_calls": [{"id": "call_0"}, {"id": "call_abc"}, {"id": "call_2"}]})"));
+}
+
+// A stream's tool calls arrive over several events, and each needs a position and an id of its
+// own across all of them.
+TEST(TranscodeRuleTest, EnumerateAcrossStreamCarriesTheCountBetweenEvents) {
+  const TranscodeRule index =
+      TranscodeRule::enumerateAcrossStream("tool_calls", "index", "tool_call_index");
+  const TranscodeRule id =
+      TranscodeRule::enumerateAcrossStream("tool_calls", "id", "tool_call_id", "call_");
+  EXPECT_EQ(id.slot(), "tool_call_id");
+  EXPECT_EQ(id.prefix(), "call_");
+
+  // Only a stream has somewhere to keep the count.
+  nlohmann::json first =
+      nlohmann::json::parse(R"({"tool_calls": [{"name": "a"}, {"name": "b", "id": "own"}]})");
+  TranscodeContext no_stream;
+  EXPECT_EQ(index.apply(first).code(), absl::StatusCode::kFailedPrecondition);
+  EXPECT_EQ(index.apply(first, &no_stream).code(), absl::StatusCode::kFailedPrecondition);
+
+  TranscodeStreamState state;
+  TranscodeContext ctx;
+  ctx.stream_state = &state;
+  const auto number = [&](nlohmann::json& event) {
+    ASSERT_THAT(index.apply(event, &ctx), IsOk());
+    ASSERT_THAT(id.apply(event, &ctx), IsOk());
+  };
+  // An element that names its own id still counts, so the two numberings stay in step.
+  number(first);
+  EXPECT_EQ(first, nlohmann::json::parse(R"({"tool_calls": [
+    {"name": "a", "index": 0, "id": "call_0"}, {"name": "b", "index": 1, "id": "own"}
+  ]})"));
+
+  // An event without the array leaves the count alone.
+  nlohmann::json text = nlohmann::json::parse(R"({"content": "Hi"})");
+  number(text);
+  EXPECT_EQ(text, nlohmann::json::parse(R"({"content": "Hi"})"));
+
+  nlohmann::json second = nlohmann::json::parse(R"({"tool_calls": [{"name": "c"}]})");
+  number(second);
+  EXPECT_EQ(second, nlohmann::json::parse(
+                        R"({"tool_calls": [{"name": "c", "index": 2, "id": "call_2"}]})"));
+  EXPECT_EQ(state.slots.at("tool_call_index"), 3);
+}
+
+TEST(TranscodeRuleTest, LookupEarlierFindsTheEntryAnElementRefersTo) {
+  const TranscodeRule name_results = TranscodeRule::lookupEarlier(
+      "messages", "tool_call_id", "tool_calls", "id", "function.name", "name");
+  EXPECT_EQ(name_results.entryKey(), "id");
+  EXPECT_EQ(name_results.writePath(), "name");
+  nlohmann::json doc = nlohmann::json::parse(R"({"messages": [
+    {"role": "assistant", "tool_calls": [
+      {"id": "call_0", "function": {"name": "get_weather"}},
+      {"id": "call_1", "function": {"name": "get_time"}}
+    ]},
+    {"role": "tool", "tool_call_id": "call_1", "content": "noon"},
+    {"role": "tool", "tool_call_id": "call_0", "content": "sunny"},
+    {"role": "assistant", "tool_calls": [{"id": "call_0", "function": {"name": "get_news"}}]},
+    {"role": "tool", "tool_call_id": "call_0", "content": "none"},
+    {"role": "tool", "tool_call_id": "call_9", "content": "unmatched"},
+    {"role": "tool", "tool_call_id": "call_1", "name": "own", "content": "kept"},
+    {"role": "tool", "tool_call_id": 1, "content": "not a string"},
+    {"role": "assistant", "tool_calls": [{"id": "call_1"}]},
+    {"role": "tool", "tool_call_id": "call_1", "content": "hidden"},
+    {"tool_call_id": "call_2", "tool_calls": [{"id": "call_2", "function": {"name": "own"}}]}
+  ]})");
+  ASSERT_THAT(name_results.apply(doc), IsOk());
+  const nlohmann::json& messages = doc["messages"];
+  EXPECT_EQ(messages[1]["name"], "get_time");
+  EXPECT_EQ(messages[2]["name"], "get_weather");
+  // The nearest earlier entry wins, so a reused id names the latest call.
+  EXPECT_EQ(messages[4]["name"], "get_news");
+  // No earlier entry holds the key, the element already names one, or the key is not a string.
+  EXPECT_FALSE(messages[5].contains("name"));
+  EXPECT_EQ(messages[6]["name"], "own");
+  EXPECT_FALSE(messages[7].contains("name"));
+  // A later entry that reuses the key without a value hides the earlier one.
+  EXPECT_FALSE(messages[9].contains("name"));
+  // An element's own entries are not earlier than it.
+  EXPECT_FALSE(messages[10].contains("name"));
+}
+
+TEST(TranscodeRuleTest, MoveElementsMovesTheMatchingElementsToAnotherArray) {
+  const TranscodeRule move_calls = TranscodeRule::moveElements(
+      "parts", "message.tool_calls", TranscodePredicate::fieldIs("functionCall", JsonShape::Object));
+  nlohmann::json doc = nlohmann::json::parse(R"({"parts": [
+    {"text": "Let me check."},
+    {"functionCall": {"name": "a"}},
+    "not an object",
+    {"functionCall": {"name": "b"}}
+  ]})");
+  ASSERT_THAT(move_calls.apply(doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({
+    "parts": [{"text": "Let me check."}, "not an object"],
+    "message": {"tool_calls": [{"functionCall": {"name": "a"}}, {"functionCall": {"name": "b"}}]}
+  })"));
+
+  // They go after whatever the destination already holds. A null destination holds nothing.
+  nlohmann::json more = nlohmann::json::parse(
+      R"({"parts": [{"functionCall": {"name": "c"}}], "message": {"tool_calls": [{"id": "x"}]}})");
+  ASSERT_THAT(move_calls.apply(more), IsOk());
+  EXPECT_EQ(more, nlohmann::json::parse(R"({
+    "parts": [], "message": {"tool_calls": [{"id": "x"}, {"functionCall": {"name": "c"}}]}
+  })"));
+  nlohmann::json null_destination = nlohmann::json::parse(
+      R"({"parts": [{"functionCall": {"name": "c"}}], "message": {"tool_calls": null}})");
+  ASSERT_THAT(move_calls.apply(null_destination), IsOk());
+  EXPECT_EQ(null_destination["message"]["tool_calls"],
+            nlohmann::json::parse(R"([{"functionCall": {"name": "c"}}])"));
+
+  // When nothing matches, no destination is made.
+  nlohmann::json text_only = nlohmann::json::parse(R"({"parts": [{"text": "Hi"}]})");
+  ASSERT_THAT(move_calls.apply(text_only), IsOk());
+  EXPECT_EQ(text_only, nlohmann::json::parse(R"({"parts": [{"text": "Hi"}]})"));
+
+  // A destination that is not an array fails before anything moves.
+  nlohmann::json clash = nlohmann::json::parse(
+      R"({"parts": [{"functionCall": {"name": "a"}}], "message": {"tool_calls": "none"}})");
+  const nlohmann::json before_clash = clash;
+  EXPECT_EQ(move_calls.apply(clash).code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(clash, before_clash);
+
+  // The default predicate moves every object. An absent or non-array source is left alone.
+  nlohmann::json all = nlohmann::json::parse(R"({"from": [{"a": 1}, 2, {"b": 3}]})");
+  ASSERT_THAT(TranscodeRule::moveElements("from", "to").apply(all), IsOk());
+  EXPECT_EQ(all, nlohmann::json::parse(R"({"from": [2], "to": [{"a": 1}, {"b": 3}]})"));
+  nlohmann::json not_array = nlohmann::json::parse(R"({"from": {"a": 1}})");
+  ASSERT_THAT(TranscodeRule::moveElements("from", "to").apply(not_array), IsOk());
+  EXPECT_EQ(not_array, nlohmann::json::parse(R"({"from": {"a": 1}})"));
+}
+
+TEST(TranscodeRuleTest, ParseJsonReplacesJsonTextWithItsValue) {
+  const TranscodeRule parse = TranscodeRule::parseJson("function.arguments");
+  nlohmann::json call = nlohmann::json::parse(
+      R"({"function": {"arguments": "{\"city\": \"Paris\", \"days\": [1, 2]}"}})");
+  ASSERT_THAT(parse.apply(call), IsOk());
+  EXPECT_EQ(call, nlohmann::json::parse(
+                      R"({"function": {"arguments": {"city": "Paris", "days": [1, 2]}}})"));
+
+  // Text that is empty or only whitespace says nothing.
+  for (const char* blank : {"", " \n\t"}) {
+    nlohmann::json doc = {{"function", {{"arguments", blank}}}};
+    ASSERT_THAT(parse.apply(doc), IsOk());
+    EXPECT_TRUE(doc["function"]["arguments"].is_null()) << '"' << blank << '"';
+  }
+
+  // Anything but text, or nothing, is left alone.
+  for (const char* other : {R"({"function": {"arguments": {"city": "Paris"}}})",
+                            R"({"function": {"arguments": 7}})", R"({"function": {}})"}) {
+    nlohmann::json doc = nlohmann::json::parse(other);
+    ASSERT_THAT(parse.apply(doc), IsOk());
+    EXPECT_EQ(doc, nlohmann::json::parse(other));
+  }
+
+  // Text that is not JSON is an error, and stays as it was.
+  nlohmann::json bad = {{"function", {{"arguments", R"({"city": )"}}}};
+  const nlohmann::json before_bad = bad;
+  const absl::Status status = parse.apply(bad);
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(status.message(), "field 'function.arguments' does not hold valid JSON text");
+  EXPECT_EQ(bad, before_bad);
+
+  // Offloaded text could only be parsed by materializing it.
+  nlohmann::json offloaded = nlohmann::json::object();
+  offloaded["function"]["arguments"] = JsonWithExtBuf::makeExternalRef({0, 4096});
+  EXPECT_EQ(parse.apply(offloaded).code(), absl::StatusCode::kUnimplemented);
+}
+
+// Parsed text joins the payload, which is written out by recursive walks, so it may nest no
+// deeper than Envoy's own JSON loader allows.
+TEST(TranscodeRuleTest, ParseJsonRefusesTextThatNestsTooDeeply) {
+  const TranscodeRule parse = TranscodeRule::parseJson("args");
+  const auto nested = [](size_t depth) { return std::string(depth, '[') + std::string(depth, ']'); };
+  nlohmann::json deepest = {{"args", nested(1000)}};
+  EXPECT_THAT(parse.apply(deepest), IsOk());
+  nlohmann::json too_deep = {{"args", nested(1001)}};
+  const absl::Status status = parse.apply(too_deep);
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(status.message(), "the JSON text in 'args' nests deeper than 1000 levels");
+
+  // Brackets inside strings are text, even after an escaped quote.
+  nlohmann::json in_strings = {
+      {"args", R"({"a": ")" + std::string(1001, '[') + R"(\")" + std::string(1001, '{') + R"("})"}};
+  ASSERT_THAT(parse.apply(in_strings), IsOk());
+  EXPECT_EQ(in_strings["args"]["a"], std::string(1001, '[') + '"' + std::string(1001, '{'));
+}
+
+TEST(TranscodeRuleTest, SerializeJsonWritesAValueAsCompactJsonText) {
+  const TranscodeRule serialize = TranscodeRule::serializeJson("function.arguments");
+  nlohmann::json call = nlohmann::json::parse(
+      R"({"function": {"arguments": {"city": "Paris", "days": [1, 2]}}})");
+  ASSERT_THAT(serialize.apply(call), IsOk());
+  EXPECT_EQ(call["function"]["arguments"], R"({"city":"Paris","days":[1,2]})");
+  // `parseJson` undoes it.
+  ASSERT_THAT(TranscodeRule::parseJson("function.arguments").apply(call), IsOk());
+  EXPECT_EQ(call["function"]["arguments"],
+            nlohmann::json::parse(R"({"city": "Paris", "days": [1, 2]})"));
+
+  // Invalid UTF-8 is replaced rather than thrown on.
+  nlohmann::json bad_utf8 = nlohmann::json::object();
+  bad_utf8["function"]["arguments"]["city"] = std::string("Par\xff") + "is";
+  ASSERT_THAT(serialize.apply(bad_utf8), IsOk());
+  EXPECT_EQ(bad_utf8["function"]["arguments"], "{\"city\":\"Par\xEF\xBF\xBDis\"}");
+
+  // An absent path is left alone.
+  nlohmann::json absent = nlohmann::json::parse(R"({"function": {}})");
+  ASSERT_THAT(serialize.apply(absent), IsOk());
+  EXPECT_EQ(absent, nlohmann::json::parse(R"({"function": {}})"));
+
+  // A value holding an offloaded reference could only be written by materializing it.
+  nlohmann::json offloaded = nlohmann::json::object();
+  offloaded["function"]["arguments"]["text"] = JsonWithExtBuf::makeExternalRef({0, 4096});
+  const nlohmann::json before_offloaded = offloaded;
+  EXPECT_EQ(serialize.apply(offloaded).code(), absl::StatusCode::kUnimplemented);
+  EXPECT_EQ(offloaded, before_offloaded);
+}
+
 TEST(TranscodeRuleTest, RetainOnlyKeepsTheListedMembers) {
   nlohmann::json doc = nlohmann::json::parse(R"({
     "id": "1",
