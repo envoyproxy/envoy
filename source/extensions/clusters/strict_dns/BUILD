@@ -19,6 +19,7 @@ envoy_cc_extension(
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/upstream:cluster_factory_includes",
         "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/common:dns_cluster_backcompat_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
