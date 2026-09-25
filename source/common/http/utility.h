@@ -228,7 +228,8 @@ absl::string_view findQueryStringStart(const HeaderString& path);
 /**
  * Returns the path without the query string.
  * @param path supplies a string_view possibly containing a query string.
- * @return absl::string_view the path without query string.
+ * @return absl::string_view the path without query string. The returned view
+ *         references the input and shares its lifetime.
  */
 absl::string_view stripQueryString(absl::string_view path);
 
@@ -238,7 +239,6 @@ absl::string_view stripQueryString(absl::string_view path);
  * @return std::string the path without query string.
  */
 std::string stripQueryString(const HeaderString& path);
-absl::string_view stripQueryStringView(absl::string_view path);
 
 /**
  * Parse a particular value out of a cookie
