@@ -201,6 +201,8 @@ const (
 	AttributeIDUpstreamRequestedServerName
 	// xds.virtual_cluster_name
 	AttributeIDXdsVirtualClusterName
+	// upstream.protocol
+	AttributeIDUpstreamProtocol
 )
 
 // LogLevel is the log level for messages logged via the host environment's logging mechanism.
@@ -312,6 +314,20 @@ type ClusterHostCounts struct {
 	Healthy uint64
 	// Degraded is the number of hosts in the DEGRADED state.
 	Degraded uint64
+}
+
+// TimingInfo is a snapshot of stream timing information. StartTimeUnixNs is a Unix timestamp in
+// nanoseconds. All other fields are durations from the monotonic request start time. Unavailable
+// values are -1.
+type TimingInfo struct {
+	StartTimeUnixNs               int64
+	RequestCompleteDurationNs     int64
+	FirstUpstreamTxByteSentNs     int64
+	LastUpstreamTxByteSentNs      int64
+	FirstUpstreamRxByteReceivedNs int64
+	LastUpstreamRxByteReceivedNs  int64
+	FirstDownstreamTxByteSentNs   int64
+	LastDownstreamTxByteSentNs    int64
 }
 
 // MetricID is an opaque identifier for a metric defined via Define{Counter,Gauge,Histogram}.

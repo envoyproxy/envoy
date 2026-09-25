@@ -17,6 +17,8 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
     return BridgeStatusValues::REQUEST_FAILED_TO_PARSE_JSON_RPC;
   case BridgeStatus::RequestUnsupportedMcpVersion:
     return BridgeStatusValues::REQUEST_UNSUPPORTED_MCP_VERSION;
+  case BridgeStatus::RequestMcpHeaderMismatch:
+    return BridgeStatusValues::REQUEST_MCP_HEADER_MISMATCH;
   case BridgeStatus::RequestInitializeNotValid:
     return BridgeStatusValues::REQUEST_INITIALIZE_NOT_VALID;
   case BridgeStatus::RequestMcpMethodNotSupported:

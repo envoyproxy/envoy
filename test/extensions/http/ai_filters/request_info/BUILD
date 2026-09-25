@@ -81,6 +81,7 @@ envoy_extension_cc_test(
         "//source/extensions/http/ai_filters/request_info:config",
         "//test/extensions/filters/http/ext_proc:test_processor_lib",
         "//test/integration:http_integration_lib",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/synchronization",
         "@abseil-cpp//absl/time",
         "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",

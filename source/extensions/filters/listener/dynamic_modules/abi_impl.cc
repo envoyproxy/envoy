@@ -14,6 +14,7 @@
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
+#include "source/extensions/dynamic_modules/abi_conversions.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
@@ -686,9 +687,16 @@ bool envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
     return false;
   }
 
-  int int_value = static_cast<int>(value);
-  auto result = callbacks->socket().setSocketOption(static_cast<int>(level), static_cast<int>(name),
-                                                    &int_value, sizeof(int_value));
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  const auto value_int = narrowToInt(value);
+  if (!level_int.has_value() || !name_int.has_value() || !value_int.has_value()) {
+    return false;
+  }
+
+  int int_value = *value_int;
+  auto result =
+      callbacks->socket().setSocketOption(*level_int, *name_int, &int_value, sizeof(int_value));
   return result.return_value_ == 0;
 }
 
@@ -701,9 +709,14 @@ bool envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
     return false;
   }
 
-  auto result =
-      callbacks->socket().setSocketOption(static_cast<int>(level), static_cast<int>(name),
-                                          value.ptr, static_cast<socklen_t>(value.length));
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  if (!level_int.has_value() || !name_int.has_value()) {
+    return false;
+  }
+
+  auto result = callbacks->socket().setSocketOption(*level_int, *name_int, value.ptr,
+                                                    static_cast<socklen_t>(value.length));
   return result.return_value_ == 0;
 }
 
@@ -716,10 +729,15 @@ bool envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
     return false;
   }
 
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  if (!level_int.has_value() || !name_int.has_value()) {
+    return false;
+  }
+
   int int_value = 0;
   socklen_t optlen = sizeof(int_value);
-  auto result = callbacks->socket().getSocketOption(static_cast<int>(level), static_cast<int>(name),
-                                                    &int_value, &optlen);
+  auto result = callbacks->socket().getSocketOption(*level_int, *name_int, &int_value, &optlen);
   if (result.return_value_ != 0) {
     return false;
   }
@@ -737,9 +755,14 @@ bool envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
     return false;
   }
 
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  if (!level_int.has_value() || !name_int.has_value()) {
+    return false;
+  }
+
   socklen_t optlen = static_cast<socklen_t>(value_size);
-  auto result = callbacks->socket().getSocketOption(static_cast<int>(level), static_cast<int>(name),
-                                                    value_out, &optlen);
+  auto result = callbacks->socket().getSocketOption(*level_int, *name_int, value_out, &optlen);
   if (result.return_value_ != 0) {
     return false;
   }

@@ -61,6 +61,9 @@ public:
   }
   const Formatter::Formatter* accountFormatter() const { return account_formatter_.get(); }
   const Formatter::Formatter* authFormatter() const { return auth_formatter_.get(); }
+  const Http::LowerCaseString& targetHeader() const { return target_header_; }
+  absl::string_view headerPrefix() const { return header_prefix_; }
+  bool preserveExistingHeader() const { return preserve_existing_header_; }
 
 private:
   // Stats are namespaced under the filter name, so that they can be distinguished from the stats
@@ -76,6 +79,9 @@ private:
   std::shared_ptr<TokenCache> token_cache_;
   Formatter::FormatterPtr account_formatter_;
   Formatter::FormatterPtr auth_formatter_;
+  const Http::LowerCaseString target_header_;
+  const std::string header_prefix_;
+  const bool preserve_existing_header_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

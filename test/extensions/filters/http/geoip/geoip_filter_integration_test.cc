@@ -1,5 +1,7 @@
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
 
+#include "source/common/stats/utility.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -488,8 +490,16 @@ TEST_P(GeoipFilterIntegrationTest, OnlyApplePrivateRelayHeaderIsPopulated) {
 TEST_P(GeoipFilterIntegrationTest, MetricForDbBuildEpochIsEmitted) {
   config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithXff));
   initialize();
-  EXPECT_EQ(1671567063,
-            test_server_->gauge("http.config_test.maxmind.city_db.db_build_epoch")->value());
+  // A database file is shared between listeners, so the stats describing it are rooted at the
+  // provider's own "maxmind." namespace rather than at the listener's stat prefix, and they name
+  // the file they describe.
+  const std::string db_name = Stats::Utility::sanitizeStatsName(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/"
+      "GeoLite2-City-Test.mmdb"));
+  const Stats::GaugeSharedPtr build_epoch =
+      test_server_->gauge(absl::StrCat("maxmind.city_db.", db_name, ".db_build_epoch"));
+  ASSERT_NE(build_epoch, nullptr);
+  EXPECT_EQ(1671567063, build_epoch->value());
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseCountryDb) {

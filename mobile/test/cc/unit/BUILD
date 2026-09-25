@@ -16,7 +16,6 @@ envoy_cc_test_with_engine_builder(
         ],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     deps = [
         "//library/cc:envoy_engine_cc_lib_no_stamp",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -34,7 +33,6 @@ envoy_cc_test_with_engine_builder(
     exec_properties = {
         "dockerNetwork": "standard",
     },
-    repository = "@envoy",
     deps = [
         "@envoy_build_config//:extension_registry",
         "@envoy_build_config//:test_extensions",
@@ -44,7 +42,6 @@ envoy_cc_test_with_engine_builder(
 envoy_cc_test_with_engine_builder(
     name = "engine_handle_test",
     srcs = ["engine_handle_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:internal_engine_lib_no_stamp",
         "@envoy_build_config//:extension_registry",

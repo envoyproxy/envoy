@@ -250,6 +250,8 @@ test_program(name = "matcher_missing_config_destroy")
 
 test_program(name = "matcher_check_headers")
 
+test_program(name = "matcher_error")
+
 test_program(name = "matcher_string_input_echo")
 
 test_program(name = "matcher_string_input_config_new_fail")
@@ -292,6 +294,8 @@ test_program(name = "upstream_bridge_headers_end_stream")
 
 test_program(name = "upstream_bridge_headers_end_stream_no_body")
 
+test_program(name = "upstream_bridge_terminal_response")
+
 test_program(name = "tracer_no_op")
 
 test_program(name = "tracer_config_fail")
@@ -313,6 +317,8 @@ test_program(name = "stat_sink_missing_histogram_complete")
 test_program(name = "stat_sink_integration_test")
 
 test_program(name = "dns_resolver_config_new_fail")
+
+test_program(name = "dns_resolver_new_fail")
 
 test_program(name = "health_checker_no_op")
 

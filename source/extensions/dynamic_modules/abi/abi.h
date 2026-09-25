@@ -214,6 +214,21 @@ typedef struct envoy_dynamic_module_type_envoy_http_header {
   size_t value_length;
 } envoy_dynamic_module_type_envoy_http_header;
 
+/**
+ * envoy_dynamic_module_type_timing_info contains timing information from StreamInfo.
+ * All durations are in nanoseconds. A value of -1 indicates the timing is not available.
+ */
+typedef struct envoy_dynamic_module_type_timing_info {
+  int64_t start_time_unix_ns;           // Request start time as Unix timestamp in nanoseconds.
+  int64_t request_complete_duration_ns; // Duration from start to request complete.
+  int64_t first_upstream_tx_byte_sent_ns;
+  int64_t last_upstream_tx_byte_sent_ns;
+  int64_t first_upstream_rx_byte_received_ns;
+  int64_t last_upstream_rx_byte_received_ns;
+  int64_t first_downstream_tx_byte_sent_ns;
+  int64_t last_downstream_tx_byte_sent_ns;
+} envoy_dynamic_module_type_timing_info;
+
 typedef enum envoy_dynamic_module_type_http_header_type {
   envoy_dynamic_module_type_http_header_type_RequestHeader,
   envoy_dynamic_module_type_http_header_type_RequestTrailer,
@@ -455,6 +470,8 @@ typedef enum envoy_dynamic_module_type_attribute_id {
   envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
   // xds.virtual_cluster_name
   envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName,
+  // upstream.protocol
+  envoy_dynamic_module_type_attribute_id_UpstreamProtocol,
 } envoy_dynamic_module_type_attribute_id;
 
 /**
@@ -1016,9 +1033,11 @@ envoy_dynamic_module_on_http_filter_per_route_config_new(
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
 
 /**
- * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP per-route filter
- * configuration is destroyed in Envoy. The module should release any resources associated with the
- * corresponding in-module HTTP filter configuration.
+ * envoy_dynamic_module_on_http_filter_config_destroy is called by the main thread when the HTTP
+ * per-route filter configuration is destroyed in Envoy. The module should release any resources
+ * associated with the corresponding in-module HTTP filter configuration. A route configuration may
+ * be released on a worker thread, in which case Envoy defers this hook to the main thread, so the
+ * module may use callbacks that require the main thread from it.
  * @param filter_config_ptr is a pointer to the in-module HTTP filter configuration whose
  * corresponding Envoy HTTP filter configuration is being destroyed.
  */
@@ -2966,6 +2985,20 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
     envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
 
 /**
+ * Get a snapshot of the current stream timing information.
+ *
+ * This always populates the module-owned output struct. The request start time is a Unix timestamp;
+ * all other fields are durations from the monotonic request start time. Fields are set to -1 when
+ * the stream or an individual timing marker is unavailable at the current event hook.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param timing_out is the module-owned output parameter for timing information.
+ */
+void envoy_dynamic_module_callback_http_get_timing_info(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_timing_info* timing_out);
+
+/**
  * envoy_dynamic_module_callback_http_filter_http_callout is called by the module to initiate
  * an HTTP callout. The callout is initiated by the HTTP filter and the response is received in
  * envoy_dynamic_module_on_http_filter_http_callout_done.
@@ -3390,6 +3423,17 @@ envoy_dynamic_module_type_span_envoy_ptr envoy_dynamic_module_callback_http_get_
 void envoy_dynamic_module_callback_http_span_set_tag(envoy_dynamic_module_type_span_envoy_ptr span,
                                                      envoy_dynamic_module_type_module_buffer key,
                                                      envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_tag_batch sets multiple tags on the given span.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param tags is the array of key-value pairs to set as tags.
+ * @param tags_size is the number of entries in the tags array.
+ */
+void envoy_dynamic_module_callback_http_span_set_tag_batch(
+    envoy_dynamic_module_type_span_envoy_ptr span,
+    const envoy_dynamic_module_type_module_key_value_pair* tags, size_t tags_size);
 
 /**
  * envoy_dynamic_module_callback_http_span_set_operation sets the operation name on the given span.
@@ -7089,29 +7133,23 @@ typedef enum envoy_dynamic_module_type_response_flag {
 } envoy_dynamic_module_type_response_flag;
 
 /**
- * envoy_dynamic_module_type_timing_info contains timing information from StreamInfo.
- * All durations are in nanoseconds. A value of -1 indicates the timing is not available.
- */
-typedef struct envoy_dynamic_module_type_timing_info {
-  int64_t start_time_unix_ns;           // Request start time as Unix timestamp in nanoseconds.
-  int64_t request_complete_duration_ns; // Duration from start to request complete.
-  int64_t first_upstream_tx_byte_sent_ns;
-  int64_t last_upstream_tx_byte_sent_ns;
-  int64_t first_upstream_rx_byte_received_ns;
-  int64_t last_upstream_rx_byte_received_ns;
-  int64_t first_downstream_tx_byte_sent_ns;
-  int64_t last_downstream_tx_byte_sent_ns;
-} envoy_dynamic_module_type_timing_info;
-
-/**
  * envoy_dynamic_module_type_bytes_info contains byte count information.
  */
 typedef struct envoy_dynamic_module_type_bytes_info {
   uint64_t bytes_received;      // Total bytes received from downstream.
   uint64_t bytes_sent;          // Total bytes sent to downstream.
-  uint64_t wire_bytes_received; // Wire bytes received (including TLS overhead).
-  uint64_t wire_bytes_sent;     // Wire bytes sent (including TLS overhead).
+  uint64_t wire_bytes_received; // Wire bytes received from upstream.
+  uint64_t wire_bytes_sent;     // Wire bytes sent to upstream.
 } envoy_dynamic_module_type_bytes_info;
+
+/**
+ * envoy_dynamic_module_type_downstream_wire_bytes contains cumulative wire byte counts from the
+ * stream's downstream bytes meter.
+ */
+typedef struct envoy_dynamic_module_type_downstream_wire_bytes {
+  uint64_t bytes_received; // Wire bytes received from downstream.
+  uint64_t bytes_sent;     // Wire bytes sent to downstream.
+} envoy_dynamic_module_type_downstream_wire_bytes;
 
 // =============================================================================
 // Access Logger Event Hooks
@@ -7334,6 +7372,21 @@ void envoy_dynamic_module_callback_access_logger_get_timing_info(
 void envoy_dynamic_module_callback_access_logger_get_bytes_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_bytes_info* bytes_out);
+
+/**
+ * Get cumulative downstream wire byte counts from StreamInfo's downstream bytes meter.
+ *
+ * These correspond to DOWNSTREAM_WIRE_BYTES_RECEIVED and DOWNSTREAM_WIRE_BYTES_SENT in access logs.
+ * For HTTP streams, they include protocol overhead accounted for by the codec, not just body bytes.
+ * They can be nonzero for locally generated responses with no upstream connection.
+ * This always populates the output struct. Both fields are set to 0 if the meter is unavailable.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param bytes_out is the output parameter for downstream wire byte counts.
+ */
+void envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_downstream_wire_bytes* bytes_out);
 
 /**
  * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_bool with
@@ -12383,6 +12436,17 @@ bool envoy_dynamic_module_callback_matcher_get_header_value(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out);
 
+/**
+ * Report that the module could not complete a match evaluation, for example because the match hook
+ * panicked. The matcher then applies its configured on_error policy for this evaluation instead of
+ * treating the failure as a no match. The SDK panic barrier invokes this when a match hook panics,
+ * so a hook that returns normally does not trigger it.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ */
+void envoy_dynamic_module_callback_matcher_set_error(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr);
+
 // =============================================================================
 // Matcher Data Input Types
 // =============================================================================
@@ -13378,6 +13442,16 @@ void envoy_dynamic_module_on_tracer_span_set_operation(
 void envoy_dynamic_module_on_tracer_span_set_tag(
     envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
     envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_reserve_tags is called to reserve capacity for tags that will
+ * be set via envoy_dynamic_module_on_tracer_span_set_tag.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param tags_size is the number of tags that will be set.
+ */
+void envoy_dynamic_module_on_tracer_span_reserve_tags(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr, size_t tags_size);
 
 /**
  * envoy_dynamic_module_on_tracer_span_log is called to record a log event on the span.
@@ -14847,6 +14921,40 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr,
     size_t histogram_index, size_t bucket_index, double* upper_bound_out,
     uint64_t* cumulative_count_out);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name is the
+ * histogram counterpart of the counter tag-extracted-name callback below, with the same buffer
+ * and truncation contract. The index is into the snapshot's histogram collection.
+ *
+ * These histogram tag callbacks are only valid during envoy_dynamic_module_on_stat_sink_flush.
+ * A module aggregating observations from envoy_dynamic_module_on_stat_sink_on_histogram_complete
+ * can use the raw name returned by envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram
+ * to associate those observations with an owned copy of this name and its tags. No tag extraction
+ * or histogram statistics computation is performed by these callbacks.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count is the histogram
+ * counterpart of the counter tag-count callback below. Returns false for an out-of-range
+ * histogram index without writing tag_count. A histogram with no tags returns true and zero.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag is the histogram counterpart
+ * of the counter tag callback below, with the same buffer and truncation contract. Returns false
+ * without writing outputs if either the histogram index or tag index is out of range.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
 
 /**
  * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name writes the

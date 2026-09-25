@@ -6,7 +6,7 @@ package shared
 //
 // Cross-surface primitives (UnsafeEnvoyBuffer, LogLevel, MetricID, AttributeID, Scheduler,
 // HttpCalloutInitResult/Result/Callback, HttpStreamCallback/ResetReason, SocketOption*,
-// ClusterHostCounts, HttpHeaderType) live in types.go.
+// ClusterHostCounts, TimingInfo, HttpHeaderType) live in types.go.
 
 // BodyBuffer is an interface that provides access to the request and response body.
 // This should be implemented by the SDK or runtime.
@@ -98,6 +98,9 @@ const (
 type Span interface {
 	// SetTag sets a key/value tag on the span.
 	SetTag(key, value string)
+
+	// SetTags sets multiple key/value tags on the span.
+	SetTags(tags [][2]string)
 
 	// SetOperation sets the operation name on the span.
 	SetOperation(operation string)
@@ -259,6 +262,9 @@ type HttpFilterHandle interface {
 	// GetAttributeBool retrieves the bool attribute value of the stream.
 	// Returns attribute value and true if found, otherwise false.
 	GetAttributeBool(attributeID AttributeID) (bool, bool)
+
+	// GetTimingInfo returns a snapshot of the current stream timing information.
+	GetTimingInfo() TimingInfo
 
 	// GetFilterStateTyped retrieves the serialized bytes of a typed filter state object stored
 	// under the given key. Unlike GetFilterState, this calls serializeAsString on the registered

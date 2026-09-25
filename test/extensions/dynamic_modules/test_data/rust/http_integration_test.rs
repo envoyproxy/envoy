@@ -25,6 +25,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
+    "filter_new_panic" => Some(Box::new(FilterNewPanicConfig {})),
     "local_reply_response_headers" => Some(Box::new(LocalReplyResponseHeadersConfig {})),
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
       headers_to_add: String::from_utf8(config.to_owned()).unwrap(),
@@ -114,6 +115,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "reentrant_stream_complete" => Some(Box::new(ReentrantStreamCompleteFilterConfig {
       stream_complete_total: envoy_filter_config
         .define_counter("reentrant_stream_complete_total")
+        .unwrap(),
+    })),
+    "stream_timing" => Some(Box::new(StreamTimingFilterConfig {
+      timing_observed_total: envoy_filter_config
+        .define_counter("stream_timing_observed_total")
         .unwrap(),
     })),
     "buffer_limit_filter" => Some(Box::new(BufferLimitFilterConfig {})),
@@ -541,6 +547,16 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PassthroughHttpFilterConfig
     envoy_log_error!("new_http_filter called");
     envoy_log_critical!("new_http_filter called");
     Box::new(PassthroughHttpFilter {})
+  }
+}
+
+/// A filter configuration whose filter constructor panics. The SDK catches the panic and returns a
+/// null filter, so Envoy must fail the request closed instead of crashing.
+struct FilterNewPanicConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FilterNewPanicConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    panic!("filter constructor failed on purpose");
   }
 }
 
@@ -1937,6 +1953,33 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantStreamCompleteFilter {
   fn on_stream_complete(&self, envoy_filter: &mut EHF) {
     envoy_filter
       .increment_counter(self.stream_complete_total, 1)
+      .unwrap();
+  }
+}
+
+struct StreamTimingFilterConfig {
+  timing_observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamTimingFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(StreamTimingFilter {
+      timing_observed_total: self.timing_observed_total,
+    })
+  }
+}
+
+struct StreamTimingFilter {
+  timing_observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamTimingFilter {
+  fn on_stream_complete(&self, envoy_filter: &mut EHF) {
+    let timing = envoy_filter.get_timing_info();
+    assert!(timing.start_time_unix_ns > 0);
+    assert!(timing.request_complete_duration_ns >= 0);
+    envoy_filter
+      .increment_counter(self.timing_observed_total, 1)
       .unwrap();
   }
 }

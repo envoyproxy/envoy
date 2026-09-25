@@ -14,6 +14,7 @@
 #include "source/common/tracing/tracer_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
+#include "source/extensions/dynamic_modules/abi_conversions.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 namespace Envoy {
@@ -2066,7 +2067,10 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     // Fall back to the shared context accessor for stream-info-based attributes that are not
     // served from the live request state above.
     if (const auto stream_info = filter->streamInfo(); stream_info != nullptr) {
-      ok = ContextAccessor::getAttributeInt(*stream_info, attribute_id, result);
+      const ContextAccessor::HttpAttributeContext context{
+          filter->requestHeaders().ptr(), filter->responseHeaders().ptr(),
+          filter->responseTrailers().ptr(), filter->requestTrailers().ptr()};
+      ok = ContextAccessor::getAttributeInt(*stream_info, attribute_id, result, &context);
     }
     break;
   }
@@ -2098,6 +2102,13 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
   }
   }
   return ok;
+}
+
+void envoy_dynamic_module_callback_http_get_timing_info(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_timing_info* timing_out) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  ContextAccessor::getTimingInfo(filter->streamInfo(), timing_out);
 }
 
 void envoy_dynamic_module_callback_http_add_custom_flag(
@@ -2144,15 +2155,22 @@ bool envoy_dynamic_module_callback_http_set_socket_option_int(
     return false;
   }
 
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  const auto value_int = narrowToInt(value);
+  if (!level_int.has_value() || !name_int.has_value() || !value_int.has_value()) {
+    return false;
+  }
+
   if (direction == envoy_dynamic_module_type_socket_direction_Downstream) {
     // For downstream, apply directly to the existing connection socket
     auto connection = filter->decoder_callbacks_->connection();
     if (!connection.has_value()) {
       return false;
     }
-    int int_value = static_cast<int>(value);
+    int int_value = *value_int;
     auto value_span = absl::MakeSpan(reinterpret_cast<uint8_t*>(&int_value), sizeof(int_value));
-    Network::SocketOptionName option_name(static_cast<int>(level), static_cast<int>(name), "");
+    Network::SocketOptionName option_name(*level_int, *name_int, "");
     // const_cast is safe here because setSocketOption modifies the underlying socket,
     // not the Connection object's logical state.
     if (!const_cast<Network::Connection&>(*connection).setSocketOption(option_name, value_span)) {
@@ -2161,9 +2179,8 @@ bool envoy_dynamic_module_callback_http_set_socket_option_int(
   } else {
     // For upstream, add to upstream socket options (applied when connection is established)
     auto option = std::make_shared<Network::SocketOptionImpl>(
-        mapHttpSocketState(state),
-        Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""),
-        static_cast<int>(value));
+        mapHttpSocketState(state), Network::SocketOptionName(*level_int, *name_int, ""),
+        *value_int);
     Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
     option_list->push_back(option);
     filter->decoder_callbacks_->addUpstreamSocketOptions(option_list);
@@ -2187,6 +2204,12 @@ bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
     return false;
   }
 
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  if (!level_int.has_value() || !name_int.has_value()) {
+    return false;
+  }
+
   absl::string_view value_view(value.ptr, value.length);
 
   if (direction == envoy_dynamic_module_type_socket_direction_Downstream) {
@@ -2198,7 +2221,7 @@ bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
     // Need to copy to a mutable buffer since setSocketOption takes non-const span
     std::vector<uint8_t> mutable_value(value.ptr, value.ptr + value.length);
     auto value_span = absl::MakeSpan(mutable_value);
-    Network::SocketOptionName option_name(static_cast<int>(level), static_cast<int>(name), "");
+    Network::SocketOptionName option_name(*level_int, *name_int, "");
     // const_cast is safe here because setSocketOption modifies the underlying socket,
     // not the Connection object's logical state.
     if (!const_cast<Network::Connection&>(*connection).setSocketOption(option_name, value_span)) {
@@ -2207,8 +2230,8 @@ bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
   } else {
     // For upstream, add to upstream socket options (applied when connection is established)
     auto option = std::make_shared<Network::SocketOptionImpl>(
-        mapHttpSocketState(state),
-        Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""), value_view);
+        mapHttpSocketState(state), Network::SocketOptionName(*level_int, *name_int, ""),
+        value_view);
     Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
     option_list->push_back(option);
     filter->decoder_callbacks_->addUpstreamSocketOptions(option_list);
@@ -2551,6 +2574,20 @@ void envoy_dynamic_module_callback_http_span_set_tag(
   absl::string_view key_view(key.ptr, key.length);
   absl::string_view value_view(value.ptr, value.length);
   span->setTag(key_view, value_view);
+}
+
+void envoy_dynamic_module_callback_http_span_set_tag_batch(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    const envoy_dynamic_module_type_module_key_value_pair* tags, size_t tags_size) {
+  if (span_ptr == nullptr || tags_size == 0) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  span->reserveTags(tags_size);
+  for (size_t i = 0; i < tags_size; i++) {
+    span->setTag(absl::string_view(tags[i].key_ptr, tags[i].key_length),
+                 absl::string_view(tags[i].value_ptr, tags[i].value_length));
+  }
 }
 
 void envoy_dynamic_module_callback_http_span_set_operation(

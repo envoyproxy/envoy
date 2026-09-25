@@ -704,6 +704,17 @@ be done by including the desired Bazel paths from [contrib_build_config.bzl](../
 into the overridden `extensions_build_config.bzl`. (There is no need to specifically perform
 a contrib build to include a contrib extension.)
 
+Downstream builds can also override a small set of Envoy implementation targets via label flags
+in their own `.bazelrc` or command line. The currently supported overrides are:
+
+```console
+build --@envoy//bazel:test_main=@your_repo//:custom_test_main
+build --@envoy//bazel:test_pch=@your_repo//:custom_test_pch
+```
+
+These replace the older `repository = "@envoy"` macro workaround and should be preferred when a
+consumer needs to substitute its own implementation target.
+
 ## Extra extensions
 
 If you are building your own Envoy extensions or custom Envoy builds and encounter visibility

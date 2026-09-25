@@ -209,7 +209,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
     return absl::InvalidArgumentError(msg);
   }
 
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
+  const auto& cluster_load_assignment =
       Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources[0].get().resource());
   if (cluster_load_assignment.cluster_name() != edsServiceName()) {
@@ -257,7 +257,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
   Config::ScopedResume resume_leds =
       transport_factory_context_->serverFactoryContext().xdsManager().pause(type_url);
 
-  update(std::move(cluster_load_assignment));
+  update(cluster_load_assignment);
   // If previously used a cached version, remove the subscription from the cache's
   // callbacks.
   if (using_cached_resource_) {
@@ -268,7 +268,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
 }
 
 void EdsClusterImpl::update(
-    envoy::config::endpoint::v3::ClusterLoadAssignment&& cluster_load_assignment) {
+    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
   // Drop overload configuration parsing.
   THROW_IF_NOT_OK(parseDropOverloadConfig(cluster_load_assignment));
 
@@ -292,8 +292,9 @@ void EdsClusterImpl::update(
 
   const envoy::config::endpoint::v3::ClusterLoadAssignment* used_load_assignment;
   if (!cla_leds_configs.empty() || eds_resources_cache_.has_value()) {
-    cluster_load_assignment_ = std::make_unique<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        std::move(cluster_load_assignment));
+    cluster_load_assignment_ =
+        ArenaWrappedProto<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+            cluster_load_assignment);
     used_load_assignment = cluster_load_assignment_.get();
   } else {
     cluster_load_assignment_ = nullptr;
@@ -465,12 +466,9 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
           debug,
           "Did not receive EDS response on time, using cached ClusterLoadAssignment for cluster {}",
           edsServiceName());
-      envoy::config::endpoint::v3::ClusterLoadAssignment cached_load_assignment =
-          Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-              *cached_resource);
       info_->configUpdateStats().assignment_use_cached_.inc();
       using_cached_resource_ = true;
-      update(std::move(cached_load_assignment));
+      update(*cached_resource);
       return;
     }
   }

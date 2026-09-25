@@ -30,6 +30,7 @@ pub mod matcher;
 pub mod matcher_data_input;
 pub mod network;
 pub mod stats_sink;
+pub mod timing;
 pub mod tracer;
 pub mod transport_socket;
 pub mod udp_listener;
@@ -46,6 +47,7 @@ pub use http::*;
 pub use listener::*;
 pub use load_balancer::*;
 pub use network::*;
+pub use timing::*;
 pub use tracer::*;
 pub use transport_socket::*;
 pub use udp_listener::*;
@@ -2041,8 +2043,8 @@ pub static NEW_DNS_RESOLVER_CONFIG_FUNCTION: OnceLock<NewDnsResolverConfigFuncti
 ///   fn new_resolver(
 ///     &self,
 ///     envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
-///   ) -> Box<dyn DnsResolverInstance> {
-///     Box::new(MyDnsResolver { envoy_callback })
+///   ) -> Option<Box<dyn DnsResolverInstance>> {
+///     Some(Box::new(MyDnsResolver { envoy_callback }))
 ///   }
 /// }
 ///
