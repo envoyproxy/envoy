@@ -1,5 +1,7 @@
 #include "source/common/config/ttl.h"
 
+#include <algorithm>
+
 namespace Envoy {
 namespace Config {
 
@@ -67,7 +69,7 @@ void TtlManager::refreshTimer() {
 
   // The time until the next TTL changed, so reset the timer to match the new value.
   last_scheduled_time_ = next_ttl_expiry;
-  timer_->enableTimer(timer_duration, nullptr);
+  timer_->enableTimer(std::max(std::chrono::milliseconds::zero(), timer_duration), nullptr);
 }
 } // namespace Config
 } // namespace Envoy

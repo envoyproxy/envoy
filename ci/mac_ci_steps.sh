@@ -13,7 +13,7 @@ BAZEL_BUILD_OPTIONS=(
     "--curses=no"
     --verbose_failures
     "--flaky_test_attempts=integration@2"
-    "--override_repository=envoy_build_config=${BUILD_CONFIG}"
+    "--override_repository=+envoy_build_config_ext+envoy_build_config=${BUILD_CONFIG}"
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
     "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 

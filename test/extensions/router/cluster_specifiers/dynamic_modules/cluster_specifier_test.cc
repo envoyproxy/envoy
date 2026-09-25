@@ -667,6 +667,16 @@ TEST_F(DynamicModuleClusterSpecifierReadTest, StreamInfoAttributesReadable) {
   EXPECT_EQ("absent", echoedValue(headers, "attribute-string-unset"));
 }
 
+TEST_F(DynamicModuleClusterSpecifierReadTest, RequestSizeAttributesReadable) {
+  setUpPlugin();
+  stream_info_.bytes_received_ = 11;
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "prod"}, {"content-length", "17"}};
+  EXPECT_EQ("11", echoedValue(headers, "attribute-request-size"));
+  headers.setCopy(Http::LowerCaseString("x-echo"), "attribute-request-total-size");
+  const uint64_t expected_total_size = 11 + headers.byteSize();
+  EXPECT_EQ(absl::StrCat(expected_total_size), resolveRouteEntry(headers)->clusterName());
+}
+
 TEST_F(DynamicModuleClusterSpecifierReadTest, DynamicMetadataReadable) {
   setUpPlugin();
   Protobuf::Struct metadata;
@@ -1376,7 +1386,7 @@ TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, ScalarHistogramDefineAndReco
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
                 config_ptr, histogram_id, nullptr, 0, 42));
-  EXPECT_TRUE(config->getHistogramById(histogram_id).has_value());
+  EXPECT_TRUE(config->metrics().getHistogramById(histogram_id).has_value());
 }
 
 TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, MetricIdsAreSequentialAndIndependent) {
@@ -1439,8 +1449,8 @@ TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, MetricIdsAreSequentialAndInd
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
                 config_ptr, second_histogram_id, nullptr, 0, 11));
-  EXPECT_TRUE(config->getHistogramById(first_histogram_id).has_value());
-  EXPECT_TRUE(config->getHistogramById(second_histogram_id).has_value());
+  EXPECT_TRUE(config->metrics().getHistogramById(first_histogram_id).has_value());
+  EXPECT_TRUE(config->metrics().getHistogramById(second_histogram_id).has_value());
 }
 
 TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, LabeledMetricsDefineAndOperate) {
@@ -1500,7 +1510,7 @@ TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, LabeledMetricsDefineAndOpera
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
                 config_ptr, histogram_id, label_values.data(), label_values.size(), 42));
-  EXPECT_TRUE(config->getHistogramVecById(histogram_id).has_value());
+  EXPECT_TRUE(config->metrics().getHistogramVecById(histogram_id).has_value());
 }
 
 TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, InvalidMetricIdsReturnMetricNotFound) {

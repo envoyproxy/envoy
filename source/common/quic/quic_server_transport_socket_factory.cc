@@ -27,8 +27,7 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
   auto server_config = std::move(server_config_or_error.value());
   // QUIC client certificate authentication is gated by a runtime guard so it can be disabled to
   // restore the prior "not supported" startup error. A client certificate requirement also needs a
-  // trust anchor and must not use `ACCEPT_UNTRUSTED`, since either would let the server accept any
-  // client certificate.
+  // trust anchor to validate the presented certificate against.
   if (server_config->requireClientCertificate()) {
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_mtls_server_enabled")) {
       return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
@@ -39,20 +38,20 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
           "QUIC downstream TLS context requires a client certificate but no "
           "validation_context.trusted_ca is configured");
     }
-    if (validation_ctx->trustChainVerification() ==
-        envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
-            ACCEPT_UNTRUSTED) {
-      return absl::InvalidArgumentError(
-          "QUIC downstream TLS context requires a client certificate but "
-          "validation_context.trust_chain_verification is ACCEPT_UNTRUSTED, which would "
-          "silently accept any client certificate");
-    }
   }
 
+  // QUIC does not re-validate the client certificate on session resumption. A resumed connection
+  // reuses the verdict of the original handshake until the ticket expires. Resumption and early
+  // data therefore default to off on filter chains that validate a client certificate. Operators
+  // can still opt into resumption explicitly.
+  const bool default_resumption =
+      !(server_config->certificateValidationContext() != nullptr &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_mtls_resumption_disabled_by_default"));
   const bool enable_early_data =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true);
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, default_resumption);
   const bool enable_resumption =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_resumption, true);
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_resumption, default_resumption);
 
   if (!enable_resumption && enable_early_data) {
     return absl::InvalidArgumentError(

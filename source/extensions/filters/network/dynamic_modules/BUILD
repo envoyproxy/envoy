@@ -17,8 +17,8 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:utility_lib",
-        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
     ],
 )
 
@@ -44,6 +44,7 @@ envoy_cc_library(
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:abi_context_accessors_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

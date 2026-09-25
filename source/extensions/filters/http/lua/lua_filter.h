@@ -37,9 +37,10 @@ struct LuaFilterStats {
 class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
   // creation_status is set (and construction stops early) if the supplied code cannot be parsed.
-  PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                  Stats::Gauge& vm_count_gauge, uint32_t concurrency,
-                  absl::Status& creation_status);
+  PerLuaCodeSetup(const std::string& lua_code,
+                  const Filters::Common::Lua::PackagePaths& package_paths,
+                  ThreadLocal::SlotAllocator& tls, Stats::Gauge& vm_count_gauge,
+                  uint32_t concurrency, absl::Status& creation_status);
   ~PerLuaCodeSetup();
 
   Extensions::Filters::Common::Lua::CoroutinePtr createCoroutine() {
@@ -152,6 +153,11 @@ public:
    * is pre-configured with the appropriate lua stat prefix.
    */
   virtual Stats::Scope& statsScope() PURE;
+
+  /**
+   * @return Http::RequestHeaderMapOptRef the request headers for this stream, if present.
+   */
+  virtual Http::RequestHeaderMapOptRef requestHeaders() PURE;
 };
 
 class Filter;
@@ -213,6 +219,7 @@ public:
 
   static ExportedFunctions exportedFunctions() {
     return {{"headers", static_luaHeaders},
+            {"requestHeaders", static_luaRequestHeaders},
             {"body", static_luaBody},
             {"bodyChunks", static_luaBodyChunks},
             {"trailers", static_luaTrailers},
@@ -261,6 +268,13 @@ private:
    * @return a handle to the headers.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHeaders);
+
+  /**
+   * @return a handle to the request headers, or nil if the stream has none. On the request path
+   *         this is the same header map that headers() returns; on the response path it is the
+   *         request's headers, which are otherwise unreachable from envoy_on_response.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRequestHeaders);
 
   /**
    * @return a handle to the full body or nil if there is no body. This call will cause the script
@@ -411,6 +425,7 @@ private:
     // Headers/body/trailers wrappers do not survive any yields. The user can request them
     // again across yields if needed.
     headers_wrapper_.reset();
+    request_headers_wrapper_.reset();
     body_wrapper_.reset();
     trailers_wrapper_.reset();
     metadata_wrapper_.reset();
@@ -442,6 +457,7 @@ private:
   FilterCallbacks& callbacks_;
   Http::HeaderMap* trailers_{};
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> request_headers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
@@ -644,6 +660,7 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
+    Http::RequestHeaderMapOptRef requestHeaders() override { return callbacks_->requestHeaders(); }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -678,6 +695,7 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
+    Http::RequestHeaderMapOptRef requestHeaders() override { return callbacks_->requestHeaders(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};

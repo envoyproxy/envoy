@@ -277,6 +277,13 @@ envoy.compression.zstd.decompressor:
   status: stable
   type_urls:
   - envoy.extensions.compression.zstd.decompressor.v3.Zstd
+envoy.config.validators.dynamic_modules:
+  categories:
+  - envoy.config.validators
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.config.validators.dynamic_modules.v3.DynamicModuleConfigValidator
 envoy.config.validators.minimum_clusters_validator:
   categories:
   - envoy.config.validators
@@ -1018,8 +1025,8 @@ envoy.filters.network.sni_cluster:
 envoy.filters.network.sni_dynamic_forward_proxy:
   categories:
   - envoy.filters.network
-  security_posture: unknown
-  status: alpha
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
   type_urls:
   - envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
 envoy.filters.network.tcp_bandwidth_limit:
@@ -1186,7 +1193,7 @@ envoy.geoip_providers.maxmind:
   categories:
   - envoy.geoip_providers
   security_posture: unknown
-  status: wip
+  status: stable
   type_urls:
   - envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
 envoy.grpc_credentials.file_based_metadata:
@@ -1236,6 +1243,13 @@ envoy.health_checkers.thrift:
   status: alpha
   type_urls:
   - envoy.extensions.health_checkers.thrift.v3.Thrift
+envoy.health_checkers.udp:
+  categories:
+  - envoy.health_checkers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.health_checkers.udp.v3.UdpHealthCheck
 envoy.health_check.event_sinks.file:
   categories:
   - envoy.health_check.event_sinks
@@ -1257,6 +1271,13 @@ envoy.http.original_ip_detection.xff:
   status: stable
   type_urls:
   - envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
+envoy.http.stateful_header_formatters.dynamic_modules:
+  categories:
+  - envoy.http.stateful_header_formatters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.header_formatters.dynamic_modules.v3.DynamicModuleHeaderFormatter
 envoy.http.stateful_header_formatters.preserve_case:
   categories:
   - envoy.http.stateful_header_formatters
@@ -2293,6 +2314,13 @@ envoy.load_balancing_policies.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig
+envoy.http.early_header_mutation.dynamic_modules:
+  categories:
+  - envoy.http.early_header_mutation
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.early_header_mutation.dynamic_modules.v3.DynamicModuleEarlyHeaderMutation
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
@@ -2354,6 +2382,13 @@ envoy.http.ext_proc.response_processors.save_processing_response:
   - envoy.http.ext_proc.response_processors
   security_posture: unknown
   status: wip
+envoy.http.ai_filters.request_info:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
 envoy.config_subscription.rest:
   categories:
   - envoy.config_subscription

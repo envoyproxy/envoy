@@ -1,13 +1,84 @@
+#include <atomic>
+
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/tracer_config.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
 
 namespace Envoy {
+
+namespace {
+
+// Counts child spans named "off_thread_work" that were finished, so SpanAcrossCallbacks can confirm
+// a span spawned in on_request_headers was finished from a later event hook.
+std::atomic<uint32_t>& offThreadWorkSpansFinished() {
+  static std::atomic<uint32_t> counter{0};
+  return counter;
+}
+
+// A minimal tracer that keeps the active span non-null so a module can spawn and finish real child
+// spans. Only the child operation name matters here, so every other method is a no-op.
+class TestTracerSpan : public Tracing::Span {
+public:
+  explicit TestTracerSpan(std::string operation) : operation_(std::move(operation)) {}
+  void setOperation(absl::string_view operation) override { operation_ = std::string(operation); }
+  void setTag(absl::string_view, absl::string_view) override {}
+  void log(SystemTime, const std::string&) override {}
+  void finishSpan() override {
+    if (operation_ == "off_thread_work") {
+      offThreadWorkSpansFinished().fetch_add(1);
+    }
+  }
+  void injectContext(Tracing::TraceContext&, const Tracing::UpstreamContext&) override {}
+  Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
+                              SystemTime) override {
+    return std::make_unique<TestTracerSpan>(name);
+  }
+  void setSampled(bool) override {}
+  bool exportedSpan() const override { return false; }
+  bool useLocalDecision() const override { return false; }
+  std::string getBaggage(absl::string_view) override { return ""; }
+  void setBaggage(absl::string_view, absl::string_view) override {}
+  std::string getTraceId() const override { return ""; }
+  std::string getSpanId() const override { return ""; }
+
+private:
+  std::string operation_;
+};
+
+class TestTracerDriver : public Tracing::Driver {
+public:
+  Tracing::SpanPtr startSpan(const Tracing::Config&, Tracing::TraceContext&,
+                             const StreamInfo::StreamInfo&, const std::string& operation_name,
+                             Tracing::Decision) override {
+    return std::make_unique<TestTracerSpan>(operation_name);
+  }
+};
+
+class TestTracerFactory : public Server::Configuration::TracerFactory {
+public:
+  Tracing::DriverSharedPtr
+  createTracerDriver(const Protobuf::Message&,
+                     Server::Configuration::TracerFactoryContext&) override {
+    return std::make_shared<TestTracerDriver>();
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  std::string name() const override { return "envoy.tracers.dynamic_modules_test"; }
+};
+
+REGISTER_FACTORY(TestTracerFactory, Server::Configuration::TracerFactory);
+
+} // namespace
 
 class DynamicModulesIntegrationTest : public testing::TestWithParam<std::string>,
                                       public HttpIntegrationTest {
@@ -174,6 +245,50 @@ TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   EXPECT_EQ(10U, response->body().size());
 }
 
+TEST_P(DynamicModulesIntegrationTest, FilterConstructorFailsClosed) {
+  // A module whose filter constructor fails must return a 500 to the client instead of crashing the
+  // worker. Only the Rust module can force this path with a caught constructor panic.
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the filter_new_panic filter is only in the rust test module";
+  }
+  initializeFilter("filter_new_panic");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  // The caught constructor panic is what leaves a null filter, so pin the 500 to that path.
+  EXPECT_LOG_CONTAINS("error", "caught panic at FFI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, HttpFilterConstructorExceptionFailsClosed) {
+  // A C++ module whose filter constructor throws must fail closed with a 500 instead of aborting
+  // the worker. The C++ SDK barrier catches the exception at the ABI boundary and returns a null
+  // filter.
+  if (GetParam() != "cpp") {
+    GTEST_SKIP() << "the throw_on_filter_new filter is only in the cpp test module";
+  }
+  initializeFilter("throw_on_filter_new");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS("error", "caught exception at the ABI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, GenericSecretCallbacks) {
   // The module subscribes by name with no config source, so the name resolves against the
   // statically configured secrets.
@@ -257,6 +372,42 @@ TEST_P(DynamicModulesIntegrationTest, LogLevel) {
                         .get(Http::LowerCaseString("x-log-error-enabled"))[0]
                         ->value()
                         .getStringView());
+}
+
+// The log callback reports the module source location of the log statement rather than a location
+// inside Envoy. This exercises each SDK's call-site capture end to end.
+TEST_P(DynamicModulesIntegrationTest, LogReportsModuleSourceLocation) {
+#ifdef __APPLE__
+  if (GetParam() == "go") {
+    GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
+  }
+#endif
+  const std::string expected_source_file = GetParam() == "go"    ? "http_integration_test.go"
+                                           : GetParam() == "cpp" ? "http_integration_test.cc"
+                                                                 : "http_integration_test.rs";
+
+  initializeFilter("passthrough");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  Envoy::LogLevelSetter save_levels(spdlog::level::info);
+  Envoy::StartStopRecording recording(Envoy::GetLogSink());
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+
+  // The passthrough filter logs from on_request_headers. That line must carry the module source
+  // location instead of a location inside Envoy.
+  bool found = false;
+  for (const std::string& message : recording.messages()) {
+    if (message.find("on_request_headers called") == std::string::npos) {
+      continue;
+    }
+    found = true;
+    EXPECT_NE(std::string::npos, message.find(expected_source_file)) << message;
+    EXPECT_EQ(std::string::npos, message.find("abi_impl.cc")) << message;
+  }
+  EXPECT_TRUE(found);
 }
 
 // A `direct_response` route is served as a local reply. The module did not send it, so its
@@ -477,6 +628,47 @@ TEST_P(DynamicModulesIntegrationTest, PerRouteStructConfig) {
   // binary bytes (which would have started with a ``0x0a`` wire-tag byte and broken any module
   // that attempted to ``json.Unmarshal`` the payload). See
   // https://github.com/envoyproxy/envoy/issues/44733.
+  EXPECT_EQ(R"({"struct_key":"struct_value"})",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("x-per-route-config"))[0]
+                ->value()
+                .getStringView());
+}
+
+// Verifies that the ``value`` of an ``xds.type.v3.TypedStruct`` per-route configuration is
+// serialized to JSON before being passed to the module, the same payload a plain
+// ``google.protobuf.Struct`` produces while preserving a logical type URL for config dumps.
+TEST_P(DynamicModulesIntegrationTest, PerRouteTypedStructConfig) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    // The per_route_config test filter that surfaces the raw config bytes back as a header is
+    // implemented by the Rust integration test data, so the TypedStruct check is scoped to those
+    // language flavors.
+    return;
+  }
+
+  // The regular filter config remains a ``StringValue`` for the ``x-config`` header, while the
+  // per-route override is supplied as an ``xds.type.v3.TypedStruct`` whose ``value`` carries the
+  // Struct payload.
+  initializeFilter("per_route_config", "a", R"({"struct_key":"struct_value"})",
+                   "type.googleapis.com/google.protobuf.StringValue", false,
+                   "type.googleapis.com/xds.type.v3.TypedStruct");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("a", upstream_request_->headers()
+                     .get(Http::LowerCaseString("x-config"))[0]
+                     ->value()
+                     .getStringView());
+  // The per-route ``TypedStruct`` must arrive as the JSON serialization of its ``value`` field,
+  // identical to the payload a plain ``Struct`` produces.
   EXPECT_EQ(R"({"struct_key":"struct_value"})",
             upstream_request_->headers()
                 .get(Http::LowerCaseString("x-per-route-config"))[0]
@@ -744,6 +936,36 @@ TEST_P(DynamicModulesIntegrationTest, Scheduler) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// A module spawns a child span in on_request_headers, does off-thread work, and finishes the span
+// from the scheduled event hook. The request completes and the tracer confirms the span was
+// finished, proving a span can outlive the event hook that created it.
+TEST_P(DynamicModulesIntegrationTest, SpanAcrossCallbacks) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* tracing = hcm.mutable_tracing();
+        // Always trace so the active span is present and the module can spawn a child span.
+        tracing->mutable_random_sampling()->set_value(100.0);
+        auto* provider = tracing->mutable_provider();
+        provider->set_name("envoy.tracers.dynamic_modules_test");
+        std::ignore = provider->mutable_typed_config()->PackFrom(Protobuf::Struct());
+      });
+  const uint32_t before = offThreadWorkSpansFinished().load();
+  initializeFilter("span_across_callbacks");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_GE(offThreadWorkSpansFinished().load(), before + 1);
 }
 
 // Regression test for the shared continue-flag wedge. The upstream replies complete at headers
@@ -1385,6 +1607,47 @@ TEST_P(DynamicModulesIntegrationTest, ListMetadataCallbacks) {
   auto bool_1 = response->headers().get(Http::LowerCaseString("x-list-bool-1"));
   ASSERT_FALSE(bool_1.empty());
   EXPECT_EQ("false", bool_1[0]->value().getStringView());
+}
+
+// Reads every runtime type through the module's SDK and confirms both paths: a key present in the
+// static runtime layer yields its configured value, and an absent key yields the default the module
+// passed in. The module reads these while its config is being created, which is the only place the
+// runtime is reachable, so this also pins that config creation runs where the server context is
+// installed.
+TEST_P(DynamicModulesIntegrationTest, RuntimeValues) {
+  config_helper_.addRuntimeOverride("test.runtime_bool", "true");
+  config_helper_.addRuntimeOverride("test.runtime_int", "42");
+  config_helper_.addRuntimeOverride("test.runtime_number", "0.25");
+  // test.runtime_missing_* are deliberately never set, so the module gets its defaults back.
+
+  initializeFilter("runtime_values");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  auto header = [&response](absl::string_view name) -> std::string {
+    auto values = response->headers().get(Http::LowerCaseString(std::string(name)));
+    if (values.empty()) {
+      return "<missing>";
+    }
+    return std::string(values[0]->value().getStringView());
+  };
+
+  // Keys present in the static runtime layer override the defaults the module passed in.
+  EXPECT_EQ("true", header("x-runtime-bool"));
+  EXPECT_EQ("42", header("x-runtime-int"));
+  EXPECT_EQ("0.25", header("x-runtime-number"));
+
+  // Absent keys fall back to the module's own defaults rather than a zero value, and each type
+  // keeps its own default.
+  EXPECT_EQ("true", header("x-runtime-missing-bool"));
+  EXPECT_EQ("1234", header("x-runtime-missing-int"));
+  EXPECT_EQ("2.5", header("x-runtime-missing-number"));
 }
 
 } // namespace Envoy

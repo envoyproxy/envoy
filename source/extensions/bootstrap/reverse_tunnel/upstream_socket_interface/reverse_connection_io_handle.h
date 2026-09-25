@@ -86,7 +86,6 @@ private:
   // The socket that this IOHandle owns and manages lifetime for.
   Network::ConnectionSocketPtr owned_socket_;
 
-  UpstreamSocketThreadLocal& registry_;
   Stats::HistogramCompletableTimespanImpl cx_post_upgrade_lifetime_;
 };
 

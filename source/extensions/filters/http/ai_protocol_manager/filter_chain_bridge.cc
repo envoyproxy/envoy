@@ -7,40 +7,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-void DecoderFilterChainBridge::registerReplayWatermarks(ReplayWatermarkHandler& handler) {
-  handler_ = &handler;
-  callbacks_.addUpstreamWatermarkCallbacks(*this);
-  registered_ = true;
-}
-
-void DecoderFilterChainBridge::unregisterReplayWatermarks() {
-  if (registered_) {
-    callbacks_.removeUpstreamWatermarkCallbacks(*this);
-    registered_ = false;
-  }
-  handler_ = nullptr;
-}
-
 void DecoderFilterChainBridge::onUnrecoverableError() {
+  stats_.request_external_buffer_error_.inc();
   callbacks_.sendLocalReply(Http::Code::InternalServerError, "AI protocol buffer error", nullptr,
                             std::nullopt, "ai_protocol_manager_external_buffer_error");
 }
 
-void EncoderFilterChainBridge::registerReplayWatermarks(ReplayWatermarkHandler& handler) {
-  handler_ = &handler;
-  decoder_callbacks_.addDownstreamWatermarkCallbacks(*this);
-  registered_ = true;
-}
-
-void EncoderFilterChainBridge::unregisterReplayWatermarks() {
-  if (registered_) {
-    decoder_callbacks_.removeDownstreamWatermarkCallbacks(*this);
-    registered_ = false;
-  }
-  handler_ = nullptr;
-}
-
 void EncoderFilterChainBridge::onUnrecoverableError() {
+  stats_.response_external_buffer_error_.inc();
   // On the response path the headers (and possibly some body) may already be in
   // flight. sendLocalReply handles this best-effort: if the response has not
   // started it generates a local reply, otherwise it either ships the reply

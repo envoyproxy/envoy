@@ -25,8 +25,8 @@ protected:
 };
 
 /**
- * A caching thread local provider. This implementation updates the date string every 500ms and
- * caches on each thread.
+ * A caching thread local provider. Each thread updates its date string every 500ms using its own
+ * dispatcher, so refresh callbacks cannot accumulate on workers that have not started.
  */
 class TlsCachingDateProviderImpl : public DateProviderImplBase, public Singleton::Instance {
 public:
@@ -37,15 +37,16 @@ public:
 
 private:
   struct ThreadLocalCachedDate : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalCachedDate(const std::string& date_string) : date_string_(date_string) {}
+    explicit ThreadLocalCachedDate(Event::Dispatcher& dispatcher);
 
-    const std::string date_string_;
+    void onRefreshDate();
+
+    TimeSource& time_source_;
+    std::string date_string_;
+    Event::TimerPtr refresh_timer_;
   };
 
-  void onRefreshDate();
-
   ThreadLocal::SlotSharedPtr tls_;
-  Event::TimerPtr refresh_timer_;
 };
 
 /**

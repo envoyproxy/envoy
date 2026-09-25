@@ -5,10 +5,9 @@
 //! arm of [`crate::declare_all_init_functions!`], which registers a factory through
 //! [`crate::NEW_FORMATTER_CONFIG_FUNCTION`] and lets a single module dispatch by `formatter_name`.
 
-use crate::{abi, bytes_to_module_buffer, EnvoyBuffer};
+use crate::{abi, bytes_to_module_buffer, ffi_export, EnvoyBuffer};
 use std::cell::RefCell;
 use std::ffi::c_void;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 pub use crate::access_log::AccessLogType;
@@ -213,29 +212,22 @@ impl FormatterContext {
       return Vec::new();
     }
 
-    let mut raw: Vec<abi::envoy_dynamic_module_type_envoy_http_header> = Vec::with_capacity(count);
+    // Fill the pairs in place as ABI headers to avoid a second allocation.
+    let mut headers: Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> = Vec::with_capacity(count);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_formatter_get_headers(
         self.envoy_ptr,
         header_type,
-        raw.as_mut_ptr(),
+        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
       )
     };
     if !success {
       return Vec::new();
     }
     unsafe {
-      raw.set_len(count);
+      headers.set_len(count);
     }
-    raw
-      .iter()
-      .map(|h| {
-        (
-          unsafe { EnvoyBuffer::new_from_raw(h.key_ptr as *const _, h.key_length) },
-          unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
-        )
-      })
-      .collect()
+    headers
   }
 
   /// Get a value from dynamic metadata.
@@ -318,17 +310,16 @@ thread_local! {
   static FORMAT_BUFFER: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_config_new(
-  _formatter_config_envoy_ptr: abi::envoy_dynamic_module_type_formatter_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> *const c_void {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_formatter_config_new(
+    _formatter_config_envoy_ptr: abi::envoy_dynamic_module_type_formatter_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> *const c_void {
     // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
     // The helpers tolerate `(nullptr, 0)` empty inputs and substitute `U+FFFD` for malformed
     // UTF-8 rather than triggering UB.
@@ -345,11 +336,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_config_new(
         .get()
         .expect("NEW_FORMATTER_CONFIG_FUNCTION must be set"),
     )
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_formatter_config_new", panic);
-    ptr::null()
-  })
+  }
+  on_panic = ptr::null()
 }
 
 /// Testable wrapper for [`envoy_dynamic_module_on_formatter_config_new`].
@@ -367,35 +355,28 @@ pub fn envoy_dynamic_module_on_formatter_config_new_impl(
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_config_destroy(
-  config_ptr: *const c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_formatter_config_destroy(config_ptr: *const c_void) {
     crate::drop_wrapped_c_void_ptr!(config_ptr, FormatterConfig);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_formatter_config_destroy", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_parse(
-  config_ptr: *const c_void,
-  command: abi::envoy_dynamic_module_type_envoy_buffer,
-  command_arg: abi::envoy_dynamic_module_type_envoy_buffer,
-  has_max_length: bool,
-  max_length: usize,
-) -> *const c_void {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_formatter_parse(
+    config_ptr: *const c_void,
+    command: abi::envoy_dynamic_module_type_envoy_buffer,
+    command_arg: abi::envoy_dynamic_module_type_envoy_buffer,
+    has_max_length: bool,
+    max_length: usize,
+  ) -> *const c_void {
     let config = &*(config_ptr as *const Box<dyn FormatterConfig>);
     // SAFETY: `command` and `command_arg` are format-string tokens (UTF-8 by contract). The
     // helpers tolerate empty inputs and substitute `U+FFFD` for malformed UTF-8.
@@ -413,48 +394,38 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_parse(
       Some(provider) => crate::wrap_into_c_void_ptr!(provider),
       None => ptr::null(),
     }
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_formatter_parse", panic);
-    ptr::null()
-  })
+  }
+  on_panic = ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_provider_destroy(
-  provider_ptr: *const c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_formatter_provider_destroy(provider_ptr: *const c_void) {
     crate::drop_wrapped_c_void_ptr!(provider_ptr, FormatterProvider);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_formatter_provider_destroy", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_format(
-  provider_ptr: *const c_void,
-  formatter_context_envoy_ptr: *mut c_void,
-  result: *mut abi::envoy_dynamic_module_type_module_buffer,
-) -> bool {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_formatter_format(
+    provider_ptr: *const c_void,
+    formatter_context_envoy_ptr: *mut c_void,
+    result: *mut abi::envoy_dynamic_module_type_module_buffer,
+  ) -> bool {
     let provider = &*(provider_ptr as *const Box<dyn FormatterProvider>);
     let ctx = FormatterContext::new(formatter_context_envoy_ptr);
     match provider.format(&ctx) {
       Some(value) => {
         FORMAT_BUFFER.with(|cell| {
           let mut buf = cell.borrow_mut();
-          buf.clear();
-          buf.extend_from_slice(value.as_bytes());
+          // The provider owns the returned string, so move its buffer in instead of copying it.
+          *buf = value.into_bytes();
           unsafe {
             *result = bytes_to_module_buffer(buf.as_slice());
           }
@@ -463,9 +434,6 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_format(
       },
       None => false,
     }
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_formatter_format", panic);
-    false
-  })
+  }
+  on_panic = false
 }

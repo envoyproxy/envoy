@@ -2061,7 +2061,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return server_context.secretManager().findOrCreateGenericSecretProvider(
-        config.sds_config(), config.name(), server_context, init_manager);
+        config.sds_config(), config.name(), server_context, init_manager, true);
   } else {
     return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
@@ -2076,6 +2076,7 @@ SecretReader::SecretReader(
     auto& init_manager = context.initManager();
     auto& tls = server_context.threadLocal();
     auto& api = server_context.api();
+    auto& main_dispatcher = server_context.mainThreadDispatcher();
     for (auto& secret : proto_config.generic_secrets()) {
       // Check here to avoid creating unecessary sds provider
       if (secrets_.contains(secret.name())) {
@@ -2085,9 +2086,9 @@ SecretReader::SecretReader(
       if (secret_provider == nullptr) {
         throw EnvoyException(absl::StrCat("no secret provider found for ", secret.name()));
       }
-      auto tlsp = THROW_OR_RETURN_VALUE(
-          Secret::ThreadLocalGenericSecretProvider::create(std::move(secret_provider), tls, api),
-          std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>);
+      auto tlsp = THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                            std::move(secret_provider), tls, api, main_dispatcher),
+                                        Secret::ThreadLocalGenericSecretProviderPtr);
       secrets_.emplace(secret.name(), std::move(tlsp));
     }
   }

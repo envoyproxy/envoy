@@ -128,6 +128,13 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
 }
 
 TEST_P(IntegrationAdminTest, Admin) {
+  // The `usedonly` assertions below expect no histograms, which only holds until the first stats
+  // flush merges the admin request/connection histograms into the parent store and marks them
+  // used. The default 5s flush interval is shorter than a slow run of this test, so push it out to
+  // the configurable maximum (the proto caps this just under 5m) rather than racing the timer.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_flush_interval()->set_seconds(299);
+  });
   initialize();
 
   BufferingStreamDecoderPtr response;

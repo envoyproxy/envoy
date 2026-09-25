@@ -128,13 +128,25 @@ message TokenCacheConfig {
 }
 
 message TokenHeader {
-  // The HTTP header's name.
-  string name = 1
-      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+  // Configuration options for preserving an existing token header.
+  message PreserveExisting {
+  }
+
+  // The HTTP header's name. Defaults to ``Authorization`` if not specified.
+  string name = 1 [
+    (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}
+  ];
 
   // The header's prefix. The format is "value_prefix<token>"
   // For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
   // end.
   string value_prefix = 2
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+  // If set, the filter checks if the target header is already present (by header key existence,
+  // even if the header value is empty). If present, it skips token fetching and preserves the
+  // existing header intact (``value_prefix`` has no effect on the preserved header). If absent,
+  // a new token is fetched and written using ``name`` and ``value_prefix``.
+  // If not set, the default behavior is to unconditionally overwrite the header.
+  PreserveExisting preserve_existing = 3;
 }
