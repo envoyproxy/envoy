@@ -284,8 +284,9 @@ std::optional<uint32_t> DynamicModuleCertValidator::daysUntilFirstCertExpires() 
 
 std::string DynamicModuleCertValidator::getCaFileName() const { return ""; }
 
-Envoy::Ssl::CertificateDetailsPtr DynamicModuleCertValidator::getCaCertInformation() const {
-  return nullptr;
+std::vector<Envoy::Ssl::CertificateDetailsPtr>
+DynamicModuleCertValidator::getCaCertInformation() const {
+  return {};
 }
 
 // Factory implementation.

@@ -23,6 +23,8 @@
 #include "test/common/tls/ocsp/test_data/good_ocsp_resp_info.h"
 #include "test/common/tls/ssl_certs_test.h"
 #include "test/common/tls/ssl_test_utility.h"
+#include "test/common/tls/test_data/ca_cert_info.h"
+#include "test/common/tls/test_data/fake_ca_cert_info.h"
 #include "test/common/tls/test_data/no_san_cert_info.h"
 #include "test/common/tls/test_data/san_dns3_cert_info.h"
 #include "test/common/tls/test_data/san_ip_cert_info.h"
@@ -519,7 +521,8 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
   EXPECT_TRUE(
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
@@ -575,7 +578,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
   EXPECT_TRUE(
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
@@ -631,7 +635,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithIPSAN) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
   EXPECT_TRUE(
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
@@ -684,7 +689,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
 }
 
 TEST_F(SslContextImplTest, TestNoCert) {
@@ -693,8 +699,59 @@ TEST_F(SslContextImplTest, TestNoCert) {
   Envoy::Ssl::ClientContextSharedPtr context(
       *manager_.createSslClientContext(*store_.rootScope(), *cfg));
   auto cleanup = cleanUpHelper(context);
-  EXPECT_EQ(nullptr, context->getCaCertInformation());
+  EXPECT_TRUE(context->getCaCertInformation().empty());
   EXPECT_TRUE(context->getCertChainInformation().empty());
+}
+
+TEST_F(SslContextImplTest, TestGetCertInformationWithMultipleCaCerts) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+
+  Envoy::Ssl::ClientContextSharedPtr context(
+      *manager_.createSslClientContext(*store_.rootScope(), *cfg));
+  auto cleanup = cleanUpHelper(context);
+
+  auto ca_certs = context->getCaCertInformation();
+  ASSERT_EQ(2, ca_certs.size());
+
+  // The bundle is fake_ca + ca, so the first entry should be fake_ca_cert and the second ca_cert.
+  std::string fake_ca_json = absl::StrCat(R"EOF({
+ "path": "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem",
+ "serial_number": ")EOF",
+                                          TEST_FAKE_CA_CERT_SERIAL, R"EOF(",
+ "subject_alt_names": []
+ }
+)EOF");
+
+  std::string ca_json = absl::StrCat(R"EOF({
+ "path": "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem",
+ "serial_number": ")EOF",
+                                     TEST_CA_CERT_SERIAL, R"EOF(",
+ "subject_alt_names": []
+ }
+)EOF");
+
+  envoy::admin::v3::CertificateDetails fake_ca_details, ca_details;
+  TestUtility::loadFromJson(TestEnvironment::substitute(fake_ca_json), fake_ca_details);
+  TestUtility::loadFromJson(TestEnvironment::substitute(ca_json), ca_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(fake_ca_details, *ca_certs[0]));
+  EXPECT_TRUE(message_differencer.Compare(ca_details, *ca_certs[1]));
 }
 
 // Multiple RSA certificates with the same exact DNS SAN are allowed.

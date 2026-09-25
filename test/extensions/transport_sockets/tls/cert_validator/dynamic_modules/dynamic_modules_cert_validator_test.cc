@@ -348,12 +348,12 @@ TEST_F(DynamicModuleCertValidatorTest, GetCaFileNameReturnsEmpty) {
   EXPECT_EQ("", validator.getCaFileName());
 }
 
-TEST_F(DynamicModuleCertValidatorTest, GetCaCertInformationReturnsNull) {
+TEST_F(DynamicModuleCertValidatorTest, GetCaCertInformationReturnsEmpty) {
   auto config_or_error = createConfig("cert_validator_no_op");
   ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
-  EXPECT_EQ(nullptr, validator.getCaCertInformation());
+  EXPECT_TRUE(validator.getCaCertInformation().empty());
 }
 
 TEST_F(DynamicModuleCertValidatorTest, AddClientValidationContext) {
