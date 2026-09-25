@@ -48,7 +48,8 @@ class StaticRateLimitOverride : public RateLimitOverrideAction {
 public:
   StaticRateLimitOverride(
       const envoy::config::route::v3::RateLimit::Override::RateLimitOverride& config)
-      : requests_per_unit_(config.requests_per_unit()), unit_(config.unit()) {}
+      : requests_per_unit_(config.requests_per_unit()), unit_(config.unit()),
+        unit_multiplier_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, unit_multiplier, 1)) {}
 
   // Router::RateLimitOverrideAction
   bool populateOverride(RateLimit::Descriptor& descriptor,
@@ -57,6 +58,7 @@ public:
 private:
   const uint32_t requests_per_unit_;
   const envoy::type::v3::RateLimitUnit unit_;
+  const uint32_t unit_multiplier_;
 };
 
 /**
