@@ -159,47 +159,6 @@ json generateInitializeResponse(const json& session_id, absl::string_view server
   return ret;
 }
 
-absl::string_view cacheScopeToString(
-    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CacheScope cache_scope) {
-  return cache_scope ==
-                 envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PRIVATE
-             ? McpConstants::CACHE_SCOPE_PRIVATE
-             : McpConstants::CACHE_SCOPE_PUBLIC;
-}
-
-constexpr absl::string_view kSupportedMcpProtocolVersions[] = {
-    McpConstants::MCP_VERSION_2024_11_05, McpConstants::MCP_VERSION_2025_03_26,
-    McpConstants::MCP_VERSION_2025_06_18, McpConstants::MCP_VERSION_2025_11_25,
-    McpConstants::MCP_VERSION_2026_07_28,
-};
-
-json generateServerDiscoverResponse(const json& session_id, absl::string_view server_name,
-                                    uint64_t cache_ttl_ms, absl::string_view cache_scope) {
-  json ret;
-  ret[McpConstants::JSONRPC_FIELD] = McpConstants::JSONRPC_VERSION;
-  ret[McpConstants::ID_FIELD] = session_id;
-
-  json result;
-  json supported_versions = json::array();
-  for (const absl::string_view supported_version : kSupportedMcpProtocolVersions) {
-    supported_versions.push_back(supported_version);
-  }
-  result[McpConstants::SUPPORTED_VERSIONS_FIELD] = supported_versions;
-
-  result[McpConstants::CAPABILITIES_FIELD][McpConstants::TOOLS_FIELD]
-        [McpConstants::LIST_CHANGED_FIELD] = false;
-  result[McpConstants::META_FIELD][McpConstants::MCP_META_SERVER_INFO_FIELD]
-        [McpConstants::NAME_FIELD] = server_name;
-  result[McpConstants::META_FIELD][McpConstants::MCP_META_SERVER_INFO_FIELD]
-        [McpConstants::VERSION_FIELD] = McpConstants::DEFAULT_SERVER_VERSION;
-
-  result[McpConstants::TTL_MS_FIELD] = cache_ttl_ms;
-  result[McpConstants::CACHE_SCOPE_FIELD] = cache_scope;
-  result[McpConstants::RESULT_TYPE_FIELD] = McpConstants::RESULT_TYPE_COMPLETE;
-  ret[McpConstants::RESULT_FIELD] = result;
-  return ret;
-}
-
 json generateErrorJsonResponse(int error_code, absl::string_view error_message) {
   return json{
       {McpConstants::ERROR_CODE_FIELD, error_code},
@@ -358,10 +317,6 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
                                                              DEFAULT_MAX_REQUEST_BODY_SIZE)),
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)),
-      server_discovery_cache_ttl_ms_(PROTOBUF_GET_MS_OR_DEFAULT(
-          proto_config_.server_info().server_discovery_cache_config(), ttl, 0)),
-      server_discovery_cache_scope_(cacheScopeToString(
-          proto_config_.server_info().server_discovery_cache_config().cache_scope())),
       clear_route_cache_(!proto_config_.disable_clear_route_cache()) {}
 
 absl::Status McpJsonRestBridgeFilterConfig::initialize() {
@@ -732,7 +687,6 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
   if (mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
       mcp_operation_ == McpOperation::OperationFailed ||
-      mcp_operation_ == McpOperation::ServerDiscover ||
       mcp_operation_ == McpOperation::ToolsListLocal) {
     // sendLocalReply/encodeHeaders was called in handleMcpMethod for these operations.
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -750,8 +704,6 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   // The response for InitializedNotification is empty body so we don't need
   // to modify the response headers.
   case McpOperation::InitializationAck:
-  // ServerDiscover sends a local reply, so the headers are already correct.
-  case McpOperation::ServerDiscover:
   // ToolsListLocal sends a local reply, so the headers are already correct.
   case McpOperation::ToolsListLocal:
     return Http::FilterHeadersStatus::Continue;
@@ -825,12 +777,11 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
 
 Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
                                                            bool end_stream) {
-  // No need to encode the response body for Initialization and InitializationAck. ToolsListLocal
-  // and ServerDiscover are local responses, and the response body is already encoded.
+  // No need to encode the response body for Initialization and InitializationAck. ToolsListLocal is
+  // a local response, and the response body is already encoded.
   if (mcp_operation_ == McpOperation::Unspecified ||
       mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
-      mcp_operation_ == McpOperation::ServerDiscover ||
       mcp_operation_ == McpOperation::ToolsListLocal) {
     return Http::FilterDataStatus::Continue;
   }
@@ -1161,8 +1112,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
                                        : json::object());
       }
     }
-
-  } else if (method == McpConstants::Methods::INITIALIZE && !is_stateless_request_) {
+  } else if (method == McpConstants::Methods::INITIALIZE) {
     mcp_operation_ = McpOperation::Initialization;
     if (json_rpc.contains(McpConstants::PARAMS_FIELD) &&
         json_rpc[McpConstants::PARAMS_FIELD].contains(McpConstants::PROTOCOL_VERSION_FIELD) &&
@@ -1191,8 +1141,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         nullptr, method,
         json_rpc.contains(McpConstants::PARAMS_FIELD) ? json_rpc[McpConstants::PARAMS_FIELD]
                                                       : json::object());
-
-  } else if (method == McpConstants::Methods::NOTIFICATION_INITIALIZED && !is_stateless_request_) {
+  } else if (method == McpConstants::Methods::NOTIFICATION_INITIALIZED) {
     mcp_operation_ = McpOperation::InitializationAck;
     setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                    ? json_rpc[McpConstants::PARAMS_FIELD]
@@ -1211,21 +1160,6 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
       setTraceContextHeaders(*request_headers, trace_context);
     }
     mapMcpToolToApiBackend(json_rpc, per_route_config);
-  } else if (method == McpConstants::Methods::SERVER_DISCOVER && is_stateless_request_) {
-    mcp_operation_ = McpOperation::ServerDiscover;
-    setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
-                                   ? json_rpc[McpConstants::PARAMS_FIELD]
-                                   : json::object());
-    decoder_callbacks_->sendLocalReply(
-        Http::Code::OK,
-        generateServerDiscoverResponse(*session_id_, server_name_,
-                                       config_->serverDiscoveryCacheTtlMs(),
-                                       config_->serverDiscoveryCacheScope())
-            .dump(),
-        [](Http::ResponseHeaderMap& headers) {
-          headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
-        },
-        Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_server_discover");
   } else {
     sendErrorResponse(
         Http::Code::OK, BridgeStatus::RequestMcpMethodNotSupported,
