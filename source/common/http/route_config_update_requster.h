@@ -26,8 +26,8 @@ public:
   void requestRouteConfigUpdate(RouteCache& route_cache,
                                 Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
                                 std::optional<Router::ConfigConstSharedPtr> route_config,
-                                Event::Dispatcher& dispatcher,
-                                RequestHeaderMap& request_headers) override;
+                                Event::Dispatcher& dispatcher, RequestHeaderMap& request_headers,
+                                Router::ScopeKeyPtr scope_key) override;
   void
   requestVhdsUpdate(const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
                     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
