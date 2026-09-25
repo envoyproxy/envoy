@@ -35,13 +35,14 @@ TEST(TranscoderConfigTest, IsRegistered) {
               testing::WhenDynamicCastTo<TranscoderFilterConfigFactory*>(testing::NotNull()));
 }
 
-TEST(TranscoderConfigTest, CreatesFilterForToIr) {
+TEST(TranscoderConfigTest, CreatesFilterForRequestAndResponseHandling) {
   TranscoderFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
 
   TranscoderProto proto;
-  proto.set_direction(TranscoderProto::TO_IR);
+  proto.set_request_handling(TranscoderProto::TO_IR);
+  proto.set_response_handling(TranscoderProto::FROM_IR);
 
   const auto factory_cb = factory.createAiFilterFactory(proto, context, *stats_store.rootScope());
   ASSERT_TRUE(factory_cb.ok()) << factory_cb.status();
@@ -52,13 +53,13 @@ TEST(TranscoderConfigTest, CreatesFilterForToIr) {
   EXPECT_NE((*factory_cb)(stream_context), nullptr);
 }
 
-TEST(TranscoderConfigTest, CreatesFilterForFromIr) {
+TEST(TranscoderConfigTest, CreatesFilterForRequestOnlyWithResponseDisabled) {
   TranscoderFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
 
   TranscoderProto proto;
-  proto.set_direction(TranscoderProto::FROM_IR);
+  proto.set_request_handling(TranscoderProto::FROM_IR);
 
   const auto factory_cb = factory.createAiFilterFactory(proto, context, *stats_store.rootScope());
   ASSERT_TRUE(factory_cb.ok()) << factory_cb.status();
@@ -69,9 +70,8 @@ TEST(TranscoderConfigTest, CreatesFilterForFromIr) {
   EXPECT_NE((*factory_cb)(stream_context), nullptr);
 }
 
-// An unset direction must fail at config load. Defaulting it to FROM_IR or TO_IR would turn a typo
-// into silent transcoding; defaulting it to a no-op would silently disable the filter.
-TEST(TranscoderConfigTest, RejectsUnsetDirection) {
+// Leaving both request_handling and response_handling unset must fail at config load.
+TEST(TranscoderConfigTest, RejectsWhenBothRequestAndResponseHandlingAreUnset) {
   TranscoderFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
@@ -80,8 +80,9 @@ TEST(TranscoderConfigTest, RejectsUnsetDirection) {
 
   const auto factory_cb = factory.createAiFilterFactory(proto, context, *stats_store.rootScope());
   EXPECT_FALSE(factory_cb.ok());
-  EXPECT_THAT(std::string(factory_cb.status().message()),
-              testing::HasSubstr("`direction` must be set"));
+  EXPECT_THAT(
+      std::string(factory_cb.status().message()),
+      testing::HasSubstr("at least one of `request_handling` or `response_handling` must be set"));
 }
 
 } // namespace

@@ -215,7 +215,8 @@ TranscoderFilterConfig::TranscoderFilterConfig(const TranscoderProto& proto,
                                                TranscodingEngine engine, Stats::Scope& scope)
     : stats_(TranscoderFilterStats{ALL_TRANSCODER_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "ai_protocol_manager.transcoder."))}),
-      direction_(proto.direction()), engine_(std::move(engine)) {}
+      request_handling_(proto.request_handling()), response_handling_(proto.response_handling()),
+      engine_(std::move(engine)) {}
 
 TranscoderFilter::TranscoderFilter(TranscoderFilterConfigSharedPtr config,
                                    const AiFilterContext& context)
@@ -228,6 +229,10 @@ Coroutine::Task<absl::Status> TranscoderFilter::decode(AiRequestReceiver receive
                                                        AiRequestPropagator propagate_request,
                                                        LocalReplier reply_locally) {
   ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+
+  if (config_->requestHandling() == TranscoderProto::DIRECTION_UNSPECIFIED) {
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
 
   const absl::Status status = transcodeRequest(request->json());
   if (!status.ok()) {
@@ -247,6 +252,10 @@ Coroutine::Task<absl::Status> TranscoderFilter::decode(AiRequestReceiver receive
 Coroutine::Task<absl::Status>
 TranscoderFilter::encodeUnary(AiResponseStreamReceiver receive_response,
                               AiResponseStreamPropagator propagate_response) {
+  if (config_->responseHandling() == TranscoderProto::DIRECTION_UNSPECIFIED) {
+    co_return absl::OkStatus();
+  }
+
   std::vector<FlattenJsonField> all_fields;
   while (true) {
     ASSIGN_OR_CO_RETURN(std::vector<FlattenJsonField> batch, co_await receive_response());
@@ -282,10 +291,14 @@ TranscoderFilter::encodeUnary(AiResponseStreamReceiver receive_response,
 
 Coroutine::Task<absl::Status> TranscoderFilter::encodeSSE(SseStreamReceiver receive_sse,
                                                           SseStreamPropagator propagate_sse) {
+  if (config_->responseHandling() == TranscoderProto::DIRECTION_UNSPECIFIED) {
+    co_return absl::OkStatus();
+  }
+
   while (true) {
     ASSIGN_OR_CO_RETURN(std::optional<SseEventPtr> event_opt, co_await receive_sse());
     if (!event_opt.has_value()) {
-      if (config_->direction() == TranscoderProto::FROM_IR &&
+      if (config_->responseHandling() == TranscoderProto::TO_IR &&
           effectiveTargetProtocol() == LLMProtocol::GeminiGenerateContent && !sse_done_emitted_) {
         auto done_event = std::make_unique<SseEvent>();
         done_event->set_raw_data(std::make_unique<Buffer::OwnedImpl>("[DONE]"));
@@ -312,8 +325,8 @@ Coroutine::Task<absl::Status> TranscoderFilter::encodeSSE(SseStreamReceiver rece
 }
 
 absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json) {
-  return config_->direction() == TranscoderProto::TO_IR ? transcodeToIr(json)
-                                                        : transcodeFromIr(json);
+  return config_->requestHandling() == TranscoderProto::TO_IR ? transcodeToIr(json)
+                                                              : transcodeFromIr(json);
 }
 
 absl::Status TranscoderFilter::transcodeToIr(nlohmann::json& json) {
@@ -361,11 +374,8 @@ absl::Status TranscoderFilter::transcodeFromIr(nlohmann::json& json) {
 }
 
 absl::Status TranscoderFilter::transcodeResponse(nlohmann::json& json) {
-  // On the response path, FilterManager runs the chain in reverse:
-  // - The FROM_IR (backend boundary) instance runs first and translates Backend -> IR.
-  // - The TO_IR (client boundary) instance runs second and translates IR -> Client.
-  return config_->direction() == TranscoderProto::FROM_IR ? transcodeResponseToIr(json)
-                                                          : transcodeResponseFromIr(json);
+  return config_->responseHandling() == TranscoderProto::TO_IR ? transcodeResponseToIr(json)
+                                                               : transcodeResponseFromIr(json);
 }
 
 absl::Status TranscoderFilter::transcodeResponseToIr(nlohmann::json& json) {
@@ -539,7 +549,7 @@ absl::Status TranscoderFilter::transcodeResponseFromIr(nlohmann::json& json) {
 }
 
 absl::Status TranscoderFilter::transcodeSseEvent(SseEvent& event, bool& should_drop) {
-  return config_->direction() == TranscoderProto::FROM_IR
+  return config_->responseHandling() == TranscoderProto::TO_IR
              ? transcodeSseEventToIr(event, should_drop)
              : transcodeSseEventFromIr(event, should_drop);
 }

@@ -26,27 +26,28 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // that adding a dialect costs one declarative rule set rather than a rule set per pair. Filters
 // placed between the two legs therefore only ever need to understand the canonical form.
 message Transcoder {
-  // Which boundary of the schema translation this filter instance sits at.
-  //
-  // ``FilterManager`` runs the AI filter chain forward on the request path and in reverse on the
-  // response path, so two instances bracket intermediate canonical-IR filters:
-  //
-  //   Client <-> Transcoder(TO_IR) <-> ...IR filters... <-> Transcoder(FROM_IR) <-> Backend
+  // Which schema translation leg to perform on a given path.
   enum Direction {
     DIRECTION_UNSPECIFIED = 0;
 
-    // Client-side boundary:
-    // - Request (decode): translates client schema -> canonical IR (OpenAI Chat Completions).
-    // - Response (encode): translates canonical IR -> client schema.
+    // Translates into the canonical IR (OpenAI Chat Completions):
+    // - In ``request_handling`` (decode): translates client schema -> canonical IR.
+    // - In ``response_handling`` (encode): translates target backend schema -> canonical IR.
     TO_IR = 1;
 
-    // Backend-side boundary:
-    // - Request (decode): translates canonical IR -> target backend schema.
-    // - Response (encode): translates target backend schema -> canonical IR.
+    // Translates out of the canonical IR (OpenAI Chat Completions):
+    // - In ``request_handling`` (decode): translates canonical IR -> target backend schema.
+    // - In ``response_handling`` (encode): translates canonical IR -> client schema.
     FROM_IR = 2;
   }
 
-  // Required. Configuring ``DIRECTION_UNSPECIFIED`` is rejected at config load rather than
-  // silently defaulting, so a missing field never quietly turns transcoding into a no-op.
-  Direction direction = 1 [(validate.rules).enum = {defined_only: true}];
+  // Request-side transcoding direction. When unset (``DIRECTION_UNSPECIFIED``), the request
+  // decode path forwards the payload untouched. At least one of ``request_handling`` or
+  // ``response_handling`` must be set.
+  Direction request_handling = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // Response-side transcoding direction. When unset (``DIRECTION_UNSPECIFIED``), response
+  // transcoding (``encodeUnary`` and ``encodeSSE``) is disabled and responses pass through
+  // untouched.
+  Direction response_handling = 2 [(validate.rules).enum = {defined_only: true}];
 }

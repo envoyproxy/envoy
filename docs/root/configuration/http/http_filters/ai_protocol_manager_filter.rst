@@ -265,27 +265,26 @@ one per pair, and AI filters placed between the two legs only ever see the canon
       - name: envoy.http.ai_filters.transcoder
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
-          direction: TO_IR
+          request_handling: TO_IR
+          response_handling: FROM_IR
       - name: envoy.http.ai_filters.transcoder
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
-          direction: FROM_IR
+          request_handling: FROM_IR
+          response_handling: TO_IR
 
 Two instances of the filter bracket the intermediate AI filters across both the request and
-response (unary and SSE streaming) pipelines: the ``TO_IR`` instance at the client boundary
-converts between the client's declared protocol and the canonical OpenAI Chat Completions IR, and
-the ``FROM_IR`` instance at the backend boundary converts between the canonical IR and the target
-backend's schema. Filters configured between the two therefore only ever see the canonical form.
+response (unary and SSE streaming) pipelines: the client-boundary instance sets
+``request_handling: TO_IR`` and ``response_handling: FROM_IR`` to convert between the client's
+declared protocol and the canonical OpenAI Chat Completions IR, and the backend-boundary instance
+sets ``request_handling: FROM_IR`` and ``response_handling: TO_IR`` to convert between the
+canonical IR and the target backend's schema. Filters configured between the two therefore only
+ever see the canonical form. Leaving either ``request_handling`` or ``response_handling`` unset
+(``DIRECTION_UNSPECIFIED``) disables transcoding on that leg so payloads pass through untouched.
 
 The rewritten payload is validated against the target's schema before it is
 replayed, so a document the upstream would reject fails locally rather than over the
 network. Such a rejection is counted by ``transcoder.failed``.
-
-.. note::
-
-  Only the request path is transcoded today. Responses are forwarded unchanged, because the
-  transcoding engine does not yet carry response mapping rules; a client that speaks one
-  vendor's API therefore still receives the backend's native response shape.
 
 .. note::
 

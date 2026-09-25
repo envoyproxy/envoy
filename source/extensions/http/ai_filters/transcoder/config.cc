@@ -22,12 +22,14 @@ TranscoderFilterConfigFactory::createAiFilterFactory(
   const auto& proto = MessageUtil::downcastAndValidate<const TranscoderProto&>(
       config, context.messageValidationVisitor());
 
-  switch (proto.direction()) {
-  case TranscoderProto::TO_IR:
-  case TranscoderProto::FROM_IR:
-    break;
-  default:
-    return absl::InvalidArgumentError("ai_filters.transcoder: `direction` must be set");
+  const bool has_request = proto.request_handling() == TranscoderProto::TO_IR ||
+                           proto.request_handling() == TranscoderProto::FROM_IR;
+  const bool has_response = proto.response_handling() == TranscoderProto::TO_IR ||
+                            proto.response_handling() == TranscoderProto::FROM_IR;
+  if (!has_request && !has_response) {
+    return absl::InvalidArgumentError(
+        "ai_filters.transcoder: at least one of `request_handling` or `response_handling` must be "
+        "set");
   }
 
   // Built once here rather than per stream. registerPack() validates every declarative rule set
