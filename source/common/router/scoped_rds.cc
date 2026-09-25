@@ -1,5 +1,6 @@
 #include "source/common/router/scoped_rds.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "envoy/admin/v3/config_dump.pb.h"
@@ -276,8 +277,9 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
   // Create route provider.
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(parent_.rds_config_source_);
-  rds.set_route_config_name(
-      parent_.scoped_route_map_[scope_name_]->configProto().route_configuration_name());
+  auto scope_info_iter = parent_.scoped_route_map_.find(scope_name_);
+  ASSERT(scope_info_iter != parent_.scoped_route_map_.end());
+  rds.set_route_config_name(scope_info_iter->second->configProto().route_configuration_name());
   initRdsConfigProvider(rds, srds_init_mgr);
   ENVOY_LOG(debug, fmt::format("Scope on demand update: {}", scope_name_));
   // If RouteConfiguration hasn't been initialized, routeConfig() return a shared_ptr to
@@ -302,7 +304,7 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
     envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
         Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
             resource.get().resource());
-    const std::string scope_name = scoped_route_config.name();
+    const absl::string_view scope_name = scoped_route_config.name();
     if (const auto& scope_info_iter = scoped_route_map_.find(scope_name);
         scope_info_iter != scoped_route_map_.end()) {
       if (scope_info_iter->second->configHash() == MessageUtil::hash(scoped_route_config)) {
@@ -342,20 +344,21 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
       std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
       if (scoped_route_config.on_demand() == false) {
         // For default scopes, create a rds helper with rds provider initialized.
-        rds_config_provider_helper =
-            std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
+        rds_config_provider_helper = std::make_unique<RdsRouteConfigProviderHelper>(
+            *this, std::string(scope_name), rds, init_manager);
         scoped_route_info = std::make_shared<ScopedRouteInfo>(
             std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
       } else {
         // For on demand scopes, create a rds helper with rds provider uninitialized.
         rds_config_provider_helper =
-            std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name);
+            std::make_unique<RdsRouteConfigProviderHelper>(*this, std::string(scope_name));
         // scope_route_info->routeConfig() will be nullptr, because RouteConfiguration is not
         // loaded.
         scoped_route_info =
             std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
       }
-      route_provider_by_scope_[scope_name] = std::move(rds_config_provider_helper);
+      route_provider_by_scope_[scoped_route_info->scopeName()] =
+          std::move(rds_config_provider_helper);
     }
     scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
     scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
@@ -507,7 +510,9 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
     return config;
   });
   // The data plane may wait for the route configuration to come back.
-  route_provider_by_scope_[scope_name]->runOnDemandUpdateCallback();
+  auto provider_iter = route_provider_by_scope_.find(scope_name);
+  ASSERT(provider_iter != route_provider_by_scope_.end());
+  provider_iter->second->runOnDemandUpdateCallback();
 }
 
 // TODO(stevenzzzz): see issue #7508, consider generalizing this function as it overlaps with
@@ -603,7 +608,7 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
                                                            &thread_local_dispatcher]() {
       thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(true); });
     };
-    std::string scope_name = iter->second;
+    const std::string& scope_name = iter->second;
     // Guard against scopes with inline route_configuration (e.g. default_routes)
     // which have an entry in scope_name_by_hash_ but not in route_provider_by_scope_.
     // Using find() instead of operator[] to avoid inserting a null unique_ptr.
@@ -639,12 +644,21 @@ ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& na
           static_cast<ScopedRdsConfigSubscription*>(subscription.get());
       dynamic_config->set_name(typed_subscription->name());
       const ScopedRouteMap& scoped_route_map = typed_subscription->scopedRouteMap();
+      std::vector<const ScopedRouteInfo*> sorted_scopes;
+      sorted_scopes.reserve(scoped_route_map.size());
       for (const auto& it : scoped_route_map) {
         if (!name_matcher.match(it.second->configProto().name())) {
           continue;
         }
-        std::ignore = dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
-            it.second->configProto());
+        sorted_scopes.push_back(it.second.get());
+      }
+      std::sort(sorted_scopes.begin(), sorted_scopes.end(),
+                [](const ScopedRouteInfo* a, const ScopedRouteInfo* b) {
+                  return a->scopeName() < b->scopeName();
+                });
+      for (const auto* scope : sorted_scopes) {
+        std::ignore =
+            dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(scope->configProto());
       }
       TimestampUtil::systemClockToTimestamp(subscription->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
