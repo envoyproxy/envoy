@@ -336,6 +336,7 @@ proto_library(
         "//envoy/extensions/health_checkers/thrift/v3:pkg",
         "//envoy/extensions/health_checkers/udp/v3:pkg",
         "//envoy/extensions/http/ai_filters/request_info/v3:pkg",
+        "//envoy/extensions/http/ai_filters/transcoder/v3:pkg",
         "//envoy/extensions/http/cache/file_system_http_cache/v3:pkg",
         "//envoy/extensions/http/cache/simple_http_cache/v3:pkg",
         "//envoy/extensions/http/cache_v2/file_system_http_cache/v3:pkg",

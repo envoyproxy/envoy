@@ -247,6 +247,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
       route_config != nullptr) {
     route_has_request_ = route_config->hasRequest();
     route_request_protocol_ = route_config->requestProtocol();
+    route_response_protocol_ = route_config->responseProtocol();
     if (route_has_request_) {
       ENVOY_LOG(debug, "ai_protocol_manager: route declares request API {}",
                 llmProtocolName(route_request_protocol_));
@@ -455,7 +456,8 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
     const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
-                                  route_request_protocol_, decode_manager_->length()};
+                                  route_request_protocol_, decode_manager_->length(),
+                                  route_response_protocol_};
     std::vector<AiFilterSharedPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());
     for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
