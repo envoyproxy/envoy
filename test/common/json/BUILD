@@ -156,6 +156,7 @@ envoy_cc_benchmark_binary(
         "//source/common/protobuf:utility_lib",
         "//test/proto:extraction_proto_cc_proto",
         "//test/proto:sensitive_proto_cc_proto",
+        "@benchmark",
     ],
 )
 
