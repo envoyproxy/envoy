@@ -122,6 +122,13 @@ public:
   // Return true if the cluster must be ready-for-use before ADS (Aggregated Discovery Service) can
   // be initialized; will only occur if ADS is configured to use the cluster via EnvoyGrpc.
   virtual bool requiredForAds() const PURE;
+
+  // Mark this cluster as opted out of CDS pausing (wait_for_warm_on_init: false).
+  // Such clusters remain in warming_clusters_ but do not hold a CDS pause handle.
+  virtual void markSkipCdsPause() PURE;
+
+  // Returns true if markSkipCdsPause() has been called for this cluster.
+  virtual bool skipCdsPause() const PURE;
 };
 
 /**
@@ -315,9 +322,12 @@ public:
   bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) override;
   void shutdown() override {
     shutdown_ = true;
-    if (resume_cds_ != nullptr) {
-      resume_cds_->cancel();
+    for (auto& [name, handle] : cds_pauses_) {
+      if (handle) {
+        handle->cancel();
+      }
     }
+    cds_pauses_.clear();
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     xds_manager_.shutdown();
@@ -849,6 +859,9 @@ private:
     }
     bool requiredForAds() const override { return required_for_ads_; }
 
+    void markSkipCdsPause() override { skip_cds_pause_ = true; }
+    bool skipCdsPause() const override { return skip_cds_pause_; }
+
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
     const std::string version_info_;
@@ -868,6 +881,7 @@ private:
     const bool avoid_cds_removal_ : 1;
     bool added_or_updated_ : 1 = false;
     const bool required_for_ads_ : 1;
+    bool skip_cds_pause_ : 1 = false;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
@@ -997,8 +1011,10 @@ private:
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
-  // Temporarily saved resume cds callback from updateClusterCounts invocation.
-  Config::ScopedResume resume_cds_;
+  // Per-cluster CDS pause handles. Each warming cluster that can block CDS holds one handle here.
+  // CDS stays paused as long as any handle is live. Clusters with a zero-timeout SDS dependency
+  // are excluded so a missing secret never deadlocks ADS for unrelated clusters.
+  absl::flat_hash_map<std::string, Config::ScopedResume> cds_pauses_;
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined.
   std::optional<std::string> local_cluster_name_;

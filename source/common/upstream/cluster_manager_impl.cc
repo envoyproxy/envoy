@@ -1005,6 +1005,10 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
     ASSERT(inserted);
   }
 
+  if (!cluster_reference.info()->waitForWarmOnInit()) {
+    cluster_entry_it->second->markSkipCdsPause();
+  }
+
   if (cluster_provided_lb) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(lb);
   } else {
@@ -1031,14 +1035,20 @@ void ClusterManagerImpl::updateClusterCounts() {
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   const bool all_clusters_initialized =
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
-  if (all_clusters_initialized && xds_manager_.adsMux()) {
+  if (all_clusters_initialized && !shutdown_ && xds_manager_.adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-    if (resume_cds_ == nullptr && !warming_clusters_.empty()) {
-      resume_cds_ = xds_manager_.pause(type_url);
-    } else if (warming_clusters_.empty()) {
-      resume_cds_.reset();
+    // Clusters with wait_for_warm_on_init: false opt out of blocking CDS. All other
+    // warming clusters hold a CDS pause handle until they finish warming.
+    for (const auto& [name, cluster_data] : warming_clusters_) {
+      if (!cds_pauses_.contains(name) && !cluster_data->skipCdsPause()) {
+        cds_pauses_.emplace(name, xds_manager_.pause(type_url));
+      }
     }
   }
+  // Release handles for clusters that are no longer warming. Run unconditionally so that
+  // handles are dropped promptly even if shutdown_ is already set.
+  absl::erase_if(cds_pauses_,
+                 [this](const auto& entry) { return !warming_clusters_.contains(entry.first); });
   cm_stats_.active_clusters_.set(active_clusters_.size());
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
 }

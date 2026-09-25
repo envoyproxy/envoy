@@ -1346,6 +1346,13 @@ public:
   virtual bool warmHosts() const PURE;
 
   /**
+   * @return false if this cluster should not block CDS ACK during warming. When false the cluster
+   * remains in warming_clusters_ but does not hold a CDS pause handle, so a slow-warming cluster
+   * cannot stall unrelated cluster updates delivered over ADS.
+   */
+  virtual bool waitForWarmOnInit() const PURE;
+
+  /**
    * @return true if this cluster is configured to set local interface name on upstream connections.
    */
   virtual bool setLocalInterfaceNameOnUpstreamConnections() const PURE;
