@@ -15,7 +15,9 @@ envoy_cc_library(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/common:pure_lib",
+        "//envoy/config:typed_config_interface",
         "//envoy/event:dispatcher_interface",
+        "//envoy/server:factory_context_interface",
         "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
@@ -362,6 +364,7 @@ envoy_cc_library(
         ":buffer_manager_lib",
         ":filter_pipeline_lib",
         ":json_with_ext_buf_lib",
+        ":replay_awaitable_lib",
         ":serializer_lib",
         ":task_group_lib",
         "//envoy/event:dispatcher_interface",
