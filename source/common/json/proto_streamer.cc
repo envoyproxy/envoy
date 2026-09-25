@@ -26,6 +26,7 @@ bool hasSpecialRepresentation(const Protobuf::Message& message) {
          Protobuf::Descriptor::WELLKNOWNTYPE_UNSPECIFIED;
 }
 
+// TODO(filipcacky): Remove this when protobuf stops aborting
 // Whether `field` holds a Value with no kind.
 bool holdsKindlessValue(const Protobuf::Message& message, const Field& field) {
   if (field.cpp_type() != Field::CPPTYPE_MESSAGE || field.is_repeated()) {
@@ -159,6 +160,7 @@ void MessageStreamer::emitNextField(Frame& frame) {
   if (frame.field_is_sensitive_ && redactionClears(field)) {
     return;
   }
+  // TODO(filipcacky): Remove this when protobuf stops aborting
   if (!frame.field_is_sensitive_ && holdsKindlessValue(frame.message_, field)) {
     return;
   }

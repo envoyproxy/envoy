@@ -656,6 +656,7 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
     }
   }
 
+  // TODO(filipcacky): Remove this when protobuf stops aborting
   // Protobuf aborts printing a Value with no kind, so null takes the place of a cleared one.
   if (ancestor_is_sensitive && descriptor->full_name() == "google.protobuf.Value" &&
       reflection->GetOneofFieldDescriptor(*reflectable_message, descriptor->oneof_decl(0)) ==

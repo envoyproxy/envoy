@@ -1,6 +1,6 @@
 any {
   [type.googleapis.com/google.protobuf.Value] {
-    // TODO: Remove this when protobuf stops aborting
+    // TODO(filipcacky): Remove this when protobuf stops aborting
     null_value: NULL_VALUE
   }
 }
@@ -12,7 +12,7 @@ repeated_any {
 sensitive {
   insensitive_any {
     [type.googleapis.com/google.protobuf.Value] {
-      // TODO: Remove this when protobuf stops aborting
+      // TODO(filipcacky): Remove this when protobuf stops aborting
       null_value: NULL_VALUE
     }
   }
@@ -25,7 +25,7 @@ sensitive {
     [type.googleapis.com/test.common.json.TestMessage] {
       any {
         [type.googleapis.com/google.protobuf.Value] {
-          // TODO: Remove this when protobuf stops aborting
+          // TODO(filipcacky): Remove this when protobuf stops aborting
           null_value: NULL_VALUE
         }
       }

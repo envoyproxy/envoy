@@ -68,6 +68,7 @@ void removeUnserializableUtf8Strings(Protobuf::Message& message,
 
 void makeComparable(Protobuf::Message& message);
 
+// TODO(filipcacky): Remove this when protobuf stops aborting
 // A missing kind aborts the printer as an Any payload,
 // fixed in protobuf fabd22a45435ac239dd86371f8814a4ad74fe123.
 void makeValueComparable(Protobuf::Value& value) {
