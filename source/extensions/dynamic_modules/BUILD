@@ -153,6 +153,19 @@ go_library(
 )
 
 go_library(
+    name = "go_sdk_internal_recovery",
+    srcs = ["sdk/go/internal/recovery/recovery.go"],
+    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/recovery",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_sdk_internal_recovery_test",
+    srcs = ["sdk/go/internal/recovery/recovery_test.go"],
+    embed = [":go_sdk_internal_recovery"],
+)
+
+go_library(
     name = "go_sdk_abi",
     srcs = [
         "sdk/go/abi/common.go",
@@ -161,6 +174,7 @@ go_library(
         "sdk/go/abi/internal.go",
         "sdk/go/abi/listener.go",
         "sdk/go/abi/network.go",
+        "sdk/go/abi/panic_barrier.go",
         "sdk/go/abi/udp_listener.go",
         "//source/extensions/dynamic_modules/abi:abi.h",
     ],
@@ -176,6 +190,7 @@ go_library(
     deps = [
         "//source/extensions/dynamic_modules:go_sdk",
         "//source/extensions/dynamic_modules:go_sdk_internal_buffer",
+        "//source/extensions/dynamic_modules:go_sdk_internal_recovery",
         "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
 )

@@ -18,6 +18,7 @@ import (
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
 		"passthrough":                  &PassthroughConfigFactory{},
+		"filter_new_panic":             &FilterNewPanicConfigFactory{},
 		"local_reply_response_headers": &LocalReplyResponseHeadersConfigFactory{},
 		"header_callbacks_on_creation": &HeaderCallbacksOnCreationConfigFactory{},
 		"header_callbacks":             &HeaderCallbacksConfigFactory{},
@@ -173,6 +174,30 @@ func (p *PassthroughFilter) OnRequestHeaders(headers shared.HeaderMap,
 	p.handle.Log(shared.LogLevelError, "on_request_headers called")
 	p.handle.Log(shared.LogLevelCritical, "on_request_headers called")
 	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// FilterNewPanic
+// -----------------------------------------------------------------------------
+
+// FilterNewPanicConfigFactory exercises the Go SDK panic barrier. Its filter constructor panics, so
+// on_http_filter_new recovers the panic, returns a null filter, and Envoy fails the request closed
+// with a 500 instead of aborting the process.
+type FilterNewPanicConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *FilterNewPanicConfigFactory) Create(shared.HttpFilterConfigHandle,
+	[]byte) (shared.HttpFilterFactory, error) {
+	return &FilterNewPanicFilterFactory{}, nil
+}
+
+type FilterNewPanicFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *FilterNewPanicFilterFactory) Create(shared.HttpFilterHandle) shared.HttpFilter {
+	panic("filter constructor failed on purpose")
 }
 
 // -----------------------------------------------------------------------------
