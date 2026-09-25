@@ -681,7 +681,7 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
   // has landed, and this subscription stays unready until then.
   EXPECT_CALL(init_watcher_, ready()).Times(0);
   EXPECT_OK(rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
-  EXPECT_FALSE(rds_->configCast()->usesVhds());
+  EXPECT_FALSE(rds_->configCast()->onDemandVhdsEnabled());
   ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
 
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks =
@@ -695,7 +695,7 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
 
-  EXPECT_TRUE(rds_->configCast()->usesVhds());
+  EXPECT_TRUE(rds_->configCast()->onDemandVhdsEnabled());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
                        ->clusterName());
@@ -731,7 +731,7 @@ TEST_F(RdsImplTest, VHDSAddedByALaterRDSUpdate) {
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_OK(rds_callbacks_->onConfigUpdate(decoded_resources_1.refvec_, response1.version_info()));
-  EXPECT_FALSE(rds_->configCast()->usesVhds());
+  EXPECT_FALSE(rds_->configCast()->onDemandVhdsEnabled());
   // No VHDS subscription yet, so the RDS one is still the most recently created subscription.
   EXPECT_EQ(rds_callbacks_,
             server_factory_context_.cluster_manager_.subscription_factory_.callbacks_);
@@ -749,13 +749,13 @@ TEST_F(RdsImplTest, VHDSAddedByALaterRDSUpdate) {
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks =
       server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   EXPECT_NE(rds_callbacks_, vhds_callbacks);
-  EXPECT_TRUE(rds_->configCast()->usesVhds());
+  EXPECT_TRUE(rds_->configCast()->onDemandVhdsEnabled());
 
   const auto vhds_resources = vhdsResources("bar", "bar");
   const auto decoded_vhds_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(vhds_resources);
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "2"));
-  EXPECT_TRUE(rds_->configCast()->usesVhds());
+  EXPECT_TRUE(rds_->configCast()->onDemandVhdsEnabled());
 }
 
 // A VHDS update publishes through the RDS publishing path, so that everything that hangs off it -
@@ -873,7 +873,7 @@ TEST_F(RdsImplTest, RdsUpdateWithUnchangedVhdsKeepsTheVhdsSubscription) {
 
   // The virtual host that VHDS delivered is still merged into the route configuration of the last
   // RDS update.
-  EXPECT_TRUE(rds_->configCast()->usesVhds());
+  EXPECT_TRUE(rds_->configCast()->onDemandVhdsEnabled());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "qux"}, {":path", "/qux"}})
                        ->routeEntry()
                        ->clusterName());
@@ -928,6 +928,96 @@ rds:
   // valid
   EXPECT_CALL(mock_callback, Call(_)).Times(0);
   EXPECT_NO_THROW(post_cb());
+}
+
+// A plain VHDS configuration (no default collection) keeps on-demand virtual host discovery
+// enabled.
+TEST_F(RdsImplTest, OnDemandVhdsEnabledWithoutDefaultCollection) {
+  setup();
+
+  const std::string response_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "vhds": {
+        "config_source": {
+          "resource_api_version": "V3",
+          "api_config_source": {
+            "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
+            "grpc_services": {
+              "envoy_grpc": {
+                "cluster_name": "xds_cluster"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+)EOF";
+  auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()).ok());
+  auto* vhds_callbacks = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(rds_callbacks_, vhds_callbacks);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate({}, {}, "1"));
+  EXPECT_TRUE(rds_->configCast()->onDemandVhdsEnabled());
+}
+
+// When a default virtual host collection is configured, on-demand virtual host discovery is
+// disabled.
+TEST_F(RdsImplTest, OnDemandVhdsDisabledWithDefaultCollection) {
+  setup();
+
+  const std::string response_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "vhds": {
+        "config_source": {
+          "resource_api_version": "V3",
+          "api_config_source": {
+            "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
+            "grpc_services": {
+              "envoy_grpc": {
+                "cluster_name": "xds_cluster"
+              }
+            }
+          }
+        },
+        "default_resource_locator":
+          "xdstp://test/envoy.config.route.v3.VirtualHost/foo_route_config/*"
+      }
+    }
+  ]
+}
+)EOF";
+  auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()).ok());
+  auto* vhds_callbacks = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(rds_callbacks_, vhds_callbacks);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate({}, {}, "1"));
+  EXPECT_FALSE(rds_->configCast()->onDemandVhdsEnabled());
 }
 
 TEST_F(RdsImplTest, RdsRouteConfigProviderImplSubscriptionSetup) {
