@@ -2892,6 +2892,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":integration_lib",
+        "//source/common/upstream:multi_health_checker_lib",
         "//test/common/http/http2:http2_frame",
         "//test/config:v2_link_hacks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

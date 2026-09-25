@@ -12,20 +12,20 @@
 namespace Envoy {
 namespace Upstream {
 
-HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
-                                             const envoy::config::core::v3::HealthCheck& config,
-                                             Event::Dispatcher& dispatcher,
-                                             Runtime::Loader& runtime,
-                                             Random::RandomGenerator& random,
-                                             HealthCheckEventLoggerPtr&& event_logger)
+HealthCheckerImplBase::HealthCheckerImplBase(
+    const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
+    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
+    HealthCheckEventLoggerPtr&& event_logger, HealthFlagCallbacks& health_flag_callbacks)
     : always_log_health_check_failures_(config.always_log_health_check_failures()),
       always_log_health_check_success_(config.always_log_health_check_success()), cluster_(cluster),
       dispatcher_(dispatcher), timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
-      stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
+      stats_(generateStats(cluster.info()->statsScope(), config.name())), runtime_(runtime),
+      random_(random),
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
-      event_logger_(std::move(event_logger)), interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
+      event_logger_(std::move(event_logger)), health_flag_callbacks_(health_flag_callbacks),
+      interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
       no_traffic_healthy_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_healthy_interval,
                                                               no_traffic_interval_.count())),
@@ -88,10 +88,16 @@ void HealthCheckerImplBase::decHealthy() { stats_.healthy_.sub(1); }
 
 void HealthCheckerImplBase::decDegraded() { stats_.degraded_.sub(1); }
 
-HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
-  std::string prefix("health_check.");
-  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                   POOL_GAUGE_PREFIX(scope, prefix))};
+HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope,
+                                                        absl::string_view name) {
+  const Stats::TaggedStatName prefix(
+      scope.symbolTable(), "health_check.",
+      name.empty() ? Stats::TagStringViewSpan{}
+                   : Stats::TagStringViewSpan{{Config::TagNames::get().HEALTH_CHECK_NAME, name}},
+      name.empty() ? "health_check." : absl::StrCat("health_check.name.", name, "."));
+
+  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_TAGGED(scope, prefix),
+                                   POOL_GAUGE_TAGGED(scope, prefix))};
 }
 
 void HealthCheckerImplBase::incHealthy() { stats_.healthy_.add(1); }
@@ -217,10 +223,6 @@ void HealthCheckerImplBase::HealthCheckHostMonitorImpl::setUnhealthy(UnhealthyTy
 
 void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
                                                     HealthCheckHostMonitor::UnhealthyType type) {
-  if (type == HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail) {
-    host->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-  }
-
   // The threading here is complex. The cluster owns the only strong reference to the health
   // checker. It might go away when we post to the main thread from a worker thread. To deal with
   // this we use the following sequence of events:
@@ -229,7 +231,7 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
   // 2) On the main thread, we make sure it is still valid (as the cluster may have been destroyed).
   // 3) Additionally, the host/session may also be gone by then so we check that also.
   std::weak_ptr<HealthCheckerImplBase> weak_this = shared_from_this();
-  dispatcher_.post([weak_this, host]() -> void {
+  dispatcher_.post([weak_this, host, type]() -> void {
     std::shared_ptr<HealthCheckerImplBase> shared_this = weak_this.lock();
     if (shared_this == nullptr) {
       return;
@@ -238,6 +240,11 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
     const auto session = shared_this->active_sessions_.find(host);
     if (session == shared_this->active_sessions_.end()) {
       return;
+    }
+
+    if (type == HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail) {
+      shared_this->health_flag_callbacks_.set(*host,
+                                              Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
     }
 
     session->second->setUnhealthy(envoy::data::core::v3::PASSIVE, /*retriable=*/false);
@@ -258,11 +265,11 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
       timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })),
       time_source_(parent.dispatcher_.timeSource()) {
 
-  if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+  if (!parent.health_flag_callbacks_.get(*host, Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent.incHealthy();
   }
 
-  if (host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+  if (parent.health_flag_callbacks_.get(*host, Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
     parent.incDegraded();
   }
 }
@@ -279,11 +286,11 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
   // implementation specific state is destroyed.
   interval_timer_.reset();
   timeout_timer_.reset();
-  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+  if (!parent_.health_flag_callbacks_.get(*host_, Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent_.decHealthy();
     state = HealthState::Healthy;
   }
-  if (host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+  if (parent_.health_flag_callbacks_.get(*host_, Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
     parent_.decDegraded();
   }
   onDeferredDelete();
@@ -300,18 +307,19 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
 
   HealthTransition changed_state = HealthTransition::Unchanged;
 
-  if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+  if (parent_.health_flag_callbacks_.get(*host_, Host::HealthFlag::FAILED_ACTIVE_HC)) {
     // If this is the first time we ever got a check result on this host, we immediately move
     // it to healthy. This makes startup faster with a small reduction in overall reliability
     // depending on the HC settings.
     if (first_check_ || ++num_healthy_ == parent_.healthy_threshold_) {
       // If the host moves to healthy, clear active HC timeout, which may be toggled off and on
       // while the host is unhealthy.
-      host_->healthFlagClear(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+      parent_.health_flag_callbacks_.clear(*host_, Host::HealthFlag::ACTIVE_HC_TIMEOUT);
       // A host that was told to exclude based on immediate failure, but is now passing, should
       // no longer be excluded.
-      host_->healthFlagClear(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-      host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      parent_.health_flag_callbacks_.clear(*host_,
+                                           Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+      parent_.health_flag_callbacks_.clear(*host_, Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
       if (parent_.event_logger_) {
@@ -330,9 +338,10 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
 
   changed_state = clearPendingFlag(changed_state);
 
-  if (degraded != host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+  if (degraded !=
+      parent_.health_flag_callbacks_.get(*host_, Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
     if (degraded) {
-      host_->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+      parent_.health_flag_callbacks_.set(*host_, Host::HealthFlag::DEGRADED_ACTIVE_HC);
       parent_.incDegraded();
       if (parent_.event_logger_) {
         parent_.event_logger_->logDegraded(parent_.healthCheckerType(), host_);
@@ -341,7 +350,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
       if (parent_.event_logger_) {
         parent_.event_logger_->logNoLongerDegraded(parent_.healthCheckerType(), host_);
       }
-      host_->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+      parent_.health_flag_callbacks_.clear(*host_, Host::HealthFlag::DEGRADED_ACTIVE_HC);
     }
 
     // This check ensures that we honor the decision made about Changed vs ChangePending in the
@@ -374,10 +383,10 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   num_healthy_ = 0;
 
   HealthTransition changed_state = HealthTransition::Unchanged;
-  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+  if (!parent_.health_flag_callbacks_.get(*host_, Host::HealthFlag::FAILED_ACTIVE_HC)) {
     if ((!networkHealthCheckFailureType(type) && !retriable) ||
         ++num_unhealthy_ == parent_.unhealthy_threshold_) {
-      host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+      parent_.health_flag_callbacks_.set(*host_, Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.decHealthy();
       changed_state = HealthTransition::Changed;
       if (parent_.event_logger_) {
@@ -393,10 +402,10 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   // Otherwise clear it. This allows a host to toggle between timeout and failure if it's continuing
   // to fail for different reasons.
   if (type == envoy::data::core::v3::NETWORK_TIMEOUT &&
-      host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    host_->healthFlagSet(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+      parent_.health_flag_callbacks_.get(*host_, Host::HealthFlag::FAILED_ACTIVE_HC)) {
+    parent_.health_flag_callbacks_.set(*host_, Host::HealthFlag::ACTIVE_HC_TIMEOUT);
   } else {
-    host_->healthFlagClear(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+    parent_.health_flag_callbacks_.clear(*host_, Host::HealthFlag::ACTIVE_HC_TIMEOUT);
   }
 
   changed_state = clearPendingFlag(changed_state);
@@ -438,8 +447,8 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
 
 HealthTransition
 HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransition changed_state) {
-  if (host_->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
-    host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  if (parent_.health_flag_callbacks_.get(*host_, Host::HealthFlag::PENDING_ACTIVE_HC)) {
+    parent_.health_flag_callbacks_.clear(*host_, Host::HealthFlag::PENDING_ACTIVE_HC);
     // Even though the health value of the host might have not changed, we set this to Changed so
     // that the cluster can update its list of excluded hosts.
     return HealthTransition::Changed;

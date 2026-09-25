@@ -28,6 +28,33 @@ enum class HealthTransition {
 };
 
 /**
+ * Callbacks for reading/writing health flags on a host. This allows indirection required
+ * when multiple health checks are configured.
+ */
+class HealthFlagCallbacks {
+public:
+  virtual ~HealthFlagCallbacks() = default;
+  virtual bool get(const Host& host, Host::HealthFlag flag) PURE;
+  virtual void set(Host& host, Host::HealthFlag flag) PURE;
+  virtual void clear(Host& host, Host::HealthFlag flag) PURE;
+};
+
+/**
+ * Default implementation that delegates directly to the host's health flag methods.
+ */
+class DefaultHealthFlagCallbacks : public HealthFlagCallbacks {
+public:
+  bool get(const Host& host, Host::HealthFlag flag) override { return host.healthFlagGet(flag); }
+  void set(Host& host, Host::HealthFlag flag) override { host.healthFlagSet(flag); }
+  void clear(Host& host, Host::HealthFlag flag) override { host.healthFlagClear(flag); }
+
+  static DefaultHealthFlagCallbacks& instance() {
+    static DefaultHealthFlagCallbacks instance;
+    return instance;
+  }
+};
+
+/**
  * Wraps active health checking of an upstream cluster.
  */
 class HealthChecker {

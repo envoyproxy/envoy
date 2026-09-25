@@ -9,6 +9,7 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/multi_health_checker.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
@@ -131,14 +132,16 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   auto& server_context = context.serverFactoryContext();
 
   if (!cluster.health_checks().empty()) {
-    // TODO(htuch): Need to support multiple health checks in v2.
-    if (cluster.health_checks().size() != 1) {
-      return absl::InvalidArgumentError("Multiple health checks not supported");
-    } else {
+    if (cluster.health_checks().size() == 1) {
       auto checker_or_error = HealthCheckerFactory::create(cluster.health_checks()[0],
                                                            *new_cluster_pair.first, server_context);
       RETURN_IF_NOT_OK_REF(checker_or_error.status());
       new_cluster_pair.first->setHealthChecker(checker_or_error.value());
+    } else {
+      auto checker_or_error = MultiHealthChecker::create(*new_cluster_pair.first,
+                                                         cluster.health_checks(), server_context);
+      RETURN_IF_NOT_OK_REF(checker_or_error.status());
+      new_cluster_pair.first->setHealthChecker(std::move(checker_or_error.value()));
     }
   }
 
