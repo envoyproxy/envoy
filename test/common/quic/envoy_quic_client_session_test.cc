@@ -209,6 +209,20 @@ public:
     return stream;
   }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Drives real WebTransport negotiation by delivering the peer SETTINGS a WebTransport-capable
+  // server sends. SupportsWebTransport() also needs H3 datagram support (the client session always
+  // offers it) and, on a client, extended CONNECT, which the peer's SETTINGS turn on. The
+  // WebTransport runtime feature must already be enabled, or the WebTransport setting is ignored.
+  void negotiateWebTransport() {
+    quic::SettingsFrame settings;
+    settings.values[quic::SETTINGS_H3_DATAGRAM] = 1;
+    settings.values[quic::SETTINGS_WEBTRANS_DRAFT00] = 1;
+    settings.values[quic::SETTINGS_ENABLE_CONNECT_PROTOCOL] = 1;
+    EXPECT_TRUE(envoy_quic_session_->OnSettingsFrame(settings));
+  }
+#endif
+
 protected:
   Event::SimulatedTimeSystemHelper time_system_;
   Api::ApiPtr api_;
@@ -262,6 +276,108 @@ TEST_P(EnvoyQuicClientSessionTest, WebTransportNegotiationGatedByRuntimeFlag) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
   EXPECT_TRUE(envoy_quic_session_->WillNegotiateWebTransport());
+}
+
+// IETF stream 1 is a server initiated bidirectional stream. Without
+// accept_server_initiated_streams it is dropped, as it always has been.
+TEST_P(EnvoyQuicClientSessionTest, ServerInitiatedBidirectionalStreamRejectedByDefault) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+
+  EXPECT_FALSE(http3_options_.quic_protocol_options().accept_server_initiated_streams());
+  constexpr quic::QuicStreamId stream_id = 1u;
+  // GetOrCreateStream() is the lookup-or-create path QuicSession itself takes when a frame arrives
+  // for a stream id it does not have yet (OnStreamFrame(), OnRstStream(), ...), so for a
+  // peer-initiated id it ends up in EnvoyQuicClientSession::CreateIncomingStream(). Calling it
+  // directly stands in for "a frame for stream 1 arrived" without building a packet; the tests
+  // below use the same idiom.
+  EXPECT_EQ(nullptr, envoy_quic_session_->GetOrCreateStream(stream_id));
+  EXPECT_FALSE(quic::test::QuicSessionPeer::IsStreamCreated(envoy_quic_session_.get(), stream_id));
+}
+
+// With the option enabled and WebTransport negotiated, the stream is created. It is a QUICHE
+// QuicServerInitiatedSpdyStream carrying WebTransport data, not an Envoy codec stream.
+TEST_P(EnvoyQuicClientSessionTest, ServerInitiatedBidirectionalStreamAcceptedWhenConfigured) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+  http3_options_.mutable_quic_protocol_options()->set_accept_server_initiated_streams(true);
+  envoy_quic_session_->setHttp3Options(http3_options_);
+
+  constexpr quic::QuicStreamId stream_id = 1u;
+  quic::QuicStream* stream = envoy_quic_session_->GetOrCreateStream(stream_id);
+  ASSERT_NE(nullptr, stream);
+  EXPECT_TRUE(quic::test::QuicSessionPeer::IsStreamCreated(envoy_quic_session_.get(), stream_id));
+  // Not an HTTP request stream: it must never reach the codec.
+  EXPECT_EQ(nullptr, dynamic_cast<EnvoyQuicClientStream*>(stream));
+
+  // Watermark callbacks iterate every active non-static stream, including this one.
+  http_connection_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+  http_connection_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+}
+
+// The option does not weaken HTTP/3: without WebTransport negotiated, a server initiated
+// bidirectional stream is a protocol violation and QUICHE closes the connection.
+TEST_P(EnvoyQuicClientSessionTest, ServerInitiatedBidirectionalStreamWithoutWebTransport) {
+  http3_options_.mutable_quic_protocol_options()->set_accept_server_initiated_streams(true);
+  envoy_quic_session_->setHttp3Options(http3_options_);
+  // The WebTransport runtime feature is off, so no WebTransport version is advertised.
+  ASSERT_FALSE(envoy_quic_session_->WillNegotiateWebTransport());
+
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_HTTP_SERVER_INITIATED_BIDIRECTIONAL_STREAM, _,
+                                        "Server created bidirectional stream."));
+  EXPECT_EQ(nullptr, envoy_quic_session_->GetOrCreateStream(1u));
+}
+
+// A server-initiated bidirectional stream is only a carrier for a WEBTRANSPORT_STREAM frame. In
+// the exact state where a WebTransport data stream would be accepted -- option on, WebTransport
+// negotiated -- an HTTP/3 HEADERS frame on that stream is still a protocol violation and QUICHE
+// closes the connection. This is what keeps the option from weakening HTTP/3.
+TEST_P(EnvoyQuicClientSessionTest, ServerInitiatedBidirectionalStreamRejectsHttpHeaders) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+  http3_options_.mutable_quic_protocol_options()->set_accept_server_initiated_streams(true);
+  envoy_quic_session_->setHttp3Options(http3_options_);
+  negotiateWebTransport();
+  ASSERT_TRUE(envoy_quic_session_->SupportsWebTransport());
+
+  constexpr quic::QuicStreamId stream_id = 1u;
+  ASSERT_NE(nullptr, envoy_quic_session_->GetOrCreateStream(stream_id));
+
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(
+                                     quic::IETF_QUIC_PROTOCOL_VIOLATION, _,
+                                     testing::HasSubstr("server-initiated bidirectional stream")));
+
+  quiche::HttpHeaderBlock response_headers;
+  response_headers[":status"] = "200";
+  envoy_quic_session_->OnStreamFrame(quic::QuicStreamFrame(
+      stream_id, /*fin=*/false, /*offset=*/0, spdyHeaderToHttp3StreamPayload(response_headers)));
+  EXPECT_FALSE(quic_connection_->connected());
+}
+
+// Same, for a stream whose first frame is DATA rather than WEBTRANSPORT_STREAM: rejected before
+// any body is surfaced, because the stream has no headers.
+TEST_P(EnvoyQuicClientSessionTest, ServerInitiatedBidirectionalStreamRejectsHttpBody) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+  http3_options_.mutable_quic_protocol_options()->set_accept_server_initiated_streams(true);
+  envoy_quic_session_->setHttp3Options(http3_options_);
+  negotiateWebTransport();
+  ASSERT_TRUE(envoy_quic_session_->SupportsWebTransport());
+
+  constexpr quic::QuicStreamId stream_id = 1u;
+  ASSERT_NE(nullptr, envoy_quic_session_->GetOrCreateStream(stream_id));
+
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_HTTP_INVALID_FRAME_SEQUENCE_ON_SPDY_STREAM, _,
+                                        "Unexpected DATA frame received."));
+
+  envoy_quic_session_->OnStreamFrame(quic::QuicStreamFrame(
+      stream_id, /*fin=*/false, /*offset=*/0, bodyToHttp3StreamPayload("not webtransport")));
+  EXPECT_FALSE(quic_connection_->connected());
 }
 #endif
 

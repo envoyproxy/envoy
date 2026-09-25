@@ -387,6 +387,10 @@ protected:
   // Set this to true when sending malformed requests to avoid test client codec rejecting it.
   // This flag is only valid when UHV build flag is enabled.
   bool disable_client_header_validation_{false};
+  // Set this to true to let the HTTP/3 test client accept server-initiated bidirectional streams
+  // belonging to a WebTransport session, the way a real WebTransport client does. Must be set
+  // before makeHttpConnection(); off by default so other tests keep the strict HTTP/3 behavior.
+  bool client_accepts_server_initiated_streams_{false};
 
   // Stops the codecs from validating the request headers they encode, so that a test can use
   // Envoy's own client codecs to send a deliberately malformed request at Envoy. Only needed in
