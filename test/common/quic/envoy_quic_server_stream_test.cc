@@ -124,6 +124,8 @@ public:
   void TearDown() override {
     if (quic_connection_.connected()) {
       EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _)).Times(testing::AtMost(1u));
+      EXPECT_CALL(quic_session_, MaybeSendResetStreamAtFrame(_, _, _, _))
+          .Times(testing::AtMost(1u));
       EXPECT_CALL(quic_session_,
                   MaybeSendStopSendingFrame(
                       _, quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_NO_ERROR)))
@@ -354,6 +356,44 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeHeaderOnClosedStream) {
   // No data should be sent on the closed stream.
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _)).Times(0);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+}
+
+// Enables RESET_STREAM_AT for local aborts by advertising reliable stream reset before config
+// negotiation (so the connection picks it up in OnConfigNegotiated).
+class EnvoyQuicServerStreamReliableResetTest : public EnvoyQuicServerStreamTest {
+protected:
+  void SetUp() override {
+    quic_session_.config()->SetReliableStreamReset(true);
+    EnvoyQuicServerStreamTest::SetUp();
+  }
+};
+
+TEST_F(EnvoyQuicServerStreamReliableResetTest, ResetStreamUsesResetStreamAt) {
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  Buffer::OwnedImpl response_body("partial response body");
+  quic_stream_->encodeData(response_body, /*end_stream=*/false);
+
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendResetStreamAtFrame(_, _, _, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _)).Times(0);
+  // maybeReliableReset() does not go through ResetWithError(); resetStream() reports LocalReset.
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_FALSE(quic_stream_->rst_sent());
+}
+
+// With no bytes written, SetReliableSize would leave reliable_size_ at 0 and
+// PartialResetWriteSide would QUIC_BUG, so fall back to a hard Reset().
+TEST_F(EnvoyQuicServerStreamReliableResetTest, ResetStreamFallsBackWhenNoBytesWritten) {
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+
+  EXPECT_CALL(quic_session_, MaybeSendResetStreamAtFrame(_, _, _, _)).Times(0);
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
 TEST_F(EnvoyQuicServerStreamTest, EncodeDataOnClosedStream) {
