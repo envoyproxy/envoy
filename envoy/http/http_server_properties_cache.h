@@ -11,6 +11,7 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -222,6 +223,17 @@ public:
   virtual HttpServerPropertiesCacheSharedPtr
   getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
            Event::Dispatcher& dispatcher) PURE;
+
+  /**
+   * Validate the key value store configuration referenced by the cache options, if any. This must
+   * be called on the main thread when the options are loaded. getCache() runs on worker threads
+   * and assumes the options it is given were validated here; it does not validate the key value
+   * store configuration itself.
+   * @param config supplies the cache parameters.
+   * @return an error status if the key value store configuration is invalid.
+   */
+  virtual absl::Status
+  validateOptions(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) PURE;
 
   using CacheFn = std::function<void(HttpServerPropertiesCache&)>;
 

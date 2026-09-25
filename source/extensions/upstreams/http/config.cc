@@ -101,6 +101,11 @@ getAlternateProtocolsCacheOptions(
           fmt::format("options has key value store but Envoy has concurrency = {} : {}",
                       server_context.options().concurrency(), cache_options.DebugString()));
     }
+    // The key value store configuration is validated here, on the main thread, because the cache
+    // itself is created on worker threads.
+    absl::Status validation_status =
+        server_context.httpServerPropertiesCacheManager().validateOptions(cache_options);
+    RETURN_IF_NOT_OK_REF(validation_status);
 
     return cache_options;
   }

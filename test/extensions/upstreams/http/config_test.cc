@@ -124,6 +124,31 @@ TEST_F(ConfigTest, KvStoreConcurrencyFail) {
                     ":.*key_value_store_config {\n}\n"));
 }
 
+// The key value store config is validated by the cache manager on the main thread when the
+// cluster protocol options are created, rather than on a worker thread when the cache is first
+// used.
+TEST_F(ConfigTest, KvStoreValidatedByCacheManager) {
+  options_.mutable_auto_config()->mutable_http3_protocol_options();
+  options_.mutable_auto_config()
+      ->mutable_alternate_protocols_cache_options()
+      ->mutable_key_value_store_config();
+  EXPECT_CALL(server_context_.http_server_properties_cache_manager_, validateOptions(::testing::_))
+      .WillOnce(::testing::Return(absl::OkStatus()));
+  std::ignore = ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, context_);
+}
+
+TEST_F(ConfigTest, KvStoreValidationFailureIsPropagated) {
+  options_.mutable_auto_config()->mutable_http3_protocol_options();
+  options_.mutable_auto_config()
+      ->mutable_alternate_protocols_cache_options()
+      ->mutable_key_value_store_config();
+  EXPECT_CALL(server_context_.http_server_properties_cache_manager_, validateOptions(::testing::_))
+      .WillOnce(::testing::Return(absl::InvalidArgumentError("invalid key value store")));
+  EXPECT_EQ(
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, context_).status().message(),
+      "invalid key value store");
+}
+
 // A stateful header formatter that rejects its configuration must fail cluster protocol options
 // creation rather than leaving the cluster with silently defaulted HTTP/1 settings.
 TEST_F(ConfigTest, StatefulFormatterCreationFailureIsPropagated) {

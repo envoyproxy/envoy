@@ -675,12 +675,18 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         ":common_lib",
+        "//envoy/common:key_value_store_interface",
         "//source/common/http:http_server_properties_cache",
+        "//source/common/protobuf:utility_lib",
         "//source/common/singleton:manager_impl_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
