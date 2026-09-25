@@ -74,6 +74,13 @@ message GcpAuthnFilterConfig {
 // [#next-free-field: 6]
 message Audience {
   message AccessToken {
+    // Optional custom OAuth scopes for the access token request.
+    // If empty, the metadata server's default scopes will be used.
+    // When populated, the filter appends "?scopes=<comma-separated-scopes>" to the
+    // metadata server token request. Note that the metadata server replaces default
+    // scopes with the provided list rather than appending; to preserve general GCP API
+    // access, callers should explicitly include "https://www.googleapis.com/auth/cloud-platform".
+    repeated string scopes = 1;
   }
 
   message BoundJwt {
@@ -82,6 +89,13 @@ message Audience {
   }
 
   message BoundAccessToken {
+    // Optional custom OAuth scopes for the bound access token request.
+    // If empty, the metadata server's default scopes will be used.
+    // When populated, the filter appends "&scopes=<comma-separated-scopes>" to the
+    // metadata server token request. Note that the metadata server replaces default
+    // scopes with the provided list rather than appending; to preserve general GCP API
+    // access, callers should explicitly include "https://www.googleapis.com/auth/cloud-platform".
+    repeated string scopes = 1;
   }
 
   // Default lifetime is 1h.
