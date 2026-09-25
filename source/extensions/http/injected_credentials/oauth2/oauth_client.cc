@@ -39,7 +39,7 @@ OAuth2Client::GetTokenResult OAuth2ClientImpl::asyncGetAccessToken(
   if (in_flight_request_ != nullptr) {
     return GetTokenResult::NotDispatchedAlreadyInFlight;
   }
-  const auto encoded_client_id = Envoy::Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
+  const auto encoded_client_id = Envoy::Http::Utility::PercentEncoding::urlEncode(client_id);
 
   Envoy::Http::RequestMessagePtr request = createPostRequest();
   std::string body;
@@ -49,24 +49,24 @@ OAuth2Client::GetTokenResult OAuth2ClientImpl::asyncGetAccessToken(
     if (scopes.empty()) {
       body = fmt::format(GetAccessTokenBodyTlsClientAuthFormatString, encoded_client_id);
     } else {
-      const auto encoded_scopes = Envoy::Http::Utility::PercentEncoding::encode(scopes, ":/=&?");
+      const auto encoded_scopes = Envoy::Http::Utility::PercentEncoding::urlEncode(scopes);
       body = fmt::format(GetAccessTokenBodyTlsClientAuthFormatStringWithScopes, encoded_client_id,
                          encoded_scopes);
     }
   } else {
-    const auto encoded_secret = Envoy::Http::Utility::PercentEncoding::encode(secret, ":/=&?");
+    const auto encoded_secret = Envoy::Http::Utility::PercentEncoding::urlEncode(secret);
     if (scopes.empty()) {
       body = fmt::format(GetAccessTokenBodyFormatString, encoded_client_id, encoded_secret);
     } else {
-      const auto encoded_scopes = Envoy::Http::Utility::PercentEncoding::encode(scopes, ":/=&?");
+      const auto encoded_scopes = Envoy::Http::Utility::PercentEncoding::urlEncode(scopes);
       body = fmt::format(GetAccessTokenBodyFormatStringWithScopes, encoded_client_id,
                          encoded_secret, encoded_scopes);
     }
   }
 
   for (const auto& [param_name, param_value] : endpoint_params) {
-    const auto encoded_name = Envoy::Http::Utility::PercentEncoding::encode(param_name, ":/=&?");
-    const auto encoded_value = Envoy::Http::Utility::PercentEncoding::encode(param_value, ":/=&?");
+    const auto encoded_name = Envoy::Http::Utility::PercentEncoding::urlEncode(param_name);
+    const auto encoded_value = Envoy::Http::Utility::PercentEncoding::urlEncode(param_value);
     body += fmt::format("&{}={}", encoded_name, encoded_value);
   }
 
