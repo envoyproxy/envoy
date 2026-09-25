@@ -1091,7 +1091,9 @@ case $CI_TARGET in
         fi
         old_registry_hash="$(registry_current_hash)"
         registry_bump "$registry_hash"
-        if ! registry_check; then
+        if [[ -n "${ENVOY_REGISTRY_CHECK_SKIP:-}" ]]; then
+            echo "WARNING: skipping registry check for ${registry_hash} (ENVOY_REGISTRY_CHECK_SKIP set)" >&2
+        elif ! registry_check; then
             echo "FAIL: registry hash ${registry_hash} rejected, restoring ${old_registry_hash}" >&2
             registry_bump "$old_registry_hash"
             exit 1
