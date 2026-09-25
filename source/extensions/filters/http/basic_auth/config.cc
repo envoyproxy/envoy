@@ -74,7 +74,7 @@ absl::StatusOr<Http::FilterFactoryCb> BasicAuthFilterFactory::createHttpFilterFa
   FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
       std::move(users_or.value()), proto_config.forward_username_header(),
       proto_config.authentication_header(), proto_config.allow_missing(),
-      proto_config.emit_dynamic_metadata(), extra_context.stats_prefix,
+      proto_config.emit_dynamic_metadata(), proto_config.realm(), extra_context.stats_prefix,
       extra_context.scopeOr(context));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BasicAuthFilter>(config));
@@ -89,7 +89,7 @@ BasicAuthFilterFactory::createRouteSpecificFilterConfigTyped(
   RETURN_IF_NOT_OK_REF(htpasswd_or.status());
   auto users_or = readHtpasswd(htpasswd_or.value());
   RETURN_IF_NOT_OK_REF(users_or.status());
-  return std::make_unique<FilterConfigPerRoute>(std::move(users_or.value()));
+  return std::make_unique<FilterConfigPerRoute>(std::move(users_or.value()), proto_config.realm());
 }
 
 REGISTER_FACTORY(BasicAuthFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
