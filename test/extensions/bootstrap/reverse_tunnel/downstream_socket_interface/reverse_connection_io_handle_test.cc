@@ -2488,14 +2488,13 @@ TEST_F(ReverseConnectionIOHandleTest, ReverseConnectionIoHandleBindMustBeNoOp) {
 
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
-  auto address = io_handle_->localAddress();
-  EXPECT_EQ(address.ok(), true);
+  auto address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
 
   // Set up the api mocks any call here fails the test.
   StrictMock<Api::MockOsSysCalls> mock_os_syscalls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
 
-  auto result = io_handle_->bind(address.value());
+  auto result = io_handle_->bind(address);
   EXPECT_EQ(result.return_value_, 0);
   EXPECT_EQ(result.errno_, 0);
 }
