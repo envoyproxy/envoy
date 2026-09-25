@@ -362,6 +362,7 @@ envoy_cc_library(
         ":buffer_manager_lib",
         ":filter_pipeline_lib",
         ":json_with_ext_buf_lib",
+        ":replay_awaitable_lib",
         ":serializer_lib",
         ":task_group_lib",
         "//envoy/event:dispatcher_interface",
