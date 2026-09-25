@@ -99,6 +99,7 @@ private:
   absl::Status transcodeRequest(nlohmann::json& json);
   absl::Status transcodeToIr(nlohmann::json& json);
   absl::Status transcodeFromIr(nlohmann::json& json);
+  absl::Status moveTargetToGeminiPath(nlohmann::json& json);
 
   absl::Status transcodeResponse(nlohmann::json& json);
   absl::Status transcodeResponseToIr(nlohmann::json& json);
@@ -116,6 +117,8 @@ private:
   TranscoderFilterConfigSharedPtr config_;
   const HttpFilters::AiProtocolManager::LLMProtocol source_protocol_;
   const HttpFilters::AiProtocolManager::LLMProtocol route_target_protocol_;
+  // Only touched by decode() before the request is propagated; see `AiFilterContext`.
+  Http::RequestHeaderMap& request_headers_;
   // Copied rather than referenced: `AiFilterContext`'s referents belong to the stream and must
   // not be read after the request is propagated.
   const std::string request_path_;

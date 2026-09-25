@@ -48,7 +48,7 @@ TEST(TranscoderConfigTest, CreatesFilterForRequestAndResponseHandling) {
   ASSERT_TRUE(factory_cb.ok()) << factory_cb.status();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  const Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/"}};
   const AiFilterContext stream_context{stream_info, headers, LLMProtocol::AnthropicMessages};
   EXPECT_NE((*factory_cb)(stream_context), nullptr);
 }
@@ -65,7 +65,7 @@ TEST(TranscoderConfigTest, CreatesFilterForRequestOnlyWithResponseDisabled) {
   ASSERT_TRUE(factory_cb.ok()) << factory_cb.status();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  const Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/"}};
   const AiFilterContext stream_context{stream_info, headers, LLMProtocol::OpenAiChatCompletions};
   EXPECT_NE((*factory_cb)(stream_context), nullptr);
 }

@@ -131,7 +131,8 @@ using AiFilterSharedPtr = std::shared_ptr<AiFilter>;
 // must not use them after propagating the request, replying locally, or an await failing.
 struct AiFilterContext {
   StreamInfo::StreamInfo& stream_info;
-  const Http::RequestHeaderMap& request_headers;
+  // Held back until the chain finishes, so a rewrite made before propagating reaches the upstream.
+  Http::RequestHeaderMap& request_headers;
   // Route-declared request wire API; Unspecified when the route named none.
   LLMProtocol request_protocol;
   // Bytes of the buffered request payload, captured before replay drains it.

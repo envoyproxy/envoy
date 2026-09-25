@@ -288,13 +288,14 @@ network. Such a rejection is counted by ``transcoder.failed``.
 
 .. note::
 
-  Only the payload body is rewritten. Vendors also differ in request path and
-  authentication headers, and Gemini in particular carries the model in the path
-  (``/v1beta/models/{model}:generateContent``), so the route must supply the path and
-  credentials the upstream expects, for example through ``prefix_rewrite`` and
-  ``request_headers_to_add``. The ``TO_IR`` leg lifts Gemini's model out of the request
-  path into the canonical payload so intermediate AI filters and the ``FROM_IR`` leg see
-  it as an ordinary ``model`` field.
+  Gemini carries the model and the streaming mode in the request path rather than the
+  body. The ``TO_IR`` leg lifts both out of the path into the canonical ``model`` and
+  ``stream`` fields, and a ``FROM_IR`` leg targeting Gemini moves them back, setting the
+  path to ``/v1beta/models/{model}:generateContent`` or
+  ``/v1beta/models/{model}:streamGenerateContent?alt=sse``. A route in front of another
+  endpoint layout rewrites that prefix, for example Vertex AI's with ``regex_rewrite``.
+  Other vendor paths and authentication headers are left to the route, for example through
+  ``prefix_rewrite`` and ``request_headers_to_add``.
 
 Response token-usage extraction
 -------------------------------

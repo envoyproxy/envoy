@@ -485,11 +485,10 @@ DialectTranscodePack createGeminiTranscodePack() {
                   {{"auto", "AUTO"}, {"none", "NONE"}, {"required", "ANY"}, {"function", "ANY"}}),
               TranscodeRule::move("tool_choice.type", "toolConfig.functionCallingConfig.mode"),
               TranscodeRule::drop("tool_choice"),
-              // 5. Keep `model` and `stream` in the JSON body for now. Gemini encodes these in
-              //    the URL path (`/v1beta/models/{model}:generateContent` or
-              //    `:streamGenerateContent`), so the upper-layer transcoding filter needs them to
-              //    rewrite `:path` (Gemini's schema allows unknown root fields).
-              //    TODO(ginama): Move `model` and `stream` into `:path` in the transcoding filter.
+              // 5. Keep `model` and `stream` in the JSON body. Gemini encodes these in the URL
+              //    path (`/v1beta/models/{model}:generateContent` or `:streamGenerateContent`),
+              //    and the transcoding filter moves them into `:path` (Gemini's schema allows
+              //    unknown root fields).
           }),
   };
 }

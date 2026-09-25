@@ -219,6 +219,91 @@ TEST_F(TranscoderFilterTest, ToIrLiftsGeminiModelFromPathAndConvertsToIr) {
   EXPECT_EQ(counterValue("transcoded"), 1);
 }
 
+// `TO_IR` also lifts the streaming mode, so a `FROM_IR` leg that rebuilds the path keeps it.
+TEST_F(TranscoderFilterTest, ToIrLiftsGeminiStreamingModeFromPath) {
+  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::GeminiGenerateContent, R"({
+    "contents": [{"role": "user", "parts": [{"text": "Hello Gemini!"}]}]
+  })",
+                  "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  nlohmann::json out = forwarded();
+  EXPECT_EQ(out["model"], "gemini-2.5-flash");
+  EXPECT_EQ(out["stream"], true);
+}
+
+// `FROM_IR` to Gemini moves `model` and `stream` into `:path` and drops `stream_options`, none of
+// which Gemini accepts in the body.
+TEST_F(TranscoderFilterTest, FromIrMovesModelAndStreamIntoGeminiPath) {
+  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
+    "model": "gemini-2.5-flash",
+    "stream": true,
+    "stream_options": {"include_usage": true},
+    "messages": [{"role": "user", "content": "Hello!"}]
+  })");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(),
+            "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse");
+  nlohmann::json out = forwarded();
+  EXPECT_FALSE(out.contains("model"));
+  EXPECT_FALSE(out.contains("stream"));
+  EXPECT_FALSE(out.contains("stream_options"));
+  EXPECT_EQ(out["contents"][0]["parts"][0]["text"], "Hello!");
+  EXPECT_EQ(counterValue("transcoded"), 1);
+}
+
+// A Gemini client through both legs keeps its model and streaming mode.
+TEST_F(TranscoderFilterTest, GeminiStreamingRequestRoundTripsThroughBothLegs) {
+  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  request_headers_ = Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/v1beta/models/gemini-2.5-flash:streamGenerateContent"}};
+
+  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::GeminiGenerateContent};
+  runDecodeChain(
+      {std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::TO_IR), context),
+       std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::FROM_IR), context)},
+      R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(),
+            "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse");
+  nlohmann::json out = forwarded();
+  EXPECT_FALSE(out.contains("model"));
+  EXPECT_FALSE(out.contains("stream"));
+  EXPECT_EQ(out["contents"][0]["parts"][0]["text"], "Hi");
+}
+
+TEST_F(TranscoderFilterTest, FromIrUsesGenerateContentWhenNotStreaming) {
+  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
+    "model": "gemini-2.5-flash",
+    "stream": false,
+    "messages": [{"role": "user", "content": "Hello!"}]
+  })");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1beta/models/gemini-2.5-flash:generateContent");
+  EXPECT_FALSE(forwarded().contains("stream"));
+}
+
+TEST_F(TranscoderFilterTest, FromIrRejectsModelThatIsNotAGeminiPathSegment) {
+  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
+    "model": "../gemini-2.5-flash:generateContent?key=x#",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  })");
+
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_THAT(local_reply_details_, testing::HasSubstr("model id"));
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/chat/completions");
+  EXPECT_EQ(counterValue("failed"), 1);
+}
+
 // `FROM_IR` reads the static target backend protocol and rewrites the IR payload into the backend
 // schema (Anthropic Messages).
 TEST_F(TranscoderFilterTest, FromIrRewritesCanonicalPayloadToTargetProtocol) {

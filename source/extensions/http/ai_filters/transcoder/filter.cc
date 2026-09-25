@@ -1,5 +1,6 @@
 #include "source/extensions/http/ai_filters/transcoder/filter.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <utility>
@@ -9,7 +10,9 @@
 #include "source/common/coroutine/status_macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp"
 
@@ -35,16 +38,25 @@ using HttpFilters::AiProtocolManager::SseStreamPropagator;
 using HttpFilters::AiProtocolManager::SseStreamReceiver;
 using HttpFilters::AiProtocolManager::TranscodingEngine;
 using TranscoderProto = envoy::extensions::http::ai_filters::transcoder::v3::Transcoder;
+namespace Keys = HttpFilters::AiProtocolManager::Keys;
 
 namespace {
 
-// Extracts the model from a Gemini request path: `.../models/{model}:generateContent` or
-// `.../models/{model}:streamGenerateContent`, which Vertex nests under a longer prefix.
+constexpr absl::string_view StreamOptions = "stream_options";
+
+struct GeminiTarget {
+  std::string model;
+  bool stream{false};
+};
+
+// Extracts the model and streaming mode from a Gemini request path:
+// `.../models/{model}:generateContent` or `.../models/{model}:streamGenerateContent`, which Vertex
+// nests under a longer prefix.
 //
 // TODO(ginama): this duplicates `readGeminiTarget()` in the request_info AI filter's
 // extractor.cc, which parses the same paths for the same reason. Factor the two into one shared
 // helper in the AI Protocol Manager rather than letting a third copy appear.
-std::optional<std::string> modelFromGeminiPath(absl::string_view path) {
+std::optional<GeminiTarget> geminiTargetFromPath(absl::string_view path) {
   path = path.substr(0, path.find('?'));
   const size_t last_slash = path.rfind('/');
   if (last_slash == absl::string_view::npos ||
@@ -61,7 +73,14 @@ std::optional<std::string> modelFromGeminiPath(absl::string_view path) {
   if (model.empty() || (operation != "generateContent" && operation != "streamGenerateContent")) {
     return std::nullopt;
   }
-  return std::string(model);
+  return GeminiTarget{std::string(model), operation == "streamGenerateContent"};
+}
+
+// The model becomes a path segment, so anything that could escape it is refused.
+bool isGeminiModelId(absl::string_view model) {
+  return !model.empty() && std::all_of(model.begin(), model.end(), [](char c) {
+    return absl::ascii_isalnum(c) || c == '-' || c == '.' || c == '_';
+  });
 }
 
 // Reconstructs a JSON document from a sequence of flattened leaf fields.
@@ -221,9 +240,11 @@ TranscoderFilterConfig::TranscoderFilterConfig(const TranscoderProto& proto,
 TranscoderFilter::TranscoderFilter(TranscoderFilterConfigSharedPtr config,
                                    const AiFilterContext& context)
     : config_(std::move(config)), source_protocol_(context.request_protocol),
-      route_target_protocol_(context.response_protocol),
-      request_path_(std::string(context.request_headers.getPathValue())),
-      sse_stream_model_(modelFromGeminiPath(request_path_).value_or("transcoded-model")) {}
+      route_target_protocol_(context.response_protocol), request_headers_(context.request_headers),
+      request_path_(std::string(context.request_headers.getPathValue())) {
+  const std::optional<GeminiTarget> gemini_target = geminiTargetFromPath(request_path_);
+  sse_stream_model_ = gemini_target.has_value() ? gemini_target->model : "transcoded-model";
+}
 
 Coroutine::Task<absl::Status> TranscoderFilter::decode(AiRequestReceiver receive_request,
                                                        AiRequestPropagator propagate_request,
@@ -330,8 +351,6 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json) {
 }
 
 absl::Status TranscoderFilter::transcodeToIr(nlohmann::json& json) {
-  namespace Keys = HttpFilters::AiProtocolManager::Keys;
-
   if (source_protocol_ == LLMProtocol::Unspecified) {
     config_->stats().unresolved_.inc();
     return absl::InvalidArgumentError(
@@ -341,11 +360,17 @@ absl::Status TranscoderFilter::transcodeToIr(nlohmann::json& json) {
   // The IR is OpenAI Chat Completions, which requires `model`. Anthropic carries it in the body
   // so it converts directly, but Gemini's API puts it in the request path and its schema has no
   // `model` property at all. The engine only ever sees an `nlohmann::json&` and has no access to
-  // headers, so the lift has to happen here, before the payload is handed over.
-  if (source_protocol_ == LLMProtocol::GeminiGenerateContent && !json.contains(Keys::Model)) {
-    if (const std::optional<std::string> model = modelFromGeminiPath(request_path_);
-        model.has_value()) {
-      json[std::string(Keys::Model)] = *model;
+  // headers, so the lift has to happen here, before the payload is handed over. The streaming
+  // mode is in the path too, and the `FROM_IR` leg rebuilds the path from both.
+  if (source_protocol_ == LLMProtocol::GeminiGenerateContent) {
+    if (const std::optional<GeminiTarget> target = geminiTargetFromPath(request_path_);
+        target.has_value()) {
+      if (!json.contains(Keys::Model)) {
+        json[std::string(Keys::Model)] = target->model;
+      }
+      if (target->stream && !json.contains(Keys::Stream)) {
+        json[std::string(Keys::Stream)] = true;
+      }
     }
   }
 
@@ -366,11 +391,34 @@ absl::Status TranscoderFilter::transcodeFromIr(nlohmann::json& json) {
 
   // Validation against the target's schema happens inside the engine, so a document the upstream
   // would reject fails here rather than over the network.
-  const absl::Status status = config_->engine().transcodeFromIr(target, json);
+  absl::Status status = config_->engine().transcodeFromIr(target, json);
+  if (status.ok() && target == LLMProtocol::GeminiGenerateContent) {
+    status = moveTargetToGeminiPath(json);
+  }
   if (!status.ok()) {
     config_->stats().failed_.inc();
   }
   return status;
+}
+
+// Gemini names the model and the streaming mode in the path, and rejects the IR's `stream` and
+// `stream_options` as unknown fields. The path is the Gemini API's; a route in front of another
+// endpoint layout, such as Vertex AI's, rewrites the `/v1beta/models/` prefix.
+absl::Status TranscoderFilter::moveTargetToGeminiPath(nlohmann::json& json) {
+  const auto model = json.find(Keys::Model);
+  if (model == json.end() || !model->is_string() ||
+      !isGeminiModelId(model->get_ref<const std::string&>())) {
+    return absl::InvalidArgumentError("transcoder: a Gemini target needs `model` to be a model id");
+  }
+  const auto stream = json.find(Keys::Stream);
+  const bool streaming = stream != json.end() && stream->is_boolean() && stream->get<bool>();
+  request_headers_.setPath(
+      absl::StrCat("/v1beta/models/", model->get_ref<const std::string&>(),
+                   streaming ? ":streamGenerateContent?alt=sse" : ":generateContent"));
+  json.erase(std::string(Keys::Model));
+  json.erase(std::string(Keys::Stream));
+  json.erase(std::string(StreamOptions));
+  return absl::OkStatus();
 }
 
 absl::Status TranscoderFilter::transcodeResponse(nlohmann::json& json) {
