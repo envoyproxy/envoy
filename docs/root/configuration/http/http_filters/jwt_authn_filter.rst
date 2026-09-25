@@ -285,17 +285,17 @@ Extract-Only Mode Security Considerations
 
    **Verification status header (default on):**
 
-   When this mode is active, Envoy sets a verification status header on
-   requests whose JWT is present but fails signature verification:
+   Because this mode forwards claims without ever verifying the JWT, Envoy
+   sets a verification status header on every request that carries a JWT:
 
    .. code-block:: yaml
 
       x-jwt-signature-verified: false
 
-   The header is NOT set when the JWT is valid or when no JWT is present.
-   This means the header's presence is a meaningful signal: if set, the
-   JWT failed verification and downstream filters should not trust any
-   JWT-derived claim headers.
+   The header is NOT set when no JWT is present. Its presence is therefore a
+   meaningful signal: if set, the request's JWT-derived claim headers were
+   forwarded without any signature verification and downstream filters
+   should not trust them.
 
    **RBAC integration:**
 
