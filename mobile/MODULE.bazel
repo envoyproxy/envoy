@@ -173,3 +173,17 @@ maven.install(
 
 extra_sources = use_extension("//bazel:extensions.bzl", "envoy_mobile_extra_sources_extension")
 use_repo(extra_sources, "envoy_mobile_extra_swift_sources", "envoy_mobile_extra_jni_deps")
+
+quiche = use_extension("@quiche//:extensions.bzl", "quiche")
+quiche.deps(
+    mobile_quiche_bug_tracker_impl_lib = "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
+)
+
+quiche_dev = use_extension("@quiche//:extensions.bzl", "quiche", dev_dependency = True)
+quiche_dev.deps(
+    quiche_expect_bug_impl_lib = "@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib",
+    quiche_test_helpers_impl_lib = "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
+    quiche_test_impl_lib = "@envoy//test/common/quic/platform:quiche_test_impl_lib",
+    quiche_test_output_impl_lib = "@envoy//test/common/quic/platform:quiche_test_output_impl_lib",
+    quiche_thread_impl_lib = "@envoy//test/common/quic/platform:quiche_thread_impl_lib",
+)

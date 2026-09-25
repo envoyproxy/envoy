@@ -15,7 +15,9 @@ envoy_cc_library(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/common:pure_lib",
+        "//envoy/config:typed_config_interface",
         "//envoy/event:dispatcher_interface",
+        "//envoy/server:factory_context_interface",
         "@abseil-cpp//absl/functional:any_invocable",
     ],
 )

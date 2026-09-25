@@ -635,6 +635,47 @@ TEST_P(DynamicModulesIntegrationTest, PerRouteStructConfig) {
                 .getStringView());
 }
 
+// Verifies that the ``value`` of an ``xds.type.v3.TypedStruct`` per-route configuration is
+// serialized to JSON before being passed to the module, the same payload a plain
+// ``google.protobuf.Struct`` produces while preserving a logical type URL for config dumps.
+TEST_P(DynamicModulesIntegrationTest, PerRouteTypedStructConfig) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    // The per_route_config test filter that surfaces the raw config bytes back as a header is
+    // implemented by the Rust integration test data, so the TypedStruct check is scoped to those
+    // language flavors.
+    return;
+  }
+
+  // The regular filter config remains a ``StringValue`` for the ``x-config`` header, while the
+  // per-route override is supplied as an ``xds.type.v3.TypedStruct`` whose ``value`` carries the
+  // Struct payload.
+  initializeFilter("per_route_config", "a", R"({"struct_key":"struct_value"})",
+                   "type.googleapis.com/google.protobuf.StringValue", false,
+                   "type.googleapis.com/xds.type.v3.TypedStruct");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("a", upstream_request_->headers()
+                     .get(Http::LowerCaseString("x-config"))[0]
+                     ->value()
+                     .getStringView());
+  // The per-route ``TypedStruct`` must arrive as the JSON serialization of its ``value`` field,
+  // identical to the payload a plain ``Struct`` produces.
+  EXPECT_EQ(R"({"struct_key":"struct_value"})",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("x-per-route-config"))[0]
+                ->value()
+                .getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, BodyCallbacks) {
   initializeFilter("body_callbacks");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
