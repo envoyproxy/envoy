@@ -1,6 +1,7 @@
 #include "source/extensions/http/ai_filters/transcoder/filter.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
@@ -202,20 +203,42 @@ std::string mapIrFinishReasonToAnthropic(absl::string_view reason) {
   return "end_turn";
 }
 
+// Gemini's prompt and candidate counts exclude tool-use prompt and thought tokens, while the IR's
+// are inclusive; this matches how the AI Protocol Manager canonicalizes Gemini's token usage.
 void transcodeGeminiUsageToIr(const nlohmann::json& src, nlohmann::json& dst) {
   if (!src.contains("usageMetadata") || !src["usageMetadata"].is_object()) {
     return;
   }
   const auto& meta = src["usageMetadata"];
+  const auto count = [&meta](absl::string_view key) -> std::optional<int64_t> {
+    const auto it = meta.find(key);
+    if (it == meta.end() || !it->is_number_integer()) {
+      return std::nullopt;
+    }
+    return it->get<int64_t>();
+  };
+  const std::optional<int64_t> prompt = count(Keys::PromptTokenCount);
+  const std::optional<int64_t> tool_use_prompt = count(Keys::ToolUsePromptTokenCount);
+  const std::optional<int64_t> candidates = count(Keys::CandidatesTokenCount);
+  const std::optional<int64_t> thoughts = count(Keys::ThoughtsTokenCount);
+  const std::optional<int64_t> cached = count(Keys::CachedContentTokenCount);
+  const std::optional<int64_t> total = count(Keys::TotalTokenCount);
+
   nlohmann::json usage = nlohmann::json::object();
-  if (meta.contains("promptTokenCount") && meta["promptTokenCount"].is_number_integer()) {
-    usage["prompt_tokens"] = meta["promptTokenCount"];
+  if (prompt.has_value() || tool_use_prompt.has_value()) {
+    usage["prompt_tokens"] = prompt.value_or(0) + tool_use_prompt.value_or(0);
   }
-  if (meta.contains("candidatesTokenCount") && meta["candidatesTokenCount"].is_number_integer()) {
-    usage["completion_tokens"] = meta["candidatesTokenCount"];
+  if (candidates.has_value() || thoughts.has_value()) {
+    usage["completion_tokens"] = candidates.value_or(0) + thoughts.value_or(0);
   }
-  if (meta.contains("totalTokenCount") && meta["totalTokenCount"].is_number_integer()) {
-    usage["total_tokens"] = meta["totalTokenCount"];
+  if (total.has_value()) {
+    usage["total_tokens"] = *total;
+  }
+  if (cached.has_value()) {
+    usage["prompt_tokens_details"]["cached_tokens"] = *cached;
+  }
+  if (thoughts.has_value()) {
+    usage["completion_tokens_details"]["reasoning_tokens"] = *thoughts;
   }
   if (!usage.empty()) {
     dst["usage"] = std::move(usage);

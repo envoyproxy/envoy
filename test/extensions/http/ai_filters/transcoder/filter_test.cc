@@ -486,6 +486,48 @@ TEST_F(TranscoderFilterTest, EncodeSseTranscodesAnthropicSseToIrAndFromIrToGemin
   resp_out_buffer.onDestroy();
 }
 
+// Gemini's candidate and prompt counts exclude thought and tool-use prompt tokens, which the IR's
+// inclusive counts carry.
+TEST_F(TranscoderFilterTest, EncodeUnaryCountsGeminiThoughtsAsCompletionTokens) {
+  TranscoderFilter::setTargetProtocol(LLMProtocol::GeminiGenerateContent);
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+
+  const AiFilterContext context{stream_info_, request_headers_, LLMProtocol::OpenAiChatCompletions};
+  auto backend_boundary_filter = std::make_shared<TranscoderFilter>(
+      makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context);
+
+  FilterManager manager({backend_boundary_filter});
+  FakeBridge resp_bridge(*dispatcher_);
+  BufferManager resp_out_buffer(BufferManager::Config{}, factory_, resp_bridge);
+  absl::Status resp_status;
+  bool resp_done = false;
+  manager.startUnaryResponse(factory_, resp_bridge, resp_out_buffer, [&](absl::Status s) {
+    resp_status = std::move(s);
+    resp_done = true;
+  });
+
+  Buffer::OwnedImpl body(
+      R"({"candidates":[{"content":{"role":"model","parts":[{"text":"Paris"}]},)"
+      R"("finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":1,)"
+      R"("thoughtsTokenCount":24,"toolUsePromptTokenCount":5,"cachedContentTokenCount":4,)"
+      R"("totalTokenCount":40}})");
+  manager.onResponseData(body, /*end_stream=*/true);
+  for (int i = 0; i < 20; ++i) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  ASSERT_TRUE(resp_done);
+  ASSERT_TRUE(resp_status.ok()) << resp_status;
+  nlohmann::json usage = nlohmann::json::parse(resp_bridge.injected_.toString())["usage"];
+  EXPECT_EQ(usage["prompt_tokens"], 15);
+  EXPECT_EQ(usage["completion_tokens"], 25);
+  EXPECT_EQ(usage["total_tokens"], 40);
+  EXPECT_EQ(usage["prompt_tokens_details"]["cached_tokens"], 4);
+  EXPECT_EQ(usage["completion_tokens_details"]["reasoning_tokens"], 24);
+  resp_out_buffer.onDestroy();
+}
+
 // A Gemini SSE chunk whose text is past the inline string threshold reaches the filter as an
 // external reference rather than a string; it must still come out as the chunk's delta.
 TEST_F(TranscoderFilterTest, EncodeSseKeepsGeminiTextHeldByReference) {
