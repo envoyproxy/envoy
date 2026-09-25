@@ -21,6 +21,7 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
@@ -47,6 +48,32 @@ absl::string_view contentType(const BufferingStreamDecoderPtr& response) {
 }
 
 } // namespace
+
+TEST_P(IntegrationAdminTest, PrometheusResponseSpansChunks) {
+  initialize();
+  std::string expected;
+  absl::Notification populated;
+  // Creating stats accesses the store's thread-local cache, so do it on a registered thread.
+  test_server_->server().dispatcher().post([&]() {
+    for (uint32_t i = 0; i < 512; ++i) {
+      const std::string name = fmt::format("metric_{:04d}_{}", i, std::string(100, 'x'));
+      test_server_->statStore().counterFromString("prometheus_chunk_test." + name).add(i);
+      const std::string metric = "envoy_prometheus_chunk_test_" + name;
+      expected += fmt::format("# TYPE {0} counter\n{0}{{}} {1}\n", metric, i);
+    }
+    populated.Notify();
+  });
+  populated.WaitForNotification();
+  ASSERT_GT(expected.size(), 64 * 1024);
+
+  for (const auto endpoint : {"/stats/prometheus?filter=^prometheus_chunk_test",
+                              "/stats?format=prometheus&filter=^prometheus_chunk_test"}) {
+    BufferingStreamDecoderPtr response;
+    ASSERT_EQ("200", request("admin", "GET", endpoint, response));
+    EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+    EXPECT_EQ(expected, response->body());
+  }
+}
 
 TEST_P(IntegrationAdminTest, AdminLogging) {
   initialize();
