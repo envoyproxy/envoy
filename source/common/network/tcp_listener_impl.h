@@ -20,7 +20,7 @@ public:
                   Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
                   bool bind_to_port, bool ignore_global_conn_limit, bool bypass_overload_manager,
                   uint32_t max_connections_to_accept_per_socket_event,
-                  Server::ThreadLocalOverloadStateOptRef overload_state);
+                  Server::ThreadLocalOverloadStateSharedPtr overload_state);
   ~TcpListenerImpl() override {
     if (bind_to_port_) {
       socket_->ioHandle().resetFileEvents();
@@ -57,7 +57,7 @@ private:
   const bool bypass_overload_manager_;
   const uint32_t max_connections_to_accept_per_socket_event_;
   Server::LoadShedPoint* listener_accept_{nullptr};
-  Server::ThreadLocalOverloadStateOptRef overload_state_;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state_;
   const bool track_global_cx_limit_in_overload_manager_;
 };
 

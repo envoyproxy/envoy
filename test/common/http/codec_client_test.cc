@@ -773,7 +773,7 @@ public:
         socket->connectionInfoProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), nullptr, nullptr);
     NiceMock<Network::MockListenerConfig> listener_config;
-    Server::ThreadLocalOverloadStateOptRef overload_state;
+    Server::ThreadLocalOverloadStateSharedPtr overload_state;
     upstream_listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, std::move(socket), listener_callbacks_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),

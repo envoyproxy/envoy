@@ -18,7 +18,7 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::SocketSharedPtr&& socket,
                                      Network::Address::InstanceConstSharedPtr& listen_address,
                                      Network::ConnectionBalancer& connection_balancer,
-                                     ThreadLocalOverloadStateOptRef overload_state)
+                                     ThreadLocalOverloadStateSharedPtr overload_state)
     : OwnedActiveStreamListenerBase(
           parent, parent.dispatcher(),
           parent.createListener(std::move(socket), *this, runtime, random, config, overload_state),

@@ -102,6 +102,12 @@ public:
   virtual ThreadLocalOverloadState& getThreadLocalOverloadState() PURE;
 
   /**
+   * Like getThreadLocalOverloadState(), but returns an owning handle. Prefer this whenever the
+   * caller may use the result from a thread other than the one that called this method.
+   */
+  virtual ThreadLocalOverloadStateSharedPtr getThreadLocalOverloadStateShared() PURE;
+
+  /**
    * Get a factory for constructing scaled timer managers that respond to overload state.
    */
   virtual Event::ScaledRangeTimerManagerFactory scaledTimerFactory() PURE;

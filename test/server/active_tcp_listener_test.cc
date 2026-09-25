@@ -45,12 +45,12 @@ public:
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                Runtime::Loader& runtime, Random::RandomGenerator& random,
                const Network::ListenerConfig& listener_config,
-               Server::ThreadLocalOverloadStateOptRef overload_state));
+               Server::ThreadLocalOverloadStateSharedPtr overload_state));
   MOCK_METHOD(Network::ListenerPtr, createListener,
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                Runtime::Loader& runtime, Random::RandomGenerator& random,
                const Network::ListenerConfig& listener_config,
-               Server::ThreadLocalOverloadStateOptRef overload_state));
+               Server::ThreadLocalOverloadStateSharedPtr overload_state));
 };
 
 class ActiveTcpListenerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
