@@ -1,0 +1,324 @@
+[
+  {
+    "name": "gemini_unary_to_ir_live_capture",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": {"candidates": [{"content": {"role": "model", "parts": [{"text": "Hello! How can I help you today?"}]}, "finishReason": "STOP", "avgLogprobs": -0.53}], "usageMetadata": {"promptTokenCount": 19, "candidatesTokenCount": 9, "totalTokenCount": 51, "trafficType": "ON_DEMAND", "promptTokensDetails": [{"modality": "TEXT", "tokenCount": 19}], "candidatesTokensDetails": [{"modality": "TEXT", "tokenCount": 9}], "thoughtsTokenCount": 23}, "modelVersion": "gemini-2.5-flash", "createTime": "2026-09-25T03:00:00.000000Z", "responseId": "4Nu1avOUGcjbsbwP5YLyyQo"},
+    "expected": {"choices": [{"finish_reason": "stop", "index": 0, "message": {"content": "Hello! How can I help you today?", "role": "assistant"}}], "id": "4Nu1avOUGcjbsbwP5YLyyQo", "model": "gemini-2.5-flash", "object": "chat.completion", "usage": {"completion_tokens": 32, "completion_tokens_details": {"reasoning_tokens": 23}, "prompt_tokens": 19, "total_tokens": 51}}
+  },
+  {
+    "name": "gemini_unary_to_ir_multi_candidate",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": {"candidates": [{"content": {"role": "model", "parts": [{"text": "Hello, "}, {"text": "world"}]}, "finishReason": "STOP"}, {"index": 1, "content": {"role": "model", "parts": [{"text": "Hi"}]}, "finishReason": "MAX_TOKENS"}]},
+    "expected": {"choices": [{"finish_reason": "stop", "index": 0, "message": {"content": "Hello, world", "role": "assistant"}}, {"finish_reason": "length", "index": 1, "message": {"content": "Hi", "role": "assistant"}}], "id": "chatcmpl-transcoded", "model": "transcoded-model", "object": "chat.completion"}
+  },
+  {
+    "name": "gemini_unary_to_ir_finish_reasons",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": {"candidates": [{"content": {"role": "model", "parts": [{"text": "a"}]}, "finishReason": "SAFETY"}, {"index": 1, "content": {"role": "model", "parts": [{"text": "b"}]}, "finishReason": "RECITATION"}, {"index": 2, "content": {"role": "model", "parts": [{"text": "c"}]}, "finishReason": "OTHER"}, {"index": 3}], "modelVersion": "gemini-2.5-pro", "responseId": "r3"},
+    "expected": {"choices": [{"finish_reason": "content_filter", "index": 0, "message": {"content": "a", "role": "assistant"}}, {"finish_reason": "content_filter", "index": 1, "message": {"content": "b", "role": "assistant"}}, {"finish_reason": "stop", "index": 2, "message": {"content": "c", "role": "assistant"}}, {"finish_reason": "stop", "index": 3, "message": {"content": "", "role": "assistant"}}], "id": "r3", "model": "gemini-2.5-pro", "object": "chat.completion"}
+  },
+  {
+    "name": "gemini_unary_to_ir_thought_parts",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": {"candidates": [{"content": {"role": "model", "parts": [{"text": "Let me think.", "thought": true}, {"text": "42"}]}, "finishReason": "STOP"}], "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 1, "thoughtsTokenCount": 24, "toolUsePromptTokenCount": 5, "cachedContentTokenCount": 4, "totalTokenCount": 40}, "modelVersion": "gemini-2.5-flash", "responseId": "r4"},
+    "expected": {"choices": [{"finish_reason": "stop", "index": 0, "message": {"content": "Let me think.42", "role": "assistant"}}], "id": "r4", "model": "gemini-2.5-flash", "object": "chat.completion", "usage": {"completion_tokens": 25, "completion_tokens_details": {"reasoning_tokens": 24}, "prompt_tokens": 15, "prompt_tokens_details": {"cached_tokens": 4}, "total_tokens": 40}}
+  },
+  {
+    "name": "gemini_unary_to_ir_function_call_part",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": {"candidates": [{"content": {"role": "model", "parts": [{"functionCall": {"name": "get_weather", "args": {"city": "Paris"}}}]}, "finishReason": "STOP"}], "modelVersion": "gemini-2.5-flash"},
+    "expected": {"choices": [{"finish_reason": "stop", "index": 0, "message": {"content": "", "role": "assistant"}}], "id": "chatcmpl-transcoded", "model": "gemini-2.5-flash", "object": "chat.completion"}
+  },
+  {
+    "name": "gemini_unary_to_ir_missing_candidates",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": {"promptFeedback": {"blockReason": "SAFETY"}, "usageMetadata": {"promptTokenCount": 7, "totalTokenCount": 7}, "modelVersion": "gemini-2.5-flash"},
+    "expected": {"modelVersion": "gemini-2.5-flash", "promptFeedback": {"blockReason": "SAFETY"}, "usageMetadata": {"promptTokenCount": 7, "totalTokenCount": 7}}
+  },
+  {
+    "name": "anthropic_unary_to_ir_basic",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": {"id": "msg_01XFDUDYJgAACzvnptvVoYEL", "type": "message", "role": "assistant", "model": "claude-sonnet-4-5", "content": [{"type": "text", "text": "Hello!"}], "stop_reason": "end_turn", "stop_sequence": null, "usage": {"input_tokens": 10, "output_tokens": 5}},
+    "expected": {"choices": [{"finish_reason": "stop", "index": 0, "message": {"content": "Hello!", "role": "assistant"}}], "id": "msg_01XFDUDYJgAACzvnptvVoYEL", "model": "claude-sonnet-4-5", "object": "chat.completion", "usage": {"completion_tokens": 5, "prompt_tokens": 10, "total_tokens": 15}}
+  },
+  {
+    "name": "anthropic_unary_to_ir_blocks_and_cache",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": {"id": "msg_02", "type": "message", "role": "assistant", "model": "claude-sonnet-4-5", "content": [{"type": "text", "text": "Part 1. "}, {"type": "tool_use", "id": "toolu_1", "name": "get_weather", "input": {"city": "Paris"}}, {"type": "text", "text": "Part 2."}], "stop_reason": "tool_use", "stop_sequence": null, "usage": {"input_tokens": 100, "output_tokens": 20, "cache_read_input_tokens": 50, "cache_creation_input_tokens": 10}},
+    "expected": {"choices": [{"finish_reason": "tool_calls", "index": 0, "message": {"content": "Part 1. Part 2.", "role": "assistant"}}], "id": "msg_02", "model": "claude-sonnet-4-5", "object": "chat.completion", "usage": {"completion_tokens": 20, "prompt_tokens": 100, "total_tokens": 120}}
+  },
+  {
+    "name": "anthropic_unary_to_ir_max_tokens_no_usage",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": {"type": "message", "content": [{"type": "text", "text": "Trunc"}], "stop_reason": "max_tokens"},
+    "expected": {"choices": [{"finish_reason": "length", "index": 0, "message": {"content": "Trunc", "role": "assistant"}}], "id": "chatcmpl-transcoded", "model": "transcoded-model", "object": "chat.completion"}
+  },
+  {
+    "name": "anthropic_unary_to_ir_missing_content",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}},
+    "expected": {"error": {"message": "Overloaded", "type": "overloaded_error"}, "type": "error"}
+  },
+  {
+    "name": "openai_unary_to_ir_identity",
+    "kind": "unary",
+    "handling": "TO_IR",
+    "dialect": "OPENAI_CHAT_COMPLETIONS",
+    "input": {"id": "chatcmpl-1", "object": "chat.completion", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hello!"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}},
+    "expected": {"choices": [{"finish_reason": "stop", "index": 0, "message": {"content": "Hello!", "role": "assistant"}}], "created": 1699999999, "id": "chatcmpl-1", "model": "gpt-4o", "object": "chat.completion", "usage": {"completion_tokens": 5, "prompt_tokens": 10, "total_tokens": 15}}
+  },
+  {
+    "name": "ir_unary_to_gemini_basic",
+    "kind": "unary",
+    "handling": "FROM_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": {"id": "chatcmpl-1", "object": "chat.completion", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hello!"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}},
+    "expected": {"candidates": [{"content": {"parts": [{"text": "Hello!"}], "role": "model"}, "finishReason": "STOP", "index": 0}], "modelVersion": "gpt-4o", "usageMetadata": {"candidatesTokenCount": 5, "promptTokenCount": 10, "totalTokenCount": 15}}
+  },
+  {
+    "name": "ir_unary_to_gemini_multi_choice_reasoning",
+    "kind": "unary",
+    "handling": "FROM_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": {"id": "chatcmpl-2", "object": "chat.completion", "model": "gemini-2.5-flash", "choices": [{"index": 0, "message": {"role": "assistant", "content": "A"}, "finish_reason": "length"}, {"index": 1, "message": {"role": "assistant", "content": null, "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "f", "arguments": "{}"}}]}, "finish_reason": "tool_calls"}, {"message": {"role": "assistant", "content": "C"}, "finish_reason": "content_filter"}], "usage": {"prompt_tokens": 12, "completion_tokens": 98, "total_tokens": 110, "prompt_tokens_details": {"cached_tokens": 4}, "completion_tokens_details": {"reasoning_tokens": 29}}},
+    "expected": {"candidates": [{"content": {"parts": [{"text": "A"}], "role": "model"}, "finishReason": "MAX_TOKENS", "index": 0}, {"content": {"parts": [{"text": ""}], "role": "model"}, "finishReason": "STOP", "index": 1}, {"content": {"parts": [{"text": "C"}], "role": "model"}, "finishReason": "SAFETY", "index": 2}], "modelVersion": "gemini-2.5-flash", "usageMetadata": {"candidatesTokenCount": 98, "promptTokenCount": 12, "totalTokenCount": 110}}
+  },
+  {
+    "name": "ir_unary_to_gemini_empty_choices",
+    "kind": "unary",
+    "handling": "FROM_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": {"id": "chatcmpl-3", "object": "chat.completion", "choices": []},
+    "expected": {"choices": [], "id": "chatcmpl-3", "object": "chat.completion"}
+  },
+  {
+    "name": "ir_unary_to_anthropic_basic",
+    "kind": "unary",
+    "handling": "FROM_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": {"id": "chatcmpl-1", "object": "chat.completion", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hello!"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}},
+    "expected": {"content": [{"text": "Hello!", "type": "text"}], "id": "chatcmpl-1", "model": "gpt-4o", "role": "assistant", "stop_reason": "end_turn", "type": "message", "usage": {"input_tokens": 10, "output_tokens": 5}}
+  },
+  {
+    "name": "ir_unary_to_anthropic_defaults",
+    "kind": "unary",
+    "handling": "FROM_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": {"choices": [{"message": {"role": "assistant", "content": "Hi"}, "finish_reason": "tool_calls"}, {"message": {"role": "assistant", "content": "ignored"}, "finish_reason": "stop"}]},
+    "expected": {"content": [{"text": "Hi", "type": "text"}], "id": "msg_transcoded", "model": "transcoded-model", "role": "assistant", "stop_reason": "tool_use", "type": "message"}
+  },
+  {
+    "name": "ir_unary_to_anthropic_unknown_finish_and_cache",
+    "kind": "unary",
+    "handling": "FROM_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": {"id": "chatcmpl-5", "model": "gpt-4o", "choices": [{"index": 0, "message": {"role": "assistant", "content": "Filtered"}, "finish_reason": "content_filter"}], "usage": {"prompt_tokens": 100, "completion_tokens": 7, "total_tokens": 107, "prompt_tokens_details": {"cached_tokens": 60}}},
+    "expected": {"content": [{"text": "Filtered", "type": "text"}], "id": "chatcmpl-5", "model": "gpt-4o", "role": "assistant", "stop_reason": "end_turn", "type": "message", "usage": {"input_tokens": 100, "output_tokens": 7}}
+  },
+  {
+    "name": "ir_unary_to_anthropic_missing_choices",
+    "kind": "unary",
+    "handling": "FROM_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": {"error": {"message": "Rate limit reached", "type": "rate_limit_error"}},
+    "expected": {"error": {"message": "Rate limit reached", "type": "rate_limit_error"}}
+  },
+  {
+    "name": "gemini_sse_to_ir_stream",
+    "kind": "sse",
+    "handling": "TO_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": [
+      {"data": {"candidates": [{"content": {"role": "model", "parts": [{"text": "1, 2, 3,"}]}}], "usageMetadata": {"promptTokenCount": 12, "totalTokenCount": 12, "trafficType": "ON_DEMAND"}, "modelVersion": "gemini-2.5-flash", "createTime": "2026-09-25T03:00:00.000000Z", "responseId": "resp-1"}},
+      {"data": {"candidates": [{"content": {"role": "model", "parts": [{"text": " 4, 5"}]}}], "usageMetadata": {"promptTokenCount": 12, "totalTokenCount": 12, "trafficType": "ON_DEMAND"}, "modelVersion": "gemini-2.5-flash", "createTime": "2026-09-25T03:00:00.000000Z", "responseId": "resp-1"}},
+      {"data": {"candidates": [{"content": {"role": "model", "parts": [{"text": ", 6"}]}, "finishReason": "STOP"}], "usageMetadata": {"promptTokenCount": 12, "candidatesTokenCount": 69, "totalTokenCount": 110, "trafficType": "ON_DEMAND", "thoughtsTokenCount": 29}, "modelVersion": "gemini-2.5-flash", "createTime": "2026-09-25T03:00:00.000000Z", "responseId": "resp-1"}}
+    ],
+    "expected": [
+      {"data": {"choices": [{"delta": {"content": "1, 2, 3,", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "resp-1", "model": "gemini-2.5-flash", "object": "chat.completion.chunk", "usage": {"prompt_tokens": 12, "total_tokens": 12}}},
+      {"data": {"choices": [{"delta": {"content": " 4, 5", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "resp-1", "model": "gemini-2.5-flash", "object": "chat.completion.chunk", "usage": {"prompt_tokens": 12, "total_tokens": 12}}},
+      {"data": {"choices": [{"delta": {"content": ", 6", "role": "assistant"}, "finish_reason": "stop", "index": 0}], "id": "resp-1", "model": "gemini-2.5-flash", "object": "chat.completion.chunk", "usage": {"completion_tokens": 98, "completion_tokens_details": {"reasoning_tokens": 29}, "prompt_tokens": 12, "total_tokens": 110}}},
+      {"data": "[DONE]"}
+    ]
+  },
+  {
+    "name": "gemini_sse_to_ir_thought_and_no_content",
+    "kind": "sse",
+    "handling": "TO_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": [
+      {"data": {"candidates": [{"content": {"role": "model", "parts": [{"text": "thinking...", "thought": true}]}}], "modelVersion": "gemini-2.5-pro"}},
+      {"data": {"candidates": [{"content": {"role": "model", "parts": [{"text": "Done"}]}}], "modelVersion": "gemini-2.5-pro"}},
+      {"data": {"candidates": [{"finishReason": "MAX_TOKENS"}], "modelVersion": "gemini-2.5-pro"}}
+    ],
+    "expected": [
+      {"data": {"choices": [{"delta": {"content": "thinking...", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "chatcmpl-transcoded", "model": "gemini-2.5-pro", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": "Done", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "chatcmpl-transcoded", "model": "gemini-2.5-pro", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {}, "finish_reason": "length", "index": 0}], "id": "chatcmpl-transcoded", "model": "gemini-2.5-pro", "object": "chat.completion.chunk"}},
+      {"data": "[DONE]"}
+    ]
+  },
+  {
+    "name": "gemini_sse_to_ir_error_frame",
+    "kind": "sse",
+    "handling": "TO_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": [
+      {"data": {"error": {"code": 429, "message": "Resource exhausted", "status": "RESOURCE_EXHAUSTED"}}}
+    ],
+    "expected": [
+      {"data": {"error": {"code": 429, "message": "Resource exhausted", "status": "RESOURCE_EXHAUSTED"}}},
+      {"data": "[DONE]"}
+    ]
+  },
+  {
+    "name": "anthropic_sse_to_ir_full_sequence",
+    "kind": "sse",
+    "handling": "TO_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": [
+      {"event": "message_start", "data": {"type": "message_start", "message": {"id": "msg_1", "type": "message", "role": "assistant", "model": "claude-sonnet-4-5", "content": [], "stop_reason": null, "usage": {"input_tokens": 25, "output_tokens": 1, "cache_read_input_tokens": 5}}}},
+      {"event": "content_block_start", "data": {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}}},
+      {"event": "ping", "data": {"type": "ping"}},
+      {"event": "content_block_delta", "data": {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "Hello"}}},
+      {"event": "content_block_delta", "data": {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": " world"}}},
+      {"event": "content_block_stop", "data": {"type": "content_block_stop", "index": 0}},
+      {"event": "message_delta", "data": {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": null}, "usage": {"output_tokens": 15}}},
+      {"event": "message_stop", "data": {"type": "message_stop"}}
+    ],
+    "expected": [
+      {"data": {"choices": [{"delta": {"content": "", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": "Hello"}, "finish_reason": null, "index": 0}], "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": " world"}, "finish_reason": null, "index": 0}], "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {}, "finish_reason": "stop", "index": 0}], "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk", "usage": {"completion_tokens": 15}}},
+      {"data": "[DONE]"}
+    ]
+  },
+  {
+    "name": "anthropic_sse_to_ir_error_and_raw",
+    "kind": "sse",
+    "handling": "TO_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": [
+      {"event": "message_start", "data": {"type": "message_start", "message": {"id": "msg_2", "type": "message", "role": "assistant", "model": "claude-haiku-4-5", "content": []}}},
+      {"event": "content_block_delta", "data": {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "Partial"}}},
+      {"event": "error", "data": {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}},
+      {"data": "keepalive"},
+      {"event": "message_delta", "data": {"type": "message_delta", "delta": {"stop_reason": "max_tokens", "stop_sequence": null}, "usage": {"output_tokens": 3}}}
+    ],
+    "expected": [
+      {"data": {"choices": [{"delta": {"content": "", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "msg_2", "model": "claude-haiku-4-5", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": "Partial"}, "finish_reason": null, "index": 0}], "id": "msg_2", "model": "claude-haiku-4-5", "object": "chat.completion.chunk"}},
+      {"data": {"error": {"message": "Overloaded", "type": "overloaded_error"}, "type": "error"}, "event": "error"},
+      {"data": "keepalive"},
+      {"data": {"choices": [{"delta": {}, "finish_reason": "length", "index": 0}], "id": "msg_2", "model": "claude-haiku-4-5", "object": "chat.completion.chunk", "usage": {"completion_tokens": 3}}}
+    ]
+  },
+  {
+    "name": "ir_sse_to_gemini_stream",
+    "kind": "sse",
+    "handling": "FROM_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": [
+      {"data": {"id": "chatcmpl-9", "object": "chat.completion.chunk", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": null}]}},
+      {"data": {"id": "chatcmpl-9", "object": "chat.completion.chunk", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "delta": {"content": "Hello"}, "finish_reason": null}]}},
+      {"data": {"id": "chatcmpl-9", "object": "chat.completion.chunk", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7}}},
+      {"data": "[DONE]"}
+    ],
+    "expected": [
+      {"data": {"candidates": [{"content": {"parts": [{"text": ""}], "role": "model"}, "index": 0}], "modelVersion": "gpt-4o"}},
+      {"data": {"candidates": [{"content": {"parts": [{"text": "Hello"}], "role": "model"}, "index": 0}], "modelVersion": "gpt-4o"}},
+      {"data": {"candidates": [{"content": {"parts": [{"text": ""}], "role": "model"}, "finishReason": "STOP", "index": 0}], "modelVersion": "gpt-4o", "usageMetadata": {"candidatesTokenCount": 2, "promptTokenCount": 5, "totalTokenCount": 7}}}
+    ]
+  },
+  {
+    "name": "ir_sse_to_gemini_usage_only_chunk",
+    "kind": "sse",
+    "handling": "FROM_IR",
+    "dialect": "GEMINI_GENERATE_CONTENT",
+    "input": [
+      {"data": {"id": "chatcmpl-10", "object": "chat.completion.chunk", "model": "gpt-4o", "choices": [{"index": 0, "delta": {"content": "Hi"}, "finish_reason": "length"}]}},
+      {"data": {"id": "chatcmpl-10", "object": "chat.completion.chunk", "model": "gpt-4o", "choices": [], "usage": {"prompt_tokens": 5, "completion_tokens": 1, "total_tokens": 6}}},
+      {"data": "[DONE]"}
+    ],
+    "expected": [
+      {"data": {"candidates": [{"content": {"parts": [{"text": "Hi"}], "role": "model"}, "finishReason": "MAX_TOKENS", "index": 0}], "modelVersion": "gpt-4o"}},
+      {"data": {"choices": [], "id": "chatcmpl-10", "model": "gpt-4o", "object": "chat.completion.chunk", "usage": {"completion_tokens": 1, "prompt_tokens": 5, "total_tokens": 6}}}
+    ]
+  },
+  {
+    "name": "ir_sse_to_anthropic_stream",
+    "kind": "sse",
+    "handling": "FROM_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": [
+      {"data": {"id": "chatcmpl-9", "object": "chat.completion.chunk", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": null}]}},
+      {"data": {"id": "chatcmpl-9", "object": "chat.completion.chunk", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "delta": {"content": "Hello"}, "finish_reason": null}]}},
+      {"data": {"id": "chatcmpl-9", "object": "chat.completion.chunk", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7}}},
+      {"data": "[DONE]"}
+    ],
+    "expected": [
+      {"data": {"delta": {"text": "", "type": "text_delta"}, "index": 0, "type": "content_block_delta"}, "event": "content_block_delta"},
+      {"data": {"delta": {"text": "Hello", "type": "text_delta"}, "index": 0, "type": "content_block_delta"}, "event": "content_block_delta"},
+      {"data": {"delta": {"stop_reason": "end_turn", "stop_sequence": null}, "type": "message_delta", "usage": {"output_tokens": 2}}, "event": "message_delta"},
+      {"data": {"type": "message_stop"}, "event": "message_stop"}
+    ]
+  },
+  {
+    "name": "ir_sse_to_anthropic_message_start_and_finish_map",
+    "kind": "sse",
+    "handling": "FROM_IR",
+    "dialect": "ANTHROPIC_MESSAGES",
+    "input": [
+      {"data": {"id": "chatcmpl-11", "model": "gpt-4o", "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": null}]}},
+      {"data": {"choices": [{"index": 0, "delta": {}, "finish_reason": "length"}]}},
+      {"data": {"choices": [{"delta": {}, "finish_reason": "weird"}]}},
+      {"data": "hello"},
+      {"data": "[DONE]"}
+    ],
+    "expected": [
+      {"data": {"message": {"content": [], "id": "chatcmpl-11", "model": "gpt-4o", "role": "assistant", "type": "message"}, "type": "message_start"}, "event": "message_start"},
+      {"data": {"delta": {"stop_reason": "max_tokens", "stop_sequence": null}, "type": "message_delta"}, "event": "message_delta"},
+      {"data": {"delta": {"stop_reason": "end_turn", "stop_sequence": null}, "type": "message_delta"}, "event": "message_delta"},
+      {"data": "hello"},
+      {"data": {"type": "message_stop"}, "event": "message_stop"}
+    ]
+  },
+  {
+    "name": "openai_sse_from_ir_identity",
+    "kind": "sse",
+    "handling": "FROM_IR",
+    "dialect": "OPENAI_CHAT_COMPLETIONS",
+    "input": [
+      {"data": {"id": "chatcmpl-9", "object": "chat.completion.chunk", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": null}]}},
+      {"data": {"id": "chatcmpl-9", "object": "chat.completion.chunk", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "delta": {"content": "Hello"}, "finish_reason": null}]}},
+      {"data": {"id": "chatcmpl-9", "object": "chat.completion.chunk", "created": 1699999999, "model": "gpt-4o", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7}}},
+      {"data": "[DONE]"}
+    ],
+    "expected": [
+      {"data": {"choices": [{"delta": {"content": "", "role": "assistant"}, "finish_reason": null, "index": 0}], "created": 1699999999, "id": "chatcmpl-9", "model": "gpt-4o", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": "Hello"}, "finish_reason": null, "index": 0}], "created": 1699999999, "id": "chatcmpl-9", "model": "gpt-4o", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {}, "finish_reason": "stop", "index": 0}], "created": 1699999999, "id": "chatcmpl-9", "model": "gpt-4o", "object": "chat.completion.chunk", "usage": {"completion_tokens": 2, "prompt_tokens": 5, "total_tokens": 7}}},
+      {"data": "[DONE]"}
+    ]
+  }
+]
