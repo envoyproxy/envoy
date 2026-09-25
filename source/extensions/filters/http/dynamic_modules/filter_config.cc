@@ -99,7 +99,8 @@ size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view n
   }
 
   auto thread_local_provider = Secret::ThreadLocalGenericSecretProvider::create(
-      std::move(provider), server_context_.threadLocal(), server_context_.api());
+      std::move(provider), server_context_.threadLocal(), server_context_.api(),
+      server_context_.mainThreadDispatcher());
   if (!thread_local_provider.ok()) {
     ENVOY_LOG(error, "{} '{}': {}", failure_prefix, name, thread_local_provider.status().message());
     return 0;
