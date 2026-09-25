@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -467,6 +468,9 @@ struct TranscodeStreamState {
 // no headers and no clocks itself; the caller passes in what it has and applies what comes back.
 struct TranscodeContext {
   // Inputs.
+  // The request's `:path`, from which a request `ToIr` leg reads what its dialect names in the path
+  // rather than the body (see `DialectTranscodePack::envelope`).
+  absl::string_view request_path{};
   // The model the request named, for a response that does not name its own (see
   // `TranscodeRule::ContextField::RequestModel`).
   absl::string_view request_model{};
@@ -481,6 +485,10 @@ struct TranscodeContext {
   // Set by request legs to the request's IR `model` (read after a `ToIr` leg and before a
   // `FromIr` one), so the caller can hand it back as the fallback model on the response legs.
   std::string ir_model{};
+  // Set by a successful request `FromIr` leg whose dialect names request members in the path (see
+  // `DialectTranscodePack::envelope`): the `:path` the request must be sent to, which the caller
+  // applies along with the body. Every other request leg clears it.
+  std::optional<std::string> rewritten_path{};
 };
 
 // The rule sets for one payload kind of a dialect: `to_ir` converts the dialect into the IR
@@ -581,6 +589,28 @@ struct StreamGrammars {
   StreamGrammar from_ir{};
 };
 
+// Where a dialect's API names request members in the request path rather than the body. Gemini
+// names the model and the streaming mode there, calling a custom method on the model:
+// `/v1beta/models/{model}:generateContent`, or `:streamGenerateContent` to stream the response.
+//
+// A request `ToIr` leg lifts what `TranscodeContext::request_path` names into the IR body, unless
+// the body names it itself. A request `FromIr` leg moves it out of the body into
+// `TranscodeContext::rewritten_path`: `{prefix}{model}{unary_method}` or
+// `{prefix}{model}{stream_method}`.
+struct PathTemplate {
+  // What a rendered path puts before the model. A parsed path need only end its own prefix with
+  // this one's last segment (`/models/`), since Vertex AI nests Gemini's models under a project and
+  // a location.
+  std::string prefix{};
+  // The custom method (`:verb`) that follows the model, for a unary and for a streamed response.
+  // A rendered path keeps any query a method ends with; a parsed path's query is ignored.
+  std::string unary_method{};
+  std::string stream_method{};
+  // The IR members the path carries: the model, and whether the response is streamed.
+  std::string model_field{"model"};
+  std::string stream_field{"stream"};
+};
+
 // Declarative dialect pack: every rule needed to move one dialect's payloads to and from the IR.
 //
 // `dialect_schema` is the protocol's own `PayloadSchema`; it is what a request converted out of
@@ -595,6 +625,8 @@ struct DialectTranscodePack {
   LegRules response{};
   // Streamed response events.
   StreamGrammars stream{};
+  // Request members the dialect's API names in the request path, if any.
+  std::optional<PathTemplate> envelope{};
   const PayloadSchema* dialect_schema{nullptr};
   const PayloadSchema* ir_schema{nullptr};
 };
@@ -647,6 +679,11 @@ public:
   // caller still holds the original and can forward it untranslated. `StreamEvent` legs go
   // through `transcodeStreamEvent()` instead.
   //
+  // A `Request` leg also moves what its dialect names in the request path rather than the body
+  // (`DialectTranscodePack::envelope`): `ToIr` lifts it from `ctx.request_path` into the IR body,
+  // and `FromIr` moves it out of the body into `ctx.rewritten_path`, which the caller must send the
+  // request to.
+  //
   // A leg whose dialect is the IR is the identity, except that a request `FromIr` leg still
   // validates the payload against the IR's schema.
   absl::Status transcode(const TranscodeLeg& leg, TranscodeContext& ctx,
@@ -667,9 +704,15 @@ public:
   absl::StatusOr<std::vector<SseEventPtr>> finishStream(const TranscodeLeg& leg,
                                                         TranscodeContext& ctx) const;
 
+  // The model that `path`, a request path of `dialect`'s API, names: empty unless the dialect
+  // names its model in the path (`DialectTranscodePack::envelope`) and `path` is one of its model
+  // methods. For a caller that needs the model without running a request leg.
+  std::string modelFromRequestPath(LLMProtocol dialect, absl::string_view path) const;
+
   // Converts request `payload` from `source_protocol` into the intermediate representation
   // (`OpenAiChatCompletions`). A no-op when `source_protocol` is already the IR protocol or is
-  // `Unspecified`.
+  // `Unspecified`. Only the body is converted: unlike `transcode()`, this has no request path to
+  // lift what the dialect names there from.
   //
   // The result is deliberately NOT validated against the IR schema. Two reasons: the source
   // payload was already validated against its own schema by the AI Protocol Manager before the
@@ -686,6 +729,10 @@ public:
   // caught here instead of over the network. Rule execution is skipped when `target_protocol`
   // is the IR protocol, but validation still runs. A no-op when `target_protocol` is
   // `Unspecified`.
+  //
+  // Only the body is converted. What the dialect names in the request path (Gemini's `model` and
+  // `stream`) stays in the body, since there is no context to hand a path back through; a request
+  // bound for the upstream goes through `transcode()`, which moves it into the path.
   absl::Status transcodeFromIr(LLMProtocol target_protocol, JsonWithExtBuf& payload) const {
     return transcodeFromIr(target_protocol, payload.json());
   }

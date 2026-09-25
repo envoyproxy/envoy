@@ -102,8 +102,9 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_GeminiSchema) 
   ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
 
   // `model` and `stream` are preserved. Gemini carries them in the URL `:path` rather than the
-  // body, but dropping them here would destroy the only copy of the routing information, and
-  // Gemini's root schema tolerates the extra fields.
+  // body, but this wrapper converts only the body and has no context to hand a path back through,
+  // so dropping them here would destroy the only copy of the routing information. Gemini's root
+  // schema tolerates the extra fields; `transcode()` moves them into the path instead.
   EXPECT_EQ(payload["model"], "gemini-2.5-pro");
   EXPECT_EQ(payload["stream"], true);
 
@@ -1318,6 +1319,221 @@ TEST(TranscodingEngineTest, TranscodeRejectsStreamEventAndUnregisteredLegs) {
                      ctx, doc)
           .ok());
   EXPECT_EQ(doc, original);
+}
+
+// ---------------------------------------------------------------------------
+// Request envelopes: what a dialect names in the request path rather than the body.
+
+constexpr TranscodeLeg kGeminiRequestToIr{PayloadKind::Request, TranscodeDirection::ToIr,
+                                          LLMProtocol::GeminiGenerateContent};
+constexpr TranscodeLeg kIrRequestToGemini{PayloadKind::Request, TranscodeDirection::FromIr,
+                                          LLMProtocol::GeminiGenerateContent};
+
+// A Gemini request names its model and streaming mode in the path, and the IR needs both in the
+// body. What the body names itself wins.
+TEST(TranscodingEngineTest, GeminiRequestToIrLiftsTheModelAndStreamFromThePath) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const nlohmann::json body =
+      nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
+
+  nlohmann::json streamed = body;
+  TranscodeContext ctx;
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, streamed), IsOk());
+  EXPECT_EQ(streamed["model"], "gemini-2.5-flash");
+  EXPECT_EQ(streamed["stream"], true);
+  EXPECT_EQ(streamed["messages"][0]["content"], "Hi");
+  EXPECT_EQ(ctx.ir_model, "gemini-2.5-flash");
+
+  // Vertex AI nests the same methods under a project and a location.
+  nlohmann::json unary = body;
+  ctx.request_path = "/v1/projects/p/locations/us-central1/publishers/google/models/"
+                     "gemini-2.5-pro:generateContent";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, unary), IsOk());
+  EXPECT_EQ(unary["model"], "gemini-2.5-pro");
+  EXPECT_FALSE(unary.contains("stream"));
+
+  nlohmann::json named = body;
+  named["model"] = "gemini-named-in-body";
+  named["stream"] = false;
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:streamGenerateContent";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, named), IsOk());
+  EXPECT_EQ(named["model"], "gemini-named-in-body");
+  EXPECT_EQ(named["stream"], false);
+}
+
+// Only Gemini's model methods name anything, and a dialect that names nothing in the path reads
+// nothing from it.
+TEST(TranscodingEngineTest, RequestToIrLiftsNothingFromAnyOtherPath) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const nlohmann::json body =
+      nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
+
+  for (const char* path : {
+           "",
+           "/v1/chat/completions",
+           "/v1beta/models/gemini-2.5-flash",
+           "/v1beta/models/gemini-2.5-flash:countTokens",
+           "/v1beta/models/:generateContent",
+           "/v1beta/models/a:b:generateContent",
+           "/v1beta/tunedModels/t:generateContent",
+           "gemini-2.5-flash:generateContent",
+       }) {
+    nlohmann::json doc = body;
+    TranscodeContext ctx;
+    ctx.request_path = path;
+    ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, doc), IsOk());
+    EXPECT_FALSE(doc.contains("model")) << path;
+    EXPECT_FALSE(doc.contains("stream")) << path;
+  }
+
+  nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5", "max_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext ctx;
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:streamGenerateContent";
+  ASSERT_THAT(engine.transcode(
+                  {PayloadKind::Request, TranscodeDirection::ToIr, LLMProtocol::AnthropicMessages},
+                  ctx, anthropic),
+              IsOk());
+  EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
+  EXPECT_FALSE(anthropic.contains("stream"));
+}
+
+// Bound for Gemini, the IR's model and streaming mode move into the path: Gemini rejects both, and
+// `stream_options`, as unknown fields in the body.
+TEST(TranscodingEngineTest, IrRequestToGeminiMovesTheModelAndStreamIntoThePath) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json streamed = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-flash", "stream": true, "stream_options": {"include_usage": true},
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext ctx;
+  ASSERT_THAT(engine.transcode(kIrRequestToGemini, ctx, streamed), IsOk());
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(
+                  std::string("/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse")));
+  EXPECT_EQ(ctx.ir_model, "gemini-2.5-flash");
+  EXPECT_EQ(streamed, nlohmann::json::parse(
+                          R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})"));
+
+  nlohmann::json unary = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-flash", "stream": false,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(engine.transcode(kIrRequestToGemini, ctx, unary), IsOk());
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(std::string("/v1beta/models/gemini-2.5-flash:generateContent")));
+  EXPECT_FALSE(unary.contains("model"));
+  EXPECT_FALSE(unary.contains("stream"));
+
+  // Anthropic names its model in the body, so there is no path to rewrite, and none survives from
+  // an earlier leg.
+  nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5", "stream": true, "max_completion_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(engine.transcode({PayloadKind::Request, TranscodeDirection::FromIr,
+                                LLMProtocol::AnthropicMessages},
+                               ctx, anthropic),
+              IsOk());
+  EXPECT_FALSE(ctx.rewritten_path.has_value());
+  EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
+  EXPECT_EQ(anthropic["stream"], true);
+}
+
+// The model becomes a path segment, so one that could escape it is refused, and no path is
+// rewritten.
+TEST(TranscodingEngineTest, IrRequestToGeminiRefusesAModelThatIsNotAModelId) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  for (const char* model : {R"("../gemini-2.5-flash:generateContent?key=x#")",
+                            R"("models/gemini-2.5-flash")", R"("")", "42", "null"}) {
+    nlohmann::json doc =
+        nlohmann::json::parse(R"({"messages": [{"role": "user", "content": "Hi"}]})");
+    doc["model"] = nlohmann::json::parse(model);
+    TranscodeContext ctx;
+    const absl::Status status = engine.transcode(kIrRequestToGemini, ctx, doc);
+    EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument) << model;
+    EXPECT_THAT(status.message(), testing::HasSubstr("model id")) << model;
+    EXPECT_FALSE(ctx.rewritten_path.has_value()) << model;
+  }
+
+  nlohmann::json no_model =
+      nlohmann::json::parse(R"({"messages": [{"role": "user", "content": "Hi"}]})");
+  TranscodeContext ctx;
+  EXPECT_EQ(engine.transcode(kIrRequestToGemini, ctx, no_model).code(),
+            absl::StatusCode::kInvalidArgument);
+}
+
+// The envelope is data in the pack: another dialect that names its model in the path gets the same
+// treatment, with its own layout.
+TEST(TranscodingEngineTest, RequestEnvelopeIsDataInThePack) {
+  TranscodingEngine engine;
+  ASSERT_THAT(engine.registerPack(DialectTranscodePack{
+                  .protocol = LLMProtocol::OpenAiResponses,
+                  .envelope =
+                      PathTemplate{
+                          .prefix = "/v2/engines/",
+                          .unary_method = ":predict",
+                          .stream_method = ":streamPredict?stream=1",
+                      },
+              }),
+              IsOk());
+  const TranscodeLeg to_ir{PayloadKind::Request, TranscodeDirection::ToIr,
+                           LLMProtocol::OpenAiResponses};
+  const TranscodeLeg from_ir{PayloadKind::Request, TranscodeDirection::FromIr,
+                             LLMProtocol::OpenAiResponses};
+
+  // Only the prefix's last segment has to match, and the query is ignored.
+  nlohmann::json doc = nlohmann::json::parse(R"({"input": "Hi"})");
+  TranscodeContext ctx;
+  ctx.request_path = "/tenants/t/v2/engines/engine-7:streamPredict?alt=json";
+  ASSERT_THAT(engine.transcode(to_ir, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({"input": "Hi", "model": "engine-7", "stream": true})"));
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::OpenAiResponses, ctx.request_path),
+            "engine-7");
+  EXPECT_EQ(
+      engine.modelFromRequestPath(LLMProtocol::OpenAiResponses, "/v2/models/engine-7:predict"), "");
+
+  // A rendered path keeps the method's query.
+  ASSERT_THAT(engine.transcode(from_ir, ctx, doc), IsOk());
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(std::string("/v2/engines/engine-7:streamPredict?stream=1")));
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({"input": "Hi"})"));
+}
+
+TEST(TranscodingEngineTest, ModelFromRequestPathReadsTheDialectsEnvelope) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::GeminiGenerateContent,
+                                        "/v1beta/models/gemini-2.5-pro:generateContent"),
+            "gemini-2.5-pro");
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::GeminiGenerateContent,
+                                        "/v1/projects/p/locations/l/publishers/google/models/"
+                                        "gemini-2.5-flash:streamGenerateContent?alt=sse"),
+            "gemini-2.5-flash");
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::GeminiGenerateContent, "/v1/chat/completions"),
+            "");
+  // Anthropic names its model in the body, and `OpenAiResponses` has no pack at all.
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::AnthropicMessages,
+                                        "/v1beta/models/gemini-2.5-pro:generateContent"),
+            "");
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::OpenAiResponses,
+                                        "/v1beta/models/gemini-2.5-pro:generateContent"),
+            "");
 }
 
 // ---------------------------------------------------------------------------

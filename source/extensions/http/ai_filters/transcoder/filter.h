@@ -99,9 +99,6 @@ private:
   HttpFilters::AiProtocolManager::LLMProtocol effectiveTargetProtocol() const;
 
   absl::Status transcodeRequest(nlohmann::json& json);
-  absl::Status transcodeToIr(nlohmann::json& json);
-  absl::Status transcodeFromIr(nlohmann::json& json);
-  absl::Status moveTargetToGeminiPath(nlohmann::json& json);
 
   // The engine leg that transcodes this stream's response as `kind`, or `std::nullopt` when the
   // response passes through: response transcoding is off, or the dialect it needs is unknown.
@@ -123,8 +120,8 @@ private:
   // When the stream started, in seconds since the Unix epoch: the `created` time of an IR
   // response whose dialect does not carry one.
   const int64_t created_;
-  // The model the request named, for a response that does not name its own: the Gemini path's
-  // model, until a request leg reports the IR's.
+  // The model the request named, for a response that does not name its own: the one the client's
+  // request path names (as Gemini's does), until a request leg reports the IR's.
   std::string request_model_;
 };
 
