@@ -117,6 +117,20 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   if (!ShouldCreateIncomingStream(id)) {
     return nullptr;
   }
+  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+    ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::CreateIncomingStream: "
+                                "sending GOAWAY and close on dispatch");
+    SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
+    closeConnectionImmediately();
+    return nullptr;
+  } else if (should_send_go_away_on_dispatch_ != nullptr &&
+             should_send_go_away_on_dispatch_->shouldShedLoad() && !h3_go_away_sent_) {
+    ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::CreateIncomingStream: "
+                                "sending GOAWAY on dispatch");
+    SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
+    h3_go_away_sent_ = true;
+  }
   if (!codec_stats_.has_value() || !http3_options_.has_value()) {
     ENVOY_BUG(false,
               fmt::format(
@@ -311,20 +325,6 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
   // If L4 filters causes the connection to be closed early during initialization, now
   // is the time to actually close the connection.
   maybeHandleCloseDuringInitialize();
-
-  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
-      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
-    ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
-                                "sending GOAWAY and close on dispatch");
-    SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
-    closeConnectionImmediately();
-  } else if (should_send_go_away_on_dispatch_ != nullptr &&
-             should_send_go_away_on_dispatch_->shouldShedLoad() && !h3_go_away_sent_) {
-    ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
-                                "sending GOAWAY on dispatch");
-    SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
-    h3_go_away_sent_ = true;
-  }
 
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
   if (connection()->expected_server_preferred_address().IsInitialized() &&

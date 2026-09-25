@@ -487,6 +487,11 @@ public:
    * Information about which cmsg to save to QuicReceivedPacket, if any.
    */
   virtual const IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const PURE;
+
+  /**
+   * Configures the LoadShedPoints for this callback.
+   */
+  virtual void configureLoadShedPoints(Server::LoadShedPointProvider&) {}
 };
 
 using UdpListenerCallbacksOptRef = std::optional<std::reference_wrapper<UdpListenerCallbacks>>;

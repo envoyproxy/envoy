@@ -25,6 +25,7 @@
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -696,6 +697,66 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsScaling) {
                                  Event::Dispatcher::RunType::NonBlock);
   envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false);
   EXPECT_EQ(2u, envoy_quic_dispatcher_.NumSessions());
+}
+
+TEST_P(EnvoyQuicDispatcherTest, LoadSheddingH3GoAwayOnDispatch) {
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(_)).WillRepeatedly(Return(nullptr));
+  NiceMock<Server::MockLoadShedPoint> mock_loadshed_point;
+  EXPECT_CALL(overload_manager,
+              getLoadShedPoint(Server::LoadShedPointName::get().H3ServerGoAwayOnDispatch))
+      .WillOnce(Return(&mock_loadshed_point));
+  envoy_quic_dispatcher_.configureLoadShedPoints(overload_manager);
+
+  EXPECT_CALL(mock_loadshed_point, shouldShedLoad()).WillOnce(Return(true));
+
+  const quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                              ? quic::QuicIpAddress::Loopback4()
+                                              : quic::QuicIpAddress::Loopback6(),
+                                          54321);
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+  processValidChloPacket(peer_addr);
+
+  EXPECT_EQ(0u, envoy_quic_dispatcher_.NumSessions());
+  EXPECT_EQ(1u, listener_stats_.downstream_cx_overload_reject_.value());
+}
+
+TEST_P(EnvoyQuicDispatcherTest, LoadSheddingH3GoAwayAndCloseOnDispatch) {
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(_)).WillRepeatedly(Return(nullptr));
+  NiceMock<Server::MockLoadShedPoint> mock_loadshed_point;
+  EXPECT_CALL(overload_manager,
+              getLoadShedPoint(Server::LoadShedPointName::get().H3ServerGoAwayAndCloseOnDispatch))
+      .WillOnce(Return(&mock_loadshed_point));
+  envoy_quic_dispatcher_.configureLoadShedPoints(overload_manager);
+
+  EXPECT_CALL(mock_loadshed_point, shouldShedLoad()).WillOnce(Return(true));
+
+  const quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                              ? quic::QuicIpAddress::Loopback4()
+                                              : quic::QuicIpAddress::Loopback6(),
+                                          54321);
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+  processValidChloPacket(peer_addr);
+
+  EXPECT_EQ(0u, envoy_quic_dispatcher_.NumSessions());
+  EXPECT_EQ(1u, listener_stats_.downstream_cx_overload_reject_.value());
+}
+
+TEST_P(EnvoyQuicDispatcherTest, NoLoadShedding) {
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(_)).WillRepeatedly(Return(nullptr));
+  NiceMock<Server::MockLoadShedPoint> mock_loadshed_point;
+  EXPECT_CALL(overload_manager,
+              getLoadShedPoint(Server::LoadShedPointName::get().H3ServerGoAwayOnDispatch))
+      .WillOnce(Return(&mock_loadshed_point));
+  envoy_quic_dispatcher_.configureLoadShedPoints(overload_manager);
+
+  EXPECT_CALL(mock_loadshed_point, shouldShedLoad()).WillOnce(Return(false));
+
+  processValidChloPacketAndInitializeFilters(/*should_buffer=*/false);
+
+  EXPECT_EQ(0u, listener_stats_.downstream_cx_overload_reject_.value());
 }
 
 } // namespace Quic
