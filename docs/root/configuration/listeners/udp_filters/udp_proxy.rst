@@ -33,6 +33,13 @@ source port. On Linux, it requires the ``CAP_NET_ADMIN`` capability. Because ups
 addressed to the original downstream IP, the deployment must use Direct Server Return or configure
 the return routing described in the API documentation.
 
+UDP proxy upstream sockets apply the :ref:`socket options
+<envoy_v3_api_field_config.core.v3.BindConfig.socket_options>` configured in the cluster's
+:ref:`upstream_bind_config <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>`.
+This supports use cases such as packet marking with Linux ``SO_MARK``. When
+``use_original_src_ip`` is enabled, the cluster socket options are combined with the options required
+to select the downstream source IP per datagram.
+
 Load balancing and unhealthy host handling
 ------------------------------------------
 
