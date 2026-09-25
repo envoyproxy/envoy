@@ -187,6 +187,8 @@ envoy_cc_library(
         ":llm_protocol_adapters_lib",
         ":schema_lib",
         ":token_usage_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",

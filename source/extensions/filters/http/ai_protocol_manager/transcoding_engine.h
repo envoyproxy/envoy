@@ -8,6 +8,7 @@
 
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -457,6 +458,9 @@ struct TranscodeStreamState {
   // The native usage `accumulateUsage` has merged so far. Never finalized itself: renders
   // finalize a copy.
   TokenUsage usage{};
+  // Set once the stream has ended, by a `Terminate` case or by `finishStream()`, after which
+  // `finishStream()` appends nothing.
+  bool terminated{false};
 };
 
 // What a leg needs beyond the payload, and what it produces outside the payload. The engine reads
@@ -469,7 +473,8 @@ struct TranscodeContext {
   // The current time, for a response the IR requires a `created` timestamp on but the dialect
   // does not carry one (see `TranscodeRule::ContextField::NowUnixSeconds`).
   int64_t now_unix_seconds{0};
-  // The stream's memory, required by stream-state and usage-accumulation rules.
+  // The stream's memory: required on `StreamEvent` legs, whose stream-state and
+  // usage-accumulation rules read and write it.
   TranscodeStreamState* stream_state{nullptr};
 
   // Outputs.
@@ -486,6 +491,96 @@ struct LegRules {
   TranscodeRuleSet from_ir{};
 };
 
+// Which SSE events a `StreamEventCase` applies to. A default-constructed match accepts every event
+// whose payload is JSON.
+class StreamEventMatch {
+public:
+  enum class Kind {
+    // A JSON payload that matches `predicate()`.
+    Json,
+    // A JSON payload whose `type` member is `type()`, or which has no string `type` member and is
+    // named `type()` by its SSE `event:` field. Anthropic names each event both ways.
+    EventType,
+    // OpenAI's stream terminator: the raw, non-JSON payload `[DONE]`.
+    IsDone,
+    // Any payload that is not JSON: raw data, raw data held by reference, or no data at all.
+    NotJson,
+  };
+
+  StreamEventMatch() = default;
+
+  static StreamEventMatch json(TranscodePredicate predicate = TranscodePredicate());
+  static StreamEventMatch eventType(std::string type);
+  static StreamEventMatch isDone();
+  static StreamEventMatch notJson();
+
+  // Takes a mutable `event` because reading a raw payload linearizes its buffer.
+  bool matches(SseEvent& event) const;
+
+  // Introspection accessors (used by the startup verifier):
+  Kind kind() const { return kind_; }
+  const TranscodePredicate& predicate() const { return predicate_; }
+  const std::string& type() const { return type_; }
+
+private:
+  explicit StreamEventMatch(Kind kind) : kind_(kind) {}
+
+  Kind kind_{Kind::Json};
+  TranscodePredicate predicate_;
+  std::string type_;
+};
+
+// What a stream grammar does with an event that one of its cases matched.
+enum class StreamDisposition {
+  // Runs the case's rules on the event's JSON payload and forwards the result.
+  Transcode,
+  // Forwards the event as it is.
+  Passthrough,
+  // Forwards nothing.
+  Drop,
+  // Ends the stream: forwards the grammar's `on_terminate` events in the event's place.
+  Terminate,
+};
+
+// An event a stream grammar writes itself, rather than transcodes from one the source sent.
+struct StreamEmit {
+  // The SSE `event:` name; empty for none.
+  std::string event{};
+  // The JSON payload, or null for the raw payload `raw_data`.
+  nlohmann::json json{};
+  // The payload of an event whose payload is not JSON (e.g. OpenAI's `[DONE]`).
+  std::string raw_data{};
+};
+
+// One row of a stream grammar: the events it matches, and what becomes of them.
+struct StreamEventCase {
+  StreamEventMatch match{};
+  StreamDisposition disposition{StreamDisposition::Transcode};
+  // For `Transcode`: the rules that convert the event's payload.
+  TranscodeRuleSet rules{};
+  // For `Transcode`: the SSE `event:` name of the converted event; empty for none.
+  std::string output_event{};
+};
+
+// How one dialect's streamed response events convert into another's. The first case that matches
+// an event decides what becomes of it, and an event no case matches is an error. A grammar without
+// cases is the identity.
+struct StreamGrammar {
+  std::vector<StreamEventCase> cases{};
+  // What a `Terminate` case forwards in place of the source's terminator.
+  std::vector<StreamEmit> on_terminate{};
+  // What to append when the source stream ends without having terminated: the terminator the
+  // destination dialect needs but the source dialect never sends.
+  std::vector<StreamEmit> on_source_end{};
+};
+
+// The stream grammars of one dialect: `to_ir` converts the dialect's events into IR chunks and
+// `from_ir` converts IR chunks into the dialect's events.
+struct StreamGrammars {
+  StreamGrammar to_ir{};
+  StreamGrammar from_ir{};
+};
+
 // Declarative dialect pack: every rule needed to move one dialect's payloads to and from the IR.
 //
 // `dialect_schema` is the protocol's own `PayloadSchema`; it is what a request converted out of
@@ -498,6 +593,8 @@ struct DialectTranscodePack {
   LegRules request{};
   // Unary response bodies.
   LegRules response{};
+  // Streamed response events.
+  StreamGrammars stream{};
   const PayloadSchema* dialect_schema{nullptr};
   const PayloadSchema* ir_schema{nullptr};
 };
@@ -555,6 +652,21 @@ public:
   absl::Status transcode(const TranscodeLeg& leg, TranscodeContext& ctx,
                          nlohmann::json& json) const;
 
+  // Runs one `StreamEvent` leg on `event`, one event of a streamed response, and returns the
+  // events to forward in its place: none when the grammar drops it, several when it writes more.
+  // On success `event` is consumed. On failure `event` and `ctx.stream_state` are left exactly as
+  // they were, so the caller can forward the event untranslated and carry on with the stream.
+  //
+  // `ctx.stream_state` is required, and must be the same object for every event of one stream.
+  // A leg whose dialect is the IR is the identity.
+  absl::StatusOr<std::vector<SseEventPtr>>
+  transcodeStreamEvent(const TranscodeLeg& leg, TranscodeContext& ctx, SseEventPtr& event) const;
+
+  // Ends a `StreamEvent` leg once its source stream has ended, and returns the events to append:
+  // the grammar's `on_source_end`, unless the stream has already terminated.
+  absl::StatusOr<std::vector<SseEventPtr>> finishStream(const TranscodeLeg& leg,
+                                                        TranscodeContext& ctx) const;
+
   // Converts request `payload` from `source_protocol` into the intermediate representation
   // (`OpenAiChatCompletions`). A no-op when `source_protocol` is already the IR protocol or is
   // `Unspecified`.
@@ -581,6 +693,9 @@ public:
 
 private:
   absl::StatusOr<const DialectTranscodePack*> findPack(LLMProtocol dialect) const;
+  // The grammar a `StreamEvent` leg runs, or null when the leg is the identity.
+  absl::StatusOr<const StreamGrammar*> findStreamGrammar(const TranscodeLeg& leg,
+                                                         const TranscodeContext& ctx) const;
 
   absl::flat_hash_map<LLMProtocol, DialectTranscodePack> packs_;
 };

@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/extensions/http/ai_filters/transcoder/v3/transcoder.pb.h"
@@ -102,14 +103,12 @@ private:
   absl::Status transcodeFromIr(nlohmann::json& json);
   absl::Status moveTargetToGeminiPath(nlohmann::json& json);
 
-  absl::Status transcodeResponse(nlohmann::json& json);
-
-  absl::Status transcodeSseEvent(HttpFilters::AiProtocolManager::SseEvent& event,
-                                 bool& should_drop);
-  absl::Status transcodeSseEventToIr(HttpFilters::AiProtocolManager::SseEvent& event,
-                                     bool& should_drop);
-  absl::Status transcodeSseEventFromIr(HttpFilters::AiProtocolManager::SseEvent& event,
-                                       bool& should_drop);
+  // The engine leg that transcodes this stream's response as `kind`, or `std::nullopt` when the
+  // response passes through: response transcoding is off, or the dialect it needs is unknown.
+  std::optional<HttpFilters::AiProtocolManager::TranscodeLeg>
+  responseLeg(HttpFilters::AiProtocolManager::PayloadKind kind);
+  // What the response legs need beyond the payload.
+  HttpFilters::AiProtocolManager::TranscodeContext responseContext() const;
 
   static std::atomic<HttpFilters::AiProtocolManager::LLMProtocol> target_protocol_;
 
@@ -127,9 +126,6 @@ private:
   // The model the request named, for a response that does not name its own: the Gemini path's
   // model, until a request leg reports the IR's.
   std::string request_model_;
-  std::string sse_stream_id_{"chatcmpl-transcoded"};
-  std::string sse_stream_model_;
-  bool sse_done_emitted_{false};
 };
 
 } // namespace Transcoder

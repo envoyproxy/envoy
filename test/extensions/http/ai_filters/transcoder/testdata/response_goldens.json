@@ -154,9 +154,9 @@
       {"data": {"candidates": [{"content": {"role": "model", "parts": [{"text": ", 6"}]}, "finishReason": "STOP"}], "usageMetadata": {"promptTokenCount": 12, "candidatesTokenCount": 69, "totalTokenCount": 110, "trafficType": "ON_DEMAND", "thoughtsTokenCount": 29}, "modelVersion": "gemini-2.5-flash", "createTime": "2026-09-25T03:00:00.000000Z", "responseId": "resp-1"}}
     ],
     "expected": [
-      {"data": {"choices": [{"delta": {"content": "1, 2, 3,", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "resp-1", "model": "gemini-2.5-flash", "object": "chat.completion.chunk", "usage": {"prompt_tokens": 12, "total_tokens": 12}}},
-      {"data": {"choices": [{"delta": {"content": " 4, 5", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "resp-1", "model": "gemini-2.5-flash", "object": "chat.completion.chunk", "usage": {"prompt_tokens": 12, "total_tokens": 12}}},
-      {"data": {"choices": [{"delta": {"content": ", 6", "role": "assistant"}, "finish_reason": "stop", "index": 0}], "id": "resp-1", "model": "gemini-2.5-flash", "object": "chat.completion.chunk", "usage": {"completion_tokens": 98, "completion_tokens_details": {"reasoning_tokens": 29}, "prompt_tokens": 12, "total_tokens": 110}}},
+      {"data": {"choices": [{"delta": {"content": "1, 2, 3,", "role": "assistant"}, "finish_reason": null, "index": 0}], "created": 1700000000, "id": "resp-1", "model": "gemini-2.5-flash", "object": "chat.completion.chunk", "usage": {"prompt_tokens": 12, "total_tokens": 12}}},
+      {"data": {"choices": [{"delta": {"content": " 4, 5", "role": "assistant"}, "finish_reason": null, "index": 0}], "created": 1700000000, "id": "resp-1", "model": "gemini-2.5-flash", "object": "chat.completion.chunk", "usage": {"prompt_tokens": 12, "total_tokens": 12}}},
+      {"data": {"choices": [{"delta": {"content": ", 6", "role": "assistant"}, "finish_reason": "stop", "index": 0}], "created": 1700000000, "id": "resp-1", "model": "gemini-2.5-flash", "object": "chat.completion.chunk", "usage": {"completion_tokens": 98, "completion_tokens_details": {"reasoning_tokens": 29}, "prompt_tokens": 12, "total_tokens": 110}}},
       {"data": "[DONE]"}
     ]
   },
@@ -171,9 +171,9 @@
       {"data": {"candidates": [{"finishReason": "MAX_TOKENS"}], "modelVersion": "gemini-2.5-pro"}}
     ],
     "expected": [
-      {"data": {"choices": [{"delta": {"content": "thinking...", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "chatcmpl-transcoded", "model": "gemini-2.5-pro", "object": "chat.completion.chunk"}},
-      {"data": {"choices": [{"delta": {"content": "Done", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "chatcmpl-transcoded", "model": "gemini-2.5-pro", "object": "chat.completion.chunk"}},
-      {"data": {"choices": [{"delta": {}, "finish_reason": "length", "index": 0}], "id": "chatcmpl-transcoded", "model": "gemini-2.5-pro", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": "", "role": "assistant"}, "finish_reason": null, "index": 0}], "created": 1700000000, "id": "chatcmpl-transcoded", "model": "gemini-2.5-pro", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": "Done", "role": "assistant"}, "finish_reason": null, "index": 0}], "created": 1700000000, "id": "chatcmpl-transcoded", "model": "gemini-2.5-pro", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {}, "finish_reason": "length", "index": 0}], "created": 1700000000, "id": "chatcmpl-transcoded", "model": "gemini-2.5-pro", "object": "chat.completion.chunk"}},
       {"data": "[DONE]"}
     ]
   },
@@ -206,10 +206,10 @@
       {"event": "message_stop", "data": {"type": "message_stop"}}
     ],
     "expected": [
-      {"data": {"choices": [{"delta": {"content": "", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk"}},
-      {"data": {"choices": [{"delta": {"content": "Hello"}, "finish_reason": null, "index": 0}], "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk"}},
-      {"data": {"choices": [{"delta": {"content": " world"}, "finish_reason": null, "index": 0}], "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk"}},
-      {"data": {"choices": [{"delta": {}, "finish_reason": "stop", "index": 0}], "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk", "usage": {"completion_tokens": 15}}},
+      {"data": {"choices": [{"delta": {"content": "", "role": "assistant"}, "finish_reason": null, "index": 0}], "created": 1700000000, "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": "Hello"}, "finish_reason": null, "index": 0}], "created": 1700000000, "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": " world"}, "finish_reason": null, "index": 0}], "created": 1700000000, "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {}, "finish_reason": "stop", "index": 0}], "created": 1700000000, "id": "msg_1", "model": "claude-sonnet-4-5", "object": "chat.completion.chunk", "usage": {"completion_tokens": 15, "prompt_tokens": 30, "prompt_tokens_details": {"cached_tokens": 5}, "total_tokens": 45}}},
       {"data": "[DONE]"}
     ]
   },
@@ -226,11 +226,11 @@
       {"event": "message_delta", "data": {"type": "message_delta", "delta": {"stop_reason": "max_tokens", "stop_sequence": null}, "usage": {"output_tokens": 3}}}
     ],
     "expected": [
-      {"data": {"choices": [{"delta": {"content": "", "role": "assistant"}, "finish_reason": null, "index": 0}], "id": "msg_2", "model": "claude-haiku-4-5", "object": "chat.completion.chunk"}},
-      {"data": {"choices": [{"delta": {"content": "Partial"}, "finish_reason": null, "index": 0}], "id": "msg_2", "model": "claude-haiku-4-5", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": "", "role": "assistant"}, "finish_reason": null, "index": 0}], "created": 1700000000, "id": "msg_2", "model": "claude-haiku-4-5", "object": "chat.completion.chunk"}},
+      {"data": {"choices": [{"delta": {"content": "Partial"}, "finish_reason": null, "index": 0}], "created": 1700000000, "id": "msg_2", "model": "claude-haiku-4-5", "object": "chat.completion.chunk"}},
       {"data": {"error": {"message": "Overloaded", "type": "overloaded_error"}, "type": "error"}, "event": "error"},
       {"data": "keepalive"},
-      {"data": {"choices": [{"delta": {}, "finish_reason": "length", "index": 0}], "id": "msg_2", "model": "claude-haiku-4-5", "object": "chat.completion.chunk", "usage": {"completion_tokens": 3}}}
+      {"data": {"choices": [{"delta": {}, "finish_reason": "length", "index": 0}], "created": 1700000000, "id": "msg_2", "model": "claude-haiku-4-5", "object": "chat.completion.chunk", "usage": {"completion_tokens": 3}}}
     ]
   },
   {
@@ -279,7 +279,7 @@
     "expected": [
       {"data": {"delta": {"text": "", "type": "text_delta"}, "index": 0, "type": "content_block_delta"}, "event": "content_block_delta"},
       {"data": {"delta": {"text": "Hello", "type": "text_delta"}, "index": 0, "type": "content_block_delta"}, "event": "content_block_delta"},
-      {"data": {"delta": {"stop_reason": "end_turn", "stop_sequence": null}, "type": "message_delta", "usage": {"output_tokens": 2}}, "event": "message_delta"},
+      {"data": {"delta": {"stop_reason": "end_turn", "stop_sequence": null}, "type": "message_delta", "usage": {"input_tokens": 5, "output_tokens": 2}}, "event": "message_delta"},
       {"data": {"type": "message_stop"}, "event": "message_stop"}
     ]
   },

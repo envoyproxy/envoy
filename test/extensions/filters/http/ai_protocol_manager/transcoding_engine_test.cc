@@ -1,4 +1,6 @@
+#include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event.h"
 #include "source/extensions/filters/http/ai_protocol_manager/transcoding_engine.h"
 
 #include "test/test_common/status_utility.h"
@@ -1578,6 +1580,494 @@ TEST(TranscodingEngineTest, ResponseLegsRoundTripThroughTheIr) {
   ASSERT_THAT(engine.transcode(kAnthropicResponseToIr, ctx, doc), IsOk());
   ASSERT_THAT(engine.transcode(kIrResponseToAnthropic, ctx, doc), IsOk());
   EXPECT_EQ(doc, anthropic);
+}
+
+// ---------------------------------------------------------------------------
+// Stream event legs.
+
+constexpr TranscodeLeg kGeminiStreamToIr{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                                         LLMProtocol::GeminiGenerateContent};
+constexpr TranscodeLeg kIrStreamToGemini{PayloadKind::StreamEvent, TranscodeDirection::FromIr,
+                                         LLMProtocol::GeminiGenerateContent};
+constexpr TranscodeLeg kAnthropicStreamToIr{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                                            LLMProtocol::AnthropicMessages};
+constexpr TranscodeLeg kIrStreamToAnthropic{PayloadKind::StreamEvent, TranscodeDirection::FromIr,
+                                            LLMProtocol::AnthropicMessages};
+
+// Builds one SSE event from `spec`, in the shape `describeEvent()` reports: an optional `event`
+// name, and either a JSON `data` payload or a `raw` one.
+SseEventPtr makeEvent(const nlohmann::json& spec) {
+  auto event = std::make_unique<SseEvent>();
+  if (const auto data = spec.find("data"); data != spec.end()) {
+    JsonWithExtBuf payload;
+    payload.setJson(*data);
+    event->set_json(std::move(payload));
+  } else {
+    event->set_raw_data(std::make_unique<Buffer::OwnedImpl>(spec.value("raw", "")));
+  }
+  if (const auto name = spec.find("event"); name != spec.end()) {
+    EXPECT_THAT(event->set_event(name->get<std::string>()), IsOk());
+  }
+  return event;
+}
+
+nlohmann::json describeEvent(SseEvent& event) {
+  nlohmann::json spec = nlohmann::json::object();
+  if (!event.event().empty()) {
+    spec["event"] = std::string(event.event());
+  }
+  if (event.is_json()) {
+    spec["data"] = event.json().json();
+  } else {
+    spec["raw"] = std::string(event.raw_data_as_string());
+  }
+  return spec;
+}
+
+// Runs `events` through `leg` as one stream, ends it, and describes everything that comes out. An
+// event the engine refuses is reported as `{"untranslated": <event>}`: the transcoder filter
+// forwards such an event as it came in, so it must come back untouched.
+nlohmann::json runStream(const TranscodingEngine& engine, const TranscodeLeg& leg,
+                         const nlohmann::json& events, TranscodeContext ctx = TranscodeContext()) {
+  TranscodeStreamState state;
+  ctx.stream_state = &state;
+  nlohmann::json out = nlohmann::json::array();
+  for (const nlohmann::json& spec : events) {
+    SseEventPtr event = makeEvent(spec);
+    absl::StatusOr<std::vector<SseEventPtr>> transcoded =
+        engine.transcodeStreamEvent(leg, ctx, event);
+    if (!transcoded.ok()) {
+      EXPECT_NE(event, nullptr);
+      if (event != nullptr) {
+        out.push_back(nlohmann::json{{"untranslated", describeEvent(*event)}});
+      }
+      continue;
+    }
+    EXPECT_EQ(event, nullptr);
+    for (SseEventPtr& result : *transcoded) {
+      out.push_back(describeEvent(*result));
+    }
+  }
+  absl::StatusOr<std::vector<SseEventPtr>> trailer = engine.finishStream(leg, ctx);
+  EXPECT_THAT(trailer.status(), IsOk());
+  if (trailer.ok()) {
+    for (SseEventPtr& result : *trailer) {
+      out.push_back(describeEvent(*result));
+    }
+  }
+  return out;
+}
+
+// The first case that matches an event decides its fate. `on_terminate` replaces the source's
+// terminator, while `on_source_end` is appended only to a stream that ended without one, and a
+// grammar without cases is the identity.
+TEST(TranscodingEngineTest, StreamGrammarAppliesTheFirstCaseThatMatches) {
+  TranscodingEngine engine;
+  DialectTranscodePack pack{
+      .protocol = LLMProtocol::OpenAiResponses,
+      .stream = {.to_ir =
+                     {
+                         .cases =
+                             {
+                                 {.match = StreamEventMatch::isDone(),
+                                  .disposition = StreamDisposition::Terminate},
+                                 {.match = StreamEventMatch::notJson(),
+                                  .disposition = StreamDisposition::Passthrough},
+                                 {.match = StreamEventMatch::eventType("keepalive"),
+                                  .disposition = StreamDisposition::Drop},
+                                 {.match = StreamEventMatch::eventType("delta"),
+                                  .rules = TranscodeRuleSet(LLMProtocol::OpenAiResponses,
+                                                            TranscodingEngine::kIrProtocol,
+                                                            {TranscodeRule::move("text", "content"),
+                                                             TranscodeRule::drop("type")}),
+                                  .output_event = "chunk"},
+                                 // Never reached by a `delta`: the case above takes those.
+                                 {.match = StreamEventMatch::json(
+                                      TranscodePredicate::fieldIs("text", JsonShape::Text)),
+                                  .disposition = StreamDisposition::Drop},
+                             },
+                         .on_terminate = {{.event = "end",
+                                           .json = nlohmann::json::object({{"type", "end"}})},
+                                          {.raw_data = "bye"}},
+                         .on_source_end = {{.raw_data = "[DONE]"}},
+                     }},
+  };
+  ASSERT_THAT(engine.registerPack(std::move(pack)), IsOk());
+  const TranscodeLeg to_ir{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                           LLMProtocol::OpenAiResponses};
+  const TranscodeLeg from_ir{PayloadKind::StreamEvent, TranscodeDirection::FromIr,
+                             LLMProtocol::OpenAiResponses};
+
+  // A JSON `type` names the event ahead of its SSE `event:` field, which only counts without one.
+  EXPECT_EQ(runStream(engine, to_ir, nlohmann::json::parse(R"([
+    {"event": "delta", "data": {"type": "delta", "text": "Hi"}},
+    {"data": {"type": "keepalive"}},
+    {"event": "keepalive", "data": {"seq": 1}},
+    {"event": "keepalive", "data": {"type": "unknown"}},
+    {"data": {"text": "untyped"}},
+    {"raw": "not json"},
+    {"raw": "[DONE]"}
+  ])")),
+            nlohmann::json::parse(R"([
+    {"event": "chunk", "data": {"content": "Hi"}},
+    {"untranslated": {"event": "keepalive", "data": {"type": "unknown"}}},
+    {"raw": "not json"},
+    {"event": "end", "data": {"type": "end"}},
+    {"raw": "bye"}
+  ])"));
+  EXPECT_EQ(runStream(engine, to_ir, nlohmann::json::parse(R"([{"raw": "not json"}])")),
+            nlohmann::json::parse(R"([{"raw": "not json"}, {"raw": "[DONE]"}])"));
+
+  const nlohmann::json ir_events =
+      nlohmann::json::parse(R"([{"data": {"x": 1}}, {"raw": "[DONE]"}])");
+  EXPECT_EQ(runStream(engine, from_ir, ir_events), ir_events);
+
+  // An event no case matches is an error that names it.
+  TranscodeStreamState state;
+  TranscodeContext ctx;
+  ctx.stream_state = &state;
+  SseEventPtr mystery =
+      makeEvent(nlohmann::json::parse(R"({"event": "mystery", "data": {"seq": 2}})"));
+  const absl::Status status = engine.transcodeStreamEvent(to_ir, ctx, mystery).status();
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(status.message(), testing::HasSubstr("'mystery'"));
+  EXPECT_FALSE(state.terminated);
+}
+
+// A refused event leaves the stream as it was: a case's rules run on copies of the payload and of
+// the stream state, so the rules that ran before the failing one leave no trace.
+TEST(TranscodingEngineTest, StreamEventLegIsAllOrNothing) {
+  TranscodingEngine engine;
+  DialectTranscodePack pack{
+      .protocol = LLMProtocol::OpenAiResponses,
+      .stream =
+          {.to_ir = {.cases = {{
+                         .match = StreamEventMatch::json(),
+                         .rules = TranscodeRuleSet(
+                             LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+                             {
+                                 TranscodeRule::captureToState("id", "id"),
+                                 TranscodeRule::accumulateUsage(LLMProtocol::OpenAiChatCompletions),
+                                 TranscodeRule::move("text", "content"),
+                                 TranscodeRule::valueMap("status", {{"ok", "stop"}},
+                                                         TranscodeRule::UnknownValuePolicy::Reject),
+                             }),
+                         .output_event = "chunk",
+                     }}}},
+  };
+  ASSERT_THAT(engine.registerPack(std::move(pack)), IsOk());
+  const TranscodeLeg leg{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                         LLMProtocol::OpenAiResponses};
+  TranscodeStreamState state;
+  TranscodeContext ctx;
+  ctx.stream_state = &state;
+
+  const nlohmann::json refused = nlohmann::json::parse(R"({
+    "event": "delta",
+    "data": {"id": "r1", "text": "Hi", "status": "bad", "usage": {"prompt_tokens": 3}}
+  })");
+  SseEventPtr event = makeEvent(refused);
+  EXPECT_EQ(engine.transcodeStreamEvent(leg, ctx, event).status().code(),
+            absl::StatusCode::kInvalidArgument);
+  ASSERT_NE(event, nullptr);
+  EXPECT_EQ(describeEvent(*event), refused);
+  EXPECT_TRUE(state.slots.empty());
+  EXPECT_FALSE(state.usage.hasAny());
+
+  event->json().json()["status"] = "ok";
+  absl::StatusOr<std::vector<SseEventPtr>> transcoded =
+      engine.transcodeStreamEvent(leg, ctx, event);
+  ASSERT_THAT(transcoded.status(), IsOk());
+  ASSERT_EQ(transcoded->size(), 1U);
+  EXPECT_EQ(describeEvent(*transcoded->front()), nlohmann::json::parse(R"({
+    "event": "chunk", "data": {"id": "r1", "content": "Hi", "status": "stop"}
+  })"));
+  EXPECT_EQ(state.slots.at("id"), "r1");
+  EXPECT_TRUE(state.usage.hasAny());
+}
+
+// A stream event leg needs a stream kind, per-stream state, a registered dialect and an event, and
+// a refused call consumes nothing.
+TEST(TranscodingEngineTest, StreamEventLegsRefuseWhatTheyCannotRun) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const TranscodeLeg response_leg{PayloadKind::Response, TranscodeDirection::ToIr,
+                                  LLMProtocol::GeminiGenerateContent};
+  const TranscodeLeg responses_stream_to_ir{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                                            LLMProtocol::OpenAiResponses};
+
+  TranscodeStreamState state;
+  TranscodeContext with_state;
+  with_state.stream_state = &state;
+  TranscodeContext without_state;
+  SseEventPtr event = makeEvent(nlohmann::json::parse(R"({"data": {"candidates": []}})"));
+
+  EXPECT_EQ(engine.transcodeStreamEvent(response_leg, with_state, event).status().code(),
+            absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(engine.transcodeStreamEvent(kGeminiStreamToIr, without_state, event).status().code(),
+            absl::StatusCode::kFailedPrecondition);
+  const absl::Status unregistered =
+      engine.transcodeStreamEvent(responses_stream_to_ir, with_state, event).status();
+  EXPECT_THAT(unregistered.message(), testing::HasSubstr("no transcoding pack registered"));
+  EXPECT_NE(event, nullptr);
+  SseEventPtr no_event;
+  EXPECT_EQ(engine.transcodeStreamEvent(kGeminiStreamToIr, with_state, no_event).status().code(),
+            absl::StatusCode::kInvalidArgument);
+
+  EXPECT_EQ(engine.finishStream(response_leg, with_state).status().code(),
+            absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(engine.finishStream(kGeminiStreamToIr, without_state).status().code(),
+            absl::StatusCode::kFailedPrecondition);
+  EXPECT_FALSE(state.terminated);
+
+  // A case that transcodes can only transcode JSON.
+  TranscodingEngine custom;
+  DialectTranscodePack pack{
+      .protocol = LLMProtocol::OpenAiResponses,
+      .stream = {.to_ir = {.cases = {{.match = StreamEventMatch::notJson()}}}},
+  };
+  ASSERT_THAT(custom.registerPack(std::move(pack)), IsOk());
+  EXPECT_EQ(
+      runStream(custom, responses_stream_to_ir, nlohmann::json::parse(R"([{"raw": "text"}])")),
+      nlohmann::json::parse(R"([{"untranslated": {"raw": "text"}}])"));
+}
+
+// A stream already in the IR needs no conversion either way, and gains no terminator.
+TEST(TranscodingEngineTest, StreamEventLegForTheIrIsTheIdentity) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const nlohmann::json events = nlohmann::json::parse(R"([
+    {"data": {"id": "c1", "choices": [{"index": 0, "delta": {"content": "Hi"}}]}},
+    {"event": "anything", "data": {"choices": []}},
+    {"raw": "[DONE]"}
+  ])");
+  for (TranscodeDirection direction : {TranscodeDirection::ToIr, TranscodeDirection::FromIr}) {
+    EXPECT_EQ(runStream(engine,
+                        {PayloadKind::StreamEvent, direction, TranscodingEngine::kIrProtocol},
+                        events),
+              events);
+  }
+}
+
+// Each Gemini chunk becomes an IR chunk that carries its answer text, and a chunk that is not a
+// response (an error) goes out as it came. A Gemini stream just ends, so the IR's `[DONE]` is
+// appended.
+TEST(TranscodingEngineTest, TranscodesGeminiStreamToIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  TranscodeContext ctx;
+  ctx.request_model = "gemini-2.5-pro";
+  ctx.now_unix_seconds = 1700000000;
+
+  EXPECT_EQ(runStream(*engine_or, kGeminiStreamToIr, nlohmann::json::parse(R"([
+    {"data": {"candidates": [{"content": {"role": "model", "parts": [
+                {"text": "Let me think.", "thought": true}, {"text": "Hel"}]}}],
+              "modelVersion": "gemini-2.5-flash", "responseId": "resp-1"}},
+    {"event": "ignored",
+     "data": {"candidates": [{"content": {"role": "model", "parts": [{"text": "lo"}]},
+                              "finishReason": "MAX_TOKENS"}],
+              "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5,
+                                "thoughtsTokenCount": 3, "totalTokenCount": 18},
+              "responseId": "resp-1"}},
+    {"data": {"candidates": [{"finishReason": "SAFETY"}]}},
+    {"data": {"error": {"code": 429, "message": "Resource exhausted"}}},
+    {"raw": "not json"}
+  ])"),
+                      ctx),
+            nlohmann::json::parse(R"([
+    {"data": {"id": "resp-1", "object": "chat.completion.chunk", "created": 1700000000,
+              "model": "gemini-2.5-flash",
+              "choices": [{"index": 0, "delta": {"role": "assistant", "content": "Hel"},
+                           "finish_reason": null}]}},
+    {"data": {"id": "resp-1", "object": "chat.completion.chunk", "created": 1700000000,
+              "model": "gemini-2.5-pro",
+              "choices": [{"index": 0, "delta": {"role": "assistant", "content": "lo"},
+                           "finish_reason": "length"}],
+              "usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18,
+                        "completion_tokens_details": {"reasoning_tokens": 3}}}},
+    {"data": {"id": "chatcmpl-transcoded", "object": "chat.completion.chunk",
+              "created": 1700000000, "model": "gemini-2.5-pro",
+              "choices": [{"index": 0, "delta": {}, "finish_reason": "content_filter"}]}},
+    {"untranslated": {"data": {"error": {"code": 429, "message": "Resource exhausted"}}}},
+    {"raw": "not json"},
+    {"raw": "[DONE]"}
+  ])"));
+}
+
+// Anthropic's typed events map one by one: the opening role, the text deltas, and the finish with
+// the usage summed across `message_start` and `message_delta`. Block boundaries and pings have no
+// IR counterpart, and `message_stop` becomes `[DONE]`.
+TEST(TranscodingEngineTest, TranscodesAnthropicStreamToIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  TranscodeContext ctx;
+  ctx.now_unix_seconds = 1700000000;
+
+  EXPECT_EQ(runStream(*engine_or, kAnthropicStreamToIr, nlohmann::json::parse(R"([
+    {"event": "message_start",
+     "data": {"type": "message_start",
+              "message": {"id": "msg_1", "type": "message", "role": "assistant",
+                          "model": "claude-sonnet-4-5", "content": [],
+                          "usage": {"input_tokens": 70, "output_tokens": 1,
+                                    "cache_read_input_tokens": 30,
+                                    "cache_creation_input_tokens": 10}}}},
+    {"event": "content_block_start",
+     "data": {"type": "content_block_start", "index": 1,
+              "content_block": {"type": "text", "text": ""}}},
+    {"event": "ping", "data": {"type": "ping"}},
+    {"event": "content_block_delta",
+     "data": {"type": "content_block_delta", "index": 1,
+              "delta": {"type": "text_delta", "text": "Hi"}}},
+    {"event": "content_block_stop", "data": {"type": "content_block_stop", "index": 1}},
+    {"event": "error",
+     "data": {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}},
+    {"event": "message_delta",
+     "data": {"type": "message_delta", "delta": {"stop_reason": "max_tokens", "stop_sequence": null},
+              "usage": {"output_tokens": 20}}},
+    {"event": "message_stop", "data": {"type": "message_stop"}}
+  ])"),
+                      ctx),
+            nlohmann::json::parse(R"([
+    {"data": {"id": "msg_1", "object": "chat.completion.chunk", "created": 1700000000,
+              "model": "claude-sonnet-4-5",
+              "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""},
+                           "finish_reason": null}]}},
+    {"data": {"id": "msg_1", "object": "chat.completion.chunk", "created": 1700000000,
+              "model": "claude-sonnet-4-5",
+              "choices": [{"index": 0, "delta": {"content": "Hi"}, "finish_reason": null}]}},
+    {"untranslated": {"event": "error",
+                      "data": {"type": "error",
+                               "error": {"type": "overloaded_error", "message": "Overloaded"}}}},
+    {"data": {"id": "msg_1", "object": "chat.completion.chunk", "created": 1700000000,
+              "model": "claude-sonnet-4-5",
+              "choices": [{"index": 0, "delta": {}, "finish_reason": "length"}],
+              "usage": {"prompt_tokens": 110, "completion_tokens": 20, "total_tokens": 130,
+                        "prompt_tokens_details": {"cached_tokens": 30, "cache_write_tokens": 10}}}},
+    {"raw": "[DONE]"}
+  ])"));
+}
+
+// Each IR chunk becomes a Gemini chunk, with a `finishReason` only once its choice finishes. A
+// chunk without choices has no candidate to carry, and the IR's `[DONE]` has no Gemini counterpart.
+TEST(TranscodingEngineTest, TranscodesIrStreamToGemini) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+
+  EXPECT_EQ(runStream(*engine_or, kIrStreamToGemini, nlohmann::json::parse(R"([
+    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gemini-2.5-flash",
+              "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""},
+                           "finish_reason": null}]}},
+    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gemini-2.5-flash",
+              "choices": [{"index": 0, "delta": {"content": "Hi"}, "finish_reason": null}]}},
+    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gemini-2.5-flash",
+              "choices": [{"index": 0, "delta": {}, "finish_reason": "length"}],
+              "usage": {"prompt_tokens": 12, "completion_tokens": 98, "total_tokens": 110,
+                        "completion_tokens_details": {"reasoning_tokens": 29}}}},
+    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gemini-2.5-flash",
+              "choices": [], "usage": {"prompt_tokens": 12, "completion_tokens": 98}}},
+    {"raw": "[DONE]"}
+  ])")),
+            nlohmann::json::parse(R"([
+    {"data": {"candidates": [{"index": 0, "content": {"role": "model", "parts": [{"text": ""}]}}],
+              "modelVersion": "gemini-2.5-flash"}},
+    {"data": {"candidates": [{"index": 0,
+                              "content": {"role": "model", "parts": [{"text": "Hi"}]}}],
+              "modelVersion": "gemini-2.5-flash"}},
+    {"data": {"candidates": [{"index": 0, "content": {"role": "model", "parts": [{"text": ""}]},
+                              "finishReason": "MAX_TOKENS"}],
+              "modelVersion": "gemini-2.5-flash",
+              "usageMetadata": {"promptTokenCount": 12, "candidatesTokenCount": 69,
+                                "totalTokenCount": 110, "thoughtsTokenCount": 29}}},
+    {"untranslated": {"data": {"id": "c1", "object": "chat.completion.chunk",
+                               "model": "gemini-2.5-flash", "choices": [],
+                               "usage": {"prompt_tokens": 12, "completion_tokens": 98}}}}
+  ])"));
+}
+
+// Each IR chunk becomes the Anthropic event its first choice calls for: text is a
+// `content_block_delta`, a finish reason a `message_delta`, and anything else the opening
+// `message_start`. The IR's `[DONE]` becomes `message_stop`.
+TEST(TranscodingEngineTest, TranscodesIrStreamToAnthropic) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  TranscodeContext ctx;
+  ctx.request_model = "claude-sonnet-4-5";
+
+  EXPECT_EQ(runStream(*engine_or, kIrStreamToAnthropic, nlohmann::json::parse(R"([
+    {"data": {"id": "c1", "object": "chat.completion.chunk",
+              "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": null}]}},
+    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gpt-4o",
+              "choices": [{"index": 0, "delta": {"content": "Hi"}, "finish_reason": null}]}},
+    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gpt-4o",
+              "choices": [{"index": 0, "delta": {}, "finish_reason": "length"}],
+              "usage": {"prompt_tokens": 100, "completion_tokens": 7, "total_tokens": 107,
+                        "prompt_tokens_details": {"cached_tokens": 60}}}},
+    {"raw": "[DONE]"}
+  ])"),
+                      ctx),
+            nlohmann::json::parse(R"([
+    {"event": "message_start",
+     "data": {"type": "message_start",
+              "message": {"id": "c1", "type": "message", "role": "assistant",
+                          "model": "claude-sonnet-4-5", "content": []}}},
+    {"event": "content_block_delta",
+     "data": {"type": "content_block_delta", "index": 0,
+              "delta": {"type": "text_delta", "text": "Hi"}}},
+    {"event": "message_delta",
+     "data": {"type": "message_delta", "delta": {"stop_reason": "max_tokens", "stop_sequence": null},
+              "usage": {"input_tokens": 40, "output_tokens": 7, "cache_read_input_tokens": 60}}},
+    {"event": "message_stop", "data": {"type": "message_stop"}}
+  ])"));
+}
+
+// Offloaded text is a reference into the event's own payload, and every stream leg that carries
+// text moves the reference rather than materializing it.
+TEST(TranscodingEngineTest, StreamLegsKeepTextHeldByReference) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const JsonWithExtBuf::ExternalRef ref{/*offset=*/64, /*length=*/40000};
+  const auto transcode_one = [&engine](const TranscodeLeg& leg, nlohmann::json data) {
+    TranscodeStreamState state;
+    TranscodeContext ctx;
+    ctx.stream_state = &state;
+    SseEventPtr event = makeEvent(nlohmann::json{{"data", std::move(data)}});
+    absl::StatusOr<std::vector<SseEventPtr>> transcoded =
+        engine.transcodeStreamEvent(leg, ctx, event);
+    EXPECT_THAT(transcoded.status(), IsOk());
+    return transcoded.ok() && transcoded->size() == 1 ? transcoded->front()->json().json()
+                                                      : nlohmann::json();
+  };
+  const auto held_ref = [](const nlohmann::json& node) {
+    absl::StatusOr<JsonWithExtBuf::ExternalRef> held = JsonWithExtBuf::externalRef(node);
+    return held.ok() ? *held : JsonWithExtBuf::ExternalRef{};
+  };
+
+  nlohmann::json gemini =
+      nlohmann::json::parse(R"({"candidates": [{"content": {"parts": [{"thought": false}]}}]})");
+  gemini["candidates"][0]["content"]["parts"][0]["text"] = JsonWithExtBuf::makeExternalRef(ref);
+  EXPECT_EQ(held_ref(transcode_one(kGeminiStreamToIr, gemini)["choices"][0]["delta"]["content"]),
+            ref);
+
+  nlohmann::json anthropic = nlohmann::json::parse(
+      R"({"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta"}})");
+  anthropic["delta"]["text"] = JsonWithExtBuf::makeExternalRef(ref);
+  EXPECT_EQ(
+      held_ref(transcode_one(kAnthropicStreamToIr, anthropic)["choices"][0]["delta"]["content"]),
+      ref);
+
+  // Held by reference or not, it is text, so the chunk is still an Anthropic text delta.
+  nlohmann::json ir = nlohmann::json::parse(R"({"choices": [{"index": 0, "delta": {}}]})");
+  ir["choices"][0]["delta"]["content"] = JsonWithExtBuf::makeExternalRef(ref);
+  const nlohmann::json text_delta = transcode_one(kIrStreamToAnthropic, ir);
+  EXPECT_EQ(text_delta["type"], "content_block_delta");
+  EXPECT_EQ(held_ref(text_delta["delta"]["text"]), ref);
+  EXPECT_EQ(held_ref(transcode_one(kIrStreamToGemini,
+                                   ir)["candidates"][0]["content"]["parts"][0]["text"]),
+            ref);
 }
 
 // ---------------------------------------------------------------------------

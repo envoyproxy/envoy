@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -229,6 +230,9 @@ absl::Status missingStreamState(absl::string_view rule_name) {
   return absl::FailedPreconditionError(
       absl::StrCat(rule_name, " rule needs per-stream state and can only run on a stream leg"));
 }
+
+// The raw payload that ends an OpenAI (and so an IR) event stream.
+constexpr absl::string_view kSseDone = "[DONE]";
 
 std::string joinRulePath(absl::string_view prefix, absl::string_view relative_path) {
   if (prefix.empty()) {
@@ -699,12 +703,175 @@ TranscodeRuleSet anthropicResponseFromIr() {
       });
 }
 
+// Completes the rules for one Anthropic stream event with the IR chunk envelope. Only
+// `message_start` names the message and its model, so they are remembered from it for the events
+// that follow.
+TranscodeRuleSet anthropicEventToIr(std::vector<TranscodeRule> rules) {
+  rules.push_back(TranscodeRule::setFromState("id", "id"));
+  rules.push_back(TranscodeRule::setDefault("id", "chatcmpl-transcoded"));
+  rules.push_back(TranscodeRule::setConst("object", "chat.completion.chunk"));
+  rules.push_back(
+      TranscodeRule::setFromContext("created", TranscodeRule::ContextField::NowUnixSeconds));
+  rules.push_back(TranscodeRule::setFromState("model", "model"));
+  rules.push_back(
+      TranscodeRule::setFromContext("model", TranscodeRule::ContextField::RequestModel));
+  rules.push_back(TranscodeRule::setDefault("model", kUnknownModel));
+  rules.push_back(
+      TranscodeRule::retainOnly("", {"id", "object", "created", "model", "choices", "usage"}));
+  return TranscodeRuleSet(LLMProtocol::AnthropicMessages, TranscodingEngine::kIrProtocol,
+                          std::move(rules));
+}
+
+// Anthropic `message_start` -> the IR's opening chunk, which only announces the assistant's role.
+TranscodeRuleSet anthropicMessageStartToIr() {
+  return anthropicEventToIr({
+      // Anthropic reports the input side of the usage here and the output side in
+      // `message_delta`, so it is summed across the two.
+      TranscodeRule::accumulateUsage(LLMProtocol::AnthropicMessages),
+      TranscodeRule::captureToState("message.id", "id"),
+      TranscodeRule::captureToState("message.model", "model"),
+      TranscodeRule::setConst("choice.index", 0),
+      TranscodeRule::setConst("choice.delta.role", "assistant"),
+      TranscodeRule::setConst("choice.delta.content", ""),
+      TranscodeRule::setConst("choice.finish_reason", nullptr),
+      TranscodeRule::move("choice", "choices"),
+      TranscodeRule::ensureArray("choices"),
+  });
+}
+
+// Anthropic `content_block_delta` -> an IR content chunk. The event's `index` numbers the content
+// blocks of the one message, not choices, so the chunk is always choice 0.
+TranscodeRuleSet anthropicContentBlockDeltaToIr() {
+  return anthropicEventToIr({
+      TranscodeRule::move("delta.text", "choice.delta.content"),
+      TranscodeRule::setDefault("choice.delta.content", ""),
+      TranscodeRule::setConst("choice.index", 0),
+      TranscodeRule::setConst("choice.finish_reason", nullptr),
+      TranscodeRule::move("choice", "choices"),
+      TranscodeRule::ensureArray("choices"),
+  });
+}
+
+// Anthropic `message_delta` -> the IR's closing chunk, with the finish reason and the usage.
+TranscodeRuleSet anthropicMessageDeltaToIr() {
+  return anthropicEventToIr({
+      TranscodeRule::accumulateUsage(LLMProtocol::AnthropicMessages,
+                                     TranscodingEngine::kIrProtocol),
+      TranscodeRule::move("delta.stop_reason", "choice.finish_reason"),
+      anthropicStopReasonToIr("choice.finish_reason"),
+      TranscodeRule::setDefault("choice.finish_reason", "stop"),
+      TranscodeRule::setConst("choice.index", 0),
+      TranscodeRule::setConst("choice.delta", nlohmann::json::object()),
+      TranscodeRule::move("choice", "choices"),
+      TranscodeRule::ensureArray("choices"),
+  });
+}
+
+// Anthropic Messages stream -> IR chunk stream.
+StreamGrammar anthropicStreamToIr() {
+  return StreamGrammar{
+      .cases =
+          {
+              {.match = StreamEventMatch::notJson(), .disposition = StreamDisposition::Passthrough},
+              {.match = StreamEventMatch::eventType("message_start"),
+               .rules = anthropicMessageStartToIr()},
+              {.match = StreamEventMatch::eventType("content_block_delta"),
+               .rules = anthropicContentBlockDeltaToIr()},
+              {.match = StreamEventMatch::eventType("message_delta"),
+               .rules = anthropicMessageDeltaToIr()},
+              {.match = StreamEventMatch::eventType("message_stop"),
+               .disposition = StreamDisposition::Terminate},
+              // The IR has no content block boundaries and no keepalives.
+              {.match = StreamEventMatch::eventType("content_block_start"),
+               .disposition = StreamDisposition::Drop},
+              {.match = StreamEventMatch::eventType("content_block_stop"),
+               .disposition = StreamDisposition::Drop},
+              {.match = StreamEventMatch::eventType("ping"),
+               .disposition = StreamDisposition::Drop},
+          },
+      .on_terminate = {StreamEmit{.raw_data = std::string(kSseDone)}},
+  };
+}
+
+// An IR content chunk -> Anthropic `content_block_delta`, into the message's one text block.
+TranscodeRuleSet anthropicTextDeltaFromIr() {
+  return TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
+                          {
+                              TranscodeRule::takeFirst("choices", "choice"),
+                              TranscodeRule::setConst("type", "content_block_delta"),
+                              TranscodeRule::setConst("index", 0),
+                              TranscodeRule::setConst("delta.type", "text_delta"),
+                              TranscodeRule::move("choice.delta.content", "delta.text"),
+                              TranscodeRule::retainOnly("", {"type", "index", "delta"}),
+                          });
+}
+
+// The IR's closing chunk -> Anthropic `message_delta`.
+TranscodeRuleSet anthropicMessageDeltaFromIr() {
+  return TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
+                          {
+                              TranscodeRule::convertUsage(TranscodingEngine::kIrProtocol,
+                                                          LLMProtocol::AnthropicMessages),
+                              TranscodeRule::takeFirst("choices", "choice"),
+                              TranscodeRule::setConst("type", "message_delta"),
+                              TranscodeRule::move("choice.finish_reason", "delta.stop_reason"),
+                              irFinishReasonToAnthropic("delta.stop_reason"),
+                              TranscodeRule::setConst("delta.stop_sequence", nullptr),
+                              TranscodeRule::retainOnly("", {"type", "delta", "usage"}),
+                          });
+}
+
+// Any other IR chunk -> Anthropic `message_start`.
+TranscodeRuleSet anthropicMessageStartFromIr() {
+  return TranscodeRuleSet(
+      TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
+      {
+          TranscodeRule::require("choices", JsonShape::NonEmptyArray),
+          TranscodeRule::setConst("type", "message_start"),
+          TranscodeRule::move("id", "message.id"),
+          TranscodeRule::setDefault("message.id", "msg_transcoded"),
+          TranscodeRule::setConst("message.type", "message"),
+          TranscodeRule::setConst("message.role", "assistant"),
+          TranscodeRule::move("model", "message.model"),
+          TranscodeRule::setFromContext("message.model", TranscodeRule::ContextField::RequestModel),
+          TranscodeRule::setDefault("message.model", kUnknownModel),
+          TranscodeRule::setConst("message.content", nlohmann::json::array()),
+          TranscodeRule::retainOnly("", {"type", "message"}),
+      });
+}
+
+// IR chunk stream -> Anthropic Messages stream. Each chunk is read by what its first choice
+// carries: text, else a finish reason, else nothing but the opening role.
+StreamGrammar anthropicStreamFromIr() {
+  return StreamGrammar{
+      .cases =
+          {
+              {.match = StreamEventMatch::isDone(), .disposition = StreamDisposition::Terminate},
+              {.match = StreamEventMatch::notJson(), .disposition = StreamDisposition::Passthrough},
+              {.match = StreamEventMatch::json(
+                   TranscodePredicate::fieldIs("choices.0.delta.content", JsonShape::Text)),
+               .rules = anthropicTextDeltaFromIr(),
+               .output_event = "content_block_delta"},
+              {.match = StreamEventMatch::json(
+                   TranscodePredicate::fieldIs("choices.0.finish_reason", JsonShape::String)),
+               .rules = anthropicMessageDeltaFromIr(),
+               .output_event = "message_delta"},
+              {.match = StreamEventMatch::json(),
+               .rules = anthropicMessageStartFromIr(),
+               .output_event = "message_start"},
+          },
+      .on_terminate = {StreamEmit{.event = "message_stop",
+                                  .json = nlohmann::json::object({{"type", "message_stop"}})}},
+  };
+}
+
 // Builds the declarative transcoding pack for Anthropic Messages <-> IR (OpenAI Chat).
 DialectTranscodePack createAnthropicTranscodePack() {
   return DialectTranscodePack{
       .protocol = LLMProtocol::AnthropicMessages,
       .request = {.to_ir = anthropicRequestToIr(), .from_ir = anthropicRequestFromIr()},
       .response = {.to_ir = anthropicResponseToIr(), .from_ir = anthropicResponseFromIr()},
+      .stream = {.to_ir = anthropicStreamToIr(), .from_ir = anthropicStreamFromIr()},
   };
 }
 
@@ -837,6 +1004,12 @@ TranscodeRule irFinishReasonToGemini(std::string path) {
       TranscodeRule::ValueFallback{"STOP"});
 }
 
+// The Gemini parts that carry the answer. Thought summaries are the model's reasoning, not its
+// answer, so they stay out of the IR.
+TranscodePredicate geminiAnswerPart() {
+  return TranscodePredicate::negate(TranscodePredicate::fieldEquals("thought", true));
+}
+
 // Gemini GenerateContent response -> IR response.
 TranscodeRuleSet geminiResponseToIr() {
   return TranscodeRuleSet(
@@ -856,15 +1029,13 @@ TranscodeRuleSet geminiResponseToIr() {
           TranscodeRule::convertUsage(LLMProtocol::GeminiGenerateContent,
                                       TranscodingEngine::kIrProtocol),
           // 3. Each candidate becomes a choice, its text parts joined into `message.content`.
-          //    Thought summaries are the model's reasoning, not its answer, so they stay out.
           TranscodeRule::move("candidates", "choices"),
           TranscodeRule::enumerate("choices", "index"),
           TranscodeRule::forEach(
               "choices",
               {
-                  TranscodeRule::collectText(
-                      "content.parts", "text", "message.content",
-                      TranscodePredicate::negate(TranscodePredicate::fieldEquals("thought", true))),
+                  TranscodeRule::collectText("content.parts", "text", "message.content",
+                                             geminiAnswerPart()),
                   TranscodeRule::setDefault("message.content", ""),
                   TranscodeRule::setConst("message.role", "assistant"),
                   TranscodeRule::move("finishReason", "finish_reason"),
@@ -905,12 +1076,114 @@ TranscodeRuleSet geminiResponseFromIr() {
       });
 }
 
+// One Gemini stream chunk -> one IR chunk. Unlike Anthropic's, every Gemini chunk is a complete
+// response in miniature: envelope, candidates and the usage so far.
+TranscodeRuleSet geminiChunkToIr() {
+  return TranscodeRuleSet(
+      LLMProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
+      {
+          TranscodeRule::require("candidates", JsonShape::Array),
+          // 1. The IR chunk envelope.
+          TranscodeRule::move("responseId", "id"),
+          TranscodeRule::setDefault("id", "chatcmpl-transcoded"),
+          TranscodeRule::setConst("object", "chat.completion.chunk"),
+          TranscodeRule::setFromContext("created", TranscodeRule::ContextField::NowUnixSeconds),
+          TranscodeRule::move("modelVersion", "model"),
+          TranscodeRule::setFromContext("model", TranscodeRule::ContextField::RequestModel),
+          TranscodeRule::setDefault("model", kUnknownModel),
+          // 2. As in the unary response, the IR's counts include tool-use and thought tokens.
+          TranscodeRule::convertUsage(LLMProtocol::GeminiGenerateContent,
+                                      TranscodingEngine::kIrProtocol),
+          // 3. Each candidate becomes a choice whose delta carries the chunk's answer text. A
+          //    candidate without parts (e.g. one that only finishes) has an empty delta.
+          TranscodeRule::move("candidates", "choices"),
+          TranscodeRule::enumerate("choices", "index"),
+          TranscodeRule::forEach(
+              "choices",
+              {
+                  TranscodeRule::when(
+                      TranscodePredicate::fieldIs("content.parts", JsonShape::Array),
+                      {
+                          TranscodeRule::collectText("content.parts", "text", "delta.content",
+                                                     geminiAnswerPart()),
+                          TranscodeRule::setConst("delta.role", "assistant"),
+                      }),
+                  TranscodeRule::setDefault("delta", nlohmann::json::object()),
+                  TranscodeRule::move("finishReason", "finish_reason"),
+                  geminiFinishReasonToIr("finish_reason"),
+                  TranscodeRule::setDefault("finish_reason", nullptr),
+                  TranscodeRule::retainOnly("", {"index", "delta", "finish_reason"}),
+              }),
+          TranscodeRule::retainOnly("", {"id", "object", "created", "model", "choices", "usage"}),
+      });
+}
+
+// Gemini GenerateContent stream -> IR chunk stream.
+StreamGrammar geminiStreamToIr() {
+  return StreamGrammar{
+      .cases =
+          {
+              {.match = StreamEventMatch::notJson(), .disposition = StreamDisposition::Passthrough},
+              {.match = StreamEventMatch::json(), .rules = geminiChunkToIr()},
+          },
+      // A Gemini stream just ends, while an IR client waits for `[DONE]`.
+      .on_source_end = {StreamEmit{.raw_data = std::string(kSseDone)}},
+  };
+}
+
+// One IR chunk -> one Gemini stream chunk.
+TranscodeRuleSet geminiChunkFromIr() {
+  return TranscodeRuleSet(
+      TranscodingEngine::kIrProtocol, LLMProtocol::GeminiGenerateContent,
+      {
+          // A chunk without choices (e.g. OpenAI's trailing usage-only chunk) has no candidate
+          // to carry.
+          TranscodeRule::require("choices", JsonShape::NonEmptyArray),
+          TranscodeRule::move("model", "modelVersion"),
+          TranscodeRule::convertUsage(TranscodingEngine::kIrProtocol,
+                                      LLMProtocol::GeminiGenerateContent),
+          // Each choice becomes a candidate, its delta a single text part. Only the last chunk
+          // finishes, so `finishReason` is left out until one does.
+          TranscodeRule::move("choices", "candidates"),
+          TranscodeRule::enumerate("candidates", "index"),
+          TranscodeRule::forEach(
+              "candidates",
+              {
+                  TranscodeRule::setDefault("delta.content", ""),
+                  TranscodeRule::wrapInArrayObject("delta.content", "content.parts", "text"),
+                  TranscodeRule::setConst("content.role", "model"),
+                  TranscodeRule::when(
+                      TranscodePredicate::fieldIs("finish_reason", JsonShape::String),
+                      {
+                          TranscodeRule::move("finish_reason", "finishReason"),
+                          irFinishReasonToGemini("finishReason"),
+                      }),
+                  TranscodeRule::retainOnly("", {"index", "content", "finishReason"}),
+              }),
+          TranscodeRule::retainOnly("", {"candidates", "modelVersion", "usageMetadata"}),
+      });
+}
+
+// IR chunk stream -> Gemini GenerateContent stream.
+StreamGrammar geminiStreamFromIr() {
+  return StreamGrammar{
+      .cases =
+          {
+              // A Gemini stream has no terminator of its own: it just ends.
+              {.match = StreamEventMatch::isDone(), .disposition = StreamDisposition::Terminate},
+              {.match = StreamEventMatch::notJson(), .disposition = StreamDisposition::Passthrough},
+              {.match = StreamEventMatch::json(), .rules = geminiChunkFromIr()},
+          },
+  };
+}
+
 // Builds the declarative transcoding pack for Gemini GenerateContent <-> IR (OpenAI Chat).
 DialectTranscodePack createGeminiTranscodePack() {
   return DialectTranscodePack{
       .protocol = LLMProtocol::GeminiGenerateContent,
       .request = {.to_ir = geminiRequestToIr(), .from_ir = geminiRequestFromIr()},
       .response = {.to_ir = geminiResponseToIr(), .from_ir = geminiResponseFromIr()},
+      .stream = {.to_ir = geminiStreamToIr(), .from_ir = geminiStreamFromIr()},
   };
 }
 
@@ -965,6 +1238,48 @@ bool TranscodePredicate::matches(const nlohmann::json& json) const {
   }
   case Kind::Not:
     return !operands_.front().matches(json);
+  }
+  return false;
+}
+
+StreamEventMatch StreamEventMatch::json(TranscodePredicate predicate) {
+  StreamEventMatch match(Kind::Json);
+  match.predicate_ = std::move(predicate);
+  return match;
+}
+
+StreamEventMatch StreamEventMatch::eventType(std::string type) {
+  StreamEventMatch match(Kind::EventType);
+  match.type_ = std::move(type);
+  return match;
+}
+
+StreamEventMatch StreamEventMatch::isDone() { return StreamEventMatch(Kind::IsDone); }
+
+StreamEventMatch StreamEventMatch::notJson() { return StreamEventMatch(Kind::NotJson); }
+
+bool StreamEventMatch::matches(SseEvent& event) const {
+  switch (kind_) {
+  case Kind::Json:
+    return event.is_json() && predicate_.matches(event.json().json());
+  case Kind::EventType: {
+    if (!event.is_json()) {
+      return false;
+    }
+    const nlohmann::json& payload = event.json().json();
+    if (payload.is_object()) {
+      if (const auto type = payload.find("type"); type != payload.end() && type->is_string()) {
+        return type->get_ref<const std::string&>() == type_;
+      }
+    }
+    return event.event() == type_;
+  }
+  case Kind::IsDone:
+    // The length check first, so a large raw payload is never linearized just to be compared.
+    return !event.is_json() && event.raw_data().length() == kSseDone.size() &&
+           event.raw_data_as_string() == kSseDone;
+  case Kind::NotJson:
+    return !event.is_json();
   }
   return false;
 }
@@ -1913,6 +2228,27 @@ absl::Status transcodeResponse(const DialectTranscodePack& pack, TranscodeDirect
   return absl::OkStatus();
 }
 
+// Builds the events a stream grammar writes itself.
+absl::StatusOr<std::vector<SseEventPtr>> makeStreamEvents(const std::vector<StreamEmit>& emits) {
+  std::vector<SseEventPtr> events;
+  events.reserve(emits.size());
+  for (const StreamEmit& emit : emits) {
+    auto event = std::make_unique<SseEvent>();
+    if (emit.json.is_null()) {
+      event->set_raw_data(std::make_unique<Buffer::OwnedImpl>(emit.raw_data));
+    } else {
+      JsonWithExtBuf payload;
+      payload.setJson(emit.json);
+      event->set_json(std::move(payload));
+    }
+    if (absl::Status status = event->set_event(emit.event); !status.ok()) {
+      return status;
+    }
+    events.push_back(std::move(event));
+  }
+  return events;
+}
+
 } // namespace
 
 absl::Status TranscodingEngine::transcode(const TranscodeLeg& leg, TranscodeContext& ctx,
@@ -1930,6 +2266,111 @@ absl::Status TranscodingEngine::transcode(const TranscodeLeg& leg, TranscodeCont
     break;
   }
   return absl::InvalidArgumentError("stream events are transcoded one at a time, as SSE events");
+}
+
+absl::StatusOr<const StreamGrammar*>
+TranscodingEngine::findStreamGrammar(const TranscodeLeg& leg, const TranscodeContext& ctx) const {
+  if (leg.kind != PayloadKind::StreamEvent) {
+    return absl::InvalidArgumentError("only a stream event leg transcodes SSE events");
+  }
+  if (ctx.stream_state == nullptr) {
+    return absl::FailedPreconditionError("a stream event leg needs per-stream state");
+  }
+  absl::StatusOr<const DialectTranscodePack*> pack = findPack(leg.dialect);
+  if (!pack.ok()) {
+    return pack.status();
+  }
+  if ((*pack)->protocol == kIrProtocol) {
+    return static_cast<const StreamGrammar*>(nullptr);
+  }
+  const StreamGrammar& grammar =
+      leg.direction == TranscodeDirection::ToIr ? (*pack)->stream.to_ir : (*pack)->stream.from_ir;
+  return grammar.cases.empty() ? nullptr : &grammar;
+}
+
+absl::StatusOr<std::vector<SseEventPtr>>
+TranscodingEngine::transcodeStreamEvent(const TranscodeLeg& leg, TranscodeContext& ctx,
+                                        SseEventPtr& event) const {
+  absl::StatusOr<const StreamGrammar*> grammar = findStreamGrammar(leg, ctx);
+  if (!grammar.ok()) {
+    return grammar.status();
+  }
+  if (event == nullptr) {
+    return absl::InvalidArgumentError("no SSE event to transcode");
+  }
+  std::vector<SseEventPtr> out;
+  if (*grammar == nullptr) {
+    out.push_back(std::move(event));
+    return out;
+  }
+
+  const std::vector<StreamEventCase>& cases = (*grammar)->cases;
+  const auto matched = std::find_if(cases.begin(), cases.end(), [&event](const StreamEventCase& c) {
+    return c.match.matches(*event);
+  });
+  if (matched == cases.end()) {
+    return absl::InvalidArgumentError(absl::StrCat("the ", llmProtocolName(leg.dialect),
+                                                   " stream grammar has no case for SSE event '",
+                                                   event->event(), "'"));
+  }
+
+  switch (matched->disposition) {
+  case StreamDisposition::Passthrough:
+    out.push_back(std::move(event));
+    return out;
+  case StreamDisposition::Drop:
+    event.reset();
+    return out;
+  case StreamDisposition::Terminate: {
+    absl::StatusOr<std::vector<SseEventPtr>> emitted = makeStreamEvents((*grammar)->on_terminate);
+    if (!emitted.ok()) {
+      return emitted.status();
+    }
+    ctx.stream_state->terminated = true;
+    event.reset();
+    return emitted;
+  }
+  case StreamDisposition::Transcode:
+    break;
+  }
+
+  if (!event->is_json()) {
+    return absl::InvalidArgumentError("only an SSE event with a JSON payload can be transcoded");
+  }
+  // Rules rewrite in place and may write the stream state, so they run on copies of both: a
+  // failure part way through then leaves the event and the stream as they were. `ExternalRef`
+  // nodes are small handles into the event's own payload store, so the copy never touches
+  // offloaded bytes.
+  nlohmann::json working = event->json().json();
+  TranscodeStreamState saved_state = *ctx.stream_state;
+  absl::Status status = matched->rules.execute(working, &ctx);
+  if (status.ok()) {
+    status = event->set_event(matched->output_event);
+  }
+  if (!status.ok()) {
+    *ctx.stream_state = std::move(saved_state);
+    return status;
+  }
+  event->json().json() = std::move(working);
+  out.push_back(std::move(event));
+  return out;
+}
+
+absl::StatusOr<std::vector<SseEventPtr>>
+TranscodingEngine::finishStream(const TranscodeLeg& leg, TranscodeContext& ctx) const {
+  absl::StatusOr<const StreamGrammar*> grammar = findStreamGrammar(leg, ctx);
+  if (!grammar.ok()) {
+    return grammar.status();
+  }
+  if (*grammar == nullptr || ctx.stream_state->terminated) {
+    return std::vector<SseEventPtr>();
+  }
+  absl::StatusOr<std::vector<SseEventPtr>> emitted = makeStreamEvents((*grammar)->on_source_end);
+  if (!emitted.ok()) {
+    return emitted.status();
+  }
+  ctx.stream_state->terminated = true;
+  return emitted;
 }
 
 // TODO(ginama): Address the IR data-loss problem where dialect-specific fields not modeled by
