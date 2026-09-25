@@ -97,6 +97,17 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "proto_filler_lib",
+    srcs = ["proto_filler.cc"],
+    hdrs = ["proto_filler.h"],
+    deps = [
+        "//source/common/protobuf",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
 envoy_cc_test_library(
     name = "registry_lib",
     hdrs = ["registry.h"],
