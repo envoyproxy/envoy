@@ -7,6 +7,10 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load(
+    "//bazel:execution_context_transition.bzl",
+    "execution_context_enabled_test",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -730,9 +734,6 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "execution_context_test",
     srcs = ["execution_context_test.cc"],
-    copts = [
-        "-DENVOY_ENABLE_EXECUTION_CONTEXT",
-    ],
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:execution_context",
@@ -742,6 +743,11 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/stream_info:stream_info_mocks",
     ],
+)
+
+execution_context_enabled_test(
+    name = "execution_context_enabled_test",
+    test = ":execution_context_test",
 )
 
 envoy_cc_test(
