@@ -8,6 +8,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
+#include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_read_filter.h"
 #include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_server_connection.h"
 
 namespace Envoy {
@@ -86,7 +87,10 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
   return std::make_unique<DrainAwareServerConnection>(
       std::move(codec), connection, factory_context_.drainDecision(),
       factory_context_.serverFactoryContext(), std::move(on_local_drain),
-      std::move(callbacks_wrapper));
+      std::move(callbacks_wrapper), enable_drain_with_goaway_,
+      factory_context_.direction() == envoy::config::core::v3::TrafficDirection::INBOUND
+          ? Network::DrainDirection::InboundOnly
+          : Network::DrainDirection::All);
 }
 
 absl::StatusOr<Network::FilterFactoryCb>
@@ -105,8 +109,17 @@ DrainAwareHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto
       creation_status);
   RETURN_IF_NOT_OK(creation_status);
 
-  return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
+  return [singletons, filter_config, &context,
+          enable_drain_with_goaway = proto_config.enable_drain_with_goaway()](
+             Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
+    if (enable_drain_with_goaway) {
+      filter_manager.addReadFilter(std::make_shared<DrainAwareReadFilter>(
+          context.drainDecision(), server_context,
+          context.direction() == envoy::config::core::v3::TrafficDirection::INBOUND
+              ? Network::DrainDirection::InboundOnly
+              : Network::DrainDirection::All));
+    }
     Server::OverloadManager& overload_manager = context.shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
                                                     : server_context.overloadManager();

@@ -54,7 +54,13 @@ public:
   // Drive onGoAway into the pool's active client so the pool drains THIS connection (no new
   // streams, in-flight finish, close when idle). Needed because our drain GOAWAY is emitted
   // out-of-band, so the pool would not otherwise stop multiplexing onto it.
-  void drainOwnPoolConnection() { inner_.onGoAway(Envoy::Http::GoAwayErrorCode::NoError); }
+  void drainOwnPoolConnection() {
+    if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
+            getThreadLocalSocketManager()) {
+      socket_manager->markSocketDraining(fd_);
+    }
+    inner_.onGoAway(Envoy::Http::GoAwayErrorCode::NoError);
+  }
 
 private:
   Envoy::Http::ConnectionCallbacks& inner_;

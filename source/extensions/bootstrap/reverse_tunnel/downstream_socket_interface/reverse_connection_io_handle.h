@@ -324,6 +324,13 @@ public:
   void markTunnelDrainingAndDialReplacement(const std::string& connection_key);
 
   /**
+   * Stop creating tunnels when the listener begins draining. Must run on the worker dispatcher.
+   * Cancels pending handshakes and queued accepts while preserving accepted tunnel sockets.
+   * Repeated calls are harmless.
+   */
+  void stopInitiatingConnections();
+
+  /**
    * Remove a connection key from per-host tracking (the key set and its state gauge). Shared by the
    * normal close path and the draining path.
    * @param connection_key the unique key identifying the connection.
@@ -540,6 +547,8 @@ private:
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
+
+  bool connections_stopped_{false};
 
   // Set while waiting for parentStopAcceptingRequested(); cleared after scheduling the one-shot
   // drain-propagation grace timer so fresh starts dial immediately.

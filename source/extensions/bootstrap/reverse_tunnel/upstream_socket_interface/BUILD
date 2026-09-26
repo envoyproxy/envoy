@@ -38,6 +38,7 @@ envoy_cc_extension(
         "//source/common/stats:timespan_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_includes",
         "//source/extensions/bootstrap/reverse_tunnel/common:rping_interceptor_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
     ],
 )

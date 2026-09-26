@@ -406,28 +406,41 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
 }
 
 void ReverseConnectionIOHandle::resetFileEvents() {
-  // Stop redials on the timer's worker before the listener closes.
-  if (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe()) {
+  // The dispatcher is gone during cleanup(). Otherwise stop all pending tunnel work on its worker.
+  if (worker_dispatcher_ == nullptr) {
     rev_conn_retry_timer_.reset();
+  } else if (worker_dispatcher_->isThreadSafe()) {
+    stopInitiatingConnections();
   }
 
-  // Handshake connections have their own file events. Tear them down on this worker so
-  // main-thread close()/destructor does not destroy in-flight codecs. Skip when
-  // worker_dispatcher_ is null (cleanup() after workers are gone).
-  if (worker_dispatcher_ != nullptr && worker_dispatcher_->isThreadSafe()) {
-    conn_wrapper_to_host_map_.clear();
-    std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
-    connection_wrappers_.clear();
-    for (auto& wrapper : wrappers) {
-      if (wrapper == nullptr) {
-        continue;
-      }
+  IoSocketHandleImpl::resetFileEvents();
+}
+
+void ReverseConnectionIOHandle::stopInitiatingConnections() {
+  ASSERT(worker_dispatcher_ != nullptr && worker_dispatcher_->isThreadSafe());
+  // Disable replacement dials before shutting down sockets, whose callbacks can request one.
+  connections_stopped_ = true;
+  rev_conn_retry_timer_.reset();
+
+  conn_wrapper_to_host_map_.clear();
+  std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
+  connection_wrappers_.clear();
+  for (auto& wrapper : wrappers) {
+    if (wrapper != nullptr) {
       wrapper->shutdown();
       worker_dispatcher_->deferredDelete(std::move(wrapper));
     }
   }
 
-  IoSocketHandleImpl::resetFileEvents();
+  // These handshakes completed but the synthetic listener has not accepted their sockets yet.
+  // They have no active downstream streams and must not become usable after drain starts.
+  while (!established_connections_.empty()) {
+    auto connection = std::move(established_connections_.front());
+    established_connections_.pop();
+    dropTunnelFromTracking(connection->connectionInfoProvider().localAddress()->asString());
+    connection->close(Network::ConnectionCloseType::NoFlush);
+    worker_dispatcher_->deferredDelete(std::move(connection));
+  }
 }
 
 void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
@@ -995,6 +1008,9 @@ void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address
 }
 
 void ReverseConnectionIOHandle::maintainReverseConnections() {
+  if (connections_stopped_) {
+    return;
+  }
   // During a hot restart, don't dial until we've asked the parent to stop accepting new
   // connections; otherwise the child's connection can be accepted by the still-listening parent
   // through a shared loopback listener and be reset when the parent exits. Re-check shortly. With
