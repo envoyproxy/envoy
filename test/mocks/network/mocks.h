@@ -610,7 +610,9 @@ class MockNonDispatchedUdpPacketHandler : public NonDispatchedUdpPacketHandler {
 public:
   ~MockNonDispatchedUdpPacketHandler() override;
 
-  MOCK_METHOD(void, handle, (uint32_t worker_index, const UdpRecvData& packet));
+  MOCK_METHOD(void, handle,
+              (uint32_t worker_index, const Address::Instance& listener_address,
+               const UdpRecvData& packet));
 };
 
 class MockIp : public Address::Ip {
