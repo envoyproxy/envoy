@@ -27,6 +27,7 @@ TestRetryPolicy::~TestRetryPolicy() = default;
 
 MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
   ON_CALL(*this, enabled()).WillByDefault(Return(false));
+  ON_CALL(*this, responseHeadersToCopy()).WillByDefault(ReturnRef(response_headers_to_copy_));
 }
 
 MockRetryState::MockRetryState() = default;

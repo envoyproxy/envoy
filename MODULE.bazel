@@ -29,7 +29,7 @@ bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.4.15.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.0.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "fmt", version = "12.2.0")
 bazel_dep(name = "gazelle", version = "0.47.0")
@@ -95,11 +95,10 @@ bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "rules_proto_grpc", version = "5.8.0")
 bazel_dep(name = "rules_proto_grpc_cpp", version = "5.8.0")
 bazel_dep(name = "rules_python", version = "2.2.0")
-bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
+bazel_dep(name = "rules_rust", version = "0.74.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
 bazel_dep(name = "rules_swift", version = "4.0.1")
 bazel_dep(name = "spdlog", version = "1.17.0")
-bazel_dep(name = "sq", version = "1.4.0.envoy")
 bazel_dep(name = "sql-parser", version = "0.0.0-260715-52e5ad1.envoy")
 bazel_dep(name = "su-exec", version = "0.3")
 bazel_dep(name = "tclap", version = "1.2.5.bcr.1")
@@ -108,7 +107,7 @@ bazel_dep(name = "thrift", version = "0.24.0.envoy")
 bazel_dep(name = "uadk", version = "2.9.envoy")
 bazel_dep(name = "v8", version = "14.6.202.10.envoy")
 bazel_dep(name = "vectorscan", version = "5.4.11.envoy")
-bazel_dep(name = "wamr", version = "2.4.4.envoy")
+bazel_dep(name = "wamr", version = "2.4.5.envoy")
 bazel_dep(name = "wasmtime", version = "45.0.2.envoy")
 bazel_dep(name = "xds", version = "0.0.0-20251210-ee656c7")
 bazel_dep(name = "vpp-vcl", version = "26.02-260111-85abefb.envoy")
@@ -157,12 +156,19 @@ single_version_override(
 #     module_name = "envoy_toolshed",
 #     path = "../toolshed/bazel",
 # )
-
+#
 # git_override(
 #     module_name = "envoy_toolshed",
-#     commit = "0f2dbc8122e776c57901bcd835e9f2526c03cf4d",
+#     commit = "4c200b2990500e3bebf3f202e096894a957a1876",
 #     remote = "https://github.com/envoyproxy/toolshed",
 #     strip_prefix = "bazel",
+# )
+#
+# git_override(
+#     module_name = "envoy_toolshed_jq",
+#     commit = "4c200b2990500e3bebf3f202e096894a957a1876",
+#     remote = "https://github.com/envoyproxy/toolshed",
+#     strip_prefix = "jq",
 # )
 
 ####################################################################################
@@ -188,7 +194,7 @@ use_repo(grcov_ext, "grcov")
 # Prebuilt wee8 (V8) static library, selected via the //bazel:v8_engine flag.
 wee8_ext = use_extension("@envoy_toolshed//v8:extensions.bzl", "wee8_prebuilt_extension")
 wee8_ext.setup()
-use_repo(wee8_ext, "wee8_prebuilt_x86_64", "wee8_prebuilt_x86_64_libstdcxx", "wee8_prebuilt_aarch64")
+use_repo(wee8_ext, "wee8_prebuilt_aarch64", "wee8_prebuilt_x86_64", "wee8_prebuilt_x86_64_libstdcxx")
 
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.cxx_cross_lib(
@@ -358,18 +364,20 @@ register_toolchains("@rust_toolchains//:all")
 
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 crate.annotation(
+    build_script_rundir = ".",
     crate = "ring",
     repositories = ["envoy_rust_crate_index"],
-    build_script_rundir = ".",
 )
 crate.from_cargo(
     name = "envoy_rust_crate_index",
     cargo_lockfile = "//:Cargo.lock",
+    lockfile = "//:Cargo.Bazel.envoy.lock",
     manifests = ["//:Cargo.toml"],
 )
 crate.from_cargo(
     name = "dynamic_modules_rust_sdk_crate_index",
     cargo_lockfile = "//:Cargo.lock",
+    lockfile = "//:Cargo.Bazel.dynamic_modules.lock",
     manifests = ["//:Cargo.toml"],
 )
 use_repo(
@@ -401,7 +409,46 @@ buf.toolchains(
 )
 use_repo(buf, "rules_buf_toolchains")
 
-register_toolchains("@envoy_toolshed//pgp:sq_toolchain")
+protobuf = use_extension("@protobuf//:extensions.bzl", "protobuf")
+protobuf.deps(zlib = "@envoy//bazel:zlib")
+
+# gRPC
+grpc = use_extension("@grpc//:extensions.bzl", "grpc")
+grpc.deps(
+    crypto = "@envoy//bazel:crypto",
+    ssl = "@envoy//bazel:ssl",
+    zlib = "@envoy//bazel:zlib",
+)
+
+# quiche
+quiche = use_extension("@quiche//:extensions.bzl", "quiche")
+quiche.deps(
+    quic_base_impl_lib = "@envoy//source/common/quic/platform:quic_base_impl_lib",
+    quiche_export_impl_lib = "@envoy//source/common/quic/platform:quiche_export_impl_lib",
+    quiche_flags_impl_lib = "@envoy//source/common/quic/platform:quiche_flags_impl_lib",
+    quiche_logging_impl_lib = "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
+    quiche_lower_case_string_impl_lib = "@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib",
+    quiche_platform_iovec_impl_lib = "@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib",
+    quiche_stack_trace_impl_lib = "@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib",
+    quiche_time_utils_impl_lib = "@envoy//source/common/quic/platform:quiche_time_utils_impl_lib",
+    ssl_lib = "@envoy//bazel:ssl",
+    zlib = "@envoy//bazel:zlib",
+)
+
+quiche_dev = use_extension("@quiche//:extensions.bzl", "quiche", dev_dependency = True)
+quiche_dev.deps(
+    quiche_expect_bug_impl_lib = "@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib",
+    quiche_test_helpers_impl_lib = "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
+    quiche_test_impl_lib = "@envoy//test/common/quic/platform:quiche_test_impl_lib",
+    quiche_test_output_impl_lib = "@envoy//test/common/quic/platform:quiche_test_output_impl_lib",
+    quiche_thread_impl_lib = "@envoy//test/common/quic/platform:quiche_thread_impl_lib",
+)
+
+proxy_wasm_cpp_host = use_extension("@proxy-wasm-cpp-host//:extensions.bzl", "proxy_wasm_cpp_host")
+proxy_wasm_cpp_host.deps(crypto_lib = "@envoy//bazel:crypto")
+
+libsxg = use_extension("@libsxg//:extensions.bzl", "libsxg")
+libsxg.deps(crypto_lib = "@envoy//bazel:crypto")
 
 ####################################################################################
 # repo: Extensions

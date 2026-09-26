@@ -14,8 +14,6 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.access_loggers.extension_filters.cel",
     "envoy.rate_limit_descriptors.expr",
     "envoy.filters.http.rate_limit_quota",
-    "envoy.filters.http.ext_proc",
-    "envoy.formatter.cel",
     "envoy.matching.inputs.cel_data_input",
     "envoy.matching.matchers.cel_matcher",
     "envoy.access_loggers.wasm",

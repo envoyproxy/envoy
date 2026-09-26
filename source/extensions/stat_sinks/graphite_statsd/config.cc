@@ -33,9 +33,10 @@ GraphiteStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
     if (statsd_sink.has_max_bytes_per_datagram()) {
       max_bytes = statsd_sink.max_bytes_per_datagram().value();
     }
-    return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
-                                                           true, statsd_sink.prefix(), max_bytes,
-                                                           Common::Statsd::getGraphiteTagFormat());
+    return std::make_unique<Common::Statsd::UdpStatsdSink>(
+        server.threadLocal(), std::move(address), true, statsd_sink.prefix(), max_bytes,
+        Common::Statsd::getGraphiteTagFormat(),
+        statsd_sink.scale_histogram_units_to_milliseconds());
   }
   case envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink::StatsdSpecifierCase::
       STATSD_SPECIFIER_NOT_SET:

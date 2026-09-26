@@ -607,6 +607,21 @@ public:
     return value;
   }
 
+  TimingInfo getTimingInfo() override {
+    envoy_dynamic_module_type_timing_info info{};
+    envoy_dynamic_module_callback_http_get_timing_info(host_plugin_ptr_, &info);
+    return TimingInfo{
+        info.start_time_unix_ns,
+        info.request_complete_duration_ns,
+        info.first_upstream_tx_byte_sent_ns,
+        info.last_upstream_tx_byte_sent_ns,
+        info.first_upstream_rx_byte_received_ns,
+        info.last_upstream_rx_byte_received_ns,
+        info.first_downstream_tx_byte_sent_ns,
+        info.last_downstream_tx_byte_sent_ns,
+    };
+  }
+
   void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
                          std::string_view body, std::string_view detail) override {
     local_reply_sent_ = true;

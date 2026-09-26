@@ -157,7 +157,8 @@ def envoy_cc_fuzz_test(
         copts = envoy_copts(test = True),
         additional_linker_inputs = envoy_exported_symbols_input(),
         linkopts = _envoy_test_linkopts() + select({
-            _LIBFUZZER: ["-fsanitize=fuzzer"],
+            # `@llvm_toolchain` links libc++, keep -fsanitize=fuzzer from also linking libstdc++.
+            _LIBFUZZER: ["-fsanitize=fuzzer", "-nostdlib++"],
             "//conditions:default": [],
         }),
         linkstatic = envoy_linkstatic(),

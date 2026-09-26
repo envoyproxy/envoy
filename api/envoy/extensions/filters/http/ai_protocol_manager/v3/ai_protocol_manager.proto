@@ -59,6 +59,18 @@ message AiProtocolManager {
 // well-formed JSON is rejected with a 400 rather than forwarded for the
 // upstream to interpret differently.
 message RequestHandling {
+  // How the request body is written out once the :ref:`AI filters
+  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`
+  // finish.
+  enum BodyReserialization {
+    // Re-serialize the parsed document, so the edits AI filters make to it reach the upstream.
+    ALWAYS = 0;
+
+    // Forward the received body byte for byte. Edits AI filters make to the parsed document are
+    // not sent, so use this only with AI filters that read the request, such as request info.
+    DISABLE = 1;
+  }
+
   // Attempt best-effort JSON parsing on routes without a per-route
   // configuration.
   //
@@ -76,6 +88,10 @@ message RequestHandling {
 
   // Request-path parsing limits. Defaults apply when unset.
   RequestParsingLimits limits = 2;
+
+  // Whether the parsed request is re-serialized once the AI filters finish. Defaults to ``ALWAYS``.
+  // Requests that run no AI filters are forwarded as received either way.
+  BodyReserialization reserialize_body = 3 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Per-stream limits for request payload parsing.

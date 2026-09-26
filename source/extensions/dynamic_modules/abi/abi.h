@@ -214,6 +214,21 @@ typedef struct envoy_dynamic_module_type_envoy_http_header {
   size_t value_length;
 } envoy_dynamic_module_type_envoy_http_header;
 
+/**
+ * envoy_dynamic_module_type_timing_info contains timing information from StreamInfo.
+ * All durations are in nanoseconds. A value of -1 indicates the timing is not available.
+ */
+typedef struct envoy_dynamic_module_type_timing_info {
+  int64_t start_time_unix_ns;           // Request start time as Unix timestamp in nanoseconds.
+  int64_t request_complete_duration_ns; // Duration from start to request complete.
+  int64_t first_upstream_tx_byte_sent_ns;
+  int64_t last_upstream_tx_byte_sent_ns;
+  int64_t first_upstream_rx_byte_received_ns;
+  int64_t last_upstream_rx_byte_received_ns;
+  int64_t first_downstream_tx_byte_sent_ns;
+  int64_t last_downstream_tx_byte_sent_ns;
+} envoy_dynamic_module_type_timing_info;
+
 typedef enum envoy_dynamic_module_type_http_header_type {
   envoy_dynamic_module_type_http_header_type_RequestHeader,
   envoy_dynamic_module_type_http_header_type_RequestTrailer,
@@ -2968,6 +2983,20 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
 bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+/**
+ * Get a snapshot of the current stream timing information.
+ *
+ * This always populates the module-owned output struct. The request start time is a Unix timestamp;
+ * all other fields are durations from the monotonic request start time. Fields are set to -1 when
+ * the stream or an individual timing marker is unavailable at the current event hook.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param timing_out is the module-owned output parameter for timing information.
+ */
+void envoy_dynamic_module_callback_http_get_timing_info(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_timing_info* timing_out);
 
 /**
  * envoy_dynamic_module_callback_http_filter_http_callout is called by the module to initiate
@@ -7102,21 +7131,6 @@ typedef enum envoy_dynamic_module_type_response_flag {
   envoy_dynamic_module_type_response_flag_DownstreamRemoteReset = 28,
   envoy_dynamic_module_type_response_flag_UnconditionalDropOverload = 29,
 } envoy_dynamic_module_type_response_flag;
-
-/**
- * envoy_dynamic_module_type_timing_info contains timing information from StreamInfo.
- * All durations are in nanoseconds. A value of -1 indicates the timing is not available.
- */
-typedef struct envoy_dynamic_module_type_timing_info {
-  int64_t start_time_unix_ns;           // Request start time as Unix timestamp in nanoseconds.
-  int64_t request_complete_duration_ns; // Duration from start to request complete.
-  int64_t first_upstream_tx_byte_sent_ns;
-  int64_t last_upstream_tx_byte_sent_ns;
-  int64_t first_upstream_rx_byte_received_ns;
-  int64_t last_upstream_rx_byte_received_ns;
-  int64_t first_downstream_tx_byte_sent_ns;
-  int64_t last_downstream_tx_byte_sent_ns;
-} envoy_dynamic_module_type_timing_info;
 
 /**
  * envoy_dynamic_module_type_bytes_info contains byte count information.

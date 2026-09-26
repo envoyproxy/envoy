@@ -465,6 +465,7 @@
 # Cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
 /*/extensions/router/cluster_specifiers/matcher @wbpcode @agrawroh
+/*/extensions/router/cluster_specifiers/priority_group @wbpcode @kanurag94
 
 # Queue policy
 /*/extensions/queue_policy/common @nezdolik @yanavlasov @tonya11en @balrawi-figma
@@ -520,6 +521,7 @@
 /contrib/tap_sinks/ @coolg92003 @yiyibaoguo
 /contrib/peak_ewma/filters/http/ @rroblak @UNOWNED
 /contrib/peak_ewma/load_balancing_policies/ @rroblak @UNOWNED
+/contrib/per_worker_subset/ @sudheerv @UNOWNED
 /contrib/kae/ @Misakokoro @UNOWNED
 /contrib/istio @kyessenov @wbpcode @keithmattix @krinkinmu @zirain
 /contrib/reverse_tunnel_reporter @agrawroh @aakugan @basundhara-c
