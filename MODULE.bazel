@@ -30,6 +30,7 @@ bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
 bazel_dep(name = "envoy_toolshed", version = "0.5.0.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.0.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "fmt", version = "12.2.0")
 bazel_dep(name = "gazelle", version = "0.47.0")
@@ -151,25 +152,19 @@ single_version_override(
     version = "0.20260813.0",
 )
 
-# testing/debugging
-# local_path_override(
-#     module_name = "envoy_toolshed",
-#     path = "../toolshed/bazel",
-# )
-#
-# git_override(
-#     module_name = "envoy_toolshed",
-#     commit = "4c200b2990500e3bebf3f202e096894a957a1876",
-#     remote = "https://github.com/envoyproxy/toolshed",
-#     strip_prefix = "bazel",
-# )
-#
-# git_override(
-#     module_name = "envoy_toolshed_jq",
-#     commit = "4c200b2990500e3bebf3f202e096894a957a1876",
-#     remote = "https://github.com/envoyproxy/toolshed",
-#     strip_prefix = "jq",
-# )
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "084951564f1de4bffa8acc41d20326ead7072be6",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "084951564f1de4bffa8acc41d20326ead7072be6",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "jq",
+)
 
 ####################################################################################
 # setup: Compilers

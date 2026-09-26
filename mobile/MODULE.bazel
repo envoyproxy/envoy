@@ -11,6 +11,7 @@ bazel_dep(name = "envoy", version = "1.40.0-dev")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev.20260903.16b0d47.envoy")
 bazel_dep(name = "envoy_build_config", version = "1.40.0-dev")
 bazel_dep(name = "envoy_toolshed", version = "0.5.0.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.0.envoy")
 bazel_dep(name = "gazelle", version = "0.47.0")
 bazel_dep(name = "google_bazel_common", version = "0.0.1")
 bazel_dep(name = "googleapis", version = "0.0.0-20251003-2193a2bf")
@@ -46,6 +47,8 @@ bazel_dep(name = "toolchains_llvm", version = "1.9.1.envoy")
 bazel_dep(name = "zlib-ng", version = "2.3.3.bcr.2")
 bazel_dep(name = "zstd", version = "1.5.7.bcr.2")
 
+bazel_dep(name = "buildifier_prebuilt", version = "10.0.1", repo_name = "buildifier", dev_dependency = True)
+
 local_path_override(
     module_name = "envoy",
     path = "..",
@@ -59,6 +62,20 @@ local_path_override(
 local_path_override(
     module_name = "envoy_build_config",
     path = "envoy_build_config",
+)
+
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "bd76d894a17def93b25f618fa257200da93e4f92",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "bd76d894a17def93b25f618fa257200da93e4f92",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "jq",
 )
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")

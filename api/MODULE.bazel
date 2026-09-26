@@ -13,6 +13,7 @@ bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "boringssl", version = "0.20260813.0")
 bazel_dep(name = "envoy_toolshed", version = "0.5.0.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.0.envoy")
 bazel_dep(name = "gazelle", version = "0.47.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20251003-2193a2bf")
 bazel_dep(name = "googleapis-cc", version = "1.0.0")
@@ -39,8 +40,24 @@ bazel_dep(name = "zipkin-api", version = "1.0.0.bcr.1")
 # deps: Dev
 ####################################################################################
 
+bazel_dep(name = "buildifier_prebuilt", version = "10.0.1", repo_name = "buildifier", dev_dependency = True)
 bazel_dep(name = "googletest", version = "1.18.0.bcr.1", dev_dependency = True)
+bazel_dep(name = "platforms", version = "1.1.0", dev_dependency = True)
 bazel_dep(name = "protoc-gen-jsonschema", version = "0.0.0-20230530-7680e49.envoy", dev_dependency = True)
+
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "bd76d894a17def93b25f618fa257200da93e4f92",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "bd76d894a17def93b25f618fa257200da93e4f92",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "jq",
+)
 
 
 ####################################################################################
