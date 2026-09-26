@@ -12,13 +12,32 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# TODO(jwendell): Remove after https://github.com/protocolbuffers/protobuf/issues/20760 is fixed.
+# Envoy has no first-class Java, but protobuf's Java tooling still needs a hermetic JDK and a
+# javabuilder workaround while https://github.com/protocolbuffers/protobuf/issues/20760 is open.
+# MODULE.bazel registers this compile toolchain plus the runtime toolchains below so downstream
+# bzlmod consumers get the same hermetic Java setup without copying .bazelrc flags.
 default_java_toolchain(
     name = "envoy_java_toolchain",
     java_runtime = "@rules_java//toolchains:remotejdk_25",
     javabuilder_jvm_opts = ["--sun-misc-unsafe-memory-access=allow"],
     source_version = "11",
     target_version = "11",
+)
+
+# Hermetic default Java runtime. Registered from MODULE.bazel so that consumers of @envoy do not
+# need to set --java_runtime_version / --tool_java_runtime_version. These wrappers intentionally
+# omit target_settings so a root module can still override them by registering its own toolchains
+# first.
+toolchain(
+    name = "envoy_java_runtime_toolchain",
+    toolchain = "@rules_java//toolchains:remotejdk_25",
+    toolchain_type = "@bazel_tools//tools/jdk:runtime_toolchain_type",
+)
+
+toolchain(
+    name = "envoy_java_bootstrap_runtime_toolchain",
+    toolchain = "@rules_java//toolchains:remotejdk_25",
+    toolchain_type = "@bazel_tools//tools/jdk:bootstrap_runtime_toolchain_type",
 )
 
 exports_files([
@@ -969,11 +988,6 @@ selects.config_setting_group(
         ":not_x86",
         ":wasm_disabled",
     ],
-)
-
-alias(
-    name = "remote_jdk11",
-    actual = "@rules_java//toolchains:remote_jdk11",
 )
 
 alias(

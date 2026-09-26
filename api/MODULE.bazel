@@ -52,6 +52,14 @@ bazel_lib.jq(version = "1.7")
 bazel_lib.yq(version = "4.24.4")
 use_repo(bazel_lib, "jq", "jq_toolchains", "yq", "yq_toolchains")
 
+# envoy_api is an independent module, so it needs to register its own hermetic Java toolchains
+# rather than relying on @envoy's dependency registrations.
+register_toolchains(
+    "//bazel:envoy_api_java_toolchain_definition",
+    "//bazel:envoy_api_java_runtime_toolchain",
+    "//bazel:envoy_api_java_bootstrap_runtime_toolchain",
+)
+
 # Go SDK and toolchain configuration
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(version = "1.24.6")
