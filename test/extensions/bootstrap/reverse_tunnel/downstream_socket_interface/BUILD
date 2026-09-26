@@ -68,6 +68,8 @@ envoy_cc_test(
     size = "large",
     srcs = ["reverse_connection_io_handle_test.cc"],
     deps = [
+        "//envoy/common:base_includes",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",

@@ -37,10 +37,15 @@ public:
   TcpStatsdSinkTest() {
     cluster_manager_.initializeClusters({"fake_cluster"}, {});
     cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    createSink(/*scale_histogram_units=*/false);
+  }
+
+  void createSink(bool scale_histogram_units) {
     sink_ =
         TcpStatsdSink::create(
             local_info_, "fake_cluster", tls_, cluster_manager_,
-            *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()))
+            *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()),
+            getDefaultPrefix(), scale_histogram_units)
             .value();
   }
 
@@ -123,6 +128,7 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 }
 
 TEST_F(TcpStatsdSinkTest, SiSuffix) {
+  createSink(/*scale_histogram_units=*/true);
   InSequence s;
   expectCreateConnection();
 
@@ -132,6 +138,9 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
 
   EXPECT_CALL(*connection_, write(BufferString("envoy.items:1|ms\n"), _));
   sink_->onHistogramComplete(items, 1);
+  // Unscaled samples keep their integer representation however large they are.
+  EXPECT_CALL(*connection_, write(BufferString("envoy.items:1234567|ms\n"), _));
+  sink_->onHistogramComplete(items, 1234567);
 
   NiceMock<Stats::MockHistogram> information;
   information.name_ = "information";
@@ -139,13 +148,21 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
 
   EXPECT_CALL(*connection_, write(BufferString("envoy.information:2|ms\n"), _));
   sink_->onHistogramComplete(information, 2);
+  EXPECT_CALL(*connection_, write(BufferString("envoy.information:2097152|ms\n"), _));
+  sink_->onHistogramComplete(information, 2097152);
 
   NiceMock<Stats::MockHistogram> duration_micro;
   duration_micro.name_ = "duration";
   duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
 
-  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:3|ms\n"), _));
+  // Microseconds are scaled to milliseconds.
+  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:0.003|ms\n"), _));
   sink_->onHistogramComplete(duration_micro, 3);
+  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:1.5|ms\n"), _));
+  sink_->onHistogramComplete(duration_micro, 1500);
+  // Large scaled samples keep full precision and never use scientific notation.
+  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:1234567.891|ms\n"), _));
+  sink_->onHistogramComplete(duration_micro, 1234567891);
 
   NiceMock<Stats::MockHistogram> duration_milli;
   duration_milli.name_ = "duration";
@@ -153,6 +170,22 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
 
   EXPECT_CALL(*connection_, write(BufferString("envoy.duration:4|ms\n"), _));
   sink_->onHistogramComplete(duration_milli, 4);
+
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  tls_.shutdownThread();
+}
+
+// Unit scaling is off by default: every sample is reported unscaled with an ms suffix.
+TEST_F(TcpStatsdSinkTest, HistogramUnitScalingOffByDefault) {
+  InSequence s;
+  expectCreateConnection();
+
+  NiceMock<Stats::MockHistogram> duration_micro;
+  duration_micro.name_ = "duration";
+  duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
+
+  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:1500|ms\n"), _));
+  sink_->onHistogramComplete(duration_micro, 1500);
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
   tls_.shutdownThread();

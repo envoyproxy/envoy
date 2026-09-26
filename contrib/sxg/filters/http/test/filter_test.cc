@@ -384,7 +384,7 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
 
   NiceMock<ThreadLocal::MockInstance> tls;
   SDSSecretReader secret_reader(std::move(certificate_secret_provider),
-                                std::move(private_key_secret_provider), tls, *api);
+                                std::move(private_key_secret_provider), tls, *api, dispatcher);
   EXPECT_TRUE(secret_reader.certificate().empty());
   EXPECT_TRUE(secret_reader.privateKey().empty());
 

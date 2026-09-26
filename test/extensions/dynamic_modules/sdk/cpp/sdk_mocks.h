@@ -144,6 +144,7 @@ public:
   MOCK_METHOD(std::optional<std::string_view>, getAttributeString, (AttributeID id), (override));
   MOCK_METHOD(std::optional<uint64_t>, getAttributeNumber, (AttributeID id), (override));
   MOCK_METHOD(std::optional<bool>, getAttributeBool, (AttributeID id), (override));
+  MOCK_METHOD(TimingInfo, getTimingInfo, (), (override));
   MOCK_METHOD(std::optional<std::string_view>, getFilterState, (std::string_view key), (override));
   MOCK_METHOD(void, setFilterState, (std::string_view key, std::string_view value), (override));
   MOCK_METHOD(void, sendLocalResponse,

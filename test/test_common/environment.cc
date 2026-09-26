@@ -61,13 +61,14 @@ std::string makeTempDir(std::string basename_template) {
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
                                                  name_template, errorDetails(errno)));
   TestEnvironment::createPath(dirname);
+  return absl::StrReplaceAll(dirname, {{"\\", "/"}});
 #else
   std::string name_template = "/tmp/" + basename_template;
   char* dirname = ::mkdtemp(&name_template[0]);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
                                                  name_template, errorDetails(errno)));
-#endif
   return {dirname};
+#endif
 }
 
 std::string getOrCreateUnixDomainSocketDirectory() {
@@ -91,6 +92,9 @@ std::string getTemporaryDirectory() {
     return makeTempDir("envoy_test_tmp.XXXXXX");
   }
   TestEnvironment::createPath(temp_dir);
+#ifdef WIN32
+  temp_dir = absl::StrReplaceAll(temp_dir, {{"\\", "/"}});
+#endif
   return temp_dir;
 }
 
@@ -346,7 +350,11 @@ std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
 std::string TestEnvironment::runfilesPath(const std::string& path, const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
   const std::string effective_workspace = workspace.empty() ? resolveMainWorkspace() : workspace;
-  return runfiles_->Rlocation(absl::StrCat(effective_workspace, "/", path));
+  std::string file_path = runfiles_->Rlocation(absl::StrCat(effective_workspace, "/", path));
+#ifdef WIN32
+  file_path = absl::StrReplaceAll(file_path, {{"\\", "/"}});
+#endif
+  return file_path;
 }
 
 const std::string TestEnvironment::unixDomainSocketDirectory() {

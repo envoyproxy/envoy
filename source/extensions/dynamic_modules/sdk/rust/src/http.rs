@@ -5,7 +5,7 @@ use crate::{
   abi, bytes_to_module_buffer, ffi_export, str_to_module_buffer, strs_to_module_buffers,
   ClusterHostCount, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId,
   EnvoyGenericSecretId, EnvoyHistogramId, EnvoyHistogramVecId, NewHttpFilterConfigFunction,
-  NewHttpFilterPerRouteConfigFunction, NEW_HTTP_FILTER_CONFIG_FUNCTION,
+  NewHttpFilterPerRouteConfigFunction, TimingInfo, NEW_HTTP_FILTER_CONFIG_FUNCTION,
   NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
 };
 use mockall::*;
@@ -1690,6 +1690,12 @@ pub trait EnvoyHttpFilter {
     &self,
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
   ) -> Option<bool>;
+
+  /// Get a snapshot of the current stream timing information.
+  ///
+  /// Unavailable values are -1. The request start time is a Unix timestamp in nanoseconds; all
+  /// other values are durations from the monotonic request start time.
+  fn get_timing_info(&self) -> TimingInfo;
 
   /// Send an HTTP callout to the given cluster with the given headers and body.
   /// Multiple callouts can be made from the same filter. Different callouts can be
@@ -3634,6 +3640,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     } else {
       None
     }
+  }
+
+  fn get_timing_info(&self) -> TimingInfo {
+    let mut info = crate::timing::unavailable_timing_info();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_get_timing_info(self.raw_ptr, &mut info);
+    }
+    info.into()
   }
 
   fn send_http_callout<'a>(

@@ -14,7 +14,7 @@ fetch --color=yes
 run --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/86a8df39ed58dd94239aa7a3f9098c63e0d5502d
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/a267f81d66df9e3ed1dd524163d99d602e351995
 common --noincompatible_disallow_empty_glob
 
 build --workspace_status_command="bash get_workspace_status"
@@ -51,8 +51,6 @@ build:remote-ci --remote_download_minimal
 
 # Common flags for Clang (shared between all clang variants)
 common:clang-common --linkopt=-fuse-ld=lld
-common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
-common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
 
 # Clang with libc++ (default)
 common:clang --config=clang-common
@@ -72,40 +70,6 @@ common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 common:libc++ --define force_libcpp=enabled
 common:libc++ --@envoy//bazel:libc++=true
-
-
-#############################################################################
-# envoy test deps
-#############################################################################
-
-build --@googleurl//build_config:system_icu=0
-
-# proxy-wasm-cpp-host
-common --@proxy-wasm-cpp-host//bazel:crypto_lib=@envoy//bazel:crypto
-
-# libsxg
-build --@libsxg//:crypto_lib=@envoy//bazel:crypto
-
-# quiche
-build --@quiche//:zlib=@envoy//bazel:zlib
-build --@quiche//:ssl_lib=@envoy//bazel:ssl
-
-# quiche — non-test platform impls
-build --@quiche//:quic_base_impl_lib=@envoy//source/common/quic/platform:quic_base_impl_lib
-build --@quiche//:quiche_export_impl_lib=@envoy//source/common/quic/platform:quiche_export_impl_lib
-build --@quiche//:quiche_flags_impl_lib=@envoy//source/common/quic/platform:quiche_flags_impl_lib
-build --@quiche//:quiche_logging_impl_lib=@envoy//source/common/quic/platform:quiche_logging_impl_lib
-build --@quiche//:quiche_lower_case_string_impl_lib=@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib
-build --@quiche//:quiche_platform_iovec_impl_lib=@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib
-build --@quiche//:quiche_stack_trace_impl_lib=@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib
-build --@quiche//:quiche_time_utils_impl_lib=@envoy//source/common/quic/platform:quiche_time_utils_impl_lib
-
-# quiche — test platform impls
-build --@quiche//:quiche_expect_bug_impl_lib=@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib
-build --@quiche//:quiche_test_impl_lib=@envoy//test/common/quic/platform:quiche_test_impl_lib
-build --@quiche//:quiche_test_helpers_impl_lib=@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib
-build --@quiche//:quiche_test_output_impl_lib=@envoy//test/common/quic/platform:quiche_test_output_impl_lib
-build --@quiche//:quiche_thread_impl_lib=@envoy//test/common/quic/platform:quiche_thread_impl_lib
 
 
 #############################################################################
