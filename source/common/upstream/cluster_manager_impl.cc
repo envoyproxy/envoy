@@ -973,9 +973,13 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   if (new_cluster->healthChecker() != nullptr) {
     new_cluster->healthChecker()->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state, HealthState) {
-          if (changed_state == HealthTransition::Changed &&
-              host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+          if (changed_state != HealthTransition::Changed) {
+            return;
+          }
+          if (host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
             postThreadLocalHealthFailure(host);
+          } else if (host->coarseHealth() == Host::Health::Healthy) {
+            postThreadLocalHealthRecovery(host);
           }
         });
   }
@@ -987,6 +991,8 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
                         "host {} in cluster {} was ejected by the outlier detector",
                         host->address()->asStringView(), host->cluster().name());
         postThreadLocalHealthFailure(host);
+      } else if (host->coarseHealth() == Host::Health::Healthy) {
+        postThreadLocalHealthRecovery(host);
       }
     });
   }
@@ -1647,6 +1653,20 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::onHttpConn
   }
 }
 
+void ClusterManagerImpl::postThreadLocalHealthRecovery(const HostSharedPtr& host) {
+  // Health recovery is only relevant for eager preconnect floor today.
+  if (host->cluster().eagerPreconnectFloor() == 0) {
+    return;
+  }
+  host->resetConsecutiveEagerPreconnectFloorFailures();
+  tls_.runOnAllThreads([host](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    if (!cluster_manager.has_value() || Envoy::Thread::MainThread::isMainThread()) {
+      return;
+    }
+    cluster_manager->onHostHealthRecovery(host);
+  });
+}
+
 Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
     LoadBalancerContext* context) {
   HostConstSharedPtr logical_host =
@@ -2263,6 +2283,15 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
   } else {
     drainOrCloseConnPools(host, ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthRecovery(
+    const HostSharedPtr& host) {
+  OptRef<ClusterEntry> entry = getClusterEntry(host->cluster().name());
+  if (!entry.has_value()) {
+    return;
+  }
+  entry->maybeBootstrapPreconnectFloor(host);
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ConnPoolsContainer*

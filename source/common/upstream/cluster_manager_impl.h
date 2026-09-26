@@ -676,6 +676,10 @@ private:
       }
       // Records `params` if new and bootstraps connections for every current host.
       void onHttpConnPoolUsed(const HttpConnPoolParams& params);
+      // Opens a bootstrap connection for every host in hosts using locally stored params.
+      void maybeBootstrapPreconnectFloor(const HostVector& hosts);
+      // Opens a bootstrap connection for host using locally stored params.
+      void maybeBootstrapPreconnectFloor(const HostConstSharedPtr& host);
 
     private:
       // Applies a batch of per-priority host updates to the cluster entry's priority set via
@@ -747,10 +751,6 @@ private:
                                          const HttpConnPoolParams& params);
       // Opens a bootstrap connection for every current host using params.
       void maybeBootstrapPreconnectFloor(const HttpConnPoolParams& params);
-      // Opens a bootstrap connection for every host in hosts using locally stored params.
-      void maybeBootstrapPreconnectFloor(const HostVector& hosts);
-      // Opens a bootstrap connection for host using locally stored params.
-      void maybeBootstrapPreconnectFloor(const HostConstSharedPtr& host);
       bool hostEligibleForPreconnectFloor(const HostConstSharedPtr& host) const;
       std::list<Event::TimerPtr> bootstrap_timers_;
 
@@ -800,6 +800,7 @@ private:
                                  bool weighted_priority_health, uint64_t overprovisioning_factor,
                                  HostMapConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
+    void onHostHealthRecovery(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
                                                   bool allocate = false);
@@ -988,6 +989,7 @@ private:
                                              bool avoid_cds_removal = false);
   absl::Status onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
+  void postThreadLocalHealthRecovery(const HostSharedPtr& host);
   void
   postThreadLocalHttpConnPoolUsed(const std::string& cluster_name,
                                   const ThreadLocalClusterManagerImpl::HttpConnPoolParams& params);
