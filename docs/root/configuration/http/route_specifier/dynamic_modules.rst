@@ -51,15 +51,16 @@ A decision Envoy cannot honor is handled by the configured
 which either passes the request through to the route table or drops the route. The SDK reports an
 error when the module panics, so a panic is handled by the same policy rather than crashing Envoy.
 
-Shadow mode
------------
+Shadowing a routing change
+--------------------------
 
-:ref:`shadow_mode <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.shadow_mode>`
-computes the route the module asks for, compares it with the route the specifier was given, emits
-per property statistics, reports the result to the module, and then returns the route it was given
-unchanged. This is how a module is validated against the route table it replaces before it serves
-traffic. A specifier in shadow mode never changes the routing of a request, so ``failure_policy``
-is not required.
+A module receives the route that route matching resolved through its context, so it can shadow a
+routing change on its own without any support from Envoy. In a dry run the module computes the route
+it would ask for, compares it against the resolved route, counts the outcome on its own metrics, and
+returns ``PassThrough`` so that routing stays unchanged. Once the counts give confidence, the same
+module returns ``Override`` or ``SelectTemplate`` to apply the decision. The
+``route_specifier_shadow.rs`` test module under ``test/extensions/dynamic_modules/test_data/rust``
+shows both runs, comparing the cluster name.
 
 Route overrides
 ---------------
@@ -107,11 +108,6 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   failure_override_without_route, Counter, Decisions not honored because there was no route to refine.
   failure_override_on_non_route_entry, Counter, Decisions not honored because route entry properties were recorded for a direct response.
   failure_route_metadata, Counter, Decisions not honored because a typed metadata factory rejected the recorded metadata.
-  shadow_match, Counter, Shadowed decisions that produced an equivalent route.
-  shadow_mismatch, Counter, Shadowed decisions that produced a different route.
-  shadow_pass_through, Counter, Shadowed decisions that kept the resolved route.
-  shadow_failure, Counter, Shadowed decisions that could not be honored.
-  shadow_mismatch_<field>, Counter, Shadowed decisions where ``<field>`` differed.
   on_route_duration, Histogram, Time in microseconds the module spent deciding.
   specifier_duration, Histogram, Time in microseconds the specifier spent on a request.
 

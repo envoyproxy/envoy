@@ -37,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the request, an override of a route that route matching did not resolve, route entry overrides
 // recorded for a direct response, and route metadata a typed metadata factory rejects.
 enum FailurePolicy {
-  // Must be set explicitly unless the specifier runs in shadow mode.
+  // Must be set explicitly.
   FAILURE_POLICY_UNSPECIFIED = 0;
 
   // Use the route the specifier was given, unchanged, and carry on with the chain. This keeps the
@@ -113,124 +113,8 @@ message RouteOverride {
   config.route.v3.CorsPolicy cors = 8;
 }
 
-// Shadow mode configuration.
-//
-// The specifier computes the route the module asks for, compares it with the route it was given,
-// emits statistics, reports the result to the module, and then returns the route it was given
-// unchanged without ending the chain. This is how a module is validated against the route table it
-// replaces before it serves traffic.
-//
-// The comparison covers the route decision as observable through Envoy's route interfaces,
-// including the request headers as the route finalizes them. Because it runs while the route is
-// resolved, that finalization approximates what the router sends: the router adds
-// ``x-envoy-expected-rq-timeout-ms`` and ``x-envoy-attempt-count`` first, and finalizes with the
-// active tracing span. Header mutations whose formatters read those are evaluated with the same
-// incomplete context on both sides, so they can agree here and differ once live. The comparison
-// does not prove equivalence of those formatters, of per filter configuration values other than
-// whether a filter is disabled, of decorators, of virtual host level behavior, of the internals of
-// extension backed retry predicates, header matchers, CORS origin matchers and tracing custom
-// tags, which are compared by count and presence only, or of response header mutations that read
-// the actual response.
-message ShadowMode {
-  // A property of the route that is compared. The mismatching properties are reported to the module
-  // as a bit set, so values must stay below 64.
-  enum CompareField {
-    COMPARE_FIELD_UNSPECIFIED = 0;
-
-    // Whether both routes are of the same kind. Always compared, and the other properties are only
-    // compared when the kinds are equal.
-    ROUTE_KIND = 1;
-
-    CLUSTER_NAME = 2;
-
-    TIMEOUT = 3;
-
-    IDLE_TIMEOUT = 4;
-
-    MAX_STREAM_DURATION = 5;
-
-    PRIORITY = 6;
-
-    REQUEST_BODY_BUFFER_LIMIT = 7;
-
-    CLUSTER_NOT_FOUND_RESPONSE_CODE = 8;
-
-    // The retry policy, plus the counts of its retriable header matchers, reset headers, host
-    // predicates and options predicates, and whether it configures a retry priority.
-    RETRY_POLICY = 9;
-
-    HEDGE_POLICY = 10;
-
-    // The subset load balancing metadata match criteria.
-    METADATA_MATCH = 11;
-
-    // Whether a hash policy is configured and the hash it generates for the request.
-    HASH_POLICY = 12;
-
-    // The request mirroring policies, plus the headers each of them adds to a mirrored request.
-    REQUEST_MIRROR_POLICIES = 13;
-
-    // ``:path`` and ``x-envoy-original-path`` of the finalized request headers.
-    REQUEST_PATH = 14;
-
-    // ``:authority``, ``x-envoy-original-host`` and ``x-forwarded-host`` of the finalized request
-    // headers.
-    REQUEST_AUTHORITY = 15;
-
-    // The other finalized request headers.
-    REQUEST_HEADERS = 16;
-
-    // The response header mutations, evaluated against an empty response.
-    RESPONSE_HEADERS = 17;
-
-    // Whether the filters named by ``filter_names``, and the filters the module disabled or
-    // enabled, are disabled.
-    FILTER_DISABLED = 18;
-
-    // The status code of direct responses and redirects.
-    RESPONSE_CODE = 19;
-
-    // The location a redirect answers with. Empty for a direct response that is not a redirect.
-    REDIRECT_LOCATION = 20;
-
-    // The name of the virtual host the route belongs to.
-    VIRTUAL_HOST_NAME = 21;
-
-    // The route metadata.
-    ROUTE_METADATA = 22;
-
-    // The body and content type of direct responses. Formats the body of every shadowed direct
-    // response, so it is not compared by default.
-    DIRECT_RESPONSE_BODY = 23;
-
-    // The route name. Template identifiers and configured route names usually differ, so it is not
-    // compared by default.
-    ROUTE_NAME = 24;
-
-    // The rate limits, compared by the descriptors and limit overrides they generate for the
-    // request.
-    RATE_LIMIT_POLICY = 25;
-
-    // The CORS policy. Origin matchers are compared by count.
-    CORS = 26;
-
-    // The tracing configuration, its sampling and the count of its custom tags.
-    TRACING = 27;
-  }
-
-  // The properties that are compared. Duplicates are ignored. If not specified, defaults to every
-  // property except ``DIRECT_RESPONSE_BODY`` and ``ROUTE_NAME``.
-  repeated CompareField compare_fields = 1
-      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
-
-  // HTTP filter names whose disabled state ``FILTER_DISABLED`` compares, for example the
-  // authorization and rate limit filters of the listener. The filters the module disables or
-  // enables for a request are always compared.
-  repeated string filter_names = 2 [(validate.rules).repeated = {items {string {min_len: 1}}}];
-}
-
 // Configuration for the dynamic modules route specifier.
-// [#next-free-field: 11]
+// [#next-free-field: 10]
 message DynamicModuleRouteSpecifier {
   // Specifies the shared object level configuration. This field is required.
   //
@@ -270,9 +154,6 @@ message DynamicModuleRouteSpecifier {
   // onto the produced route. The ``override_id`` values must be unique.
   repeated RouteOverride route_overrides = 6;
 
-  // If specified, the specifier runs in shadow mode and never changes the routing of a request.
-  ShadowMode shadow_mode = 7;
-
   // Fraction of requests the module is invoked for. A request outside the fraction is passed
   // through untouched and counted in ``runtime_skipped``. The stable random value of the request is
   // used, so the choice holds when the route of a request is recomputed. If not specified,
@@ -284,16 +165,15 @@ message DynamicModuleRouteSpecifier {
   //   ``0``, while the route table the module replaces is still complete. Once that table has been
   //   shrunk, lowering the fraction turns the affected requests into 404s or routes them wrongly, and
   //   the way back is a route configuration rollback that restores the table.
-  config.core.v3.RuntimeFractionalPercent runtime_fraction = 8;
+  config.core.v3.RuntimeFractionalPercent runtime_fraction = 7;
 
-  // What Envoy does when the decision of the module cannot be honored. Must be set unless
-  // ``shadow_mode`` is set, where the route the specifier was given is always used.
-  FailurePolicy failure_policy = 9 [(validate.rules).enum = {defined_only: true}];
+  // What Envoy does when the decision of the module cannot be honored. Must be set explicitly.
+  FailurePolicy failure_policy = 8 [(validate.rules).enum = {defined_only: true}];
 
   // Whether the clusters the route templates and the route overrides name are checked
   // against the cluster manager while the specifier is configured. If not specified, defaults to
   // ``false``, because the clusters a route names may be delivered after the route configuration
   // that references them. An unknown cluster then fails the request with the
   // ``cluster_not_found_response_code`` of the route instead.
-  google.protobuf.BoolValue validate_clusters = 10;
+  google.protobuf.BoolValue validate_clusters = 9;
 }

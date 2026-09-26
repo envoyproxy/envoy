@@ -48,6 +48,7 @@ envoy_extension_cc_dyn_module_test(
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:route_specifier_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:route_specifier_shadow",
     ],
     extension_names = ["envoy.router.route_specifiers.dynamic_modules"],
     rbe_pool = "linux_x64_small",

@@ -1957,9 +1957,6 @@ WEAK_STUB(envoy_dynamic_module_type_metrics_result,
           envoy_dynamic_module_type_route_specifier_config_envoy_ptr, size_t,
           envoy_dynamic_module_type_module_buffer*, size_t, uint64_t)
 
-WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_config_is_shadow_mode, false,
-          envoy_dynamic_module_type_route_specifier_config_envoy_ptr)
-
 WEAK_STUB(envoy_dynamic_module_type_metrics_result,
           envoy_dynamic_module_callback_route_specifier_config_record_histogram_value,
           envoy_dynamic_module_type_metrics_result_MetricNotFound,

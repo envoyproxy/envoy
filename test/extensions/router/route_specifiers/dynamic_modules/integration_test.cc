@@ -126,60 +126,6 @@ route_templates:
         disabled: true
     route:
       cluster: canary
-route_overrides:
-- override_id: slow
-  retry_policy:
-    retry_on: 5xx
-    num_retries: 3
-- override_id: mirrored
-  request_mirror_policies:
-  - cluster: canary
-- override_id: hashed
-  hash_policy:
-  - header: {header_name: x-hash}
-- override_id: matched
-  metadata_match:
-    filter_metadata:
-      envoy.lb:
-        version: canary
-- override_id: hedged_action
-  hedge_policy:
-    hedge_on_per_try_timeout: true
-- override_id: rated
-  rate_limits:
-  - actions: [{generic_key: {descriptor_value: rated}}]
-    limit: {rate_limit: {requests_per_unit: 5, unit: MINUTE}}
-- override_id: corsed
-  cors:
-    allow_origin_string_match: [{exact: "example.com"}]
-    allow_methods: GET
-    allow_credentials: true
-    allow_private_network_access: false
-- override_id: complex_match
-  hash_policy:
-  - cookie: {name: shadow-cookie, ttl: 5s, attributes: [{name: SameSite, value: Strict}]}
-  metadata_match:
-    filter_metadata:
-      envoy.lb: {version: complex}
-  request_mirror_policies:
-  - cluster: canary
-- override_id: complex_diff
-  hash_policy:
-  - cookie: {name: other-cookie, ttl: 5s, attributes: [{name: SameSite, value: Strict}]}
-  metadata_match:
-    filter_metadata:
-      envoy.lb: {version: other}
-  request_mirror_policies:
-  - cluster: cluster_0
-- override_id: complex_meta_size
-  metadata_match:
-    filter_metadata:
-      envoy.lb: {version: complex, region: us}
-- override_id: complex_mirror_headers
-  request_mirror_policies:
-  - cluster: canary
-    request_headers_mutations:
-    - append: {header: {key: x-mirror, value: v}}
 )EOF" + extra_specifier_yaml;
           DynamicModuleRouteSpecifierProto specifier_config;
           TestUtility::loadFromYaml(specifier_yaml, specifier_config);
@@ -206,8 +152,7 @@ route_overrides:
           second->set_name("envoy.router.route_specifiers.dynamic_modules");
           std::ignore = second->mutable_typed_config()->PackFrom(second_config);
         });
-    // Routes that answer the request directly, so that a shadow comparison has two routes of the
-    // same kind to compare.
+    // Extra routes so a test can match a redirect or a direct response by path.
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
@@ -216,11 +161,6 @@ route_overrides:
           // no route, which is how OverrideWithoutRoute exercises a decision without a route.
           virtual_host->clear_domains();
           virtual_host->add_domains("example.com");
-          // Give the catch all route rate limits matching the rated override except for the limit
-          // override, so the rate_limit_policy shadow comparison differs by the limit alone.
-          TestUtility::loadFromYaml(
-              "actions: [{generic_key: {descriptor_value: rated}}]",
-              *virtual_host->mutable_routes(0)->mutable_route()->add_rate_limits());
           auto* redirect = virtual_host->add_routes();
           TestUtility::loadFromYaml(R"EOF(
 match: {prefix: "/redirect"}
@@ -236,34 +176,52 @@ direct_response:
   body: {inline_string: "route"}
 )EOF",
                                     *direct);
-          // A route carrying the properties built from extensions, so a shadow comparison of an
-          // override that carries them too runs their whole comparison rather than the null check.
-          auto* complex = virtual_host->add_routes();
-          TestUtility::loadFromYaml(R"EOF(
-match: {prefix: "/complex"}
-route:
-  cluster: cluster_0
-  hash_policy:
-  - cookie: {name: shadow-cookie, ttl: 5s, attributes: [{name: SameSite, value: Strict}]}
-  metadata_match:
-    filter_metadata:
-      envoy.lb: {version: complex}
-  request_mirror_policies:
-  - cluster: canary
-)EOF",
-                                    *complex);
           // Envoy matches routes in order, so the catch all route moves to the end.
           auto* routes = virtual_host->mutable_routes();
           routes->SwapElements(0, 1);
           routes->SwapElements(1, 2);
-          routes->SwapElements(2, 3);
         });
     // The template clusters must exist, since a template names one that no route does.
+    addCanaryCluster();
+    setUpstreamCount(2);
+    HttpIntegrationTest::initialize();
+  }
+
+  // Adds a second static cluster named canary, which the templates and the module may route to.
+  void addCanaryCluster() {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
       cluster->MergeFrom(bootstrap.static_resources().clusters(0));
       cluster->set_name("canary");
     });
+  }
+
+  // Configures the virtual host to run the shadow example module, which routes to intended_cluster
+  // by shadowing the decision in a dry run or by applying it in a wet run.
+  void setupShadowExample(bool dry_run, absl::string_view intended_cluster) {
+    const std::string mode = dry_run ? "dry-run" : "wet-run";
+    config_helper_.addConfigModifier(
+        [mode, intended_cluster = std::string(intended_cluster)](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          const std::string specifier_yaml = absl::StrCat(R"EOF(
+dynamic_module_config:
+  name: route_specifier_shadow
+specifier_name: shadow_example
+stat_prefix: test
+failure_policy: PASS_THROUGH
+specifier_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: ")EOF",
+                                                          mode, " ", intended_cluster, "\"\n");
+          DynamicModuleRouteSpecifierProto specifier_config;
+          TestUtility::loadFromYaml(specifier_yaml, specifier_config);
+          auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+          auto* specifier = virtual_host->add_route_specifiers();
+          specifier->set_name("envoy.router.route_specifiers.dynamic_modules");
+          std::ignore = specifier->mutable_typed_config()->PackFrom(specifier_config);
+        });
+    addCanaryCluster();
     setUpstreamCount(2);
     HttpIntegrationTest::initialize();
   }
@@ -454,22 +412,6 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverridesCluster) {
                                testing::Ge(1));
 }
 
-// A module that disables a filter differs from the route table it replaces, which shadow
-// mode reports on the filter_disabled counter.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, DisablesFilter) {
-  setupTest(R"EOF(
-shadow_mode:
-  compare_fields: [FILTER_DISABLED]
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = sendRequest(
-      {{"x-decision", "override"}, {"x-filter-disabled", "envoy.filters.http.disabled"}});
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_filter_disabled", testing::Ge(1));
-}
-
 // Route entry properties cannot be applied to a route that answers the request directly.
 TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverrideOnDirectResponse) {
   setupTest();
@@ -495,21 +437,6 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverridesTimeout) {
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_NE(nullptr, upstream_headers);
   EXPECT_EQ("3000", upstream_headers->get_("x-envoy-expected-rq-timeout-ms"));
-}
-
-// A route override that replaces the hedge policy differs from the route it was given, which
-// shadow mode reports on the hedge_policy counter.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverridesHedgePolicy) {
-  setupTest(R"EOF(
-shadow_mode:
-  compare_fields: [HEDGE_POLICY]
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = sendRequest({{"x-decision", "override"}, {"x-override", "hedged_action"}});
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_hedge_policy", testing::Ge(1));
 }
 
 // The status code a module records for a missing cluster is the one the request fails with.
@@ -613,7 +540,6 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsRequestAndRouteState) {
       {"template-ids",
        "canary,direct,redirect,unmatched,hedged,redirect_found,direct_body,full,traced,filter_off,"
        "registered,registered_direct"},
-      {"shadow-mode", "false"},
   };
   for (const auto& test_case : test_cases) {
     auto response = sendRequest({{"x-decision", "override"},
@@ -786,11 +712,14 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RejectsInvalidSetterInputs) {
   setupTest();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // The empty cluster and filter names are rejected, which the specifier records at debug level.
+  // The empty cluster and filter names and the unknown override are rejected, which the specifier
+  // records at debug level.
   IntegrationStreamDecoderPtr response;
   EXPECT_LOG_CONTAINS_ALL_OF(
-      (Envoy::ExpectedLogMessages{{"debug", "dynamic module route specifier rejected cluster ''"},
-                                  {"debug", "dynamic module route specifier rejected filter ''"}}),
+      (Envoy::ExpectedLogMessages{
+          {"debug", "dynamic module route specifier rejected cluster ''"},
+          {"debug", "dynamic module route specifier rejected filter ''"},
+          {"debug", "dynamic module route specifier selected unknown route override 'unknown'"}}),
       {
         response = sendRequest({{"x-decision", "override"},
                                 {"x-cluster", ""},
@@ -839,263 +768,6 @@ runtime_fraction:
   auto response = sendRequest({{"x-decision", "no-route"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.runtime_skipped",
-                               testing::Ge(1));
-}
-
-// In shadow mode the routing of a request never changes, and the comparison of the two routes is
-// reported to the module and counted.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowModeReportsMismatch) {
-  setupTest(R"EOF(
-shadow_mode:
-  compare_fields: [ROUTE_KIND, CLUSTER_NAME, TIMEOUT]
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = sendRequest({{"x-decision", "select-template"}, {"x-template", "canary"}});
-  EXPECT_EQ("200", response->headers().getStatusValue());
-
-  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_mismatch",
-                               testing::Ge(1));
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_cluster_name", testing::Ge(1));
-  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_mismatch_timeout",
-                               testing::Ge(1));
-  test_server_->waitForCounter("dynamicmodulescustom.shadow_results.outcome.mismatch",
-                               testing::Ge(1));
-}
-
-// Every compared property is reported on its own counter, so an operator can tell which part of
-// the route the module got wrong.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowModeReportsEachComparedField) {
-  setupTest(R"EOF(
-shadow_mode: {}
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  struct TestCase {
-    std::string field;
-    std::vector<std::pair<std::string, std::string>> headers;
-  };
-  const TestCase test_cases[] = {
-      {"route_kind", {{"x-decision", "select-template"}, {"x-template", "direct"}}},
-      {"cluster_name", {{"x-decision", "override"}, {"x-cluster", "canary"}}},
-      {"timeout", {{"x-decision", "override"}, {"x-timeout-ms", "9000"}}},
-      {"idle_timeout", {{"x-decision", "override"}, {"x-idle-timeout-ms", "9000"}}},
-      {"max_stream_duration", {{"x-decision", "override"}, {"x-max-stream-duration-ms", "9000"}}},
-      {"priority", {{"x-decision", "override"}, {"x-priority", "high"}}},
-      {"request_body_buffer_limit", {{"x-decision", "override"}, {"x-buffer-limit", "9999"}}},
-      {"cluster_not_found_response_code",
-       {{"x-decision", "override"}, {"x-not-found-code", "502"}}},
-      {"retry_policy", {{"x-decision", "override"}, {"x-override", "slow"}}},
-      {"metadata_match", {{"x-decision", "override"}, {"x-override", "matched"}}},
-      {"hash_policy", {{"x-decision", "override"}, {"x-override", "hashed"}, {"x-hash", "a"}}},
-      {"request_mirror_policies", {{"x-decision", "override"}, {"x-override", "mirrored"}}},
-      {"request_path", {{"x-decision", "override"}, {"x-set-path", "/rewritten"}}},
-      {"request_authority", {{"x-decision", "override"}, {"x-set-host", "upstream.local"}}},
-      {"request_headers", {{"x-decision", "override"}, {"x-add-request-header", "x-shadow=value"}}},
-      {"response_headers",
-       {{"x-decision", "override"}, {"x-add-response-header", "x-shadow=value"}}},
-      {"route_metadata", {{"x-decision", "override"}, {"x-route-meta-string", "value"}}},
-      {"hedge_policy", {{"x-decision", "select-template"}, {"x-template", "hedged"}}},
-      {"rate_limit_policy", {{"x-decision", "override"}, {"x-override", "rated"}}},
-      {"cors", {{"x-decision", "override"}, {"x-override", "corsed"}}},
-      {"tracing", {{"x-decision", "select-template"}, {"x-template", "traced"}}},
-  };
-  for (const auto& test_case : test_cases) {
-    const std::string counter =
-        absl::StrCat("dynamicmodulescustom.route_specifier.test.shadow_mismatch_", test_case.field);
-    const uint64_t before = test_server_->counter(counter)->value();
-    auto response = sendRequest(test_case.headers);
-    EXPECT_EQ("200", response->headers().getStatusValue()) << test_case.field;
-    test_server_->waitForCounter(counter, testing::Gt(before));
-  }
-}
-
-// The properties only a route that answers the request directly has are compared against a
-// matched route of the same kind.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowModeComparesDirectResponseFields) {
-  setupTest(R"EOF(
-shadow_mode:
-  compare_fields:
-  - RESPONSE_CODE
-  - REDIRECT_LOCATION
-  - DIRECT_RESPONSE_BODY
-  - ROUTE_NAME
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // The matched route redirects to another host with the default status, the template uses a
-  // different host and status.
-  auto response =
-      codec_client_->makeHeaderOnlyRequest(requestHeaders({{":path", "/redirect"},
-                                                           {"x-decision", "select-template"},
-                                                           {"x-template", "redirect_found"}}));
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("301", response->headers().getStatusValue());
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_response_code", testing::Ge(1));
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_redirect_location",
-      testing::Ge(1));
-
-  // The matched route and the template answer with different bodies under different names.
-  response = codec_client_->makeHeaderOnlyRequest(requestHeaders(
-      {{":path", "/direct"}, {"x-decision", "select-template"}, {"x-template", "direct_body"}}));
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_direct_response_body",
-      testing::Ge(1));
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_route_name", testing::Ge(1));
-}
-
-// The comparison of the properties built from extensions runs their whole comparison, not only the
-// null check, when both routes carry them.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowModeComparesComplexEqualFields) {
-  setupTest(R"EOF(
-shadow_mode:
-  compare_fields: [HASH_POLICY, METADATA_MATCH, REQUEST_MIRROR_POLICIES]
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // The override reproduces the properties of the matched route, so the comparison holds.
-  auto response = codec_client_->makeHeaderOnlyRequest(requestHeaders(
-      {{":path", "/complex"}, {"x-decision", "override"}, {"x-override", "complex_match"}}));
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_match",
-                               testing::Ge(1));
-}
-
-// When the properties built from extensions differ, each is reported on its own mismatch counter.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowModeComparesComplexUnequalFields) {
-  setupTest(R"EOF(
-shadow_mode:
-  compare_fields: [HASH_POLICY, METADATA_MATCH, REQUEST_MIRROR_POLICIES]
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeHeaderOnlyRequest(requestHeaders(
-      {{":path", "/complex"}, {"x-decision", "override"}, {"x-override", "complex_diff"}}));
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_hash_policy", testing::Ge(1));
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_metadata_match", testing::Ge(1));
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_request_mirror_policies",
-      testing::Ge(1));
-
-  // A metadata match that differs in the number of criteria reaches the size check, a different
-  // rejection than a value that differs.
-  const uint64_t metadata_mismatches =
-      counterValue("dynamicmodulescustom.route_specifier.test.shadow_mismatch_metadata_match");
-  response = codec_client_->makeHeaderOnlyRequest(requestHeaders(
-      {{":path", "/complex"}, {"x-decision", "override"}, {"x-override", "complex_meta_size"}}));
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_metadata_match",
-      testing::Gt(metadata_mismatches));
-
-  // A mirror policy whose header mutations differ is compared through its header evaluator, past
-  // the comparison of its plain fields.
-  const uint64_t mirror_mismatches = counterValue(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_request_mirror_policies");
-  response = codec_client_->makeHeaderOnlyRequest(
-      requestHeaders({{":path", "/complex"},
-                      {"x-decision", "override"},
-                      {"x-override", "complex_mirror_headers"}}));
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_request_mirror_policies",
-      testing::Gt(mirror_mismatches));
-}
-
-// In shadow mode a decision that drops the route compares two absent routes, an equivalent outcome
-// because both are of the absent kind.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowModeComparesAbsentRoutes) {
-  setupTest(R"EOF(
-shadow_mode: {}
-)EOF",
-            /*chain_second_specifier=*/false, /*at_route_config_level=*/true);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // The authority matches no virtual host, so the input route is absent, and the decision drops the
-  // route too, so both routes compared are absent.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      requestHeaders({{":authority", "nomatch.example.com"}, {"x-decision", "no-route"}}));
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("404", response->headers().getStatusValue());
-  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_match",
-                               testing::Ge(1));
-}
-
-// Shadow mode also compares the filters named in its configuration, so an operator can watch a
-// filter the module does not itself disable.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowModeComparesConfiguredFilterNames) {
-  setupTest(R"EOF(
-shadow_mode:
-  compare_fields: [FILTER_DISABLED]
-  filter_names: [envoy.test.disabled]
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // The template disables the configured filter, which the matched route does not, so the filter
-  // named only in the configuration surfaces the difference even though the module disabled none.
-  auto response = sendRequest({{"x-decision", "select-template"}, {"x-template", "filter_off"}});
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter(
-      "dynamicmodulescustom.route_specifier.test.shadow_mismatch_filter_disabled", testing::Ge(1));
-}
-
-// A shadowed decision that produces an equivalent route is counted as a match.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowModeReportsMatch) {
-  setupTest(R"EOF(
-shadow_mode:
-  compare_fields: [ROUTE_KIND, CLUSTER_NAME]
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = sendRequest({{"x-decision", "override"}, {"x-cluster", "cluster_0"}});
-  EXPECT_EQ("200", response->headers().getStatusValue());
-
-  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_match",
-                               testing::Ge(1));
-  test_server_->waitForCounter("dynamicmodulescustom.shadow_results.outcome.match", testing::Ge(1));
-}
-
-// A shadowed pass through has nothing to compare, and is counted separately so that it does not
-// look like a match.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowModeReportsPassThrough) {
-  setupTest(R"EOF(
-shadow_mode: {}
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = sendRequest({});
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_pass_through",
-                               testing::Ge(1));
-}
-
-// A shadowed decision that cannot be honored is reported as a failure rather than as a mismatch.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowModeReportsFailure) {
-  setupTest(R"EOF(
-shadow_mode: {}
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = sendRequest({{"x-decision", "error"}});
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_failure",
-                               testing::Ge(1));
-  EXPECT_EQ(
-      0, test_server_->counter("dynamicmodulescustom.route_specifier.test.shadow_match")->value());
-  test_server_->waitForCounter("dynamicmodulescustom.shadow_results.outcome.failure",
                                testing::Ge(1));
 }
 
@@ -1229,6 +901,49 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RemovesHeaders) {
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_NE(nullptr, upstream_headers);
   EXPECT_EQ("", upstream_headers->get_("x-drop-me"));
+}
+
+// The example module shadows its routing in a dry run, counting a match when the cluster it would
+// route to is the cluster the matched route already names, and leaving routing unchanged.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowExampleDryRunCountsMatch) {
+  setupShadowExample(/*dry_run=*/true, "cluster_0");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("dynamicmodulescustom.shadow_match", testing::Ge(1));
+  // Routing is unchanged, so the request reaches the cluster the matched route names.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", testing::Ge(1));
+  EXPECT_EQ(0, counterValue("dynamicmodulescustom.shadow_mismatch"));
+}
+
+// A dry run counts a mismatch when the cluster the module would route to differs from the matched
+// route, and still leaves routing unchanged.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowExampleDryRunCountsMismatch) {
+  setupShadowExample(/*dry_run=*/true, "canary");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("dynamicmodulescustom.shadow_mismatch", testing::Ge(1));
+  // The dry run does not apply the decision, so the request still reaches the matched cluster.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", testing::Ge(1));
+  EXPECT_EQ(0, counterValue("cluster.canary.upstream_rq_200"));
+}
+
+// A wet run applies the decision, so the request reaches the cluster the module chose rather than
+// the one the matched route names.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowExampleWetRunApplies) {
+  setupShadowExample(/*dry_run=*/false, "canary");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.canary.upstream_rq_200", testing::Ge(1));
+  EXPECT_EQ(0, counterValue("cluster.cluster_0.upstream_rq_200"));
+  // A wet run applies the decision instead of counting, so the dry run counters are never created.
+  EXPECT_EQ(0, counterValue("dynamicmodulescustom.shadow_match"));
+  EXPECT_EQ(0, counterValue("dynamicmodulescustom.shadow_mismatch"));
 }
 
 } // namespace

@@ -143,12 +143,6 @@ TEST_F(DynamicModuleRouteSpecifierTest, FailurePolicyRequired) {
   EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr("failure_policy must be set")));
 }
 
-TEST_F(DynamicModuleRouteSpecifierTest, ShadowModeWithoutFailurePolicy) {
-  const auto config = loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      shadow_mode: {}
-)EOF"));
-  EXPECT_TRUE(config.ok());
-}
-
 TEST_F(DynamicModuleRouteSpecifierTest, DuplicateTemplateId) {
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
@@ -350,7 +344,7 @@ TEST_F(DynamicModuleRouteSpecifierTest, UnknownDecisionFailsClosed) {
 }
 
 // A virtual host that configures no routes at all is routed entirely by the module, which is how a
-// module owns the routing of a virtual host once shadow mode has validated it.
+// module owns the routing of a virtual host.
 TEST_F(DynamicModuleRouteSpecifierTest, RoutesVirtualHostWithoutRoutes) {
   envoy::config::route::v3::RouteConfiguration proto_config;
   TestUtility::loadFromYaml(R"EOF(
@@ -500,6 +494,15 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteEntryWrapperAccessors) {
   EXPECT_EQ("/rewritten",
             entry->currentUrlPathAfterRewrite(headers, formatter_context, stream_info_));
 
+  // The recorded scalar route entry overrides replace those of the route.
+  ASSERT_TRUE(entry->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::milliseconds(8000), *entry->idleTimeout());
+  ASSERT_TRUE(entry->maxStreamDuration().has_value());
+  EXPECT_EQ(std::chrono::milliseconds(9000), *entry->maxStreamDuration());
+  EXPECT_TRUE(entry->usingNewTimeouts());
+  EXPECT_EQ(4096, entry->requestBodyBufferLimit());
+  EXPECT_EQ(Envoy::Upstream::ResourcePriority::High, entry->priority());
+
   // Each recorded header mutation lands in the transform bucket of its append action, and the
   // removal in the remove list.
   const auto request_transforms = entry->requestHeaderTransforms(stream_info_, true);
@@ -523,6 +526,48 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteEntryWrapperAccessors) {
   // The typed accessor reads the same layered metadata, exercised for coverage since string
   // metadata has no typed representation to assert.
   static_cast<void>(route.route->typedMetadata());
+}
+
+// A decision that selects a declared route override applies its properties, so the route entry
+// wrapper reads each one from the override rather than from the route.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteEntryWrapperRouteOverrideAccessors) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_override", R"EOF(      failure_policy: PASS_THROUGH
+      specifier_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: select-override
+      route_overrides:
+      - override_id: applied
+        retry_policy: {retry_on: "5xx", num_retries: 3}
+        hedge_policy: {hedge_on_per_try_timeout: true}
+        hash_policy:
+        - header: {header_name: x-hash}
+        metadata_match:
+          filter_metadata:
+            envoy.lb: {version: canary}
+        rate_limits:
+        - actions: [{generic_key: {descriptor_value: rated}}]
+        cors:
+          allow_origin_string_match: [{exact: "example.com"}]
+        request_mirror_policies:
+        - cluster: canary
+)EOF"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  // Each property the override sets is read from the override rather than from the route.
+  ASSERT_NE(nullptr, entry->retryPolicy());
+  EXPECT_EQ(3, entry->retryPolicy()->numRetries());
+  EXPECT_TRUE(entry->hedgePolicy().hedgeOnPerTryTimeout());
+  EXPECT_NE(nullptr, entry->hashPolicy());
+  EXPECT_NE(nullptr, entry->metadataMatchCriteria());
+  EXPECT_FALSE(entry->rateLimitPolicy().empty());
+  EXPECT_NE(nullptr, entry->corsPolicy());
+  ASSERT_FALSE(entry->shadowPolicies().empty());
+  EXPECT_EQ("canary", entry->shadowPolicies()[0]->cluster());
 }
 
 // A decision that records only route metadata produces a route wrapper, whose metadata accessors

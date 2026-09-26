@@ -72,9 +72,6 @@ fn new_route_specifier_config_fn(
       let decisions_by_template_id = envoy_config
         .define_counter_vec("decisions_by_template", &["template"])
         .ok();
-      let shadow_results_id = envoy_config
-        .define_counter_vec("shadow_results", &["outcome"])
-        .ok();
       // A gauge and a histogram, each with a scalar and a labeled form, are defined here so the
       // gauge and histogram record paths can be driven per request through `x-metric-op`.
       let in_flight_id = envoy_config.define_gauge("in_flight").ok();
@@ -85,8 +82,12 @@ fn new_route_specifier_config_fn(
       let decision_micros_by_template_id = envoy_config
         .define_histogram_vec("decision_micros_by_template", &["template"])
         .ok();
-      // A second labeled gauge and histogram give `drive_metric_errors` a labeled id whose scalar
-      // form is absent, matching how the counter uses the labeled `shadow_results` for that error.
+      // A second labeled counter, gauge and histogram give `drive_metric_errors` a labeled id whose
+      // scalar form is absent, so a scalar call on that id finds a labeled metric rather than a
+      // scalar one.
+      let decisions_by_outcome_id = envoy_config
+        .define_counter_vec("decisions_by_outcome", &["outcome"])
+        .ok();
       let in_flight_by_outcome_id = envoy_config
         .define_gauge_vec("in_flight_by_outcome", &["outcome"])
         .ok();
@@ -126,7 +127,7 @@ fn new_route_specifier_config_fn(
         envoy_config,
         decisions_total_id,
         decisions_by_template_id,
-        shadow_results_id,
+        decisions_by_outcome_id,
         in_flight_id,
         in_flight_by_template_id,
         decision_micros_id,
@@ -143,7 +144,7 @@ struct TestRouteSpecifierConfig {
   envoy_config: Arc<dyn EnvoyRouteSpecifierConfig>,
   decisions_total_id: Option<EnvoyCounterId>,
   decisions_by_template_id: Option<EnvoyCounterVecId>,
-  shadow_results_id: Option<EnvoyCounterVecId>,
+  decisions_by_outcome_id: Option<EnvoyCounterVecId>,
   in_flight_id: Option<EnvoyGaugeId>,
   in_flight_by_template_id: Option<EnvoyGaugeVecId>,
   decision_micros_id: Option<EnvoyHistogramId>,
@@ -349,7 +350,7 @@ impl TestRouteSpecifierConfig {
     }
     // A scalar operation on a labeled id finds no scalar metric but a labeled one, so it is invalid
     // labels rather than not found.
-    if let Some(id) = self.shadow_results_id {
+    if let Some(id) = self.decisions_by_outcome_id {
       let _ = cfg.increment_counter(EnvoyCounterId(id.0), 1);
     }
     if let Some(id) = self.in_flight_by_outcome_id {
@@ -493,7 +494,6 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
     if let Some(name) = ctx.get_request_header("x-echo") {
       let value = match name.as_slice() {
         b"template-ids" => self.envoy_config.template_ids().join(","),
-        b"shadow-mode" => self.envoy_config.is_shadow_mode().to_string(),
         name => read_echoed_value(ctx, name),
       };
       let _ = ctx.add_response_header(
@@ -542,24 +542,5 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
         .increment_counter_vec(id, &[template_label.as_str()], 1);
     }
     decision
-  }
-
-  fn on_shadow_result(
-    &self,
-    _ctx: &RouteSpecifierContext,
-    _decision: RouteDecision,
-    failure: RouteFailure,
-    mismatches: ShadowMismatches,
-  ) {
-    let outcome = if failure != RouteFailure::None {
-      "failure"
-    } else if mismatches.is_match() {
-      "match"
-    } else {
-      "mismatch"
-    };
-    if let Some(id) = self.shadow_results_id {
-      let _ = self.envoy_config.increment_counter_vec(id, &[outcome], 1);
-    }
   }
 }

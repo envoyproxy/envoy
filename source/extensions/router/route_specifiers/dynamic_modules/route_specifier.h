@@ -34,23 +34,18 @@ namespace DynamicModules {
 
 using DynamicModuleRouteSpecifierProto =
     envoy::extensions::router::route_specifiers::dynamic_modules::v3::DynamicModuleRouteSpecifier;
-using ShadowModeProto =
-    envoy::extensions::router::route_specifiers::dynamic_modules::v3::ShadowMode;
 
 // Type aliases for function pointers resolved from the module.
 using OnRouteSpecifierConfigNewType = decltype(&envoy_dynamic_module_on_route_specifier_config_new);
 using OnRouteSpecifierConfigDestroyType =
     decltype(&envoy_dynamic_module_on_route_specifier_config_destroy);
 using OnRouteSpecifierOnRouteType = decltype(&envoy_dynamic_module_on_route_specifier_on_route);
-using OnRouteSpecifierShadowResultType =
-    decltype(&envoy_dynamic_module_on_route_specifier_shadow_result);
 
 // The default custom stat namespace which prepends all user-defined metrics.
 // This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
 constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
-// The statistics of a route specifier. The per property shadow mismatch counters are created
-// separately, from the names of the compared properties.
+// The statistics of a route specifier.
 #define ALL_DYNAMIC_MODULE_ROUTE_SPECIFIER_STATS(COUNTER, HISTOGRAM)                               \
   COUNTER(decision_pass_through)                                                                   \
   COUNTER(decision_override)                                                                       \
@@ -64,10 +59,6 @@ constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
   COUNTER(failure_override_without_route)                                                          \
   COUNTER(failure_override_on_non_route_entry)                                                     \
   COUNTER(failure_route_metadata)                                                                  \
-  COUNTER(shadow_match)                                                                            \
-  COUNTER(shadow_mismatch)                                                                         \
-  COUNTER(shadow_pass_through)                                                                     \
-  COUNTER(shadow_failure)                                                                          \
   HISTOGRAM(on_route_duration, Microseconds)                                                       \
   HISTOGRAM(specifier_duration, Microseconds)
 
@@ -131,13 +122,6 @@ struct RouteOverrides {
   bool hasRouteOverrides() const;
 };
 
-// Shadow mode settings. The compared properties are a bit set of CompareField values, matching the
-// mismatch mask the module is handed.
-struct ShadowSettings {
-  uint64_t compare_mask{0};
-  std::vector<std::string> filter_names;
-};
-
 // The runtime fraction the module is invoked for.
 struct RuntimeFraction {
   std::string key;
@@ -198,25 +182,20 @@ public:
   bool registerRouteTemplate(absl::string_view id, absl::string_view serialized_route);
 
   const std::deque<std::string>& templateIds() const { return template_ids_; }
-  const std::optional<ShadowSettings>& shadow() const { return shadow_; }
   const std::optional<RuntimeFraction>& runtimeFraction() const { return runtime_fraction_; }
   bool failClosed() const { return fail_closed_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Runtime::Loader& runtime() const { return runtime_; }
   TimeSource& timeSource() const { return time_source_; }
   RouteSpecifierStats& stats() const { return stats_; }
-  // The counter of the given compare field, which is only created for a compared field.
-  Stats::Counter* mismatchCounter(uint32_t compare_field) const;
 
   // The corresponding in-module route specifier configuration.
   envoy_dynamic_module_type_route_specifier_config_module_ptr in_module_config_{nullptr};
 
-  // The function pointers resolved from the module. The first three are guaranteed non-nullptr
-  // after newDynamicModuleRouteSpecifierConfig() succeeds, while the shadow result hook is optional
-  // and stays null when the module does not export it.
+  // The function pointers resolved from the module, guaranteed non-nullptr after
+  // newDynamicModuleRouteSpecifierConfig() succeeds.
   OnRouteSpecifierConfigDestroyType on_config_destroy_{nullptr};
   OnRouteSpecifierOnRouteType on_route_{nullptr};
-  OnRouteSpecifierShadowResultType on_shadow_result_{nullptr};
 
   // ----------------------------- Metrics Support -----------------------------
   // The shared registry holding all module-defined metrics.
@@ -251,7 +230,6 @@ private:
   // route templates Envoy builds with the route builder of the configuration.
   Envoy::Router::RouteBuilder* config_new_route_builder_{nullptr};
   bool config_new_validate_clusters_{false};
-  const std::optional<ShadowSettings> shadow_;
   const std::optional<RuntimeFraction> runtime_fraction_;
   const bool fail_closed_;
   Upstream::ClusterManager& cluster_manager_;
@@ -259,8 +237,6 @@ private:
   TimeSource& time_source_;
   const Stats::ScopeSharedPtr stats_scope_;
   mutable RouteSpecifierStats stats_;
-  // Indexed by CompareField value, null for a property that is not compared.
-  std::vector<Stats::Counter*> mismatch_counters_;
 };
 
 using DynamicModuleRouteSpecifierConfigSharedPtr =
@@ -282,8 +258,7 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
 /**
  * Per-decision context passed to the module as the route_specifier_context_envoy_ptr. It bundles
  * the request state the module reads and the decision it is building. Valid only for the duration
- * of a single envoy_dynamic_module_on_route_specifier_on_route or
- * envoy_dynamic_module_on_route_specifier_shadow_result call.
+ * of a single envoy_dynamic_module_on_route_specifier_on_route call.
  */
 struct RouteSpecifierContext {
   const DynamicModuleRouteSpecifierConfig& config;
@@ -291,8 +266,6 @@ struct RouteSpecifierContext {
   const Http::RequestHeaderMap& headers;
   const StreamInfo::StreamInfo& stream_info;
   const uint64_t random_value;
-  // False while the result of the decision is reported, where the setters do nothing.
-  bool setters_enabled{true};
   const DynamicModuleRouteSpecifierConfig::Template* selected_template{nullptr};
   // The selected template evaluated against the request, set when set_template succeeds so that the
   // getters reflect the route being produced. Null keeps the getters on the route matching
@@ -385,6 +358,25 @@ private:
   const Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack_;
 };
 
+// Why Envoy could not honor the decision of a module. There is one value per failure statistic of
+// the route specifier.
+enum class Failure {
+  // The decision was honored.
+  None,
+  // The module returned the Error decision.
+  ModuleError,
+  // The decision was SelectTemplate without a successful set_template.
+  TemplateNotSelected,
+  // The match of the selected template does not hold for the request.
+  TemplateMatchFailed,
+  // The decision was Override while route matching resolved no route.
+  OverrideWithoutRoute,
+  // Route entry overrides were recorded for a route that answers the request directly.
+  OverrideOnNonRouteEntry,
+  // The recorded route metadata was rejected by a typed metadata factory.
+  RouteMetadata,
+};
+
 /**
  * RouteSpecifier that delegates the route decision to a dynamic module.
  */
@@ -405,8 +397,7 @@ private:
   struct Decision {
     Envoy::Router::RouteConstSharedPtr route;
     Envoy::Router::OnRouteResultStatus status{Envoy::Router::OnRouteResultStatus::Continue};
-    envoy_dynamic_module_type_route_specifier_failure failure{
-        envoy_dynamic_module_type_route_specifier_failure_None};
+    Failure failure{Failure::None};
   };
 
   // decision is the raw value the module returned, which may be outside the known enum values.
@@ -414,10 +405,6 @@ private:
   // The route the module asked for, without the failure policy applied.
   Decision wrap(Envoy::Router::RouteConstSharedPtr route, RouteSpecifierContext& context,
                 Envoy::Router::OnRouteResultStatus status) const;
-  // The bit set of the properties that differ between the two routes.
-  uint64_t compare(const Envoy::Router::RouteConstSharedPtr& shadow_route,
-                   const RouteSpecifierContext& context,
-                   const std::vector<std::string>& module_filter_names) const;
 
   const DynamicModuleRouteSpecifierConfigSharedPtr config_;
 };

@@ -84,6 +84,8 @@ test_program(name = "cluster_specifier_integration_test")
 
 test_program(name = "route_specifier_integration_test")
 
+test_program(name = "route_specifier_shadow")
+
 test_program(name = "cluster_integration_test")
 
 test_program(name = "cluster_filter_state_test")

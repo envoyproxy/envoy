@@ -16147,12 +16147,11 @@ typedef const void* envoy_dynamic_module_type_route_specifier_config_module_ptr;
  * OWNERSHIP: Envoy owns the pointer.
  *
  * THREADING: This pointer is only valid on the worker thread handling the request, for the duration
- * of a single envoy_dynamic_module_on_route_specifier_on_route or
- * envoy_dynamic_module_on_route_specifier_shadow_result call, and it refers to storage that Envoy
- * reuses once the call returns. Route resolution runs concurrently on multiple worker threads, so
- * the module must not store this pointer, share it across threads, or use it after the hook
- * returns. Every envoy_dynamic_module_callback_route_specifier_* callback that takes it must be
- * called with this pointer from inside that hook.
+ * of a single envoy_dynamic_module_on_route_specifier_on_route call, and it refers to storage that
+ * Envoy reuses once the call returns. Route resolution runs concurrently on multiple worker
+ * threads, so the module must not store this pointer, share it across threads, or use it after the
+ * hook returns. Every envoy_dynamic_module_callback_route_specifier_* callback that takes it must
+ * be called with this pointer from inside that hook.
  */
 typedef void* envoy_dynamic_module_type_route_specifier_context_envoy_ptr;
 
@@ -16215,64 +16214,6 @@ typedef enum envoy_dynamic_module_type_route_specifier_header_append_action {
 } envoy_dynamic_module_type_route_specifier_header_append_action;
 
 /**
- * envoy_dynamic_module_type_route_specifier_failure is why Envoy could not honor the decision of a
- * module. It has one value per failure statistic of the route specifier.
- */
-typedef enum envoy_dynamic_module_type_route_specifier_failure {
-  // The decision was honored.
-  envoy_dynamic_module_type_route_specifier_failure_None = 0,
-  // The module returned the Error decision.
-  envoy_dynamic_module_type_route_specifier_failure_ModuleError = 1,
-  // The decision was SelectTemplate without a successful set_template.
-  envoy_dynamic_module_type_route_specifier_failure_TemplateNotSelected = 2,
-  // The match of the selected template does not hold for the request.
-  envoy_dynamic_module_type_route_specifier_failure_TemplateMatchFailed = 3,
-  // The decision was Override while route matching resolved no route.
-  envoy_dynamic_module_type_route_specifier_failure_OverrideWithoutRoute = 4,
-  // Route entry overrides were recorded for a route that answers the request directly.
-  envoy_dynamic_module_type_route_specifier_failure_OverrideOnNonRouteEntry = 5,
-  // The recorded route metadata was rejected by a typed metadata factory.
-  envoy_dynamic_module_type_route_specifier_failure_RouteMetadata = 6,
-} envoy_dynamic_module_type_route_specifier_failure;
-
-/**
- * envoy_dynamic_module_type_route_specifier_compare_field identifies one property that shadow mode
- * compares. This has 1:1 correspondence with the CompareField enum of the route specifier
- * configuration. Bit (1 << value) of the mismatch mask passed to
- * envoy_dynamic_module_on_route_specifier_shadow_result is set when the property differed, so
- * values stay below 64 and a module must ignore the bits it does not know.
- */
-typedef enum envoy_dynamic_module_type_route_specifier_compare_field {
-  envoy_dynamic_module_type_route_specifier_compare_field_RouteKind = 1,
-  envoy_dynamic_module_type_route_specifier_compare_field_ClusterName = 2,
-  envoy_dynamic_module_type_route_specifier_compare_field_Timeout = 3,
-  envoy_dynamic_module_type_route_specifier_compare_field_IdleTimeout = 4,
-  envoy_dynamic_module_type_route_specifier_compare_field_MaxStreamDuration = 5,
-  envoy_dynamic_module_type_route_specifier_compare_field_Priority = 6,
-  envoy_dynamic_module_type_route_specifier_compare_field_RequestBodyBufferLimit = 7,
-  envoy_dynamic_module_type_route_specifier_compare_field_ClusterNotFoundResponseCode = 8,
-  envoy_dynamic_module_type_route_specifier_compare_field_RetryPolicy = 9,
-  envoy_dynamic_module_type_route_specifier_compare_field_HedgePolicy = 10,
-  envoy_dynamic_module_type_route_specifier_compare_field_MetadataMatch = 11,
-  envoy_dynamic_module_type_route_specifier_compare_field_HashPolicy = 12,
-  envoy_dynamic_module_type_route_specifier_compare_field_RequestMirrorPolicies = 13,
-  envoy_dynamic_module_type_route_specifier_compare_field_RequestPath = 14,
-  envoy_dynamic_module_type_route_specifier_compare_field_RequestAuthority = 15,
-  envoy_dynamic_module_type_route_specifier_compare_field_RequestHeaders = 16,
-  envoy_dynamic_module_type_route_specifier_compare_field_ResponseHeaders = 17,
-  envoy_dynamic_module_type_route_specifier_compare_field_FilterDisabled = 18,
-  envoy_dynamic_module_type_route_specifier_compare_field_ResponseCode = 19,
-  envoy_dynamic_module_type_route_specifier_compare_field_RedirectLocation = 20,
-  envoy_dynamic_module_type_route_specifier_compare_field_VirtualHostName = 21,
-  envoy_dynamic_module_type_route_specifier_compare_field_RouteMetadata = 22,
-  envoy_dynamic_module_type_route_specifier_compare_field_DirectResponseBody = 23,
-  envoy_dynamic_module_type_route_specifier_compare_field_RouteName = 24,
-  envoy_dynamic_module_type_route_specifier_compare_field_RateLimitPolicy = 25,
-  envoy_dynamic_module_type_route_specifier_compare_field_Cors = 26,
-  envoy_dynamic_module_type_route_specifier_compare_field_Tracing = 27,
-} envoy_dynamic_module_type_route_specifier_compare_field;
-
-/**
  * envoy_dynamic_module_type_route_specifier_input_route holds the properties of the route the
  * module is resolving that are free to read, so that a module can take all of them in one call
  * instead of one call each. After a template is selected with
@@ -16320,8 +16261,8 @@ typedef struct envoy_dynamic_module_type_route_specifier_input_route {
  * specifier referencing this module is configured. The module should parse the configuration and
  * return a pointer to the in-module route specifier configuration. The
  * envoy_dynamic_module_callback_route_specifier_config_define_* callbacks that define metrics may
- * only be called from inside this hook. The callbacks that read the declared templates, route
- * overrides and shadow mode may be called from here or from the request path.
+ * only be called from inside this hook. The callbacks that read the declared templates and route
+ * overrides may be called from here or from the request path.
  *
  * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig object for the
  * corresponding config.
@@ -16361,9 +16302,7 @@ void envoy_dynamic_module_on_route_specifier_config_destroy(
  * so the module must treat the configuration as read-only and avoid shared mutable state. The call
  * is synchronous and cannot be time boxed, so the module must not block or perform I/O.
  *
- * Recorded overrides take effect only for the Override and SelectTemplate decisions. In shadow mode
- * the decision is compared with the route that route matching resolved and reported through
- * statistics and envoy_dynamic_module_on_route_specifier_shadow_result, but never used.
+ * Recorded overrides take effect only for the Override and SelectTemplate decisions.
  *
  * @param config_module_ptr is the pointer to the in-module route specifier configuration.
  * @param context_envoy_ptr is the pointer to the Envoy route decision context, valid only during
@@ -16373,31 +16312,6 @@ void envoy_dynamic_module_on_route_specifier_config_destroy(
 envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route_specifier_on_route(
     envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
-
-/**
- * envoy_dynamic_module_on_route_specifier_shadow_result is called in shadow mode right after
- * envoy_dynamic_module_on_route_specifier_on_route with the outcome of comparing the route of the
- * module with the route that route matching resolved. It lets a module report mismatches with the
- * request at hand. Envoy resolves this hook when the module is loaded and skips the call when the
- * module does not export it.
- *
- * The threading contract is the one of envoy_dynamic_module_on_route_specifier_on_route. The getter
- * callbacks may be used with the context and the setter callbacks do nothing.
- *
- * @param config_module_ptr is the pointer to the in-module route specifier configuration.
- * @param context_envoy_ptr is the pointer to the same route decision context, valid only during
- * this call.
- * @param decision is the decision the module returned.
- * @param failure is None when the decision was honored, and otherwise why it was not.
- * @param mismatch_mask has bit (1 << envoy_dynamic_module_type_route_specifier_compare_field) set
- * for every compared property that differed, so zero means the two routes were equivalent. It is
- * zero for the PassThrough decision, which has nothing to compare.
- */
-void envoy_dynamic_module_on_route_specifier_shadow_result(
-    envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
-    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_route_specifier_decision decision,
-    envoy_dynamic_module_type_route_specifier_failure failure, uint64_t mismatch_mask);
 
 // =============================================================================
 // Route Specifier Callbacks
@@ -16459,17 +16373,6 @@ envoy_dynamic_module_callback_route_specifier_config_get_template_kind(
 bool envoy_dynamic_module_callback_route_specifier_config_has_route_override(
     envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer override_id);
-
-/**
- * envoy_dynamic_module_callback_route_specifier_config_is_shadow_mode is called by the module to
- * check whether the route specifier runs in shadow mode. This may be called from the config hook or
- * from the request path.
- *
- * @param config_envoy_ptr is the pointer to the route specifier configuration.
- * @return true if the specifier runs in shadow mode, false otherwise.
- */
-bool envoy_dynamic_module_callback_route_specifier_config_is_shadow_mode(
-    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_route_specifier_config_register_route_template registers a route
@@ -17028,8 +16931,7 @@ bool envoy_dynamic_module_callback_route_specifier_get_selected_template_id(
 // ------------------- Route Specifier Callbacks - Decision --------------------
 
 // The setter callbacks record the decision of the module. They validate their arguments and record
-// nothing when an argument is rejected. Envoy copies every module buffer. They do nothing during
-// envoy_dynamic_module_on_route_specifier_shadow_result.
+// nothing when an argument is rejected. Envoy copies every module buffer.
 
 /**
  * envoy_dynamic_module_callback_route_specifier_set_template selects the route template the

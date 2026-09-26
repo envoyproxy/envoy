@@ -11101,13 +11101,6 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_has_route
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_is_shadow_mode(
-  _config_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
-) -> bool {
-  true
-}
-
-#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_register_route_template(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
   template_id: abi::envoy_dynamic_module_type_module_buffer,
@@ -11986,79 +11979,6 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route_recovers_from_panic() {
 }
 
 #[test]
-fn test_envoy_dynamic_module_on_route_specifier_shadow_result() {
-  static RESULT_SEEN: std::sync::Mutex<
-    Option<(
-      route_specifier::RouteDecision,
-      route_specifier::RouteFailure,
-      route_specifier::ShadowMismatches,
-    )>,
-  > = std::sync::Mutex::new(None);
-
-  struct TestRouteSpecifierConfig;
-  impl route_specifier::RouteSpecifierConfig for TestRouteSpecifierConfig {
-    fn on_route(
-      &self,
-      _ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
-      route_specifier::RouteDecision::Override
-    }
-    fn on_shadow_result(
-      &self,
-      _ctx: &route_specifier::RouteSpecifierContext,
-      decision: route_specifier::RouteDecision,
-      failure: route_specifier::RouteFailure,
-      mismatches: route_specifier::ShadowMismatches,
-    ) {
-      *RESULT_SEEN.lock().unwrap() = Some((decision, failure, mismatches));
-    }
-  }
-
-  let new_fn: NewRouteSpecifierConfigFunction = |_, _, _| Some(Box::new(TestRouteSpecifierConfig));
-  let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
-    std::ptr::null_mut(),
-    "test_route_specifier",
-    b"",
-    &new_fn,
-  );
-  let mismatch_mask = 1u64 << (route_specifier::CompareField::ClusterName as u32);
-  unsafe {
-    route_specifier::envoy_dynamic_module_on_route_specifier_shadow_result(
-      config_ptr,
-      std::ptr::null_mut(),
-      abi::envoy_dynamic_module_type_route_specifier_decision::Override,
-      abi::envoy_dynamic_module_type_route_specifier_failure::None,
-      mismatch_mask,
-    );
-  }
-  let (decision, failure, mismatches) = RESULT_SEEN.lock().unwrap().unwrap();
-  assert_eq!(route_specifier::RouteDecision::Override, decision);
-  assert_eq!(route_specifier::RouteFailure::None, failure);
-  assert!(!mismatches.is_match());
-  assert!(mismatches.contains(route_specifier::CompareField::ClusterName));
-  assert!(!mismatches.contains(route_specifier::CompareField::Timeout));
-  unsafe {
-    route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
-  }
-}
-
-#[test]
-fn test_route_specifier_shadow_mismatches() {
-  let mismatches = route_specifier::ShadowMismatches(0);
-  assert!(mismatches.is_match());
-  assert!(!mismatches.contains(route_specifier::CompareField::RouteKind));
-
-  let mismatches = route_specifier::ShadowMismatches(
-    (1u64 << (route_specifier::CompareField::RouteKind as u32))
-      | (1u64 << (route_specifier::CompareField::RouteName as u32)),
-  );
-  assert!(!mismatches.is_match());
-  assert!(mismatches.contains(route_specifier::CompareField::RouteKind));
-  assert!(mismatches.contains(route_specifier::CompareField::RouteName));
-  assert!(!mismatches.contains(route_specifier::CompareField::ClusterName));
-}
-
-#[test]
 fn test_route_specifier_context_reads_request_state() {
   let ctx = unsafe { route_specifier::RouteSpecifierContext::new(std::ptr::null_mut()) };
 
@@ -12422,7 +12342,6 @@ fn test_envoy_route_specifier_config_impl() {
   );
   assert!(config.has_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
   assert!(!config.has_route_override("unknown"));
-  assert!(config.is_shadow_mode());
   assert!(config.register_route_template("built", &[1, 2, 3]));
   assert!(!config.register_route_template("", &[1, 2, 3]));
   assert!(!config.register_route_template("built", &[]));

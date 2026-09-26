@@ -44,18 +44,6 @@ impl RouteDecision {
       Self::Error => abi::envoy_dynamic_module_type_route_specifier_decision::Error,
     }
   }
-
-  fn from_abi(value: abi::envoy_dynamic_module_type_route_specifier_decision) -> Self {
-    match value {
-      abi::envoy_dynamic_module_type_route_specifier_decision::PassThrough => Self::PassThrough,
-      abi::envoy_dynamic_module_type_route_specifier_decision::Override => Self::Override,
-      abi::envoy_dynamic_module_type_route_specifier_decision::SelectTemplate => {
-        Self::SelectTemplate
-      },
-      abi::envoy_dynamic_module_type_route_specifier_decision::NoRoute => Self::NoRoute,
-      _ => Self::Error,
-    }
-  }
 }
 
 /// Whether the route specifiers configured after this one run for the request.
@@ -133,97 +121,6 @@ impl HeaderAppendAction {
   }
 }
 
-/// Why Envoy could not honor the decision of a module.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RouteFailure {
-  /// The decision was honored.
-  None,
-  /// The module returned [`RouteDecision::Error`].
-  ModuleError,
-  /// The decision was [`RouteDecision::SelectTemplate`] without a successful template selection.
-  TemplateNotSelected,
-  /// The match of the selected template does not hold for the request.
-  TemplateMatchFailed,
-  /// The decision was [`RouteDecision::Override`] while route matching resolved no route.
-  OverrideWithoutRoute,
-  /// Route entry overrides were recorded for a route that answers the request directly.
-  OverrideOnNonRouteEntry,
-  /// The recorded route metadata was rejected by a typed metadata factory.
-  RouteMetadata,
-}
-
-impl RouteFailure {
-  fn from_abi(value: abi::envoy_dynamic_module_type_route_specifier_failure) -> Self {
-    match value {
-      abi::envoy_dynamic_module_type_route_specifier_failure::None => Self::None,
-      abi::envoy_dynamic_module_type_route_specifier_failure::ModuleError => Self::ModuleError,
-      abi::envoy_dynamic_module_type_route_specifier_failure::TemplateNotSelected => {
-        Self::TemplateNotSelected
-      },
-      abi::envoy_dynamic_module_type_route_specifier_failure::TemplateMatchFailed => {
-        Self::TemplateMatchFailed
-      },
-      abi::envoy_dynamic_module_type_route_specifier_failure::OverrideWithoutRoute => {
-        Self::OverrideWithoutRoute
-      },
-      abi::envoy_dynamic_module_type_route_specifier_failure::OverrideOnNonRouteEntry => {
-        Self::OverrideOnNonRouteEntry
-      },
-      abi::envoy_dynamic_module_type_route_specifier_failure::RouteMetadata => Self::RouteMetadata,
-    }
-  }
-}
-
-/// One property that shadow mode compares.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u32)]
-pub enum CompareField {
-  RouteKind = 1,
-  ClusterName = 2,
-  Timeout = 3,
-  IdleTimeout = 4,
-  MaxStreamDuration = 5,
-  Priority = 6,
-  RequestBodyBufferLimit = 7,
-  ClusterNotFoundResponseCode = 8,
-  RetryPolicy = 9,
-  HedgePolicy = 10,
-  MetadataMatch = 11,
-  HashPolicy = 12,
-  RequestMirrorPolicies = 13,
-  RequestPath = 14,
-  RequestAuthority = 15,
-  RequestHeaders = 16,
-  ResponseHeaders = 17,
-  FilterDisabled = 18,
-  ResponseCode = 19,
-  RedirectLocation = 20,
-  VirtualHostName = 21,
-  RouteMetadata = 22,
-  DirectResponseBody = 23,
-  RouteName = 24,
-  RateLimitPolicy = 25,
-  Cors = 26,
-  Tracing = 27,
-}
-
-/// The properties that differed between the route of the module and the route of the route table
-/// it is being validated against.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ShadowMismatches(pub u64);
-
-impl ShadowMismatches {
-  /// Whether the two routes were equivalent.
-  pub fn is_match(&self) -> bool {
-    self.0 == 0
-  }
-
-  /// Whether the given property differed.
-  pub fn contains(&self, field: CompareField) -> bool {
-    self.0 & (1u64 << (field as u32)) != 0
-  }
-}
-
 /// Convert a duration to the millisecond count the ABI takes, saturating instead of wrapping.
 fn duration_to_millis(duration: Duration) -> u64 {
   u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
@@ -274,9 +171,7 @@ pub struct InputRoute<'a> {
 ///
 /// It provides read access to the request, to the stream info and to the route that route matching
 /// resolved, and the setters that record the decision. A context is valid only for the duration of
-/// a single [`RouteSpecifierConfig::on_route`] or [`RouteSpecifierConfig::on_shadow_result`] call
-/// and must not be stored. The setters do nothing during the latter, where the decision has
-/// already been made.
+/// a single [`RouteSpecifierConfig::on_route`] call and must not be stored.
 pub struct RouteSpecifierContext {
   envoy_ptr: *mut c_void,
 }
@@ -1023,17 +918,6 @@ pub trait RouteSpecifierConfig: Send + Sync {
   /// so it must be able to reach a decision from the request and the stream info alone. The call
   /// is synchronous and cannot be time boxed, so it must not block or perform I/O.
   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision;
-
-  /// Report the outcome of comparing the route of the module with the route that route matching
-  /// resolved, in shadow mode. The default implementation does nothing.
-  fn on_shadow_result(
-    &self,
-    _ctx: &RouteSpecifierContext,
-    _decision: RouteDecision,
-    _failure: RouteFailure,
-    _mismatches: ShadowMismatches,
-  ) {
-  }
 }
 
 /// Envoy-side interface for the route specifier dynamic module.
@@ -1058,9 +942,6 @@ pub trait EnvoyRouteSpecifierConfig: Send + Sync {
 
   /// Whether a route override with the given override_id is declared.
   fn has_route_override(&self, override_id: &str) -> bool;
-
-  /// Whether the route specifier runs in shadow mode.
-  fn is_shadow_mode(&self) -> bool;
 
   /// Register a route template from a serialized `envoy.config.route.v3.Route`.
   ///
@@ -1245,10 +1126,6 @@ impl EnvoyRouteSpecifierConfig for EnvoyRouteSpecifierConfigImpl {
         crate::str_to_module_buffer(override_id),
       )
     }
-  }
-
-  fn is_shadow_mode(&self) -> bool {
-    unsafe { abi::envoy_dynamic_module_callback_route_specifier_config_is_shadow_mode(self.raw) }
   }
 
   fn register_route_template(&self, template_id: &str, serialized_route: &[u8]) -> bool {
@@ -1618,27 +1495,4 @@ ffi_export! {
   // A panic during resolution must not look like a decision, so fail closed and let Envoy apply
   // the configured failure policy.
   on_panic = abi::envoy_dynamic_module_type_route_specifier_decision::Error
-}
-
-ffi_export! {
-  /// # Safety
-  ///
-  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-  /// by the Envoy dynamic module ABI.
-  unsafe fn envoy_dynamic_module_on_route_specifier_shadow_result(
-    config_ptr: abi::envoy_dynamic_module_type_route_specifier_config_module_ptr,
-    context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
-    decision: abi::envoy_dynamic_module_type_route_specifier_decision,
-    failure: abi::envoy_dynamic_module_type_route_specifier_failure,
-    mismatch_mask: u64,
-  ) {
-    let config = &*(config_ptr as *const Box<dyn RouteSpecifierConfig>);
-    let ctx = unsafe { RouteSpecifierContext::new(context_envoy_ptr) };
-    config.on_shadow_result(
-      &ctx,
-      RouteDecision::from_abi(decision),
-      RouteFailure::from_abi(failure),
-      ShadowMismatches(mismatch_mask),
-    );
-  }
 }

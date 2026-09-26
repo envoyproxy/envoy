@@ -29,14 +29,6 @@ routeSpecifierContext(envoy_dynamic_module_type_route_specifier_context_envoy_pt
   return static_cast<RouteSpecifierContext*>(ptr);
 }
 
-// The context of a setter, or nullptr when the setters do nothing because the decision has already
-// been made.
-RouteSpecifierContext*
-settableContext(envoy_dynamic_module_type_route_specifier_context_envoy_ptr ptr) {
-  auto* context = routeSpecifierContext(ptr);
-  return context->setters_enabled ? context : nullptr;
-}
-
 DynamicModuleRouteSpecifierConfig*
 routeSpecifierConfig(envoy_dynamic_module_type_route_specifier_config_envoy_ptr ptr) {
   return static_cast<DynamicModuleRouteSpecifierConfig*>(ptr);
@@ -85,16 +77,13 @@ Envoy::Stats::StatNameTagVector buildTagsForRouteSpecifierMetric(
 }
 
 // Returns a mutable handle to the route metadata value the module is setting, creating the
-// namespace and key when they are absent, or nullptr when there is no settable context.
-Protobuf::Value* mutableRouteMetadataValue(RouteSpecifierContext* context,
+// namespace and key when they are absent.
+Protobuf::Value& mutableRouteMetadataValue(RouteSpecifierContext& context,
                                            envoy_dynamic_module_type_module_buffer ns,
                                            envoy_dynamic_module_type_module_buffer key) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  return &Envoy::Config::Metadata::mutableMetadataValue(context->overrides.route_metadata,
-                                                        std::string(toStringView(ns)),
-                                                        std::string(toStringView(key)));
+  return Envoy::Config::Metadata::mutableMetadataValue(context.overrides.route_metadata,
+                                                       std::string(toStringView(ns)),
+                                                       std::string(toStringView(key)));
 }
 
 bool knownAppendAction(envoy_dynamic_module_type_route_specifier_header_append_action action) {
@@ -108,8 +97,7 @@ bool knownAppendAction(envoy_dynamic_module_type_route_specifier_header_append_a
   return false;
 }
 
-bool recordHeaderMutation(RouteSpecifierContext* context,
-                          envoy_dynamic_module_type_module_buffer key,
+bool recordHeaderMutation(envoy_dynamic_module_type_module_buffer key,
                           envoy_dynamic_module_type_module_buffer value,
                           envoy_dynamic_module_type_route_specifier_header_append_action action,
                           std::vector<HeaderMutation>& mutations) {
@@ -120,23 +108,18 @@ bool recordHeaderMutation(RouteSpecifierContext* context,
       !Http::HeaderUtility::headerValueIsValid(value_view)) {
     return false;
   }
-  if (context != nullptr) {
-    mutations.push_back({Http::LowerCaseString(key_view), std::string(value_view), action});
-  }
+  mutations.push_back({Http::LowerCaseString(key_view), std::string(value_view), action});
   return true;
 }
 
-bool recordHeaderRemoval(RouteSpecifierContext* context,
-                         envoy_dynamic_module_type_module_buffer key,
+bool recordHeaderRemoval(envoy_dynamic_module_type_module_buffer key,
                          std::vector<Http::LowerCaseString>& removals) {
   const absl::string_view key_view = toStringView(key);
   if (key_view.empty() || absl::StartsWith(key_view, ":") ||
       !Http::HeaderUtility::headerNameIsValid(key_view)) {
     return false;
   }
-  if (context != nullptr) {
-    removals.emplace_back(key_view);
-  }
+  removals.emplace_back(key_view);
   return true;
 }
 
@@ -214,11 +197,6 @@ bool envoy_dynamic_module_callback_route_specifier_config_has_route_override(
     envoy_dynamic_module_type_module_buffer override_id) {
   return routeSpecifierConfig(config_envoy_ptr)->routeOverride(toStringView(override_id)) !=
          nullptr;
-}
-
-bool envoy_dynamic_module_callback_route_specifier_config_is_shadow_mode(
-    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr) {
-  return routeSpecifierConfig(config_envoy_ptr)->shadow().has_value();
 }
 
 bool envoy_dynamic_module_callback_route_specifier_config_register_route_template(
@@ -730,23 +708,19 @@ bool envoy_dynamic_module_callback_route_specifier_set_template(
     ENVOY_LOG_MISC(debug, "dynamic module route specifier selected unknown template '{}'", id);
     return false;
   }
-  if (context->setters_enabled) {
-    context->selected_template = route_template;
-    // Evaluate the template now so that the getters reflect the route being produced and the
-    // decision reuses it rather than matching a second time. A null result means the match did not
-    // hold, which resolve() turns into a template match failure.
-    context->selected_route =
-        route_template->route->match(context->headers, context->stream_info, context->random_value);
-  }
+  context->selected_template = route_template;
+  // Evaluate the template now so that the getters reflect the route being produced and the decision
+  // reuses it rather than matching a second time. A null result means the match did not hold, which
+  // resolve() turns into a template match failure.
+  context->selected_route =
+      route_template->route->match(context->headers, context->stream_info, context->random_value);
   return true;
 }
 
 void envoy_dynamic_module_callback_route_specifier_set_chain_status(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_route_specifier_chain_status status) {
-  if (auto* context = settableContext(context_envoy_ptr); context != nullptr) {
-    context->chain_status = status;
-  }
+  routeSpecifierContext(context_envoy_ptr)->chain_status = status;
 }
 
 bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
@@ -758,52 +732,43 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
     ENVOY_LOG_MISC(debug, "dynamic module route specifier rejected cluster '{}'", name);
     return false;
   }
-  if (context->setters_enabled) {
-    context->overrides.cluster_name.assign(name.data(), name.size());
-  }
+  context->overrides.cluster_name.assign(name.data(), name.size());
   return true;
 }
 
 void envoy_dynamic_module_callback_route_specifier_set_timeout(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     uint64_t timeout_ms) {
-  if (auto* context = settableContext(context_envoy_ptr); context != nullptr) {
-    context->overrides.timeout = toMilliseconds(timeout_ms);
-  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.timeout = toMilliseconds(timeout_ms);
 }
 
 void envoy_dynamic_module_callback_route_specifier_set_idle_timeout(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     uint64_t idle_timeout_ms) {
-  if (auto* context = settableContext(context_envoy_ptr); context != nullptr) {
-    context->overrides.idle_timeout = toMilliseconds(idle_timeout_ms);
-  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.idle_timeout =
+      toMilliseconds(idle_timeout_ms);
 }
 
 void envoy_dynamic_module_callback_route_specifier_set_max_stream_duration(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     uint64_t max_stream_duration_ms) {
-  if (auto* context = settableContext(context_envoy_ptr); context != nullptr) {
-    context->overrides.max_stream_duration = toMilliseconds(max_stream_duration_ms);
-  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.max_stream_duration =
+      toMilliseconds(max_stream_duration_ms);
 }
 
 void envoy_dynamic_module_callback_route_specifier_set_request_body_buffer_limit(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     uint64_t limit_bytes) {
-  if (auto* context = settableContext(context_envoy_ptr); context != nullptr) {
-    context->overrides.request_body_buffer_limit = limit_bytes;
-  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.request_body_buffer_limit = limit_bytes;
 }
 
 void envoy_dynamic_module_callback_route_specifier_set_priority(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_resource_priority priority) {
-  if (auto* context = settableContext(context_envoy_ptr); context != nullptr) {
-    context->overrides.priority = priority == envoy_dynamic_module_type_resource_priority_High
-                                      ? Upstream::ResourcePriority::High
-                                      : Upstream::ResourcePriority::Default;
-  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.priority =
+      priority == envoy_dynamic_module_type_resource_priority_High
+          ? Upstream::ResourcePriority::High
+          : Upstream::ResourcePriority::Default;
 }
 
 bool envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_response_code(
@@ -812,9 +777,8 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_respons
   if (status_code < 200 || status_code >= 600) {
     return false;
   }
-  if (auto* context = settableContext(context_envoy_ptr); context != nullptr) {
-    context->overrides.cluster_not_found_response_code = static_cast<Http::Code>(status_code);
-  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.cluster_not_found_response_code =
+      static_cast<Http::Code>(status_code);
   return true;
 }
 
@@ -828,9 +792,7 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_override(
                    toStringView(override_id));
     return false;
   }
-  if (context->setters_enabled) {
-    context->overrides.route_override = entry;
-  }
+  context->overrides.route_override = entry;
   return true;
 }
 
@@ -838,33 +800,24 @@ void envoy_dynamic_module_callback_route_specifier_set_route_metadata_string(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_module_buffer value) {
-  if (Protobuf::Value* target =
-          mutableRouteMetadataValue(settableContext(context_envoy_ptr), ns, key);
-      target != nullptr) {
-    target->set_string_value(std::string(toStringView(value)));
-  }
+  mutableRouteMetadataValue(*routeSpecifierContext(context_envoy_ptr), ns, key)
+      .set_string_value(std::string(toStringView(value)));
 }
 
 void envoy_dynamic_module_callback_route_specifier_set_route_metadata_number(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     double value) {
-  if (Protobuf::Value* target =
-          mutableRouteMetadataValue(settableContext(context_envoy_ptr), ns, key);
-      target != nullptr) {
-    target->set_number_value(value);
-  }
+  mutableRouteMetadataValue(*routeSpecifierContext(context_envoy_ptr), ns, key)
+      .set_number_value(value);
 }
 
 void envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     bool value) {
-  if (Protobuf::Value* target =
-          mutableRouteMetadataValue(settableContext(context_envoy_ptr), ns, key);
-      target != nullptr) {
-    target->set_bool_value(value);
-  }
+  mutableRouteMetadataValue(*routeSpecifierContext(context_envoy_ptr), ns, key)
+      .set_bool_value(value);
 }
 
 bool envoy_dynamic_module_callback_route_specifier_set_route_typed_metadata(
@@ -878,10 +831,8 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_typed_metadata(
   if (!any.ParseFromString(serialized)) {
     return false;
   }
-  if (context->setters_enabled) {
-    (*context->overrides.route_metadata.mutable_typed_filter_metadata())[std::string(name)] =
-        std::move(any);
-  }
+  (*context->overrides.route_metadata.mutable_typed_filter_metadata())[std::string(name)] =
+      std::move(any);
   return true;
 }
 
@@ -894,9 +845,7 @@ bool envoy_dynamic_module_callback_route_specifier_set_filter_disabled(
     ENVOY_LOG_MISC(debug, "dynamic module route specifier rejected filter '{}'", name);
     return false;
   }
-  if (context->setters_enabled) {
-    context->overrides.filter_disabled[std::string(name)] = disabled;
-  }
+  context->overrides.filter_disabled[std::string(name)] = disabled;
   return true;
 }
 
@@ -907,9 +856,7 @@ bool envoy_dynamic_module_callback_route_specifier_set_path(
   if (!absl::StartsWith(value, "/") || !Http::HeaderUtility::headerValueIsValid(value)) {
     return false;
   }
-  if (auto* context = settableContext(context_envoy_ptr); context != nullptr) {
-    context->overrides.path = std::string(value);
-  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.path = std::string(value);
   return true;
 }
 
@@ -920,9 +867,7 @@ bool envoy_dynamic_module_callback_route_specifier_set_host(
   if (value.empty() || !Http::HeaderUtility::authorityIsValid(value)) {
     return false;
   }
-  if (auto* context = settableContext(context_envoy_ptr); context != nullptr) {
-    context->overrides.host = std::string(value);
-  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.host = std::string(value);
   return true;
 }
 
@@ -930,46 +875,32 @@ bool envoy_dynamic_module_callback_route_specifier_add_request_header(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
     envoy_dynamic_module_type_route_specifier_header_append_action action) {
-  auto* context = settableContext(context_envoy_ptr);
   return recordHeaderMutation(
-      context, key, value, action,
-      context != nullptr
-          ? context->overrides.request_headers_to_add
-          : routeSpecifierContext(context_envoy_ptr)->overrides.request_headers_to_add);
+      key, value, action,
+      routeSpecifierContext(context_envoy_ptr)->overrides.request_headers_to_add);
 }
 
 bool envoy_dynamic_module_callback_route_specifier_remove_request_header(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key) {
-  auto* context = settableContext(context_envoy_ptr);
   return recordHeaderRemoval(
-      context, key,
-      context != nullptr
-          ? context->overrides.request_headers_to_remove
-          : routeSpecifierContext(context_envoy_ptr)->overrides.request_headers_to_remove);
+      key, routeSpecifierContext(context_envoy_ptr)->overrides.request_headers_to_remove);
 }
 
 bool envoy_dynamic_module_callback_route_specifier_add_response_header(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
     envoy_dynamic_module_type_route_specifier_header_append_action action) {
-  auto* context = settableContext(context_envoy_ptr);
   return recordHeaderMutation(
-      context, key, value, action,
-      context != nullptr
-          ? context->overrides.response_headers_to_add
-          : routeSpecifierContext(context_envoy_ptr)->overrides.response_headers_to_add);
+      key, value, action,
+      routeSpecifierContext(context_envoy_ptr)->overrides.response_headers_to_add);
 }
 
 bool envoy_dynamic_module_callback_route_specifier_remove_response_header(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key) {
-  auto* context = settableContext(context_envoy_ptr);
   return recordHeaderRemoval(
-      context, key,
-      context != nullptr
-          ? context->overrides.response_headers_to_remove
-          : routeSpecifierContext(context_envoy_ptr)->overrides.response_headers_to_remove);
+      key, routeSpecifierContext(context_envoy_ptr)->overrides.response_headers_to_remove);
 }
 
 } // extern "C"

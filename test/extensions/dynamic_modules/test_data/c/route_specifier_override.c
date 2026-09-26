@@ -5,8 +5,9 @@
 // This module records route overrides so that a test can read the delegating route wrappers
 // directly. The specifier config selects what is recorded: "route-only" records only route
 // metadata, "entry-no-meta" records only a cluster, "filter-only" records only a disabled filter,
-// and any other config records route entry overrides with metadata. The metadata-free modes let a
-// test reach the wrapper metadata accessors when no metadata pack is built.
+// "select-override" applies a route override declared in the configuration, and any other config
+// records route entry overrides with metadata. The metadata-free modes let a test reach the wrapper
+// metadata accessors when no metadata pack is built.
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
   return envoy_dynamic_modules_abi_version;
@@ -17,6 +18,7 @@ static char entry_mode;
 static char route_only_mode;
 static char entry_no_meta_mode;
 static char filter_only_mode;
+static char select_override_mode;
 
 static int config_is(envoy_dynamic_module_type_envoy_buffer config, const char* name) {
   const size_t length = strlen(name);
@@ -36,6 +38,9 @@ envoy_dynamic_module_on_route_specifier_config_new(
   if (config_is(config, "filter-only")) {
     return &filter_only_mode;
   }
+  if (config_is(config, "select-override")) {
+    return &select_override_mode;
+  }
   return &entry_mode;
 }
 
@@ -45,6 +50,14 @@ void envoy_dynamic_module_on_route_specifier_config_destroy(
 envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route_specifier_on_route(
     envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr) {
+  // Selecting a declared route override isolates the route entry override accessors from the other
+  // recorded overrides.
+  if (config_module_ptr == &select_override_mode) {
+    const envoy_dynamic_module_type_module_buffer override_id = {"applied", 7};
+    envoy_dynamic_module_callback_route_specifier_set_route_override(context_envoy_ptr,
+                                                                     override_id);
+    return envoy_dynamic_module_type_route_specifier_decision_Override;
+  }
   // The metadata-free modes skip metadata so a test can reach the wrapper metadata fallbacks.
   if (config_module_ptr != &entry_no_meta_mode && config_module_ptr != &filter_only_mode) {
     const envoy_dynamic_module_type_module_buffer ns = {"envoy.test.route", 16};
@@ -69,6 +82,13 @@ envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route
   }
   const envoy_dynamic_module_type_module_buffer path = {"/rewritten", 10};
   envoy_dynamic_module_callback_route_specifier_set_path(context_envoy_ptr, path);
+  // Record the scalar route entry overrides so a test can read them from the wrapper.
+  envoy_dynamic_module_callback_route_specifier_set_idle_timeout(context_envoy_ptr, 8000);
+  envoy_dynamic_module_callback_route_specifier_set_max_stream_duration(context_envoy_ptr, 9000);
+  envoy_dynamic_module_callback_route_specifier_set_request_body_buffer_limit(context_envoy_ptr,
+                                                                              4096);
+  envoy_dynamic_module_callback_route_specifier_set_priority(
+      context_envoy_ptr, envoy_dynamic_module_type_resource_priority_High);
   const envoy_dynamic_module_type_module_buffer value = {"value", 5};
   // Record a request header for each transform arm and a removal, so requestHeaderTransforms
   // exercises every arm of appendHeaderTransforms.
@@ -85,7 +105,8 @@ envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route
       context_envoy_ptr, overwrite_key, value,
       envoy_dynamic_module_type_route_specifier_header_append_action_OverwriteIfExistsOrAdd);
   const envoy_dynamic_module_type_module_buffer remove_key = {"x-remove", 8};
-  envoy_dynamic_module_callback_route_specifier_remove_request_header(context_envoy_ptr, remove_key);
+  envoy_dynamic_module_callback_route_specifier_remove_request_header(context_envoy_ptr,
+                                                                      remove_key);
   const envoy_dynamic_module_type_module_buffer response_key = {"x-added", 7};
   envoy_dynamic_module_callback_route_specifier_add_response_header(
       context_envoy_ptr, response_key, value,
