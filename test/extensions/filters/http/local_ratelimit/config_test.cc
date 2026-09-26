@@ -468,10 +468,9 @@ local_cluster_rate_limit: {}
   ASSERT_FALSE(share_provider_manager.expired());
 
   Event::PostCb posted;
-  EXPECT_CALL(context.dispatcher_, post(_))
-      .WillOnce([&posted](Event::PostCb callback) { posted = std::move(callback); })
-      // The share provider manager in turn posts its cluster membership callback handle.
-      .WillOnce([](Event::PostCb callback) { callback(); });
+  EXPECT_CALL(context.dispatcher_, post(_)).WillOnce([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  });
   config.reset();
   ASSERT_TRUE(posted != nullptr);
   EXPECT_FALSE(share_provider_manager.expired());
