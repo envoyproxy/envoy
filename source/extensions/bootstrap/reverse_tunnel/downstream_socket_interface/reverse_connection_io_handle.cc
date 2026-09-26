@@ -111,9 +111,7 @@ void ReverseConnectionIOHandle::cleanup() {
                  "reverse_tunnel: resetting file events before closing trigger pipe; "
                  "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
                  trigger_pipe_write_fd_, trigger_pipe_read_fd_);
-  // The worker dispatcher is destroyed before this handle during server teardown.
-  worker_dispatcher_ = nullptr;
-  resetFileEvents();
+  IoSocketHandleImpl::resetFileEvents();
   SET_SOCKET_INVALID(trigger_pipe_read_fd_);
 
   // Clean up pipe trigger mechanism first to prevent use-after-free.
@@ -221,6 +219,11 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
 
   // Call parent implementation.
   IoSocketHandleImpl::initializeFileEvent(dispatcher, cb, trigger, events);
+
+  if (!extension_ || !extension_->getLocalRegistry()) {
+    return;
+  }
+  extension_->getLocalRegistry()->registerIoHandle(this);
 }
 
 Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* addr,
@@ -406,28 +409,28 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
 }
 
 void ReverseConnectionIOHandle::resetFileEvents() {
-  // Stop redials on the timer's worker before the listener closes.
-  if (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe()) {
-    rev_conn_retry_timer_.reset();
-  }
-
-  // Handshake connections have their own file events. Tear them down on this worker so
-  // main-thread close()/destructor does not destroy in-flight codecs. Skip when
-  // worker_dispatcher_ is null (cleanup() after workers are gone).
-  if (worker_dispatcher_ != nullptr && worker_dispatcher_->isThreadSafe()) {
-    conn_wrapper_to_host_map_.clear();
-    std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
-    connection_wrappers_.clear();
-    for (auto& wrapper : wrappers) {
-      if (wrapper == nullptr) {
-        continue;
-      }
-      wrapper->shutdown();
-      worker_dispatcher_->deferredDelete(std::move(wrapper));
-    }
-  }
-
   IoSocketHandleImpl::resetFileEvents();
+  rev_conn_retry_timer_.reset();
+
+  if (!worker_dispatcher_ || !worker_dispatcher_->isThreadSafe()) {
+    return;
+  }
+
+  conn_wrapper_to_host_map_.clear();
+  std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
+  connection_wrappers_.clear();
+  for (auto& wrapper : wrappers) {
+    if (wrapper == nullptr) {
+      continue;
+    }
+    wrapper->shutdown();
+    worker_dispatcher_->deferredDelete(std::move(wrapper));
+  }
+
+  if (!extension_ || !extension_->getLocalRegistry()) {
+    return;
+  }
+  extension_->getLocalRegistry()->unregisterIoHandle(this);
 }
 
 void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
