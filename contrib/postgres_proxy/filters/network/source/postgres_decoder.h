@@ -44,6 +44,10 @@ public:
 
   virtual void processQuery(const std::string&) PURE;
 
+  virtual bool authorizationEnabled() const PURE;
+  virtual bool authorizeStartup() PURE;
+  virtual void rejectStartup(absl::string_view log_policy_id) PURE;
+  virtual bool shouldPassthroughSSL() const PURE;
   virtual bool onSSLRequest() PURE;
   virtual bool shouldEncryptUpstream() const PURE;
   virtual void sendUpstream(Buffer::Instance&) PURE;
@@ -101,7 +105,8 @@ public:
     InSyncState,
     OutOfSyncState,
     EncryptedState,
-    NegotiatingUpstreamSSL
+    NegotiatingUpstreamSSL,
+    RejectedState
   };
   State state() const { return state_; }
   void state(State state) { state_ = state; }
