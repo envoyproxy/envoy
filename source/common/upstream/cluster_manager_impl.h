@@ -1,10 +1,10 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <functional>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -43,6 +43,7 @@
 #include "source/common/upstream/upstream_impl.h"
 
 #include "absl/container/btree_map.h"
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -597,6 +598,23 @@ private:
           connections_;
     };
 
+    // Params for an HTTP pool this worker has used.
+    struct HttpConnPoolParams {
+      HttpConnPoolParams(
+          const std::vector<uint8_t>& hash_key,
+          const Network::Socket::OptionsSharedPtr& upstream_options,
+          const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+          std::optional<Http::Protocol> downstream_protocol, ResourcePriority priority)
+          : hash_key_(hash_key), upstream_options_(upstream_options),
+            transport_socket_options_(transport_socket_options),
+            downstream_protocol_(downstream_protocol), priority_(priority) {}
+      std::vector<uint8_t> hash_key_;
+      Network::Socket::OptionsSharedPtr upstream_options_;
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
+      std::optional<Http::Protocol> downstream_protocol_;
+      ResourcePriority priority_{ResourcePriority::Default};
+    };
+
     class ClusterEntry : public ThreadLocalCluster {
     public:
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
@@ -656,6 +674,8 @@ private:
       void setDropCategory(absl::string_view drop_category) override {
         drop_category_ = drop_category;
       }
+      // Records `params` if new and bootstraps connections for every current host.
+      void onHttpConnPoolUsed(const HttpConnPoolParams& params);
 
     private:
       // Applies a batch of per-priority host updates to the cluster entry's priority set via
@@ -689,10 +709,8 @@ private:
         const HostMapConstSharedPtr cross_priority_host_map_;
       };
 
-      Http::ConnectionPool::Instance*
-      httpConnPoolImpl(HostConstSharedPtr host, ResourcePriority priority,
-                       std::optional<Http::Protocol> downstream_protocol,
-                       LoadBalancerContext* context);
+      Http::ConnectionPool::Instance* httpConnPoolImpl(HostConstSharedPtr host,
+                                                       const HttpConnPoolParams& params);
 
       Tcp::ConnectionPool::Instance* tcpConnPoolImpl(HostConstSharedPtr host,
                                                      ResourcePriority priority,
@@ -717,6 +735,24 @@ private:
       // Stores QUICHE specific objects which live through out the life time of the cluster and can
       // be shared across its hosts.
       Http::PersistentQuicInfoPtr quic_info_;
+
+      // Returns true if `params` was newly recorded.
+      bool maybeAddHttpConnPoolParams(const HttpConnPoolParams& params);
+      // Schedules a bootstrap connection for host using params, delayed by random jitter
+      // if eager_preconnect_floor_jitter is configured.
+      void scheduleBootstrapPreconnectFloor(const HostConstSharedPtr& host,
+                                            const HttpConnPoolParams& params);
+      // Opens a bootstrap connection for host using params.
+      void maybeBootstrapPreconnectFloor(const HostConstSharedPtr& host,
+                                         const HttpConnPoolParams& params);
+      // Opens a bootstrap connection for every current host using params.
+      void maybeBootstrapPreconnectFloor(const HttpConnPoolParams& params);
+      // Opens a bootstrap connection for every host in hosts using locally stored params.
+      void maybeBootstrapPreconnectFloor(const HostVector& hosts);
+      // Opens a bootstrap connection for host using locally stored params.
+      void maybeBootstrapPreconnectFloor(const HostConstSharedPtr& host);
+      bool hostEligibleForPreconnectFloor(const HostConstSharedPtr& host) const;
+      std::list<Event::TimerPtr> bootstrap_timers_;
 
       // Expected override host statues. Every bit in the HostStatusSet represent an enum value
       // of envoy::config::core::v3::HealthStatus. The specific correspondence is shown below:
@@ -771,6 +807,8 @@ private:
     // Upstream::ClusterLifecycleCallbackHandler
     ClusterUpdateCallbacksHandlePtr addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) override;
 
+    // Returns the inflated ClusterEntry for `cluster`, if one exists.
+    OptRef<ClusterEntry> getClusterEntry(absl::string_view cluster);
     /**
      * Transparently initialize the given thread local cluster if possible using
      * the Cluster Initialization object.
@@ -807,6 +845,9 @@ private:
     absl::node_hash_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
     absl::node_hash_map<HostConstSharedPtr, TcpConnPoolsContainer> host_tcp_conn_pool_map_;
     absl::node_hash_map<HostConstSharedPtr, TcpConnectionsMap> host_tcp_conn_map_;
+    // HTTP pool templates used, keyed by cluster name. Persisted on ClusterEntry recreation.
+    absl::flat_hash_map<std::string, absl::InlinedVector<HttpConnPoolParams, 1>>
+        http_conn_pool_params_;
 
     std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
@@ -947,6 +988,9 @@ private:
                                              bool avoid_cds_removal = false);
   absl::Status onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
+  void
+  postThreadLocalHttpConnPoolUsed(const std::string& cluster_name,
+                                  const ThreadLocalClusterManagerImpl::HttpConnPoolParams& params);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
   static void maybePreconnect(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
