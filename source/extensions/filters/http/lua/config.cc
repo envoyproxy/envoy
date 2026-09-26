@@ -18,7 +18,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> LuaFilterConfig::createHttpFilterFa
   absl::Status creation_status = absl::OkStatus();
   FilterConfigConstSharedPtr filter_config(
       new FilterConfig{proto_config, context.threadLocal(), context.clusterManager(), context.api(),
-                       extra_context.scopeOr(context), extra_context.stats_prefix,
+                       extra_context.statsPrefixScopeOr(context), extra_context.statsPrefixOr(),
                        context.options().concurrency(), creation_status});
   RETURN_IF_NOT_OK_REF(creation_status);
   auto& time_source = context.mainThreadDispatcher().timeSource();

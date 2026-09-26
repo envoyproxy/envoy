@@ -130,9 +130,9 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createHttpFilterFa
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
     Server::Configuration::ServerFactoryContext& server_context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactoryFromProtoHelper(proto_config, extra_context.stats_prefix,
-                                            server_context, extra_context.scopeOr(server_context),
-                                            extra_context.is_upstream);
+  return createFilterFactoryFromProtoHelper(
+      proto_config, extra_context.statsPrefixOr(), server_context,
+      extra_context.statsPrefixScopeOr(server_context), extra_context.is_upstream);
 }
 
 /*

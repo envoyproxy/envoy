@@ -1797,7 +1797,11 @@ FilterConfig::FilterConfig(
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
-      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))),
+      // The metrics that the Go plugin defines itself are named by the plugin alone and are not
+      // related to the stat prefix of this filter, so they live in a scope of their own that is
+      // created from the server's scope rather than from the scope of this context.
+      metric_store_(
+          std::make_shared<MetricStore>(context.serverFactoryContext().scope().createScope(""))),
       secret_reader_(std::make_shared<SecretReader>(proto_config, context)) {};
 
 absl::Status FilterConfig::newGoPluginConfig() {

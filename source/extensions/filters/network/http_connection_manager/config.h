@@ -15,6 +15,7 @@
 #include "envoy/http/early_header_mutation.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_validator.h"
+#include "envoy/http/http_filter_factory_context.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -302,6 +303,11 @@ private:
   const std::string stats_prefix_;
   // The 'http.<stat_prefix>.' scope in which this connection manager creates its stats.
   const Stats::ScopeSharedPtr http_scope_;
+  // The factory context that the HTTP filters are created with. Only created when the
+  // 'use_stats_prefix_scope_for_http_filter' runtime feature is enabled, the network filter chain's
+  // own factory context is used otherwise. Declared before the filter factories because the filter
+  // config providers keep a reference to it and it must outlive them.
+  const Http::HttpFilterFactoryContextPtr http_filter_factory_context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
   AccessLog::InstanceSharedPtrVector access_logs_;
