@@ -3,13 +3,23 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Return;
 using testing::ReturnPointee;
 
 namespace Envoy {
 namespace Tracing {
 
-MockSpan::MockSpan() { ON_CALL(*this, exportedSpan()).WillByDefault(Return(true)); }
+MockSpan::MockSpan() {
+  ON_CALL(*this, exportedSpan()).WillByDefault(Return(true));
+  // Mirror the production Span::setTypedTag default, which records the value via setTag(). This
+  // keeps expectations written against setTag() working for tags that do not exercise
+  // typed-attribute behavior.
+  ON_CALL(*this, setTypedTag(_, _, _))
+      .WillByDefault([this](absl::string_view name, absl::string_view value, TagValueType) {
+        setTag(name, value);
+      });
+}
 MockSpan::~MockSpan() = default;
 
 MockConfig::MockConfig() {

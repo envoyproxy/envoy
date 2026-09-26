@@ -15,6 +15,13 @@ class Span;
 using SpanPtr = std::unique_ptr<Span>;
 
 /**
+ * The desired value type for a typed span tag. Tracers that support typed span
+ * attributes (e.g. OpenTelemetry) may emit the tag as a native attribute of this
+ * type; tracers without such support keep treating the value as a string.
+ */
+enum class TagValueType { String, Int, Double, Bool };
+
+/**
  * The upstream service type.
  */
 enum class ServiceType {
@@ -74,6 +81,24 @@ public:
    * @param value the value to associate with the tag
    */
   virtual void setTag(absl::string_view name, absl::string_view value) PURE;
+
+  /**
+   * Attach a typed tag to a Span.
+   *
+   * The value is provided as its string representation together with the desired
+   * type. The default implementation ignores the type and records the original
+   * string via setTag(), so tracers without typed-attribute support keep their
+   * existing behavior and never rewrite the value. Tracers such as OpenTelemetry
+   * override this to emit a native typed span attribute when the value parses,
+   * falling back to a string tag otherwise.
+   * @param name the name of the tag
+   * @param value the string representation of the tag value
+   * @param type the desired value type
+   */
+  virtual void setTypedTag(absl::string_view name, absl::string_view value,
+                           TagValueType /* type */) {
+    setTag(name, value);
+  }
 
   /**
    * Reserve capacity for additional tags.
