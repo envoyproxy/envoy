@@ -74,13 +74,6 @@ declared override changing something.
 Notes
 -----
 
-* The module may only select the clusters that
-  :ref:`allowed_cluster_names <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.allowed_cluster_names>`
-  accepts, may only disable the filters that
-  :ref:`allowed_filter_names <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.allowed_filter_names>`
-  accepts, and may only write the metadata namespaces that
-  :ref:`allowed_metadata_namespaces <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.allowed_metadata_namespaces>`
-  accepts. Without a list any name is accepted, so configure the ones the module needs.
 * The request headers are read-only. A recorded path, authority or header mutation is applied
   through the header transforms of the route the decision produces, so that Envoy applies it at the
   right point of the request lifetime.
@@ -162,8 +155,6 @@ Configuration example
               route:
                 cluster: canary_service
                 timeout: 5s
-          allowed_cluster_names:
-          - prefix: shard-
       routes:
       - match:
           prefix: "/"

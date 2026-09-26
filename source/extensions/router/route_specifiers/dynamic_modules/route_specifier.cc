@@ -138,17 +138,6 @@ buildRouteOverride(const RouteOverrideProto& proto_override,
   return entry;
 }
 
-std::vector<Matchers::StringMatcherPtr> buildStringMatchers(
-    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& matchers,
-    Server::Configuration::ServerFactoryContext& context) {
-  std::vector<Matchers::StringMatcherPtr> result;
-  result.reserve(matchers.size());
-  for (const auto& matcher : matchers) {
-    result.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
-  }
-  return result;
-}
-
 std::optional<ShadowSettings> buildShadowSettings(const DynamicModuleRouteSpecifierProto& config) {
   if (!config.has_shadow_mode()) {
     return std::nullopt;
@@ -290,12 +279,6 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
           absl::StrCat(metrics_namespace, "."))),
       metrics_(*metrics_scope_), dynamic_module_(std::move(dynamic_module)),
       specifier_name_(proto_config.specifier_name()), specifier_config_(specifier_config),
-      allowed_cluster_names_(buildStringMatchers(proto_config.allowed_cluster_names(),
-                                                 context.serverFactoryContext())),
-      allowed_filter_names_(
-          buildStringMatchers(proto_config.allowed_filter_names(), context.serverFactoryContext())),
-      allowed_metadata_namespaces_(buildStringMatchers(proto_config.allowed_metadata_namespaces(),
-                                                       context.serverFactoryContext())),
       shadow_(buildShadowSettings(proto_config)),
       runtime_fraction_(buildRuntimeFraction(proto_config)),
       fail_closed_(proto_config.failure_policy() ==
@@ -363,31 +346,6 @@ bool DynamicModuleRouteSpecifierConfig::registerRouteTemplate(absl::string_view 
   templates_.emplace(std::string(id), Template{std::string(id), std::move(built.value()), kind});
   template_ids_.emplace_back(id);
   return true;
-}
-
-namespace {
-
-// An empty allowlist accepts every name.
-bool allowed(const std::vector<Matchers::StringMatcherPtr>& matchers, absl::string_view name) {
-  if (matchers.empty()) {
-    return true;
-  }
-  return std::any_of(matchers.begin(), matchers.end(),
-                     [name](const auto& matcher) { return matcher->match(name); });
-}
-
-} // namespace
-
-bool DynamicModuleRouteSpecifierConfig::clusterNameAllowed(absl::string_view name) const {
-  return allowed(allowed_cluster_names_, name);
-}
-
-bool DynamicModuleRouteSpecifierConfig::metadataNamespaceAllowed(absl::string_view name) const {
-  return allowed(allowed_metadata_namespaces_, name);
-}
-
-bool DynamicModuleRouteSpecifierConfig::filterNameAllowed(absl::string_view name) const {
-  return allowed(allowed_filter_names_, name);
 }
 
 Stats::Counter* DynamicModuleRouteSpecifierConfig::mismatchCounter(uint32_t compare_field) const {

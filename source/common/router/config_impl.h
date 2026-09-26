@@ -222,31 +222,6 @@ class CommonVirtualHostImpl;
 using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
 
 /**
- * Creates the route entries of a virtual host from their configuration.
- */
-class RouteCreator {
-public:
-  /**
-   * @param route_config the route configuration.
-   * @param vhost the virtual host the route belongs to.
-   * @param factory_context the server factory context.
-   * @param validator the validation visitor used to translate nested configuration.
-   * @param init_manager the init manager the resources of the route warm up with. Only valid while
-   *        the route configuration is being constructed and must never be stored.
-   * @param validate_clusters whether the clusters the route names are looked up in the cluster
-   *        manager.
-   * @return the route entry, or an error status if the configuration is invalid.
-   * @throw EnvoyException if the configuration of a nested extension is invalid.
-   */
-  static absl::StatusOr<RouteEntryImplBaseConstSharedPtr>
-  createAndValidateRoute(const envoy::config::route::v3::Route& route_config,
-                         const CommonVirtualHostSharedPtr& vhost,
-                         Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-                         bool validate_clusters);
-};
-
-/**
  * Builds routes of a virtual host for the route specifiers configured on it.
  */
 class RouteBuilderImpl : public RouteBuilder {

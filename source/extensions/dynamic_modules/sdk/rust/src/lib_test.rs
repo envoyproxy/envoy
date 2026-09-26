@@ -11643,7 +11643,7 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_metada
   ns: abi::envoy_dynamic_module_type_module_buffer,
   key: abi::envoy_dynamic_module_type_module_buffer,
   value: abi::envoy_dynamic_module_type_module_buffer,
-) -> bool {
+) {
   STUB_ROUTE_DECISION.lock().unwrap().route_metadata_string = Some(unsafe {
     (
       stub_specifier_string(ns),
@@ -11651,7 +11651,6 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_metada
       stub_specifier_string(value),
     )
   });
-  true
 }
 
 #[no_mangle]
@@ -11660,10 +11659,9 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_metada
   ns: abi::envoy_dynamic_module_type_module_buffer,
   key: abi::envoy_dynamic_module_type_module_buffer,
   value: f64,
-) -> bool {
+) {
   STUB_ROUTE_DECISION.lock().unwrap().route_metadata_number =
     Some(unsafe { (stub_specifier_string(ns), stub_specifier_string(key), value) });
-  true
 }
 
 #[no_mangle]
@@ -11672,10 +11670,9 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_metada
   ns: abi::envoy_dynamic_module_type_module_buffer,
   key: abi::envoy_dynamic_module_type_module_buffer,
   value: bool,
-) -> bool {
+) {
   STUB_ROUTE_DECISION.lock().unwrap().route_metadata_bool =
     Some(unsafe { (stub_specifier_string(ns), stub_specifier_string(key), value) });
-  true
 }
 
 #[no_mangle]
@@ -12277,9 +12274,9 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_cluster_not_found_response_code(99));
   assert!(ctx.set_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
   assert!(!ctx.set_route_override("unknown"));
-  assert!(ctx.set_route_metadata_string("ns", "key", "value"));
-  assert!(ctx.set_route_metadata_number("ns", "num", 1.5));
-  assert!(ctx.set_route_metadata_bool("ns", "flag", true));
+  ctx.set_route_metadata_string("ns", "key", "value");
+  ctx.set_route_metadata_number("ns", "num", 1.5);
+  ctx.set_route_metadata_bool("ns", "flag", true);
   assert!(ctx.set_route_typed_metadata("ns", b"serialized"));
   assert!(ctx.set_filter_disabled("filter", true));
   assert!(!ctx.set_filter_disabled("", true));

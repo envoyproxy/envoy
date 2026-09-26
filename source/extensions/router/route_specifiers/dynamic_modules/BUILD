@@ -28,7 +28,6 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:matchers_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:statusor_lib",
         "//source/common/common:thread_lib",

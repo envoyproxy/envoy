@@ -2116,18 +2116,20 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_override
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
-WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool, false,
-          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
-          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, bool)
+WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool,
+               envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+               envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+               bool)
 
-WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_metadata_number, false,
-          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
-          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, double)
+WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_route_metadata_number,
+               envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+               envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+               double)
 
-WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_metadata_string, false,
-          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
-          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
-          envoy_dynamic_module_type_module_buffer)
+WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_route_metadata_string,
+               envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+               envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+               envoy_dynamic_module_type_module_buffer)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_typed_metadata, false,
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,

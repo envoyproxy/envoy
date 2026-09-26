@@ -395,7 +395,7 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
     }
 
     if let Some(cluster_name) = ctx.get_request_header("x-cluster") {
-      // Tests also pass names the allowlist rejects, so a miss is expected here.
+      // Tests also pass an empty value, so a rejection is expected here.
       let _ = ctx.set_cluster_name(&buffer_to_string(cluster_name));
     }
     if let Some(timeout_ms) = read_u64_header(ctx, "x-timeout-ms") {
@@ -455,13 +455,13 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
       let _ = ctx.remove_response_header(&buffer_to_string(key));
     }
     if let Some(filter_name) = ctx.get_request_header("x-filter-disabled") {
+      // Tests also pass an empty value, so a rejection is expected here.
       let _ = ctx.set_filter_disabled(&buffer_to_string(filter_name), true);
     }
 
     // Route metadata setters, each guarded by its own header so a test can drive them in isolation.
     if let Some(value) = ctx.get_request_header("x-route-meta-string") {
-      let _ =
-        ctx.set_route_metadata_string("envoy.test.route", "string_key", &buffer_to_string(value));
+      ctx.set_route_metadata_string("envoy.test.route", "string_key", &buffer_to_string(value));
     }
     if let Some(value) = ctx
       .get_request_header("x-route-meta-number")
@@ -472,11 +472,10 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
           .ok()
       })
     {
-      let _ = ctx.set_route_metadata_number("envoy.test.route", "number_key", value);
+      ctx.set_route_metadata_number("envoy.test.route", "number_key", value);
     }
     if let Some(value) = ctx.get_request_header("x-route-meta-bool") {
-      let _ =
-        ctx.set_route_metadata_bool("envoy.test.route", "bool_key", value.as_slice() == b"true");
+      ctx.set_route_metadata_bool("envoy.test.route", "bool_key", value.as_slice() == b"true");
     }
     if let Some(value) = ctx.get_request_header("x-route-typed-meta") {
       // Hand-encoded google.protobuf.Any because the test module has no protobuf dependency.

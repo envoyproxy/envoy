@@ -9,7 +9,6 @@ api_proto_package(
         "//envoy/config/core/v3:pkg",
         "//envoy/config/route/v3:pkg",
         "//envoy/extensions/dynamic_modules/v3:pkg",
-        "//envoy/type/matcher/v3:pkg",
         "@xds//udpa/annotations:pkg",
     ],
 )

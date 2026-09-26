@@ -85,11 +85,11 @@ Envoy::Stats::StatNameTagVector buildTagsForRouteSpecifierMetric(
 }
 
 // Returns a mutable handle to the route metadata value the module is setting, creating the
-// namespace and key when they are absent, or nullptr when the namespace is not allowed.
+// namespace and key when they are absent, or nullptr when there is no settable context.
 Protobuf::Value* mutableRouteMetadataValue(RouteSpecifierContext* context,
                                            envoy_dynamic_module_type_module_buffer ns,
                                            envoy_dynamic_module_type_module_buffer key) {
-  if (context == nullptr || !context->config.metadataNamespaceAllowed(toStringView(ns))) {
+  if (context == nullptr) {
     return nullptr;
   }
   return &Envoy::Config::Metadata::mutableMetadataValue(context->overrides.route_metadata,
@@ -754,8 +754,7 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
     envoy_dynamic_module_type_module_buffer cluster_name) {
   auto* context = routeSpecifierContext(context_envoy_ptr);
   const absl::string_view name = toStringView(cluster_name);
-  if (name.empty() || !Http::HeaderUtility::headerValueIsValid(name) ||
-      !context->config.clusterNameAllowed(name)) {
+  if (name.empty() || !Http::HeaderUtility::headerValueIsValid(name)) {
     ENVOY_LOG_MISC(debug, "dynamic module route specifier rejected cluster '{}'", name);
     return false;
   }
@@ -835,52 +834,37 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_override(
   return true;
 }
 
-bool envoy_dynamic_module_callback_route_specifier_set_route_metadata_string(
+void envoy_dynamic_module_callback_route_specifier_set_route_metadata_string(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_module_buffer value) {
-  auto* context = routeSpecifierContext(context_envoy_ptr);
-  if (!context->config.metadataNamespaceAllowed(toStringView(ns))) {
-    return false;
-  }
   if (Protobuf::Value* target =
           mutableRouteMetadataValue(settableContext(context_envoy_ptr), ns, key);
       target != nullptr) {
     target->set_string_value(std::string(toStringView(value)));
   }
-  return true;
 }
 
-bool envoy_dynamic_module_callback_route_specifier_set_route_metadata_number(
+void envoy_dynamic_module_callback_route_specifier_set_route_metadata_number(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     double value) {
-  auto* context = routeSpecifierContext(context_envoy_ptr);
-  if (!context->config.metadataNamespaceAllowed(toStringView(ns))) {
-    return false;
-  }
   if (Protobuf::Value* target =
           mutableRouteMetadataValue(settableContext(context_envoy_ptr), ns, key);
       target != nullptr) {
     target->set_number_value(value);
   }
-  return true;
 }
 
-bool envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool(
+void envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     bool value) {
-  auto* context = routeSpecifierContext(context_envoy_ptr);
-  if (!context->config.metadataNamespaceAllowed(toStringView(ns))) {
-    return false;
-  }
   if (Protobuf::Value* target =
           mutableRouteMetadataValue(settableContext(context_envoy_ptr), ns, key);
       target != nullptr) {
     target->set_bool_value(value);
   }
-  return true;
 }
 
 bool envoy_dynamic_module_callback_route_specifier_set_route_typed_metadata(
@@ -889,9 +873,6 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_typed_metadata(
     envoy_dynamic_module_type_module_buffer serialized_any) {
   auto* context = routeSpecifierContext(context_envoy_ptr);
   const absl::string_view name = toStringView(ns);
-  if (!context->config.metadataNamespaceAllowed(name)) {
-    return false;
-  }
   const absl::string_view serialized = toStringView(serialized_any);
   Protobuf::Any any;
   if (!any.ParseFromString(serialized)) {
@@ -909,7 +890,7 @@ bool envoy_dynamic_module_callback_route_specifier_set_filter_disabled(
     envoy_dynamic_module_type_module_buffer filter_name, bool disabled) {
   auto* context = routeSpecifierContext(context_envoy_ptr);
   const absl::string_view name = toStringView(filter_name);
-  if (name.empty() || !context->config.filterNameAllowed(name)) {
+  if (name.empty()) {
     ENVOY_LOG_MISC(debug, "dynamic module route specifier rejected filter '{}'", name);
     return false;
   }

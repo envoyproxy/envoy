@@ -5,7 +5,6 @@ package envoy.extensions.router.route_specifiers.dynamic_modules.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
-import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
@@ -231,7 +230,7 @@ message ShadowMode {
 }
 
 // Configuration for the dynamic modules route specifier.
-// [#next-free-field: 14]
+// [#next-free-field: 11]
 message DynamicModuleRouteSpecifier {
   // Specifies the shared object level configuration. This field is required.
   //
@@ -297,28 +296,4 @@ message DynamicModuleRouteSpecifier {
   // that references them. An unknown cluster then fails the request with the
   // ``cluster_not_found_response_code`` of the route instead.
   google.protobuf.BoolValue validate_clusters = 10;
-
-  // The clusters the module may select with ``set_cluster_name``. A name that matches none of these
-  // matchers is rejected, and the cluster of the produced route stays in effect. If not specified,
-  // any cluster name is accepted.
-  //
-  // .. attention::
-  //   Without this list a module that derives cluster names from the request can route to any
-  //   configured cluster, including ones no route exposes. Configure it, or have the module map the
-  //   request onto a closed set of names from its own configuration.
-  repeated type.matcher.v3.StringMatcher allowed_cluster_names = 11;
-
-  // Metadata namespaces the module may write with ``set_route_metadata_*``. A namespace that
-  // matches none of these matchers is rejected. If not specified, any namespace is accepted.
-  repeated type.matcher.v3.StringMatcher allowed_metadata_namespaces = 12;
-
-  // The HTTP filters the module may disable or enable with ``set_filter_disabled``. A name that
-  // matches none of these matchers is rejected, and the filter keeps the state the produced route
-  // gives it. If not specified, any filter name is accepted.
-  //
-  // .. attention::
-  //   Without this list a module that derives filter names from the request can disable any filter
-  //   of the chain, including the authorization and rate limit filters. Configure it whenever the
-  //   module needs to disable a filter at all.
-  repeated type.matcher.v3.StringMatcher allowed_filter_names = 13;
 }

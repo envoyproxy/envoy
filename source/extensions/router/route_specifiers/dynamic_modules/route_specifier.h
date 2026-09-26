@@ -18,7 +18,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/common/matchers.h"
 #include "source/common/common/statusor.h"
 #include "source/common/config/metadata.h"
 #include "source/common/router/delegating_route_impl.h"
@@ -198,11 +197,6 @@ public:
    */
   bool registerRouteTemplate(absl::string_view id, absl::string_view serialized_route);
 
-  // Whether the module may select the given cluster name, metadata namespace and filter name.
-  bool clusterNameAllowed(absl::string_view name) const;
-  bool metadataNamespaceAllowed(absl::string_view name) const;
-  bool filterNameAllowed(absl::string_view name) const;
-
   const std::deque<std::string>& templateIds() const { return template_ids_; }
   const std::optional<ShadowSettings>& shadow() const { return shadow_; }
   const std::optional<RuntimeFraction>& runtimeFraction() const { return runtime_fraction_; }
@@ -257,9 +251,6 @@ private:
   // route templates Envoy builds with the route builder of the configuration.
   Envoy::Router::RouteBuilder* config_new_route_builder_{nullptr};
   bool config_new_validate_clusters_{false};
-  const std::vector<Matchers::StringMatcherPtr> allowed_cluster_names_;
-  const std::vector<Matchers::StringMatcherPtr> allowed_filter_names_;
-  const std::vector<Matchers::StringMatcherPtr> allowed_metadata_namespaces_;
   const std::optional<ShadowSettings> shadow_;
   const std::optional<RuntimeFraction> runtime_fraction_;
   const bool fail_closed_;

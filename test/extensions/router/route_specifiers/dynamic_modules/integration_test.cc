@@ -1,6 +1,7 @@
 #include "envoy/extensions/router/route_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -453,56 +454,17 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverridesCluster) {
                                testing::Ge(1));
 }
 
-// A cluster name the allowlist rejects is ignored, so the cluster of the route that matching
-// resolved stays in effect.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RejectsClusterOutsideAllowlist) {
-  setupTest(R"EOF(
-allowed_cluster_names:
-- exact: canary
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = sendRequest({{"x-decision", "override"}, {"x-cluster", "denied"}});
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", testing::Ge(1));
-  EXPECT_EQ(0, counterValue("cluster.canary.upstream_rq_200"));
-}
-
-// A filter name the allowlist rejects is ignored, so the module cannot disable a filter the
-// operator did not list.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RejectsFilterOutsideAllowlist) {
-  setupTest(R"EOF(
-allowed_filter_names:
-- exact: envoy.filters.http.allowed
-shadow_mode:
-  compare_fields: [FILTER_DISABLED]
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response =
-      sendRequest({{"x-decision", "override"}, {"x-filter-disabled", "envoy.filters.http.denied"}});
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_match",
-                               testing::Ge(1));
-  EXPECT_EQ(
-      0, test_server_
-             ->counter("dynamicmodulescustom.route_specifier.test.shadow_mismatch_filter_disabled")
-             ->value());
-}
-
-// A module that disables an allowed filter differs from the route table it replaces, which shadow
+// A module that disables a filter differs from the route table it replaces, which shadow
 // mode reports on the filter_disabled counter.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, DisablesAllowedFilter) {
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, DisablesFilter) {
   setupTest(R"EOF(
-allowed_filter_names:
-- exact: envoy.filters.http.allowed
 shadow_mode:
   compare_fields: [FILTER_DISABLED]
 )EOF");
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = sendRequest(
-      {{"x-decision", "override"}, {"x-filter-disabled", "envoy.filters.http.allowed"}});
+      {{"x-decision", "override"}, {"x-filter-disabled", "envoy.filters.http.disabled"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter(
       "dynamicmodulescustom.route_specifier.test.shadow_mismatch_filter_disabled", testing::Ge(1));
@@ -558,30 +520,6 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverridesClusterNotFoundRespo
   auto response = sendRequest(
       {{"x-decision", "override"}, {"x-cluster", "missing"}, {"x-not-found-code", "502"}});
   EXPECT_EQ("502", response->headers().getStatusValue());
-}
-
-// A metadata namespace the allowlist rejects is ignored, so the metadata of the produced route
-// stays in effect.
-TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RejectsMetadataNamespaceOutsideAllowlist) {
-  setupTest(R"EOF(
-allowed_metadata_namespaces:
-- exact: envoy.test.allowed
-shadow_mode:
-  compare_fields: [ROUTE_METADATA]
-)EOF");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = sendRequest({{"x-decision", "override"},
-                               {"x-route-meta-string", "value"},
-                               {"x-route-meta-number", "42"},
-                               {"x-route-meta-bool", "true"}});
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.shadow_match",
-                               testing::Ge(1));
-  EXPECT_EQ(
-      0, test_server_
-             ->counter("dynamicmodulescustom.route_specifier.test.shadow_mismatch_route_metadata")
-             ->value());
 }
 
 // An override of a request that matching resolved no route for cannot be honored.
@@ -848,13 +786,22 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RejectsInvalidSetterInputs) {
   setupTest();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = sendRequest({{"x-decision", "override"},
-                               {"x-set-path", "no-leading-slash"},
-                               {"x-set-host", "invalid host"},
-                               {"x-add-request-header", ":method=CONNECT"},
-                               {"x-remove-request-header", ":path"},
-                               {"x-not-found-code", "max"},
-                               {"x-override", "unknown"}});
+  // The empty cluster and filter names are rejected, which the specifier records at debug level.
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      (Envoy::ExpectedLogMessages{{"debug", "dynamic module route specifier rejected cluster ''"},
+                                  {"debug", "dynamic module route specifier rejected filter ''"}}),
+      {
+        response = sendRequest({{"x-decision", "override"},
+                                {"x-cluster", ""},
+                                {"x-filter-disabled", ""},
+                                {"x-set-path", "no-leading-slash"},
+                                {"x-set-host", "invalid host"},
+                                {"x-add-request-header", ":method=CONNECT"},
+                                {"x-remove-request-header", ":path"},
+                                {"x-not-found-code", "max"},
+                                {"x-override", "unknown"}});
+      });
   EXPECT_EQ("200", response->headers().getStatusValue());
   // Every setter input was rejected, so the request reaches the upstream with its path and host
   // unchanged.

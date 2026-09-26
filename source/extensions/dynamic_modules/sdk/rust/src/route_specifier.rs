@@ -762,8 +762,7 @@ impl RouteSpecifierContext {
 
   /// Record the upstream cluster the request should use.
   ///
-  /// Returns `false` when the name is not a valid header value or is not allowed by the route
-  /// specifier configuration.
+  /// Returns `false` when the name is empty or not a valid header value.
   pub fn set_cluster_name(&mut self, cluster_name: &str) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_cluster_name(
@@ -848,9 +847,7 @@ impl RouteSpecifierContext {
   }
 
   /// Record the string value of a route metadata entry.
-  ///
-  /// Returns `false` when the namespace is not allowed by the route specifier configuration.
-  pub fn set_route_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+  pub fn set_route_metadata_string(&mut self, namespace: &str, key: &str, value: &str) {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_route_metadata_string(
         self.envoy_ptr,
@@ -862,9 +859,7 @@ impl RouteSpecifierContext {
   }
 
   /// Record the number value of a route metadata entry.
-  ///
-  /// Returns `false` when the namespace is not allowed by the route specifier configuration.
-  pub fn set_route_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
+  pub fn set_route_metadata_number(&mut self, namespace: &str, key: &str, value: f64) {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_route_metadata_number(
         self.envoy_ptr,
@@ -876,9 +871,7 @@ impl RouteSpecifierContext {
   }
 
   /// Record the boolean value of a route metadata entry.
-  ///
-  /// Returns `false` when the namespace is not allowed by the route specifier configuration.
-  pub fn set_route_metadata_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool {
+  pub fn set_route_metadata_bool(&mut self, namespace: &str, key: &str, value: bool) {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool(
         self.envoy_ptr,
@@ -891,7 +884,7 @@ impl RouteSpecifierContext {
 
   /// Record the typed route metadata of a namespace from a serialized `google.protobuf.Any`.
   ///
-  /// Returns `false` when the namespace is not allowed or the bytes do not parse.
+  /// Returns `false` when the bytes do not parse.
   pub fn set_route_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_route_typed_metadata(

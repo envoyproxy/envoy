@@ -63,64 +63,68 @@
 
 namespace Envoy {
 namespace Router {
-absl::StatusOr<RouteEntryImplBaseConstSharedPtr>
-RouteCreator::createAndValidateRoute(const envoy::config::route::v3::Route& route_config,
-                                     const CommonVirtualHostSharedPtr& vhost,
-                                     Server::Configuration::ServerFactoryContext& factory_context,
-                                     ProtobufMessage::ValidationVisitor& validator,
-                                     Init::Manager& init_manager, bool validate_clusters) {
-  absl::Status creation_status = absl::OkStatus();
-  RouteEntryImplBaseConstSharedPtr route;
-  switch (route_config.match().path_specifier_case()) {
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
-    route = std::make_shared<PrefixRouteEntryImpl>(vhost, route_config, factory_context, validator,
-                                                   init_manager, creation_status);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
-    route = std::make_shared<PathRouteEntryImpl>(vhost, route_config, factory_context, validator,
-                                                 init_manager, creation_status);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex:
-    route = std::make_shared<RegexRouteEntryImpl>(vhost, route_config, factory_context, validator,
-                                                  init_manager, creation_status);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher:
-    route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, factory_context, validator,
-                                                    init_manager, creation_status);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
-    route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
-        vhost, route_config, factory_context, validator, init_manager, creation_status);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy:
-    route = std::make_shared<UriTemplateMatcherRouteEntryImpl>(
-        vhost, route_config, factory_context, validator, init_manager, creation_status);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
-    break; // return the error below.
-  }
-  if (!route) {
-    return absl::InvalidArgumentError("Invalid route config");
-  }
-  RETURN_IF_NOT_OK(creation_status);
+class RouteCreator {
+public:
+  static absl::StatusOr<RouteEntryImplBaseConstSharedPtr>
+  createAndValidateRoute(const envoy::config::route::v3::Route& route_config,
+                         const CommonVirtualHostSharedPtr& vhost,
+                         Server::Configuration::ServerFactoryContext& factory_context,
+                         ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                         bool validate_clusters) {
 
-  if (validate_clusters) {
-    const Upstream::ClusterManager& cluster_manager = factory_context.clusterManager();
-    RETURN_IF_NOT_OK(route->validateClusters(cluster_manager));
-    for (const auto& shadow_policy : route->shadowPolicies()) {
-      if (!shadow_policy->cluster().empty()) {
-        ASSERT(shadow_policy->clusterHeader().get().empty());
-        // if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
-        if (!cluster_manager.hasCluster(shadow_policy->cluster())) {
-          return absl::InvalidArgumentError(
-              fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
+    absl::Status creation_status = absl::OkStatus();
+    RouteEntryImplBaseConstSharedPtr route;
+    switch (route_config.match().path_specifier_case()) {
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
+      route = std::make_shared<PrefixRouteEntryImpl>(vhost, route_config, factory_context,
+                                                     validator, init_manager, creation_status);
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
+      route = std::make_shared<PathRouteEntryImpl>(vhost, route_config, factory_context, validator,
+                                                   init_manager, creation_status);
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex:
+      route = std::make_shared<RegexRouteEntryImpl>(vhost, route_config, factory_context, validator,
+                                                    init_manager, creation_status);
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher:
+      route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, factory_context,
+                                                      validator, init_manager, creation_status);
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
+      route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
+          vhost, route_config, factory_context, validator, init_manager, creation_status);
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy:
+      route = std::make_shared<UriTemplateMatcherRouteEntryImpl>(
+          vhost, route_config, factory_context, validator, init_manager, creation_status);
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
+      break; // return the error below.
+    }
+    if (!route) {
+      return absl::InvalidArgumentError("Invalid route config");
+    }
+    RETURN_IF_NOT_OK(creation_status);
+
+    if (validate_clusters) {
+      const Upstream::ClusterManager& cluster_manager = factory_context.clusterManager();
+      RETURN_IF_NOT_OK(route->validateClusters(cluster_manager));
+      for (const auto& shadow_policy : route->shadowPolicies()) {
+        if (!shadow_policy->cluster().empty()) {
+          ASSERT(shadow_policy->clusterHeader().get().empty());
+          // if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
+          if (!cluster_manager.hasCluster(shadow_policy->cluster())) {
+            return absl::InvalidArgumentError(
+                fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
+          }
         }
       }
     }
-  }
 
-  return route;
-}
+    return route;
+  }
+};
 
 namespace {
 

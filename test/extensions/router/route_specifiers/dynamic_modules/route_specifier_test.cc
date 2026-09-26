@@ -315,10 +315,6 @@ TEST_F(DynamicModuleRouteSpecifierTest, ValidConfigWithTemplatesAndOverrides) {
       route_overrides:
       - override_id: slow
         retry_policy: {retry_on: "5xx", num_retries: 3}
-      allowed_cluster_names:
-      - exact: canary_cluster
-      allowed_metadata_namespaces:
-      - exact: envoy.test.route
 )EOF"));
   ASSERT_TRUE(config.ok());
 
@@ -351,20 +347,6 @@ TEST_F(DynamicModuleRouteSpecifierTest, UnknownDecisionFailsClosed) {
 
   const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
   EXPECT_EQ(nullptr, route.route);
-}
-
-// Every allowlist is accepted, and an empty one accepts any name.
-TEST_F(DynamicModuleRouteSpecifierTest, AcceptsAllowlists) {
-  const auto config =
-      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
-      allowed_cluster_names:
-      - prefix: shard-
-      allowed_filter_names:
-      - exact: envoy.filters.http.rbac
-      allowed_metadata_namespaces:
-      - exact: envoy.test.route
-)EOF"));
-  EXPECT_TRUE(config.ok());
 }
 
 // A virtual host that configures no routes at all is routed entirely by the module, which is how a
