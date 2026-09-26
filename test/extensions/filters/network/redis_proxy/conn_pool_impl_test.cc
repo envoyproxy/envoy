@@ -1505,8 +1505,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccessWithDNSEntryViaCallback) {
   // DNS entry is not cached.
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
-  std::optional<std::reference_wrapper<
-      Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks>>
+  OptRef<Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks>
       saved_callbacks;
 
   EXPECT_CALL(*dns_cache, loadDnsCacheEntry_(Eq("foo:6379"), 6379, false, _))
@@ -1531,7 +1530,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccessWithDNSEntryViaCallback) {
   EXPECT_CALL(*client2, makeRequest_(Ref(*request_value), _)).WillOnce(Return(&active_request2));
   EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
 
-  saved_callbacks.value().get().onLoadDnsCacheComplete(host_info);
+  saved_callbacks->onLoadDnsCacheComplete(host_info);
 
   EXPECT_EQ(host1->address()->asString(), "1.2.3.4:6379");
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
@@ -1566,8 +1565,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailedWithDNSEntryViaCallback) {
   // DNS entry is not cached.
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
-  std::optional<std::reference_wrapper<
-      Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks>>
+  OptRef<Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks>
       saved_callbacks;
 
   EXPECT_CALL(*dns_cache, loadDnsCacheEntry_(Eq("foo:6379"), 6379, false, _))
@@ -1586,7 +1584,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailedWithDNSEntryViaCallback) {
   EXPECT_CALL(callbacks, onResponse_(_));
   EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
 
-  saved_callbacks.value().get().onLoadDnsCacheComplete(nullptr);
+  saved_callbacks->onLoadDnsCacheComplete(nullptr);
 
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
                      .counter("upstream_internal_redirect_failed_total")

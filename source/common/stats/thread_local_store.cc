@@ -1048,7 +1048,7 @@ HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogramLockHeld(Stat
   }
 
   RefcountPtr<Histogram> histogram_ref(iter->second);
-  return std::cref(*histogram_ref);
+  return makeOptRefFromPtr(histogram_ref.get());
 }
 
 TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName name) const {

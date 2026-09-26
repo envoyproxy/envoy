@@ -226,7 +226,7 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
       Config::Utility::checkCluster("tcp statsd", cluster_name, cluster_manager);
   SET_AND_RETURN_IF_NOT_OK(cluster_or_error.status(), creation_status);
   const auto cluster = cluster_or_error.value();
-  cluster_info_ = cluster->get().info();
+  cluster_info_ = cluster->info();
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsSink>(*this, dispatcher);
   });

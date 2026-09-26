@@ -92,7 +92,7 @@ private:
   Event::Dispatcher& dispatcher_;
   absl::variant<double, absl::Status> response_;
   bool update_async_ = false;
-  std::optional<std::reference_wrapper<ResourceUpdateCallbacks>> callbacks_;
+  OptRef<ResourceUpdateCallbacks> callbacks_;
 };
 
 class FakeProactiveResourceMonitor : public ProactiveResourceMonitor {
@@ -1168,11 +1168,11 @@ TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsCreateStats) {
 
   const auto active_gauge = stats_.findGaugeByString("overload.connection_idle_timeouts.active");
   ASSERT_TRUE(active_gauge.has_value());
-  EXPECT_EQ(0, active_gauge->get().value());
+  EXPECT_EQ(0, active_gauge->value());
   const auto scale_percent_gauge =
       stats_.findGaugeByString("overload.connection_idle_timeouts.scale_percent");
   ASSERT_TRUE(scale_percent_gauge.has_value());
-  EXPECT_EQ(0, scale_percent_gauge->get().value());
+  EXPECT_EQ(0, scale_percent_gauge->value());
 }
 
 TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsAdjustScaleFactorIndependently) {

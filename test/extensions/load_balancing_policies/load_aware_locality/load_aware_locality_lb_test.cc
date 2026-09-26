@@ -185,7 +185,7 @@ private:
 
 uint64_t counterValue(NiceMock<Upstream::MockClusterInfo>& info, const std::string& name) {
   auto c = info.stats_store_.findCounterByString(name);
-  return c.has_value() ? c->get().value() : 0;
+  return c.has_value() ? c->value() : 0;
 }
 
 class LoadAwareLocalityLbTest : public Event::TestUsingSimulatedTime, public testing::Test {

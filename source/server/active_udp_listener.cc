@@ -53,7 +53,7 @@ void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
                                     &parent = parent_, address]() mutable {
     Network::UdpListenerCallbacksOptRef listener = parent.getUdpListenerCallbacks(tag, *address);
     if (listener.has_value()) {
-      listener->get().onDataWorker(std::move(data));
+      listener->onDataWorker(std::move(data));
     }
   });
 }

@@ -220,7 +220,7 @@ void ReporterImpl::flushSpans() {
 
     if (collector_cluster_.threadLocalCluster().has_value()) {
       Http::AsyncClient::Request* request =
-          collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+          collector_cluster_.threadLocalCluster()->httpAsyncClient().send(
               std::move(message), *this,
               Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
       if (request) {

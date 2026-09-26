@@ -5071,11 +5071,11 @@ TEST_F(LuaHttpFilterTest, StatsApi) {
 
   auto gauge = stats_store_.findGaugeByString("test.lua.my_gauge");
   ASSERT_TRUE(gauge.has_value());
-  EXPECT_EQ(105, gauge->get().value());
+  EXPECT_EQ(105, gauge->value());
 
   auto histogram = stats_store_.findHistogramByString("test.lua.my_histogram");
   ASSERT_TRUE(histogram.has_value());
-  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, histogram->get().unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, histogram->unit());
 }
 
 // Test stats() API with custom stat_prefix.

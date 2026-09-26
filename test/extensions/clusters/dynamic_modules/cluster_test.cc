@@ -1983,7 +1983,7 @@ TEST_F(DynamicModuleClusterTest, MetricsResolveAndRecordByHandle) {
   auto counter_stat = server_context_.store_.findCounterByString(
       "dynamicmodulescustom.handle_counter.outcome.resolved");
   ASSERT_TRUE(counter_stat.has_value());
-  EXPECT_EQ(8, counter_stat->get().value());
+  EXPECT_EQ(8, counter_stat->value());
 
   // Resolving the same tuple again yields the same child, which is what makes a cached handle
   // equivalent to the id path rather than a second stat.
@@ -2011,7 +2011,7 @@ TEST_F(DynamicModuleClusterTest, MetricsResolveAndRecordByHandle) {
   auto gauge_stat = server_context_.store_.findGaugeByString(
       "dynamicmodulescustom.handle_gauge.outcome.resolved");
   ASSERT_TRUE(gauge_stat.has_value());
-  EXPECT_EQ(12, gauge_stat->get().value());
+  EXPECT_EQ(12, gauge_stat->value());
 
   // Histogram vec. The record forwards the value to the resolved child, which the isolated store
   // delivers to sinks, so intercept that to assert the tagged child receives the value.

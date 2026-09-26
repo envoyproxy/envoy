@@ -820,7 +820,7 @@ TEST(DefaultCertValidatorTest, DefaultValidatorCaExpirationStats) {
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
   // No real certificate, so should get sentinel max value
-  EXPECT_EQ(gauge_opt->get().value(), std::chrono::seconds::max().count());
+  EXPECT_EQ(gauge_opt->value(), std::chrono::seconds::max().count());
 }
 
 // Test that ValidationResults contains detailed error information when SAN validation fails.

@@ -697,7 +697,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, std::nullopt);
-  EXPECT_TRUE(cluster->get().info()->loadBalancerConfig().has_value());
+  EXPECT_TRUE(cluster->info()->loadBalancerConfig().has_value());
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {

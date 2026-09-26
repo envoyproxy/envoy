@@ -85,8 +85,7 @@ public:
 };
 
 using ConnectionBalancerSharedPtr = std::shared_ptr<ConnectionBalancer>;
-using BalancedConnectionHandlerOptRef =
-    std::optional<std::reference_wrapper<BalancedConnectionHandler>>;
+using BalancedConnectionHandlerOptRef = OptRef<BalancedConnectionHandler>;
 
 } // namespace Network
 } // namespace Envoy

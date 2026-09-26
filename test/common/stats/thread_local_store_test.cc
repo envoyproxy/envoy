@@ -267,10 +267,10 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   auto found_counter = scope_.findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
-  EXPECT_EQ(&c1, &found_counter->get());
-  EXPECT_EQ(100, found_counter->get().value());
+  EXPECT_EQ(&c1, &found_counter.ref());
+  EXPECT_EQ(100, found_counter->value());
   c1.add(100);
-  EXPECT_EQ(200, found_counter->get().value());
+  EXPECT_EQ(200, found_counter->value());
 
   Gauge& g1 = scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&g1, &scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate));
@@ -279,10 +279,10 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   auto found_gauge = scope_.findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
-  EXPECT_EQ(&g1, &found_gauge->get());
-  EXPECT_EQ(100, found_gauge->get().value());
+  EXPECT_EQ(&g1, &found_gauge.ref());
+  EXPECT_EQ(100, found_gauge->value());
   g1.set(0);
-  EXPECT_EQ(0, found_gauge->get().value());
+  EXPECT_EQ(0, found_gauge->value());
 
   Histogram& h1 = scope_.histogramFromString("h1", Histogram::Unit::Unspecified);
   EXPECT_EQ(&h1, &scope_.histogramFromString("h1", Histogram::Unit::Unspecified));
@@ -290,13 +290,13 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   auto found_histogram = scope_.findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
-  EXPECT_EQ(&h1, &found_histogram->get());
+  EXPECT_EQ(&h1, &found_histogram.ref());
   TextReadout& t1 = scope_.textReadoutFromString("t1");
   EXPECT_EQ(&t1, &scope_.textReadoutFromString("t1"));
 
   auto found_text_readout = scope_.findTextReadout(t1.statName());
   ASSERT_TRUE(found_text_readout.has_value());
-  EXPECT_EQ(&t1, &found_text_readout->get());
+  EXPECT_EQ(&t1, &found_text_readout.ref());
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
@@ -325,10 +325,10 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   c1.add(100);
   auto found_counter = scope_.findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
-  EXPECT_EQ(&c1, &found_counter->get());
-  EXPECT_EQ(100, found_counter->get().value());
+  EXPECT_EQ(&c1, &found_counter.ref());
+  EXPECT_EQ(100, found_counter->value());
   c1.add(100);
-  EXPECT_EQ(200, found_counter->get().value());
+  EXPECT_EQ(200, found_counter->value());
 
   Gauge& g1 = scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&g1, &scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate));
@@ -336,17 +336,17 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   g1.set(100);
   auto found_gauge = scope_.findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
-  EXPECT_EQ(&g1, &found_gauge->get());
-  EXPECT_EQ(100, found_gauge->get().value());
+  EXPECT_EQ(&g1, &found_gauge.ref());
+  EXPECT_EQ(100, found_gauge->value());
   g1.set(0);
-  EXPECT_EQ(0, found_gauge->get().value());
+  EXPECT_EQ(0, found_gauge->value());
 
   Histogram& h1 = scope_.histogramFromString("h1", Histogram::Unit::Unspecified);
   EXPECT_EQ(&h1, &scope_.histogramFromString("h1", Histogram::Unit::Unspecified));
   StatNameManagedStorage h1_name("h1", symbol_table_);
   auto found_histogram = scope_.findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
-  EXPECT_EQ(&h1, &found_histogram->get());
+  EXPECT_EQ(&h1, &found_histogram.ref());
 
   TextReadout& t1 = scope_.textReadoutFromString("t1");
   EXPECT_EQ(&t1, &scope_.textReadoutFromString("t1"));
@@ -435,11 +435,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   StatNameManagedStorage c1_name("c1", symbol_table_);
   auto found_counter = scope_.findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
-  EXPECT_EQ(&c1, &found_counter->get());
+  EXPECT_EQ(&c1, &found_counter.ref());
   StatNameManagedStorage c2_name("scope1.c2", symbol_table_);
   auto found_counter2 = scope1->findCounter(c2_name.statName());
   ASSERT_TRUE(found_counter2.has_value());
-  EXPECT_EQ(&c2, &found_counter2->get());
+  EXPECT_EQ(&c2, &found_counter2.ref());
 
   Gauge& g1 = scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromString("g2", Gauge::ImportMode::Accumulate);
@@ -448,11 +448,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   StatNameManagedStorage g1_name("g1", symbol_table_);
   auto found_gauge = scope_.findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
-  EXPECT_EQ(&g1, &found_gauge->get());
+  EXPECT_EQ(&g1, &found_gauge.ref());
   StatNameManagedStorage g2_name("scope1.g2", symbol_table_);
   auto found_gauge2 = scope1->findGauge(g2_name.statName());
   ASSERT_TRUE(found_gauge2.has_value());
-  EXPECT_EQ(&g2, &found_gauge2->get());
+  EXPECT_EQ(&g2, &found_gauge2.ref());
 
   Histogram& h1 = scope_.histogramFromString("h1", Histogram::Unit::Unspecified);
   Histogram& h2 = scope1->histogramFromString("h2", Histogram::Unit::Unspecified);
@@ -465,11 +465,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   StatNameManagedStorage h1_name("h1", symbol_table_);
   auto found_histogram = scope_.findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
-  EXPECT_EQ(&h1, &found_histogram->get());
+  EXPECT_EQ(&h1, &found_histogram.ref());
   StatNameManagedStorage h2_name("scope1.h2", symbol_table_);
   auto found_histogram2 = scope1->findHistogram(h2_name.statName());
   ASSERT_TRUE(found_histogram2.has_value());
-  EXPECT_EQ(&h2, &found_histogram2->get());
+  EXPECT_EQ(&h2, &found_histogram2.ref());
 
   TextReadout& t1 = scope_.textReadoutFromString("t1");
   TextReadout& t2 = scope1->textReadoutFromString("t2");
@@ -964,7 +964,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   StatNameManagedStorage c1_name("scope1.foo.bar", symbol_table_);
   auto found_counter = scope1->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
-  EXPECT_EQ(&c1, &found_counter->get());
+  EXPECT_EQ(&c1, &found_counter.ref());
 
   ScopeSharedPtr scope2 = scope1->createScope("foo.");
   Counter& c2 = scope2->counterFromString("bar");
@@ -2804,7 +2804,7 @@ TEST_F(ThreadLocalStoreExplicitTagsTest, CounterNameAndNameTags) {
   // The flat name is the cache key: looking it up returns the same counter.
   CounterOptConstRef found = scope_.findCounter(c.statName());
   ASSERT_TRUE(found.has_value());
-  EXPECT_EQ(&c, &found->get());
+  EXPECT_EQ(&c, &found.ref());
 }
 
 // A child scope created with name_tags + an explicit tagged_name propagates the tag to child stats

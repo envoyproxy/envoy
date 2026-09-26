@@ -101,8 +101,7 @@ public:
   virtual void disableChunkEncoding() PURE;
 };
 
-using Http1StreamEncoderOptionsOptRef =
-    std::optional<std::reference_wrapper<Http1StreamEncoderOptions>>;
+using Http1StreamEncoderOptionsOptRef = OptRef<Http1StreamEncoderOptions>;
 
 /**
  * Encodes an HTTP stream. This interface contains methods common to both the request and response

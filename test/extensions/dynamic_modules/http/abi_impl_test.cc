@@ -3199,17 +3199,17 @@ TEST(ABIImpl, Stats) {
   Stats::CounterOptConstRef counter_vec = stats_store.findCounterByString(
       "dynamicmodulescustom.some_counter_vec.some_label.some_value");
   EXPECT_TRUE(counter_vec.has_value());
-  EXPECT_EQ(counter_vec->get().value(), 10);
+  EXPECT_EQ(counter_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_vec_id, counter_vec_labels_values.data(), counter_vec_labels_values.size(),
       10);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_vec->get().value(), 20);
+  EXPECT_EQ(counter_vec->value(), 20);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_vec_id, counter_vec_labels_values.data(), counter_vec_labels_values.size(),
       42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_vec->get().value(), 62);
+  EXPECT_EQ(counter_vec->value(), 62);
 
   const std::string counter_no_labels_name{"some_counter_no_labels"};
   size_t counter_no_labels_id;
@@ -3220,15 +3220,15 @@ TEST(ABIImpl, Stats) {
   Stats::CounterOptConstRef counter_no_labels =
       stats_store.findCounterByString("dynamicmodulescustom.some_counter_no_labels");
   EXPECT_TRUE(counter_no_labels.has_value());
-  EXPECT_EQ(counter_no_labels->get().value(), 0);
+  EXPECT_EQ(counter_no_labels->value(), 0);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_no_labels_id, nullptr, 0, 15);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_no_labels->get().value(), 15);
+  EXPECT_EQ(counter_no_labels->value(), 15);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_no_labels_id, nullptr, 0, 25);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_no_labels->get().value(), 40);
+  EXPECT_EQ(counter_no_labels->value(), 40);
 
   const std::string gauge_vec_name{"some_gauge_vec"};
   const std::string gauge_vec_label_name{"some_label"};
@@ -3251,19 +3251,19 @@ TEST(ABIImpl, Stats) {
   Stats::GaugeOptConstRef gauge_vec =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_vec.some_label.some_value");
   EXPECT_TRUE(gauge_vec.has_value());
-  EXPECT_EQ(gauge_vec->get().value(), 10);
+  EXPECT_EQ(gauge_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_increment_gauge(
       &filter, gauge_vec_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 10);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 20);
+  EXPECT_EQ(gauge_vec->value(), 20);
   result = envoy_dynamic_module_callback_http_filter_decrement_gauge(
       &filter, gauge_vec_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 12);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 8);
+  EXPECT_EQ(gauge_vec->value(), 8);
   result = envoy_dynamic_module_callback_http_filter_set_gauge(
       &filter, gauge_vec_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 9001);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 9001);
+  EXPECT_EQ(gauge_vec->value(), 9001);
 
   const std::string gauge_no_labels_name{"some_gauge_no_labels"};
   size_t gauge_no_labels_id;
@@ -3274,19 +3274,19 @@ TEST(ABIImpl, Stats) {
   Stats::GaugeOptConstRef gauge_no_labels =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_no_labels");
   EXPECT_TRUE(gauge_no_labels.has_value());
-  EXPECT_EQ(gauge_no_labels->get().value(), 0);
+  EXPECT_EQ(gauge_no_labels->value(), 0);
   result = envoy_dynamic_module_callback_http_filter_increment_gauge(&filter, gauge_no_labels_id,
                                                                      nullptr, 0, 15);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_no_labels->get().value(), 15);
+  EXPECT_EQ(gauge_no_labels->value(), 15);
   result = envoy_dynamic_module_callback_http_filter_decrement_gauge(&filter, gauge_no_labels_id,
                                                                      nullptr, 0, 5);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_no_labels->get().value(), 10);
+  EXPECT_EQ(gauge_no_labels->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_set_gauge(&filter, gauge_no_labels_id, nullptr,
                                                                0, 42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_no_labels->get().value(), 42);
+  EXPECT_EQ(gauge_no_labels->value(), 42);
 
   const std::string histogram_vec_name{"some_histogram_vec"};
   const std::string histogram_vec_label_name{"some_label"};
@@ -3455,12 +3455,12 @@ TEST(ABIImpl, ConfigStats) {
   Stats::CounterOptConstRef counter_vec = stats_store.findCounterByString(
       "dynamicmodulescustom.some_counter_vec.some_label.some_value");
   EXPECT_TRUE(counter_vec.has_value());
-  EXPECT_EQ(counter_vec->get().value(), 10);
+  EXPECT_EQ(counter_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_config_increment_counter(
       filter_config.get(), counter_vec_id, counter_vec_labels_values.data(),
       counter_vec_labels_values.size(), 42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_vec->get().value(), 52);
+  EXPECT_EQ(counter_vec->value(), 52);
 
   // counter without labels
   const std::string counter_no_labels_name{"some_counter_no_labels"};
@@ -3475,7 +3475,7 @@ TEST(ABIImpl, ConfigStats) {
   Stats::CounterOptConstRef counter_no_labels =
       stats_store.findCounterByString("dynamicmodulescustom.some_counter_no_labels");
   EXPECT_TRUE(counter_no_labels.has_value());
-  EXPECT_EQ(counter_no_labels->get().value(), 15);
+  EXPECT_EQ(counter_no_labels->value(), 15);
 
   // gauge with labels
   const std::string gauge_vec_name{"some_gauge_vec"};
@@ -3500,17 +3500,17 @@ TEST(ABIImpl, ConfigStats) {
   Stats::GaugeOptConstRef gauge_vec =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_vec.some_label.some_value");
   EXPECT_TRUE(gauge_vec.has_value());
-  EXPECT_EQ(gauge_vec->get().value(), 10);
+  EXPECT_EQ(gauge_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
       filter_config.get(), gauge_vec_id, gauge_vec_labels_values.data(),
       gauge_vec_labels_values.size(), 2);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 8);
+  EXPECT_EQ(gauge_vec->value(), 8);
   result = envoy_dynamic_module_callback_http_filter_config_set_gauge(
       filter_config.get(), gauge_vec_id, gauge_vec_labels_values.data(),
       gauge_vec_labels_values.size(), 9001);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 9001);
+  EXPECT_EQ(gauge_vec->value(), 9001);
 
   // gauge without labels
   const std::string gauge_no_labels_name{"some_gauge_no_labels"};
@@ -3531,7 +3531,7 @@ TEST(ABIImpl, ConfigStats) {
   Stats::GaugeOptConstRef gauge_no_labels =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_no_labels");
   EXPECT_TRUE(gauge_no_labels.has_value());
-  EXPECT_EQ(gauge_no_labels->get().value(), 42);
+  EXPECT_EQ(gauge_no_labels->value(), 42);
 
   // histogram with labels
   const std::string histogram_vec_name{"some_histogram_vec"};

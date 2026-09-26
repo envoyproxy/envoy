@@ -315,11 +315,11 @@ public:
     ClusterConstOptRef getCluster(absl::string_view cluster) const {
       auto active_cluster = active_clusters_.find(cluster);
       if (active_cluster != active_clusters_.cend()) {
-        return active_cluster->second;
+        return active_cluster->second.get();
       }
       auto warming_cluster = warming_clusters_.find(cluster);
       if (warming_cluster != warming_clusters_.cend()) {
-        return warming_cluster->second;
+        return warming_cluster->second.get();
       }
       return std::nullopt;
     }

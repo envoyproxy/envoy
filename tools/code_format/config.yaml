@@ -368,6 +368,11 @@ paths:
     - test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc
     - test/test_common/wasm_base.h
 
+  # Files that can use std::optional<std::reference_wrapper<T>> instead of OptRef<T>
+  optional_reference_wrapper:
+    include:
+    - test/common/common/optref_test.cc
+
 dir_order:
 - envoy
 - common
@@ -392,6 +397,7 @@ re:
   mangled_protobuf_name: envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}
   maintainers: .*github.com.(.*)\)\)
   old_mock_method: MOCK_METHOD\d
+  optional_reference_wrapper: \bstd::optional<\s*(std::)?reference_wrapper\b
   owner: "@\\S+"
   runtime_guard_flag: RUNTIME_GUARD\((.*)\);
   test_name_starting_lc: TEST(_.\(.*,\s|\()[a-z].*\)\s\{
