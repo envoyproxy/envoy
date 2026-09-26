@@ -164,6 +164,16 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
   EXPECT_CALL(*connection_, write(BufferString("envoy.duration:1234567.891|ms\n"), _));
   sink_->onHistogramComplete(duration_micro, 1234567891);
 
+  NiceMock<Stats::MockHistogram> duration_nano;
+  duration_nano.name_ = "duration";
+  duration_nano.unit_ = Stats::Histogram::Unit::Nanoseconds;
+
+  // Nanoseconds are scaled to milliseconds without losing the sub-microsecond part.
+  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:0.0407|ms\n"), _));
+  sink_->onHistogramComplete(duration_nano, 40700);
+  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:3.943277|ms\n"), _));
+  sink_->onHistogramComplete(duration_nano, 3943277);
+
   NiceMock<Stats::MockHistogram> duration_milli;
   duration_milli.name_ = "duration";
   duration_milli.unit_ = Stats::Histogram::Unit::Milliseconds;
@@ -186,6 +196,13 @@ TEST_F(TcpStatsdSinkTest, HistogramUnitScalingOffByDefault) {
 
   EXPECT_CALL(*connection_, write(BufferString("envoy.duration:1500|ms\n"), _));
   sink_->onHistogramComplete(duration_micro, 1500);
+
+  NiceMock<Stats::MockHistogram> duration_nano;
+  duration_nano.name_ = "duration";
+  duration_nano.unit_ = Stats::Histogram::Unit::Nanoseconds;
+
+  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:40700|ms\n"), _));
+  sink_->onHistogramComplete(duration_nano, 40700);
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
   tls_.shutdownThread();
