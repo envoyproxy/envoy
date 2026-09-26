@@ -1040,6 +1040,94 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   dispatcher_->clearDeferredDeleteList();
 }
 
+// Regression test: a second createWasm while a remote fetch is in_progress must return false
+// with exactly one cb(nullptr) call — not fall through to the empty-code path.
+TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  Init::ExpectableWatcherImpl init_watcher;
+
+  std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto vm_config = plugin_config.mutable_vm_config();
+  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  Protobuf::BytesValue vm_configuration_bytes;
+  vm_configuration_bytes.set_value("vm_cache");
+  std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
+  plugin_config.mutable_configuration()->set_value("done");
+
+  std::string sha256_str = Extensions::Common::Wasm::sha256(code);
+  std::string sha256Hex = Hex::encode(absl::Span<const uint8_t>(
+      reinterpret_cast<const uint8_t*>(&*sha256_str.begin()), sha256_str.size()));
+  vm_config->mutable_code()->mutable_remote()->set_sha256(sha256Hex);
+  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_uri(
+      "http://example.com/test.wasm");
+  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_cluster("example_com");
+  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_);
+
+  WasmHandleSharedPtr wasm_handle;
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  int http_fetch_count = 0;
+  cluster_manager.initializeThreadLocalClusters({"example_com"});
+  EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
+      .WillRepeatedly(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            ++http_fetch_count;
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+            response->body().add(code);
+            callbacks.onSuccess(request, std::move(response));
+            return nullptr;
+          }));
+
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
+    init_target_handle = target.createHandle("test");
+  }));
+
+  // First createWasm: cache miss, sets in_progress = true (fetch deferred until init).
+  bool first_ret = createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+                               lifecycle_notifier_, remote_data_provider_,
+                               [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
+  EXPECT_TRUE(first_ret);
+
+  // Second createWasm with the same sha256 while in_progress = true.
+  int race_cb_count = 0;
+  bool second_ret =
+      createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+                 lifecycle_notifier_, remote_data_provider_,
+                 [&race_cb_count](const WasmHandleSharedPtr& w) {
+                   ++race_cb_count;
+                   EXPECT_EQ(w, nullptr);
+                 });
+  EXPECT_FALSE(second_ret);
+  EXPECT_EQ(race_cb_count, 1);
+  EXPECT_EQ(http_fetch_count, 0);
+
+  // Complete the first fetch via the init target.
+  EXPECT_CALL(init_watcher, ready());
+  init_target_handle->initialize(init_watcher);
+  EXPECT_NE(wasm_handle, nullptr);
+  EXPECT_EQ(http_fetch_count, 1);
+
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->clearDeferredDeleteList();
+}
+
 // test that wasm imports/exports do not work when ABI restriction is enforced
 TEST_P(WasmCommonTest, RestrictCapabilities) {
   if (std::get<0>(GetParam()) == "null") {
