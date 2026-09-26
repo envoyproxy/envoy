@@ -654,8 +654,9 @@ TEST_P(QuicMtlsIntegrationTest, MtlsResumptionRefusedButRequestSucceedsWhenCertR
   codec_client_->close();
 }
 
-// Upstream HTTP/3 connections to a server presenting a certificate with only a URI SAN, as X.509
-// SVIDs do. The fake upstream serves the URI-only test certificate instead of the default one.
+// Upstream HTTP/3 connections to a server presenting a certificate with only a URI SAN, as an
+// X.509 SVID does. The fake upstream serves the URI-only test certificate instead of the default
+// one.
 class QuicUpstreamUriSanIntegrationTest : public QuicMtlsIntegrationTest {
 public:
   Network::DownstreamTransportSocketFactoryPtr
