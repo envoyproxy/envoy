@@ -10,6 +10,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
@@ -138,7 +139,7 @@ TEST_F(SessionIdleListTest, TerminateIdleSessionsWhenOverloaded) {
   idle_list_.AddSession(session2);
   time_system_->advanceTimeWait(std::chrono::seconds(1));
   idle_list_.AddSession(session3);
-  time_system_->advanceTimeWait(std::chrono::seconds(1));
+  time_system_->advanceTimeWait(std::chrono::seconds(20));
   idle_list_.MaybeTerminateIdleSessions(/*is_saturated=*/true);
   // When ignore_min_time_before_termination_allowed_ is true, we should
   // terminate up to max_sessions_to_terminate_in_one_round_when_overload_
@@ -153,7 +154,14 @@ TEST_F(SessionIdleListTest, TerminateIdleSessionsWhenOverloaded) {
 }
 
 TEST_F(SessionIdleListTest, MinTimeBeforeTerminationAllowed) {
-  EXPECT_EQ(idle_list_.MinTimeBeforeTerminationAllowed(), absl::Minutes(1));
+  EXPECT_EQ(idle_list_.MinTimeBeforeTerminationAllowed(/*is_saturated=*/false), absl::Minutes(1));
+  EXPECT_EQ(idle_list_.MinTimeBeforeTerminationAllowed(/*is_saturated=*/true), absl::Seconds(10));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.session_idle_list_min_timeout_when_saturated", "false"}});
+  EXPECT_EQ(idle_list_.MinTimeBeforeTerminationAllowed(/*is_saturated=*/true),
+            absl::ZeroDuration());
 }
 
 TEST_F(SessionIdleListTest, RemoveNonExistentSession) {

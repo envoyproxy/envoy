@@ -657,8 +657,10 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsWhenSaturated) {
 
   getIdleList()->set_max_sessions_to_terminate_in_one_round(1);
   getIdleList()->set_max_sessions_to_terminate_in_one_round_when_saturated(2);
-  // Set a large enough gap to verify it's ignored.
+  // Set a large enough gap to verify it's ignored when saturated (which uses 10s).
   getIdleList()->set_min_time_before_termination_allowed(absl::Hours(1));
+  time_system_.advanceTimeAndRun(std::chrono::seconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true);
   EXPECT_EQ(1u, envoy_quic_dispatcher_.NumSessions());
   envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true);
