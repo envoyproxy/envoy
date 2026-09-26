@@ -276,8 +276,44 @@ bazel_lib.yq(version = "4.24.4")
 use_repo(bazel_lib, "jq", "jq_toolchains", "yq", "yq_toolchains")
 
 # Java
+java_toolchains = use_extension("@rules_java//java:extensions.bzl", "toolchains")
+use_repo(
+    java_toolchains,
+    "remotejdk25_linux",
+    "remotejdk25_linux_aarch64",
+    "remotejdk25_linux_ppc64le",
+    "remotejdk25_linux_s390x",
+    "remotejdk25_macos",
+    "remotejdk25_macos_aarch64",
+    "remotejdk25_win",
+    "remotejdk25_win_arm64",
+)
+
 java_compat = use_extension("@rules_java//java:rules_java_deps.bzl", "compatibility_proxy")
 use_repo(java_compat, "compatibility_proxy")
+# Envoy has no first-class Java, but protobuf's Java tooling still needs a hermetic JDK and the
+# javabuilder workaround configured in //bazel:envoy_java_toolchain. The runtime toolchains below
+# must point at concrete @remotejdk25_*//:jdk targets rather than the remotejdk_25 alias to avoid
+# a self-cycle through Java runtime toolchain resolution.
+register_toolchains(
+    "//bazel:envoy_java_toolchain_definition",
+    "//bazel:envoy_java_runtime_toolchain_linux",
+    "//bazel:envoy_java_runtime_toolchain_linux_aarch64",
+    "//bazel:envoy_java_runtime_toolchain_linux_ppc64le",
+    "//bazel:envoy_java_runtime_toolchain_linux_s390x",
+    "//bazel:envoy_java_runtime_toolchain_macos",
+    "//bazel:envoy_java_runtime_toolchain_macos_aarch64",
+    "//bazel:envoy_java_runtime_toolchain_win",
+    "//bazel:envoy_java_runtime_toolchain_win_arm64",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux_aarch64",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux_ppc64le",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux_s390x",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_macos",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_macos_aarch64",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_win",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_win_arm64",
+)
 
 # Python/pip
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
