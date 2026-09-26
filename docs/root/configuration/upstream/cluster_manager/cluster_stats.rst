@@ -370,6 +370,8 @@ the following statistics:
   lb_local_cluster_not_ok, Counter, Local host set is not set or it is panic mode for local cluster
   lb_zone_no_capacity_left, Counter, Total number of times ended with random zone selection due to rounding error
   original_dst_host_invalid, Counter, Total number of invalid hosts passed to original destination load balancer
+  lb_connection_aware_selected_cold, Counter, Total connection-aware selections that fell back to a host without a ready connection
+  lb_connection_aware_skipped_cold, Counter, Total candidate hosts skipped during connection-aware selection because they lacked a ready connection
 
 .. _config_cluster_manager_cluster_stats_subset_lb:
 

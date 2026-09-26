@@ -765,6 +765,8 @@ public:
   COUNTER(lb_zone_routing_all_directly)                                                            \
   COUNTER(lb_zone_routing_cross_zone)                                                              \
   COUNTER(lb_zone_routing_sampled)                                                                 \
+  COUNTER(lb_connection_aware_selected_cold)                                                       \
+  COUNTER(lb_connection_aware_skipped_cold)                                                        \
   GAUGE(lb_subsets_active, Accumulate)
 
 /**

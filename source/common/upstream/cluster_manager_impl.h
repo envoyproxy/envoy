@@ -674,7 +674,7 @@ private:
       void setDropCategory(absl::string_view drop_category) override {
         drop_category_ = drop_category;
       }
-      // Records `params` if new and bootstraps connections for every current host.
+      // Records `params` if new and posts a bootstrap connection for every current host.
       void onHttpConnPoolUsed(const HttpConnPoolParams& params);
       // Opens a bootstrap connection for every host in hosts using locally stored params.
       void maybeBootstrapPreconnectFloor(const HostVector& hosts);
@@ -727,6 +727,19 @@ private:
       UnitFloat drop_overload_{0};
       std::string drop_category_;
 
+      class ConnectionStateProviderImpl : public ConnectionStateProvider {
+      public:
+        ConnectionStateProviderImpl(ClusterEntry& parent) : parent_(parent) {}
+
+        bool hasReadyConnection(const HostConstSharedPtr& host) const override;
+        void preconnect(const HostConstSharedPtr& host) override;
+
+      private:
+        ClusterEntry& parent_;
+      };
+
+      ConnectionStateProviderImpl connection_state_provider_{*this};
+
       // Don't change the order of cluster_info_ and lb_factory_/lb_ as the the lb_factory_/lb_
       // may keep a reference to the cluster_info_.
       ClusterInfoConstSharedPtr cluster_info_;
@@ -735,6 +748,7 @@ private:
       LoadBalancerFactorySharedPtr lb_factory_;
       // Current active LB.
       LoadBalancerPtr lb_;
+      LoadBalancerPtr createLoadBalancer();
       Http::AsyncClientPtr lazy_http_async_client_;
       // Stores QUICHE specific objects which live through out the life time of the cluster and can
       // be shared across its hosts.

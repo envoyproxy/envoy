@@ -128,6 +128,17 @@ message SlowStartConfig {
   type.v3.Percent min_weight_percent = 3;
 }
 
+// Configuration for connection-aware load balancing. When this field is set, host selection
+// prefers hosts that already have at least one established upstream connection on
+// the current worker thread. Most useful in combination with
+// ``preconnect_policy.eager_preconnect_floor``, which proactively opens connections.
+message ConnectionAwareLbConfig {
+  // The maximum number of times to reattempt host selection in order to find a host with a ready
+  // connection. Each reattempt also primes the rejected cold host when
+  // ``preconnect_policy.eager_preconnect_floor`` is enabled. Defaults to 2.
+  google.protobuf.UInt32Value host_selection_retry_max_attempts = 1;
+}
+
 // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
 message ConsistentHashingLbConfig {
   // If set to ``true``, the cluster will use hostname instead of the resolved

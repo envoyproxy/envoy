@@ -1456,13 +1456,25 @@ ClusterInfoImpl::ClusterInfoImpl(
     pending_rq_queue_policy_ = std::move(*policy_or_error);
   }
 
-  // eager_preconnect_floor warms and refills a set of upstream connections per host.
-  // Not compatible with connection_pool_per_downstream_connection, where each pool is bound
-  // to a single downstream connection and torn down when it closes.
-  if (connection_pool_per_downstream_connection_ && eager_preconnect_floor_ > 0) {
-    creation_status = absl::InvalidArgumentError("eager_preconnect_floor is incompatible with "
-                                                 "connection_pool_per_downstream_connection");
-    return;
+  // eager_preconnect_floor warms and refills a set of upstream connections per host, and
+  // connection-aware load balancing inspects/primes connections across requests. Neither is
+  // compatible with connection_pool_per_downstream_connection, where each pool is bound to a
+  // single downstream connection and torn down when it closes.
+  if (connection_pool_per_downstream_connection_) {
+    if (eager_preconnect_floor_ > 0) {
+      creation_status = absl::InvalidArgumentError(
+          "eager_preconnect_floor is incompatible with connection_pool_per_downstream_connection");
+      return;
+    }
+    if ((config.has_round_robin_lb_config() &&
+         config.round_robin_lb_config().has_connection_aware_lb_config()) ||
+        (config.has_least_request_lb_config() &&
+         config.least_request_lb_config().has_connection_aware_lb_config())) {
+      creation_status =
+          absl::InvalidArgumentError("connection_aware_lb_config is incompatible with "
+                                     "connection_pool_per_downstream_connection");
+      return;
+    }
   }
 
   if (config.has_load_balancing_policy() ||

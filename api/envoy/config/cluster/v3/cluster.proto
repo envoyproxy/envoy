@@ -435,11 +435,25 @@ message Cluster {
     type.v3.Percent min_weight_percent = 3;
   }
 
+  // Configuration for connection-aware load balancing. When this field is set, host selection
+  // prefers hosts that already have at least one established upstream connection on
+  // the current worker thread. Most useful in combination with
+  // ``preconnect_policy.eager_preconnect_floor``, which proactively opens connections.
+  message ConnectionAwareLbConfig {
+    // The maximum number of times to reattempt host selection in order to find a host with a ready
+    // connection. Each reattempt also primes the rejected cold host when
+    // ``preconnect_policy.eager_preconnect_floor`` is enabled. Defaults to 2.
+    google.protobuf.UInt32Value host_selection_retry_max_attempts = 1;
+  }
+
   // Specific configuration for the RoundRobin load balancing policy.
   message RoundRobinLbConfig {
     // Configuration for slow start mode.
     // If this configuration is not set, slow start will not be not enabled.
     SlowStartConfig slow_start_config = 1;
+
+    // Configuration for connection-aware load balancing.
+    ConnectionAwareLbConfig connection_aware_lb_config = 2;
   }
 
   // Specific configuration for the LeastRequest load balancing policy.
@@ -479,6 +493,9 @@ message Cluster {
     // Configuration for slow start mode.
     // If this configuration is not set, slow start will not be not enabled.
     SlowStartConfig slow_start_config = 3;
+
+    // Configuration for connection-aware load balancing.
+    ConnectionAwareLbConfig connection_aware_lb_config = 4;
   }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`

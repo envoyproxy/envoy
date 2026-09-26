@@ -1735,7 +1735,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
         "Re-creating local LB for TLS cluster ({}) is deprecated and the LB should be refactored "
         "to not require this",
         name);
-    lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
+    lb_ = createLoadBalancer();
   }
 
   maybeBootstrapPreconnectFloor(hosts_added);
@@ -1843,8 +1843,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::maybeBoots
     return;
   }
   if (pool->maybePreconnect(1.0f)) {
-    ENVOY_LOG(debug,
-              "eager preconnect floor: bootstrapped an HTTP connection to host {} in cluster {}",
+    ENVOY_LOG(debug, "preconnect: opened an HTTP connection to host {} in cluster {}",
               host->address()->asString(), cluster_info_->name());
   }
 }
@@ -1924,7 +1923,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
         "Re-creating local LB for TLS cluster ({}) is deprecated and the LB should be refactored "
         "to not require this",
         cluster_info_->name());
-    lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
+    lb_ = createLoadBalancer();
   }
 
   HostVector all_hosts_added;
@@ -2325,7 +2324,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   ASSERT(lb_factory_ != nullptr);
-  lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
+  lb_ = createLoadBalancer();
+}
+
+LoadBalancerPtr
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::createLoadBalancer() {
+  return lb_factory_->create(
+      {priority_set_, parent_.local_priority_set_, &connection_state_provider_});
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
@@ -2530,6 +2535,17 @@ HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cluster
     }
   }
   return response;
+}
+
+bool ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ConnectionStateProviderImpl::
+    hasReadyConnection(const HostConstSharedPtr& host) const {
+  auto* http_container = parent_.parent_.getHttpConnPoolsContainer(host);
+  return http_container != nullptr && http_container->pools_->hasReadyConnection();
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ConnectionStateProviderImpl::
+    preconnect(const HostConstSharedPtr& host) {
+  parent_.maybeBootstrapPreconnectFloor(host);
 }
 
 HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(

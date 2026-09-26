@@ -410,7 +410,9 @@ uint64_t LoadBalancerBase::random(bool peeking) {
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-    const std::optional<LocalityLbConfig> locality_config)
+    const std::optional<LocalityLbConfig> locality_config,
+    const std::optional<ConnectionAwareLbConfig> connection_aware_lb_config,
+    ConnectionStateProvider* connection_state_provider)
     : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
       local_priority_set_(local_priority_set),
       min_cluster_size_(locality_config.has_value()
@@ -446,7 +448,15 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
       locality_weighted_balancing_(locality_config.has_value() &&
-                                   locality_config->has_locality_weighted_lb_config()) {
+                                   locality_config->has_locality_weighted_lb_config()),
+      connection_state_provider_(connection_aware_lb_config.has_value() ? connection_state_provider
+                                                                        : nullptr),
+      connection_aware_attempts_(
+          connection_state_provider_ != nullptr
+              ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(connection_aware_lb_config.value(),
+                                                host_selection_retry_max_attempts, 2) +
+                    1
+              : 0) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   if (locality_weighted_balancing_) {
@@ -658,19 +668,39 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
 HostSelectionResponse ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   HostConstSharedPtr host;
 
-  const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
-  for (size_t i = 0; i < max_attempts; ++i) {
-    host = chooseHostOnce(context);
-
-    // If host selection failed or the host is accepted by the filter, return.
-    // Otherwise, try again.
-    // Note: in the future we might want to allow retrying when chooseHostOnce returns nullptr.
-    if (!host || !context || !context->shouldSelectAnotherHost(*host)) {
-      return host;
+  if (connection_state_provider_ == nullptr) {
+    const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
+    for (size_t i = 0; i < max_attempts; ++i) {
+      host = chooseHostOnce(context);
+      if (!host || !context || !context->shouldSelectAnotherHost(*host)) {
+        return host;
+      }
     }
+    return host;
   }
 
-  // If we didn't find anything, return the last host.
+  const size_t context_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
+  for (size_t i = 0; i < connection_aware_attempts_; ++i) {
+    for (size_t j = 0; j < context_attempts; ++j) {
+      host = chooseHostOnce(context);
+      if (!host || !context || !context->shouldSelectAnotherHost(*host)) {
+        break;
+      }
+    }
+
+    if (!host) {
+      return host;
+    }
+
+    if (connection_state_provider_->hasReadyConnection(host)) {
+      return host;
+    }
+
+    connection_state_provider_->preconnect(host);
+    stats_.lb_connection_aware_skipped_cold_.inc();
+  }
+
+  stats_.lb_connection_aware_selected_cold_.inc();
   return host;
 }
 
@@ -950,9 +980,12 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
     const std::optional<LocalityLbConfig> locality_config,
-    const std::optional<SlowStartConfig> slow_start_config, TimeSource& time_source)
+    const std::optional<SlowStartConfig> slow_start_config,
+    const std::optional<ConnectionAwareLbConfig> connection_aware_lb_config,
+    TimeSource& time_source, ConnectionStateProvider* connection_state_provider)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                healthy_panic_threshold, locality_config),
+                                healthy_panic_threshold, locality_config,
+                                connection_aware_lb_config, connection_state_provider),
       seed_(random_.random()),
       slow_start_window_(slow_start_config.has_value()
                              ? std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
