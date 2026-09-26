@@ -19,9 +19,7 @@ bazel_dep(name = "googletest", version = "1.18.0.bcr.1")
 bazel_dep(name = "googleurl", version = "0.0.0-221103-dd4080f.envoy")
 bazel_dep(name = "gperftools", version = "2.18.1")
 bazel_dep(name = "grpc", version = "1.83.0.envoy")
-
 bazel_dep(name = "hermetic-android-toolchains", version = "0.4.0.envoy", dev_dependency = True)
-
 bazel_dep(name = "librdkafka", version = "2.15.0")
 bazel_dep(name = "libsxg", version = "0.0.0-210708-beaa393.envoy")
 bazel_dep(name = "openssl", version = "3.5.7.envoy")
@@ -110,8 +108,8 @@ single_version_override(
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
-    is_default = True,
     python_version = "3.12",
+    is_default = True,
 )
 use_repo(python, "python_3_12")
 
@@ -127,11 +125,7 @@ envoy_repo_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_repo_exten
 use_repo(envoy_repo_ext, "envoy_repo")
 
 envoy_build_config_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_build_config_ext")
-
-override_repo(
-    envoy_build_config_ext,
-    envoy_build_config = "envoy_build_config",
-)
+override_repo(envoy_build_config_ext, envoy_build_config = "envoy_build_config")
 
 mobile_platforms_ext = use_extension("//bazel:extensions.bzl", "envoy_mobile_platforms_extension")
 use_repo(mobile_platforms_ext, "mobile_clang_platform")
@@ -147,8 +141,8 @@ use_repo(remote_android_extensions, "android_gmaven_r8", "android_tools")
 
 android = use_extension("@hermetic-android-toolchains//:extensions.bzl", "android", dev_dependency = True)
 android.sdk(
-    build_tools_version = "35.0.0",
     version = "30",
+    build_tools_version = "35.0.0",
 )
 android.ndk(
     api_level = 23,
@@ -158,23 +152,18 @@ use_repo(android, "androidndk", "androidsdk")
 
 # Make @rules_android's @androidsdk labels resolve to the hermetic SDK.
 rules_android_sdk = use_extension("@rules_android//rules/android_sdk_repository:rule.bzl", "android_sdk_repository_extension", dev_dependency = True)
-
 override_repo(rules_android_sdk, "androidsdk")
 
 # Make @rules_android_ndk's @androidndk labels resolve to the hermetic NDK.
 rules_android_ndk = use_extension("@rules_android_ndk//:extension.bzl", "android_ndk_repository_extension", dev_dependency = True)
-
 override_repo(rules_android_ndk, "androidndk")
 
-register_toolchains(
-    "@androidndk//:all",
-    "@androidsdk//:all",
-    dev_dependency = True,
-)
+register_toolchains("@androidndk//:all", "@androidsdk//:all", dev_dependency = True)
 
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
     name = "maven",
+    known_contributing_modules = ["protobuf"],
     artifacts = [
         "com.google.code.findbugs:jsr305:3.0.2",
         "androidx.annotation:annotation:1.5.0",
@@ -203,21 +192,19 @@ maven.install(
         "org.robolectric:robolectric:4.17",
         "org.hamcrest:hamcrest:3.0",
     ],
-    known_contributing_modules = ["protobuf"],
+    version_conflict_policy = "pinned",
     repositories = [
         "https://repo1.maven.org/maven2",
         "https://maven.google.com",
     ],
-    version_conflict_policy = "pinned",
 )
 use_repo(maven, "maven")
-
 maven.artifact(
     name = "rules_android_maven",
-    artifact = "protobuf-java",
-    force_version = True,
     group = "com.google.protobuf",
+    artifact = "protobuf-java",
     version = "4.35.1",
+    force_version = True,
 )
 
 # This pin is only for rules_android_maven's own tooling; it is intentionally independent from the
@@ -241,7 +228,7 @@ maven.install(
 )
 
 extra_sources = use_extension("//bazel:extensions.bzl", "envoy_mobile_extra_sources_extension")
-use_repo(extra_sources, "envoy_mobile_extra_jni_deps", "envoy_mobile_extra_swift_sources")
+use_repo(extra_sources, "envoy_mobile_extra_swift_sources", "envoy_mobile_extra_jni_deps")
 
 quiche = use_extension("@quiche//:extensions.bzl", "quiche")
 quiche.deps(
