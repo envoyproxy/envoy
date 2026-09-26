@@ -4,6 +4,7 @@ bazel_dep(name = "envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
 bazel_dep(name = "envoy-docs", version = "1.40.0-dev")
 bazel_dep(name = "envoy_toolshed", version = "0.5.0.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.0.envoy")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "protobuf", version = "35.1.bcr.envoy")
 bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
@@ -26,6 +27,20 @@ local_path_override(
 local_path_override(
     module_name = "envoy-docs",
     path = "../../../docs",
+)
+
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "bd76d894a17def93b25f618fa257200da93e4f92",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "bd76d894a17def93b25f618fa257200da93e4f92",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "jq",
 )
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
