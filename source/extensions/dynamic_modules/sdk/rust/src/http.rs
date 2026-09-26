@@ -2105,7 +2105,11 @@ pub trait EnvoyHttpFilter {
   /// Get the upstream connection ID, or 0 if not available.
   fn get_upstream_connection_id(&self) -> u64;
 
-  /// Get the remote address of the upstream connection, including the port.
+  /// Get the remote address of the connected upstream socket, including the port.
+  ///
+  /// This can differ from
+  /// [`abi::envoy_dynamic_module_type_attribute_id::UpstreamAddress`], which exposes the selected
+  /// upstream host address.
   ///
   /// Returns `None` if the address is unavailable. The buffer is valid until the current event
   /// hook returns.

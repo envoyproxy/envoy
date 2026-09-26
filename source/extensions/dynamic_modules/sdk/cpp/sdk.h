@@ -788,7 +788,8 @@ public:
   virtual std::optional<ClusterHostCounts> getClusterHostCounts(uint32_t priority) = 0;
 
   /**
-   * Retrieves the remote address of the upstream connection, including the port.
+   * Retrieves the remote address of the connected upstream socket, including the port. This can
+   * differ from AttributeId::UpstreamAddress, which exposes the selected upstream host address.
    */
   virtual std::optional<std::string_view> getUpstreamRemoteAddress() = 0;
 

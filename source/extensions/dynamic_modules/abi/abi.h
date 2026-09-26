@@ -3618,7 +3618,10 @@ uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 /**
- * Get the remote address of the upstream connection, including the port.
+ * Get the remote address of the connected upstream socket, including the port.
+ *
+ * This can differ from envoy_dynamic_module_type_attribute_id_UpstreamAddress, which exposes the
+ * selected upstream host address.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
  * @param result is the pointer to store the address. The buffer is owned by Envoy and is valid

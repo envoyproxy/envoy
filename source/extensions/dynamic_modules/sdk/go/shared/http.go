@@ -368,8 +368,10 @@ type HttpFilterHandle interface {
 	// Returns host counts and true if successful, otherwise a zero-valued struct and false.
 	GetClusterHostCounts(priority uint32) (ClusterHostCounts, bool)
 
-	// GetUpstreamRemoteAddress returns the remote address of the upstream connection, including
-	// the port. The buffer is owned by Envoy and is valid until the current event hook returns.
+	// GetUpstreamRemoteAddress returns the remote address of the connected upstream socket,
+	// including the port. This can differ from AttributeIDUpstreamAddress, which exposes the
+	// selected upstream host address. The buffer is owned by Envoy and is valid until the current
+	// event hook returns.
 	GetUpstreamRemoteAddress() (UnsafeEnvoyBuffer, bool)
 
 	// GetUpstreamHostsAttempted returns the upstream host addresses in attempt order. The buffers
