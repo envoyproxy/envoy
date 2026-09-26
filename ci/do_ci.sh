@@ -12,8 +12,22 @@ CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
 CI_TARGET=$1
 
+# Portable realpath alternative since macOS realpath does not support -m.
+_realpath() {
+    local path="$1"
+    if [[ -d "$path" ]]; then
+        cd "$path" && pwd
+    elif [[ "$path" != /* ]]; then
+        echo "${PWD}/${path}"
+    else
+        echo "$path"
+    fi
+}
+
 # shellcheck source=ci/build_setup.sh
 . "${CURRENT_SCRIPT_DIR}"/build_setup.sh
+# shellcheck source=ci/bazel_fun.sh
+. "${CURRENT_SCRIPT_DIR}"/bazel_fun.sh
 
 echo "building for ${ENVOY_BUILD_ARCH}"
 
@@ -27,138 +41,6 @@ else
   # Fall back to use the ENVOY_BUILD_ARCH itself.
   BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
-
-# Portable realpath alternative since macOS realpath does not support -m.
-_realpath() {
-    local path="$1"
-    if [[ -d "$path" ]]; then
-        cd "$path" && pwd
-    elif [[ "$path" != /* ]]; then
-        echo "${PWD}/${path}"
-    else
-        echo "$path"
-    fi
-}
-
-ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
-ENVOY_DOCS_PATH="$(_realpath "$ENVOY_DOCS_PATH")"
-LOCKFILES_DIFF_OUTPUT="${LOCKFILES_DIFF_OUTPUT:-/build/fix_lockfiles.diff}"
-readonly LOCKFILE_PATHSPEC=':(glob)**/MODULE.bazel.lock'
-readonly -a REGISTRY_BAZELRC_FILES=(
-    ".bazelrc"
-    "api/.bazelrc"
-    "bazel/tests/external/.bazelrc"
-)
-
-lockfiles_check() {
-    lockfiles_generate
-    if [[ -z "$(git status --porcelain -- "$LOCKFILE_PATHSPEC")" ]]; then
-        return 0
-    fi
-    git --no-pager diff --stat -- "$LOCKFILE_PATHSPEC"
-    echo >&2
-    echo "FAIL: Lockfiles are not in sync, please run: ci/do_ci.sh lockfiles" >&2
-    if { git --no-pager diff -- "$LOCKFILE_PATHSPEC" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
-        echo "  Full diff written to ${LOCKFILES_DIFF_OUTPUT}" >&2
-    fi
-    echo >&2
-    exit 1
-}
-
-lockfiles_generate() {
-    local module_dir
-    for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/external/; do
-        pushd "$module_dir" > /dev/null
-        bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
-        bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
-        popd > /dev/null
-    done
-}
-
-registry_current_hash() {
-    local bazelrc
-    local hash
-    local current_hash=""
-
-    for bazelrc in "${REGISTRY_BAZELRC_FILES[@]}"; do
-        hash="$(sed -n -E \
-            's#^common --registry=https://raw\.githubusercontent\.com/envoyproxy/bazel-registry/([0-9a-f]+)$#\1#p' \
-            "$bazelrc")"
-        if [[ -z "${hash}" ]]; then
-            echo "FAIL: Failed to determine current registry hash from ${bazelrc}" >&2
-            return 1
-        fi
-        if [[ -n "${current_hash}" && "${current_hash}" != "${hash}" ]]; then
-            echo "FAIL: Registry hash mismatch: ${bazelrc} has ${hash}, expected ${current_hash}" >&2
-            return 1
-        fi
-        current_hash="${hash}"
-    done
-
-    echo "${current_hash}"
-}
-
-registry_check() {
-    local registry_repo="${ENVOY_REGISTRY_REPO:-https://github.com/envoyproxy/bazel-registry}"
-    local registry_branch="${ENVOY_REGISTRY_BRANCH:-main}"
-    local registry_hash
-    local registry_dir
-    local tags
-    local version
-
-    registry_hash="$(registry_current_hash)"
-    version="$(cat VERSION.txt)"
-
-    registry_dir="$(mktemp -d)"
-    # shellcheck disable=SC2064
-    trap "rm -rf '${registry_dir}'" RETURN
-    # Blobless bare clone: history/tags without file contents.
-    git clone --quiet --bare --filter=blob:none "${registry_repo}" "${registry_dir}"
-
-    if ! git -c safe.bareRepository=all -C "${registry_dir}" \
-        cat-file -e "${registry_hash}^{commit}" 2>/dev/null; then
-        echo "FAIL: Registry commit ${registry_hash} not found in ${registry_repo}" >&2
-        return 1
-    fi
-    if ! git -c safe.bareRepository=all -C "${registry_dir}" \
-        merge-base --is-ancestor "${registry_hash}" "${registry_branch}"; then
-        echo "FAIL: Registry commit ${registry_hash} is not an ancestor of ${registry_branch}" >&2
-        return 1
-    fi
-    echo "Registry commit ${registry_hash} is an ancestor of ${registry_branch}"
-
-    tags="$(git -c safe.bareRepository=all -C "${registry_dir}" tag --points-at "${registry_hash}")"
-    if [[ -n "${tags}" ]]; then
-        echo "Registry commit ${registry_hash} is tagged: ${tags//$'\n'/ }"
-        return 0
-    fi
-    if [[ "${version}" == *-dev ]]; then
-        echo "WARNING: registry commit ${registry_hash} is not a tagged version (ok for ${version})" >&2
-        return 0
-    fi
-    echo "FAIL: Registry commit ${registry_hash} is not a tagged version, required for release ${version}" >&2
-    return 1
-}
-
-registry_bump() {
-    local registry_hash="$1"
-    local bazelrc
-    local old_hash
-
-    old_hash="$(registry_current_hash)"
-
-    if [[ "${old_hash}" == "${registry_hash}" ]]; then
-        echo "registry hash unchanged: ${old_hash}"
-        return 0
-    fi
-
-    for bazelrc in "${REGISTRY_BAZELRC_FILES[@]}"; do
-        sed -i -E \
-            "s#^(common --registry=https://raw\\.githubusercontent\\.com/envoyproxy/bazel-registry/)[0-9a-f]+\$#\1${registry_hash}#" \
-            "$bazelrc"
-        echo "${bazelrc}: ${old_hash} -> ${registry_hash}"
-    done
-}
 
 setup_clang_toolchain() {
     local config
@@ -523,10 +405,17 @@ function build_openssl_presubmit() {
 
 shift
 
+DEPENDENCY_ARGS=()
+
 if [[ "$CI_TARGET" =~ bazel.* ]]; then
     ORIG_CI_TARGET="$CI_TARGET"
     CI_TARGET="$(echo "${CI_TARGET}" | cut -d. -f2-)"
     echo "Using \`${ORIG_CI_TARGET}\` is deprecated, please use \`${CI_TARGET}\`"
+fi
+
+if [[ "${CI_TARGET}" == "deps.update" ]]; then
+    DEPENDENCY_ARGS=("$@")
+    set --
 fi
 
 if [[ $# -ge 1 ]]; then
@@ -819,6 +708,18 @@ case $CI_TARGET in
         #       //tools/base:requirements_test
         ;;
 
+    deps.report)
+        deps_report
+        ;;
+
+    deps.update)
+        if [[ ${#DEPENDENCY_ARGS[@]} -ne 1 ]]; then
+            echo "Usage: ci/do_ci.sh deps.update <name[=version]>" >&2
+            exit 1
+        fi
+        deps_update "${DEPENDENCY_ARGS[0]}"
+        ;;
+
     dev)
         setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
@@ -1075,28 +976,7 @@ case $CI_TARGET in
             registry_check
             exit 0
         fi
-        if [[ -n "$ENVOY_REGISTRY_HASH" ]]; then
-            registry_hash="$ENVOY_REGISTRY_HASH"
-        else
-            registry_hash="$(
-                git ls-remote \
-                    "${ENVOY_REGISTRY_REPO:-https://github.com/envoyproxy/bazel-registry}" \
-                    "refs/heads/${ENVOY_REGISTRY_BRANCH:-main}" \
-                    | cut -f1
-            )"
-        fi
-        if [[ -z "${registry_hash}" ]]; then
-            echo "FAIL: Failed to determine Envoy bazel-registry hash" >&2
-            exit 1
-        fi
-        old_registry_hash="$(registry_current_hash)"
-        registry_bump "$registry_hash"
-        if ! registry_check; then
-            echo "FAIL: registry hash ${registry_hash} rejected, restoring ${old_registry_hash}" >&2
-            registry_bump "$old_registry_hash"
-            exit 1
-        fi
-        lockfiles_generate
+        registry_update
         ;;
 
     release|release.server_only|release.test_only)
