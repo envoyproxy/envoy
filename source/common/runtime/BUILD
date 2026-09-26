@@ -23,6 +23,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "breaking_changes_flags",
+    hdrs = [
+        "breaking_changes_flags.h",
+    ],
+)
+
+envoy_cc_library(
     name = "runtime_features_lib",
     srcs = [
         "runtime_features.cc",
@@ -46,6 +53,7 @@ envoy_cc_library(
         # AVOID ADDING TO THESE DEPENDENCIES IF POSSIBLE
         # Any code using runtime guards depends on this library, and the more dependencies there are,
         # the harder it is to runtime-guard without dependency loops.
+        ":breaking_changes_flags",
         "@abseil-cpp//absl/flags:commandlineflag",
         "@abseil-cpp//absl/flags:flag",
         "//envoy/http:codec_runtime_overrides",
@@ -109,4 +117,21 @@ envoy_cc_library(
         "//source/common/quic/platform:quiche_flags_impl_lib",
         "@quiche//:quic_platform_base",
     ]),
+)
+
+envoy_cc_library(
+    name = "breaking_changes",
+    srcs = [
+        "breaking_changes.cc",
+    ],
+    hdrs = [
+        "breaking_changes.h",
+    ],
+    deps = [
+        ":breaking_changes_flags",
+        "//envoy/stream_info:filter_state_interface",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/strings",
+    ],
 )
