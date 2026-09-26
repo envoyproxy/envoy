@@ -30,6 +30,7 @@
 #include "source/common/router/header_parser.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/udp_source_address_policy.h"
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/router/router_impl.h"
 
@@ -731,7 +732,7 @@ protected:
 
   private:
     void onReadReady();
-    void createUdpSocket(const Upstream::HostConstSharedPtr& host);
+    bool createUdpSocket(const Upstream::HostConstSharedPtr& host);
 
     // The socket is used for writing packets to the selected upstream host as well as receiving
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
@@ -739,7 +740,7 @@ protected:
     Network::SocketPtr udp_socket_;
     // The socket has been connected to avoid port exhaustion.
     bool connected_{};
-    const bool use_original_src_ip_;
+    Upstream::UdpSourceAddressPolicy source_address_policy_;
   };
 
   /**

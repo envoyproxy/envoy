@@ -33,6 +33,26 @@ source port. On Linux, it requires the ``CAP_NET_ADMIN`` capability. Because ups
 addressed to the original downstream IP, the deployment must use Direct Server Return or configure
 the return routing described in the API documentation.
 
+Upstream source binding
+-----------------------
+
+Native UDP upstream sockets honor the per-cluster :ref:`upstream_bind_config
+<envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>` and the bootstrap-wide
+:ref:`upstream_bind_config
+<envoy_v3_api_field_config.bootstrap.v3.ClusterManager.upstream_bind_config>`. The per-cluster
+configuration takes precedence over the bootstrap configuration. Envoy applies the selected source
+address and pre-bind socket options before sending the first upstream datagram.
+
+A source address with port ``0`` lets the kernel choose an ephemeral port and is recommended for
+most deployments. A fixed source port can collide when multiple UDP sessions select the same local
+address and port. Configured source-port ranges and port reservation are not currently supported.
+
+When :ref:`use_original_src_ip
+<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_original_src_ip>` is
+enabled, transparent source binding takes precedence over ``upstream_bind_config``. In that mode,
+Envoy uses the downstream peer IP for each upstream datagram and does not bind the configured source
+address.
+
 Load balancing and unhealthy host handling
 ------------------------------------------
 

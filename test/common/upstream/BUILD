@@ -883,6 +883,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "udp_source_address_policy_test",
+    size = "small",
+    srcs = ["udp_source_address_policy_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/upstream:udp_source_address_policy_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/network:socket_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "local_address_selector_integration_test",
     size = "large",
     srcs = ["local_address_selector_integration_test.cc"],

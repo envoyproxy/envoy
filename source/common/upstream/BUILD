@@ -604,6 +604,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "udp_source_address_policy_lib",
+    srcs = ["udp_source_address_policy.cc"],
+    hdrs = ["udp_source_address_policy.h"],
+    deps = [
+        "//envoy/network:address_interface",
+        "//envoy/network:socket_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/network:socket_option_factory_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "default_local_address_selector_factory",
     srcs = [
         "default_local_address_selector_factory.cc",
