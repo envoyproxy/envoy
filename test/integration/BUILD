@@ -3264,12 +3264,14 @@ envoy_cc_test(
     name = "quic_mtls_integration_test",
     srcs = envoy_select_enable_http3(["quic_mtls_integration_test.cc"]),
     data = [
+        "//test/common/tls/test_data:certs",
         "//test/config/integration/certs",
     ],
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",
         "//source/common/quic:quic_ssl_connection_info_lib",
         "//source/extensions/formatter/cel:config",
+        "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ]),

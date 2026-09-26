@@ -169,15 +169,19 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
   ThreadLocalQuicConfig& tls_config = *tls_slot_;
 
   if (tls_config.client_context_ != context) {
-    bool accept_untrusted =
-        clientContextConfig() && clientContextConfig()->certificateValidationContext() &&
-        clientContextConfig()->certificateValidationContext()->trustChainVerification() ==
-            envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
-                ACCEPT_UNTRUSTED;
+    const Ssl::CertificateValidationContextConfig* validation_context =
+        clientContextConfig() ? clientContextConfig()->certificateValidationContext() : nullptr;
+    const bool accept_untrusted =
+        validation_context != nullptr && validation_context->trustChainVerification() ==
+                                             envoy::extensions::transport_sockets::tls::v3::
+                                                 CertificateValidationContext::ACCEPT_UNTRUSTED;
+    const bool explicit_identity_check =
+        Quic::EnvoyQuicProofVerifier::hasExplicitIdentityCheck(validation_context);
     // If the context has been updated, update the crypto config.
     tls_config.client_context_ = context;
     tls_config.crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context), accept_untrusted),
+        std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context), accept_untrusted,
+                                                       explicit_identity_check),
         std::make_unique<quic::QuicClientSessionCache>());
 
     registerCertCompression(tls_config.crypto_config_->ssl_ctx());
