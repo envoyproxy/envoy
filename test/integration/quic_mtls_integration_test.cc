@@ -3,7 +3,9 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 
+#include "source/common/config/utility.h"
 #include "source/common/quic/quic_ssl_connection_info.h"
 #include "source/common/tls/cert_validator/san_matcher.h"
 
@@ -649,6 +651,125 @@ TEST_P(QuicMtlsIntegrationTest, MtlsResumptionRefusedButRequestSucceedsWhenCertR
   // the client certificate against the unchanged trust anchor, so the request succeeds.
   sendRequestAndExpectSuccess();
   expectResumption(false);
+  codec_client_->close();
+}
+
+// Upstream HTTP/3 connections to a server presenting a certificate with only a URI SAN, as X.509
+// SVIDs do. The fake upstream serves the URI-only test certificate instead of the default one.
+class QuicUpstreamUriSanIntegrationTest : public QuicMtlsIntegrationTest {
+public:
+  Network::DownstreamTransportSocketFactoryPtr
+  createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config) override {
+    RELEASE_ASSERT(upstream_config.upstream_protocol_ == Http::CodecType::HTTP3, "");
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+    certs->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/common/tls/test_data/san_uri_cert.pem"));
+    certs->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/common/tls/test_data/san_uri_key.pem"));
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+    quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
+    auto& config_factory = Config::Utility::getAndCheckFactoryByName<
+        Server::Configuration::DownstreamTransportSocketConfigFactory>(
+        "envoy.transport_sockets.quic");
+    return *config_factory.createTransportSocketFactory(quic_config, factory_context_, {});
+  }
+
+  // Points the cluster's QUIC upstream TLS context at the CA of the URI-only certificate, with an
+  // SNI that is not a DNS name and optionally a URI SAN matcher for the certificate's identity.
+  void setupUpstreamValidation(bool with_san_matcher, bool with_spiffe_validator = false) {
+    setUpstreamProtocol(Http::CodecType::HTTP3);
+    config_helper_.addConfigModifier([with_san_matcher, with_spiffe_validator](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* transport_socket =
+          bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+      envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_config;
+      ASSERT_TRUE(
+          MessageUtil::unpackTo(*transport_socket->mutable_typed_config(), quic_config).ok());
+      auto* tls_context = quic_config.mutable_upstream_tls_context();
+      tls_context->set_sni("not-a-dns-name");
+      auto* validation_context =
+          tls_context->mutable_common_tls_context()->mutable_validation_context();
+      if (with_spiffe_validator) {
+        envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig spiffe_config;
+        auto* trust_domain = spiffe_config.add_trust_domains();
+        trust_domain->set_name("lyft.com");
+        trust_domain->mutable_trust_bundle()->set_filename(
+            TestEnvironment::runfilesPath("test/common/tls/test_data/ca_cert.pem"));
+        auto* custom_validator = validation_context->mutable_custom_validator_config();
+        custom_validator->set_name("envoy.tls.cert_validator.spiffe");
+        ASSERT_TRUE(custom_validator->mutable_typed_config()->PackFrom(spiffe_config));
+      } else {
+        validation_context->mutable_trusted_ca()->set_filename(
+            TestEnvironment::runfilesPath("test/common/tls/test_data/ca_cert.pem"));
+      }
+      if (with_san_matcher) {
+        auto* san_matcher = validation_context->add_match_typed_subject_alt_names();
+        san_matcher->set_san_type(
+            envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+        san_matcher->mutable_matcher()->set_exact("spiffe://lyft.com/test-team");
+      }
+      ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(quic_config));
+    });
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, QuicUpstreamUriSanIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// With a URI SAN matcher the upstream handshake succeeds although the server certificate has no
+// DNS SAN matching the SNI.
+TEST_P(QuicUpstreamUriSanIntegrationTest, UriSanMatcherWithoutDnsSan) {
+  setupUpstreamValidation(/*with_san_matcher=*/true);
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  codec_client_->close();
+}
+
+// The SPIFFE validator owns the identity check, so no DNS SAN matching the SNI is required.
+TEST_P(QuicUpstreamUriSanIntegrationTest, SpiffeValidatorWithoutDnsSan) {
+  setupUpstreamValidation(/*with_san_matcher=*/false, /*with_spiffe_validator=*/true);
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  codec_client_->close();
+}
+
+// Without an explicit identity check the SNI must still match a DNS SAN, so the handshake fails.
+TEST_P(QuicUpstreamUriSanIntegrationTest, NoSanMatcherStillRequiresDnsSan) {
+  setupUpstreamValidation(/*with_san_matcher=*/false);
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  codec_client_->close();
+}
+
+// The runtime guard restores the unconditional SNI check.
+TEST_P(QuicUpstreamUriSanIntegrationTest, UriSanMatcherWithRuntimeGuardDisabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.quic_hostname_check_deferred_to_explicit_san_match", "false");
+  setupUpstreamValidation(/*with_san_matcher=*/true);
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
   codec_client_->close();
 }
 

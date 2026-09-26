@@ -17,6 +17,10 @@ envoy_cc_extension(
         "spiffe_validator.h",
     ],
     external_deps = ["ssl"],
+    # Ensure this could be used in integration tests.
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//envoy/router:string_accessor_interface",
         "//envoy/ssl:context_config_interface",
