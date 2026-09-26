@@ -1,4 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("@envoy_toolshed//dependency:macros.bzl", "module_deps_json", "module_updater")
 
 licenses(["notice"])  # Apache 2
 
@@ -13,6 +14,19 @@ exports_files([
     "pom_template.xml",
     "test_manifest.xml",
 ])
+
+module_deps_json(
+    name = "module_deps",
+    lockfile = "//:MODULE.bazel.lock",
+    module_file = "//:MODULE.bazel",
+)
+
+module_updater(
+    name = "update_module",
+    bazelrc = "@envoy//:.bazelrc",
+    dependencies = ":module_deps",
+    module_file = "//:MODULE.bazel",
+)
 
 alias(
     name = "zipper",

@@ -49,6 +49,86 @@ readonly -a REGISTRY_BAZELRC_FILES=(
     "api/.bazelrc"
     "bazel/tests/external/.bazelrc"
 )
+# shellcheck disable=SC2034
+readonly -a MODULE_DIRS=(. "$ENVOY_DOCS_PATH" api mobile bazel/tests/external)
+# shellcheck disable=SC2034
+readonly -a REGISTRY_MODULE_DIRS=(. api bazel/tests/external)
+
+run_in_mods() {
+    local -n _mod_dirs="$1"
+    local fn="$2"
+    shift 2
+    local module_dir status
+
+    declare -F "$fn" > /dev/null || {
+        echo "FAIL: no such function: ${fn}" >&2
+        return 1
+    }
+    for module_dir in "${_mod_dirs[@]}"; do
+        status=0
+        pushd "$module_dir" > /dev/null
+        "$fn" "$module_dir" "$@" || status=$?
+        bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
+        popd > /dev/null
+        (( status == 0 )) || return "$status"
+    done
+}
+
+run_in_nested_mods() {
+    run_in_mods MODULE_DIRS "$@"
+}
+
+run_in_registry_mods() {
+    run_in_mods REGISTRY_MODULE_DIRS "$@"
+}
+
+workspace_name() {
+    local module_dir="${1%/}"
+
+    case "$module_dir" in
+        .) echo "root" ;;
+        "$ENVOY_DOCS_PATH") echo "docs" ;;
+        api) echo "api" ;;
+        mobile) echo "mobile" ;;
+        bazel/tests/external) echo "bazel/tests/external" ;;
+        *) echo "$module_dir" ;;
+    esac
+}
+
+workspace_target() {
+    local module_dir="${1%/}"
+    local target_name="$2"
+
+    case "$module_dir" in
+        .) echo "//bazel/dependency:${target_name}" ;;
+        "$ENVOY_DOCS_PATH") echo "//:${target_name}" ;;
+        api) echo "//bazel:${target_name}" ;;
+        mobile) echo "//bazel:${target_name}" ;;
+        bazel/tests/external) echo "//:${target_name}" ;;
+        *)
+            echo "FAIL: Unknown workspace: ${module_dir}" >&2
+            return 1
+            ;;
+    esac
+}
+
+workspace_bazel_options() {
+    case "${1%/}" in
+        mobile|api) ;;
+        *) echo --config=clang ;;
+    esac
+}
+
+workspace_bazel_run() {
+    local module_dir="$1"
+    local target_name="$2"
+    local target
+    shift 2
+
+    target="$(workspace_target "$module_dir" "$target_name")" || return 1
+    # shellcheck disable=SC2046
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" $(workspace_bazel_options "$module_dir") "$target" "$@"
+}
 
 lockfiles_check() {
     lockfiles_generate
@@ -66,13 +146,11 @@ lockfiles_check() {
 }
 
 lockfiles_generate() {
-    local module_dir
-    for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/external/; do
-        pushd "$module_dir" > /dev/null
-        bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
-        bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
-        popd > /dev/null
-    done
+    run_in_nested_mods _lockfiles_generate_mod
+}
+
+_lockfiles_generate_mod() {
+    bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
 }
 
 registry_current_hash() {
@@ -99,65 +177,138 @@ registry_current_hash() {
 }
 
 registry_check() {
-    local registry_repo="${ENVOY_REGISTRY_REPO:-https://github.com/envoyproxy/bazel-registry}"
-    local registry_branch="${ENVOY_REGISTRY_BRANCH:-main}"
-    local registry_hash
-    local registry_dir
-    local tags
     local version
+    local registry_hash=""
 
-    registry_hash="$(registry_current_hash)"
     version="$(cat VERSION.txt)"
+    if [[ -n "${ENVOY_REGISTRY_ALLOW_UNSAFE:-}" ]]; then
+        run_in_registry_mods _registry_check_mod \
+            "--@envoy_toolshed//dependency:registry_allow_unsafe=true"
+        return
+    fi
+    run_in_registry_mods _registry_check_mod
+}
 
-    registry_dir="$(mktemp -d)"
+_registry_check_mod() {
+    local module_dir="$1"
+    local markdown_path
+    local sha
+    local sha_path
+    local status_path
+    local tags
+    local workspace
+    shift
+
+    workspace="$(workspace_name "$module_dir")"
+    status_path="$(mktemp)"
+    markdown_path="$(mktemp)"
+    sha_path="$(mktemp)"
     # shellcheck disable=SC2064
-    trap "rm -rf '${registry_dir}'" RETURN
-    # Blobless bare clone: history/tags without file contents.
-    git clone --quiet --bare --filter=blob:none "${registry_repo}" "${registry_dir}"
+    trap "rm -f '${status_path}' '${markdown_path}' '${sha_path}'" RETURN
 
-    if ! git -c safe.bareRepository=all -C "${registry_dir}" \
-        cat-file -e "${registry_hash}^{commit}" 2>/dev/null; then
-        echo "FAIL: Registry commit ${registry_hash} not found in ${registry_repo}" >&2
+    workspace_bazel_run "$module_dir" update_registry.check "$@" -- \
+        "--json-out=${status_path}" \
+        "--markdown-out=${markdown_path}" \
+        "--sha-out=${sha_path}"
+
+    sha="$(cat "${sha_path}")"
+    tags="$(jq -r '.tags | join(" ")' "${status_path}")"
+    if [[ -z "${sha}" || "${sha}" == "null" ]]; then
+        echo "FAIL: Failed to determine registry hash for ${workspace}" >&2
         return 1
     fi
-    if ! git -c safe.bareRepository=all -C "${registry_dir}" \
-        merge-base --is-ancestor "${registry_hash}" "${registry_branch}"; then
-        echo "FAIL: Registry commit ${registry_hash} is not an ancestor of ${registry_branch}" >&2
+    if [[ -n "${registry_hash}" && "${registry_hash}" != "${sha}" ]]; then
+        echo "FAIL: Registry hash mismatch: ${workspace} has ${sha}, expected ${registry_hash}" >&2
         return 1
     fi
-    echo "Registry commit ${registry_hash} is an ancestor of ${registry_branch}"
+    registry_hash="${sha}"
 
-    tags="$(git -c safe.bareRepository=all -C "${registry_dir}" tag --points-at "${registry_hash}")"
+    echo "${workspace}: $(cat "${markdown_path}")"
     if [[ -n "${tags}" ]]; then
-        echo "Registry commit ${registry_hash} is tagged: ${tags//$'\n'/ }"
-        return 0
+        echo "${workspace}: registry commit ${sha} is tagged: ${tags}"
+        return
     fi
     if [[ "${version}" == *-dev ]]; then
-        echo "WARNING: registry commit ${registry_hash} is not a tagged version (ok for ${version})" >&2
-        return 0
+        echo "WARNING: ${workspace}: registry commit ${sha} is not a tagged version (ok for ${version})" >&2
+        return
     fi
-    echo "FAIL: Registry commit ${registry_hash} is not a tagged version, required for release ${version}" >&2
+    echo "FAIL: ${workspace}: registry commit ${sha} is not a tagged version, required for release ${version}" >&2
     return 1
 }
 
-registry_bump() {
-    local registry_hash="$1"
-    local bazelrc
-    local old_hash
+deps_report() {
+    run_in_nested_mods _deps_report_mod
+}
 
-    old_hash="$(registry_current_hash)"
+_deps_report_mod() {
+    local module_dir="$1"
+    local markdown_path
+    local report_path
+    local workspace
 
-    if [[ "${old_hash}" == "${registry_hash}" ]]; then
-        echo "registry hash unchanged: ${old_hash}"
-        return 0
+    workspace="$(workspace_name "$module_dir")"
+    report_path="$(mktemp)"
+    markdown_path="$(mktemp)"
+    # shellcheck disable=SC2064
+    trap "rm -f '${report_path}' '${markdown_path}'" RETURN
+
+    workspace_bazel_run "$module_dir" update_module -- \
+        --report \
+        "--json-out=${report_path}" \
+        "--markdown-out=${markdown_path}"
+
+    echo "== ${workspace} =="
+    cat "${markdown_path}"
+    echo
+}
+
+deps_update() {
+    run_in_nested_mods _deps_update_mod "$1"
+    lockfiles_generate
+}
+
+_deps_update_mod() {
+    local module_dir="$1"
+    local dep="$2"
+    local dep_name="${dep%%=*}"
+    local output
+    local status=0
+    local workspace
+
+    workspace="$(workspace_name "$module_dir")"
+    output="$(workspace_bazel_run "$module_dir" update_module -- "${dep}" 2>&1)" || status=$?
+    if [[ ${status} -eq 0 ]]; then
+        printf '%s: %s\n' "${workspace}" "${output}"
+        return
+    fi
+    if grep -q "Dependency ${dep_name} not found" <<< "${output}"; then
+        echo "${workspace}: ${dep_name} not declared, skipping"
+        return
+    fi
+    echo "${output}" >&2
+    return "${status}"
+}
+
+registry_update() {
+    local -a registry_args=()
+
+    if [[ -n "${ENVOY_REGISTRY_HASH:-}" ]]; then
+        registry_args+=("--@envoy_toolshed//dependency:registry_sha=${ENVOY_REGISTRY_HASH}")
+    fi
+    if [[ -n "${ENVOY_REGISTRY_ALLOW_UNSAFE:-}" ]]; then
+        registry_args+=("--@envoy_toolshed//dependency:registry_allow_unsafe=true")
     fi
 
-    for bazelrc in "${REGISTRY_BAZELRC_FILES[@]}"; do
-        sed -i -E \
-            "s#^(common --registry=https://raw\\.githubusercontent\\.com/envoyproxy/bazel-registry/)[0-9a-f]+\$#\1${registry_hash}#" \
-            "$bazelrc"
-        echo "${bazelrc}: ${old_hash} -> ${registry_hash}"
-    done
+    run_in_registry_mods _registry_update_mod "${registry_args[@]}"
+    registry_current_hash > /dev/null
+    lockfiles_generate
+}
+
+_registry_update_mod() {
+    local module_dir="$1"
+    shift
+
+    workspace_bazel_run "$module_dir" update_registry "$@"
 }
 
 setup_clang_toolchain() {
@@ -523,10 +674,17 @@ function build_openssl_presubmit() {
 
 shift
 
+DEPENDENCY_ARGS=()
+
 if [[ "$CI_TARGET" =~ bazel.* ]]; then
     ORIG_CI_TARGET="$CI_TARGET"
     CI_TARGET="$(echo "${CI_TARGET}" | cut -d. -f2-)"
     echo "Using \`${ORIG_CI_TARGET}\` is deprecated, please use \`${CI_TARGET}\`"
+fi
+
+if [[ "${CI_TARGET}" == "deps.update" ]]; then
+    DEPENDENCY_ARGS=("$@")
+    set --
 fi
 
 if [[ $# -ge 1 ]]; then
@@ -819,6 +977,18 @@ case $CI_TARGET in
         #       //tools/base:requirements_test
         ;;
 
+    deps.report)
+        deps_report
+        ;;
+
+    deps.update)
+        if [[ ${#DEPENDENCY_ARGS[@]} -ne 1 ]]; then
+            echo "Usage: ci/do_ci.sh deps.update <name[=version]>" >&2
+            exit 1
+        fi
+        deps_update "${DEPENDENCY_ARGS[0]}"
+        ;;
+
     dev)
         setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
@@ -1075,28 +1245,7 @@ case $CI_TARGET in
             registry_check
             exit 0
         fi
-        if [[ -n "$ENVOY_REGISTRY_HASH" ]]; then
-            registry_hash="$ENVOY_REGISTRY_HASH"
-        else
-            registry_hash="$(
-                git ls-remote \
-                    "${ENVOY_REGISTRY_REPO:-https://github.com/envoyproxy/bazel-registry}" \
-                    "refs/heads/${ENVOY_REGISTRY_BRANCH:-main}" \
-                    | cut -f1
-            )"
-        fi
-        if [[ -z "${registry_hash}" ]]; then
-            echo "FAIL: Failed to determine Envoy bazel-registry hash" >&2
-            exit 1
-        fi
-        old_registry_hash="$(registry_current_hash)"
-        registry_bump "$registry_hash"
-        if ! registry_check; then
-            echo "FAIL: registry hash ${registry_hash} rejected, restoring ${old_registry_hash}" >&2
-            registry_bump "$old_registry_hash"
-            exit 1
-        fi
-        lockfiles_generate
+        registry_update
         ;;
 
     release|release.server_only|release.test_only)
