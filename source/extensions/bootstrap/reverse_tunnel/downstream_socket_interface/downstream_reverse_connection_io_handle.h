@@ -51,23 +51,24 @@ public:
 
   /**
    * Key the parent IOHandle uses to track this tunnel (the local address of the outbound TCP
-   * socket at handoff time). The drain-aware HCM passes this back to parent() when the tunnel
-   * begins draining so the parent can drop it from tracking and dial a replacement.
+   * socket at handoff time). Passed to the parent on drain/close so it can drop the tunnel from
+   * tracking and dial a replacement.
    */
   const std::string& connectionKey() const { return connection_key_; }
 
   /**
-   * Parent ReverseConnectionIOHandle that owns this tunnel, or nullptr if the parent has already
-   * been torn down (it clears this back-pointer via detachParent() on teardown). Always re-check
-   * for nullptr at the point of use rather than caching the result.
-   */
-  ReverseConnectionIOHandle* parent() const { return parent_; }
-
-  /**
-   * Called by the parent ReverseConnectionIOHandle when it is destroyed, so a surviving tunnel's
-   * parent() returns nullptr instead of a dangling pointer.
+   * Called by the parent ReverseConnectionIOHandle when it is destroyed, so a surviving tunnel
+   * clears its back-pointer instead of retaining a dangling parent pointer.
    */
   void detachParent() { parent_ = nullptr; }
+
+  /**
+   * Notify the parent that this tunnel has begun draining so it can drop the key from tracking
+   * and dial a replacement. No-op if the parent has already been torn down (detachParent).
+   * Forwards connection_key_ and connection_id_ so the parent's access log can correlate the
+   * drain event with the later connection_closed event.
+   */
+  void markTunnelDrainingAndDialReplacement();
 
 private:
   // The socket that this IOHandle owns and manages lifetime for.
