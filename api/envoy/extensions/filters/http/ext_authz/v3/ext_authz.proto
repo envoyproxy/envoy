@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 34]
+// [#next-free-field: 35]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -404,6 +404,27 @@ message ExtAuthz {
   //
   // If unset, defaults to ``true``.
   google.protobuf.BoolValue emit_client_span = 33;
+
+  // When set to ``true``, the query string is stripped from the client request path that is
+  // sent to the external authorization service. This is useful when query parameters contain
+  // sensitive information that should not be forwarded to the authorization server.
+  //
+  // For gRPC services, the stripped path populates the
+  // :ref:`path <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.path>` field
+  // (and the ``:path`` header entry, if forwarded) of the
+  // :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>` payload; the path of
+  // the gRPC request itself is unaffected. For HTTP services, the stripped path is used to
+  // populate the ``:path`` header of the client request embedded in the authorization request.
+  // Any :ref:`path_prefix
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.HttpService.path_prefix>` or
+  // :ref:`path_override
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.HttpService.path_override>`
+  // is applied after that.
+  //
+  // Defaults to ``false``, in which case the original full path, including query parameters,
+  // is sent to the authorization server. The query string is never modified on the downstream
+  // or upstream requests.
+  bool strip_query_params = 34;
 }
 
 // Serialized form of the shadow-mode authorization decision written to FilterState

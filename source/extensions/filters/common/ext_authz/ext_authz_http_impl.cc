@@ -172,7 +172,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
                               createRetryPolicy(config.http_service().retry_policy(), context),
                               Router::RetryPolicyConstSharedPtr)
                         : nullptr),
-      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)) {
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)),
+      strip_query_params_(config.http_service().strip_query_params()) {
   THROW_IF_NOT_OK(
       validateOnlyOneOfPathPrefixOrOverride(path_prefix, config.http_service().path_override()));
 }
@@ -208,7 +209,7 @@ ClientConfig::ClientConfig(
               ? THROW_OR_RETURN_VALUE(createRetryPolicy(http_service.retry_policy(), context),
                                       Router::RetryPolicyConstSharedPtr)
               : nullptr),
-      emit_client_span_(emit_client_span) {
+      emit_client_span_(emit_client_span), strip_query_params_(http_service.strip_query_params()) {
   THROW_IF_NOT_OK(validateOnlyOneOfPathPrefixOrOverride(http_service.path_prefix(),
                                                         http_service.path_override()));
 }
