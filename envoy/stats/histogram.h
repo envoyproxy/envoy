@@ -125,6 +125,7 @@ public:
                  // anything.
     Unspecified, // Measured quantity does not require a unit, e.g. "items".
     Bytes,
+    Nanoseconds,
     Microseconds,
     Milliseconds,
     Percent, // A percent value stored as fixed-point, where the stored value is divided by

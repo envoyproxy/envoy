@@ -2180,6 +2180,9 @@ TEST_F(LuaStatsScopeWrapperTest, HistogramUnits) {
       local us_histogram = object:histogram("latency_us", "microseconds")
       us_histogram:recordValue(500)
 
+      local ns_histogram = object:histogram("latency_ns", "nanoseconds")
+      ns_histogram:recordValue(40700)
+
       local unspecified_histogram = object:histogram("count", "unspecified")
       unspecified_histogram:recordValue(42)
     end
@@ -2206,6 +2209,10 @@ TEST_F(LuaStatsScopeWrapperTest, HistogramUnits) {
   ASSERT_TRUE(latency_us.has_value());
   EXPECT_EQ(Stats::Histogram::Unit::Microseconds, latency_us->get().unit());
 
+  auto latency_ns = store_.findHistogramByString("lua.latency_ns");
+  ASSERT_TRUE(latency_ns.has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Nanoseconds, latency_ns->get().unit());
+
   auto count = store_.findHistogramByString("lua.count");
   ASSERT_TRUE(count.has_value());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified, count->get().unit());
@@ -2230,7 +2237,8 @@ TEST_F(LuaStatsScopeWrapperTest, HistogramInvalidUnit) {
   EXPECT_THAT(start("callMe"),
               StatusHelpers::HasStatusMessage("[string \"...\"]:3: invalid histogram unit "
                                               "'invalid_unit', expected 'ms', 'milliseconds', "
-                                              "'microseconds', 'bytes', or 'unspecified'"));
+                                              "'microseconds', 'nanoseconds', 'bytes', or "
+                                              "'unspecified'"));
   wrapper.reset();
 }
 

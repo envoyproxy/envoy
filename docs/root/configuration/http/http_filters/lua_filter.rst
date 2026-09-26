@@ -1994,8 +1994,8 @@ histogram()
 
 Returns a :ref:`histogram object <config_http_filters_lua_histogram_wrapper>`
 with the given name and unit. The second argument specifies the unit and must be
-one of: ``"unspecified"``, ``"bytes"``, ``"microseconds"``, ``"milliseconds"``, or ``"ms"``
-(shorthand for milliseconds).
+one of: ``"unspecified"``, ``"bytes"``, ``"nanoseconds"``, ``"microseconds"``, ``"milliseconds"``,
+or ``"ms"`` (shorthand for milliseconds).
 
 .. _config_http_filters_lua_counter_wrapper:
 
