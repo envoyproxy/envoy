@@ -4,6 +4,7 @@
 #include <format>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -170,6 +171,26 @@ public:
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(PassthroughConfigFactory, "passthrough");
+
+// A filter factory whose create throws so the exception barrier around the filter constructor
+// export can be exercised. Without the barrier the exception would cross the ABI boundary and abort
+// the worker. The caught exception leaves a null filter, so the host fails the request closed with
+// a 500.
+class ThrowOnNewFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle&) override {
+    throw std::runtime_error("filter constructor failed on purpose");
+  }
+};
+
+class ThrowOnNewConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<ThrowOnNewFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(ThrowOnNewConfigFactory, "throw_on_filter_new");
 
 // Only records that its response-headers callback ran. Used to check that the callback still fires
 // when the response is a local reply the module did not send, such as a `direct_response` route.
@@ -1188,6 +1209,63 @@ public:
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(StatsCallbacksConfigFactory, "stats_callbacks");
+
+// -----------------------------------------------------------------------------
+// StreamTiming
+// -----------------------------------------------------------------------------
+
+class StreamTimingFilter : public HttpFilter {
+public:
+  StreamTimingFilter(HttpFilterHandle& handle, MetricID timing_observed_total)
+      : handle_(handle), timing_observed_total_(timing_observed_total) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+
+  void onStreamComplete() override {
+    const TimingInfo timing = handle_.getTimingInfo();
+    assertTrue(timing.start_time_unix_ns > 0, "start time");
+    assertTrue(timing.request_complete_duration_ns >= 0, "request complete duration");
+    assertEq(static_cast<size_t>(handle_.incrementCounterValue(timing_observed_total_, 1)),
+             static_cast<size_t>(MetricsResult::Success), "timing counter");
+  }
+
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+  MetricID timing_observed_total_;
+};
+
+class StreamTimingFilterFactory : public HttpFilterFactory {
+public:
+  StreamTimingFilterFactory(MetricID timing_observed_total)
+      : timing_observed_total_(timing_observed_total) {}
+
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<StreamTimingFilter>(handle, timing_observed_total_);
+  }
+
+private:
+  MetricID timing_observed_total_;
+};
+
+class StreamTimingConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view) override {
+    const auto result = handle.defineCounter("stream_timing_observed_total");
+    assertEq(static_cast<size_t>(result.second), static_cast<size_t>(MetricsResult::Success),
+             "timing counter definition");
+    return std::make_unique<StreamTimingFilterFactory>(result.first);
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(StreamTimingConfigFactory, "stream_timing");
 
 // -----------------------------------------------------------------------------
 // StreamingTerminal

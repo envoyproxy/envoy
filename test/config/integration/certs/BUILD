@@ -30,6 +30,8 @@ CERTS = [
     "intermediate_cacert.pem",
     "intermediate_cacert_info.h",
     "intermediate_partial_ca_cert_chain.pem",
+    "long_intermediate_cacert.pem",
+    "long_server_chain.pem",
     "long_server_ocsp_resp.der",
     "long_servercert.pem",
     "long_servercert_hash.h",

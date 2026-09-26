@@ -276,15 +276,12 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_ssl_connection_info_lib",
+    srcs = envoy_select_enable_http3(["quic_ssl_connection_info.cc"]),
     hdrs = envoy_select_enable_http3(["quic_ssl_connection_info.h"]),
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
         "//source/common/common:empty_string",
-        "//source/common/common:hex_lib",
-        "//source/common/http:utility_lib",
         "//source/common/tls:connection_info_impl_base_lib",
-        "//source/common/tls:utility_lib",
-        "//source/common/tls/cert_validator:cert_validator_lib",
         "@quiche//:quic_core_session_lib",
     ]),
 )
@@ -614,6 +611,7 @@ envoy_cc_library(
         "//source/common/tls:server_ssl_socket_lib",
         "@quiche//:quic_core_crypto_crypto_handshake_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ]),
     alwayslink = LEGACY_ALWAYSLINK,
 )

@@ -7,6 +7,7 @@
 //! `logger_name`. The legacy [`crate::declare_access_logger!`] macro is preserved as a
 //! single-config shim over the same factory.
 
+pub use crate::timing::TimingInfo;
 use crate::{abi, ffi_export, EnvoyBuffer};
 use std::ffi::c_void;
 use std::ptr;
@@ -305,27 +306,6 @@ pub trait AccessLogger: Send {
   fn flush(&mut self) {}
 }
 
-/// Timing information from the stream info.
-#[derive(Debug, Clone, Default)]
-pub struct TimingInfo {
-  /// Request start time as Unix timestamp in nanoseconds.
-  pub start_time_unix_ns: i64,
-  /// Duration from start to request complete in nanoseconds, or -1 if not available.
-  pub request_complete_duration_ns: i64,
-  /// Time of first upstream TX byte sent in nanoseconds, or -1 if not available.
-  pub first_upstream_tx_byte_sent_ns: i64,
-  /// Time of last upstream TX byte sent in nanoseconds, or -1 if not available.
-  pub last_upstream_tx_byte_sent_ns: i64,
-  /// Time of first upstream RX byte received in nanoseconds, or -1 if not available.
-  pub first_upstream_rx_byte_received_ns: i64,
-  /// Time of last upstream RX byte received in nanoseconds, or -1 if not available.
-  pub last_upstream_rx_byte_received_ns: i64,
-  /// Time of first downstream TX byte sent in nanoseconds, or -1 if not available.
-  pub first_downstream_tx_byte_sent_ns: i64,
-  /// Time of last downstream TX byte sent in nanoseconds, or -1 if not available.
-  pub last_downstream_tx_byte_sent_ns: i64,
-}
-
 /// Byte count information from the stream info.
 #[derive(Debug, Clone, Default)]
 pub struct BytesInfo {
@@ -333,10 +313,19 @@ pub struct BytesInfo {
   pub bytes_received: u64,
   /// Total bytes sent to downstream.
   pub bytes_sent: u64,
-  /// Wire bytes received (including TLS overhead).
+  /// Wire bytes received from upstream.
   pub wire_bytes_received: u64,
-  /// Wire bytes sent (including TLS overhead).
+  /// Wire bytes sent to upstream.
   pub wire_bytes_sent: u64,
+}
+
+/// Cumulative wire byte counts from the stream's downstream bytes meter.
+#[derive(Debug, Clone, Default)]
+pub struct DownstreamWireBytes {
+  /// Wire bytes received from downstream.
+  pub bytes_received: u64,
+  /// Wire bytes sent to downstream.
+  pub bytes_sent: u64,
 }
 
 /// Access log type indicating when the log was recorded.
@@ -579,6 +568,29 @@ impl LogContext {
       bytes_sent: info.bytes_sent,
       wire_bytes_received: info.wire_bytes_received,
       wire_bytes_sent: info.wire_bytes_sent,
+    }
+  }
+
+  /// Get cumulative downstream wire byte counts.
+  ///
+  /// These correspond to `DOWNSTREAM_WIRE_BYTES_RECEIVED` and `DOWNSTREAM_WIRE_BYTES_SENT` in
+  /// access logs. For HTTP streams, they include protocol overhead accounted for by the codec,
+  /// not just body bytes. They can be nonzero for locally generated responses with no upstream
+  /// connection. Both fields are zero if the downstream bytes meter is unavailable.
+  pub fn downstream_wire_bytes(&self) -> DownstreamWireBytes {
+    let mut info = abi::envoy_dynamic_module_type_downstream_wire_bytes {
+      bytes_received: 0,
+      bytes_sent: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(
+        self.envoy_ptr,
+        &mut info,
+      );
+    }
+    DownstreamWireBytes {
+      bytes_received: info.bytes_received,
+      bytes_sent: info.bytes_sent,
     }
   }
 

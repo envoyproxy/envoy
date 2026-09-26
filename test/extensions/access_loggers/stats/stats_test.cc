@@ -131,22 +131,20 @@ public:
 
     EXPECT_CALL(store_.mockScope(), createScope_(_, _))
         .WillRepeatedly(Invoke([this](const std::string& name, const std::string&) {
+          // The prefix must be encoded in the same symbol table the scope resolves names
+          // with (store_), since MockScope now joins prefix() into the flat stat name.
           auto scope_name_storage =
-              std::make_unique<Stats::StatNameDynamicStorage>(name, context_.store_.symbolTable());
+              std::make_unique<Stats::StatNameDynamicStorage>(name, store_.symbolTable());
           auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(
               scope_name_storage->statName(), store_);
           ON_CALL(*scope, gaugeFromTaggedName(_, _, _, _))
-              .WillByDefault(Invoke([this](Stats::StatName name,
-                                           std::optional<Stats::StatNameTagSpan>, Stats::StatName,
-                                           Stats::Gauge::ImportMode import_mode) -> Stats::Gauge& {
-                return this->store_.gauge(this->context_.store_.symbolTable().toString(name),
-                                          import_mode);
-              }));
-          ON_CALL(*scope, counterFromTaggedName(_, _, _))
-              .WillByDefault(
-                  Invoke([this](Stats::StatName name, std::optional<Stats::StatNameTagSpan>,
-                                Stats::StatName) -> Stats::Counter& {
-                    return this->store_.counter(this->context_.store_.symbolTable().toString(name));
+              .WillByDefault(Invoke(
+                  [scope_ptr = scope.get()](Stats::StatName name,
+                                            std::optional<Stats::StatNameTagSpan> name_tags,
+                                            Stats::StatName tagged_name,
+                                            Stats::Gauge::ImportMode import_mode) -> Stats::Gauge& {
+                    return scope_ptr->Stats::MockScope::gaugeFromTaggedName(
+                        name, name_tags, tagged_name, import_mode);
                   }));
 
           ON_CALL(*scope, histogramFromTaggedName(_, _, _, _))
@@ -244,11 +242,14 @@ TEST_F(StatsAccessLoggerTest, HistogramUnits) {
 )EOF";
   initialize(yaml);
 
-  EXPECT_CALL(store_, histogram("Unspecified", Stats::Histogram::Unit::Unspecified));
-  EXPECT_CALL(store_, histogram("Bytes", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(store_, histogram("Microseconds", Stats::Histogram::Unit::Microseconds));
-  EXPECT_CALL(store_, histogram("Milliseconds", Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(store_, histogram("Percent", Stats::Histogram::Unit::Percent));
+  EXPECT_CALL(store_,
+              histogram("test_stat_prefix.Unspecified", Stats::Histogram::Unit::Unspecified));
+  EXPECT_CALL(store_, histogram("test_stat_prefix.Bytes", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(store_,
+              histogram("test_stat_prefix.Microseconds", Stats::Histogram::Unit::Microseconds));
+  EXPECT_CALL(store_,
+              histogram("test_stat_prefix.Milliseconds", Stats::Histogram::Unit::Milliseconds));
+  EXPECT_CALL(store_, histogram("test_stat_prefix.Percent", Stats::Histogram::Unit::Percent));
   logger_->log(formatter_context_, stream_info_);
 }
 

@@ -1193,7 +1193,7 @@ envoy.geoip_providers.maxmind:
   categories:
   - envoy.geoip_providers
   security_posture: unknown
-  status: wip
+  status: stable
   type_urls:
   - envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
 envoy.grpc_credentials.file_based_metadata:
@@ -1243,6 +1243,13 @@ envoy.health_checkers.thrift:
   status: alpha
   type_urls:
   - envoy.extensions.health_checkers.thrift.v3.Thrift
+envoy.health_checkers.udp:
+  categories:
+  - envoy.health_checkers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.health_checkers.udp.v3.UdpHealthCheck
 envoy.health_check.event_sinks.file:
   categories:
   - envoy.health_check.event_sinks
@@ -1264,6 +1271,13 @@ envoy.http.original_ip_detection.xff:
   status: stable
   type_urls:
   - envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
+envoy.http.stateful_header_formatters.dynamic_modules:
+  categories:
+  - envoy.http.stateful_header_formatters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.header_formatters.dynamic_modules.v3.DynamicModuleHeaderFormatter
 envoy.http.stateful_header_formatters.preserve_case:
   categories:
   - envoy.http.stateful_header_formatters
@@ -1573,6 +1587,13 @@ envoy.router.cluster_specifier_plugin.matcher:
   status: alpha
   type_urls:
   - envoy.extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier
+envoy.router.cluster_specifier_plugin.priority_group:
+  categories:
+  - envoy.router.cluster_specifier_plugin
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier
 envoy.stat_sinks.dog_statsd:
   categories:
   - envoy.stats_sinks

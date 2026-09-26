@@ -2,6 +2,8 @@
 
 // This file provides host-side implementations for ABI callbacks specific to bootstrap extensions.
 
+#include <vector>
+
 #include "envoy/server/admin.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -17,6 +19,25 @@ using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtens
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfigScheduler;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionTimer;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
+
+namespace {
+
+// Serializes a metric name into the reused buffer and returns a view over it. This avoids the
+// std::string that Metric::name() allocates on every call. The view is valid until the buffer is
+// next written on the same thread.
+absl::string_view serializeMetricName(const Envoy::Stats::Metric& metric,
+                                      std::vector<char>& buffer) {
+  const Envoy::Stats::SymbolTable& symbol_table = metric.constSymbolTable();
+  const Envoy::Stats::StatName stat_name = metric.statName();
+  size_t required = symbol_table.serializeToBuffer(stat_name, buffer.data(), buffer.size());
+  if (required > buffer.size()) {
+    buffer.resize(required);
+    symbol_table.serializeToBuffer(stat_name, buffer.data(), buffer.size());
+  }
+  return absl::string_view(buffer.data(), required);
+}
+
+} // namespace
 
 extern "C" {
 
@@ -95,10 +116,11 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
   const absl::string_view name_view(name.ptr, name.length);
 
   // Use iterate() instead of forEachCounter() to enable early exit once the stat is found.
+  thread_local std::vector<char> name_buffer;
   bool found = false;
   Envoy::Stats::IterateFn<Envoy::Stats::Counter> counter_callback =
       [&name_view, &found, value_ptr](const Envoy::Stats::CounterSharedPtr& counter) -> bool {
-    if (counter->name() == name_view) {
+    if (serializeMetricName(*counter, name_buffer) == name_view) {
       *value_ptr = counter->value();
       found = true;
       return false; // Stop iteration.
@@ -117,10 +139,11 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
   const absl::string_view name_view(name.ptr, name.length);
 
   // Use iterate() instead of forEachGauge() to enable early exit once the stat is found.
+  thread_local std::vector<char> name_buffer;
   bool found = false;
   Envoy::Stats::IterateFn<Envoy::Stats::Gauge> gauge_callback =
       [&name_view, &found, value_ptr](const Envoy::Stats::GaugeSharedPtr& gauge) -> bool {
-    if (gauge->name() == name_view) {
+    if (serializeMetricName(*gauge, name_buffer) == name_view) {
       *value_ptr = gauge->value();
       found = true;
       return false; // Stop iteration.
@@ -139,11 +162,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
   Envoy::Stats::Store& stats_store = extension->statsStore();
   const absl::string_view name_view(name.ptr, name.length);
 
+  thread_local std::vector<char> name_buffer;
   bool found = false;
   stats_store.forEachHistogram(
       [](size_t) {},
       [&name_view, &found, sample_count_ptr, sample_sum_ptr](Envoy::Stats::ParentHistogram& hist) {
-        if (!found && hist.name() == name_view) {
+        if (!found && serializeMetricName(hist, name_buffer) == name_view) {
           const auto& stats = hist.cumulativeStatistics();
           *sample_count_ptr = stats.sampleCount();
           *sample_sum_ptr = stats.sampleSum();
@@ -159,12 +183,13 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
   auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
   Envoy::Stats::Store& stats_store = extension->statsStore();
 
+  thread_local std::vector<char> name_buffer;
   stats_store.forEachCounter([](size_t) {},
                              [iterator_fn, user_data](Envoy::Stats::Counter& counter) {
-                               std::string name = counter.name();
-                               envoy_dynamic_module_type_envoy_buffer name_buffer{name.data(),
-                                                                                  name.size()};
-                               auto action = iterator_fn(name_buffer, counter.value(), user_data);
+                               absl::string_view name = serializeMetricName(counter, name_buffer);
+                               envoy_dynamic_module_type_envoy_buffer name_buf{name.data(),
+                                                                               name.size()};
+                               auto action = iterator_fn(name_buf, counter.value(), user_data);
                                // Note: forEachCounter doesn't support early exit, so we ignore Stop
                                // action. The module should handle this by setting a flag in
                                // user_data.
@@ -178,12 +203,13 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
   auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
   Envoy::Stats::Store& stats_store = extension->statsStore();
 
+  thread_local std::vector<char> name_buffer;
   stats_store.forEachGauge([](size_t) {},
                            [iterator_fn, user_data](Envoy::Stats::Gauge& gauge) {
-                             std::string name = gauge.name();
-                             envoy_dynamic_module_type_envoy_buffer name_buffer{name.data(),
-                                                                                name.size()};
-                             auto action = iterator_fn(name_buffer, gauge.value(), user_data);
+                             absl::string_view name = serializeMetricName(gauge, name_buffer);
+                             envoy_dynamic_module_type_envoy_buffer name_buf{name.data(),
+                                                                             name.size()};
+                             auto action = iterator_fn(name_buf, gauge.value(), user_data);
                              // Note: forEachGauge doesn't support early exit, so we ignore Stop
                              // action. The module should handle this by setting a flag in
                              // user_data.

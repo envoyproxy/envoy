@@ -27,6 +27,7 @@ TestRetryPolicy::~TestRetryPolicy() = default;
 
 MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
   ON_CALL(*this, enabled()).WillByDefault(Return(false));
+  ON_CALL(*this, responseHeadersToCopy()).WillByDefault(ReturnRef(response_headers_to_copy_));
 }
 
 MockRetryState::MockRetryState() = default;
@@ -199,6 +200,16 @@ MockRoute::MockRoute() {
       .WillByDefault(Return(std::numeric_limits<uint64_t>::max()));
 }
 MockRoute::~MockRoute() = default;
+
+MockRouteSpecifier::MockRouteSpecifier() {
+  // By default a specifier is transparent: it hands back exactly what it was given and lets the
+  // rest of the chain run. Tests override this when they want the specifier to do something.
+  ON_CALL(*this, onRoute(_, _, _, _))
+      .WillByDefault(Invoke([](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
+                               const StreamInfo::StreamInfo&,
+                               uint64_t) -> OnRouteResult { return {std::move(route)}; }));
+}
+MockRouteSpecifier::~MockRouteSpecifier() = default;
 
 MockRouteConfigProvider::MockRouteConfigProvider() {
   ON_CALL(*this, config()).WillByDefault(Return(route_config_));

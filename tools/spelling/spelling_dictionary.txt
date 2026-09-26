@@ -129,6 +129,7 @@ FIXME
 decrypted
 decrypts
 gperf
+gperftools
 HEXDIG
 HEXDIGIT
 HPE
@@ -470,6 +471,7 @@ qatzip
 qatzstd
 RAII
 RANLUX
+RBE
 RBAC
 RDN
 RDS
@@ -603,6 +605,7 @@ WRR
 WS
 WSA
 WSABUF
+WSAEMSGSIZE
 WSS
 WUFFS
 Welford's

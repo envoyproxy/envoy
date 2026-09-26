@@ -97,7 +97,9 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::VerifyCertChain(
       certs, *context, error_details, details, out_alert, &cert_validated);
   if (cert_validated) {
     ASSERT(dynamic_cast<EnvoyQuicServerSession*>(session()) != nullptr);
-    static_cast<EnvoyQuicServerSession*>(session())->setClientCertificateValidated();
+    ASSERT(dynamic_cast<const CertVerifyResult*>(details->get()) != nullptr);
+    static_cast<EnvoyQuicServerSession*>(session())->setClientCertificateValidated(
+        static_cast<const CertVerifyResult&>(**details).validatedChain());
   }
   return status;
 }

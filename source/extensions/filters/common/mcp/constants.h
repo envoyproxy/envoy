@@ -32,7 +32,11 @@ constexpr absl::string_view TYPE_FIELD = "type";
 constexpr absl::string_view TEXT_FIELD = "text";
 constexpr absl::string_view CONTENT_FIELD = "content";
 constexpr absl::string_view IS_ERROR_FIELD = "isError";
+constexpr absl::string_view RESULT_TYPE_FIELD = "resultType";
+constexpr absl::string_view RESULT_TYPE_COMPLETE = "complete";
 constexpr absl::string_view ERROR_FIELD = "error";
+
+constexpr int MCP_HEADER_MISMATCH_ERROR_CODE = -32020;
 
 // MCP Initialize constants
 constexpr absl::string_view MCP_VERSION_2024_11_05 = "2024-11-05";
@@ -41,6 +45,9 @@ constexpr absl::string_view MCP_VERSION_2025_06_18 = "2025-06-18";
 constexpr absl::string_view MCP_VERSION_2025_11_25 = "2025-11-25";
 constexpr absl::string_view MCP_VERSION_2026_07_28 = "2026-07-28";
 constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
+constexpr absl::string_view META_FIELD = "_meta";
+constexpr absl::string_view MCP_META_PROTOCOL_VERSION_FIELD =
+    "io.modelcontextprotocol/protocolVersion";
 constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
 constexpr absl::string_view TOOLS_FIELD = "tools";
 constexpr absl::string_view LIST_CHANGED_FIELD = "listChanged";
@@ -52,6 +59,7 @@ constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
 constexpr absl::string_view IS_EXCEEDING_LIMIT = "is_exceeding_limit";
 constexpr absl::string_view STATUS = "status";
+constexpr absl::string_view PASSTHROUGH_REASON = "passthrough_reason";
 
 namespace StatusValues {
 constexpr absl::string_view OK = "mcp_ok";
@@ -67,6 +75,10 @@ constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
 constexpr absl::string_view MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version";
 constexpr absl::string_view MCP_METHOD_HEADER = "mcp-method";
 constexpr absl::string_view MCP_NAME_HEADER = "mcp-name";
+
+// Delimiters for encoded header values.
+constexpr absl::string_view MCP_BASE64_PREFIX = "=?base64?";
+constexpr absl::string_view MCP_BASE64_SUFFIX = "?=";
 
 // Method names
 namespace Methods {

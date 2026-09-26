@@ -12,12 +12,12 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_conversion.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
 #include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
 #include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -49,10 +49,11 @@ public:
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   const AiFilterFactories& aiFilterFactories() const { return ai_filter_factories_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
+  bool alwaysSerializeRequest() const { return always_serialize_request_; }
   uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
-  ApiProtocol defaultApiProtocol() const { return default_api_protocol_; }
+  LLMProtocol defaultLLMProtocol() const { return default_llm_protocol_; }
   const std::string& metadataNamespace() const { return metadata_namespace_; }
   bool synthesizeUsageTrailers() const { return synthesize_usage_trailers_; }
   uint32_t maxSseEventSize() const { return max_sse_event_size_; }
@@ -66,10 +67,11 @@ private:
   mutable AiProtocolManagerStats stats_;
   const bool request_handling_enabled_ = false;
   const bool parse_unconfigured_routes_ = false;
+  const bool always_serialize_request_ = true;
   const uint32_t inline_string_threshold_bytes_ = 0;
   const bool token_usage_enabled_ = false;
   const bool include_unconfigured_routes_ = false;
-  const ApiProtocol default_api_protocol_ = ApiProtocol::Unspecified;
+  const LLMProtocol default_llm_protocol_ = LLMProtocol::Unspecified;
   const std::string metadata_namespace_;
   const bool synthesize_usage_trailers_ = false;
   const uint32_t max_sse_event_size_ = 0;
@@ -87,25 +89,25 @@ class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
   explicit RouteConfig(const PerRouteProto& proto)
       : has_request_(proto.has_request()),
-        request_protocol_(protocolFromProto(proto.request().api_protocol())),
-        response_protocol_(protocolFromProto(proto.response().api_protocol())) {}
+        request_protocol_(protocolFromProto(proto.request().llm_protocol())),
+        response_protocol_(protocolFromProto(proto.response().llm_protocol())) {}
 
   // Whether the route hands its request payload to the filter to hold and
   // validate.
   bool hasRequest() const { return has_request_; }
-  ApiProtocol requestProtocol() const { return request_protocol_; }
-  ApiProtocol responseProtocol() const { return response_protocol_; }
+  LLMProtocol requestProtocol() const { return request_protocol_; }
+  LLMProtocol responseProtocol() const { return response_protocol_; }
 
   // The wire API for response extraction on this route: the declared response
   // API, falling back to the declared request API.
-  ApiProtocol effectiveResponseProtocol() const {
-    return response_protocol_ != ApiProtocol::Unspecified ? response_protocol_ : request_protocol_;
+  LLMProtocol effectiveResponseProtocol() const {
+    return response_protocol_ != LLMProtocol::Unspecified ? response_protocol_ : request_protocol_;
   }
 
 private:
   const bool has_request_ = false;
-  const ApiProtocol request_protocol_ = ApiProtocol::Unspecified;
-  const ApiProtocol response_protocol_ = ApiProtocol::Unspecified;
+  const LLMProtocol request_protocol_ = LLMProtocol::Unspecified;
+  const LLMProtocol response_protocol_ = LLMProtocol::Unspecified;
 };
 
 // AI Protocol Manager HTTP filter (alpha).
@@ -213,19 +215,29 @@ private:
   // Sets endStream on decode_manager_ and executes the AI filter chain or replays the body.
   void finalizeDecode(bool has_trailers);
 
+  // Invoked when the SSE response filter pipeline completes or fails.
+  void onEncodeComplete(absl::Status status);
+
   ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
+
+  // Declared before decode_manager_, encode_manager_, and filter_manager_ so they outlive the
+  // managers and coroutines that reference them.
+  FilterChainBridgePtr decode_bridge_;
 
   // Non-null exactly when decodeHeaders() decided to inspect this stream, so it
   // doubles as the engaged flag. Outlives request_parser_, which is released as
   // soon as parsing is done with.
   BufferManagerPtr decode_manager_;
 
+  FilterChainBridgePtr encode_bridge_;
+  BufferManagerPtr encode_manager_;
+
   // Copied out of the route configuration rather than held by pointer: the route
   // can be re-resolved mid-stream, which would leave a cached pointer dangling,
   // and these are two scalars.
   bool route_has_request_{false};
-  ApiProtocol route_request_protocol_{ApiProtocol::Unspecified};
+  LLMProtocol route_request_protocol_{LLMProtocol::Unspecified};
 
   JsonWithExtBuf request_json_;
   // Cleared once parsing is done with, whether it completed, was abandoned, or
@@ -241,9 +253,12 @@ private:
   // FilterManager orchestrating the AI filter chain.
   std::unique_ptr<FilterManager> filter_manager_;
 
-  // Encode-path (response token-usage) state.
+  // Encode-path state.
   ResponseHandlerPtr response_handler_;
   bool response_finalized_{false};
+  bool encode_input_ended_{false};
+  bool encode_has_trailers_{false};
+  bool encode_rejected_{false};
 };
 
 } // namespace AiProtocolManager

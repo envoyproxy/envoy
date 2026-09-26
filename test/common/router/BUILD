@@ -135,6 +135,24 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "route_specifier_integration_test",
+    size = "large",
+    srcs = ["route_specifier_integration_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//envoy/router:route_specifier_interface",
+        "//source/common/common:macros",
+        "//source/common/protobuf",
+        "//source/common/router:delegating_route_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "config_impl_headermap_benchmark_test",
     srcs = ["config_impl_headermap_benchmark_test.cc"],
@@ -586,6 +604,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "route_specifier_impl_test",
+    srcs = ["route_specifier_impl_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/router:config_lib",
+        "//source/common/router:delegating_route_lib",
+        "//source/common/router:route_specifier_lib",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "delegating_route_impl_test",
     srcs = ["delegating_route_impl_test.cc"],
     rbe_pool = "linux_x64_small",
@@ -641,4 +678,23 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "header_formatter_benchmark_test",
     benchmark_binary = "header_formatter_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "scoped_config_speed_test",
+    srcs = ["scoped_config_speed_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/router:scoped_config_lib",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "scoped_config_benchmark_test",
+    benchmark_binary = "scoped_config_speed_test",
 )

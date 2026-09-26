@@ -198,7 +198,7 @@ DynamicModuleConfigFactory::createHttpFilterRouteConfigTyped(
                      DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-              filter_name, config, std::move(dynamic_module));
+              filter_name, config, std::move(dynamic_module), context.mainThreadDispatcher());
 
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(

@@ -28,7 +28,7 @@ run --color=yes
 build --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/ea7d3f2e84c102cda5ad4db645dbe156c807a77f
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/a267f81d66df9e3ed1dd524163d99d602e351995
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -75,19 +75,8 @@ test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 # Allow tags to influence execution requirements
 common --incompatible_allow_tags_propagation
 
-# Python
-common --@rules_python//python/config_settings:bootstrap_impl=script
-build --incompatible_default_to_explicit_init_py
-
-# Protobuf
-common --@protobuf//bazel/flags:prefer_prebuilt_protoc=true
-common --incompatible_enable_proto_toolchain_resolution
-
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
-
-# Disable ICU linking for googleurl.
-build --@googleurl//build_config:system_icu=0
 
 # Test options
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
@@ -95,6 +84,9 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 # Coverage options
 coverage --config=coverage
 coverage --build_tests_only
+
+# Envoy deprecation
+common --@envoy//bazel:deprecated_repo_arg_allowed=false
 
 
 #############################################################################
@@ -108,10 +100,7 @@ build --incompatible_default_to_explicit_init_py
 # Rust
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
-
-# grpc
-build --@grpc//third_party:ssl_lib=@envoy//bazel:ssl
-build --@grpc//third_party:crypto_lib=@envoy//bazel:crypto
+common --@rules_rust//rust/settings:skip_fission_for_rust=true
 
 # kafka
 build --@librdkafka//:with_ssl=false
@@ -121,36 +110,9 @@ build --per_file_copt=contrib/kafka/.*\.cc@-Wno-old-style-cast
 # protobuf
 common --incompatible_enable_proto_toolchain_resolution=true
 common --@protobuf//bazel/toolchains:prefer_prebuilt_protoc
-common --@protobuf//:zlib=@zlib-ng
+
 # these are here to detect if the toolchain attempts to compile protoc
 common --per_file_copt=bazel-out/.*/bin/external/protobuf.*/protoc@--THIS_CC_TOOLCHAIN_IS_BROKEN
-
-# proxy-wasm-cpp-host
-common --@proxy-wasm-cpp-host//bazel:crypto_lib=@envoy//bazel:crypto
-
-# libsxg
-build --@libsxg//:crypto_lib=@envoy//bazel:crypto
-
-# quiche
-build --@quiche//:zlib=@envoy//bazel:zlib
-build --@quiche//:ssl_lib=@envoy//bazel:ssl
-
-# quiche — non-test platform impls
-build --@quiche//:quic_base_impl_lib=@envoy//source/common/quic/platform:quic_base_impl_lib
-build --@quiche//:quiche_export_impl_lib=@envoy//source/common/quic/platform:quiche_export_impl_lib
-build --@quiche//:quiche_flags_impl_lib=@envoy//source/common/quic/platform:quiche_flags_impl_lib
-build --@quiche//:quiche_logging_impl_lib=@envoy//source/common/quic/platform:quiche_logging_impl_lib
-build --@quiche//:quiche_lower_case_string_impl_lib=@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib
-build --@quiche//:quiche_platform_iovec_impl_lib=@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib
-build --@quiche//:quiche_stack_trace_impl_lib=@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib
-build --@quiche//:quiche_time_utils_impl_lib=@envoy//source/common/quic/platform:quiche_time_utils_impl_lib
-
-# quiche — test platform impls
-build --@quiche//:quiche_expect_bug_impl_lib=@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib
-build --@quiche//:quiche_test_impl_lib=@envoy//test/common/quic/platform:quiche_test_impl_lib
-build --@quiche//:quiche_test_helpers_impl_lib=@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib
-build --@quiche//:quiche_test_output_impl_lib=@envoy//test/common/quic/platform:quiche_test_output_impl_lib
-build --@quiche//:quiche_thread_impl_lib=@envoy//test/common/quic/platform:quiche_thread_impl_lib
 
 
 #############################################################################
@@ -171,8 +133,6 @@ build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/u
 build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
 build:macos --cxxopt=-Wno-nullability-completeness
-build:macos --@toolchains_llvm//toolchain/config:compiler-rt=false
-build:macos --@toolchains_llvm//toolchain/config:libunwind=false
 
 
 #############################################################################
@@ -182,8 +142,6 @@ build:macos --@toolchains_llvm//toolchain/config:libunwind=false
 # Common flags for Clang (shared between all clang variants)
 common:clang-common --linkopt=-fuse-ld=lld
 common:clang-common --cxxopt=-Wno-nullability-completeness
-common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
-common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
 
 # Clang with libc++ (default)
 common:clang --config=clang-common
@@ -300,7 +258,6 @@ common:fips-common --@envoy//bazel:fips=True
 common:boringssl-fips --config=fips-common
 common:boringssl-fips --@envoy//bazel:ssl=@boringssl-fips//:ssl
 common:boringssl-fips --@envoy//bazel:crypto=@boringssl-fips//:crypto
-common:boringssl-fips --@quiche//:ssl_lib=@boringssl-fips//:ssl
 
 # OpenSSL
 common:openssl --@envoy//bazel:openssl=True
@@ -310,7 +267,6 @@ common:openssl --@envoy//bazel:crypto=@envoy//compat/openssl:crypto
 # OpenSSL builds via non-QUIC features (e.g. HTTP datagram / CONNECT-UDP capsule
 # support), and must use the same SSL implementation as the rest of the binary
 # to avoid linking BoringSSL and OpenSSL together (symbol/ABI collisions).
-common:openssl --@quiche//:ssl_lib=@envoy//compat/openssl:ssl
 common:openssl --copt=-DENVOY_SSL_OPENSSL
 common:openssl --host_copt=-DENVOY_SSL_OPENSSL
 common:openssl --@envoy//bazel:http3=False
@@ -423,7 +379,6 @@ build:asan-fuzzer --config=asan
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
-build:asan-fuzzer --linkopt=-lc++
 
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
