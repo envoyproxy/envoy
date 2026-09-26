@@ -250,7 +250,11 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   initializeCertExpirationStats(scope, config->caCertName());
 }
 
-absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
+absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool require_client_cert) {
+  if (require_client_cert) {
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+  }
+
   // When suppressed, CAs are still used for validation (loaded via the trust bundle
   // in initializeSslContexts) but their names are not advertised in the TLS
   // CertificateRequest. Skip building the name stack entirely — this is the common
@@ -306,7 +310,7 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
 
 absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool,
                                                            Stats::Scope&) {
-  return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+  return SSL_VERIFY_PEER;
 }
 
 bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
