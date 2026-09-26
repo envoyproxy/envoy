@@ -78,12 +78,17 @@ public:
                Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
                absl::Status& creation_status, const bool per_route = false);
   ~FilterConfig() override {
-    // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
-    // timer is created and running.
-    auto shared_ptr_wrapper =
-        std::make_shared<std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>>(
-            std::move(rate_limiter_));
-    dispatcher_.post([shared_ptr_wrapper]() { shared_ptr_wrapper->reset(); });
+    // Ensure that the rate limiter and the share provider manager are destroyed on the main
+    // thread. The rate limiter owns a fill timer created on that thread. The share provider
+    // manager is an unpinned singleton, so the singleton manager only holds a weak reference to it
+    // and this configuration may own the last strong one; it in turn owns a cluster membership
+    // callback handle that must be de-registered on the main thread. A route level configuration
+    // can be released on a worker thread when an RDS update replaces the route configuration.
+    dispatcher_.post([rate_limiter = std::move(rate_limiter_),
+                      share_provider_manager = std::move(share_provider_manager_)]() mutable {
+      rate_limiter.reset();
+      share_provider_manager.reset();
+    });
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
