@@ -58,6 +58,7 @@ RUNTIME_GUARD(envoy_reloadable_features_disallow_redirect_prefix_rewrite_with_pa
 // references a symbol the main program does not provide then fails to load rather than crashing
 // later when the symbol is first reached. Disable to restore the previous RTLD_LAZY behavior.
 RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_rtld_now);
+RUNTIME_GUARD(envoy_reloadable_features_eager_preconnect_floor);
 // When enabled, the filter factory of an ECDS HTTP filter uses the stats prefix of its parent
 // (e.g. "http.<stat_prefix>.") rather than "extension_config_discovery.<type>.<name>.".
 RUNTIME_GUARD(envoy_reloadable_features_ecds_filter_use_parent_stats_prefix);
