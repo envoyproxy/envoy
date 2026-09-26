@@ -4,6 +4,7 @@
 
 #include "envoy/thread/thread.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/signal/non_fatal_signal_handler.h"
@@ -15,6 +16,30 @@ namespace Envoy {
 namespace Extensions {
 namespace Watchdog {
 namespace BacktraceAction {
+namespace {
+
+using ProtoConfig = envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig;
+
+spdlog::level::level_enum logLevelFromProto(ProtoConfig::LogLevel level) {
+  switch (level) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case ProtoConfig::TRACE:
+    return spdlog::level::trace;
+  case ProtoConfig::DEBUG:
+    return spdlog::level::debug;
+  case ProtoConfig::INFO:
+    return spdlog::level::info;
+  case ProtoConfig::WARN:
+    return spdlog::level::warn;
+  case ProtoConfig::ERROR:
+    return spdlog::level::err;
+  case ProtoConfig::CRITICAL:
+    return spdlog::level::critical;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+} // namespace
 
 std::array<BacktraceAction::SignalSlot, BacktraceAction::MaxSlots> BacktraceAction::signal_slots_;
 std::atomic<int> BacktraceAction::instance_count_ = 0;
@@ -29,7 +54,7 @@ BacktraceAction::BacktraceAction(
     Server::Configuration::GuardDogActionFactoryContext& context)
     : cooldown_duration_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cooldown_duration, 10000))),
-      stats_(generateStats(context.stats_)) {
+      log_level_(logLevelFromProto(config.log_level())), stats_(generateStats(context.stats_)) {
   if (instance_count_.fetch_add(1, std::memory_order_acq_rel) == 0) {
     signal_handler_registered_.store(
         NonFatalSignalHandler::registerNonFatalSignalHandler(onNonFatalSignal),
@@ -47,10 +72,9 @@ void BacktraceAction::onSlotTimer(int slot_index) {
   case SlotState::Ready: {
     // The handler finished writing the backtrace and it's safe to read.
     // Log it and free the slot for future use.
-    ENVOY_LOG_MISC(critical, "Backtrace Action: backtrace for thread {}:",
-                   slot.tid.load(std::memory_order_relaxed));
+    logThreadId(slot.tid.load(std::memory_order_relaxed));
     BackwardsTrace tracer(slot.trace.frames, slot.trace.depth);
-    tracer.logTrace();
+    tracer.logTrace(log_level_);
     stats_.backtraces_logged_.inc();
     slot.state.store(SlotState::Free, std::memory_order_release);
     break;
@@ -78,6 +102,30 @@ void BacktraceAction::onSlotTimer(int slot_index) {
     // Nothing to do: Free means the slot was already released, and Claimed
     // cannot be observed here (the timer is only armed after Signaled).
     break;
+  }
+}
+
+void BacktraceAction::logThreadId(int64_t tid) {
+  switch (log_level_) {
+  case spdlog::level::trace:
+    ENVOY_LOG_MISC(trace, "Backtrace Action: backtrace for thread {}:", tid);
+    return;
+  case spdlog::level::debug:
+    ENVOY_LOG_MISC(debug, "Backtrace Action: backtrace for thread {}:", tid);
+    return;
+  case spdlog::level::info:
+    ENVOY_LOG_MISC(info, "Backtrace Action: backtrace for thread {}:", tid);
+    return;
+  case spdlog::level::warn:
+    ENVOY_LOG_MISC(warn, "Backtrace Action: backtrace for thread {}:", tid);
+    return;
+  case spdlog::level::err:
+    ENVOY_LOG_MISC(error, "Backtrace Action: backtrace for thread {}:", tid);
+    return;
+  case spdlog::level::critical:
+  default:
+    ENVOY_LOG_MISC(critical, "Backtrace Action: backtrace for thread {}:", tid);
+    return;
   }
 }
 

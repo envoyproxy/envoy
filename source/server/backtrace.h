@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iostream>
 #include <ostream>
+#include <utility>
 
 #include "source/common/common/logger.h"
 #include "source/common/version/version.h"
@@ -129,8 +130,10 @@ public:
 
   /**
    * Log the stack trace.
+   *
+   * @param level the level at which the trace is logged. Defaults to critical.
    */
-  void logTrace() {
+  void logTrace(spdlog::level::level_enum level = spdlog::level::critical) {
     if (log_to_stderr_) {
       printTrace(std::cerr);
       return;
@@ -150,21 +153,21 @@ public:
           fmt::format_to(std::back_inserter(buf), "\n#{}: [{}]", index, address);
         }
       });
-      ENVOY_LOG(critical, "{}", buf);
+      logLine(level, "{}", buf);
       return;
     }
 
-    ENVOY_LOG(critical, "Backtrace (use tools/stack_decode.py to get line numbers):");
-    ENVOY_LOG(critical, "Envoy version: {}", VersionInfo::version());
+    logLine(level, "Backtrace (use tools/stack_decode.py to get line numbers):");
+    logLine(level, "Envoy version: {}", VersionInfo::version());
     if (!addrMapping().empty()) {
-      ENVOY_LOG(critical, "Address mapping: {}", addrMapping());
+      logLine(level, "Address mapping: {}", addrMapping());
     }
 
-    visitTrace([](int index, const char* symbol, void* address) {
+    visitTrace([this, level](int index, const char* symbol, void* address) {
       if (symbol != nullptr) {
-        ENVOY_LOG(critical, "#{}: {} [{}]", index, symbol, address);
+        logLine(level, "#{}: {} [{}]", index, symbol, address);
       } else {
-        ENVOY_LOG(critical, "#{}: [{}]", index, address);
+        logLine(level, "#{}: [{}]", index, address);
       }
     });
   }
@@ -184,6 +187,38 @@ public:
   }
 
 private:
+  /**
+   * Logs a single message at the requested level. The logging macros require
+   * the level as a compile time token, so dispatch on the runtime level here.
+   */
+  template <typename... Args>
+  void logLine(spdlog::level::level_enum level, fmt::format_string<Args...> format,
+               Args&&... args) {
+    switch (level) {
+    case spdlog::level::trace:
+      ENVOY_LOG(trace, format, std::forward<Args>(args)...);
+      return;
+    case spdlog::level::debug:
+      ENVOY_LOG(debug, format, std::forward<Args>(args)...);
+      return;
+    case spdlog::level::info:
+      ENVOY_LOG(info, format, std::forward<Args>(args)...);
+      return;
+    case spdlog::level::warn:
+      ENVOY_LOG(warn, format, std::forward<Args>(args)...);
+      return;
+    case spdlog::level::err:
+      ENVOY_LOG(error, format, std::forward<Args>(args)...);
+      return;
+    case spdlog::level::critical:
+      ENVOY_LOG(critical, format, std::forward<Args>(args)...);
+      return;
+    case spdlog::level::off:
+    case spdlog::level::n_levels:
+      return;
+    }
+  }
+
   static bool log_to_stderr_;
   static bool single_line_;
 
