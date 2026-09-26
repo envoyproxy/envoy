@@ -278,6 +278,13 @@ use_repo(bazel_lib, "jq", "jq_toolchains", "yq", "yq_toolchains")
 # Java
 java_compat = use_extension("@rules_java//java:rules_java_deps.bzl", "compatibility_proxy")
 use_repo(java_compat, "compatibility_proxy")
+# Envoy has no first-class Java, but protobuf's Java tooling still needs a hermetic JDK and the
+# javabuilder workaround configured in //bazel:envoy_java_toolchain.
+register_toolchains(
+    "//bazel:envoy_java_toolchain_definition",
+    "//bazel:envoy_java_runtime_toolchain",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain",
+)
 
 # Python/pip
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
