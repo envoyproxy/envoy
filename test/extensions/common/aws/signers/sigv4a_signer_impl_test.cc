@@ -148,13 +148,15 @@ public:
   std::shared_ptr<SigV4ASignerImpl> signer_;
 };
 
-// No authorization header should be present when the credentials are empty
+// No authorization header should be present when the credentials are empty, and the caller should
+// be able to tell that the request was deliberately left unsigned rather than signed.
 TEST_F(SigV4ASignerImplTest, AnonymousCredentials) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(Credentials()));
 
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_);
-  EXPECT_OK(status);
+  EXPECT_TRUE(absl::IsFailedPrecondition(status));
+  EXPECT_EQ(status.message(), SignatureConstants::NoCredentialsMessage);
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
 

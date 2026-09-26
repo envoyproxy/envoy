@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/aws_request_signing:aws_request_signing_filter_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

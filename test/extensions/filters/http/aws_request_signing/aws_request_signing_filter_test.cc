@@ -5,6 +5,7 @@
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -210,6 +211,78 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignFails) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
   EXPECT_EQ(1UL, filter_config_->stats_.payload_signing_failed_.value());
+}
+
+// Verify that a request forwarded unsigned, because the credentials provider chain resolved to no
+// credentials, is counted apart from both a signed request and a signing failure.
+TEST_F(AwsRequestSigningFilterTest, SignSkippedWhenCredentialsUnavailable) {
+  setup();
+
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+
+  EXPECT_CALL(*(filter_config_->signer_),
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
+        return absl::FailedPreconditionError("no credentials available, request left unsigned");
+      }));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(1UL, filter_config_->stats_.signing_skipped_.value());
+  EXPECT_EQ(0UL, filter_config_->stats_.signing_added_.value());
+  EXPECT_EQ(0UL, filter_config_->stats_.signing_failed_.value());
+}
+
+// Verify that disabling the runtime guard restores the previous signing_added total, while the new
+// counter still reports the skipped request.
+TEST_F(AwsRequestSigningFilterTest, SignSkippedCountedAsAddedWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.aws_request_signing_count_skipped_separately", "false"}});
+  setup();
+
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+
+  EXPECT_CALL(*(filter_config_->signer_),
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
+        return absl::FailedPreconditionError("no credentials available, request left unsigned");
+      }));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(1UL, filter_config_->stats_.signing_skipped_.value());
+  EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
+  EXPECT_EQ(0UL, filter_config_->stats_.signing_failed_.value());
+}
+
+// Verify the payload signing counters when signing is skipped in decodeData.
+TEST_F(AwsRequestSigningFilterTest, DecodeDataSignSkippedWhenCredentialsUnavailable) {
+  setup();
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
+                                               An<const std::string&>(), An<absl::string_view>()))
+      .WillOnce(
+          Invoke([](Http::HeaderMap&, const std::string&, const absl::string_view) -> absl::Status {
+            return absl::FailedPreconditionError("no credentials available, request left unsigned");
+          }));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(1UL, filter_config_->stats_.signing_skipped_.value());
+  EXPECT_EQ(1UL, filter_config_->stats_.payload_signing_skipped_.value());
+  EXPECT_EQ(0UL, filter_config_->stats_.signing_added_.value());
+  EXPECT_EQ(0UL, filter_config_->stats_.payload_signing_added_.value());
+  EXPECT_EQ(0UL, filter_config_->stats_.payload_signing_failed_.value());
 }
 
 // Verify FilterConfigImpl getters.
