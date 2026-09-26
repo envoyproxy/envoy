@@ -26,5 +26,14 @@ public:
   std::shared_ptr<MockHost> host_{new NiceMock<MockHost>()};
 };
 
+class MockConnectionStateProvider : public ConnectionStateProvider {
+public:
+  MockConnectionStateProvider();
+  ~MockConnectionStateProvider() override;
+
+  MOCK_METHOD(bool, hasReadyConnection, (const HostConstSharedPtr& host), (const, override));
+  MOCK_METHOD(void, preconnect, (const HostConstSharedPtr& host), (override));
+};
+
 } // namespace Upstream
 } // namespace Envoy

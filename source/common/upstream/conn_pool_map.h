@@ -76,6 +76,11 @@ public:
   void drainConnectionsIf(Envoy::ConnectionPool::DrainConnectionsPoolPredicate predicate,
                           Envoy::ConnectionPool::DrainBehavior drain_behavior);
 
+  /**
+   * @return true if any pool has at least one connection ready to accept a new stream.
+   */
+  bool hasReadyConnection() const;
+
 private:
   /**
    * Frees the first idle pool in `active_pools_`.

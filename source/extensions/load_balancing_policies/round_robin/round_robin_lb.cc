@@ -10,6 +10,7 @@ TypedRoundRobinLbConfig::TypedRoundRobinLbConfig(const CommonLbConfigProto& comm
                                                  const LegacyRoundRobinLbProto& lb_config) {
   Upstream::LoadBalancerConfigHelper::convertSlowStartConfigTo(lb_config, lb_config_);
   Upstream::LoadBalancerConfigHelper::convertLocalityLbConfigTo(common_lb_config, lb_config_);
+  Upstream::LoadBalancerConfigHelper::convertConnectionAwareLbConfigTo(lb_config, lb_config_);
 }
 
 } // namespace Upstream
