@@ -156,5 +156,38 @@ private:
   const TransportSocketOptionsConstSharedPtr inner_options_;
 };
 
+class Http11ProxyDecoratingTransportSocketOptions : public TransportSocketOptions {
+public:
+  Http11ProxyDecoratingTransportSocketOptions(
+      Http11ProxyInfo proxy_info, TransportSocketOptionsConstSharedPtr inner_options)
+      : proxy_info_(std::move(proxy_info)),
+        inner_options_(inner_options ? std::move(inner_options)
+                                     : std::make_shared<TransportSocketOptionsImpl>()) {}
+
+  const std::optional<std::string>& serverNameOverride() const override {
+    return inner_options_->serverNameOverride();
+  }
+  const std::vector<std::string>& verifySubjectAltNameListOverride() const override {
+    return inner_options_->verifySubjectAltNameListOverride();
+  }
+  const std::vector<std::string>& applicationProtocolListOverride() const override {
+    return inner_options_->applicationProtocolListOverride();
+  }
+  const std::vector<std::string>& applicationProtocolFallback() const override {
+    return inner_options_->applicationProtocolFallback();
+  }
+  std::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
+    return inner_options_->proxyProtocolOptions();
+  }
+  OptRef<const Http11ProxyInfo> http11ProxyInfo() const override { return {proxy_info_}; }
+  const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
+    return inner_options_->downstreamSharedFilterStateObjects();
+  }
+
+private:
+  const Http11ProxyInfo proxy_info_;
+  const TransportSocketOptionsConstSharedPtr inner_options_;
+};
+
 } // namespace Network
 } // namespace Envoy
