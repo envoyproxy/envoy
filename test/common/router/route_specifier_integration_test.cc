@@ -67,8 +67,7 @@ private:
 class TagAddingRouteSpecifierFactory : public RouteSpecifierFactory {
 public:
   absl::StatusOr<RouteSpecifierSharedPtr>
-  createRouteSpecifier(const Protobuf::Message& config,
-                       Server::Configuration::ServerFactoryContext&) override {
+  createRouteSpecifier(const Protobuf::Message& config, RouteSpecifierFactoryContext&) override {
     const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(config);
     return std::make_shared<TagAddingRouteSpecifier>(
         typed_config.fields().at("tag").string_value());

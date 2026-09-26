@@ -19,6 +19,7 @@ package(default_visibility = [
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
     "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
+    "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
@@ -80,6 +81,10 @@ test_program(name = "health_checker_integration_test")
 test_program(name = "upstream_http_tcp_bridge")
 
 test_program(name = "cluster_specifier_integration_test")
+
+test_program(name = "route_specifier_integration_test")
+
+test_program(name = "route_specifier_shadow")
 
 test_program(name = "cluster_integration_test")
 

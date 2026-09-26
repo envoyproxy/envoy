@@ -20,18 +20,38 @@ using RouteSpecifierList = absl::InlinedVector<RouteSpecifierSharedPtr, 2>;
 using RouteSpecifierSpan = absl::Span<const RouteSpecifierSharedPtr>;
 
 /**
+ * Context handed to route specifier factories.
+ */
+class RouteSpecifierFactoryContextImpl : public RouteSpecifierFactoryContext {
+public:
+  RouteSpecifierFactoryContextImpl(Server::Configuration::ServerFactoryContext& factory_context,
+                                   OptRef<RouteBuilder> route_builder)
+      : factory_context_(factory_context), route_builder_(route_builder) {}
+
+  // Router::RouteSpecifierFactoryContext
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() override {
+    return factory_context_;
+  }
+  OptRef<RouteBuilder> routeBuilder() override { return route_builder_; }
+
+private:
+  Server::Configuration::ServerFactoryContext& factory_context_;
+  const OptRef<RouteBuilder> route_builder_;
+};
+
+/**
  * Create the route specifiers of one configuration level.
  *
  * @param configs the repeated `route_specifiers` field of a RouteConfiguration, VirtualHost or
  *        Route.
- * @param context the server factory context. Its message validation visitor is used to translate
- *        the specifier configurations.
+ * @param context the factory context. The message validation visitor of its server factory context
+ *        is used to translate the specifier configurations.
  * @return the created specifiers in configuration order, or an error status if any specifier is
  *         unknown or misconfigured.
  */
 absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& configs,
-    Server::Configuration::ServerFactoryContext& context);
+    RouteSpecifierFactoryContext& context);
 
 /**
  * Run the route specifier chains of all three configuration levels. The levels run in order:
