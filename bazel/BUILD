@@ -12,7 +12,10 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# TODO(jwendell): Remove after https://github.com/protocolbuffers/protobuf/issues/20760 is fixed.
+# Envoy has no first-class Java, but protobuf's Java tooling still needs a hermetic JDK and a
+# javabuilder workaround while https://github.com/protocolbuffers/protobuf/issues/20760 is open.
+# MODULE.bazel registers this compile toolchain plus the runtime toolchains below so downstream
+# bzlmod consumers get the same hermetic Java setup without copying .bazelrc flags.
 default_java_toolchain(
     name = "envoy_java_toolchain",
     java_runtime = "@rules_java//toolchains:remotejdk_25",
@@ -20,6 +23,66 @@ default_java_toolchain(
     source_version = "11",
     target_version = "11",
 )
+
+# Hermetic default Java runtime. Registered from MODULE.bazel so that consumers of @envoy do not
+# need to set --java_runtime_version / --tool_java_runtime_version. The
+# @rules_java//toolchains:remotejdk_25 target is a java_runtime_version_alias that resolves its
+# runtime via toolchain resolution, so these wrappers must point at the concrete per-platform
+# @remotejdk25_*//:jdk targets to avoid a self-cycle through runtime toolchain resolution.
+_JDK_PLATFORMS = {
+    "linux": [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    "linux_aarch64": [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+    "linux_ppc64le": [
+        "@platforms//os:linux",
+        "@platforms//cpu:ppc64le",
+    ],
+    "linux_s390x": [
+        "@platforms//os:linux",
+        "@platforms//cpu:s390x",
+    ],
+    "macos": [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+    "macos_aarch64": [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+    "win": [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+    ],
+    "win_arm64": [
+        "@platforms//os:windows",
+        "@platforms//cpu:aarch64",
+    ],
+}
+
+[
+    toolchain(
+        name = "envoy_java_runtime_toolchain_" + suffix,
+        target_compatible_with = constraints,
+        toolchain = "@remotejdk25_%s//:jdk" % suffix,
+        toolchain_type = "@bazel_tools//tools/jdk:runtime_toolchain_type",
+    )
+    for suffix, constraints in _JDK_PLATFORMS.items()
+]
+
+[
+    toolchain(
+        name = "envoy_java_bootstrap_runtime_toolchain_" + suffix,
+        target_compatible_with = constraints,
+        toolchain = "@remotejdk25_%s//:jdk" % suffix,
+        toolchain_type = "@bazel_tools//tools/jdk:bootstrap_runtime_toolchain_type",
+    )
+    for suffix, constraints in _JDK_PLATFORMS.items()
+]
 
 exports_files([
     "gen_sh_test_runner.sh",
@@ -978,11 +1041,6 @@ selects.config_setting_group(
         ":not_x86",
         ":wasm_disabled",
     ],
-)
-
-alias(
-    name = "remote_jdk11",
-    actual = "@rules_java//toolchains:remote_jdk11",
 )
 
 alias(

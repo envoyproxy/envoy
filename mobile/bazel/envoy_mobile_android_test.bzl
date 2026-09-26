@@ -9,6 +9,13 @@ def jvm_flags(lib_name):
         "-Djava.library.path=library/jni:test/jni",
         "-Denvoy_jni_library_name={}".format(lib_name),
         "-Xcheck:jni",
+        # Robolectric >= 4.9 installs its bundled Conscrypt as the #1 JCA provider inside the
+        # test sandbox. Its EC AlgorithmParameters cannot handle the F2m curves that SunJSSE
+        # enumerates on JDK 17+, which breaks every TLS handshake (and Netty ALPN) in tests.
+        # We don't need Conscrypt in these tests, so disable the injection.
+        "-Drobolectric.conscryptMode=OFF",
+        # CronetTestRule reflectively resets java.net.URL.factory between tests; JDK 17+ strong
+        # encapsulation requires java.net to be opened explicitly.
         "--add-opens=java.base/java.net=ALL-UNNAMED",
     ] + select({
         "@envoy//bazel:disable_google_grpc": ["-Denvoy_jni_google_grpc_disabled=true"],

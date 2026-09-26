@@ -144,34 +144,19 @@ trap 'rm -rf "$tmp_dir"' EXIT
 # Keep only Envoy classes plus Kotlin module metadata needed for Kotlin consumers to resolve
 # top-level declarations in io.envoyproxy.envoymobile packages, while dropping generated R
 # classes from the published aar classes.jar.
-mapfile -t keep_entries < <(
-  unzip -Z1 "$original_directory/$input_jar" \
-    | grep -E '^io/envoyproxy/' \
-    | grep -Ev '(^|/)R(\\$[^/]+)?\\.class$' || true
-)
-
-mapfile -t kotlin_module_entries < <(
-  unzip -Z1 "$original_directory/$metadata_jar" \
-    | grep -E '^META-INF/[^/]+\\.kotlin_module$' || true
-)
-
-if [ "${#keep_entries[@]}" -eq 0 ] && [ "${#kotlin_module_entries[@]}" -eq 0 ]; then
-  echo "classes.jar filter matched no entries" >&2
+#
+# NOTE: do not use `grep -q` here - under `set -o pipefail` it can close the pipe before
+# unzip finishes writing, unzip then dies with SIGPIPE and the pipeline reports failure.
+if ! unzip -Z1 "$original_directory/$input_jar" | grep '^io/envoyproxy/' > /dev/null; then
+  echo "classes.jar has no io/envoyproxy classes" >&2
   exit 1
 fi
 
-printf '%s\n' "${keep_entries[@]}" | grep -q '^io/envoyproxy/' || {
-  echo "classes.jar has no io/envoyproxy classes" >&2
-  exit 1
-}
-
 (
   cd "$tmp_dir"
-  if [ "${#keep_entries[@]}" -gt 0 ]; then
-    unzip -qq "$original_directory/$input_jar" "${keep_entries[@]}"
-  fi
-  if [ "${#kotlin_module_entries[@]}" -gt 0 ]; then
-    unzip -qq "$original_directory/$metadata_jar" "${kotlin_module_entries[@]}"
+  unzip -qq "$original_directory/$input_jar" 'io/envoyproxy/*' -x '*/R.class' '*/R$*.class'
+  if unzip -Z1 "$original_directory/$metadata_jar" | grep '^META-INF/[^/]*\\.kotlin_module$' > /dev/null; then
+    unzip -qq "$original_directory/$metadata_jar" 'META-INF/*.kotlin_module'
   fi
   zip -q -r "$original_directory/$output_jar" .
 )

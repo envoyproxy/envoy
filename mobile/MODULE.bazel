@@ -52,6 +52,42 @@ bazel_dep(name = "zstd", version = "1.5.7.bcr.2")
 
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = True, repo_name = "buildifier")
 
+java_toolchains = use_extension("@rules_java//java:extensions.bzl", "toolchains")
+use_repo(
+    java_toolchains,
+    "remotejdk17_linux",
+    "remotejdk17_linux_aarch64",
+    "remotejdk17_macos",
+    "remotejdk17_macos_aarch64",
+    "remotejdk21_linux",
+    "remotejdk21_linux_aarch64",
+    "remotejdk21_macos",
+    "remotejdk21_macos_aarch64",
+)
+
+register_toolchains(
+    "//bazel:envoy_mobile_java_toolchain_linux_definition",
+    "//bazel:envoy_mobile_java_toolchain_linux_aarch64_definition",
+    "//bazel:envoy_mobile_java_toolchain_macos_definition",
+    "//bazel:envoy_mobile_java_toolchain_macos_aarch64_definition",
+    "//bazel:envoy_mobile_java11_toolchain_linux_default_definition",
+    "//bazel:envoy_mobile_java11_toolchain_linux_aarch64_default_definition",
+    "//bazel:envoy_mobile_java11_toolchain_macos_default_definition",
+    "//bazel:envoy_mobile_java11_toolchain_macos_aarch64_default_definition",
+    "//bazel:envoy_mobile_java11_toolchain_linux_definition",
+    "//bazel:envoy_mobile_java11_toolchain_linux_aarch64_definition",
+    "//bazel:envoy_mobile_java11_toolchain_macos_definition",
+    "//bazel:envoy_mobile_java11_toolchain_macos_aarch64_definition",
+    "//bazel:envoy_mobile_java_runtime_toolchain_linux",
+    "//bazel:envoy_mobile_java_runtime_toolchain_linux_aarch64",
+    "//bazel:envoy_mobile_java_runtime_toolchain_macos",
+    "//bazel:envoy_mobile_java_runtime_toolchain_macos_aarch64",
+    "//bazel:envoy_mobile_java_bootstrap_runtime_toolchain_linux",
+    "//bazel:envoy_mobile_java_bootstrap_runtime_toolchain_linux_aarch64",
+    "//bazel:envoy_mobile_java_bootstrap_runtime_toolchain_macos",
+    "//bazel:envoy_mobile_java_bootstrap_runtime_toolchain_macos_aarch64",
+)
+
 local_path_override(
     module_name = "envoy",
     path = "..",
@@ -66,7 +102,6 @@ local_path_override(
     module_name = "envoy_build_config",
     path = "envoy_build_config",
 )
-
 
 single_version_override(
     module_name = "openssl",
@@ -185,12 +220,14 @@ maven.artifact(
     version = "4.35.1",
 )
 
+# This pin is only for rules_android_maven's own tooling; it is intentionally independent from the
+# @android_gmaven_r8 D8 used in mobile/bazel/android_artifacts.bzl to desugar the published aar.
 maven.artifact(
     name = "rules_android_maven",
-    group = "com.android.tools",
     artifact = "r8",
-    version = "9.1.43",
     force_version = True,
+    group = "com.android.tools",
+    version = "9.1.43",
 )
 
 # This is to workaround upstream bug/noise
@@ -224,13 +261,13 @@ quiche_dev.deps(
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk", dev_dependency = True)
 go_sdk.download(
     name = "go_sdk",
-    version = "1.27.1",
     sdks = {
         "linux_amd64": ("go1.27.1.linux-amd64.tar.gz", "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445"),
         "linux_arm64": ("go1.27.1.linux-arm64.tar.gz", "3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec"),
         "darwin_arm64": ("go1.27.1.darwin-arm64.tar.gz", "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12"),
         "darwin_amd64": ("go1.27.1.darwin-amd64.tar.gz", "8f8f52c6649542cf027bbc9b9c68d1ec042f9f34808a40413f0b8b3f66f3caa4"),
     },
+    version = "1.27.1",
 )
 use_repo(
     go_sdk,
