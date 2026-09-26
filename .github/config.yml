@@ -196,6 +196,7 @@ run:
     - bazel/**/*
     - .bazelrc
     - ci/do_ci.sh
+    - ci/bazel_fun.sh
   check-coverage:
     paths:
     - "**/*"
@@ -357,6 +358,7 @@ run:
     - .github/dependabot.yml
     - .github/workflows/_precheck_deps.yml
     - ci/do_ci.sh
+    - ci/bazel_fun.sh
     - VERSION.txt
     - bazel/BUILD
     - tools/dependency/*
