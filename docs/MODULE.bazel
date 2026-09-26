@@ -37,14 +37,14 @@ local_path_override(
 
 git_override(
     module_name = "envoy_toolshed",
-    commit = "bd76d894a17def93b25f618fa257200da93e4f92",
+    commit = "68c61f57733ea9e39ea3ec286d95d177e45d6f3a",
     remote = "https://github.com/envoyproxy/toolshed",
     strip_prefix = "bazel",
 )
 
 git_override(
     module_name = "envoy_toolshed_jq",
-    commit = "bd76d894a17def93b25f618fa257200da93e4f92",
+    commit = "68c61f57733ea9e39ea3ec286d95d177e45d6f3a",
     remote = "https://github.com/envoyproxy/toolshed",
     strip_prefix = "jq",
 )

@@ -135,56 +135,71 @@ registry_current_hash() {
 registry_check() {
     local bazelrc
     local module_dir
-    local target
-    local status_json
-    local workspace
-    local behind
-    local latest
+    local markdown_path
     local sha
+    local sha_path
+    local status_path
+    local workspace
     local tags
     local version
     local registry_hash=""
+    local target
 
     version="$(cat VERSION.txt)"
     for bazelrc in "${REGISTRY_BAZELRC_FILES[@]}"; do
         module_dir="$(dirname "$bazelrc")"
         target="$(workspace_target "$module_dir" update_registry.check)"
         workspace="$(workspace_name "$module_dir")"
+        status_path="$(mktemp)"
+        markdown_path="$(mktemp)"
+        sha_path="$(mktemp)"
 
         pushd "$module_dir" > /dev/null
         if [[ -n "${ENVOY_REGISTRY_ALLOW_UNSAFE:-}" ]]; then
-            status_json="$(bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
                 "${target}" \
-                "--@envoy_toolshed//dependency:registry_allow_unsafe=true")"
+                "--@envoy_toolshed//dependency:registry_allow_unsafe=true" \
+                -- \
+                "--json-out=${status_path}" \
+                "--markdown-out=${markdown_path}" \
+                "--sha-out=${sha_path}"
         else
-            status_json="$(bazel run "${BAZEL_BUILD_OPTIONS[@]}" "${target}")"
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+                "${target}" \
+                -- \
+                "--json-out=${status_path}" \
+                "--markdown-out=${markdown_path}" \
+                "--sha-out=${sha_path}"
         fi
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
         popd > /dev/null
 
-        sha="$(jq -r '.sha' <<< "${status_json}")"
-        latest="$(jq -r '.latest' <<< "${status_json}")"
-        behind="$(jq -r '.behind // "unknown"' <<< "${status_json}")"
-        tags="$(jq -r '.tags | join(" ")' <<< "${status_json}")"
+        sha="$(cat "${sha_path}")"
+        tags="$(jq -r '.tags | join(" ")' "${status_path}")"
         if [[ -z "${sha}" || "${sha}" == "null" ]]; then
+            rm -f "${status_path}" "${markdown_path}" "${sha_path}"
             echo "FAIL: Failed to determine registry hash for ${workspace}" >&2
             return 1
         fi
         if [[ -n "${registry_hash}" && "${registry_hash}" != "${sha}" ]]; then
+            rm -f "${status_path}" "${markdown_path}" "${sha_path}"
             echo "FAIL: Registry hash mismatch: ${workspace} has ${sha}, expected ${registry_hash}" >&2
             return 1
         fi
         registry_hash="${sha}"
 
-        echo "${workspace}: pinned ${sha}, latest ${latest}, behind main by ${behind}"
+        echo "${workspace}: $(cat "${markdown_path}")"
         if [[ -n "${tags}" ]]; then
+            rm -f "${status_path}" "${markdown_path}" "${sha_path}"
             echo "${workspace}: registry commit ${sha} is tagged: ${tags}"
             continue
         fi
         if [[ "${version}" == *-dev ]]; then
+            rm -f "${status_path}" "${markdown_path}" "${sha_path}"
             echo "WARNING: ${workspace}: registry commit ${sha} is not a tagged version (ok for ${version})" >&2
             continue
         fi
+        rm -f "${status_path}" "${markdown_path}" "${sha_path}"
         echo "FAIL: ${workspace}: registry commit ${sha} is not a tagged version, required for release ${version}" >&2
         return 1
     done
@@ -192,15 +207,17 @@ registry_check() {
 
 deps_report() {
     local extra_options
+    local markdown_path
     local module_dir
+    local report_path
     local target
     local workspace
-    local report_path
 
     while IFS= read -r module_dir; do
         target="$(workspace_target "$module_dir" update_module)"
         workspace="$(workspace_name "$module_dir")"
         report_path="$(mktemp)"
+        markdown_path="$(mktemp)"
 
         pushd "$module_dir" > /dev/null
         extra_options=()
@@ -216,27 +233,16 @@ deps_report() {
             "${target}" \
             -- \
             --report \
-            "--json-out=${report_path}"
+            "--json-out=${report_path}" \
+            "--markdown-out=${markdown_path}"
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
         popd > /dev/null
 
         echo "== ${workspace} =="
-        jq -r '
-            [
-              "| Dependency | Current | Latest | Registry | Update |",
-              "| --- | --- | --- | --- | --- |",
-              (
-                to_entries
-                | sort_by(.key)
-                | .[]
-                | "| \(.key) | \(.value.current // "—") | \(.value.latest // "—") | \(.value.current_registry // "—") | \(if .value.update_available then "yes" else "no" end) |"
-              )
-            ]
-            | .[]
-        ' "${report_path}"
+        cat "${markdown_path}"
         echo
 
-        rm -f "${report_path}"
+        rm -f "${report_path}" "${markdown_path}"
     done < <(module_workspace_dirs)
 }
 
