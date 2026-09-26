@@ -749,6 +749,13 @@ public:
    * @throw EnvoyException when duration is out-of-range.
    */
   static uint64_t durationToSeconds(const Protobuf::Duration& duration);
+
+  /**
+   * Validates that the duration is valid, positive, and does not exceed maximum seconds/nanos.
+   * @param duration protobuf duration.
+   * @return OkStatus if valid, or an OutOfRangeError status.
+   */
+  static absl::Status validateDurationNoThrow(const Protobuf::Duration& duration);
 };
 
 class TimestampUtil {

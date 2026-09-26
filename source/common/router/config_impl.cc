@@ -40,6 +40,7 @@
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/path_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/init/manager_impl.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -49,6 +50,7 @@
 #include "source/common/router/route_specifier_impl.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
@@ -1931,14 +1933,14 @@ VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb, const Http::Reques
   return getRouteFromRoutes(cb, route_match_context, stream_info, random_value, routes_);
 }
 
-const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
-    absl::string_view host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
+const DomainEntry* RouteMatcher::findWildcardDomainEntry(
+    absl::string_view host, const RouteMatcher::WildcardDomainEntries& wildcard_domain_entries,
     RouteMatcher::SubstringFunction substring_function) const {
   // We do a longest wildcard match against the host that's passed in
   // (e.g. "foo-bar.baz.com" should match "*-bar.baz.com" before matching "*.baz.com" for suffix
   // wildcards). This is done by scanning the length => wildcards map looking for every wildcard
   // whose size is < length.
-  for (const auto& iter : wildcard_virtual_hosts) {
+  for (const auto& iter : wildcard_domain_entries) {
     const uint32_t wildcard_length = iter.first;
     const auto& wildcard_map = iter.second;
     // >= because *.foo.com shouldn't match .foo.com.
@@ -1952,6 +1954,229 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
   }
   return nullptr;
 }
+
+/**
+ * Isolated validation context used to sequentially validate virtual hosts and their route
+ * structures at configuration ingestion time without polluting global server state or leaking
+ * init manager handles.
+ */
+class IsolatedValidationContext : public Server::Configuration::ServerFactoryContext {
+public:
+  explicit IsolatedValidationContext(Server::Configuration::ServerFactoryContext& parent_context)
+      : parent_context_(parent_context), isolated_store_(parent_context.scope().symbolTable()),
+        isolated_scope_(isolated_store_.rootScope()),
+        isolated_init_manager_("isolated_validation") {}
+
+  // Server::Configuration::ServerFactoryContext
+  Stats::Scope& scope() override { return *isolated_scope_; }
+  Stats::Scope& serverScope() override { return *isolated_scope_; }
+  Init::Manager& initManager() override { return isolated_init_manager_; }
+
+  Upstream::ClusterManager& clusterManager() override { return parent_context_.clusterManager(); }
+  Envoy::Config::XdsManager& xdsManager() override { return parent_context_.xdsManager(); }
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return parent_context_.httpServerPropertiesCacheManager();
+  }
+  Event::Dispatcher& mainThreadDispatcher() override {
+    return parent_context_.mainThreadDispatcher();
+  }
+  const Server::Options& options() override { return parent_context_.options(); }
+  const LocalInfo::LocalInfo& localInfo() const override { return parent_context_.localInfo(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return parent_context_.messageValidationContext();
+  }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return parent_context_.messageValidationVisitor();
+  }
+  Envoy::Runtime::Loader& runtime() override { return parent_context_.runtime(); }
+  Singleton::Manager& singletonManager() override { return parent_context_.singletonManager(); }
+  ThreadLocal::Instance& threadLocal() override { return parent_context_.threadLocal(); }
+  OptRef<Server::Admin> admin() override { return parent_context_.admin(); }
+  TimeSource& timeSource() override { return parent_context_.timeSource(); }
+  AccessLog::AccessLogManager& accessLogManager() override {
+    return parent_context_.accessLogManager();
+  }
+  Api::Api& api() override { return parent_context_.api(); }
+  Http::Context& httpContext() override { return parent_context_.httpContext(); }
+  Grpc::Context& grpcContext() override { return parent_context_.grpcContext(); }
+  Router::Context& routerContext() override { return parent_context_.routerContext(); }
+  ProcessContextOptRef processContext() override { return parent_context_.processContext(); }
+  Envoy::Server::DrainManager& drainManager() override { return parent_context_.drainManager(); }
+  Server::ServerLifecycleNotifier& lifecycleNotifier() override {
+    return parent_context_.lifecycleNotifier();
+  }
+  Regex::Engine& regexEngine() override { return parent_context_.regexEngine(); }
+  Server::Configuration::StatsConfig& statsConfig() override {
+    return parent_context_.statsConfig();
+  }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override {
+    return parent_context_.bootstrap();
+  }
+  Server::OverloadManager& overloadManager() override { return parent_context_.overloadManager(); }
+  Server::OverloadManager& nullOverloadManager() override {
+    return parent_context_.nullOverloadManager();
+  }
+  bool healthCheckFailed() const override { return parent_context_.healthCheckFailed(); }
+  Ssl::ContextManager& sslContextManager() override { return parent_context_.sslContextManager(); }
+  Secret::SecretManager& secretManager() override { return parent_context_.secretManager(); }
+
+private:
+  Server::Configuration::ServerFactoryContext& parent_context_;
+  Stats::IsolatedStoreImpl isolated_store_;
+  Stats::ScopeSharedPtr isolated_scope_;
+  Init::ManagerImpl isolated_init_manager_;
+};
+
+bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_proto,
+                             const CommonConfigSharedPtr& global_route_config,
+                             bool validate_clusters,
+                             Server::Configuration::ServerFactoryContext& factory_context) {
+  if (vhost_proto.has_matcher()) {
+    return true;
+  }
+
+  if (vhost_proto.virtual_clusters_size() > 0 || vhost_proto.rate_limits_size() > 0 ||
+      vhost_proto.has_cors() || vhost_proto.typed_per_filter_config_size() > 0 ||
+      vhost_proto.request_mirror_policies_size() > 0 || vhost_proto.has_retry_policy() ||
+      vhost_proto.has_retry_policy_typed_config() || vhost_proto.has_hedge_policy() ||
+      vhost_proto.has_metadata() || !vhost_proto.request_headers_to_add().empty() ||
+      !vhost_proto.request_headers_to_remove().empty() ||
+      !vhost_proto.response_headers_to_add().empty() ||
+      !vhost_proto.response_headers_to_remove().empty()) {
+    return true;
+  }
+
+  if (!envoy::config::route::v3::VirtualHost_TlsRequirementType_IsValid(
+          vhost_proto.require_tls())) {
+    return true;
+  }
+
+  // Global shadow cluster validation
+  if (validate_clusters && global_route_config != nullptr) {
+    for (const auto& shadow_policy : global_route_config->shadowPolicies()) {
+      if (!shadow_policy->cluster().empty() &&
+          !factory_context.clusterManager().hasCluster(shadow_policy->cluster())) {
+        return true;
+      }
+    }
+  }
+
+  for (const auto& route : vhost_proto.routes()) {
+    if (route.action_case() != envoy::config::route::v3::Route::ActionCase::kRoute) {
+      return true;
+    }
+
+    if (route.typed_per_filter_config_size() > 0 || !route.request_headers_to_add().empty() ||
+        !route.request_headers_to_remove().empty() || !route.response_headers_to_add().empty() ||
+        !route.response_headers_to_remove().empty() || route.has_metadata() ||
+        route.has_decorator() || route.has_tracing()) {
+      return true;
+    }
+
+    switch (route.match().path_specifier_case()) {
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
+      break;
+    default:
+      return true;
+    }
+
+    if (route.match().headers_size() > 0 || route.match().query_parameters_size() > 0 ||
+        route.match().dynamic_metadata_size() > 0 || route.match().has_grpc() ||
+        route.match().has_tls_context() || !route.match().cookies().empty() ||
+        !route.match().filter_state().empty() || route.match().has_runtime_fraction()) {
+      return true;
+    }
+
+    const auto& route_action = route.route();
+
+    if (route_action.cluster_specifier_case() !=
+        envoy::config::route::v3::RouteAction::ClusterSpecifierCase::kCluster) {
+      return true;
+    }
+
+    if (route_action.cluster().empty() || route_action.has_weighted_clusters() ||
+        route_action.has_cluster_specifier_plugin() ||
+        route_action.has_inline_cluster_specifier_plugin() ||
+        !route_action.cluster_header().empty()) {
+      return true;
+    }
+
+    if (validate_clusters && !factory_context.clusterManager().hasCluster(route_action.cluster())) {
+      return true;
+    }
+
+    // Enum validation
+    if (!envoy::config::route::v3::RouteAction_ClusterNotFoundResponseCode_IsValid(
+            route_action.cluster_not_found_response_code())) {
+      return true;
+    }
+    if (!envoy::config::core::v3::RoutingPriority_IsValid(route_action.priority())) {
+      return true;
+    }
+
+    // Legacy redirect validation
+    if (route_action.internal_redirect_action() !=
+        envoy::config::route::v3::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT) {
+      return true;
+    }
+
+    // Duration validation
+    if (route_action.has_timeout() &&
+        !DurationUtil::validateDurationNoThrow(route_action.timeout()).ok()) {
+      return true;
+    }
+    if (route_action.has_idle_timeout() &&
+        !DurationUtil::validateDurationNoThrow(route_action.idle_timeout()).ok()) {
+      return true;
+    }
+    if (route_action.has_flush_timeout() &&
+        !DurationUtil::validateDurationNoThrow(route_action.flush_timeout()).ok()) {
+      return true;
+    }
+    if (route_action.has_max_grpc_timeout() &&
+        !DurationUtil::validateDurationNoThrow(route_action.max_grpc_timeout()).ok()) {
+      return true;
+    }
+    if (route_action.has_grpc_timeout_offset() &&
+        !DurationUtil::validateDurationNoThrow(route_action.grpc_timeout_offset()).ok()) {
+      return true;
+    }
+    if (route_action.has_max_stream_duration()) {
+      const auto& msd = route_action.max_stream_duration();
+      if (msd.has_max_stream_duration() &&
+          !DurationUtil::validateDurationNoThrow(msd.max_stream_duration()).ok()) {
+        return true;
+      }
+      if (msd.has_grpc_timeout_header_max() &&
+          !DurationUtil::validateDurationNoThrow(msd.grpc_timeout_header_max()).ok()) {
+        return true;
+      }
+      if (msd.has_grpc_timeout_header_offset() &&
+          !DurationUtil::validateDurationNoThrow(msd.grpc_timeout_header_offset()).ok()) {
+        return true;
+      }
+    }
+
+    if (route_action.has_retry_policy() || route_action.has_retry_policy_typed_config() ||
+        route_action.has_hedge_policy() || route_action.has_metadata_match() ||
+        !route_action.prefix_rewrite().empty() || !route_action.path_rewrite().empty() ||
+        route_action.has_regex_rewrite() || route_action.has_path_rewrite_policy() ||
+        !route_action.host_rewrite_literal().empty() || route_action.has_auto_host_rewrite() ||
+        !route_action.host_rewrite_header().empty() || route_action.has_host_rewrite_path_regex() ||
+        !route_action.host_rewrite().empty() || route_action.append_x_forwarded_host() ||
+        route_action.request_mirror_policies_size() > 0 || route_action.rate_limits_size() > 0 ||
+        route_action.hash_policy_size() > 0 || route_action.has_cors() ||
+        route_action.upgrade_configs_size() > 0 || route_action.has_internal_redirect_policy() ||
+        route_action.has_early_data_policy()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 absl::StatusOr<std::unique_ptr<RouteMatcher>>
 RouteMatcher::create(const envoy::config::route::v3::RouteConfiguration& route_config,
                      const CommonConfigSharedPtr& global_route_config,
@@ -1965,43 +2190,77 @@ RouteMatcher::create(const envoy::config::route::v3::RouteConfiguration& route_c
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
+
 RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& route_config,
                            const CommonConfigSharedPtr& global_route_config,
                            Server::Configuration::ServerFactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator,
                            Init::Manager& init_manager, bool validate_clusters,
                            absl::Status& creation_status)
-    : global_route_config_(global_route_config),
+    : time_source_(factory_context.timeSource()), global_route_config_(global_route_config),
       vhost_scope_(factory_context.scope().scopeFromStatName(
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()),
       vhost_header_(route_config.vhost_header()) {
+  const bool deferred_vhost_enabled =
+      factory_context.bootstrap().has_route_manager() &&
+      factory_context.bootstrap().route_manager().enable_deferred_virtual_host_creation();
+
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
-    VirtualHostImplSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
-        virtual_host_config, global_route_config, factory_context, *vhost_scope_, validator,
-        init_manager, validate_clusters, creation_status);
-    SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
+    DomainEntrySharedPtr domain_entry;
+    if (deferred_vhost_enabled) {
+      if (requiresProbeValidation(virtual_host_config, global_route_config, validate_clusters,
+                                  factory_context)) {
+        // Sequential probe validation using an isolated validation context.
+        IsolatedValidationContext validation_context(factory_context);
+        auto isolated_vhost_scope = validation_context.scope().scopeFromStatName(
+            factory_context.routerContext().virtualClusterStatNames().vhost_);
+        absl::Status validation_status = absl::OkStatus();
+        VirtualHostImpl probe_vhost(
+            virtual_host_config, global_route_config, validation_context, *isolated_vhost_scope,
+            validator, validation_context.initManager(), validate_clusters, validation_status);
+        if (!validation_status.ok()) {
+          creation_status = validation_status;
+          return;
+        }
+      }
+
+      // The VirtualHost is not fully unpacked and instantiated until first use.
+      auto init_object = std::make_shared<VirtualHostInitializationObject>(
+          virtual_host_config, global_route_config, factory_context, vhost_scope_, validator,
+          init_manager, validate_clusters);
+      domain_entry = std::make_shared<DomainEntry>(std::move(init_object));
+    } else {
+      VirtualHostImplSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
+          virtual_host_config, global_route_config, factory_context, *vhost_scope_, validator,
+          init_manager, validate_clusters, creation_status);
+      SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
+      domain_entry = std::make_shared<DomainEntry>(std::move(virtual_host));
+    }
+
+    all_domain_entries_.push_back(domain_entry);
+
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const Http::LowerCaseString lower_case_domain_name(domain_name);
       absl::string_view domain = lower_case_domain_name;
       bool duplicate_found = false;
       if ("*" == domain) {
-        if (default_virtual_host_) {
+        if (default_domain_entry_) {
           creation_status = absl::InvalidArgumentError(fmt::format(
               "Only a single wildcard domain is permitted in route {}", route_config.name()));
           return;
         }
-        default_virtual_host_ = virtual_host;
+        default_domain_entry_ = domain_entry;
       } else if (!domain.empty() && '*' == domain[0]) {
-        duplicate_found = !wildcard_virtual_host_suffixes_[domain.size() - 1]
-                               .emplace(domain.substr(1), virtual_host)
+        duplicate_found = !wildcard_domain_suffixes_[domain.size() - 1]
+                               .emplace(domain.substr(1), domain_entry)
                                .second;
       } else if (!domain.empty() && '*' == domain[domain.size() - 1]) {
-        duplicate_found = !wildcard_virtual_host_prefixes_[domain.size() - 1]
-                               .emplace(domain.substr(0, domain.size() - 1), virtual_host)
+        duplicate_found = !wildcard_domain_prefixes_[domain.size() - 1]
+                               .emplace(domain.substr(0, domain.size() - 1), domain_entry)
                                .second;
       } else {
-        duplicate_found = !virtual_hosts_.emplace(domain, virtual_host).second;
+        duplicate_found = !exact_domain_entries_.emplace(domain, domain_entry).second;
       }
       if (duplicate_found) {
         creation_status = absl::InvalidArgumentError(
@@ -2014,13 +2273,50 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   }
 }
 
-const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
+const DomainEntry* RouteMatcher::findDomainEntry(absl::string_view host_header_value) const {
   // Fast path the case where we only have a default virtual host.
-  if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
-      wildcard_virtual_host_prefixes_.empty()) {
-    return default_virtual_host_.get();
+  if (exact_domain_entries_.empty() && wildcard_domain_suffixes_.empty() &&
+      wildcard_domain_prefixes_.empty()) {
+    return default_domain_entry_.get();
   }
 
+  // TODO (@rshriram) Match Origin header in WebSocket
+  // request with VHost, using wildcard match
+  // Lower-case the value of the host header, as hostnames are case insensitive. Hosts on the wire
+  // are overwhelmingly lower-case already (DNS names normalize to lower-case per RFC 3986 3.2.2),
+  // so scan first and only build a lower-cased copy when an upper-case byte is present. This
+  // keeps the common path allocation-free instead of always constructing a std::string.
+  absl::string_view host = host_header_value;
+  std::string lowercase_host;
+  if (std::any_of(host_header_value.begin(), host_header_value.end(),
+                  [](char c) { return absl::ascii_isupper(static_cast<unsigned char>(c)); })) {
+    lowercase_host = absl::AsciiStrToLower(host_header_value);
+    host = lowercase_host;
+  }
+  const auto iter = exact_domain_entries_.find(host);
+  if (iter != exact_domain_entries_.end()) {
+    return iter->second.get();
+  }
+  if (!wildcard_domain_suffixes_.empty()) {
+    const DomainEntry* entry = findWildcardDomainEntry(
+        host, wildcard_domain_suffixes_,
+        [](absl::string_view h, int l) -> absl::string_view { return h.substr(h.size() - l); });
+    if (entry != nullptr) {
+      return entry;
+    }
+  }
+  if (!wildcard_domain_prefixes_.empty()) {
+    const DomainEntry* entry = findWildcardDomainEntry(
+        host, wildcard_domain_prefixes_,
+        [](absl::string_view h, int l) -> absl::string_view { return h.substr(0, l); });
+    if (entry != nullptr) {
+      return entry;
+    }
+  }
+  return default_domain_entry_.get();
+}
+
+const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
   absl::string_view host_header_value;
   if (!vhost_header_.get().empty()) {
     auto result = headers.get(vhost_header_);
@@ -2045,40 +2341,39 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
       host_header_value = host_header_value.substr(0, port_start);
     }
   }
-  // TODO (@rshriram) Match Origin header in WebSocket
-  // request with VHost, using wildcard match
-  // Lower-case the value of the host header, as hostnames are case insensitive. Hosts on the wire
-  // are overwhelmingly lower-case already (DNS names normalize to lower-case per RFC 3986 3.2.2),
-  // so scan first and only build a lower-cased copy when an upper-case byte is present. This keeps
-  // the common path allocation-free instead of always constructing a std::string.
-  absl::string_view host = host_header_value;
-  std::string lowercase_host;
-  if (std::any_of(host_header_value.begin(), host_header_value.end(),
-                  [](char c) { return absl::ascii_isupper(static_cast<unsigned char>(c)); })) {
-    lowercase_host = absl::AsciiStrToLower(host_header_value);
-    host = lowercase_host;
+
+  const DomainEntry* entry = findDomainEntry(host_header_value);
+  if (entry == nullptr) {
+    return nullptr;
   }
-  const auto iter = virtual_hosts_.find(host);
-  if (iter != virtual_hosts_.end()) {
-    return iter->second.get();
+  return entry->getOrCreateVirtualHost(time_source_);
+}
+
+size_t RouteMatcher::evictIdleVirtualHosts(uint64_t current_time_ms, uint64_t idle_ttl_ms,
+                                           size_t max_entries, size_t& cursor) const {
+  if (all_domain_entries_.empty() || max_entries == 0) {
+    return 0;
   }
-  if (!wildcard_virtual_host_suffixes_.empty()) {
-    const VirtualHostImpl* vhost = findWildcardVirtualHost(
-        host, wildcard_virtual_host_suffixes_,
-        [](absl::string_view h, int l) -> absl::string_view { return h.substr(h.size() - l); });
-    if (vhost != nullptr) {
-      return vhost;
+  const size_t total = all_domain_entries_.size();
+  if (cursor >= total) {
+    cursor = 0;
+  }
+  size_t evicted_count = 0;
+  const size_t inspect_count = std::min(max_entries, total);
+  for (size_t i = 0; i < inspect_count; ++i) {
+    const size_t idx = (cursor + i) % total;
+    const auto& entry = all_domain_entries_[idx];
+    if (entry && entry->evictIfIdle(current_time_ms, idle_ttl_ms)) {
+      ++evicted_count;
     }
   }
-  if (!wildcard_virtual_host_prefixes_.empty()) {
-    const VirtualHostImpl* vhost = findWildcardVirtualHost(
-        host, wildcard_virtual_host_prefixes_,
-        [](absl::string_view h, int l) -> absl::string_view { return h.substr(0, l); });
-    if (vhost != nullptr) {
-      return vhost;
-    }
-  }
-  return default_virtual_host_.get();
+  cursor = (cursor + inspect_count) % total;
+  return evicted_count;
+}
+
+size_t RouteMatcher::evictIdleVirtualHosts(uint64_t current_time_ms, uint64_t idle_ttl_ms) const {
+  size_t cursor = 0;
+  return evictIdleVirtualHosts(current_time_ms, idle_ttl_ms, all_domain_entries_.size(), cursor);
 }
 
 VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
