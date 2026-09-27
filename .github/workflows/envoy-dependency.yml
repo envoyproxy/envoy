@@ -31,6 +31,12 @@ on:
         default: true
       pr-message:
         description: Additional message for PR, eg to fix an issue (optional)
+      wip:
+        type: boolean
+        default: false
+        description: >-
+          Open the PR as a draft with a `[WIP] ` title prefix. For the `registry` task this also
+          allows a non-ancestor/untagged bazel-registry commit (sets ENVOY_REGISTRY_ALLOW_UNSAFE).
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
@@ -127,6 +133,7 @@ jobs:
       env:
         ENVOY_DOCKER_CI: 1
         ENVOY_REGISTRY_HASH: ${{ inputs.task == 'registry' && inputs.version || '' }}
+        ENVOY_REGISTRY_ALLOW_UNSAFE: ${{ inputs.task == 'registry' && inputs.wip && '1' || '' }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - uses: envoyproxy/toolshed/actions/upload/diff@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
@@ -138,7 +145,8 @@ jobs:
                || inputs.task == 'registry' && 'bazel-registry'
                || 'lockfiles')
               }}-${{ steps.update.outputs.output }}
-    - name: Create a PR
+    - id: pr
+      name: Create a PR
       if: ${{ inputs.pr && steps.update.outputs.changes != 'false' }}
       uses: envoyproxy/toolshed/actions/github/pr@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       with:
@@ -147,8 +155,13 @@ jobs:
           Created by Envoy dependency bot for @${{ github.actor }}
 
           ${{ inputs.pr-message }}
+          ${{ inputs.wip && (
+              inputs.task == 'registry'
+              && '> ⚠️ **WIP**: registry pin was bumped with `ENVOY_REGISTRY_ALLOW_UNSAFE` and may not be an ancestor of bazel-registry `main`. Do not merge as-is.'
+              || '> ⚠️ **WIP**: this PR was opened in draft mode for testing. Do not merge as-is.')
+              || '' }}
         branch: >-
-          dependency/${{ inputs.task }}/${{ inputs.task == 'bazel' && inputs.dependency
+          dependency/${{ inputs.task }}${{ inputs.wip && '/wip' || '' }}/${{ inputs.task == 'bazel' && inputs.dependency
               || inputs.task == 'registry' && 'bazel-registry'
               || 'lockfiles' }}/${{ steps.update.outputs.output }}
         commit-message: |
@@ -174,6 +187,21 @@ jobs:
                 || 'lockfiles',
                 steps.update.outputs.output) }}
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
+    - name: Mark PR as WIP (draft)
+      if: ${{ inputs.pr && inputs.wip && steps.update.outputs.changes != 'false' }}
+      run: |
+        pr_number="$(gh pr view "$PR_BRANCH" --json number --jq .number)"
+        title="$(gh pr view "$pr_number" --json title --jq .title)"
+        if [[ "$title" != "[WIP] "* ]]; then
+            gh pr edit "$pr_number" --title "[WIP] ${title}"
+        fi
+        gh pr ready --undo "$pr_number"
+      env:
+        GH_TOKEN: ${{ steps.appauth.outputs.token }}
+        PR_BRANCH: >-
+          dependency/${{ inputs.task }}${{ inputs.wip && '/wip' || '' }}/${{ inputs.task == 'bazel' && inputs.dependency
+              || inputs.task == 'registry' && 'bazel-registry'
+              || 'lockfiles' }}/${{ steps.update.outputs.output }}
 
   report:
     if: >-
