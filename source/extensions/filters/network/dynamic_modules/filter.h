@@ -49,7 +49,14 @@ public:
   // Accessors for ABI callbacks.
   Network::ReadFilterCallbacks* readCallbacks() { return read_callbacks_; }
   Network::WriteFilterCallbacks* writeCallbacks() { return write_callbacks_; }
-  Buffer::Instance* currentReadBuffer() { return current_read_buffer_; }
+  Buffer::Instance* currentReadBuffer() {
+    if (current_read_buffer_ != nullptr) {
+      return current_read_buffer_;
+    }
+    // Outside on_read the connection read buffer stays valid for the connection lifetime, so use it
+    // rather than the possibly transient buffer on_read received.
+    return read_callbacks_ != nullptr ? read_callbacks_->readBuffer().ptr() : nullptr;
+  }
   Buffer::Instance* currentWriteBuffer() { return current_write_buffer_; }
 
   // Test-only setters for buffer pointers.
@@ -180,8 +187,8 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_ = nullptr;
   Network::WriteFilterCallbacks* write_callbacks_ = nullptr;
 
-  // The connection read buffer, set on the first on_read callback and kept for the lifetime of the
-  // connection so modules can access buffered read data outside of on_read.
+  // The buffer passed to the active on_read callback, or null outside on_read. Deferred read access
+  // resolves the connection read buffer via currentReadBuffer() instead.
   Buffer::Instance* current_read_buffer_ = nullptr;
   // The write buffer for the active on_write callback only. The connection reuses or moves it after
   // on_write, so it is restored when the call returns rather than cached.

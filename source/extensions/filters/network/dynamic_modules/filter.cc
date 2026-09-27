@@ -101,13 +101,13 @@ Network::FilterStatus DynamicModuleNetworkFilter::onData(Buffer::Instance& data,
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
-  // Set the current read buffer for ABI callbacks. The buffer pointer is kept after the callback
-  // returns so that modules can access buffered data outside of on_read (e.g., in on_scheduled or
-  // on_http_callout_done). The buffer is the connection's persistent read buffer and remains valid
-  // for the lifetime of the connection.
+  // Expose the read buffer only while the hook runs. The argument may be a transient injected
+  // buffer, so it is cleared on return. Deferred access outside on_read resolves the connection
+  // read buffer in currentReadBuffer().
   current_read_buffer_ = &data;
   auto status = config_->on_network_filter_read_(thisAsVoidPtr(), in_module_filter_, data.length(),
                                                  end_stream);
+  current_read_buffer_ = nullptr;
   return toEnvoyFilterStatus(status);
 }
 
