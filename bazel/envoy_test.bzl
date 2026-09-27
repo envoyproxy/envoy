@@ -30,6 +30,7 @@ _ENABLE_EXPORTED_SYMBOLS = Label("//bazel:enable_exported_symbols")
 _ENGFLOW_RBE_X86_64 = Label("//bazel:engflow_rbe_x86_64")
 _EXPORTED_SYMBOLS = Label("//bazel:exported_symbols.txt")
 _EXPORTED_SYMBOLS_APPLE = Label("//bazel:exported_symbols_apple.txt")
+_EXPORTED_SYMBOLS_WINDOWS = Label("//bazel:exported_symbols_windows.def")
 _FUZZING_ENGINE = Label("//bazel:fuzzing_engine")
 _LIBFUZZER = Label("//bazel:libfuzzer")
 _LIBFUZZER_COVERAGE = Label("//bazel:libfuzzer_coverage")
@@ -88,6 +89,9 @@ def _envoy_test_default_exported_symbols():
         ],
         _APPLE: [
             "-Wl,-exported_symbols_list,$(location %s)" % str(_EXPORTED_SYMBOLS_APPLE),
+        ],
+        _WINDOWS_X86_64: [
+            "-DEF:$(location %s)" % str(_EXPORTED_SYMBOLS_WINDOWS),
         ],
         "//conditions:default": [],
     })
