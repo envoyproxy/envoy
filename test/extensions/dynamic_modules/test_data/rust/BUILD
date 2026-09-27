@@ -47,6 +47,8 @@ test_program(name = "bootstrap_integration_test")
 
 test_program(name = "bootstrap_stats_test")
 
+test_program(name = "bootstrap_iterate_panic_test")
+
 test_program(name = "bootstrap_function_registry_test")
 
 test_program(name = "bootstrap_shared_data_test")

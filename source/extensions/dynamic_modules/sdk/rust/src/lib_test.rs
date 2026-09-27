@@ -2895,20 +2895,112 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_histogra
   false
 }
 
+// Drive a stats iterator callback over a fixed set of entries, honoring the Stop action. This lets
+// the SDK counter and gauge iterator trampolines be exercised from unit tests.
+fn drive_stat_iterator(
+  iterator_fn: ::std::option::Option<
+    unsafe extern "C" fn(
+      abi::envoy_dynamic_module_type_envoy_buffer,
+      u64,
+      *mut std::os::raw::c_void,
+    ) -> abi::envoy_dynamic_module_type_stats_iteration_action,
+  >,
+  user_data: *mut std::os::raw::c_void,
+  entries: &[(&str, u64)],
+) {
+  let Some(callback) = iterator_fn else {
+    return;
+  };
+  for (name, value) in entries {
+    let name_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: name.as_ptr() as *mut _,
+      length: name.len(),
+    };
+    let action = unsafe { callback(name_buffer, *value, user_data) };
+    if matches!(
+      action,
+      abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+    ) {
+      break;
+    }
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
   _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
-  _iterator_fn: abi::envoy_dynamic_module_type_counter_iterator_fn,
-  _user_data: *mut std::os::raw::c_void,
+  iterator_fn: abi::envoy_dynamic_module_type_counter_iterator_fn,
+  user_data: *mut std::os::raw::c_void,
 ) {
+  drive_stat_iterator(
+    iterator_fn,
+    user_data,
+    &[("iter.counter.a", 1), ("iter.counter.b", 2)],
+  );
 }
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
   _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
-  _iterator_fn: abi::envoy_dynamic_module_type_gauge_iterator_fn,
-  _user_data: *mut std::os::raw::c_void,
+  iterator_fn: abi::envoy_dynamic_module_type_gauge_iterator_fn,
+  user_data: *mut std::os::raw::c_void,
 ) {
+  drive_stat_iterator(
+    iterator_fn,
+    user_data,
+    &[("iter.gauge.a", 3), ("iter.gauge.b", 4)],
+  );
+}
+
+#[test]
+fn test_bootstrap_iterate_counters_visitor_panic_is_caught() {
+  let extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let mut visited = 0usize;
+  // A panicking visitor must be caught inside the trampoline rather than unwinding across the C
+  // boundary and aborting Envoy. Iteration stops at the panicking entry.
+  extension.iterate_counters(&mut |_name, _value| {
+    visited += 1;
+    panic!("intentional panic in counter visitor");
+  });
+  assert_eq!(visited, 1);
+}
+
+#[test]
+fn test_bootstrap_iterate_gauges_visitor_panic_is_caught() {
+  let extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let mut visited = 0usize;
+  extension.iterate_gauges(&mut |_name, _value| {
+    visited += 1;
+    panic!("intentional panic in gauge visitor");
+  });
+  assert_eq!(visited, 1);
+}
+
+#[test]
+fn test_bootstrap_iterate_counters_continue_and_stop() {
+  let extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+
+  // Returning true visits every entry the host offers.
+  let mut all = Vec::new();
+  extension.iterate_counters(&mut |name, value| {
+    all.push((name.to_string(), value));
+    true
+  });
+  assert_eq!(
+    all,
+    vec![
+      ("iter.counter.a".to_string(), 1),
+      ("iter.counter.b".to_string(), 2),
+    ]
+  );
+
+  // Returning false stops iteration after the first entry.
+  let mut visited = 0usize;
+  extension.iterate_counters(&mut |_name, _value| {
+    visited += 1;
+    false
+  });
+  assert_eq!(visited, 1);
 }
 
 #[no_mangle]
