@@ -59,6 +59,7 @@ x-envoy-build-base: &envoy-build-base
   - ENVOY_HEAD_REF
   - ENVOY_OUTPUT_BASE_DIR
   - ENVOY_REPO
+  - ENVOY_REGISTRY_HASH
   - ENVOY_BUILD_ARCH
   - ENVOY_GEN_COMPDB_OPTIONS
 
