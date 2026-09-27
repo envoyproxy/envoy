@@ -248,6 +248,16 @@ bool_flag(
     build_setting_default = False,
 )
 
+bool_flag(
+    name = "deprecated_repo_arg_allowed",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "deprecated_repo_arg_is_allowed",
+    flag_values = {":deprecated_repo_arg_allowed": "True"},
+)
+
 config_setting(
     name = "jemalloc_enabled",
     flag_values = {":jemalloc": "True"},
@@ -533,6 +543,18 @@ label_flag(
 label_flag(
     name = "crypto",
     build_setting_default = "@boringssl//:crypto",
+)
+
+label_flag(
+    name = "test_main",
+    build_setting_default = "//test:main",
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "test_pch",
+    build_setting_default = "//test:test_pch",
+    visibility = ["//visibility:public"],
 )
 
 # wee8 engine: envoy_toolshed prebuilt by default, source for configs the

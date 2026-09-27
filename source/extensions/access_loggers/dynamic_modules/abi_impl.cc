@@ -17,19 +17,6 @@ using Envoy::Extensions::DynamicModules::ContextAccessor;
 using Envoy::Extensions::DynamicModules::HeadersMapOptConstRef;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
 
-namespace {
-
-// Helper to convert MonotonicTime to nanoseconds duration from start time.
-int64_t monotonicTimeToNanos(const std::optional<MonotonicTime>& time,
-                             const MonotonicTime& start_time) {
-  if (!time.has_value()) {
-    return -1;
-  }
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() - start_time).count();
-}
-
-} // namespace
-
 extern "C" {
 
 // -----------------------------------------------------------------------------
@@ -87,46 +74,7 @@ void envoy_dynamic_module_callback_access_logger_get_timing_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_timing_info* timing_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  const auto& info = *logger->stream_info_;
-  const MonotonicTime start_time = info.startTimeMonotonic();
-
-  timing_out->start_time_unix_ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(info.startTime().time_since_epoch())
-          .count();
-
-  auto duration = info.requestComplete();
-  timing_out->request_complete_duration_ns = duration.has_value() ? duration->count() : -1;
-
-  // Downstream timing.
-  const auto downstream = info.downstreamTiming();
-  if (downstream.has_value()) {
-    timing_out->first_downstream_tx_byte_sent_ns =
-        monotonicTimeToNanos(downstream->firstDownstreamTxByteSent(), start_time);
-    timing_out->last_downstream_tx_byte_sent_ns =
-        monotonicTimeToNanos(downstream->lastDownstreamTxByteSent(), start_time);
-  } else {
-    timing_out->first_downstream_tx_byte_sent_ns = -1;
-    timing_out->last_downstream_tx_byte_sent_ns = -1;
-  }
-
-  // Upstream timing.
-  const auto upstream = info.upstreamInfo();
-  if (upstream.has_value()) {
-    const auto& upstream_timing = upstream->upstreamTiming();
-    timing_out->first_upstream_tx_byte_sent_ns =
-        monotonicTimeToNanos(upstream_timing.first_upstream_tx_byte_sent_, start_time);
-    timing_out->last_upstream_tx_byte_sent_ns =
-        monotonicTimeToNanos(upstream_timing.last_upstream_tx_byte_sent_, start_time);
-    timing_out->first_upstream_rx_byte_received_ns =
-        monotonicTimeToNanos(upstream_timing.first_upstream_rx_byte_received_, start_time);
-    timing_out->last_upstream_rx_byte_received_ns =
-        monotonicTimeToNanos(upstream_timing.last_upstream_rx_byte_received_, start_time);
-  } else {
-    timing_out->first_upstream_tx_byte_sent_ns = -1;
-    timing_out->last_upstream_tx_byte_sent_ns = -1;
-    timing_out->first_upstream_rx_byte_received_ns = -1;
-    timing_out->last_upstream_rx_byte_received_ns = -1;
-  }
+  ContextAccessor::getTimingInfo(logger->stream_info_, timing_out);
 }
 
 void envoy_dynamic_module_callback_access_logger_get_bytes_info(
@@ -144,6 +92,20 @@ void envoy_dynamic_module_callback_access_logger_get_bytes_info(
   } else {
     bytes_out->wire_bytes_received = 0;
     bytes_out->wire_bytes_sent = 0;
+  }
+}
+
+void envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_downstream_wire_bytes* bytes_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& downstream = logger->stream_info_->getDownstreamBytesMeter();
+  if (downstream) {
+    bytes_out->bytes_received = downstream->wireBytesReceived();
+    bytes_out->bytes_sent = downstream->wireBytesSent();
+  } else {
+    bytes_out->bytes_received = 0;
+    bytes_out->bytes_sent = 0;
   }
 }
 
@@ -898,7 +860,8 @@ bool envoy_dynamic_module_callback_access_logger_get_attribute_int(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  return ContextAccessor::getAttributeInt(*logger->stream_info_, attribute_id, result);
+  return ContextAccessor::getAttributeInt(*logger->stream_info_, *logger->log_context_,
+                                          attribute_id, result);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_attribute_bool(

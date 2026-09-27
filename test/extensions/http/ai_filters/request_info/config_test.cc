@@ -23,7 +23,7 @@ namespace {
 
 using HttpFilters::AiProtocolManager::AiFilterConfigFactory;
 using HttpFilters::AiProtocolManager::AiFilterContext;
-using HttpFilters::AiProtocolManager::ApiProtocol;
+using HttpFilters::AiProtocolManager::LLMProtocol;
 
 TEST(RequestInfoConfigTest, IsRegistered) {
   auto* factory = Registry::FactoryRegistry<AiFilterConfigFactory>::getFactory(
@@ -47,7 +47,8 @@ TEST(RequestInfoConfigTest, CreatesFilterFromEmptyConfig) {
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   const Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/"}};
-  const AiFilterContext stream_context{stream_info, headers, ApiProtocol::OpenAiChatCompletions};
+  const AiFilterContext stream_context{stream_info, headers, LLMProtocol::OpenAiChatCompletions,
+                                       /*request_payload_bytes=*/64};
   EXPECT_NE((*factory_cb)(stream_context), nullptr);
 }
 
@@ -59,6 +60,31 @@ TEST(RequestInfoConfigTest, NamespaceDefaultsAndOverrides) {
   proto.set_metadata_namespace("custom.ns");
   EXPECT_EQ(RequestInfoFilterConfig(proto, *stats_store.rootScope()).metadataNamespace(),
             "custom.ns");
+}
+
+TEST(RequestInfoConfigTest, TokenEstimationIsOptional) {
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  envoy::extensions::http::ai_filters::request_info::v3::RequestInfo proto;
+  EXPECT_FALSE(
+      RequestInfoFilterConfig(proto, *stats_store.rootScope()).tokensPerByte().has_value());
+  proto.mutable_token_estimation()->set_tokens_per_byte(0.5);
+  EXPECT_EQ(*RequestInfoFilterConfig(proto, *stats_store.rootScope()).tokensPerByte(), 0.5);
+}
+
+TEST(RequestInfoConfigTest, RejectsRatioOutsideZeroToOne) {
+  RequestInfoFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  envoy::extensions::http::ai_filters::request_info::v3::RequestInfo proto;
+
+  proto.mutable_token_estimation()->set_tokens_per_byte(0.0);
+  EXPECT_THROW_WITH_REGEX(
+      factory.createAiFilterFactory(proto, context, *stats_store.rootScope()).IgnoreError(),
+      EnvoyException, "value must be inside range");
+  proto.mutable_token_estimation()->set_tokens_per_byte(1.5);
+  EXPECT_THROW_WITH_REGEX(
+      factory.createAiFilterFactory(proto, context, *stats_store.rootScope()).IgnoreError(),
+      EnvoyException, "value must be inside range");
 }
 
 } // namespace

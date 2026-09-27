@@ -995,6 +995,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                               : 0),
       http2_include_cookies_in_limits_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_include_cookies_in_limits")),
+      reject_frames_after_end_stream_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_reject_frames_after_end_stream")),
       protocol_constraints_(stats, http2_options,
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.http2_flood_protection_active_streams")),
@@ -1261,6 +1263,10 @@ Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t fla
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
 
+  if (reject_frames_after_end_stream_ && stream->remote_end_stream_) {
+    return codecProtocolError("Received DATA frame on a half-closed (remote) stream");
+  }
+
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   stream->decodeData();
   return okStatus();
@@ -1286,6 +1292,17 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
   stream->bytes_meter_->addHeaderBytesReceived(length + H2_FRAME_HEADER_SIZE);
+
+  // RFC 9113 Section 5.1: a peer that receives any frame other than PRIORITY, WINDOW_UPDATE or
+  // RST_STREAM for a stream in the "half-closed (remote)" state must treat it as an error. This is
+  // enforced here rather than in the codec adapter because the decoder that the frame would
+  // otherwise be dispatched to may already have been destroyed: for a client connection the
+  // CodecClient deletes the ActiveRequest (which owns the ResponseDecoder) as soon as the response
+  // completes, while oghttp2 keeps the stream alive until it is also half-closed locally. nghttp2
+  // already rejects these frames, so this only changes behavior for oghttp2.
+  if (reject_frames_after_end_stream_ && stream->remote_end_stream_) {
+    return codecProtocolError("Received HEADERS frame on a half-closed (remote) stream");
+  }
 
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   recordHistogramsForStream(*stream);

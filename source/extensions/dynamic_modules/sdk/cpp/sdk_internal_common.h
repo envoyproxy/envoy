@@ -1,9 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <map>
 #include <mutex>
+#include <string>
+#include <utility>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
@@ -11,6 +14,45 @@
 
 namespace Envoy {
 namespace DynamicModules {
+
+// Logs an exception caught at the ABI boundary at error level so a failure inside a module hook
+// stays visible.
+inline void logAbiException(const char* function_name, const char* what) {
+  std::string message(function_name);
+  message += ": caught exception at the ABI boundary: ";
+  message += what;
+  envoy_dynamic_module_callback_log_v2(
+      envoy_dynamic_module_type_log_level_Error,
+      envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
+      envoy_dynamic_module_type_module_buffer{nullptr, 0}, 0);
+}
+
+// Runs a module hook body and returns fail_closed if it throws, so a module exception never crosses
+// the C ABI boundary and aborts the process. This mirrors the Rust SDK panic barrier. The return
+// type is taken from the body, so fail_closed only needs to be convertible to it.
+template <class Fail, class Body>
+auto failClosed(const char* function_name, Fail&& fail_closed, Body&& body) noexcept
+    -> decltype(body()) {
+  try {
+    return body();
+  } catch (const std::exception& e) {
+    logAbiException(function_name, e.what());
+  } catch (...) {
+    logAbiException(function_name, "unknown exception");
+  }
+  return static_cast<decltype(body())>(std::forward<Fail>(fail_closed));
+}
+
+// The void returning counterpart of failClosed.
+template <class Body> void failClosedVoid(const char* function_name, Body&& body) noexcept {
+  try {
+    body();
+  } catch (const std::exception& e) {
+    logAbiException(function_name, e.what());
+  } catch (...) {
+    logAbiException(function_name, "unknown exception");
+  }
+}
 
 /**
  * Implements the CommonHandle process-wide callbacks against the C ABI, as a mixin over the

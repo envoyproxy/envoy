@@ -467,6 +467,51 @@ TEST_F(DynamicModuleClusterTest, BatchRemoveMultipleHosts) {
   EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
 }
 
+// Removing a host that was added at a higher priority must republish that priority so the worker
+// load balancers drop the stale endpoint. Republishing only priority 0 would leave it in place.
+TEST_F(DynamicModuleClusterTest, RemoveHostsRepublishesHigherPriority) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  std::vector<Upstream::HostSharedPtr> p0_hosts;
+  ASSERT_TRUE(
+      addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 1}, p0_hosts, 0));
+  std::vector<Upstream::HostSharedPtr> p1_hosts;
+  ASSERT_TRUE(
+      addSimpleHosts(*cluster, {"127.0.0.1:10003", "127.0.0.1:10004"}, {1, 1}, p1_hosts, 1));
+
+  EXPECT_EQ(2, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(2, cluster->prioritySet().hostSetsPerPriority()[1]->hosts().size());
+
+  // Capture priority 0's partition identity. An unaffected priority must not be rebuilt, and a
+  // rebuild would allocate new partition vectors and change this pointer.
+  const auto* p0_hosts_ptr_before =
+      cluster->prioritySet().hostSetsPerPriority()[0]->hostsPtr().get();
+
+  // Remove one host from priority 1.
+  EXPECT_EQ(1, cluster->removeHosts({p1_hosts[0]}));
+
+  // Priority 1 is republished without the removed host and priority 0 is untouched.
+  EXPECT_EQ(2, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority()[1]->hosts().size());
+  EXPECT_EQ(p1_hosts[1].get(), cluster->prioritySet().hostSetsPerPriority()[1]->hosts()[0].get());
+  EXPECT_EQ(3, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(p0_hosts_ptr_before, cluster->prioritySet().hostSetsPerPriority()[0]->hostsPtr().get());
+
+  // The removed host is gone from the cross-priority map and the remaining one still resolves.
+  EXPECT_EQ(nullptr, cluster->findHostByAddress("127.0.0.1:10003"));
+  EXPECT_NE(nullptr, cluster->findHostByAddress("127.0.0.1:10004"));
+
+  // A single removal spanning priorities updates both host sets, including draining priority 1.
+  EXPECT_EQ(2, cluster->removeHosts({p0_hosts[0], p1_hosts[1]}));
+  EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0, cluster->prioritySet().hostSetsPerPriority()[1]->hosts().size());
+  EXPECT_EQ(1, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+}
+
 // Test that addresses already present in the host set are skipped on a subsequent batch.
 TEST_F(DynamicModuleClusterTest, DuplicateHostDetection) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));

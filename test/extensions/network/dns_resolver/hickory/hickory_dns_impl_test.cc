@@ -569,7 +569,10 @@ TEST_F(HickoryDnsImplTest, ResolveFailsSynchronouslyWhenFfiReturnsNull) {
 
   config->on_dns_resolve_ = stubOnDnsResolveReturningNull;
 
-  auto resolver = std::make_shared<HickoryDnsResolver>(config, *dispatcher_, api_->rootScope());
+  absl::Status creation_status = absl::OkStatus();
+  auto resolver = std::make_shared<HickoryDnsResolver>(config, *dispatcher_, api_->rootScope(),
+                                                       creation_status);
+  ASSERT_OK(creation_status);
 
   bool callback_called = false;
   auto* query = resolver->resolve("example.com", DnsLookupFamily::All,
@@ -881,6 +884,26 @@ TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsWhenModuleRejectsConfig) {
   ASSERT_THAT(result,
               HasStatus(absl::StatusCode::kInvalidArgument,
                         testing::HasSubstr("Hickory DNS module rejected the configuration")));
+}
+
+// Verifies that a module whose configuration loads but which returns null from
+// ``on_dns_resolver_new`` surfaces ``InvalidArgumentError`` so operators see a configuration
+// failure rather than a process abort, for example under resource exhaustion.
+TEST_F(HickoryDnsConfigFailureTest, ResolverCreateFailsWhenModuleReturnsNull) {
+  envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
+  auto config_or =
+      HickoryDnsResolverConfigTestPeer::createForModule(proto_config, "dns_resolver_new_fail");
+  ASSERT_OK(config_or);
+
+  Stats::TestUtil::TestStore stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+
+  absl::Status creation_status = absl::OkStatus();
+  auto resolver = std::make_shared<HickoryDnsResolver>(std::move(*config_or), *dispatcher,
+                                                       api->rootScope(), creation_status);
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         testing::HasSubstr("could not create the resolver")));
 }
 
 // Verifies that the factory propagates an ``unpackTo`` failure when ``typed_config`` contains

@@ -202,6 +202,17 @@ private:
   void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
                        const McpJsonRestBridgePerRouteConfig* per_route_config);
 
+  // Validates that the "Mcp-Method" request header is present and matches the JSON-RPC "method"
+  // field. Returns true when the header is valid. Otherwise sends a local error response and
+  // returns false.
+  bool validateMcpMethodHeader(const nlohmann::json& json_rpc, absl::string_view method,
+                               Http::RequestHeaderMapOptRef request_headers);
+
+  // Validates that the "Mcp-Name" request header is present and matches the JSON-RPC
+  // "params.name" field for a tools/call request.
+  bool validateMcpNameHeader(const nlohmann::json& json_rpc, absl::string_view method,
+                             Http::RequestHeaderMapOptRef request_headers);
+
   // Serves a local tools/list response using tools' ToolsListSpecificConfig.
   void serveToolsListLocal(
       const nlohmann::json& json_rpc,
@@ -217,15 +228,17 @@ private:
 
   // Handles decoding errors: sets dynamic metadata and sends a local reply.
   // IMPORTANT PROTOCOL RULE:
-  // 1. For JSON-RPC application/protocol errors (-32600, -32601, -32602), MUST use Http::Code::OK
-  //    (200). Many MCP SDK clients inspect HTTP status before JSON-RPC decoding and will fail with
-  //    a transport exception on non-200 responses, discarding the structured JSON-RPC error
-  //    code/message.
+  // 1. For JSON-RPC application/protocol errors in the request payload (-32600, -32601, -32602),
+  //    MUST use Http::Code::OK (200). Many MCP SDK clients inspect HTTP status before JSON-RPC
+  //    decoding and will fail with a transport exception on non-200 responses, discarding the
+  //    structured JSON-RPC error code/message.
   // 2. Only use non-200 HTTP codes (400, 401, 403, 405, 413) in the following cases:
   //    - Transport-level or framing syntax failures (generated locally by this filter):
   //      * 405 Method Not Allowed (non-POST request)
   //      * 413 Payload Too Large (exceeding maxRequestBodySize)
   //      * 400 Bad Request for malformed JSON syntax (-32700 parse error)
+  //      * 400 Bad Request when an MCP standard request header fails validation (-32020 header
+  //        mismatch), which is an HTTP-level error rather than a JSON-RPC payload error
   //    - Authorization errors preserved from upstream (401 Unauthorized, 403 Forbidden):
   //      * 401 and 403 from upstream are preserved as non-200 HTTP responses as required by the MCP
   //        authorization spec:
@@ -284,6 +297,7 @@ private:
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   std::optional<nlohmann::json> session_id_;
+  bool is_stateless_request_{false};
   std::string server_name_;
   std::string path_;
   Buffer::OwnedImpl request_body_;

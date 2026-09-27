@@ -74,7 +74,9 @@ quic::QuicAsyncStatus verifyQuicClientCertChain(
   }
   ENVOY_LOG_MISC(debug, "QUIC client certificate accepted, validated {}, chain size {}", validated,
                  certs.size());
-  *details = std::make_unique<CertVerifyResult>(true);
+  // Hand the verifier-built chain (not the peer-sent list) to the details so the connection info
+  // can report the validated issuer. The chain is empty when the certificate was not validated.
+  *details = std::make_unique<CertVerifyResult>(true, std::move(result.validated_chain));
   return quic::QUIC_SUCCESS;
 }
 

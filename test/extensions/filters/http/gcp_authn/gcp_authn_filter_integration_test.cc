@@ -660,6 +660,70 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenCacheHit) {
   EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 2);
 }
 
+TEST_P(GcpAuthnFilterIntegrationTest, PreserveExistingHeaderSkipsAuthn) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* gcp_authn_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    gcp_authn_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    gcp_authn_cluster->set_name("gcp_authn");
+    gcp_authn_cluster->mutable_load_assignment()->set_cluster_name("gcp_authn");
+    ConfigHelper::setHttp2(*gcp_authn_cluster);
+
+    auto cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    envoy::config::core::v3::Metadata* cluster_metadata = cluster_0->mutable_metadata();
+    envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+    audience.set_url(std::string(AudienceValue));
+    std::ignore = (*cluster_metadata->mutable_typed_filter_metadata())
+                      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                          .PackFrom(audience);
+
+    TestUtility::loadFromYaml(new_config_, proto_config_);
+    auto* token_header = proto_config_.mutable_token_header();
+    token_header->set_name("Authorization");
+    token_header->set_value_prefix("Bearer ");
+    token_header->mutable_preserve_existing();
+
+    envoy::config::listener::v3::Filter gcp_authn_filter;
+    gcp_authn_filter.set_name(std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName));
+    std::ignore = gcp_authn_filter.mutable_typed_config()->PackFrom(proto_config_);
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(gcp_authn_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  response_ = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"authorization", "Bearer my_original_token"}});
+
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  ASSERT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
+  EXPECT_EQ(upstream_request_->headers()
+                .get(Http::LowerCaseString("authorization"))[0]
+                ->value()
+                .getStringView(),
+            "Bearer my_original_token");
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  cleanup();
+
+  EXPECT_EQ(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 0);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
+}
+
 } // namespace
 } // namespace GcpAuthn
 } // namespace HttpFilters

@@ -25,6 +25,7 @@ public:
 
   // schedule() -> post(), which is thread-safe: the seam for future thread hops.
   void schedule(std::coroutine_handle<> handle) override;
+  void post(absl::AnyInvocable<void()> cb) override;
   Event::TimerPtr createTimer(std::function<void()> cb) override;
 
 private:

@@ -131,7 +131,7 @@ class HickoryDnsResolver : public DnsResolver,
                            protected Logger::Loggable<Logger::Id::dns> {
 public:
   HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config, Event::Dispatcher& dispatcher,
-                     Stats::Scope& root_scope);
+                     Stats::Scope& root_scope, absl::Status& creation_status);
   ~HickoryDnsResolver() override;
 
   static HickoryDnsResolverStats generateHickoryDnsResolverStats(Stats::Scope& scope);

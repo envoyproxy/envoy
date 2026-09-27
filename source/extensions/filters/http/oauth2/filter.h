@@ -76,17 +76,18 @@ class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr&& hmac_secret_provider,
-                  ThreadLocal::SlotAllocator& tls, Api::Api& api)
-      : client_secret_(
-            client_secret_provider
-                ? THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                            std::move(client_secret_provider), tls, api),
-                                        std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)
-                : nullptr),
+                  ThreadLocal::SlotAllocator& tls, Api::Api& api,
+                  Event::Dispatcher& main_dispatcher)
+      : client_secret_(client_secret_provider
+                           ? THROW_OR_RETURN_VALUE(
+                                 Secret::ThreadLocalGenericSecretProvider::create(
+                                     std::move(client_secret_provider), tls, api, main_dispatcher),
+                                 Secret::ThreadLocalGenericSecretProviderPtr)
+                           : nullptr),
         hmac_secret_(
             THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                      std::move(hmac_secret_provider), tls, api),
-                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
+                                      std::move(hmac_secret_provider), tls, api, main_dispatcher),
+                                  Secret::ThreadLocalGenericSecretProviderPtr)),
         empty_client_secret_("") {}
   const std::string& clientSecret() const override {
     return client_secret_ ? client_secret_->secret() : empty_client_secret_;
@@ -106,8 +107,8 @@ public:
   }
 
 private:
-  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> client_secret_;
-  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> hmac_secret_;
+  Secret::ThreadLocalGenericSecretProviderPtr client_secret_;
+  Secret::ThreadLocalGenericSecretProviderPtr hmac_secret_;
   const std::string empty_client_secret_;
 };
 

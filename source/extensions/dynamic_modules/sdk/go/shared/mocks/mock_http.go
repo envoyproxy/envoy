@@ -371,6 +371,18 @@ func (mr *MockSpanMockRecorder) SetTag(key, value any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTag", reflect.TypeOf((*MockSpan)(nil).SetTag), key, value)
 }
 
+// SetTags mocks base method.
+func (m *MockSpan) SetTags(tags [][2]string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetTags", tags)
+}
+
+// SetTags indicates an expected call of SetTags.
+func (mr *MockSpanMockRecorder) SetTags(tags any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTags", reflect.TypeOf((*MockSpan)(nil).SetTags), tags)
+}
+
 // SpawnChild mocks base method.
 func (m *MockSpan) SpawnChild(operationName string) shared.ChildSpan {
 	m.ctrl.T.Helper()
@@ -524,6 +536,18 @@ func (m *MockChildSpan) SetTag(key, value string) {
 func (mr *MockChildSpanMockRecorder) SetTag(key, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTag", reflect.TypeOf((*MockChildSpan)(nil).SetTag), key, value)
+}
+
+// SetTags mocks base method.
+func (m *MockChildSpan) SetTags(tags [][2]string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetTags", tags)
+}
+
+// SetTags indicates an expected call of SetTags.
+func (mr *MockChildSpanMockRecorder) SetTags(tags any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTags", reflect.TypeOf((*MockChildSpan)(nil).SetTags), tags)
 }
 
 // SpawnChild mocks base method.
@@ -1078,6 +1102,20 @@ func (m *MockHttpFilterHandle) GetSocketOptionInt(level, name int64, state share
 func (mr *MockHttpFilterHandleMockRecorder) GetSocketOptionInt(level, name, state, direction any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSocketOptionInt", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetSocketOptionInt), level, name, state, direction)
+}
+
+// GetTimingInfo mocks base method.
+func (m *MockHttpFilterHandle) GetTimingInfo() shared.TimingInfo {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTimingInfo")
+	ret0, _ := ret[0].(shared.TimingInfo)
+	return ret0
+}
+
+// GetTimingInfo indicates an expected call of GetTimingInfo.
+func (mr *MockHttpFilterHandleMockRecorder) GetTimingInfo() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTimingInfo", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetTimingInfo))
 }
 
 // GetWorkerIndex mocks base method.

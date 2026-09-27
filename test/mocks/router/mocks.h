@@ -22,6 +22,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/route_config_update_receiver.h"
+#include "envoy/router/route_specifier.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/scopes.h"
@@ -192,6 +193,8 @@ public:
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
   MOCK_METHOD(bool, isCrossSchemeRedirectAllowed, (), (const));
   MOCK_METHOD(const std::vector<Http::LowerCaseString>&, responseHeadersToCopy, (), (const));
+
+  std::vector<Http::LowerCaseString> response_headers_to_copy_;
 };
 
 class MockInternalRedirectPredicate : public InternalRedirectPredicate {
@@ -650,6 +653,18 @@ public:
   std::string name_{"fake_config"};
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;
+};
+
+class MockRouteSpecifier : public RouteSpecifier {
+public:
+  MockRouteSpecifier();
+  ~MockRouteSpecifier() override;
+
+  // Router::RouteSpecifier
+  MOCK_METHOD(OnRouteResult, onRoute,
+              (RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value),
+              (const));
 };
 
 class MockRouteConfigProvider : public RouteConfigProvider {

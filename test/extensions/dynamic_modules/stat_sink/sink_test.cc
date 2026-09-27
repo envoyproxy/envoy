@@ -212,6 +212,37 @@ TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompletePassesNameAndValue) {
   g_recorder = nullptr;
 }
 
+// The reused name buffer grows when a longer name is serialized and reports the exact length for a
+// shorter name afterwards, so no stale bytes leak from a previous sample.
+TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompleteReusesAndGrowsNameBuffer) {
+  CallRecorder recorder;
+  g_recorder = &recorder;
+
+  config_->on_histogram_complete_ = [](envoy_dynamic_module_type_stat_sink_config_module_ptr,
+                                       envoy_dynamic_module_type_envoy_buffer name,
+                                       uint64_t value) {
+    g_recorder->histogram_complete_calls++;
+    g_recorder->histogram_names.emplace_back(name.ptr, name.length);
+    g_recorder->histogram_values.push_back(value);
+  };
+
+  DynamicModuleStatsSink sink(config_);
+  NiceMock<Stats::MockHistogram> short_histogram;
+  short_histogram.name_ = "hh";
+  NiceMock<Stats::MockHistogram> long_histogram;
+  long_histogram.name_ = "a_much_longer_histogram_name_than_before";
+
+  sink.onHistogramComplete(short_histogram, 1);
+  sink.onHistogramComplete(long_histogram, 2);
+  sink.onHistogramComplete(short_histogram, 3);
+
+  ASSERT_EQ(3, recorder.histogram_names.size());
+  EXPECT_EQ("hh", recorder.histogram_names[0]);
+  EXPECT_EQ("a_much_longer_histogram_name_than_before", recorder.histogram_names[1]);
+  EXPECT_EQ("hh", recorder.histogram_names[2]);
+  g_recorder = nullptr;
+}
+
 // =============================================================================
 // Gauge and scheduler config tests
 // =============================================================================

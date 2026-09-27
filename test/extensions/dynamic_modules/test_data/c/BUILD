@@ -16,6 +16,7 @@ package(default_visibility = [
     "//test/extensions/formatter/dynamic_modules:__pkg__",
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
+    "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/http/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
@@ -183,6 +184,26 @@ test_program(name = "early_header_mutation_rewrite")
 
 test_program(name = "early_header_mutation_stop_chain")
 
+test_program(name = "header_formatter_no_op")
+
+test_program(name = "header_formatter_missing_config_new")
+
+test_program(name = "header_formatter_missing_config_destroy")
+
+test_program(name = "header_formatter_missing_new")
+
+test_program(name = "header_formatter_missing_destroy")
+
+test_program(name = "header_formatter_missing_process_key")
+
+test_program(name = "header_formatter_missing_format")
+
+test_program(name = "header_formatter_config_new_fail")
+
+test_program(name = "header_formatter_new_fail")
+
+test_program(name = "header_formatter_preserve_case")
+
 test_program(name = "cluster_specifier_no_op")
 
 test_program(name = "cluster_specifier_missing_config_new")
@@ -229,6 +250,8 @@ test_program(name = "matcher_missing_config_destroy")
 
 test_program(name = "matcher_check_headers")
 
+test_program(name = "matcher_error")
+
 test_program(name = "matcher_string_input_echo")
 
 test_program(name = "matcher_string_input_config_new_fail")
@@ -271,6 +294,8 @@ test_program(name = "upstream_bridge_headers_end_stream")
 
 test_program(name = "upstream_bridge_headers_end_stream_no_body")
 
+test_program(name = "upstream_bridge_terminal_response")
+
 test_program(name = "tracer_no_op")
 
 test_program(name = "tracer_config_fail")
@@ -292,6 +317,8 @@ test_program(name = "stat_sink_missing_histogram_complete")
 test_program(name = "stat_sink_integration_test")
 
 test_program(name = "dns_resolver_config_new_fail")
+
+test_program(name = "dns_resolver_new_fail")
 
 test_program(name = "health_checker_no_op")
 

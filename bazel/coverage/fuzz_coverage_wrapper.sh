@@ -21,4 +21,4 @@ _CORPUS="$(find fuzz_corpus -type f)"
 while read -r line; do CORPUS+=("$line"); done \
     <<< "$_CORPUS"
 # Specify gtest/gmock commandf line flags before the -- Flags after -- are for the libFuzzer
-${TEST_BINARY} -- "${CORPUS[@]}" -rss_limit_mb=8192 || :
+${TEST_BINARY} -- "${CORPUS[@]}" -rss_limit_mb=8192

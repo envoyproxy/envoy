@@ -58,6 +58,8 @@ areas:
     title: compressor
   config:
     title: config
+  contrib:
+    title: contrib
   credential_injector:
     title: credential_injector
   dns_resolver:

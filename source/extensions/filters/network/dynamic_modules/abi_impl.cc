@@ -14,6 +14,7 @@
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
+#include "source/extensions/dynamic_modules/abi_conversions.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 #include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 
@@ -742,12 +743,17 @@ void envoy_dynamic_module_callback_network_set_socket_option_int(
   ASSERT(validateSocketState(state));
 
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
 
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  const auto value_int = narrowToInt(value);
+  if (!level_int.has_value() || !name_int.has_value() || !value_int.has_value()) {
+    return;
+  }
+
+  auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
   auto option = std::make_shared<Network::SocketOptionImpl>(
-      mapSocketState(state),
-      Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""),
-      static_cast<int>(value));
+      mapSocketState(state), Network::SocketOptionName(*level_int, *name_int, ""), *value_int);
   Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
   option_list->push_back(option);
   upstream_options->addOption(option_list);
@@ -762,12 +768,17 @@ void envoy_dynamic_module_callback_network_set_socket_option_bytes(
   ASSERT(validateSocketState(state));
 
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
 
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  if (!level_int.has_value() || !name_int.has_value()) {
+    return;
+  }
+
+  auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
   absl::string_view value_view(value.ptr, value.length);
   auto option = std::make_shared<Network::SocketOptionImpl>(
-      mapSocketState(state),
-      Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""), value_view);
+      mapSocketState(state), Network::SocketOptionName(*level_int, *name_int, ""), value_view);
   Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
   option_list->push_back(option);
   upstream_options->addOption(option_list);

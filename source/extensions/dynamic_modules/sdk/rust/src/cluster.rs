@@ -387,7 +387,8 @@ pub trait EnvoyCluster: Send + Sync {
   /// the overhead of updating the priority set per host.
   ///
   /// Returns the host pointers if all hosts were added successfully, or `None` if any host failed
-  /// (e.g., invalid address or weight). On failure, no hosts are added.
+  /// (e.g., invalid address or weight) or `addresses` and `weights` have different lengths. On
+  /// failure, no hosts are added.
   fn add_hosts(
     &self,
     addresses: &[String],
@@ -436,7 +437,8 @@ pub trait EnvoyCluster: Send + Sync {
   /// The number of triples per host must be the same for all hosts (pad with empty triples
   /// if needed) or the outer slice can be empty to skip metadata entirely.
   ///
-  /// Returns the host pointers on success, or `None` if any host failed.
+  /// Returns the host pointers on success, or `None` if any host failed or the per-host slice
+  /// lengths are inconsistent.
   fn add_hosts_with_locality(
     &self,
     addresses: &[String],
@@ -453,7 +455,8 @@ pub trait EnvoyCluster: Send + Sync {
   /// Each address must be in `ip:port` format (e.g., `127.0.0.1:8080`).
   /// Each weight must be between 1 and 128.
   ///
-  /// Returns the host pointers if all hosts were added successfully, or `None` if any host failed.
+  /// Returns the host pointers if all hosts were added successfully, or `None` if any host failed
+  /// or `addresses` and `weights` have different lengths.
   fn add_hosts_to_priority(
     &self,
     priority: u32,
@@ -469,7 +472,8 @@ pub trait EnvoyCluster: Send + Sync {
   ///
   /// Each address must be in `ip:port` format. Each weight must be between 1 and 128.
   ///
-  /// Returns the host pointers on success, or `None` if any host failed.
+  /// Returns the host pointers on success, or `None` if any host failed or the per-host slice
+  /// lengths are inconsistent.
   fn add_hosts_with_locality_to_priority(
     &self,
     priority: u32,
@@ -950,7 +954,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn define_counter_vec<'a>(
     &self,
     name: &str,
-    labels: &[&'a str],
+    label_names: &[&'a str],
   ) -> Result<EnvoyCounterVecId, abi::envoy_dynamic_module_type_metrics_result>;
 
   /// Define a new gauge with the given name and no labels.
@@ -963,7 +967,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn define_gauge_vec<'a>(
     &self,
     name: &str,
-    labels: &[&'a str],
+    label_names: &[&'a str],
   ) -> Result<EnvoyGaugeVecId, abi::envoy_dynamic_module_type_metrics_result>;
 
   /// Define a new histogram with the given name and no labels.
@@ -976,7 +980,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn define_histogram_vec<'a>(
     &self,
     name: &str,
-    labels: &[&'a str],
+    label_names: &[&'a str],
   ) -> Result<EnvoyHistogramVecId, abi::envoy_dynamic_module_type_metrics_result>;
 
   // -------------------------------------------------------------------------
@@ -995,7 +999,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn resolve_counter_vec<'a>(
     &self,
     id: EnvoyCounterVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
   ) -> Result<EnvoyResolvedCounter, abi::envoy_dynamic_module_type_metrics_result>;
 
   /// Resolve one label-value tuple of a gauge vec to a handle. See [`resolve_counter_vec`].
@@ -1004,7 +1008,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn resolve_gauge_vec<'a>(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
   ) -> Result<EnvoyResolvedGauge, abi::envoy_dynamic_module_type_metrics_result>;
 
   /// Resolve one label-value tuple of a histogram vec to a handle. See [`resolve_counter_vec`].
@@ -1013,7 +1017,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn resolve_histogram_vec<'a>(
     &self,
     id: EnvoyHistogramVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
   ) -> Result<EnvoyResolvedHistogram, abi::envoy_dynamic_module_type_metrics_result>;
 
   // -------------------------------------------------------------------------
@@ -1031,7 +1035,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn increment_counter_vec<'a>(
     &self,
     id: EnvoyCounterVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
@@ -1046,7 +1050,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn set_gauge_vec<'a>(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
@@ -1061,7 +1065,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn increase_gauge_vec<'a>(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
@@ -1076,7 +1080,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn decrease_gauge_vec<'a>(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
@@ -1091,7 +1095,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   fn record_histogram_value_vec<'a>(
     &self,
     id: EnvoyHistogramVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 }
@@ -1149,8 +1153,19 @@ impl EnvoyClusterImpl {
     metadata: &[Vec<(String, String, String)>],
   ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
     let count = addresses.len();
+    // The host reads weights and localities up to count and expects a rectangular metadata block, so
+    // reject any inconsistent length before crossing the ABI to avoid an out of bounds read.
     if hostnames.is_some_and(|hostnames| hostnames.len() != count) {
       return None;
+    }
+    if weights.len() != count || localities.len() != count {
+      return None;
+    }
+    if !metadata.is_empty() {
+      let pairs_per_host = metadata[0].len();
+      if metadata.len() != count || metadata.iter().any(|host| host.len() != pairs_per_host) {
+        return None;
+      }
     }
     let address_buffers: Vec<abi::envoy_dynamic_module_type_module_buffer> =
       addresses.iter().map(|a| str_to_module_buffer(a)).collect();
@@ -2079,16 +2094,16 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn define_counter_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyCounterVecId, abi::envoy_dynamic_module_type_metrics_result> {
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_names = strs_to_module_buffers(label_names);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_define_counter(
         self.raw,
         str_to_module_buffer(name),
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_names.as_mut_ptr(),
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -2098,18 +2113,18 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn resolve_counter_vec(
     &self,
     id: EnvoyCounterVecId,
-    labels: &[&str],
+    label_values: &[&str],
   ) -> Result<EnvoyResolvedCounter, abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyCounterVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     let mut handle: abi::envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr =
       std::ptr::null_mut();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         &mut handle,
       )
     })?;
@@ -2119,18 +2134,18 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn resolve_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
   ) -> Result<EnvoyResolvedGauge, abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     let mut handle: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr =
       std::ptr::null_mut();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         &mut handle,
       )
     })?;
@@ -2140,18 +2155,18 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn resolve_histogram_vec(
     &self,
     id: EnvoyHistogramVecId,
-    labels: &[&str],
+    label_values: &[&str],
   ) -> Result<EnvoyResolvedHistogram, abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyHistogramVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     let mut handle: abi::envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr =
       std::ptr::null_mut();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         &mut handle,
       )
     })?;
@@ -2178,16 +2193,16 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn define_gauge_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyGaugeVecId, abi::envoy_dynamic_module_type_metrics_result> {
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_names = strs_to_module_buffers(label_names);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_define_gauge(
         self.raw,
         str_to_module_buffer(name),
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_names.as_mut_ptr(),
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -2214,16 +2229,16 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn define_histogram_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyHistogramVecId, abi::envoy_dynamic_module_type_metrics_result> {
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_names = strs_to_module_buffers(label_names);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_define_histogram(
         self.raw,
         str_to_module_buffer(name),
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_names.as_mut_ptr(),
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -2250,17 +2265,17 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn increment_counter_vec(
     &self,
     id: EnvoyCounterVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyCounterVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     cluster_metric_result_to_rust(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_increment_counter(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     })
@@ -2286,17 +2301,17 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn set_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     cluster_metric_result_to_rust(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_set_gauge(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     })
@@ -2322,17 +2337,17 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn increase_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     cluster_metric_result_to_rust(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_increment_gauge(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     })
@@ -2358,17 +2373,17 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn decrease_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     cluster_metric_result_to_rust(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_decrement_gauge(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     })
@@ -2394,17 +2409,17 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   fn record_histogram_value_vec(
     &self,
     id: EnvoyHistogramVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
     let EnvoyHistogramVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     cluster_metric_result_to_rust(unsafe {
       abi::envoy_dynamic_module_callback_cluster_config_record_histogram_value(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        labels.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     })
@@ -2692,25 +2707,28 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
   }
 
   fn set_dynamic_metadata_string_batch(&self, namespace: &str, entries: &[(&str, &str)]) -> bool {
-    // `pairs` borrows the key/value bytes of `entries`, which outlive this call. Envoy copies the
-    // bytes into the metadata Struct synchronously, so the pointers never dangle. An empty
-    // `entries` yields an empty Vec paired with a zero length the callback treats as a no-op.
-    let mut pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> =
-      Vec::with_capacity(entries.len());
-    for (key, value) in entries {
-      pairs.push(abi::envoy_dynamic_module_type_module_key_value_pair {
-        key_ptr: key.as_ptr() as *const _,
-        key_length: key.len(),
-        value_ptr: value.as_ptr() as *const _,
-        value_length: value.len(),
-      });
-    }
+    type KvPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: KvPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<KvPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
     unsafe {
       abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
         self.raw_context,
         str_to_module_buffer(namespace),
-        pairs.as_ptr(),
-        pairs.len(),
+        entries.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
+        entries.len(),
       )
     }
   }
@@ -3247,7 +3265,7 @@ mod tests {
   }
 
   #[test]
-  fn add_hosts_with_hostnames_dispatches_and_validates_lengths() {
+  fn add_hosts_dispatches_and_validates_slice_lengths() {
     use std::sync::atomic::Ordering;
 
     crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.store(0, Ordering::SeqCst);
@@ -3315,6 +3333,55 @@ mod tests {
     assert_eq!(
       crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
       1
+    );
+
+    // Mismatched non-hostname slice lengths must be rejected before the ABI call.
+    let localities = vec![
+      (
+        "region".to_owned(),
+        "zone".to_owned(),
+        "sub-zone".to_owned(),
+      ),
+      (
+        "region".to_owned(),
+        "zone".to_owned(),
+        "sub-zone".to_owned(),
+      ),
+    ];
+    assert!(cluster.add_hosts(&addresses, &weights[..1]).is_none());
+    assert!(cluster
+      .add_hosts_with_locality(&addresses, &weights, &localities[..1], &[])
+      .is_none());
+    let metadata_short = vec![vec![("f".to_owned(), "k".to_owned(), "v".to_owned())]];
+    assert!(cluster
+      .add_hosts_with_locality(&addresses, &weights, &localities, &metadata_short)
+      .is_none());
+    let metadata_ragged = vec![
+      vec![("f".to_owned(), "k".to_owned(), "v".to_owned())],
+      Vec::new(),
+    ];
+    assert!(cluster
+      .add_hosts_with_locality(&addresses, &weights, &localities, &metadata_ragged)
+      .is_none());
+
+    // The rejected calls must not reach the ABI, so the call count is unchanged.
+    assert_eq!(
+      crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
+      1
+    );
+
+    // A rectangular metadata block with matching lengths still dispatches.
+    let metadata_ok = vec![
+      vec![("f".to_owned(), "k".to_owned(), "v0".to_owned())],
+      vec![("f".to_owned(), "k".to_owned(), "v1".to_owned())],
+    ];
+    let hosts = cluster
+      .add_hosts_with_locality(&addresses, &weights, &localities, &metadata_ok)
+      .expect("matching rectangular slices must dispatch");
+    assert_eq!(hosts.len(), 2);
+    assert_eq!(
+      crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
+      2
     );
   }
 
