@@ -87,6 +87,7 @@ void DynamicModuleNetworkFilter::initializeWriteFilterCallbacks(
 }
 
 Network::FilterStatus DynamicModuleNetworkFilter::onNewConnection() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     if (read_callbacks_ != nullptr) {
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
@@ -98,6 +99,7 @@ Network::FilterStatus DynamicModuleNetworkFilter::onNewConnection() {
 }
 
 Network::FilterStatus DynamicModuleNetworkFilter::onData(Buffer::Instance& data, bool end_stream) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
@@ -112,6 +114,7 @@ Network::FilterStatus DynamicModuleNetworkFilter::onData(Buffer::Instance& data,
 }
 
 Network::FilterStatus DynamicModuleNetworkFilter::onWrite(Buffer::Instance& data, bool end_stream) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
@@ -127,6 +130,7 @@ Network::FilterStatus DynamicModuleNetworkFilter::onWrite(Buffer::Instance& data
 }
 
 void DynamicModuleNetworkFilter::onEvent(Network::ConnectionEvent event) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return;
   }
@@ -135,12 +139,14 @@ void DynamicModuleNetworkFilter::onEvent(Network::ConnectionEvent event) {
 }
 
 void DynamicModuleNetworkFilter::onScheduled(uint64_t event_id) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ != nullptr && config_->on_network_filter_scheduled_ != nullptr) {
     config_->on_network_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
   }
 }
 
 void DynamicModuleNetworkFilter::onAboveWriteBufferHighWatermark() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr ||
       config_->on_network_filter_above_write_buffer_high_watermark_ == nullptr) {
     return;
@@ -149,6 +155,7 @@ void DynamicModuleNetworkFilter::onAboveWriteBufferHighWatermark() {
 }
 
 void DynamicModuleNetworkFilter::onBelowWriteBufferLowWatermark() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr ||
       config_->on_network_filter_below_write_buffer_low_watermark_ == nullptr) {
     return;
@@ -304,6 +311,7 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onSuccess(
         envoy_dynamic_module_type_envoy_buffer{static_cast<const char*>(slice.mem_), slice.len_});
   }
 
+  DynamicModuleNetworkFilter::HookScope hook_scope(*filter);
   filter->config_->on_network_filter_http_callout_done_(
       filter->thisAsVoidPtr(), filter->in_module_filter_, callout_id,
       envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
@@ -328,6 +336,7 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onFailure(
     return;
   }
 
+  DynamicModuleNetworkFilter::HookScope hook_scope(*filter);
   envoy_dynamic_module_type_http_callout_result result =
       envoy_dynamic_module_type_http_callout_result_Reset;
   switch (reason) {
