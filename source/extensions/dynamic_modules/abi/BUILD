@@ -12,5 +12,3 @@ cc_library(
     visibility = ["//visibility:public"],
     alwayslink = True,
 )
-
-exports_files(["abi.h"])
