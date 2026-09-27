@@ -272,7 +272,6 @@ const envoy::config::core::v3::Metadata*
 getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
             envoy_dynamic_module_type_metadata_source metadata_source) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  filter->last_metadata_snapshot_.reset();
   auto* callbacks = filter->callbacks();
   if (!callbacks) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
@@ -304,9 +303,9 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     if (upstreamInfo) {
       Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
       if (hostInfo) {
-        filter->last_metadata_snapshot_ = hostInfo->metadata();
-        if (filter->last_metadata_snapshot_) {
-          return filter->last_metadata_snapshot_.get();
+        Upstream::MetadataConstSharedPtr metadata = hostInfo->metadata();
+        if (metadata) {
+          return filter->metadata_scratch_.emplace_back(std::move(metadata)).get();
         }
       }
     }
@@ -317,9 +316,9 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     if (upstreamInfo) {
       Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
       if (hostInfo) {
-        filter->last_metadata_snapshot_ = hostInfo->localityMetadata();
-        if (filter->last_metadata_snapshot_) {
-          return filter->last_metadata_snapshot_.get();
+        Upstream::MetadataConstSharedPtr metadata = hostInfo->localityMetadata();
+        if (metadata) {
+          return filter->metadata_scratch_.emplace_back(std::move(metadata)).get();
         }
       }
     }
@@ -1681,10 +1680,12 @@ bool envoy_dynamic_module_callback_http_get_filter_state_typed(
     return false;
   }
 
-  // Store the serialized string on the filter to ensure it outlives the current event hook.
-  filter->last_serialized_filter_state_ = std::move(serialized.value());
-  result->ptr = const_cast<char*>(filter->last_serialized_filter_state_->data());
-  result->length = filter->last_serialized_filter_state_->size();
+  // Append to the scratch so consecutive getter calls in the same hook stay valid until the hook
+  // returns.
+  filter->filter_state_scratch_.push_back(std::move(serialized.value()));
+  const std::string& stored = filter->filter_state_scratch_.back();
+  result->ptr = const_cast<char*>(stored.data());
+  result->length = stored.size();
   return true;
 }
 

@@ -66,6 +66,19 @@ public:
 
 REGISTER_FACTORY(HttpTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
+// A second typed object factory under a distinct name, so a test can store two filter-state values
+// and verify that consecutive getter calls do not invalidate each other.
+class HttpSecondTestTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.http_typed_object_second"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(HttpSecondTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 // A filter state object that does not support serialization. This is used to test the
 // `get_filter_state_typed` fallback when `serializeAsString()` returns nullopt.
 class HttpNonSerializableObject : public StreamInfo::FilterState::Object {};
@@ -1100,6 +1113,63 @@ TEST(ABIImpl, metadata) {
   EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), lbendpoint_value);
 }
 
+// Host and locality metadata snapshots accumulate in the metadata scratch across getters in one
+// hook so earlier views stay valid, and the scratch is cleared when the outermost hook returns.
+TEST(ABIImpl, metadata_scratch_retains_snapshots_until_outermost_hook) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  const std::string namespace_str = "foo";
+  const std::string host_key = "host_key";
+  const std::string locality_key = "locality_key";
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  auto upstream_info = std::make_shared<StreamInfo::MockUpstreamInfo>();
+  auto upstream_host = std::make_shared<Upstream::MockHostDescription>();
+  EXPECT_CALL(*upstream_info, upstreamHost).WillRepeatedly(testing::Return(upstream_host));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  auto host_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  host_metadata->mutable_filter_metadata()->insert({namespace_str, Protobuf::Struct()});
+  Protobuf::Value host_value_proto;
+  host_value_proto.set_string_value("host_value");
+  host_metadata->mutable_filter_metadata()
+      ->at(namespace_str)
+      .mutable_fields()
+      ->insert({host_key, host_value_proto});
+  EXPECT_CALL(*upstream_host, metadata()).WillRepeatedly(testing::Return(host_metadata));
+
+  auto locality_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  locality_metadata->mutable_filter_metadata()->insert({namespace_str, Protobuf::Struct()});
+  Protobuf::Value locality_value_proto;
+  locality_value_proto.set_string_value("locality_value");
+  locality_metadata->mutable_filter_metadata()
+      ->at(namespace_str)
+      .mutable_fields()
+      ->insert({locality_key, locality_value_proto});
+  EXPECT_CALL(*upstream_host, localityMetadata())
+      .WillRepeatedly(testing::Return(locality_metadata));
+
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  {
+    DynamicModuleHttpFilter::HookScope hook(filter);
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+        &filter, envoy_dynamic_module_type_metadata_source_Host,
+        {namespace_str.data(), namespace_str.size()}, {host_key.data(), host_key.size()}, &result));
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+        &filter, envoy_dynamic_module_type_metadata_source_HostLocality,
+        {namespace_str.data(), namespace_str.size()}, {locality_key.data(), locality_key.size()},
+        &result));
+    // Both snapshots are retained so an earlier metadata view is not freed by a later getter.
+    EXPECT_EQ(filter.metadataScratchSizeForTest(), 2);
+  }
+  // The outermost hook clears the metadata scratch.
+  EXPECT_EQ(filter.metadataScratchSizeForTest(), 0);
+}
+
 TEST(ABIImpl, metadata_bool) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
@@ -1698,6 +1768,69 @@ TEST(ABIImpl, filter_state_typed) {
       &filter, {key_str.data(), key_str.size()}, &result_buffer));
   EXPECT_EQ(result_buffer.length, value_str.size());
   EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), value_str);
+}
+
+TEST(ABIImpl, filter_state_typed_consecutive_getters_stay_valid) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  const std::string key1 = "envoy.test.http_typed_object";
+  const std::string value1 = "first_value";
+  const std::string key2 = "envoy.test.http_typed_object_second";
+  const std::string value2 = "second_value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_typed(
+      &filter, {key1.data(), key1.size()}, {value1.data(), value1.size()}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_typed(
+      &filter, {key2.data(), key2.size()}, {value2.data(), value2.size()}));
+
+  // Read the first value, then the second. The first view must stay valid after the second call.
+  envoy_dynamic_module_type_envoy_buffer result1 = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_typed(
+      &filter, {key1.data(), key1.size()}, &result1));
+  envoy_dynamic_module_type_envoy_buffer result2 = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_typed(
+      &filter, {key2.data(), key2.size()}, &result2));
+
+  EXPECT_EQ(std::string(result1.ptr, result1.length), value1);
+  EXPECT_EQ(std::string(result2.ptr, result2.length), value2);
+}
+
+TEST(ABIImpl, filter_state_typed_scratch_cleared_at_outermost_hook) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  const std::string key = "envoy.test.http_typed_object";
+  const std::string value = "value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_typed(
+      &filter, {key.data(), key.size()}, {value.data(), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  {
+    DynamicModuleHttpFilter::HookScope outer(filter);
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_typed(
+        &filter, {key.data(), key.size()}, &result));
+    {
+      DynamicModuleHttpFilter::HookScope inner(filter);
+      EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_typed(
+          &filter, {key.data(), key.size()}, &result));
+    }
+    // A nested hook does not clear the scratch.
+    EXPECT_EQ(filter.filterStateScratchSizeForTest(), 2);
+  }
+  // The outermost hook clears the scratch.
+  EXPECT_EQ(filter.filterStateScratchSizeForTest(), 0);
 }
 
 TEST(ABIImpl, filter_state_typed_no_factory) {
