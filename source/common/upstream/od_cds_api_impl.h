@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -73,8 +74,9 @@ private:
 };
 
 /**
- * ODCDS API implementation that fetches via Subscription for xDS-TP based
- * configs and resources.
+ * ODCDS API implementation that creates a singleton Subscription per resource.
+ * Used for xDS-TP based configs and resources, ADS config sources, and
+ * (when enabled by runtime) regular config sources.
  */
 class XdstpOdCdsApiImpl : public OdCdsApi {
 public:
@@ -91,9 +93,10 @@ private:
   class XdstpOdcdsSubscriptionsManager;
   using XdstpOdcdsSubscriptionsManagerSharedPtr = std::shared_ptr<XdstpOdcdsSubscriptionsManager>;
 
-  XdstpOdCdsApiImpl(Config::XdsManager& xds_manager, ClusterManager& cm,
+  XdstpOdCdsApiImpl(const envoy::config::core::v3::ConfigSource& config_source,
+                    Config::XdsManager& xds_manager, ClusterManager& cm,
                     MissingClusterNotifier& notifier, Stats::Scope& scope,
-                    Server::Configuration::ServerFactoryContext& server_context, bool old_ads,
+                    Server::Configuration::ServerFactoryContext& server_context,
                     ProtobufMessage::ValidationVisitor& validation_visitor,
                     absl::Status& creation_status);
 
@@ -106,9 +109,13 @@ private:
                        MissingClusterNotifier& notifier, Stats::Scope& scope,
                        ProtobufMessage::ValidationVisitor& validation_visitor);
 
-  // A singleton through which all subscriptions will be processed.
+  // The manager through which all subscriptions will be processed. This is a
+  // singleton for xDS-TP based config sources, and owned by this instance for
+  // any other config source.
   XdstpOdcdsSubscriptionsManagerSharedPtr subscriptions_manager_;
-  const bool old_ads_;
+  // The config source used for the per-resource subscriptions. Unset for
+  // xDS-TP based config sources.
+  std::optional<envoy::config::core::v3::ConfigSource> config_source_;
 };
 
 } // namespace Upstream

@@ -253,6 +253,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_ma
 // TODO(adisuissa): flip to true after all xDS types use the new subscription
 // method, and this is tested extensively.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_xdstp_based_config_singleton_subscriptions);
+// TODO(wbpcode): flip to true once the per-resource ODCDS subscriptions over a regular (non-ADS)
+// config source share a single gRPC mux, instead of creating a separate stream per cluster.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_odcds_singleton_subscriptions_for_config_source);
 // TODO(abeyad): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
 // TODO(abeyad): Flip to true after prod testing.
