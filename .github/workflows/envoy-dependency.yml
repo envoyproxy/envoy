@@ -18,6 +18,7 @@ on:
         - build-image
         - check
         - registry
+        - report
       dependency:
         description: Dependency to update (bazel task)
       version:
@@ -139,6 +140,36 @@ jobs:
           deps: Bump `${{ inputs.task == 'bazel' && inputs.dependency || 'bazel-registry' }}`
           -> ${{ steps.update.outputs.output }}
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
+
+  report:
+    if: >-
+      ${{
+          github.event_name == 'workflow_dispatch'
+          && inputs.task == 'report'
+      }}
+    name: Dependency report
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+    - name: Generate report
+      run: |
+        ./ci/run_envoy_docker.sh './ci/do_ci.sh deps.report' \
+            | tee "${RUNNER_TEMP}/deps-report.md"
+        {
+            echo "## Bazel module dependencies"
+            echo
+            # do_ci.sh prints "== workspace ==" headers; promote to markdown
+            sed -E 's/^== (.*) ==$/### \1/' "${RUNNER_TEMP}/deps-report.md"
+        } >> "$GITHUB_STEP_SUMMARY"
+      env:
+        ENVOY_DOCKER_CI: 1
+    - name: Upload dependency report
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: deps-report
+        path: ${{ runner.temp }}/deps-report.md
+        retention-days: 30
 
   update-build-image:
     if: >-

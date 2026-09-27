@@ -223,7 +223,7 @@ deps_report() {
         extra_options=()
         case "${module_dir%/}" in
             mobile|api) ;;
-            *) registry_args+=(--config=clang) ;;
+            *) extra_options+=(--config=clang) ;;
         esac
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
             "${extra_options[@]}" \
