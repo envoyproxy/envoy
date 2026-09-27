@@ -43,7 +43,6 @@
     "https://bcr.bazel.build/modules/aspect_bazel_lib/1.40.3/MODULE.bazel": "668e6bcb4d957fc0e284316dba546b705c8d43c857f87119619ee83c4555b859",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.14.0/MODULE.bazel": "2b31ffcc9bdc8295b2167e07a757dbbc9ac8906e7028e5170a3708cecaac119f",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.19.3/MODULE.bazel": "253d739ba126f62a5767d832765b12b59e9f8d2bc88cc1572f4a73e46eb298ca",
-    "https://bcr.bazel.build/modules/aspect_bazel_lib/2.22.0/MODULE.bazel": "7fe0191f047d4fe4a4a46c1107e2350cbb58a8fc2e10913aa4322d3190dec0bf",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.22.5/MODULE.bazel": "004ba890363d05372a97248c37205ae64b6fa31047629cd2c0895a9d0c7779e8",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.22.5/source.json": "ac2c3213df8f985785f1d0aeb7f0f73d5324e6e67d593d9b9470fb74a25d4a9b",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.8.1/MODULE.bazel": "812d2dd42f65dca362152101fbec418029cc8fd34cbad1a2fde905383d705838",
@@ -134,8 +133,8 @@
     "https://bcr.bazel.build/modules/curl/8.8.0/source.json": "d7d138b6878cf38891692fee0649ace35357fd549b425614d571786f054374d4",
     "https://bcr.bazel.build/modules/cython/3.0.11-1/MODULE.bazel": "868b3f5c956c3657420d2302004c6bb92606bfa47e314bab7f2ba0630c7c966c",
     "https://bcr.bazel.build/modules/cython/3.0.11-1/source.json": "da318be900b8ca9c3d1018839d3bebc5a8e1645620d0848fa2c696d4ecf7c296",
-    "https://bcr.bazel.build/modules/envoy_toolshed/0.5.0.envoy/MODULE.bazel": "not found",
-    "https://bcr.bazel.build/modules/envoy_toolshed_jq/0.5.0.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/envoy_toolshed/0.5.1.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/envoy_toolshed_jq/0.5.1.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/gawk/5.3.2.bcr.1/MODULE.bazel": "cdf8cbe5ee750db04b78878c9633cc76e80dcf4416cbe982ac3a9222f80713c8",
     "https://bcr.bazel.build/modules/gawk/5.3.2.bcr.1/source.json": "fa7b512dfcb5eafd90ce3959cf42a2a6fe96144ebbb4b3b3928054895f2afac2",
     "https://bcr.bazel.build/modules/gazelle/0.27.0/MODULE.bazel": "3446abd608295de6d90b4a8a118ed64a9ce11dcb3dda2dc3290a22056bd20996",
@@ -416,8 +415,8 @@
     "https://bcr.bazel.build/modules/rules_perl/0.2.4/source.json": "574317d6b3c7e4843fe611b76f15e62a1889949f5570702e1ee4ad335ea3c339",
     "https://bcr.bazel.build/modules/rules_pkg/0.7.0/MODULE.bazel": "df99f03fc7934a4737122518bb87e667e62d780b610910f0447665a7e2be62dc",
     "https://bcr.bazel.build/modules/rules_pkg/1.0.1/MODULE.bazel": "5b1df97dbc29623bccdf2b0dcd0f5cb08e2f2c9050aab1092fd39a41e82686ff",
-    "https://bcr.bazel.build/modules/rules_pkg/1.1.0/MODULE.bazel": "9db8031e71b6ef32d1846106e10dd0ee2deac042bd9a2de22b4761b0c3036453",
-    "https://bcr.bazel.build/modules/rules_pkg/1.1.0/source.json": "fef768df13a92ce6067e1cd0cdc47560dace01354f1d921cfb1d632511f7d608",
+    "https://bcr.bazel.build/modules/rules_pkg/1.3.0/MODULE.bazel": "ae0bdefbacc990c91f843206c90cf0f4be620639a5bf22119043599ba86d51a3",
+    "https://bcr.bazel.build/modules/rules_pkg/1.3.0/source.json": "58ae84c545141762f7c434c0ce78bfb55ef0be08d84863e7f0503fff135fe4e2",
     "https://bcr.bazel.build/modules/rules_proto/4.0.0/MODULE.bazel": "a7a7b6ce9bee418c1a760b3d84f83a299ad6952f9903c67f19e4edd964894e06",
     "https://bcr.bazel.build/modules/rules_proto/5.3.0-21.7/MODULE.bazel": "e8dff86b0971688790ae75528fe1813f71809b5afd57facb44dad9e8eca631b7",
     "https://bcr.bazel.build/modules/rules_proto/6.0.0-rc1/MODULE.bazel": "1e5b502e2e1a9e825eef74476a5a1ee524a92297085015a052510b09a1a09483",
@@ -450,7 +449,6 @@
     "https://bcr.bazel.build/modules/rules_python/1.6.3/MODULE.bazel": "a7b80c42cb3de5ee2a5fa1abc119684593704fcd2fec83165ebe615dec76574f",
     "https://bcr.bazel.build/modules/rules_python/1.7.0/MODULE.bazel": "d01f995ecd137abf30238ad9ce97f8fc3ac57289c8b24bd0bf53324d937a14f8",
     "https://bcr.bazel.build/modules/rules_python/2.0.2/MODULE.bazel": "9d26ecb43f248c2663fb29f3c9b833aa86c31e736096e58c7077f80038f8d32f",
-    "https://bcr.bazel.build/modules/rules_python/2.2.0/MODULE.bazel": "9ce85518b14625a3abec3c95e3fa739ab0578e58240ef829af20efebcdebc41a",
     "https://bcr.bazel.build/modules/rules_python/2.3.3/MODULE.bazel": "f6ff81e044aedbcf4ccb915431fea6f506f1262a7f6366f36a6e156ec89b7890",
     "https://bcr.bazel.build/modules/rules_python/2.3.3/source.json": "8dbd175f0d158d0a0aa35581584f075b598a00be3a39b04d57e30b3c0ccdd16c",
     "https://bcr.bazel.build/modules/rules_robolectric/4.14.1.2/MODULE.bazel": "d44fec647d0aeb67b9f3b980cf68ba634976f3ae7ccd6c07d790b59b87a4f251",
@@ -515,10 +513,10 @@
     "https://bcr.bazel.build/modules/zlib/1.3.2/source.json": "8f35ed65174ee2ad9630baeccd243cadf482b72d2ab32b57f9d84dc30ab076e0",
     "https://bcr.bazel.build/modules/zlib/1.3/MODULE.bazel": "6a9c02f19a24dcedb05572b2381446e27c272cd383aed11d41d99da9e3167a72",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/bazel_registry.json": "51bd3a0b193753e419c5d3db38e92fbcb9f7f97fd992ef2e24a0addd7274b37a",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/envoy_toolshed/0.5.0.envoy/MODULE.bazel": "dafeb62b3a9b6f137c3710ad963d4f04a0095c71f46598a80f301231c7b67128",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/envoy_toolshed/0.5.0.envoy/source.json": "405798a5d2c0c13ba12dbc3f86b584a0c5abc9116529a3f8a1d605442ce8019d",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/envoy_toolshed_jq/0.5.0.envoy/MODULE.bazel": "96b16c95a5022c64af9d2695af243cdfc53053d003f03ceab7399ebf45398d82",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/envoy_toolshed_jq/0.5.0.envoy/source.json": "bf1e5ee98d584c2849e3d05da9b407b9d28d870d9660ec577243156062b444e5",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/envoy_toolshed/0.5.1.envoy/MODULE.bazel": "882ce947b719f79d620f12087716af3f4de68212087bf4f0ed6fed88c190618f",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/envoy_toolshed/0.5.1.envoy/source.json": "84109aef9d3eccf052d007ffea097d48fd2e9d9dbb2df5a7c06d9db7dfbd0793",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/envoy_toolshed_jq/0.5.1.envoy/MODULE.bazel": "3fe72de4a588e67c6c08790e24ae19917f736a8fb44eb6b09ab44c3cf51f29b0",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/envoy_toolshed_jq/0.5.1.envoy/source.json": "1e3f24cf8e647aaf446dc51331af7673f191e7ce8db419b759b03759624ffab2",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/grpc/1.83.0.envoy/MODULE.bazel": "71ff92df79911a0975a09c1482791fd3983696383d4652277684e67884ac9d40",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/grpc/1.83.0.envoy/source.json": "b42e4dd1c7e881e04dbd05b9319ac243dbe60254d94c6d5fd24a6a97ca493a9a",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/8bceade61002e46bd84cb11b01505d9d4da094d7/modules/prometheus-metrics-model/0.6.2.envoy/MODULE.bazel": "40e1b9b9db52c3238fcc3e85c08ef35eb9157783e620009ed01eeed7631a9f67",
@@ -535,7 +533,7 @@
     "@@envoy_toolshed+//git:extensions.bzl%git_prebuilt_extension": {
       "general": {
         "bzlTransitiveDigest": "pSy/wBIDkJSEqv3vCM9MC/4saJt77Uqtm/w4zFHCxK8=",
-        "usagesDigest": "b4HcstmmufUpIoezRiCJYdjubxQtBHuc5+KMpP/hh9w=",
+        "usagesDigest": "TSS2dcZ8bihh1V5LmXdg2DNaXoXiiBjuERA5APeg59s=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "cacert": {
@@ -576,7 +574,7 @@
     "@@envoy_toolshed+//pgp:extensions.bzl%sq_prebuilt_extension": {
       "general": {
         "bzlTransitiveDigest": "HAHpnrqVn2Fa6+62V4FPDh0K5XJpRWasSOYn+ogQH5M=",
-        "usagesDigest": "uze3qO2FMDiSd5ABbAWngUIZSBFJiif3oJ79Jl2okm8=",
+        "usagesDigest": "hIXiLE6pNMyClVlykZCddDDEotj3I8wu1ZIO3iOG/Aw=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "sq_prebuilt_linux_aarch64": {
@@ -2392,10 +2390,8 @@
             "https://files.pythonhosted.org/packages/98/97/06afe62762c9a8a86af0cfb7bfdab22a43ad17138b07af5b1a58442690a2/deprecated-1.2.18.tar.gz": "sha256:422b6f6d859da6f2ef57857761bfb392480502a64c3028ca9bbe86085d72115d"
           },
           "docutils": {
-            "https://files.pythonhosted.org/packages/02/10/5da547df7a391dcde17f59520a231527b8571e6f46fc8efb02ccb370ab12/docutils-0.22.4-py3-none-any.whl": "sha256:d0013f540772d1420576855455d050a2180186c91c15779301ac2ccb3eeb68de",
             "https://files.pythonhosted.org/packages/32/91/30151a39f7570f448ed84529390628a651d7f27c87d73c9b887f8189695e/docutils-0.23-py3-none-any.whl": "sha256:25d013af9bf23bc1c7b2b093dff4208166c53a94786c9e447808335ef1185fea",
-            "https://files.pythonhosted.org/packages/39/a4/5180d9afc57e8fca05601dd652bdff19604c218814037fe90ffc7625a50a/docutils-0.23.tar.gz": "sha256:746f5060322511280a1e50eb76846ed6bf2342984b2ac04dc42caa1a8d78799e",
-            "https://files.pythonhosted.org/packages/ae/b6/03bb70946330e88ffec97aefd3ea75ba575cb2e762061e0e62a213befee8/docutils-0.22.4.tar.gz": "sha256:4db53b1fde9abecbb74d91230d32ab626d94f6badfc575d6db9194a49df29968"
+            "https://files.pythonhosted.org/packages/39/a4/5180d9afc57e8fca05601dd652bdff19604c218814037fe90ffc7625a50a/docutils-0.23.tar.gz": "sha256:746f5060322511280a1e50eb76846ed6bf2342984b2ac04dc42caa1a8d78799e"
           },
           "feedgenerator": {
             "https://files.pythonhosted.org/packages/5e/4e/0efde53652edbae3f86c0ec67260bb53287edc67033ac8d00fe08cd02557/feedgenerator-2.1.0.tar.gz": "sha256:f075f23f28fd227f097c36b212161c6cf012e1c6caaf7ff53d5d6bb02cd42b9d",
@@ -2581,8 +2577,8 @@
             "https://files.pythonhosted.org/packages/fd/5a/eb5b62641df0459a3291fc206cf5bd669c0feed7814dded8edef4ade8512/libsass-0.23.0-cp38-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.whl": "sha256:4a218406d605f325d234e4678bd57126a66a88841cb95bee2caeafdc6f138306"
           },
           "markdown": {
-            "https://files.pythonhosted.org/packages/2b/f4/69fa6ed85ae003c2378ffa8f6d2e3234662abd02c10d216c0ba96081a238/markdown-3.10.2.tar.gz": "sha256:994d51325d25ad8aa7ce4ebaec003febcce822c3f8c911e3b17c52f7f589f950",
-            "https://files.pythonhosted.org/packages/de/1f/77fa3081e4f66ca3576c896ae5d31c3002ac6607f9747d2e3aa49227e464/markdown-3.10.2-py3-none-any.whl": "sha256:e91464b71ae3ee7afd3017d9f358ef0baf158fd9a298db92f1d4761133824c36"
+            "https://files.pythonhosted.org/packages/29/6f/da4c6aea59b3001f2e8c0ec7497475aadaf3b021c10cab5b2858f0f32b26/markdown-3.10.3.tar.gz": "sha256:3589362618f743188b4d955b874402bc814f4f83f544dc207719f4baa7d9c45f",
+            "https://files.pythonhosted.org/packages/64/69/4a5af2bc115a9a33fefe51709749de8262be3f9ba063d1753a837cdbc49c/markdown-3.10.3-py3-none-any.whl": "sha256:fa6c92a00a4a3c98b22728c64a935ae1928250ae65058a6ded814d2cc29a4cea"
           },
           "markdown-it-py": {
             "https://files.pythonhosted.org/packages/06/ff/7841249c247aa650a76b9ee4bbaeae59370dc8bfd2f6c01f3630c35eb134/markdown_it_py-4.2.0.tar.gz": "sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49",
@@ -2714,6 +2710,8 @@
             "https://files.pythonhosted.org/packages/4c/ca/bfac8bc689799bcca4157e0e0ced07e70ce125193fc2e166d2e685b7e2fe/ordered-set-4.1.0.tar.gz": "sha256:694a8e44c87657c59292ede72891eb91d34131f6531463aab3009191c77364a8"
           },
           "packaging": {
+            "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl": "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+            "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz": "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79",
             "https://files.pythonhosted.org/packages/d7/f1/e7a6dd94a8d4a5626c03e4e99c87f241ba9e350cd9e6d75123f992427270/packaging-26.2.tar.gz": "sha256:ff452ff5a3e828ce110190feff1178bb1f2ea2281fa2075aadb987c2fb221661",
             "https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl": "sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e"
           },
