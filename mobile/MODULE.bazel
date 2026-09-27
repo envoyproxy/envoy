@@ -49,7 +49,7 @@ bazel_dep(name = "toolchains_llvm", version = "1.9.1.envoy")
 bazel_dep(name = "zlib-ng", version = "2.3.3.bcr.2")
 bazel_dep(name = "zstd", version = "1.5.7.bcr.2")
 
-bazel_dep(name = "buildifier_prebuilt", version = "10.0.1", dev_dependency = True, repo_name = "buildifier")
+bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = True, repo_name = "buildifier")
 
 local_path_override(
     module_name = "envoy",
