@@ -75,6 +75,24 @@ TEST_F(FactoryTestBase, ExtensionConfigCreateFail) {
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
 
+TEST_F(FactoryTestBase, NullInModuleExtensionRejected) {
+  // A module whose on_bootstrap_extension_new returns null must be rejected at load rather than
+  // kept as an extension whose hooks silently no-op.
+  DynamicModuleBootstrapExtensionFactory factory;
+  TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", testDataDir(), 1);
+
+  envoy::extensions::bootstrap::dynamic_modules::v3::DynamicModuleBootstrapExtension proto_config;
+  proto_config.mutable_dynamic_module_config()->set_name("bootstrap_extension_new_null");
+  proto_config.set_extension_name("test");
+
+  EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
+                          "Failed to initialize dynamic module bootstrap extension");
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test"));
+
+  TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+}
+
 TEST_F(FactoryTestBase, InvalidExtensionConfig) {
   // Test that factory throws when extension_config Any message fails to parse.
   // This covers the config_or_error.ok() check in factory.cc.

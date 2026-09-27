@@ -92,6 +92,8 @@ test_program(name = "listener_stop_iteration")
 
 test_program(name = "udp_no_op")
 
+test_program(name = "udp_null_config")
+
 test_program(name = "udp_stop_iteration")
 
 test_program(name = "udp_no_config_destroy")
@@ -217,6 +219,8 @@ test_program(name = "cluster_specifier_config_new_fail")
 test_program(name = "cluster_async_host_selection")
 
 test_program(name = "cluster_no_op")
+
+test_program(name = "cluster_null_lb")
 
 test_program(name = "cluster_run_on_all_workers")
 
