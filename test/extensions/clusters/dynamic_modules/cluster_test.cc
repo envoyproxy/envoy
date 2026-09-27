@@ -79,6 +79,11 @@ public:
   // constructed: clears in_module_lb_ so chooseHost exercises the early-return path.
   static void clearInModuleLb(DynamicModuleLoadBalancer& lb) { lb.in_module_lb_ = nullptr; }
 
+  // Returns whether the load balancer registered the host membership update callback.
+  static bool hasMemberUpdateCb(const DynamicModuleLoadBalancer& lb) {
+    return lb.member_update_cb_ != nullptr;
+  }
+
   // Sets the borrowed host vectors that back the member update host accessors. These are only
   // populated by Envoy during an on_host_membership_update callback, so this lets the accessors
   // be exercised deterministically from a unit test.
@@ -232,6 +237,33 @@ cluster_type:
   EXPECT_NE(nullptr, result->first);
   // CLUSTER_PROVIDED should return a non-null thread-aware LB (module LB).
   EXPECT_NE(nullptr, result->second);
+}
+
+// A module that provides a load balancer and the membership hook registers the callback.
+TEST_F(DynamicModuleClusterTest, ValidLoadBalancerRegistersMembershipCallback) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  EXPECT_TRUE(DynamicModuleClusterTestPeer::hasMemberUpdateCb(*lb_instance));
+}
+
+// A module returning a null load balancer must not register the host membership update callback,
+// so a later membership change cannot invoke the module hook against a null load balancer.
+TEST_F(DynamicModuleClusterTest, NullLoadBalancerSkipsMembershipCallback) {
+  auto result = createCluster(makeYamlConfig("cluster_null_lb"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  EXPECT_FALSE(DynamicModuleClusterTestPeer::hasMemberUpdateCb(*lb_instance));
 }
 
 // Test that LEAST_REQUEST lb_policy is accepted and returns nullptr thread-aware LB.
