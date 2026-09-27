@@ -66,6 +66,12 @@ local_path_override(
     path = "envoy_build_config",
 )
 
+
+single_version_override(
+    module_name = "openssl",
+    version = "3.5.7.envoy",
+)
+
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
     is_default = True,
