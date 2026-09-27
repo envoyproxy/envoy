@@ -17,6 +17,7 @@ on:
         - bazel
         - build-image
         - check
+        - lockfiles
         - registry
         - report
       dependency:
@@ -44,12 +45,14 @@ jobs:
     if: >-
       ${{
           github.event_name == 'workflow_dispatch'
-          && (inputs.task == 'bazel' || inputs.task == 'registry')
+          && contains(fromJSON('["bazel", "lockfiles", "registry"]'), inputs.task)
       }}
     name: >
       Update
       (${{ inputs.pr && 'PR/' || '' }}${{ inputs.task }}
-      /${{ inputs.task == 'bazel' && inputs.dependency || 'bazel-registry' }}
+      /${{ inputs.task == 'bazel' && inputs.dependency
+           || inputs.task == 'registry' && 'bazel-registry'
+           || 'lockfiles' }}
       /${{ inputs.version || 'latest' }})
     runs-on: ubuntu-24.04
     steps:
@@ -91,10 +94,15 @@ jobs:
                 dependency_name: $dependency,
                 command: "./ci/run_envoy_docker.sh './ci/do_ci.sh deps.update \($dependency)\($version_suffix)'"
               }
-            else
+            elif $task == "registry" then
               {
                 dependency_name: "bazel-registry",
                 command: "./ci/run_envoy_docker.sh './ci/do_ci.sh registry'"
+              }
+            else
+              {
+                dependency_name: "lockfiles",
+                command: "./ci/run_envoy_docker.sh './ci/do_ci.sh lockfiles'"
               }
             end
           | ("
@@ -104,6 +112,14 @@ jobs:
               OUTPUT=\($version_short)
           elif [[ \"\($task)\" == \"registry\" ]]; then
               OUTPUT=$(sed -n -E 's#^common --registry=https://raw\\.githubusercontent\\.com/envoyproxy/bazel-registry/([0-9a-f]+)$#\\1#p' .bazelrc | cut -c1-7)
+          elif [[ \"\($task)\" == \"lockfiles\" ]]; then
+              if [[ -z \"$(git status --porcelain -- ':(glob)**/MODULE.bazel.lock')\" ]]; then
+                  echo 'Lockfiles are in sync, nothing to do'
+                  echo 'changes=false' > \"$GITHUB_OUTPUT\"
+                  OUTPUT=in-sync
+              else
+                  OUTPUT=$(git diff -- ':(glob)**/MODULE.bazel.lock' | sha256sum | cut -c1-7)
+              fi
           else
               OUTPUT=$(git diff -U0 -- MODULE.bazel | sed -n -E 's/^\\+bazel_dep\\(name = \"\($dependency)\", version = \"([^\"]+)\".*/\\1/p' | head -n1)
           fi
@@ -115,12 +131,15 @@ jobs:
 
     - uses: envoyproxy/toolshed/actions/upload/diff@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       name: Upload diff
+      if: ${{ steps.update.outputs.changes != 'false' }}
       with:
         name: >-
-          ${{ (inputs.task == 'bazel' && inputs.dependency || 'bazel-registry')
+          ${{ (inputs.task == 'bazel' && inputs.dependency
+               || inputs.task == 'registry' && 'bazel-registry'
+               || 'lockfiles')
               }}-${{ steps.update.outputs.output }}
     - name: Create a PR
-      if: ${{ inputs.pr }}
+      if: ${{ inputs.pr && steps.update.outputs.changes != 'false' }}
       uses: envoyproxy/toolshed/actions/github/pr@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       with:
         base: main
@@ -129,16 +148,31 @@ jobs:
 
           ${{ inputs.pr-message }}
         branch: >-
-          dependency/${{ inputs.task }}/${{ inputs.task == 'bazel' && inputs.dependency || 'bazel-registry' }}/${{ steps.update.outputs.output }}
+          dependency/${{ inputs.task }}/${{ inputs.task == 'bazel' && inputs.dependency
+              || inputs.task == 'registry' && 'bazel-registry'
+              || 'lockfiles' }}/${{ steps.update.outputs.output }}
         commit-message: |
-          deps: Bump `${{ inputs.task == 'bazel' && inputs.dependency || 'bazel-registry' }}` -> ${{ steps.update.outputs.output }}
+          ${{ inputs.task == 'lockfiles'
+              && 'deps: Regenerate bazel lockfiles'
+              || format(
+                'deps: Bump `{0}` -> {1}',
+                inputs.task == 'bazel' && inputs.dependency
+                || inputs.task == 'registry' && 'bazel-registry'
+                || 'lockfiles',
+                steps.update.outputs.output) }}
 
           Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
         title: >-
-          deps: Bump `${{ inputs.task == 'bazel' && inputs.dependency || 'bazel-registry' }}`
-          -> ${{ steps.update.outputs.output }}
+          ${{ inputs.task == 'lockfiles'
+              && 'deps: Regenerate bazel lockfiles'
+              || format(
+                'deps: Bump `{0}` -> {1}',
+                inputs.task == 'bazel' && inputs.dependency
+                || inputs.task == 'registry' && 'bazel-registry'
+                || 'lockfiles',
+                steps.update.outputs.output) }}
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
 
   report:
