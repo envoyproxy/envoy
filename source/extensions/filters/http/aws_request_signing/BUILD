@@ -20,6 +20,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/http:filter_interface",
         "//source/common/common:cancel_wrapper_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/common/aws:credential_provider_chains_lib",
         "//source/extensions/common/aws:region_provider_impl_lib",
         "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",

@@ -152,6 +152,12 @@ comes from the owning HTTP connection manager.
 
   signing_added, Counter, Total requests for which signing succeeded (includes payload_signing_added)
   signing_failed, Counter, Total requests for which signing failed (includes payload_signing_failed)
+  signing_skipped, Counter, Total requests forwarded unsigned because no credentials were available (includes payload_signing_skipped)
   payload_signing_added, Counter, Total requests for which the payload was buffered signing succeeded
   payload_signing_failed, Counter, Total requests for which the payload was buffered but signing failed
+  payload_signing_skipped, Counter, Total requests for which the payload was buffered but no credentials were available
+
+Signing is skipped, rather than failed, when the configured credentials provider chain resolves to
+no credentials. This is a supported configuration - the request is forwarded unsigned, matching the
+behavior of the AWS SDKs - so it is counted separately from a signing error.
 

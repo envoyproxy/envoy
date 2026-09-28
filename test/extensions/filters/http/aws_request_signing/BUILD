@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
