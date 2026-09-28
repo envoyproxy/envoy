@@ -15,6 +15,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/flattening_json_codec.h"
 #include "source/extensions/filters/http/ai_protocol_manager/transcoding_engine.h"
 
+#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "nlohmann/json_fwd.hpp"
 
@@ -112,6 +113,11 @@ private:
   // response passes through: response transcoding is off, or the dialect it needs is unknown.
   std::optional<HttpFilters::AiProtocolManager::TranscodeLeg>
   responseLeg(HttpFilters::AiProtocolManager::PayloadKind kind);
+  // The leg `handling` runs on a payload of `kind`, or an error (counted as `unresolved`) when the
+  // route did not declare the dialect it needs.
+  absl::StatusOr<HttpFilters::AiProtocolManager::TranscodeLeg>
+  resolveLeg(envoy::extensions::http::ai_filters::transcoder::v3::Transcoder::Direction handling,
+             HttpFilters::AiProtocolManager::PayloadKind kind);
   // What the response legs need beyond the payload.
   HttpFilters::AiProtocolManager::TranscodeContext responseContext() const;
 
@@ -123,9 +129,6 @@ private:
   const HttpFilters::AiProtocolManager::LLMProtocol target_protocol_;
   // Only touched by decode() before the request is propagated; see `AiFilterContext`.
   Http::RequestHeaderMap& request_headers_;
-  // Copied rather than referenced: `AiFilterContext`'s referents belong to the stream and must
-  // not be read after the request is propagated.
-  const std::string request_path_;
   // When the stream started, in seconds since the Unix epoch: the `created` time of an IR
   // response whose dialect does not carry one.
   const int64_t created_;

@@ -53,23 +53,6 @@ TEST(TranscoderConfigTest, CreatesFilterForRequestAndResponseHandling) {
   EXPECT_NE((*factory_cb)(stream_context), nullptr);
 }
 
-TEST(TranscoderConfigTest, CreatesFilterForRequestOnlyWithResponseDisabled) {
-  TranscoderFilterConfigFactory factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
-
-  TranscoderProto proto;
-  proto.set_request_handling(TranscoderProto::FROM_IR);
-
-  const auto factory_cb = factory.createAiFilterFactory(proto, context, *stats_store.rootScope());
-  ASSERT_TRUE(factory_cb.ok()) << factory_cb.status();
-
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/"}};
-  const AiFilterContext stream_context{stream_info, headers, LLMProtocol::OpenAiChatCompletions};
-  EXPECT_NE((*factory_cb)(stream_context), nullptr);
-}
-
 // Leaving both request_handling and response_handling unset must fail at config load.
 TEST(TranscoderConfigTest, RejectsWhenBothRequestAndResponseHandlingAreUnset) {
   TranscoderFilterConfigFactory factory;

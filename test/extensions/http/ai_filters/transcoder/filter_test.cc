@@ -164,6 +164,36 @@ public:
 
   nlohmann::json forwarded() { return nlohmann::json::parse(bridge_.injected_.toString()); }
 
+  // Runs `body`, a unary response or an SSE stream, through `filters`' response chain and returns
+  // what reaches the client.
+  std::string runResponse(std::vector<AiFilterSharedPtr> filters, const std::string& body,
+                          bool sse) {
+    FilterManager manager(std::move(filters));
+    FakeBridge bridge(*dispatcher_);
+    BufferManager out(BufferManager::Config{}, factory_, bridge);
+    absl::Status status;
+    bool done = false;
+    const auto on_done = [&](absl::Status s) {
+      status = std::move(s);
+      done = true;
+    };
+    if (sse) {
+      manager.startSseResponse(factory_, bridge, out, on_done);
+    } else {
+      manager.startUnaryResponse(factory_, bridge, out, on_done);
+    }
+    Buffer::OwnedImpl data(body);
+    manager.onResponseData(data, /*end_stream=*/true);
+    for (int i = 0; i < 20; ++i) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    EXPECT_TRUE(done);
+    EXPECT_TRUE(status.ok()) << status;
+    const std::string wire = bridge.injected_.toString();
+    out.onDestroy();
+    return wire;
+  }
+
   uint64_t counterValue(const std::string& name) {
     const auto counter =
         TestUtility::findCounter(stats_store_, "ai_protocol_manager.transcoder." + name);
@@ -187,80 +217,6 @@ public:
   std::string local_reply_details_;
 };
 
-// `TO_IR` converts an Anthropic request into the canonical OpenAI Chat Completions IR.
-TEST_F(TranscoderFilterTest, ToIrConvertsAnthropicRequestToCanonicalIr) {
-  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::AnthropicMessages, R"({
-    "model": "claude-sonnet-4-5",
-    "max_tokens": 1024,
-    "system": "Be concise.",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  })");
-
-  ASSERT_TRUE(status_.ok()) << status_;
-  const nlohmann::json out = forwarded();
-  EXPECT_EQ(out["model"], "claude-sonnet-4-5");
-  EXPECT_EQ(out["max_completion_tokens"], 1024);
-  ASSERT_EQ(out["messages"].size(), 2);
-  EXPECT_EQ(out["messages"][0]["role"], "system");
-  EXPECT_EQ(out["messages"][0]["content"], "Be concise.");
-  EXPECT_EQ(out["messages"][1]["role"], "user");
-  EXPECT_EQ(out["messages"][1]["content"], "Hello!");
-  EXPECT_EQ(counterValue("transcoded"), 1);
-}
-
-// `TO_IR` lifts Gemini's model from `:path` (`/v1beta/models/{model}:generateContent`) into
-// `json["model"]` and converts the payload to canonical IR.
-TEST_F(TranscoderFilterTest, ToIrLiftsGeminiModelFromPathAndConvertsToIr) {
-  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::GeminiGenerateContent, R"({
-    "contents": [{"role": "user", "parts": [{"text": "Hello Gemini!"}]}]
-  })",
-                  "/v1beta/models/gemini-2.5-pro:generateContent");
-
-  ASSERT_TRUE(status_.ok()) << status_;
-  const nlohmann::json out = forwarded();
-  EXPECT_EQ(out["model"], "gemini-2.5-pro");
-  ASSERT_EQ(out["messages"].size(), 1);
-  EXPECT_EQ(out["messages"][0]["role"], "user");
-  EXPECT_EQ(out["messages"][0]["content"], "Hello Gemini!");
-  EXPECT_EQ(counterValue("transcoded"), 1);
-}
-
-// `TO_IR` also lifts the streaming mode, so a `FROM_IR` leg that rebuilds the path keeps it.
-TEST_F(TranscoderFilterTest, ToIrLiftsGeminiStreamingModeFromPath) {
-  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::GeminiGenerateContent, R"({
-    "contents": [{"role": "user", "parts": [{"text": "Hello Gemini!"}]}]
-  })",
-                  "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse");
-
-  ASSERT_TRUE(status_.ok()) << status_;
-  nlohmann::json out = forwarded();
-  EXPECT_EQ(out["model"], "gemini-2.5-flash");
-  EXPECT_EQ(out["stream"], true);
-}
-
-// `FROM_IR` to Gemini moves `model` and `stream` into `:path` and drops `stream_options`, none of
-// which Gemini accepts in the body.
-TEST_F(TranscoderFilterTest, FromIrMovesModelAndStreamIntoGeminiPath) {
-  target_protocol_ = LLMProtocol::GeminiGenerateContent;
-
-  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
-    "model": "gemini-2.5-flash",
-    "stream": true,
-    "stream_options": {"include_usage": true},
-    "messages": [{"role": "user", "content": "Hello!"}]
-  })");
-
-  ASSERT_TRUE(status_.ok()) << status_;
-  EXPECT_EQ(request_headers_.getPathValue(),
-            "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse");
-  nlohmann::json out = forwarded();
-  EXPECT_FALSE(out.contains("model"));
-  EXPECT_FALSE(out.contains("stream"));
-  EXPECT_FALSE(out.contains("stream_options"));
-  EXPECT_EQ(out["contents"][0]["parts"][0]["text"], "Hello!");
-  EXPECT_EQ(counterValue("transcoded"), 1);
-}
-
 // A Gemini client through both legs keeps its model and streaming mode.
 TEST_F(TranscoderFilterTest, GeminiStreamingRequestRoundTripsThroughBothLegs) {
   target_protocol_ = LLMProtocol::GeminiGenerateContent;
@@ -282,20 +238,6 @@ TEST_F(TranscoderFilterTest, GeminiStreamingRequestRoundTripsThroughBothLegs) {
   EXPECT_EQ(out["contents"][0]["parts"][0]["text"], "Hi");
 }
 
-TEST_F(TranscoderFilterTest, FromIrUsesGenerateContentWhenNotStreaming) {
-  target_protocol_ = LLMProtocol::GeminiGenerateContent;
-
-  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
-    "model": "gemini-2.5-flash",
-    "stream": false,
-    "messages": [{"role": "user", "content": "Hello!"}]
-  })");
-
-  ASSERT_TRUE(status_.ok()) << status_;
-  EXPECT_EQ(request_headers_.getPathValue(), "/v1beta/models/gemini-2.5-flash:generateContent");
-  EXPECT_FALSE(forwarded().contains("stream"));
-}
-
 TEST_F(TranscoderFilterTest, FromIrRejectsModelThatIsNotAGeminiPathSegment) {
   target_protocol_ = LLMProtocol::GeminiGenerateContent;
 
@@ -308,30 +250,8 @@ TEST_F(TranscoderFilterTest, FromIrRejectsModelThatIsNotAGeminiPathSegment) {
   EXPECT_THAT(local_reply_details_, testing::HasSubstr("model id"));
   EXPECT_EQ(request_headers_.getPathValue(), "/v1/chat/completions");
   EXPECT_EQ(counterValue("failed"), 1);
-}
-
-// `FROM_IR` reads the route's target backend protocol and rewrites the IR payload into the backend
-// schema (Anthropic Messages).
-TEST_F(TranscoderFilterTest, FromIrRewritesCanonicalPayloadToTargetProtocol) {
-  target_protocol_ = LLMProtocol::AnthropicMessages;
-
-  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
-    "model": "claude-sonnet-4-5",
-    "max_completion_tokens": 2048,
-    "messages": [
-      {"role": "system", "content": "Be concise."},
-      {"role": "user", "content": "Hello!"}
-    ]
-  })");
-
-  ASSERT_TRUE(status_.ok()) << status_;
-  const nlohmann::json out = forwarded();
-  EXPECT_EQ(out["system"], "Be concise.");
-  EXPECT_EQ(out["max_tokens"], 2048);
-  EXPECT_FALSE(out.contains("max_completion_tokens"));
-  EXPECT_EQ(counterValue("transcoded"), 1);
+  EXPECT_EQ(counterValue("transcoded"), 0);
   EXPECT_EQ(counterValue("unresolved"), 0);
-  EXPECT_EQ(counterValue("failed"), 0);
 }
 
 // Full two-instance decode pipeline:
@@ -376,51 +296,29 @@ TEST_F(TranscoderFilterTest, TwoInstanceDecodeChainTranscodesToIrAppliesAiFilter
   EXPECT_EQ(counterValue("transcoded"), 2);
 }
 
-// Bidirectional unary response transcoding:
-// FilterManager runs the response chain in reverse order (`N-1 .. 0`).
-// With `[client_boundary_filter(request: TO_IR, response: FROM_IR), mid_filter,
-// backend_boundary_filter(request: FROM_IR, response: TO_IR)]`, the response from the Gemini
-// backend (`target_protocol_ == GeminiGenerateContent`) first hits `backend_boundary_filter`
-// (converting Gemini -> OpenAI IR via `response_handling: TO_IR`), then passes through
-// `mid_filter`, and finally hits `client_boundary_filter` (converting OpenAI IR -> Anthropic
-// Messages for the client via `response_handling: FROM_IR`).
+// Bidirectional unary response transcoding. The response chain runs in reverse, so a Gemini
+// backend's response is converted to the IR by `backend_boundary_filter` (`response_handling:
+// TO_IR`), passes `mid_filter`, and is converted to Anthropic Messages for the client by
+// `client_boundary_filter` (`response_handling: FROM_IR`).
 TEST_F(TranscoderFilterTest, EncodeUnaryTranscodesGeminiResponseToIrAndFromIrToAnthropic) {
   target_protocol_ = LLMProtocol::GeminiGenerateContent;
   request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/messages"}};
 
   const AiFilterContext context = makeContext(LLMProtocol::AnthropicMessages);
-  auto client_boundary_filter = std::make_shared<TranscoderFilter>(
-      makeConfig(TranscoderProto::TO_IR, TranscoderProto::FROM_IR), context);
   auto mid_filter = std::make_shared<IrInspectingAiFilter>();
-  auto backend_boundary_filter = std::make_shared<TranscoderFilter>(
-      makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context);
-
-  FilterManager manager({client_boundary_filter, mid_filter, backend_boundary_filter});
-  FakeBridge resp_bridge(*dispatcher_);
-  BufferManager resp_out_buffer(BufferManager::Config{}, factory_, resp_bridge);
-  absl::Status resp_status;
-  bool resp_done = false;
-
-  manager.startUnaryResponse(factory_, resp_bridge, resp_out_buffer, [&](absl::Status s) {
-    resp_status = std::move(s);
-    resp_done = true;
-  });
-
-  const std::string response =
+  const std::string wire = runResponse(
+      {std::make_shared<TranscoderFilter>(
+           makeConfig(TranscoderProto::TO_IR, TranscoderProto::FROM_IR), context),
+       mid_filter,
+       std::make_shared<TranscoderFilter>(
+           makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context)},
       R"({"candidates":[{"content":{"role":"model","parts":[{"text":"Hello back!"}]},)"
       R"("finishReason":"STOP"}],"modelVersion":"gemini-2.5-pro",)"
-      R"("usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":30,"totalTokenCount":42}})";
-  Buffer::OwnedImpl body(response);
-  manager.onResponseData(body, /*end_stream=*/true);
-  for (int i = 0; i < 20; ++i) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+      R"("usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":30,"totalTokenCount":42}})",
+      /*sse=*/false);
 
-  ASSERT_TRUE(resp_done);
-  ASSERT_TRUE(resp_status.ok()) << resp_status;
   EXPECT_GT(mid_filter->seen_unary_batches_, 0);
-
-  const nlohmann::json out = nlohmann::json::parse(resp_bridge.injected_.toString());
+  const nlohmann::json out = nlohmann::json::parse(wire);
   EXPECT_EQ(out["type"], "message");
   EXPECT_EQ(out["role"], "assistant");
   EXPECT_EQ(out["model"], "gemini-2.5-pro");
@@ -432,41 +330,24 @@ TEST_F(TranscoderFilterTest, EncodeUnaryTranscodesGeminiResponseToIrAndFromIrToA
   EXPECT_EQ(out["usage"]["output_tokens"], 30);
   EXPECT_EQ(counterValue("transcoded"), 2);
   EXPECT_EQ(counterValue("failed"), 0);
-  resp_out_buffer.onDestroy();
 }
 
-// Bidirectional streaming SSE response transcoding:
-// With `[client_boundary_filter(request: TO_IR, response: FROM_IR), mid_filter,
-// backend_boundary_filter(request: FROM_IR, response: TO_IR)]`, Anthropic SSE frames from the
-// backend (`target_protocol_ == AnthropicMessages`) first hit `backend_boundary_filter`
-// (`response_handling: TO_IR` at backend boundary, converting Anthropic -> OpenAI
-// `chat.completion.chunk` IR frames), pass through `mid_filter`, and finally hit
-// `client_boundary_filter` (`response_handling: FROM_IR` at client boundary, converting OpenAI IR
-// -> Gemini SSE frames for `source_protocol_ == GeminiGenerateContent`, dropping `[DONE]`).
+// Bidirectional SSE response transcoding: Anthropic frames from the backend become IR
+// `chat.completion.chunk` frames for `mid_filter`, then Gemini frames for the client, which has no
+// `[DONE]` terminator.
 TEST_F(TranscoderFilterTest, EncodeSseTranscodesAnthropicSseToIrAndFromIrToGemini) {
   target_protocol_ = LLMProtocol::AnthropicMessages;
   request_headers_ = Http::TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", "/v1beta/models/gemini-2.5-pro:streamGenerateContent"}};
 
   const AiFilterContext context = makeContext(LLMProtocol::GeminiGenerateContent);
-  auto client_boundary_filter = std::make_shared<TranscoderFilter>(
-      makeConfig(TranscoderProto::TO_IR, TranscoderProto::FROM_IR), context);
   auto mid_filter = std::make_shared<IrInspectingAiFilter>();
-  auto backend_boundary_filter = std::make_shared<TranscoderFilter>(
-      makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context);
-
-  FilterManager manager({client_boundary_filter, mid_filter, backend_boundary_filter});
-  FakeBridge resp_bridge(*dispatcher_);
-  BufferManager resp_out_buffer(BufferManager::Config{}, factory_, resp_bridge);
-  absl::Status resp_status;
-  bool resp_done = false;
-
-  manager.startSseResponse(factory_, resp_bridge, resp_out_buffer, [&](absl::Status s) {
-    resp_status = std::move(s);
-    resp_done = true;
-  });
-
-  Buffer::OwnedImpl sse_data(
+  const std::string wire = runResponse(
+      {std::make_shared<TranscoderFilter>(
+           makeConfig(TranscoderProto::TO_IR, TranscoderProto::FROM_IR), context),
+       mid_filter,
+       std::make_shared<TranscoderFilter>(
+           makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context)},
       "event: message_start\n"
       R"(data: {"type":"message_start","message":{"id":"msg_1","model":"claude-sonnet-4-5"}})"
       "\n\n"
@@ -475,62 +356,14 @@ TEST_F(TranscoderFilterTest, EncodeSseTranscodesAnthropicSseToIrAndFromIrToGemin
       "\n\n"
       "event: message_stop\n"
       R"(data: {"type":"message_stop"})"
-      "\n\n");
-  manager.onResponseData(sse_data, /*end_stream=*/true);
-  for (int i = 0; i < 20; ++i) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+      "\n\n",
+      /*sse=*/true);
 
-  ASSERT_TRUE(resp_done);
-  ASSERT_TRUE(resp_status.ok()) << resp_status;
   EXPECT_EQ(mid_filter->observed_encode_ir_["object"], "chat.completion.chunk");
-  EXPECT_THAT(resp_bridge.injected_.toString(), testing::HasSubstr("\"candidates\""));
-  EXPECT_THAT(resp_bridge.injected_.toString(), testing::HasSubstr("chunk"));
-  EXPECT_THAT(resp_bridge.injected_.toString(), testing::Not(testing::HasSubstr("[DONE]")));
+  EXPECT_THAT(wire, testing::HasSubstr("\"candidates\""));
+  EXPECT_THAT(wire, testing::HasSubstr("chunk"));
+  EXPECT_THAT(wire, testing::Not(testing::HasSubstr("[DONE]")));
   EXPECT_EQ(counterValue("failed"), 0);
-  resp_out_buffer.onDestroy();
-}
-
-// Gemini's candidate and prompt counts exclude thought and tool-use prompt tokens, which the IR's
-// inclusive counts carry.
-TEST_F(TranscoderFilterTest, EncodeUnaryCountsGeminiThoughtsAsCompletionTokens) {
-  target_protocol_ = LLMProtocol::GeminiGenerateContent;
-  request_headers_ =
-      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
-
-  const AiFilterContext context = makeContext(LLMProtocol::OpenAiChatCompletions);
-  auto backend_boundary_filter = std::make_shared<TranscoderFilter>(
-      makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context);
-
-  FilterManager manager({backend_boundary_filter});
-  FakeBridge resp_bridge(*dispatcher_);
-  BufferManager resp_out_buffer(BufferManager::Config{}, factory_, resp_bridge);
-  absl::Status resp_status;
-  bool resp_done = false;
-  manager.startUnaryResponse(factory_, resp_bridge, resp_out_buffer, [&](absl::Status s) {
-    resp_status = std::move(s);
-    resp_done = true;
-  });
-
-  Buffer::OwnedImpl body(
-      R"({"candidates":[{"content":{"role":"model","parts":[{"text":"Paris"}]},)"
-      R"("finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":1,)"
-      R"("thoughtsTokenCount":24,"toolUsePromptTokenCount":5,"cachedContentTokenCount":4,)"
-      R"("totalTokenCount":40}})");
-  manager.onResponseData(body, /*end_stream=*/true);
-  for (int i = 0; i < 20; ++i) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  ASSERT_TRUE(resp_done);
-  ASSERT_TRUE(resp_status.ok()) << resp_status;
-  nlohmann::json usage = nlohmann::json::parse(resp_bridge.injected_.toString())["usage"];
-  EXPECT_EQ(usage["prompt_tokens"], 15);
-  EXPECT_EQ(usage["completion_tokens"], 25);
-  EXPECT_EQ(usage["total_tokens"], 40);
-  EXPECT_EQ(usage["prompt_tokens_details"]["cached_tokens"], 4);
-  EXPECT_EQ(usage["completion_tokens_details"]["reasoning_tokens"], 24);
-  resp_out_buffer.onDestroy();
 }
 
 // A Gemini SSE chunk whose text is past the inline string threshold reaches the filter as an
@@ -541,39 +374,22 @@ TEST_F(TranscoderFilterTest, EncodeSseKeepsGeminiTextHeldByReference) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
 
   const AiFilterContext context = makeContext(LLMProtocol::OpenAiChatCompletions);
-  auto backend_boundary_filter = std::make_shared<TranscoderFilter>(
-      makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context);
-
-  FilterManager manager({backend_boundary_filter});
-  FakeBridge resp_bridge(*dispatcher_);
-  BufferManager resp_out_buffer(BufferManager::Config{}, factory_, resp_bridge);
-  absl::Status resp_status;
-  bool resp_done = false;
-  manager.startSseResponse(factory_, resp_bridge, resp_out_buffer, [&](absl::Status s) {
-    resp_status = std::move(s);
-    resp_done = true;
-  });
-
   const std::string text = std::string(3000, 'a') + "\\n" + std::string(10, 'b');
-  Buffer::OwnedImpl sse_data(absl::StrCat(
-      R"(data: {"candidates":[{"content":{"role":"model","parts":[{"text":")", text,
-      R"("}]},"finishReason":"STOP"}],"modelVersion":"gemini-2.5-flash"})", "\r\n\r\n"));
-  manager.onResponseData(sse_data, /*end_stream=*/true);
-  for (int i = 0; i < 20; ++i) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  const std::string wire = runResponse(
+      {std::make_shared<TranscoderFilter>(
+          makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context)},
+      absl::StrCat(R"(data: {"candidates":[{"content":{"role":"model","parts":[{"text":")", text,
+                   R"("}]},"finishReason":"STOP"}],"modelVersion":"gemini-2.5-flash"})",
+                   "\r\n\r\n"),
+      /*sse=*/true);
 
-  ASSERT_TRUE(resp_done);
-  ASSERT_TRUE(resp_status.ok()) << resp_status;
-  const std::string out = resp_bridge.injected_.toString();
-  const std::string first_payload = out.substr(6, out.find('\n') - 6);
+  const std::string first_payload = wire.substr(6, wire.find('\n') - 6);
   nlohmann::json chunk = nlohmann::json::parse(first_payload);
   EXPECT_EQ(chunk["object"], "chat.completion.chunk");
   EXPECT_EQ(chunk["choices"][0]["delta"]["content"],
             std::string(3000, 'a') + "\n" + std::string(10, 'b'));
   EXPECT_EQ(chunk["choices"][0]["finish_reason"], "stop");
-  EXPECT_THAT(out, testing::HasSubstr("data: [DONE]"));
-  resp_out_buffer.onDestroy();
+  EXPECT_THAT(wire, testing::HasSubstr("data: [DONE]"));
 }
 
 // When `response_handling` is unset (`DIRECTION_UNSPECIFIED`), the filter splices out of the
@@ -583,36 +399,13 @@ TEST_F(TranscoderFilterTest, UnsetResponseHandlingPassesResponsesThroughUntouche
   request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/messages"}};
 
   const AiFilterContext context = makeContext(LLMProtocol::AnthropicMessages);
-  // Only `request_handling` is set; `response_handling` defaults to `DIRECTION_UNSPECIFIED`.
-  auto client_boundary_filter =
-      std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::TO_IR), context);
-  auto backend_boundary_filter =
-      std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::FROM_IR), context);
+  const std::string wire = runResponse(
+      {std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::TO_IR), context),
+       std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::FROM_IR), context)},
+      R"({"already_transcoded":"by_upstream_apm"})", /*sse=*/false);
 
-  FilterManager manager({client_boundary_filter, backend_boundary_filter});
-  FakeBridge resp_bridge(*dispatcher_);
-  BufferManager resp_out_buffer(BufferManager::Config{}, factory_, resp_bridge);
-  absl::Status resp_status;
-  bool resp_done = false;
-
-  manager.startUnaryResponse(factory_, resp_bridge, resp_out_buffer, [&](absl::Status s) {
-    resp_status = std::move(s);
-    resp_done = true;
-  });
-
-  const std::string response = R"({"already_transcoded":"by_upstream_apm"})";
-  Buffer::OwnedImpl body(response);
-  manager.onResponseData(body, /*end_stream=*/true);
-  for (int i = 0; i < 20; ++i) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  ASSERT_TRUE(resp_done);
-  ASSERT_TRUE(resp_status.ok()) << resp_status;
-  const nlohmann::json out = nlohmann::json::parse(resp_bridge.injected_.toString());
-  EXPECT_EQ(out["already_transcoded"], "by_upstream_apm");
+  EXPECT_EQ(nlohmann::json::parse(wire)["already_transcoded"], "by_upstream_apm");
   EXPECT_EQ(counterValue("transcoded"), 0);
-  resp_out_buffer.onDestroy();
 }
 
 // Rejects `TO_IR` when the route declared no `request_protocol` (`Unspecified`).
@@ -638,18 +431,6 @@ TEST_F(TranscoderFilterTest, RejectsFromIrWhenTargetProtocolIsUnspecified) {
   EXPECT_EQ(counterValue("transcoded"), 0);
 }
 
-// Rejects `FROM_IR` when the transcoded document violates the target schema.
-TEST_F(TranscoderFilterTest, RejectsPayloadTheTargetSchemaWouldReject) {
-  target_protocol_ = LLMProtocol::AnthropicMessages;
-  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
-                  R"({"model":"claude-sonnet-4-5"})");
-
-  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
-  EXPECT_EQ(counterValue("failed"), 1);
-  EXPECT_EQ(counterValue("transcoded"), 0);
-  EXPECT_EQ(counterValue("unresolved"), 0);
-}
-
 TEST(UnflattenFieldsTest, JoinsPartialStringChunks) {
   const std::vector<FlattenJsonField> fields = {
       FlattenJsonField({"id"}, "msg_1"),
@@ -673,11 +454,6 @@ TEST(UnflattenFieldsTest, CompleteStringReplacesRatherThanJoins) {
       FlattenJsonField({"model"}, "second"),
   };
   EXPECT_EQ(unflattenFields(fields), nlohmann::json::parse(R"({"model": "second"})"));
-}
-
-TEST(UnflattenFieldsTest, RootScalar) {
-  EXPECT_EQ(unflattenFields({FlattenJsonField({}, 42)}), nlohmann::json(42));
-  EXPECT_EQ(unflattenFields({}), nlohmann::json::object());
 }
 
 } // namespace

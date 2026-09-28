@@ -114,11 +114,11 @@ TranscoderFilter::TranscoderFilter(TranscoderFilterConfigSharedPtr config,
                                    const AiFilterContext& context)
     : config_(std::move(config)), source_protocol_(context.request_protocol),
       target_protocol_(context.response_protocol), request_headers_(context.request_headers),
-      request_path_(std::string(context.request_headers.getPathValue())),
       created_(std::chrono::duration_cast<std::chrono::seconds>(
                    context.stream_info.startTime().time_since_epoch())
                    .count()),
-      request_model_(config_->engine().modelFromRequestPath(source_protocol_, request_path_)) {}
+      request_model_(config_->engine().modelFromRequestPath(
+          source_protocol_, context.request_headers.getPathValue())) {}
 
 Coroutine::Task<absl::Status> TranscoderFilter::decode(AiRequestReceiver receive_request,
                                                        AiRequestPropagator propagate_request,
@@ -233,29 +233,17 @@ Coroutine::Task<absl::Status> TranscoderFilter::encodeSSE(SseStreamReceiver rece
   co_return absl::OkStatus();
 }
 
-// A `TO_IR` request comes from the client in the dialect the route declared; a `FROM_IR` one goes
-// to the backend in the target's dialect. As with responses, every dialect rule is the engine's,
-// down to what a dialect names in the request path rather than the body.
 absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json) {
-  const bool to_ir = config_->requestHandling() == TranscoderProto::TO_IR;
-  const LLMProtocol dialect = to_ir ? source_protocol_ : target_protocol_;
-  if (dialect == LLMProtocol::Unspecified) {
-    config_->stats().unresolved_.inc();
-    return absl::InvalidArgumentError(
-        to_ir
-            ? "transcoder: the route declared no wire API, so the payload's source schema is "
-              "unknown"
-            : "transcoder: no target backend protocol is set, so the payload has no target schema");
+  absl::StatusOr<TranscodeLeg> leg = resolveLeg(config_->requestHandling(), PayloadKind::Request);
+  if (!leg.ok()) {
+    return leg.status();
   }
 
   // A `FROM_IR` leg validates against the target's schema inside the engine, so a document the
   // upstream would reject fails here rather than over the network.
   TranscodeContext ctx;
-  ctx.request_path = request_path_;
-  const absl::Status status = config_->engine().transcode(
-      {PayloadKind::Request, to_ir ? TranscodeDirection::ToIr : TranscodeDirection::FromIr,
-       dialect},
-      ctx, json);
+  ctx.request_path = request_headers_.getPathValue();
+  const absl::Status status = config_->engine().transcode(*leg, ctx, json);
   if (!status.ok()) {
     config_->stats().failed_.inc();
     return status;
@@ -269,22 +257,34 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json) {
   return absl::OkStatus();
 }
 
-// A `TO_IR` response comes back from the backend in the target's dialect; a `FROM_IR` one goes
-// back to the client in the dialect the route declared. Every dialect rule is the engine's: the
-// filter only picks the leg and hands over what the payload does not carry.
 std::optional<TranscodeLeg> TranscoderFilter::responseLeg(PayloadKind kind) {
-  const auto handling = config_->responseHandling();
-  if (handling == TranscoderProto::DIRECTION_UNSPECIFIED) {
+  if (config_->responseHandling() == TranscoderProto::DIRECTION_UNSPECIFIED) {
     return std::nullopt;
   }
+  absl::StatusOr<TranscodeLeg> leg = resolveLeg(config_->responseHandling(), kind);
+  if (!leg.ok()) {
+    ENVOY_LOG(debug, "transcoder: forwarding the response untranslated: {}",
+              leg.status().message());
+    return std::nullopt;
+  }
+  return *leg;
+}
+
+// A request goes from the client's dialect (the route's request protocol) to the backend's (its
+// response protocol), and a response the other way; the dialect a leg needs is the non-IR end of
+// its hop. Every dialect rule is the engine's: the filter only picks the leg.
+absl::StatusOr<TranscodeLeg> TranscoderFilter::resolveLeg(TranscoderProto::Direction handling,
+                                                          PayloadKind kind) {
   const bool to_ir = handling == TranscoderProto::TO_IR;
-  const LLMProtocol dialect = to_ir ? target_protocol_ : source_protocol_;
+  const bool client_side = (kind == PayloadKind::Request) == to_ir;
+  const LLMProtocol dialect = client_side ? source_protocol_ : target_protocol_;
   if (dialect == LLMProtocol::Unspecified) {
     config_->stats().unresolved_.inc();
-    ENVOY_LOG(debug, "transcoder: forwarding the response untranslated: {}",
-              to_ir ? "no target backend protocol is set for response TO_IR transcoding"
-                    : "the route declared no wire API for response FROM_IR transcoding");
-    return std::nullopt;
+    return absl::InvalidArgumentError(
+        client_side
+            ? "transcoder: the route declared no wire API, so the client's schema is unknown"
+            : "transcoder: no target backend protocol is set, so the backend's schema is "
+              "unknown");
   }
   return TranscodeLeg{kind, to_ir ? TranscodeDirection::ToIr : TranscodeDirection::FromIr, dialect};
 }

@@ -22,11 +22,8 @@ TranscoderFilterConfigFactory::createAiFilterFactory(
   const auto& proto = MessageUtil::downcastAndValidate<const TranscoderProto&>(
       config, context.messageValidationVisitor());
 
-  const bool has_request = proto.request_handling() == TranscoderProto::TO_IR ||
-                           proto.request_handling() == TranscoderProto::FROM_IR;
-  const bool has_response = proto.response_handling() == TranscoderProto::TO_IR ||
-                            proto.response_handling() == TranscoderProto::FROM_IR;
-  if (!has_request && !has_response) {
+  if (proto.request_handling() == TranscoderProto::DIRECTION_UNSPECIFIED &&
+      proto.response_handling() == TranscoderProto::DIRECTION_UNSPECIFIED) {
     return absl::InvalidArgumentError(
         "ai_filters.transcoder: at least one of `request_handling` or `response_handling` must be "
         "set");
