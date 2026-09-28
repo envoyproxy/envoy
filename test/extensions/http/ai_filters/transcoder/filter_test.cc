@@ -110,6 +110,28 @@ public:
   size_t seen_unary_batches_{0};
 };
 
+// AI filter that consumes the whole unary response and propagates none of it, so the filter
+// after it in the response chain sees the response end before any field arrives.
+class DrainingAiFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+
+  Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive_batch,
+                                            AiResponseStreamPropagator) override {
+    while (true) {
+      ASSIGN_OR_CO_RETURN(std::vector<FlattenJsonField> batch, co_await receive_batch());
+      if (batch.empty()) {
+        co_return absl::OkStatus();
+      }
+    }
+  }
+};
+
 class TranscoderFilterTest : public testing::Test {
 public:
   TranscoderFilterTest()
@@ -439,6 +461,115 @@ TEST_F(TranscoderFilterTest, RejectsFromIrWhenTargetProtocolIsUnspecified) {
   EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
   EXPECT_THAT(local_reply_details_, testing::HasSubstr("no target backend protocol is set"));
   EXPECT_EQ(counterValue("unresolved"), 1);
+  EXPECT_EQ(counterValue("transcoded"), 0);
+}
+
+// When `request_handling` is unset (`DIRECTION_UNSPECIFIED`), the filter forwards the request
+// untouched even though it transcodes responses.
+TEST_F(TranscoderFilterTest, UnsetRequestHandlingPassesRequestThroughUntouched) {
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+  const std::string payload =
+      R"({"model":"gemini-2.5-flash","messages":[{"role":"user","content":"hi"}]})";
+
+  runDecodeChain({std::make_shared<TranscoderFilter>(
+                     makeConfig(TranscoderProto::DIRECTION_UNSPECIFIED, TranscoderProto::TO_IR),
+                     makeContext(LLMProtocol::OpenAiChatCompletions))},
+                 payload);
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(local_reply_code_, Http::Code::OK);
+  EXPECT_EQ(forwarded(), nlohmann::json::parse(payload));
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/chat/completions");
+  EXPECT_EQ(counterValue("transcoded"), 0);
+  EXPECT_EQ(counterValue("failed"), 0);
+  EXPECT_EQ(counterValue("unresolved"), 0);
+}
+
+// When `response_handling` is unset, an SSE response also passes through untouched.
+TEST_F(TranscoderFilterTest, UnsetResponseHandlingPassesSseThroughUntouched) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+
+  const std::string wire = runResponse(
+      {std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::FROM_IR),
+                                          makeContext(LLMProtocol::OpenAiChatCompletions))},
+      "event: message_stop\n"
+      R"(data: {"type":"message_stop"})"
+      "\n\n",
+      /*sse=*/true);
+
+  EXPECT_THAT(wire, testing::HasSubstr("event: message_stop"));
+  EXPECT_THAT(wire, testing::HasSubstr(R"("type":"message_stop")"));
+  EXPECT_THAT(wire, testing::Not(testing::HasSubstr("chat.completion.chunk")));
+  EXPECT_EQ(counterValue("transcoded"), 0);
+  EXPECT_EQ(counterValue("failed"), 0);
+}
+
+// A unary response that ends before any field reaches the transcoder (here an earlier filter in
+// the response chain consumed it) has nothing to transcode, so nothing is counted or forwarded.
+TEST_F(TranscoderFilterTest, EncodeUnaryWithNoFieldsForwardsNothing) {
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+
+  // The response chain runs in reverse, so `DrainingAiFilter` sees the backend's response first.
+  const std::string wire =
+      runResponse({std::make_shared<TranscoderFilter>(
+                       makeConfig(TranscoderProto::DIRECTION_UNSPECIFIED, TranscoderProto::TO_IR),
+                       makeContext(LLMProtocol::OpenAiChatCompletions)),
+                   std::make_shared<DrainingAiFilter>()},
+                  R"({"candidates":[{"content":{"role":"model","parts":[{"text":"dropped"}]}}]})",
+                  /*sse=*/false);
+
+  EXPECT_THAT(wire, testing::Not(testing::HasSubstr("dropped")));
+  EXPECT_EQ(counterValue("transcoded"), 0);
+  EXPECT_EQ(counterValue("failed"), 0);
+}
+
+// A response leg that cannot be resolved (the route declared no backend protocol) forwards the
+// response untranslated rather than failing it.
+TEST_F(TranscoderFilterTest, UnresolvedResponseLegForwardsResponseUntranslated) {
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+
+  const std::string wire =
+      runResponse({std::make_shared<TranscoderFilter>(
+                      makeConfig(TranscoderProto::DIRECTION_UNSPECIFIED, TranscoderProto::TO_IR),
+                      makeContext(LLMProtocol::OpenAiChatCompletions))},
+                  R"({"candidates":[{"content":{"role":"model","parts":[{"text":"as is"}]}}]})",
+                  /*sse=*/false);
+
+  EXPECT_EQ(nlohmann::json::parse(wire)["candidates"][0]["content"]["parts"][0]["text"], "as is");
+  EXPECT_EQ(counterValue("unresolved"), 1);
+  EXPECT_EQ(counterValue("transcoded"), 0);
+  EXPECT_EQ(counterValue("failed"), 0);
+}
+
+// A backend dialect with no registered transcoding pack (OpenAI Responses) refuses every SSE
+// event and also refuses to end the stream: each event is forwarded untranslated, and the stream
+// ends without a trailer, each refusal counted as a failure.
+TEST_F(TranscoderFilterTest, EncodeSseCountsFailureWhenStreamCannotBeFinished) {
+  target_protocol_ = LLMProtocol::OpenAiResponses;
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+
+  const std::string wire =
+      runResponse({std::make_shared<TranscoderFilter>(
+                      makeConfig(TranscoderProto::DIRECTION_UNSPECIFIED, TranscoderProto::TO_IR),
+                      makeContext(LLMProtocol::OpenAiChatCompletions))},
+                  "event: response.created\n"
+                  R"(data: {"type":"response.created"})"
+                  "\n\n",
+                  /*sse=*/true);
+
+  EXPECT_THAT(wire, testing::HasSubstr("event: response.created"));
+  EXPECT_THAT(wire, testing::HasSubstr(R"("type":"response.created")"));
+  EXPECT_THAT(wire, testing::Not(testing::HasSubstr("[DONE]")));
+  // One refusal for the event, one for ending the stream.
+  EXPECT_EQ(counterValue("failed"), 2);
   EXPECT_EQ(counterValue("transcoded"), 0);
 }
 
