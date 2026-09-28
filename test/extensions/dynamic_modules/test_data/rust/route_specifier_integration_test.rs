@@ -47,8 +47,14 @@
 
 use envoy_proxy_dynamic_modules_rust_sdk::route_specifier::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+
+// Counts the routes destroyed with user data, so a test can observe the route destroy hook through
+// the destroy-count echo. It is a process global because the hook may run on any thread and after
+// the stream that installed the route is gone.
+static ROUTE_DESTROY_COUNT: AtomicU64 = AtomicU64::new(0);
 
 declare_all_init_functions!(init, route_specifier: new_route_specifier_config_fn);
 
@@ -322,6 +328,15 @@ fn read_echoed_value(ctx: &RouteSpecifierContext, name: &[u8]) -> String {
       .input_route_metadata_number("envoy.test.route", "number")
       .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
     b"selected-template" => buffer_to_string_or_absent(ctx.selected_template_id()),
+    // Reads the previous route of the stream, the route the connection manager last installed.
+    b"previous-route-cluster" => ctx
+      .previous_route()
+      .and_then(|route| route.cluster_name.map(buffer_to_string))
+      .unwrap_or_else(|| ABSENT.to_owned()),
+    b"previous-route-metadata" => {
+      buffer_to_string_or_absent(ctx.previous_route_metadata_string("envoy.test.route", "key"))
+    },
+    b"destroy-count" => ROUTE_DESTROY_COUNT.load(Ordering::Relaxed).to_string(),
     _ => ABSENT.to_owned(),
   }
 }
@@ -368,6 +383,10 @@ impl TestRouteSpecifierConfig {
 }
 
 impl RouteSpecifierConfig for TestRouteSpecifierConfig {
+  fn on_route_destroy(&self, _user_data: u64) {
+    ROUTE_DESTROY_COUNT.fetch_add(1, Ordering::Relaxed);
+  }
+
   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision {
     let decision = match ctx.get_request_header("x-decision") {
       Some(buffer) => match buffer.as_slice() {
@@ -375,6 +394,7 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
         b"select-template" => RouteDecision::SelectTemplate,
         b"no-route" => RouteDecision::NoRoute,
         b"error" => RouteDecision::Error,
+        b"reuse-previous" => RouteDecision::ReusePrevious,
         _ => RouteDecision::PassThrough,
       },
       None => RouteDecision::PassThrough,
@@ -421,6 +441,9 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
         b"high" => ResourcePriority::High,
         _ => ResourcePriority::Default,
       });
+    }
+    if let Some(user_data) = read_u64_header(ctx, "x-user-data") {
+      ctx.set_route_user_data(user_data);
     }
     if let Some(name) = ctx.get_request_header("x-override") {
       // The declaration getter is queried, then the override is applied. Applying validates the name

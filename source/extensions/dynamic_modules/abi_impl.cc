@@ -2012,6 +2012,10 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_get_input_route, f
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_route_specifier_input_route*)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_get_previous_route, false,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+          envoy_dynamic_module_type_route_specifier_input_route*)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_get_input_route_cluster_name, false,
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_envoy_buffer*)
@@ -2025,6 +2029,18 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_get_input_route_me
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
           envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_get_previous_route_metadata, false,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id,
+               envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
+               envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_route_user_data,
+               envoy_dynamic_module_type_route_specifier_context_envoy_ptr, uint64_t)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_get_input_route_metadata_number,
           false, envoy_dynamic_module_type_route_specifier_context_envoy_ptr,

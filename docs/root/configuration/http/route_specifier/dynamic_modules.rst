@@ -38,18 +38,43 @@ request the match accepts.
 Decisions
 ---------
 
-The module returns one of five decisions:
+The module returns one of six decisions:
 
 * ``PassThrough`` uses the route the specifier was given, unchanged.
 * ``Override`` uses that route with the properties the module recorded applied on top.
 * ``SelectTemplate`` uses the selected template, with the recorded properties applied on top.
 * ``NoRoute`` uses no route, so the request is handled as if nothing had matched.
 * ``Error`` reports that the module could not decide.
+* ``ReusePrevious`` uses the previous route of the stream unchanged, without building a new route.
 
 A decision Envoy cannot honor is handled by the configured
 :ref:`failure_policy <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.failure_policy>`,
 which either passes the request through to the route table or drops the route. The SDK reports an
 error when the module panics, so a panic is handled by the same policy rather than crashing Envoy.
+
+Stream consistent decisions
+---------------------------
+
+Envoy resolves the route more than once per stream, for example after a filter clears the route
+cache. On a later resolution the module reads the route the connection manager last installed with
+``get_previous_route`` and ``get_previous_route_metadata``, which are null on the first resolution,
+after an internal redirect, and when a filter installed a null route. Reading a marker the module
+wrote into the metadata of a route it built earlier, through ``set_route_metadata_string``, is how a
+module keeps a stream on the version it first served without depending on route object identity.
+
+``ReusePrevious`` uses that previous route unchanged and builds nothing. When the stream has no
+previous route the decision is rejected and counted in ``reuse_previous_rejected``, and the failure
+policy applies.
+
+A module that builds routes from versioned state can lease that version for as long as any route it
+built is alive. ``set_route_user_data`` records a ``u64`` on the produced route, which forces the
+route to be wrapped even with no other override, and
+:ref:`on_route_specifier_route_destroy <arch_overview_dynamic_modules>` fires with that value when
+the route is destroyed. The hook may run on any thread and after the stream is gone, since another
+owner may retain the route, so a module must treat it as a lease release only. The
+:ref:`specifier_instance_id
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.specifier_instance_id>`
+lets two specifier instances sharing one module tell their routes apart.
 
 Shadowing a routing change
 --------------------------
@@ -101,6 +126,7 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   decision_select_template, Counter, Requests for which the module selected a route template.
   decision_no_route, Counter, Requests for which the module dropped the route.
   decision_error, Counter, Requests for which the module could not decide.
+  decision_reuse_previous, Counter, Requests for which the module reused the previous route.
   runtime_skipped, Counter, Requests outside ``runtime_fraction``.
   failure_module_error, Counter, Decisions not honored because the module reported an error.
   failure_template_not_selected, Counter, Decisions not honored because no known template was selected.
@@ -108,6 +134,8 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   failure_override_without_route, Counter, Decisions not honored because there was no route to refine.
   failure_override_on_non_route_entry, Counter, Decisions not honored because route entry properties were recorded for a direct response.
   failure_route_metadata, Counter, Decisions not honored because a typed metadata factory rejected the recorded metadata.
+  reuse_previous_rejected, Counter, ReusePrevious decisions rejected because the stream had no previous route.
+  route_destroy, Counter, Routes built with user data that were destroyed and fired the route destroy hook.
   on_route_duration, Histogram, Time in microseconds the module spent deciding.
   specifier_duration, Histogram, Time in microseconds the specifier spent on a request.
 

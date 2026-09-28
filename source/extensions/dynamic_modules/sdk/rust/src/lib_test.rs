@@ -11397,6 +11397,19 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_has_route
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  unsafe {
+    *result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+  }
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_register_route_template(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
   template_id: abi::envoy_dynamic_module_type_module_buffer,
