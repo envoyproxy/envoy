@@ -940,7 +940,7 @@ void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_loca
     // If we did not receive a valid CONNECT response yet we treat this as a pool
     // failure, otherwise we forward the event downstream.
     if (tunnel_creation_callbacks_.has_value()) {
-      tunnel_creation_callbacks_.value().get().onStreamFailure();
+      tunnel_creation_callbacks_->onStreamFailure();
       return;
     }
 

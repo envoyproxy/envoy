@@ -224,6 +224,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "multi_health_checker_lib",
+    srcs = ["multi_health_checker.cc"],
+    hdrs = ["multi_health_checker.h"],
+    deps = [
+        ":health_checker_lib",
+        "//envoy/upstream:health_checker_interface",
+        "//source/common/common:callback_impl_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
@@ -524,6 +536,7 @@ envoy_cc_library(
     deps = [
         ":cluster_factory_includes",
         ":health_checker_lib",
+        ":multi_health_checker_lib",
         ":upstream_includes",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",

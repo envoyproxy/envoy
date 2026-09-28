@@ -49,6 +49,7 @@ public:
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   const AiFilterFactories& aiFilterFactories() const { return ai_filter_factories_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
+  bool alwaysSerializeRequest() const { return always_serialize_request_; }
   uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
@@ -66,6 +67,7 @@ private:
   mutable AiProtocolManagerStats stats_;
   const bool request_handling_enabled_ = false;
   const bool parse_unconfigured_routes_ = false;
+  const bool always_serialize_request_ = true;
   const uint32_t inline_string_threshold_bytes_ = 0;
   const bool token_usage_enabled_ = false;
   const bool include_unconfigured_routes_ = false;
