@@ -123,6 +123,33 @@ TEST_F(HotRestartingBaseTest, OversizedLengthPrefixDroppedThenNormalMessageParse
   close(fds[1]);
 }
 
+// In blocking mode an oversized datagram must be skipped, not end the receive: the
+// caller expects a reply, and the receive must restore O_NONBLOCK on its way out.
+TEST_F(HotRestartingBaseTest, OversizedLengthPrefixDroppedBlockingReturnsNextMessage) {
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_DGRAM, 0, fds));
+
+  RpcStream stream(0);
+  stream.domain_socket_ = fds[0];
+
+  const uint8_t oversized[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xF8};
+  ASSERT_EQ(8, write(fds[1], oversized, 8));
+
+  // A well-formed length prefix (0) followed by a zero-length protobuf payload.
+  const uint8_t normal[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+  ASSERT_EQ(8, write(fds[1], normal, 8));
+
+  auto message = stream.receiveHotRestartMessage(RpcStream::Blocking::Yes);
+  EXPECT_NE(nullptr, message);
+
+  // The blocking receive must have restored O_NONBLOCK before returning.
+  const int flags = fcntl(fds[0], F_GETFL);
+  ASSERT_NE(-1, flags);
+  EXPECT_TRUE(flags & O_NONBLOCK);
+
+  close(fds[1]);
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
