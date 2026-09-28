@@ -161,12 +161,19 @@ json generateInitializeResponse(const json& session_id, absl::string_view server
 
 absl::string_view cacheScopeToString(
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CacheScope cache_scope) {
-  return cache_scope ==
-                 envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PRIVATE
-             ? McpConstants::CACHE_SCOPE_PRIVATE
-             : McpConstants::CACHE_SCOPE_PUBLIC;
+  switch (cache_scope) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_UNSPECIFIED:
+  case envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PUBLIC:
+    return McpConstants::CACHE_SCOPE_PUBLIC;
+  case envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PRIVATE:
+    return McpConstants::CACHE_SCOPE_PRIVATE;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+// TODO(Wenwei-Zhao): When newer MCP versions are added, advertise only versions
+// up to ServerInfo.max_supported_protocol_version.
 constexpr absl::string_view kSupportedMcpProtocolVersions[] = {
     McpConstants::MCP_VERSION_2024_11_05, McpConstants::MCP_VERSION_2025_03_26,
     McpConstants::MCP_VERSION_2025_06_18, McpConstants::MCP_VERSION_2025_11_25,

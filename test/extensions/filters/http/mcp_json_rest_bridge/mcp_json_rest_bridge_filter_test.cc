@@ -359,7 +359,10 @@ TEST_F(McpJsonRestBridgeFilterTest, StatelessServerDiscoverReturnsLocalDiscovery
       "2026-07-28");
   ASSERT_OK(makeFilter());
 
-  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {":authority", "test-host"},
+                      {"mcp-method", "server/discover"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
@@ -444,7 +447,10 @@ protected:
         "2026-07-28");
     ASSERT_OK(makeFilter());
 
-    request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+    request_headers_ = {{":method", "POST"},
+                        {":path", "/mcp"},
+                        {":authority", "test-host"},
+                        {"mcp-method", "server/discover"}};
     EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
               Http::FilterHeadersStatus::StopIteration);
 
@@ -493,7 +499,10 @@ TEST_F(McpJsonRestBridgeFilterTest, StatelessInitializeIsRejectedAsUnsupportedMe
       "2026-07-28");
   ASSERT_OK(makeFilter());
 
-  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {":authority", "test-host"},
+                      {"mcp-method", "initialize"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
@@ -534,7 +543,10 @@ TEST_F(McpJsonRestBridgeFilterTest,
       "2026-07-28");
   ASSERT_OK(makeFilter());
 
-  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {":authority", "test-host"},
+                      {"mcp-method", "notifications/initialized"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
