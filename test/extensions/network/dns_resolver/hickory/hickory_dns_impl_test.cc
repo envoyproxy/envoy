@@ -27,12 +27,12 @@ public:
   }
 };
 
-// Test peer that toggles the resolver's private ``shutting_down_`` flag so the ABI callback's
-// shutdown fast path can be exercised without racing against destructor teardown.
+// Test peer that exposes the resolver token so tests can drive the completion callback the way the
+// module would.
 class HickoryDnsResolverTestPeer {
 public:
-  static void setShuttingDown(HickoryDnsResolver& resolver, bool value) {
-    resolver.shutting_down_.store(value, std::memory_order_release);
+  static const void* completionToken(HickoryDnsResolver& resolver) {
+    return reinterpret_cast<const void*>(static_cast<uintptr_t>(resolver.token_));
   }
 };
 
@@ -393,10 +393,39 @@ TEST_F(HickoryDnsImplTest, AbiCallbackWithNullAddress) {
   // Call the ABI callback directly with a null address entry. The query ID does not match
   // any pending query, so onResolveComplete will early-return after the post.
   envoy_dynamic_module_callback_dns_resolve_complete(
-      static_cast<const void*>(hickory_resolver), 0,
+      HickoryDnsResolverTestPeer::completionToken(*hickory_resolver), 0,
       envoy_dynamic_module_type_dns_resolution_status_Completed, details_buf, &null_addr, 1);
 
   // Run the dispatcher to process the posted lambda.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
+// A completion that arrives after the resolver is destroyed resolves to no target and is dropped
+// without touching freed memory. A new resolver receives a distinct token, so the stale token
+// stays unresolved.
+TEST_F(HickoryDnsImplTest, LateCompletionAfterDestroyIsDropped) {
+  initialize();
+  auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
+  ASSERT_NE(hickory_resolver, nullptr);
+  const void* stale_token = HickoryDnsResolverTestPeer::completionToken(*hickory_resolver);
+
+  // Destroy the resolver, which unregisters its token.
+  resolver_.reset();
+
+  envoy_dynamic_module_type_module_buffer details_buf;
+  details_buf.ptr = nullptr;
+  details_buf.length = 0;
+
+  // The stale token no longer resolves, so the completion is dropped.
+  envoy_dynamic_module_callback_dns_resolve_complete(
+      stale_token, 0, envoy_dynamic_module_type_dns_resolution_status_Completed, details_buf,
+      nullptr, 0);
+
+  // A new resolver gets a distinct token, so the stale token still resolves to nothing.
+  initialize();
+  envoy_dynamic_module_callback_dns_resolve_complete(
+      stale_token, 0, envoy_dynamic_module_type_dns_resolution_status_Completed, details_buf,
+      nullptr, 0);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
@@ -417,7 +446,7 @@ TEST_F(HickoryDnsImplTest, AbiCallbackWithEmptyAddress) {
   details_buf.length = 0;
 
   envoy_dynamic_module_callback_dns_resolve_complete(
-      static_cast<const void*>(hickory_resolver), 0,
+      HickoryDnsResolverTestPeer::completionToken(*hickory_resolver), 0,
       envoy_dynamic_module_type_dns_resolution_status_Completed, details_buf, &empty_addr, 1);
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -440,7 +469,7 @@ TEST_F(HickoryDnsImplTest, AbiCallbackWithInvalidAddress) {
   details_buf.length = 0;
 
   envoy_dynamic_module_callback_dns_resolve_complete(
-      static_cast<const void*>(hickory_resolver), 0,
+      HickoryDnsResolverTestPeer::completionToken(*hickory_resolver), 0,
       envoy_dynamic_module_type_dns_resolution_status_Completed, details_buf, &invalid_addr, 1);
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -622,7 +651,7 @@ TEST_F(HickoryDnsImplTest, ResolverDestroyedBeforePostedCallbackRuns) {
   details_buf.length = 0;
 
   envoy_dynamic_module_callback_dns_resolve_complete(
-      static_cast<const void*>(hickory_resolver), kFirstQueryId,
+      HickoryDnsResolverTestPeer::completionToken(*hickory_resolver), kFirstQueryId,
       envoy_dynamic_module_type_dns_resolution_status_Completed, details_buf, &addr, 1);
 
   // Destroy the resolver before the dispatcher processes the queued lambda. Without
@@ -958,54 +987,6 @@ TEST_F(HickoryDnsConfigFailureTest, FactoryReturnsErrorWhenConfigCreateFails) {
   ASSERT_THAT(result, HasStatus(absl::StatusCode::kInternal,
                                 testing::HasSubstr(
                                     "Failed to serialize HickoryDnsResolverConfig to JSON")));
-}
-
-// -- ABI callback shutdown fast-path test --------------------------------------------------------
-
-// Verifies that the ABI callback returns early when the resolver's ``shutting_down_`` flag is
-// set, without posting to the dispatcher. Regression coverage for the synchronous shutdown
-// guard at the top of ``envoy_dynamic_module_callback_dns_resolve_complete``.
-//
-// No real resolution is initiated so the synthetic ABI callback below cannot race with a Tokio
-// task; this isolates the shutdown fast-path from any background work.
-TEST_F(HickoryDnsImplTest, AbiCallbackIgnoredWhenResolverShuttingDown) {
-  initialize();
-  auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
-  ASSERT_NE(hickory_resolver, nullptr);
-
-  HickoryDnsResolverTestPeer::setShuttingDown(*hickory_resolver, true);
-
-  const std::string addr_str = "127.0.0.1:0";
-  envoy_dynamic_module_type_dns_address addr;
-  addr.address_ptr = addr_str.c_str();
-  addr.address_length = addr_str.size();
-  addr.ttl_seconds = 60;
-
-  envoy_dynamic_module_type_module_buffer details_buf;
-  details_buf.ptr = nullptr;
-  details_buf.length = 0;
-
-  // The callback must take its fast-path return; without the guard it would copy the address
-  // buffer and post a lambda to the dispatcher.
-  envoy_dynamic_module_callback_dns_resolve_complete(
-      static_cast<const void*>(hickory_resolver), kFirstQueryId,
-      envoy_dynamic_module_type_dns_resolution_status_Completed, details_buf, &addr, 1);
-
-  // Drain the dispatcher; if the fast-path was skipped a lambda would have been posted and run
-  // here, incrementing ``resolve_total`` once ``onResolveComplete`` matched the pending query.
-  // No query was actually registered, so the only behaviour that distinguishes "fast-path took
-  // effect" from "lambda ran but found no match" is the absence of any side effects: details
-  // buffer copy, address parse, weak_ptr capture. Stats remain zero in both cases, but the
-  // important invariant is that the fast-path return path was exercised at all.
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(0, stats_store_.counter("dns.hickory.resolve_total").value());
-  EXPECT_EQ(0, stats_store_
-                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
-                   .value());
-
-  // Restore the flag so the resolver's destructor can run its normal Tokio-runtime shutdown
-  // path without observing a spurious early-set flag.
-  HickoryDnsResolverTestPeer::setShuttingDown(*hickory_resolver, false);
 }
 
 } // namespace

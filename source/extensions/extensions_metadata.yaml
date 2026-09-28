@@ -1573,6 +1573,13 @@ envoy.router.cluster_specifier_plugin.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier
+envoy.router.route_specifiers.dynamic_modules:
+  categories:
+  - envoy.router.route_specifiers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier
 envoy.router.cluster_specifier_plugin.lua:
   categories:
   - envoy.router.cluster_specifier_plugin

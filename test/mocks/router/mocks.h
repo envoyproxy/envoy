@@ -193,6 +193,8 @@ public:
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
   MOCK_METHOD(bool, isCrossSchemeRedirectAllowed, (), (const));
   MOCK_METHOD(const std::vector<Http::LowerCaseString>&, responseHeadersToCopy, (), (const));
+
+  std::vector<Http::LowerCaseString> response_headers_to_copy_;
 };
 
 class MockInternalRedirectPredicate : public InternalRedirectPredicate {

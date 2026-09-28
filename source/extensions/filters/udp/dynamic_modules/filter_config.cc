@@ -67,6 +67,11 @@ DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
   in_module_config_ =
       on_filter_config_new_(static_cast<void*>(this), {filter_name_.c_str(), filter_name_.size()},
                             {filter_config_.data(), filter_config_.size()});
+  // A null config means the module reported a configuration error. Reject at load so no later hook
+  // runs against a null config and dereferences it.
+  if (in_module_config_ == nullptr) {
+    throw EnvoyException("Failed to initialize dynamic module UDP listener filter");
+  }
   stat_creation_frozen_ = true;
 }
 

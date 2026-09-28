@@ -481,6 +481,23 @@ private:
 };
 
 /**
+ * Bounds the lifetime of the filter state views returned by the cluster load balancer callbacks.
+ * The serialized values are cleared when the outermost host selection callback returns so a module
+ * can hold several views during a single callback. The backing storage lives in abi_impl.cc.
+ */
+class ClusterLbFilterStateScratchGuard {
+public:
+  ClusterLbFilterStateScratchGuard();
+  ~ClusterLbFilterStateScratchGuard();
+  ClusterLbFilterStateScratchGuard(const ClusterLbFilterStateScratchGuard&) = delete;
+  ClusterLbFilterStateScratchGuard& operator=(const ClusterLbFilterStateScratchGuard&) = delete;
+};
+
+// Returns the number of retained cluster load balancer filter state values on this thread. Test
+// only.
+size_t clusterLbFilterStateScratchSizeForTest();
+
+/**
  * Load balancer that delegates to the dynamic module.
  */
 class DynamicModuleLoadBalancer : public Upstream::LoadBalancer {

@@ -862,8 +862,9 @@ TEST(TranscodingEngineTest, MapsSeedBetweenTheIrAndGemini) {
   ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, ir), IsOk());
   EXPECT_FALSE(ir.contains("seed"));
   EXPECT_EQ(ir["generationConfig"], nlohmann::json::parse(R"({"seed": 42})"));
-  EXPECT_THAT(AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).schema()->validateRequest(ir),
-              IsOk());
+  EXPECT_THAT(
+      AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).schema()->validateRequest(ir),
+      IsOk());
 
   for (const char* gemini_request : {
            R"({"contents": [{"parts": [{"text": "Hi"}]}], "generationConfig": {"seed": "42"}})",
@@ -2399,8 +2400,9 @@ TEST(TranscodeRuleTest, EnumerateWritesAPrefixedPositionAsAString) {
   nlohmann::json doc =
       nlohmann::json::parse(R"({"tool_calls": [{}, {"id": "call_abc"}, {"id": null}]})");
   ASSERT_THAT(ids.apply(doc), IsOk());
-  EXPECT_EQ(doc, nlohmann::json::parse(
-                     R"({"tool_calls": [{"id": "call_0"}, {"id": "call_abc"}, {"id": "call_2"}]})"));
+  EXPECT_EQ(doc,
+            nlohmann::json::parse(
+                R"({"tool_calls": [{"id": "call_0"}, {"id": "call_abc"}, {"id": "call_2"}]})"));
 }
 
 // A stream's tool calls arrive over several events, and each needs a position and an id of its
@@ -2483,8 +2485,9 @@ TEST(TranscodeRuleTest, LookupEarlierFindsTheEntryAnElementRefersTo) {
 }
 
 TEST(TranscodeRuleTest, MoveElementsMovesTheMatchingElementsToAnotherArray) {
-  const TranscodeRule move_calls = TranscodeRule::moveElements(
-      "parts", "message.tool_calls", TranscodePredicate::fieldIs("functionCall", JsonShape::Object));
+  const TranscodeRule move_calls =
+      TranscodeRule::moveElements("parts", "message.tool_calls",
+                                  TranscodePredicate::fieldIs("functionCall", JsonShape::Object));
   nlohmann::json doc = nlohmann::json::parse(R"({"parts": [
     {"text": "Let me check."},
     {"functionCall": {"name": "a"}},
@@ -2572,7 +2575,9 @@ TEST(TranscodeRuleTest, ParseJsonReplacesJsonTextWithItsValue) {
 // deeper than Envoy's own JSON loader allows.
 TEST(TranscodeRuleTest, ParseJsonRefusesTextThatNestsTooDeeply) {
   const TranscodeRule parse = TranscodeRule::parseJson("args");
-  const auto nested = [](size_t depth) { return std::string(depth, '[') + std::string(depth, ']'); };
+  const auto nested = [](size_t depth) {
+    return std::string(depth, '[') + std::string(depth, ']');
+  };
   nlohmann::json deepest = {{"args", nested(1000)}};
   EXPECT_THAT(parse.apply(deepest), IsOk());
   nlohmann::json too_deep = {{"args", nested(1001)}};
@@ -2589,8 +2594,8 @@ TEST(TranscodeRuleTest, ParseJsonRefusesTextThatNestsTooDeeply) {
 
 TEST(TranscodeRuleTest, SerializeJsonWritesAValueAsCompactJsonText) {
   const TranscodeRule serialize = TranscodeRule::serializeJson("function.arguments");
-  nlohmann::json call = nlohmann::json::parse(
-      R"({"function": {"arguments": {"city": "Paris", "days": [1, 2]}}})");
+  nlohmann::json call =
+      nlohmann::json::parse(R"({"function": {"arguments": {"city": "Paris", "days": [1, 2]}}})");
   ASSERT_THAT(serialize.apply(call), IsOk());
   EXPECT_EQ(call["function"]["arguments"], R"({"city":"Paris","days":[1,2]})");
   // `parseJson` undoes it.
@@ -3109,8 +3114,8 @@ TEST(TranscodingEngineTest, VerifierFollowsOffloadableFieldsThroughToolCallRuleO
   // `moveElements` relocates the elements that match and leaves the rest where they were...
   const TranscodeRule move_calls =
       TranscodeRule::forEach("messages", {TranscodeRule::moveElements("tool_calls", "parts")});
-  EXPECT_EQ(verify({move_calls, TranscodeRule::forEach(
-                                    "messages", {TranscodeRule::forEach("parts", {map_arguments})})})
+  EXPECT_EQ(verify({move_calls, TranscodeRule::forEach("messages", {TranscodeRule::forEach(
+                                                                       "parts", {map_arguments})})})
                 .code(),
             kRejected);
   EXPECT_EQ(verify({move_calls, for_each_call({map_arguments})}).code(), kRejected);
@@ -3119,10 +3124,9 @@ TEST(TranscodingEngineTest, VerifierFollowsOffloadableFieldsThroughToolCallRuleO
     return TranscodeRule::forEach(
         "messages", {TranscodeRule::moveElements("tool_calls", "parts", std::move(where))});
   };
-  EXPECT_EQ(
-      verify({move_calls_where(TranscodePredicate::fieldEquals("function.arguments", "{}"))})
-          .code(),
-      kRejected);
+  EXPECT_EQ(verify({move_calls_where(TranscodePredicate::fieldEquals("function.arguments", "{}"))})
+                .code(),
+            kRejected);
   EXPECT_THAT(verify({move_calls_where(TranscodePredicate::fieldEquals("type", "function"))}),
               IsOk());
 
@@ -3142,8 +3146,8 @@ TEST(TranscodingEngineTest, VerifierFollowsOffloadableFieldsThroughToolCallRuleO
       "messages", "tool_call_id", "tool_calls", "id", "function.arguments", "arguments");
   EXPECT_THAT(verify({copy_arguments}), IsOk());
   EXPECT_EQ(verify({copy_arguments,
-                    TranscodeRule::forEach("messages", {TranscodeRule::valueMap(
-                                                           "arguments", {{"a", "b"}})})})
+                    TranscodeRule::forEach("messages",
+                                           {TranscodeRule::valueMap("arguments", {{"a", "b"}})})})
                 .code(),
             kRejected);
 }
@@ -3191,9 +3195,10 @@ TEST(TranscodingEngineTest, RegisterPackRefusesStreamStateOutsideStreamLegs) {
           {.protocol = LLMProtocol::OpenAiResponses, .response = {.to_ir = enumerate_across}}),
       refusedBecause("OPENAI_RESPONSES response to_ir rules cannot use enumerate_across_stream"));
   // Numbering within one payload needs no state.
-  EXPECT_THAT(registered({.protocol = LLMProtocol::OpenAiResponses,
-                          .response = {.to_ir = nested(TranscodeRule::enumerate("calls", "index"))}}),
-              IsOk());
+  EXPECT_THAT(
+      registered({.protocol = LLMProtocol::OpenAiResponses,
+                  .response = {.to_ir = nested(TranscodeRule::enumerate("calls", "index"))}}),
+      IsOk());
 
   // Stream legs are what these rules are for.
   EXPECT_THAT(registered({.protocol = LLMProtocol::OpenAiResponses,

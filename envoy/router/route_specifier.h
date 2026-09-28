@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/router/router.h"
@@ -98,6 +99,81 @@ public:
 using RouteSpecifierSharedPtr = std::shared_ptr<const RouteSpecifier>;
 
 /**
+ * A route built by a RouteBuilder, which a specifier evaluates against a request the same way route
+ * matching evaluates a configured route. Implementations must be thread safe.
+ */
+class MatchableRoute {
+public:
+  virtual ~MatchableRoute() = default;
+
+  /**
+   * Evaluate the route against a request.
+   *
+   * @param headers the request headers.
+   * @param stream_info the stream info of the downstream request.
+   * @param random a stable random seed for the request, used when the route requires a runtime
+   *        choice.
+   * @return the route to use for the request, or nullptr when the request does not match. The
+   *         returned route resolves weighted clusters and cluster specifier plugins, so it may
+   *         differ from the route that was built.
+   */
+  virtual RouteConstSharedPtr match(const Http::RequestHeaderMap& headers,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    uint64_t random) const PURE;
+};
+
+using MatchableRouteConstSharedPtr = std::shared_ptr<const MatchableRoute>;
+
+/**
+ * Builds routes that belong to the configuration the specifier is configured on, so that a
+ * specifier can select one of them for a request instead of restating every route field itself.
+ * A built route inherits from its virtual host and route configuration exactly like a configured
+ * route does.
+ *
+ * Only valid for the duration of the createRouteSpecifier() call it was handed to, because it
+ * borrows the init manager that the routes it builds warm up with.
+ */
+class RouteBuilder {
+public:
+  virtual ~RouteBuilder() = default;
+
+  /**
+   * Build a route.
+   *
+   * @param route the route configuration. `route_specifiers` must be empty, since a built route is
+   *        not run through the specifier chains.
+   * @param validate_clusters whether the clusters the route names are looked up in the cluster
+   *        manager.
+   * @return the built route, or an error status if the configuration is invalid.
+   */
+  virtual absl::StatusOr<MatchableRouteConstSharedPtr>
+  build(const envoy::config::route::v3::Route& route, bool validate_clusters) PURE;
+};
+
+/**
+ * Context handed to a route specifier factory. Only valid for the duration of the
+ * createRouteSpecifier() call.
+ */
+class RouteSpecifierFactoryContext {
+public:
+  virtual ~RouteSpecifierFactoryContext() = default;
+
+  /**
+   * @return the server factory context. The specifier may keep a reference to it as it outlives the
+   *         route configuration. Use serverFactoryContext().messageValidationVisitor() if any
+   *         nested configuration needs to be validated.
+   */
+  virtual Server::Configuration::ServerFactoryContext& serverFactoryContext() PURE;
+
+  /**
+   * @return the builder for routes of the virtual host the specifier is configured on, or an empty
+   *         reference for a specifier configured on a route configuration, which has no virtual
+   *         host to build routes in.
+   */
+  virtual OptRef<RouteBuilder> routeBuilder() PURE;
+};
+
+/**
  * Extension configuration for route specifier factory.
  */
 class RouteSpecifierFactory : public Envoy::Config::TypedFactory {
@@ -106,14 +182,12 @@ public:
    * Create a particular route specifier implementation.
    *
    * @param config the typed configuration of the specifier.
-   * @param context the server factory context. The specifier may keep a reference to it as it
-   *        outlives the route configuration. Use context.messageValidationVisitor() if any nested
-   *        configuration needs to be validated.
+   * @param context the factory context. Only valid for the duration of this call, although the
+   *        server factory context it exposes may be kept.
    * @return the route specifier, or an error status if the configuration is invalid.
    */
   virtual absl::StatusOr<RouteSpecifierSharedPtr>
-  createRouteSpecifier(const Protobuf::Message& config,
-                       Server::Configuration::ServerFactoryContext& context) PURE;
+  createRouteSpecifier(const Protobuf::Message& config, RouteSpecifierFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.router.route_specifiers"; }
 };
