@@ -13,6 +13,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/flattening_json_codec.h"
 #include "source/extensions/filters/http/ai_protocol_manager/transcoding_engine.h"
 #include "source/extensions/http/ai_filters/transcoder/filter.h"
 
@@ -41,7 +42,10 @@ namespace {
 using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::BufferManager;
 using HttpFilters::AiProtocolManager::FakeBridge;
+using HttpFilters::AiProtocolManager::FieldPathSegment;
 using HttpFilters::AiProtocolManager::FilterManager;
+using HttpFilters::AiProtocolManager::FlatteningJsonDecoder;
+using HttpFilters::AiProtocolManager::FlattenJsonField;
 using HttpFilters::AiProtocolManager::InMemoryExternalBufferFactory;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::TranscodingEngine;
@@ -201,6 +205,61 @@ TEST_F(TranscoderGoldenTest, ResponsesMatchGoldens) {
     }
     EXPECT_EQ(actual, golden["expected"])
         << "actual:   " << actual.dump() << "\nexpected: " << golden["expected"].dump();
+  }
+}
+
+// Fields as JSON, to compare and print them. Compared as dumps so that a number's type counts.
+std::string describeFields(const std::vector<FlattenJsonField>& fields) {
+  nlohmann::json out = nlohmann::json::array();
+  for (const FlattenJsonField& field : fields) {
+    nlohmann::json path = nlohmann::json::array();
+    for (const FieldPathSegment& seg : field.field_path()) {
+      if (absl::holds_alternative<std::string>(seg)) {
+        path.push_back(absl::get<std::string>(seg));
+      } else {
+        path.push_back(absl::get<size_t>(seg));
+      }
+    }
+    out.push_back({{"path", path}, {"node", field.node()}, {"partial", field.is_partial()}});
+  }
+  return out.dump();
+}
+
+// The filter hands the next filter `flattenJson()` of a transcoded unary body in place of what
+// `FlatteningJsonDecoder` would decode from its serialization, so the two must agree exactly: on
+// every document in the corpus, and on the shapes the corpus lacks.
+TEST(TranscoderFlattenJsonTest, MatchesDecoderOnSerializedDocument) {
+  const std::string corpus = TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+      "test/extensions/http/ai_filters/transcoder/testdata/response_goldens.json"));
+  std::vector<nlohmann::json> documents;
+  for (const nlohmann::json& golden : nlohmann::json::parse(corpus)) {
+    documents.push_back(golden["input"]);
+    documents.push_back(golden["expected"]);
+  }
+  for (const char* edge : {
+           R"({})",
+           R"([])",
+           R"("text")",
+           R"(7)",
+           R"(null)",
+           R"({"a": {}, "b": [], "c": [{}, [], [[]]], "d": {"e": {"f": {}}}})",
+           R"({"int": -3, "uint": 18446744073709551615, "float": 1.5, "whole_float": 2.0})",
+           R"({"s": "quote \" backslash \\ newline \n tab \t unicode \u00e9 \ud83d\ude00"})",
+           R"({"z": 1, "a": 2, "m": [true, false, null]})",
+       }) {
+    documents.push_back(nlohmann::json::parse(edge));
+  }
+
+  for (const nlohmann::json& document : documents) {
+    SCOPED_TRACE(document.dump());
+    FlatteningJsonDecoder decoder;
+    Buffer::OwnedImpl serialized(document.dump());
+    absl::StatusOr<std::vector<FlattenJsonField>> decoded =
+        decoder.onData(serialized, /*end_stream=*/true);
+    ASSERT_TRUE(decoded.ok()) << decoded.status();
+    const std::vector<FlattenJsonField> flattened = flattenJson(document);
+    EXPECT_EQ(describeFields(flattened), describeFields(*decoded));
+    EXPECT_EQ(unflattenFields(flattened), document);
   }
 }
 

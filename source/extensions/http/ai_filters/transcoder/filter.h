@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/extensions/http/ai_filters/transcoder/v3/transcoder.pb.h"
 #include "envoy/stats/scope.h"
@@ -11,14 +12,29 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/flattening_json_codec.h"
 #include "source/extensions/filters/http/ai_protocol_manager/transcoding_engine.h"
 
+#include "absl/types/span.h"
 #include "nlohmann/json_fwd.hpp"
 
 namespace Envoy {
 namespace Extensions {
 namespace AiFilters {
 namespace Transcoder {
+
+// A unary response body reaches an AI filter as the leaf fields `FlatteningJsonDecoder` flattens it
+// into, while the engine rewrites whole documents. These two convert between the two forms without
+// serializing the document in between.
+//
+// Rebuilds the document `fields` flatten. A string that arrives as partial chunks
+// (`FlattenJsonField::is_partial()`) is joined back into one.
+nlohmann::json
+unflattenFields(absl::Span<const HttpFilters::AiProtocolManager::FlattenJsonField> fields);
+// Flattens `json` into the leaf fields, in the same order, that `FlatteningJsonDecoder` emits for
+// its serialization: one per scalar and per empty object or array, none of them partial.
+std::vector<HttpFilters::AiProtocolManager::FlattenJsonField>
+flattenJson(const nlohmann::json& json);
 
 // `transcoded` counts payloads rewritten and accepted by the target schema. The two failure
 // counters are kept apart because they mean different things operationally: `unresolved` is a

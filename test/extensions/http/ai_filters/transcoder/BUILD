@@ -45,6 +45,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:buffer_manager_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_manager_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:flattening_json_codec_lib",
         "//source/extensions/filters/http/ai_protocol_manager:transcoding_engine_lib",
         "//source/extensions/http/ai_filters/transcoder:filter_lib",
         "//test/extensions/filters/http/ai_protocol_manager:fake_bridge_lib",
