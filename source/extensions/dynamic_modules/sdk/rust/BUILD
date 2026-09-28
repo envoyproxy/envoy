@@ -1,4 +1,4 @@
-load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
+load("@envoy_repo//:compiler.bzl", "LLVM_HOST_WINDOWS", "LLVM_PATH")
 load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library")
@@ -14,19 +14,33 @@ envoy_extension_package()
 
 exports_files(["Cargo.toml"])
 
+# abi/abi.h is a symlink, which git may check out as a plain text file on Windows.
+# Point the build script at the original header instead.
+_WINDOWS_ENV = {
+    "ENVOY_ABI_HEADER": "$(location //source/extensions/dynamic_modules/abi:abi.h)",
+}
+
+# @envoy_repo//:use_local_llvm matches the host OS, which is Windows or Linux.
+_LOCAL_LLVM_ENV = dict(
+    _WINDOWS_ENV,
+    LIBCLANG_PATH = "%s/bin" % LLVM_PATH,
+) if LLVM_HOST_WINDOWS else {
+    "LIBCLANG_PATH": "%s/lib/libclang.so" % LLVM_PATH,
+    "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
+        "-resource-dir %s/lib/clang/%s" % (LLVM_PATH, LLVM_MAJOR),
+        "-isystem %s/lib/clang/%s/include" % (LLVM_PATH, LLVM_MAJOR),
+        "-isystem %s/include/x86_64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
+        "-isystem %s/include/aarch64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
+    ]),
+}
+
+_WINDOWS_DATA = ["//source/extensions/dynamic_modules/abi:abi.h"]
+
 cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],
     build_script_env = select({
-        "@envoy_repo//:use_local_llvm": {
-            "LIBCLANG_PATH": "%s/lib/libclang.so" % LLVM_PATH,
-            "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-                "-resource-dir %s/lib/clang/%s" % (LLVM_PATH, LLVM_MAJOR),
-                "-isystem %s/lib/clang/%s/include" % (LLVM_PATH, LLVM_MAJOR),
-                "-isystem %s/include/x86_64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
-                "-isystem %s/include/aarch64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
-            ]),
-        },
+        "@envoy_repo//:use_local_llvm": _LOCAL_LLVM_ENV,
         "@platforms//os:linux": {
             "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
             "ENVOY_LLVM_ANCHOR": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
@@ -35,12 +49,13 @@ cargo_build_script(
             "ENVOY_SYSROOT_AMD64_ANCHOR": "$(location @sysroot_linux_amd64//:usr/include/stdio.h)",
             "ENVOY_SYSROOT_ARM64_ANCHOR": "$(location @sysroot_linux_arm64//:usr/include/stdio.h)",
         },
+        "@platforms//os:windows": _WINDOWS_ENV,
         "//conditions:default": {},
     }),
     data = [
         ":abi/abi.h",
     ] + select({
-        "@envoy_repo//:use_local_llvm": [],
+        "@envoy_repo//:use_local_llvm": _WINDOWS_DATA if LLVM_HOST_WINDOWS else [],
         "@platforms//os:linux": [
             "@llvm_toolchain_llvm//:include",
             "@llvm_toolchain_llvm//:lib/libclang.so",
@@ -48,6 +63,7 @@ cargo_build_script(
             "@sysroot_linux_amd64//:usr/include/stdio.h",
             "@sysroot_linux_arm64//:usr/include/stdio.h",
         ],
+        "@platforms//os:windows": _WINDOWS_DATA,
         "//conditions:default": [],
     }) + select({
         # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.

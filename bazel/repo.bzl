@@ -95,9 +95,16 @@ def _envoy_repo_impl(repository_ctx):
     version = repository_ctx.read(repo_version_path).strip()
     api_version = repository_ctx.read(api_version_path).strip()
 
+    is_windows = repository_ctx.os.name.lower().startswith("windows")
+
     # Read BAZEL_LLVM_PATH environment variable for local LLVM installations
     llvm_path = repository_ctx.os.environ.get("BAZEL_LLVM_PATH", "")
+
+    # Normalize Windows paths so they can be embedded in generated Starlark files and shell
+    # commands.
+    llvm_path = llvm_path.replace("\\", "/").rstrip("/")
     local_llvm = "True" if llvm_path else "False"
+    local_llvm_os = "windows" if is_windows else "linux"
 
     # When using a local LLVM, detect its version and library directory so that
     # downstream BUILD files can reference the correct libclang-cpp.so and
@@ -111,7 +118,7 @@ def _envoy_repo_impl(repository_ctx):
                 if "clang version" in line:
                     llvm_version_local = line.split("clang version ")[1].split(" ")[0].strip()
                     break
-        for directory in ["lib64", "lib"]:
+        for directory in ([] if is_windows else ["lib64", "lib"]):
             if repository_ctx.path(llvm_path + "/" + directory + "/libclang-cpp.so").exists:
                 llvm_lib_dir = directory
                 break
@@ -145,7 +152,8 @@ LLVM_VERSION_LOCAL = '%s'
 LLVM_LIB_DIR = '%s'
 USE_LOCAL_SYSROOT = %s
 USE_LIBSTDCPP = %s
-""" % (llvm_path, llvm_version_local, llvm_lib_dir, local_sysroot, use_libstdcpp))
+LLVM_HOST_WINDOWS = %s
+""" % (llvm_path, llvm_version_local, llvm_lib_dir, local_sysroot, use_libstdcpp, is_windows))
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
@@ -168,7 +176,7 @@ config_setting(
         ":use_local_llvm_flag": "True",
     },
     constraint_values = [
-        "@platforms//os:linux",
+        "@platforms//os:%s",
     ],
     visibility = ["//visibility:public"],
 )
@@ -333,7 +341,7 @@ py_console_script_binary(
     data = [":envoy_repo.py"],
 )
 
-''' % (local_llvm, local_sysroot))
+''' % (local_llvm, local_llvm_os, local_sysroot))
 
 _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
