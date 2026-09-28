@@ -679,7 +679,7 @@ struct PathTemplate {
 //
 // `dialect_schema` is the protocol's own `PayloadSchema`; it is what a request converted out of
 // the IR is validated against before it is handed to the upstream. `ir_schema` is only used for
-// static rule verification at registration time -- see `TranscodingEngine::transcodeToIr()` for
+// static rule verification at registration time -- see `TranscodingEngine::transcode()` for
 // why the IR document itself is not validated at runtime.
 struct DialectTranscodePack {
   LLMProtocol protocol{LLMProtocol::Unspecified};
@@ -755,6 +755,12 @@ public:
   //
   // A leg whose dialect is the IR is the identity, except that a request `FromIr` leg still
   // validates the payload against the IR's schema.
+  //
+  // A request `ToIr` leg deliberately does NOT validate its result against the IR schema. Two
+  // reasons: the source payload was already validated against its own schema by the AI Protocol
+  // Manager before the filter chain ran, so re-validating is duplicated work on the hot path; and
+  // the IR schema requires `model`, which a Gemini request need not carry in its body or its path,
+  // so validating here would reject valid Gemini traffic.
   absl::Status transcode(const TranscodeLeg& leg, TranscodeContext& ctx,
                          nlohmann::json& json) const;
 
@@ -777,35 +783,6 @@ public:
   // names its model in the path (`DialectTranscodePack::envelope`) and `path` is one of its model
   // methods. For a caller that needs the model without running a request leg.
   std::string modelFromRequestPath(LLMProtocol dialect, absl::string_view path) const;
-
-  // Converts request `payload` from `source_protocol` into the intermediate representation
-  // (`OpenAiChatCompletions`). A no-op when `source_protocol` is already the IR protocol or is
-  // `Unspecified`. Only the body is converted: unlike `transcode()`, this has no request path to
-  // lift what the dialect names there from.
-  //
-  // The result is deliberately NOT validated against the IR schema. Two reasons: the source
-  // payload was already validated against its own schema by the AI Protocol Manager before the
-  // filter chain ran, so re-validating is duplicated work on the hot path; and the IR schema
-  // requires `model`, which a Gemini request legitimately does not carry in its body (it lives
-  // in the request path), so validating here would reject valid Gemini traffic.
-  absl::Status transcodeToIr(LLMProtocol source_protocol, JsonWithExtBuf& payload) const {
-    return transcodeToIr(source_protocol, payload.json());
-  }
-  absl::Status transcodeToIr(LLMProtocol source_protocol, nlohmann::json& json) const;
-
-  // Converts request `payload` out of the intermediate representation into `target_protocol`,
-  // then validates it against that protocol's schema so a payload the upstream would reject is
-  // caught here instead of over the network. Rule execution is skipped when `target_protocol`
-  // is the IR protocol, but validation still runs. A no-op when `target_protocol` is
-  // `Unspecified`.
-  //
-  // Only the body is converted. What the dialect names in the request path (Gemini's `model` and
-  // `stream`) stays in the body, since there is no context to hand a path back through; a request
-  // bound for the upstream goes through `transcode()`, which moves it into the path.
-  absl::Status transcodeFromIr(LLMProtocol target_protocol, JsonWithExtBuf& payload) const {
-    return transcodeFromIr(target_protocol, payload.json());
-  }
-  absl::Status transcodeFromIr(LLMProtocol target_protocol, nlohmann::json& json) const;
 
 private:
   absl::StatusOr<const DialectTranscodePack*> findPack(LLMProtocol dialect) const;

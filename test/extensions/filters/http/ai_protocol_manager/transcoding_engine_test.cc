@@ -17,6 +17,40 @@ namespace {
 
 using StatusHelpers::IsOk;
 
+// Runs a request leg of `dialect` in `direction` on `json`, with no request path. A `ToIr` leg
+// then has no path to lift what the dialect names there from, and a `FromIr` leg moves it out of
+// the body into `rewritten_path`, which is returned through `rewritten_path` when non-null.
+absl::Status transcodeRequestLeg(const TranscodingEngine& engine, TranscodeDirection direction,
+                                 LLMProtocol dialect, nlohmann::json& json,
+                                 std::optional<std::string>* rewritten_path = nullptr) {
+  TranscodeContext ctx;
+  absl::Status status = engine.transcode({PayloadKind::Request, direction, dialect}, ctx, json);
+  if (rewritten_path != nullptr) {
+    *rewritten_path = ctx.rewritten_path;
+  }
+  return status;
+}
+
+absl::Status requestToIr(const TranscodingEngine& engine, LLMProtocol source,
+                         nlohmann::json& json) {
+  return transcodeRequestLeg(engine, TranscodeDirection::ToIr, source, json);
+}
+absl::Status requestToIr(const TranscodingEngine& engine, LLMProtocol source,
+                         JsonWithExtBuf& payload) {
+  return requestToIr(engine, source, payload.json());
+}
+
+absl::Status requestFromIr(const TranscodingEngine& engine, LLMProtocol target,
+                           nlohmann::json& json,
+                           std::optional<std::string>* rewritten_path = nullptr) {
+  return transcodeRequestLeg(engine, TranscodeDirection::FromIr, target, json, rewritten_path);
+}
+absl::Status requestFromIr(const TranscodingEngine& engine, LLMProtocol target,
+                           JsonWithExtBuf& payload,
+                           std::optional<std::string>* rewritten_path = nullptr) {
+  return requestFromIr(engine, target, payload.json(), rewritten_path);
+}
+
 TEST(TranscodingEngineTest, CreateDefaultRegistersCoreDialectPacks) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
@@ -48,7 +82,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_AnthropicSchem
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
 
   // System message extracted to top-level `system`
   EXPECT_EQ(payload["system"], "Be concise.");
@@ -99,14 +133,14 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_GeminiSchema) 
   const JsonWithExtBuf::ExternalRef expected_ref{/*offset=*/128, /*length=*/50000};
   payload["messages"][1]["content"] = JsonWithExtBuf::makeExternalRef(expected_ref);
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  std::optional<std::string> rewritten_path;
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload, &rewritten_path),
+              IsOk());
 
-  // `model` and `stream` are preserved. Gemini carries them in the URL `:path` rather than the
-  // body, but this wrapper converts only the body and has no context to hand a path back through,
-  // so dropping them here would destroy the only copy of the routing information. Gemini's root
-  // schema tolerates the extra fields; `transcode()` moves them into the path instead.
-  EXPECT_EQ(payload["model"], "gemini-2.5-pro");
-  EXPECT_EQ(payload["stream"], true);
+  // `model` and `stream` move out of the body into the request path, where Gemini carries them.
+  EXPECT_EQ(rewritten_path, "/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse");
+  EXPECT_FALSE(payload.contains("model"));
+  EXPECT_FALSE(payload.contains("stream"));
 
   // `systemInstruction` created with `parts`
   EXPECT_EQ(payload["systemInstruction"]["parts"][0]["text"], "You are helpful.");
@@ -188,11 +222,11 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_PassthroughIr) {
   const nlohmann::json original_snapshot = payload;
 
   // Step 1: To IR (OpenAI -> IR)
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::OpenAiChatCompletions, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::OpenAiChatCompletions, payload), IsOk());
   EXPECT_EQ(payload, original_snapshot);
 
   // Step 2: From IR (IR -> OpenAI)
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::OpenAiChatCompletions, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::OpenAiChatCompletions, payload), IsOk());
   EXPECT_EQ(payload, original_snapshot);
 
   // Validate against OpenAI Chat Completions RequestSchema
@@ -225,7 +259,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_RoundTripViaIr
   })");
 
   // 1. To IR (`to_ir`): Anthropic -> OpenAI Chat Completions
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::AnthropicMessages, anthropic_payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::AnthropicMessages, anthropic_payload), IsOk());
   EXPECT_FALSE(anthropic_payload.contains("system"));
   ASSERT_EQ(anthropic_payload["messages"].size(), 2);
   EXPECT_EQ(anthropic_payload["messages"][0]["role"], "system");
@@ -239,7 +273,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_RoundTripViaIr
   EXPECT_THAT(openai_schema->validateRequest(anthropic_payload), IsOk());
 
   // 2. From IR (`from_ir`): OpenAI Chat Completions -> Anthropic Messages
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::AnthropicMessages, anthropic_payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, anthropic_payload), IsOk());
 
   EXPECT_EQ(anthropic_payload["system"], "You are a helpful coding assistant.");
   EXPECT_EQ(anthropic_payload["max_tokens"], 1500);
@@ -276,7 +310,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_To_OpenAiSchem
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
 
   EXPECT_FALSE(payload.contains("system"));
   EXPECT_EQ(payload["max_completion_tokens"], 256);
@@ -313,7 +347,7 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_To_OpenAiSchema) 
     }
   })");
 
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
 
   EXPECT_FALSE(payload.contains("systemInstruction"));
   EXPECT_FALSE(payload.contains("contents"));
@@ -352,10 +386,10 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_RoundTripViaIr) {
   })");
 
   // 1. To IR (`to_ir`): Gemini -> OpenAI Chat Completions
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
 
   // 2. From IR (`from_ir`): OpenAI Chat Completions -> Gemini
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
 
   EXPECT_EQ(payload["systemInstruction"]["parts"][0]["text"], "Keep answers brief.");
   EXPECT_EQ(payload["generationConfig"]["maxOutputTokens"], 128);
@@ -413,13 +447,13 @@ TEST(TranscodingEngineTest, CustomInboundAndOutboundConfiguration) {
   })");
 
   // Test custom `to_ir` configuration
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::OpenAiResponses, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::OpenAiResponses, payload), IsOk());
   EXPECT_EQ(payload["max_completion_tokens"], 300);
   ASSERT_EQ(payload["messages"].size(), 2);
   EXPECT_EQ(payload["messages"][1]["role"], "assistant");
 
   // Test custom `from_ir` configuration
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::OpenAiResponses, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::OpenAiResponses, payload), IsOk());
   EXPECT_EQ(payload["max_output_tokens"], 300);
   ASSERT_EQ(payload["input"].size(), 2);
   EXPECT_EQ(payload["input"][1]["role"], "bot");
@@ -440,7 +474,7 @@ TEST(TranscodingEngineTest, RejectsPayloadFailingTargetSchemaValidation) {
     ]
   })");
 
-  absl::Status status = engine.transcodeFromIr(LLMProtocol::AnthropicMessages, system_only_payload);
+  absl::Status status = requestFromIr(engine, LLMProtocol::AnthropicMessages, system_only_payload);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
 
@@ -455,7 +489,7 @@ TEST(TranscodingEngineTest, RejectsPayloadFailingTargetSchemaValidation) {
   })");
 
   absl::Status status2 =
-      engine.transcodeFromIr(LLMProtocol::AnthropicMessages, negative_tokens_payload);
+      requestFromIr(engine, LLMProtocol::AnthropicMessages, negative_tokens_payload);
   EXPECT_FALSE(status2.ok());
   EXPECT_EQ(status2.code(), absl::StatusCode::kInvalidArgument);
 }
@@ -496,11 +530,11 @@ TEST(TranscodingEngineTest, RejectsUnregisteredProtocol) {
 
   // `OpenAiResponses` is not registered in `createDefault()`, so transcoding to/from it is
   // rejected.
-  absl::Status to_ir_status = engine.transcodeToIr(LLMProtocol::OpenAiResponses, payload);
+  absl::Status to_ir_status = requestToIr(engine, LLMProtocol::OpenAiResponses, payload);
   EXPECT_FALSE(to_ir_status.ok());
   EXPECT_EQ(to_ir_status.code(), absl::StatusCode::kInvalidArgument);
 
-  absl::Status from_ir_status = engine.transcodeFromIr(LLMProtocol::OpenAiResponses, payload);
+  absl::Status from_ir_status = requestFromIr(engine, LLMProtocol::OpenAiResponses, payload);
   EXPECT_FALSE(from_ir_status.ok());
   EXPECT_EQ(from_ir_status.code(), absl::StatusCode::kInvalidArgument);
 }
@@ -520,7 +554,7 @@ TEST(TranscodingEngineTest, TranscodesGeminiRequestWithoutBodyLevelModel) {
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
   EXPECT_FALSE(payload.contains("model"));
   ASSERT_EQ(payload["messages"].size(), 1);
   EXPECT_EQ(payload["messages"][0]["content"], "Hello");
@@ -543,7 +577,7 @@ TEST(TranscodingEngineTest, PreservesEverySystemMessageWhenTargetingAnthropic) {
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
 
   // Both prompts survive as Anthropic text blocks, which `system` accepts alongside a bare string.
   ASSERT_TRUE(payload["system"].is_array());
@@ -573,7 +607,7 @@ TEST(TranscodingEngineTest, PreservesEverySystemMessageWhenTargetingGemini) {
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
 
   // `part.text` is a string in Gemini's schema, so two prompts must become two parts rather than
   // one part holding an array.
@@ -600,7 +634,7 @@ TEST(TranscodingEngineTest, PreservesEveryGeminiMessagePart) {
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
 
   ASSERT_EQ(payload["messages"].size(), 1);
   ASSERT_TRUE(payload["messages"][0]["content"].is_array());
@@ -629,7 +663,7 @@ TEST(TranscodingEngineTest, RejectsGeminiPartThatCarriesNoText) {
     ]
   })");
 
-  absl::Status status = engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, payload);
+  absl::Status status = requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
 }
@@ -653,7 +687,7 @@ TEST(TranscodingEngineTest, MergeDoesNotFabricateContentForMessageWithoutContent
 
   // The content-less message is left alone rather than merged, so no `null` text block is
   // invented. Anthropic's schema then rejects it on its own terms (`content` is `.required()`).
-  absl::Status status = engine.transcodeFromIr(LLMProtocol::AnthropicMessages, payload);
+  absl::Status status = requestFromIr(engine, LLMProtocol::AnthropicMessages, payload);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
 
@@ -662,8 +696,8 @@ TEST(TranscodingEngineTest, MergeDoesNotFabricateContentForMessageWithoutContent
   EXPECT_FALSE(payload["messages"][1].contains("content"));
 }
 
-// Verify that `transcodeFromIr` validates against the target dialect schema even when the target
-// protocol is the IR protocol itself (`OpenAiChatCompletions`).
+// Verify that a request `FromIr` leg validates against the target dialect schema even when the
+// target protocol is the IR protocol itself (`OpenAiChatCompletions`).
 TEST(TranscodingEngineTest, TranscodeFromIrValidatesAgainstIrTargetSchema) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
@@ -676,7 +710,7 @@ TEST(TranscodingEngineTest, TranscodeFromIrValidatesAgainstIrTargetSchema) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  absl::Status status = engine.transcodeFromIr(LLMProtocol::OpenAiChatCompletions, payload);
+  absl::Status status = requestFromIr(engine, LLMProtocol::OpenAiChatCompletions, payload);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
 }
@@ -695,7 +729,7 @@ TEST(TranscodingEngineTest, NormalizesScalarStopToArrayForAnthropic) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
   EXPECT_FALSE(payload.contains("stop"));
   EXPECT_EQ(payload["stop_sequences"], nlohmann::json::array({"END"}));
 }
@@ -711,7 +745,7 @@ TEST(TranscodingEngineTest, NormalizesScalarStopToArrayForGemini) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
   EXPECT_FALSE(payload.contains("stop"));
   EXPECT_EQ(payload["generationConfig"]["stopSequences"], nlohmann::json::array({"END"}));
 }
@@ -727,7 +761,7 @@ TEST(TranscodingEngineTest, LeavesAnExistingStopArrayAlone) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
   EXPECT_EQ(payload["stop_sequences"], nlohmann::json::array({"END", "STOP"}));
 }
 
@@ -741,7 +775,7 @@ TEST(TranscodingEngineTest, DoesNotMaterializeStopSequencesWhenStopIsAbsent) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
   EXPECT_FALSE(payload.contains("stop"));
   EXPECT_FALSE(payload.contains("stop_sequences"));
 }
@@ -760,7 +794,7 @@ TEST(TranscodingEngineTest, MapsStringToolChoiceToAnthropicObject) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
   EXPECT_EQ(payload["tool_choice"], nlohmann::json::parse(R"({"type": "any"})"));
 }
 
@@ -775,7 +809,7 @@ TEST(TranscodingEngineTest, MapsPinnedToolChoiceToAnthropicObject) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
   EXPECT_EQ(payload["tool_choice"],
             nlohmann::json::parse(R"({"type": "tool", "name": "lookup_doc"})"));
 }
@@ -792,7 +826,7 @@ TEST(TranscodingEngineTest, MapsAnthropicToolChoiceBackToAnIrString) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
   EXPECT_EQ(payload["tool_choice"], "auto");
 }
 
@@ -808,7 +842,7 @@ TEST(TranscodingEngineTest, MapsAnthropicPinnedToolChoiceBackToAnIrObject) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::AnthropicMessages, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
   EXPECT_EQ(payload["tool_choice"],
             nlohmann::json::parse(R"({"type": "function", "function": {"name": "lookup_doc"}})"));
 }
@@ -826,7 +860,7 @@ TEST(TranscodingEngineTest, MapsStringToolChoiceToGeminiFunctionCallingConfig) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
   EXPECT_FALSE(payload.contains("tool_choice"));
   EXPECT_EQ(payload["toolConfig"]["functionCallingConfig"]["mode"], "NONE");
 }
@@ -842,7 +876,7 @@ TEST(TranscodingEngineTest, MapsPinnedToolChoiceToGeminiAllowedFunctionNames) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
   EXPECT_FALSE(payload.contains("tool_choice"));
   const nlohmann::json& config = payload["toolConfig"]["functionCallingConfig"];
   EXPECT_EQ(config["mode"], "ANY");
@@ -859,7 +893,7 @@ TEST(TranscodingEngineTest, MapsSeedBetweenTheIrAndGemini) {
   nlohmann::json ir = nlohmann::json::parse(R"({
     "model": "gemini-2.5-flash", "seed": 42, "messages": [{"role": "user", "content": "Hi"}]
   })");
-  ASSERT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, ir), IsOk());
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, ir), IsOk());
   EXPECT_FALSE(ir.contains("seed"));
   EXPECT_EQ(ir["generationConfig"], nlohmann::json::parse(R"({"seed": 42})"));
   EXPECT_THAT(
@@ -871,7 +905,7 @@ TEST(TranscodingEngineTest, MapsSeedBetweenTheIrAndGemini) {
            R"({"contents": [{"parts": [{"text": "Hi"}]}], "generation_config": {"seed": 42}})",
        }) {
     nlohmann::json gemini = nlohmann::json::parse(gemini_request);
-    ASSERT_THAT(engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, gemini), IsOk());
+    ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, gemini), IsOk());
     EXPECT_TRUE(gemini["seed"].is_number_integer()) << gemini_request;
     EXPECT_EQ(gemini["seed"], 42) << gemini_request;
   }
@@ -890,7 +924,7 @@ TEST(TranscodingEngineTest, MapsResponseFormatToGeminiJsonMode) {
       "model": "gemini-2.5-flash", "messages": [{"role": "user", "content": "List two colors."}]
     })");
     payload["response_format"] = nlohmann::json::parse(response_format);
-    EXPECT_THAT(engine.transcodeFromIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+    EXPECT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
     EXPECT_THAT(gemini_schema->validateRequest(payload), IsOk());
     EXPECT_FALSE(payload.contains("response_format"));
     return payload.value("generationConfig", nlohmann::json());
@@ -929,7 +963,7 @@ TEST(TranscodingEngineTest, CoercesQuotedGeminiNumbersWhenEnteringTheIr) {
     }
   })");
 
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
   EXPECT_TRUE(payload["max_completion_tokens"].is_number_integer());
   EXPECT_EQ(payload["max_completion_tokens"], 256);
   EXPECT_TRUE(payload["temperature"].is_number());
@@ -954,7 +988,7 @@ TEST(TranscodingEngineTest, LeavesRealGeminiNumbersUntouched) {
     "generationConfig": {"maxOutputTokens": 256, "temperature": 0.5}
   })");
 
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
   EXPECT_EQ(payload["max_completion_tokens"], 256);
   EXPECT_EQ(payload["temperature"], 0.5);
 }
@@ -971,7 +1005,7 @@ TEST(TranscodingEngineTest, AppliesGeminiRoleDefaultForMessagesThatOmitIt) {
     "contents": [{"parts": [{"text": "Hello"}]}]
   })");
 
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
   ASSERT_EQ(payload["messages"].size(), 1);
   EXPECT_EQ(payload["messages"][0]["role"], "user");
   EXPECT_EQ(payload["messages"][0]["content"], "Hello");
@@ -994,7 +1028,7 @@ TEST(TranscodingEngineTest, DoesNotOverrideAnExplicitGeminiRole) {
     ]
   })");
 
-  ASSERT_THAT(engine.transcodeToIr(LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
   ASSERT_EQ(payload["messages"].size(), 2);
   EXPECT_EQ(payload["messages"][0]["role"], "user");
   EXPECT_EQ(payload["messages"][1]["role"], "assistant");
@@ -1032,7 +1066,7 @@ TEST(TranscodingEngineTest, RegisterPackKeepsSchemasAlreadySetOnThePack) {
     "messages": [{"role": "user", "content": "Hi"}]
   })");
 
-  absl::Status status = engine.transcodeFromIr(LLMProtocol::AnthropicMessages, payload);
+  absl::Status status = requestFromIr(engine, LLMProtocol::AnthropicMessages, payload);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
 }
@@ -1126,7 +1160,8 @@ TEST(TranscodingEngineTest, CoversAllRuleAndEngineEdgeCases) {
   EXPECT_EQ(vec_rule_set.sourceProtocol(), LLMProtocol::OpenAiResponses);
   EXPECT_EQ(vec_rule_set.targetProtocol(), LLMProtocol::OpenAiChatCompletions);
 
-  // 2. Exercise `JsonWithExtBuf` wrapper overloads on `TranscodeRuleSet` and `TranscodingEngine`.
+  // 2. Exercise the `JsonWithExtBuf` wrapper overload on `TranscodeRuleSet`, then run request legs
+  // on the payload it holds.
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& default_engine = *engine_or;
@@ -1140,11 +1175,8 @@ TEST(TranscodingEngineTest, CoversAllRuleAndEngineEdgeCases) {
   ASSERT_THAT(vec_rule_set.execute(ext_payload), IsOk());
   EXPECT_FALSE(ext_payload.json().contains("role"));
 
-  ASSERT_THAT(default_engine.transcodeToIr(LLMProtocol::Unspecified, ext_payload), IsOk());
-  ASSERT_THAT(default_engine.transcodeFromIr(LLMProtocol::Unspecified, ext_payload), IsOk());
-  ASSERT_THAT(default_engine.transcodeToIr(LLMProtocol::OpenAiChatCompletions, ext_payload),
-              IsOk());
-  ASSERT_THAT(default_engine.transcodeFromIr(LLMProtocol::AnthropicMessages, ext_payload), IsOk());
+  ASSERT_THAT(requestToIr(default_engine, LLMProtocol::OpenAiChatCompletions, ext_payload), IsOk());
+  ASSERT_THAT(requestFromIr(default_engine, LLMProtocol::AnthropicMessages, ext_payload), IsOk());
 
   // 3. Non-object root payload is rejected by `TranscodeRule::apply`.
   nlohmann::json non_obj = nlohmann::json::array({1, 2, 3});
@@ -1194,7 +1226,8 @@ TEST(TranscodingEngineTest, CoversAllRuleAndEngineEdgeCases) {
   EXPECT_FALSE(
       TranscodeRule::unwrapArrayObject("non_obj_parts", "text", "out").apply(edge_doc).ok());
 
-  // 5. Runtime `ExternalRef` protection on `ValueMap` and `registerPack` / `transcodeFromIr` error
+  // 5. Runtime `ExternalRef` protection on `ValueMap` and `registerPack` / request `FromIr` leg
+  // error
   //    propagation.
   nlohmann::json ext_ref_doc = nlohmann::json::object();
   ext_ref_doc["field"] = JsonWithExtBuf::makeExternalRef({0, 16});
@@ -1247,7 +1280,7 @@ TEST(TranscodingEngineTest, CoversAllRuleAndEngineEdgeCases) {
   };
   ASSERT_THAT(custom_engine.registerPack(std::move(strict_from_ir_pack)), IsOk());
   nlohmann::json bad_mode = nlohmann::json::parse(R"({"mode": "invalid"})");
-  EXPECT_FALSE(custom_engine.transcodeFromIr(LLMProtocol::OpenAiResponses, bad_mode).ok());
+  EXPECT_FALSE(requestFromIr(custom_engine, LLMProtocol::OpenAiResponses, bad_mode).ok());
 }
 
 // A request leg reports the request's IR `model` back through the context: read after the rules
@@ -1375,7 +1408,7 @@ TEST(TranscodingEngineTest, TranscodeRejectsStreamEventAndUnregisteredLegs) {
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(status.message(), testing::HasSubstr("no transcoding pack registered"));
 
-  // Unlike the `transcodeToIr()` / `transcodeFromIr()` wrappers, a leg must name a dialect.
+  // A leg must name a dialect.
   EXPECT_FALSE(
       engine
           .transcode({PayloadKind::Request, TranscodeDirection::ToIr, LLMProtocol::Unspecified},

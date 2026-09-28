@@ -2692,11 +2692,11 @@ std::string irModel(const nlohmann::json& json) {
   return model != json.end() && model->is_string() ? model->get<std::string>() : "";
 }
 
-// Runs a request leg. `envelope` is what the dialect names in the request path, or none to convert
-// only the body.
+// Runs a request leg, moving what the dialect names in the request path (`pack.envelope`) between
+// the path and the body.
 absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirection direction,
-                              const std::optional<PathTemplate>& envelope, TranscodeContext& ctx,
-                              nlohmann::json& json) {
+                              TranscodeContext& ctx, nlohmann::json& json) {
+  const std::optional<PathTemplate>& envelope = pack.envelope;
   const bool is_ir = pack.protocol == TranscodingEngine::kIrProtocol;
   ctx.rewritten_path.reset();
   if (direction == TranscodeDirection::ToIr) {
@@ -2790,7 +2790,7 @@ absl::Status TranscodingEngine::transcode(const TranscodeLeg& leg, TranscodeCont
   }
   switch (leg.kind) {
   case PayloadKind::Request:
-    return transcodeRequest(**pack, leg.direction, (*pack)->envelope, ctx, json);
+    return transcodeRequest(**pack, leg.direction, ctx, json);
   case PayloadKind::Response:
     return transcodeResponse(**pack, leg.direction, ctx, json);
   case PayloadKind::StreamEvent:
@@ -2913,34 +2913,6 @@ std::string TranscodingEngine::modelFromRequestPath(LLMProtocol dialect,
   }
   std::optional<PathTarget> target = parseRequestPath(*pack->second.envelope, path);
   return target.has_value() ? std::move(target->model) : "";
-}
-
-// TODO(ginama): Address the IR data-loss problem where dialect-specific fields not modeled by
-// `OpenAiChatCompletions` are dropped when converting to the IR.
-absl::Status TranscodingEngine::transcodeToIr(LLMProtocol source_protocol,
-                                              nlohmann::json& json) const {
-  if (source_protocol == LLMProtocol::Unspecified) {
-    return absl::OkStatus();
-  }
-  absl::StatusOr<const DialectTranscodePack*> pack = findPack(source_protocol);
-  if (!pack.ok()) {
-    return pack.status();
-  }
-  TranscodeContext ctx;
-  return transcodeRequest(**pack, TranscodeDirection::ToIr, /*envelope=*/std::nullopt, ctx, json);
-}
-
-absl::Status TranscodingEngine::transcodeFromIr(LLMProtocol target_protocol,
-                                                nlohmann::json& json) const {
-  if (target_protocol == LLMProtocol::Unspecified) {
-    return absl::OkStatus();
-  }
-  absl::StatusOr<const DialectTranscodePack*> pack = findPack(target_protocol);
-  if (!pack.ok()) {
-    return pack.status();
-  }
-  TranscodeContext ctx;
-  return transcodeRequest(**pack, TranscodeDirection::FromIr, /*envelope=*/std::nullopt, ctx, json);
 }
 
 } // namespace AiProtocolManager
