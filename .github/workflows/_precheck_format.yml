@@ -36,8 +36,7 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
       request: ${{ inputs.request }}
-      # format needs aspell, and format-api requires git
-      docker-ci: false
+      docker-ci: ${{ matrix.docker-ci }}
       error-match: |
         ERROR
         error:
@@ -53,10 +52,13 @@ jobs:
       matrix:
         include:
         - target: format
+          # format needs aspell
+          docker-ci: false
           uploads: |
             fix_format.diff: /home/runner/work/_temp/container/fix_format.diff
           diskpace-hack-paths: |
             /opt/hostedtoolcache
         - target: format-api
+          docker-ci: true
           uploads: |
             fix_proto_format.diff: /home/runner/work/_temp/container/fix_proto_format.diff

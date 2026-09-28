@@ -197,6 +197,13 @@ grcov_ext = use_extension("@envoy_toolshed//coverage/grcov:extensions.bzl", "grc
 grcov_ext.setup()
 use_repo(grcov_ext, "grcov")
 
+# Hermetic (prebuilt) git toolchain.
+git_prebuilt_ext = use_extension("@envoy_toolshed//git:extensions.bzl", "git_prebuilt_extension")
+git_prebuilt_ext.setup()
+use_repo(git_prebuilt_ext, "git_toolchains")
+
+register_toolchains("@git_toolchains//:all")
+
 # Prebuilt wee8 (V8) static library, selected via the //bazel:v8_engine flag.
 wee8_ext = use_extension("@envoy_toolshed//v8:extensions.bzl", "wee8_prebuilt_extension")
 wee8_ext.setup()
