@@ -121,8 +121,7 @@ TEST_F(InternalClientConnectionImplTest, AbortResetEmitsConnectionResetToPeerGua
 TEST_F(InternalClientConnectionImplTest, AbortResetEmitsEofToPeerGuardDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"},
-       {"envoy.reloadable_features.internal_listener_peer_destroyed_propagation", "false"}});
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
 
   client_ = std::make_unique<Network::ClientConnectionImpl>(
       *dispatcher_,
@@ -150,7 +149,7 @@ TEST_F(InternalClientConnectionImplTest, AbortResetEmitsEofToPeerGuardDisabled) 
 TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullClosePropagatesRemoteClose) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.internal_listener_peer_destroyed_propagation", "true"}});
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
 
   client_ = std::make_unique<Network::ClientConnectionImpl>(
       *dispatcher_,
@@ -179,7 +178,7 @@ TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullClosePropagates
 TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullCloseLegacyBehavior) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.internal_listener_peer_destroyed_propagation", "false"}});
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
 
   client_ = std::make_unique<Network::ClientConnectionImpl>(
       *dispatcher_,
@@ -211,7 +210,7 @@ TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullCloseLegacyBeha
 TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerShutdownWritePreservesHalfClose) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.internal_listener_peer_destroyed_propagation", "true"}});
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
 
   client_ = std::make_unique<Network::ClientConnectionImpl>(
       *dispatcher_,

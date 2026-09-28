@@ -6,5 +6,6 @@ A full peer close on a user-space socket surfaced as a plain end-of-stream, whic
 connection treats as a read half-close, so the upstream tunnel (e.g. HTTP CONNECT) stayed pinned until the
 upstream idle timeout. A full peer close is now reported the way the kernel reports a reset: reads drain
 pending data first and then return ``ECONNRESET``. A peer ``shutdown(WR)`` half-close is unchanged and real
-OS sockets are unaffected. Guarded by runtime feature
-``envoy.reloadable_features.internal_listener_peer_destroyed_propagation``.
+OS sockets are unaffected. Guarded by the existing runtime feature
+``envoy.reloadable_features.enable_send_rst_on_user_space_socket``, which already gates turning a
+peer-side disconnect into a reset on the read side.

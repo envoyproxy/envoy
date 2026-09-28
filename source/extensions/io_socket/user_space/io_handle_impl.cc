@@ -76,8 +76,10 @@ void IoHandleImpl::setAbortiveClose() {
 void IoHandleImpl::onPeerDestroy() {
   peer_handle_ = nullptr;
   sent_eof_ = true;
+  // Same guard as the abortive close path in setAbortiveClose(): both turn a peer-side
+  // disconnect into a reset on the read side, so they are enabled and disabled together.
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.internal_listener_peer_destroyed_propagation")) {
+          "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
     receive_data_reset_after_drain_ = true;
   }
 }

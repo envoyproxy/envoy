@@ -1262,7 +1262,7 @@ TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseEmitsConnectionReset) {
 TEST_F(IoHandleImplTest, PeerCloseEmitsEofGuardDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.internal_listener_peer_destroyed_propagation", "false"}});
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
 
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->hasReceivedEof());
@@ -1392,8 +1392,7 @@ TEST_F(IoHandleImplTest, ResetCloseEmitsConnectionResetErrorOnReadGuardEnabled) 
 TEST_F(IoHandleImplTest, ResetCloseEmitsEofOnReadGuardDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"},
-       {"envoy.reloadable_features.internal_listener_peer_destroyed_propagation", "false"}});
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
 
   EXPECT_TRUE(io_handle_->isOpen());
   EXPECT_TRUE(io_handle_peer_->isOpen());
