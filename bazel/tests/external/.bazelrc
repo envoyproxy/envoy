@@ -68,8 +68,6 @@ common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
 common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
-common:libc++ --define force_libcpp=enabled
-common:libc++ --@envoy//bazel:libc++=true
 
 
 #############################################################################
