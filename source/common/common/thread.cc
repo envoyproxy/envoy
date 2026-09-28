@@ -61,16 +61,12 @@ struct ThreadIds {
   }
 
   // Records the current thread as the test thread.
-  void registerTestThread() {
-    test_thread_id_ = std::this_thread::get_id();
-  }
+  void registerTestThread() { test_thread_id_ = std::this_thread::get_id(); }
 
   // Returns true if the current thread was registered as the test thread. A
   // default-constructed std::thread::id never matches a running thread, so this
   // returns false if no test thread was registered (e.g. in production binaries).
-  bool inTestThread() const {
-    return test_thread_id_ == std::this_thread::get_id();
-  }
+  bool inTestThread() const { return test_thread_id_ == std::this_thread::get_id(); }
 
   // Methods to track how many SkipAssert objects are instantiated.
   void incSkipAsserts() { ++skip_asserts_; }
