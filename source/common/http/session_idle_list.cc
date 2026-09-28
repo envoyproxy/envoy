@@ -8,7 +8,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/session_idle_list_interface.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/time/time.h"
 
@@ -49,14 +48,10 @@ size_t SessionIdleList::MaxSessionsToTerminateInOneRound(bool is_saturated) cons
 
 absl::Duration SessionIdleList::MinTimeBeforeTerminationAllowed(bool is_saturated) const {
   if (is_saturated) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.session_idle_list_min_timeout_when_saturated")) {
-      // Leave some time for session to complete handshake and possibly serve some
-      // requests. Handshake rejection should be the responsibility of the health
-      // check handler and not the idle session list.
-      return absl::Seconds(10);
-    }
-    return absl::ZeroDuration();
+    // Leave some time for session to complete handshake and possibly serve some
+    // requests. Handshake rejection should be the responsibility of the health
+    // check handler and not the idle session list.
+    return absl::Seconds(10);
   }
   return min_time_before_termination_allowed_;
 };
