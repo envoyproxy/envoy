@@ -43,7 +43,7 @@ OpenSSL builds are not currently covered by the :repo:`Envoy security policy <SE
 .. _arch_overview_ssl_read_ahead:
 
 Ciphertext read-ahead
---------------------
+---------------------
 
 Envoy can buffer encrypted data after a TCP TLS handshake completes to serve multiple reads by the
 TLS library. This can reduce socket read calls for record headers and bodies. TLS record processing
