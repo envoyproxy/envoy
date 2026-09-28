@@ -863,10 +863,12 @@ bool envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
     return false;
   }
 
-  // Store the serialized string on the filter so it outlives the current event hook.
-  filter->last_serialized_filter_state_ = std::move(serialized.value());
-  value_out->ptr = const_cast<char*>(filter->last_serialized_filter_state_->data());
-  value_out->length = filter->last_serialized_filter_state_->size();
+  // Append to the scratch so consecutive getter calls in the same hook stay valid until the hook
+  // returns.
+  filter->filter_state_scratch_.push_back(std::move(serialized.value()));
+  const std::string& stored = filter->filter_state_scratch_.back();
+  value_out->ptr = const_cast<char*>(stored.data());
+  value_out->length = stored.size();
   return true;
 }
 
