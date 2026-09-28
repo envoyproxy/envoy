@@ -1,3 +1,7 @@
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event.h"
@@ -567,36 +571,26 @@ TEST(TranscodingEngineTest, TranscodeFromIrValidatesAgainstIrTargetSchema) {
 // Regression: OpenAI allows `stop` to be a bare string, but both `stop_sequences` and
 // `stopSequences` are array-only, so moving the scalar straight across produced a payload the
 // destination schema rejects.
-TEST(TranscodingEngineTest, NormalizesScalarStopToArrayForAnthropic) {
+TEST(TranscodingEngineTest, NormalizesScalarStopToArray) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
 
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "claude-sonnet-4",
-    "stop": "END",
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-
-  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
-  EXPECT_FALSE(payload.contains("stop"));
-  EXPECT_EQ(payload["stop_sequences"], nlohmann::json::array({"END"}));
-}
-
-TEST(TranscodingEngineTest, NormalizesScalarStopToArrayForGemini) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "gemini-2.5-pro",
-    "stop": "END",
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-
-  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
-  EXPECT_FALSE(payload.contains("stop"));
-  EXPECT_EQ(payload["generationConfig"]["stopSequences"], nlohmann::json::array({"END"}));
+  for (const auto& [dialect, stop_pointer] : std::vector<std::pair<LLMProtocol, std::string>>{
+           {LLMProtocol::AnthropicMessages, "/stop_sequences"},
+           {LLMProtocol::GeminiGenerateContent, "/generationConfig/stopSequences"},
+       }) {
+    SCOPED_TRACE(stop_pointer);
+    nlohmann::json payload = nlohmann::json::parse(R"({
+      "model": "test-model",
+      "stop": "END",
+      "messages": [{"role": "user", "content": "Hi"}]
+    })");
+    ASSERT_THAT(requestFromIr(engine, dialect, payload), IsOk());
+    EXPECT_FALSE(payload.contains("stop"));
+    EXPECT_EQ(payload.at(nlohmann::json::json_pointer(stop_pointer)),
+              nlohmann::json::array({"END"}));
+  }
 }
 
 TEST(TranscodingEngineTest, DoesNotMaterializeStopSequencesWhenStopIsAbsent) {
@@ -616,105 +610,66 @@ TEST(TranscodingEngineTest, DoesNotMaterializeStopSequencesWhenStopIsAbsent) {
 
 // Regression: `tool_choice` was mapped in neither direction. OpenAI spells the unconstrained
 // cases as a bare string and Anthropic always uses an object, so every request that set the
-// field was rejected by Anthropic's schema on the way out.
-TEST(TranscodingEngineTest, MapsStringToolChoiceToAnthropicObject) {
+// field was rejected by Anthropic's schema on the way out. Envoy's Gemini schema accepts unknown
+// root fields, so an unmapped `tool_choice` was forwarded, and Gemini refused the whole request for
+// naming a field it does not know.
+TEST(TranscodingEngineTest, MapsToolChoiceOutOfTheIr) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
 
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "claude-sonnet-4",
-    "tool_choice": "required",
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-
-  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
-  EXPECT_EQ(payload["tool_choice"], nlohmann::json::parse(R"({"type": "any"})"));
+  struct Case {
+    LLMProtocol dialect;
+    const char* ir_tool_choice;
+    // Where the dialect carries the choice, and what it says there.
+    const char* pointer;
+    const char* expected;
+  };
+  const char* const pinned = R"({"type": "function", "function": {"name": "lookup_doc"}})";
+  for (const Case& c : std::vector<Case>{
+           {LLMProtocol::AnthropicMessages, R"("required")", "/tool_choice", R"({"type": "any"})"},
+           {LLMProtocol::AnthropicMessages, pinned, "/tool_choice",
+            R"({"type": "tool", "name": "lookup_doc"})"},
+           {LLMProtocol::GeminiGenerateContent, R"("none")", "/toolConfig/functionCallingConfig",
+            R"({"mode": "NONE"})"},
+           {LLMProtocol::GeminiGenerateContent, pinned, "/toolConfig/functionCallingConfig",
+            R"({"mode": "ANY", "allowedFunctionNames": ["lookup_doc"]})"},
+       }) {
+    SCOPED_TRACE(c.expected);
+    nlohmann::json payload = nlohmann::json::parse(R"({
+      "model": "test-model",
+      "messages": [{"role": "user", "content": "Hi"}]
+    })");
+    payload["tool_choice"] = nlohmann::json::parse(c.ir_tool_choice);
+    ASSERT_THAT(requestFromIr(engine, c.dialect, payload), IsOk());
+    EXPECT_EQ(payload.at(nlohmann::json::json_pointer(c.pointer)),
+              nlohmann::json::parse(c.expected));
+    if (std::string(c.pointer) != "/tool_choice") {
+      EXPECT_FALSE(payload.contains("tool_choice"));
+    }
+  }
 }
 
-TEST(TranscodingEngineTest, MapsPinnedToolChoiceToAnthropicObject) {
+TEST(TranscodingEngineTest, MapsAnthropicToolChoiceIntoTheIr) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
 
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "claude-sonnet-4",
-    "tool_choice": {"type": "function", "function": {"name": "lookup_doc"}},
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-
-  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
-  EXPECT_EQ(payload["tool_choice"],
-            nlohmann::json::parse(R"({"type": "tool", "name": "lookup_doc"})"));
-}
-
-TEST(TranscodingEngineTest, MapsAnthropicToolChoiceBackToAnIrString) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "gpt-4o",
-    "tool_choice": {"type": "auto"},
-    "max_tokens": 16,
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-
-  ASSERT_THAT(requestToIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
-  EXPECT_EQ(payload["tool_choice"], "auto");
-}
-
-TEST(TranscodingEngineTest, MapsAnthropicPinnedToolChoiceBackToAnIrObject) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "gpt-4o",
-    "tool_choice": {"type": "tool", "name": "lookup_doc"},
-    "max_tokens": 16,
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-
-  ASSERT_THAT(requestToIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
-  EXPECT_EQ(payload["tool_choice"],
-            nlohmann::json::parse(R"({"type": "function", "function": {"name": "lookup_doc"}})"));
-}
-
-// Envoy's Gemini schema accepts unknown root fields, so an unmapped `tool_choice` was forwarded,
-// and Gemini refused the whole request for naming a field it does not know.
-TEST(TranscodingEngineTest, MapsStringToolChoiceToGeminiFunctionCallingConfig) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "gemini-2.5-pro",
-    "tool_choice": "none",
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-
-  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
-  EXPECT_FALSE(payload.contains("tool_choice"));
-  EXPECT_EQ(payload["toolConfig"]["functionCallingConfig"]["mode"], "NONE");
-}
-
-TEST(TranscodingEngineTest, MapsPinnedToolChoiceToGeminiAllowedFunctionNames) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "gemini-2.5-pro",
-    "tool_choice": {"type": "function", "function": {"name": "lookup_doc"}},
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-
-  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
-  EXPECT_FALSE(payload.contains("tool_choice"));
-  const nlohmann::json& config = payload["toolConfig"]["functionCallingConfig"];
-  EXPECT_EQ(config["mode"], "ANY");
-  EXPECT_EQ(config["allowedFunctionNames"], nlohmann::json::array({"lookup_doc"}));
+  for (const auto& [anthropic, ir] : std::vector<std::pair<const char*, const char*>>{
+           {R"({"type": "auto"})", R"("auto")"},
+           {R"({"type": "tool", "name": "lookup_doc"})",
+            R"({"type": "function", "function": {"name": "lookup_doc"}})"},
+       }) {
+    SCOPED_TRACE(anthropic);
+    nlohmann::json payload = nlohmann::json::parse(R"({
+      "model": "test-model",
+      "max_tokens": 16,
+      "messages": [{"role": "user", "content": "Hi"}]
+    })");
+    payload["tool_choice"] = nlohmann::json::parse(anthropic);
+    ASSERT_THAT(requestToIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
+    EXPECT_EQ(payload["tool_choice"], nlohmann::json::parse(ir));
+  }
 }
 
 // Gemini refused a root `seed` as an unknown field: it takes the seed in `generationConfig`, where
