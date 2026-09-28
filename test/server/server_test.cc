@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/common/logger.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/xds_config_tracker.h"
@@ -14,6 +15,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/notification.h"
+#include "source/common/http/codes.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
@@ -537,8 +539,9 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
 // first.
 //
 // With the runtime guard enabled and a default stats config (no custom tags), server initialization
-// turns on the explicit-tags logic on the real stats store. Guards against a regression where an
-// early scope creation would silently cause setUseExplicitTags() to be ignored.
+// turns on the explicit-tags logic on the real stats store, and hands the http context the matching
+// CodeStats implementation. Guards against a regression where an early scope creation would
+// silently cause setUseExplicitTags() to be ignored.
 TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
   Stats::SymbolTableImpl symbol_table;
@@ -556,6 +559,7 @@ TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
   server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                       component_factory_);
   EXPECT_TRUE(real_store->useExplicitTags());
+  EXPECT_NE(nullptr, dynamic_cast<Http::TaggedCodeStatsImpl*>(&server_->httpContext().codeStats()));
 
   // Tear down the server (which shuts down threading on real_store) before real_store is destroyed,
   // and restore the process-global runtime flag so it does not leak into other tests.
@@ -1872,7 +1876,7 @@ TEST_P(ServerInstanceImplTest, BootstrapApplicationLogsAndCLIThrows) {
 TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
     EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
@@ -1900,7 +1904,7 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagUnderscore
 TEST_P(ServerInstanceImplTest, TextApplicationLog) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/text_application_log.yaml"));
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));

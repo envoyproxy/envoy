@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "envoy/api/api.h"
+#include "envoy/common/logger.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
@@ -734,7 +735,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
 
 TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
   auto cluster = new NiceMock<Upstream::MockClusterMockPrioritySet>();
   NiceMock<Event::MockDispatcher> dispatcher;

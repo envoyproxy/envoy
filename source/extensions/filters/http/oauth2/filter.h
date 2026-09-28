@@ -76,17 +76,18 @@ class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr&& hmac_secret_provider,
-                  ThreadLocal::SlotAllocator& tls, Api::Api& api)
-      : client_secret_(
-            client_secret_provider
-                ? THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                            std::move(client_secret_provider), tls, api),
-                                        std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)
-                : nullptr),
+                  ThreadLocal::SlotAllocator& tls, Api::Api& api,
+                  Event::Dispatcher& main_dispatcher)
+      : client_secret_(client_secret_provider
+                           ? THROW_OR_RETURN_VALUE(
+                                 Secret::ThreadLocalGenericSecretProvider::create(
+                                     std::move(client_secret_provider), tls, api, main_dispatcher),
+                                 Secret::ThreadLocalGenericSecretProviderPtr)
+                           : nullptr),
         hmac_secret_(
             THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                      std::move(hmac_secret_provider), tls, api),
-                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
+                                      std::move(hmac_secret_provider), tls, api, main_dispatcher),
+                                  Secret::ThreadLocalGenericSecretProviderPtr)),
         empty_client_secret_("") {}
   const std::string& clientSecret() const override {
     return client_secret_ ? client_secret_->secret() : empty_client_secret_;
@@ -106,8 +107,8 @@ public:
   }
 
 private:
-  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> client_secret_;
-  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> hmac_secret_;
+  Secret::ThreadLocalGenericSecretProviderPtr client_secret_;
+  Secret::ThreadLocalGenericSecretProviderPtr hmac_secret_;
   const std::string empty_client_secret_;
 };
 
@@ -223,10 +224,12 @@ public:
   }
   const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
-  std::string clientSecret() const { return secret_reader_->clientSecret(); }
-  std::string hmacSecret() const { return secret_reader_->hmacSecret(); }
-  std::string privateKey() const { return secret_reader_->privateKey(); }
-  std::string keyId() const { return secret_reader_->keyId(); }
+  // Return string view is safe because the filter will consume the value immediately and not store
+  // it.
+  absl::string_view clientSecret() const { return secret_reader_->clientSecret(); }
+  absl::string_view hmacSecret() const { return secret_reader_->hmacSecret(); }
+  absl::string_view privateKey() const { return secret_reader_->privateKey(); }
+  absl::string_view keyId() const { return secret_reader_->keyId(); }
   // The secrets are loaded asynchronously if per-route configurations are used, so the filter needs
   // to check if the secrets are available before processing the request.
   bool requiredSecretsAvailable() const {
@@ -370,7 +373,7 @@ public:
   virtual const std::string& token() const PURE;
   virtual const std::string& idToken() const PURE;
   virtual const std::string& refreshToken() const PURE;
-  virtual void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) PURE;
+  virtual void setParams(const Http::RequestHeaderMap& headers, absl::string_view secret) PURE;
   virtual bool isValid() const PURE;
   virtual bool canUpdateTokenByRefreshToken() const PURE;
 };
@@ -385,7 +388,7 @@ public:
   const std::string& idToken() const override { return id_token_; }
   const std::string& refreshToken() const override { return refresh_token_; }
 
-  void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
+  void setParams(const Http::RequestHeaderMap& headers, absl::string_view secret) override;
   bool isValid() const override;
   bool hmacIsValid() const;
   bool timestampIsValid() const;
@@ -397,7 +400,7 @@ private:
   std::string refresh_token_;
   std::string expires_;
   std::string hmac_;
-  std::vector<uint8_t> secret_;
+  std::string secret_;
   std::string host_;
   TimeSource& time_source_;
   const CookieNames cookie_names_;
@@ -480,11 +483,16 @@ private:
   std::string original_request_url_;
   std::string flow_id_;
   Http::RequestHeaderMap* request_headers_{nullptr};
+  // Whether the request path is the OAuth callback path. Computed once in decodeHeaders() so the
+  // path matcher does not have to run again on the failure paths.
+  bool is_redirect_path_{false};
   bool was_refresh_token_flow_{false};
 
-  std::shared_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr default_config_;
   const FilterConfig* config_{nullptr};
+  // Declared after the configs on purpose: the client holds a reference to the token endpoint URI
+  // owned by the FilterConfig, so it must be destroyed before default_config_ is released.
+  std::shared_ptr<OAuth2Client> oauth_client_;
   OAuth2ClientFactory oauth_client_factory_;
   ValidatorFactory validator_factory_;
   TimeSource& time_source_;
@@ -526,6 +534,9 @@ private:
   bool shouldAllowFailed(const Http::RequestHeaderMap& headers) const;
   bool shouldDenyRedirect(const Http::RequestHeaderMap& headers) const;
   void continueWithFailedOAuth(const std::string& reason, const std::string& extra_details = "");
+  // Creates the OAuth client on first use. Requests that are served from a valid cookie never
+  // talk to the token endpoint, so the client is not created for them.
+  OAuth2Client& oauthClient();
   void sendUnauthorizedResponse(const std::string& details);
   void sendSecretsNotReadyResponse(const std::string& details);
 };

@@ -6,7 +6,7 @@ package shared
 //
 // Cross-surface primitives (UnsafeEnvoyBuffer, LogLevel, MetricID, AttributeID, Scheduler,
 // HttpCalloutInitResult/Result/Callback, HttpStreamCallback/ResetReason, SocketOption*,
-// ClusterHostCounts, HttpHeaderType) live in types.go.
+// ClusterHostCounts, TimingInfo, HttpHeaderType) live in types.go.
 
 // BodyBuffer is an interface that provides access to the request and response body.
 // This should be implemented by the SDK or runtime.
@@ -91,11 +91,16 @@ const (
 )
 
 // Span is a tracing span associated with the current HTTP stream. It is owned by Envoy and is
-// valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span -
-// it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module owns.
+// valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span
+// because it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module
+// owns. A span may be stored and used in a later event hook on the same worker thread. Do not use
+// a span after the stream has ended or move it to another goroutine.
 type Span interface {
 	// SetTag sets a key/value tag on the span.
 	SetTag(key, value string)
+
+	// SetTags sets multiple key/value tags on the span.
+	SetTags(tags [][2]string)
 
 	// SetOperation sets the operation name on the span.
 	SetOperation(operation string)
@@ -136,7 +141,8 @@ type Span interface {
 }
 
 // ChildSpan is a tracing span owned by the module. It must be finished by calling Finish when
-// the module is done with it.
+// the module is done with it. A child span may be stored and finished in a later event hook on the
+// same worker thread, for example to cover off-thread work that resumes in a scheduled callback.
 type ChildSpan interface {
 	Span
 
@@ -256,6 +262,9 @@ type HttpFilterHandle interface {
 	// GetAttributeBool retrieves the bool attribute value of the stream.
 	// Returns attribute value and true if found, otherwise false.
 	GetAttributeBool(attributeID AttributeID) (bool, bool)
+
+	// GetTimingInfo returns a snapshot of the current stream timing information.
+	GetTimingInfo() TimingInfo
 
 	// GetFilterStateTyped retrieves the serialized bytes of a typed filter state object stored
 	// under the given key. Unlike GetFilterState, this calls serializeAsString on the registered
@@ -543,6 +552,8 @@ type HttpFilterHandle interface {
 // implementations. It supports config-scoped logging, metric definition, generic secret
 // subscription, and async I/O via HttpCallout / StartHttpStream from the main thread.
 type HttpFilterConfigHandle interface {
+	CommonHandle
+
 	// Log will log the given message via the host environment's logging mechanism.
 	Log(level LogLevel, format string, args ...any)
 

@@ -1023,6 +1023,68 @@ TEST(DefaultCertValidatorTest, SuppressClientCaListSessionIdDiffers) {
       << "Session ID digests must differ when suppress_client_ca_list differs";
 }
 
+namespace {
+
+std::string readTestCaCert(const std::string& file_name) {
+  return TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/" + file_name));
+}
+
+// Builds a validator whose trusted CA bundle is `ca_cert`, initializes its SSL
+// contexts so the bundle is actually parsed, and stores the resulting session
+// ID digest in `digest`.
+void sessionIdDigestForCaBundle(const std::string& ca_cert,
+                                NiceMock<Server::Configuration::MockServerFactoryContext>& context,
+                                SslStats& stats, Stats::TestUtil::TestStore& store,
+                                std::vector<uint8_t>& digest) {
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
+  auto config = std::make_unique<TestCertificateValidationContextConfig>(
+      typed_conf, /*allow_expired_certificate=*/false, san_matchers, ca_cert,
+      /*verify_depth=*/std::nullopt, /*suppress_client_ca_list=*/false);
+  DefaultCertValidator validator(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  // `provides_certificates` is false so that the trusted CA bundle is loaded and
+  // included in the digest, mirroring a server context validating peers.
+  std::vector<SSL_CTX*> ctxs = {ssl_ctx.get()};
+  ASSERT_OK(
+      validator.initializeSslContexts(ctxs, /*provides_certificates=*/false, *store.rootScope()));
+  digest = computeSessionIdDigest(validator);
+}
+
+} // namespace
+
+// Every CA in the trusted bundle must contribute to the session ID digest, not
+// just the first one. Otherwise rotating or removing any CA after the first one
+// leaves previously issued session IDs valid against a changed trust bundle.
+TEST(DefaultCertValidatorTest, SessionIdDigestCoversAllCaCertificates) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  const std::string ca = readTestCaCert("ca_cert.pem");
+  const std::string intermediate_ca = readTestCaCert("intermediate_ca_cert.pem");
+  const std::string fake_ca = readTestCaCert("fake_ca_cert.pem");
+
+  // The first CA of the bundle is the same in all three cases, so before the fix
+  // all digests were computed from ca_cert_ alone and came out identical.
+  std::vector<uint8_t> digest_single;
+  std::vector<uint8_t> digest_two_with_intermediate;
+  std::vector<uint8_t> digest_two_with_fake;
+  sessionIdDigestForCaBundle(ca, context, stats, store, digest_single);
+  sessionIdDigestForCaBundle(ca + intermediate_ca, context, stats, store,
+                             digest_two_with_intermediate);
+  sessionIdDigestForCaBundle(ca + fake_ca, context, stats, store, digest_two_with_fake);
+
+  // A CA added after the first one changes the digest.
+  EXPECT_NE(digest_single, digest_two_with_intermediate);
+  EXPECT_NE(digest_single, digest_two_with_fake);
+  // Changing only the non-first CA changes the digest.
+  EXPECT_NE(digest_two_with_intermediate, digest_two_with_fake);
+}
+
 // Certificate validation context config that reports a fixed CRL blob, used to
 // exercise CRL sharing across validators.
 class CrlValidationContextConfig : public TestCertificateValidationContextConfig {

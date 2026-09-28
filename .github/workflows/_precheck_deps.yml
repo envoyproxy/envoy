@@ -36,6 +36,7 @@ jobs:
       concurrency-suffix: -${{ matrix.target }}
       docker-ci: false
       request: ${{ inputs.request }}
+      uploads: ${{ matrix.uploads }}
       error-match: |
         ERROR
         error:
@@ -49,3 +50,5 @@ jobs:
       matrix:
         include:
         - target: deps
+          uploads: |
+            fix_lockfiles.diff: /home/runner/work/_temp/container/fix_lockfiles.diff

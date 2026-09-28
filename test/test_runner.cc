@@ -123,6 +123,9 @@ bool isDeathTestChild(int argc, char** argv) {
 int TestRunner::runTests(int argc, char** argv) {
   const bool is_death_test_child = isDeathTestChild(argc, argv);
   ::testing::InitGoogleMock(&argc, argv);
+  // Record the thread initializing gtest (the first thread of the process) as the test thread,
+  // for platforms that cannot identify it directly.
+  Thread::TestThread::registerTestThread();
   // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
   ProcessWide process_wide(false);

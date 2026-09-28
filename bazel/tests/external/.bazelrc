@@ -14,7 +14,7 @@ fetch --color=yes
 run --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/66e17d52f35b5d203c9cd205be5e4833f63e8d5e
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/86855d5d9ae43755ad6648e4af39983c1c748874
 common --noincompatible_disallow_empty_glob
 
 build --workspace_status_command="bash get_workspace_status"
@@ -51,8 +51,6 @@ build:remote-ci --remote_download_minimal
 
 # Common flags for Clang (shared between all clang variants)
 common:clang-common --linkopt=-fuse-ld=lld
-common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
-common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
 
 # Clang with libc++ (default)
 common:clang --config=clang-common
@@ -83,9 +81,6 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-# This flag may be more generally useful - it sets foreign_cc builds -jauto.
-# It is only set here because if it were the default it risks OOMing on local builds.
-build:remote --@envoy//bazel/foreign_cc:parallel_builds
 
 ## RBE (Engflow Envoy)
 

@@ -355,7 +355,6 @@ class FormatChecker:
     def allow_listed_for_protobuf_deps(self, file_path):
         return (
             file_path.endswith(self.config.suffixes["proto"])
-            or file_path.endswith(self.config.suffixes["repositories_bzl"])
             or any(file_path.startswith(path) for path in self.config.paths["protobuf"]["include"]))
 
     # Real-world time sources should not be instantiated in the source, except for a few
