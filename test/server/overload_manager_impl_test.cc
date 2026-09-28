@@ -14,6 +14,7 @@
 #include "source/server/overload_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -40,6 +41,7 @@ using testing::Pointee;
 using testing::Property;
 using testing::Return;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
@@ -47,6 +49,12 @@ namespace Server {
 namespace {
 
 using TimerType = Event::ScaledTimerType;
+
+class MockSynchronousFeedbackResourceMonitor : public SynchronousFeedbackResourceMonitor {
+public:
+  MOCK_METHOD(ResourceUsage, getResourceUsage, (), (override));
+  MOCK_METHOD(void, onLoadAccepted, (absl::string_view), (override));
+};
 
 class FakeResourceMonitor : public ResourceMonitor {
 public:
@@ -151,6 +159,34 @@ public:
 };
 
 template <class ConfigType>
+class FakeSynchronousFeedbackResourceMonitorFactory
+    : public Server::Configuration::ResourceMonitorFactory {
+public:
+  FakeSynchronousFeedbackResourceMonitorFactory(const std::string& name) : name_(name) {}
+
+  absl::StatusOr<Server::ResourceMonitorPtr>
+  createResourceMonitor(const Protobuf::Message&,
+                        Server::Configuration::ResourceMonitorFactoryContext&) override {
+    if (!status_.ok()) {
+      return status_;
+    }
+    auto monitor = std::make_unique<StrictMock<MockSynchronousFeedbackResourceMonitor>>();
+    monitor_ = monitor.get();
+    return monitor;
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ConfigType()};
+  }
+
+  std::string name() const override { return name_; }
+
+  StrictMock<MockSynchronousFeedbackResourceMonitor>* monitor_{nullptr}; // not owned
+  absl::Status status_{absl::OkStatus()};
+  const std::string name_;
+};
+
+template <class ConfigType>
 class FakeProactiveResourceMonitorFactory
     : public Server::Configuration::ProactiveResourceMonitorFactory {
 public:
@@ -210,9 +246,17 @@ protected:
         factory3_("envoy.resource_monitors.fake_resource3"),
         factory4_("envoy.resource_monitors.fake_resource4"),
         factory5_("envoy.resource_monitors.global_downstream_max_connections"),
+        sf_factory1_("envoy.resource_monitors.fake_synchronous_feedback_resource1"),
+        sf_factory2_("envoy.resource_monitors.fake_synchronous_feedback_resource2"),
         register_factory1_(factory1_), register_factory2_(factory2_), register_factory3_(factory3_),
         register_factory4_(factory4_), register_factory5_(factory5_),
-        api_(Api::createApiForTest(stats_)) {}
+        register_sf_factory1_(sf_factory1_), register_sf_factory2_(sf_factory2_),
+        api_(Api::createApiForTest(stats_)) {
+    ON_CALL(dispatcher_, createTimer_(_)).WillByDefault(Invoke([&](Event::TimerCb cb) {
+      timer_cb_ = cb;
+      return new NiceMock<Event::MockTimer>();
+    }));
+  }
 
   void setDispatcherExpectation() {
     timer_ = new NiceMock<Event::MockTimer>();
@@ -245,11 +289,15 @@ protected:
   FakeResourceMonitorFactory<Envoy::Protobuf::Duration> factory3_;
   FakeResourceMonitorFactory<Envoy::Protobuf::StringValue> factory4_;
   FakeProactiveResourceMonitorFactory<Envoy::Protobuf::BoolValue> factory5_;
+  FakeSynchronousFeedbackResourceMonitorFactory<Envoy::Protobuf::DoubleValue> sf_factory1_;
+  FakeSynchronousFeedbackResourceMonitorFactory<Envoy::Protobuf::Int64Value> sf_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory4_;
   Registry::InjectFactory<Configuration::ProactiveResourceMonitorFactory> register_factory5_;
+  Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_sf_factory1_;
+  Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_sf_factory2_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockTimer>* timer_; // not owned
   Stats::TestUtil::TestStore stats_;
@@ -1820,6 +1868,340 @@ TEST_F(OverloadManagerLoadShedPointImplTest, LoadShedPointShouldUseCurrentReadin
   other_dispatcher->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(overload_action_states[0], UnitFloat(1));
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, SynchronousFeedbackResourceMonitorCreationFailure) {
+  sf_factory1_.status_ = absl::InternalError("sf_creation_error");
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException, "sf_creation_error");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, DuplicateSynchronousFeedbackResourceMonitor) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Duplicate resource monitor .*");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest,
+       DuplicateRegularAndSynchronousFeedbackResourceMonitor) {
+  // Regular monitor first, then synchronous feedback monitor with the same name.
+  const std::string config_regular_first = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+      - name: envoy.resource_monitors.fake_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config_regular_first), EnvoyException,
+                          "Duplicate resource monitor envoy.resource_monitors.fake_resource1");
+
+  // Synchronous feedback monitor first, then regular monitor with the same name.
+  const std::string config_synchronous_feedback_first = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(
+      createOverloadManager(config_synchronous_feedback_first), EnvoyException,
+      "Duplicate resource monitor envoy.resource_monitors.fake_synchronous_feedback_resource1");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest,
+       SynchronousFeedbackResourceMonitorWithOverloadActionAndStats) {
+  setDispatcherExpectation();
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            threshold:
+              value: 0.9
+    actions:
+      - name: envoy.overload_actions.stop_accepting_requests
+        triggers:
+          - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+
+  Event::DispatcherPtr other_dispatcher{api_->allocateDispatcher("other_dispatcher")};
+  std::vector<UnitFloat> overload_action_states;
+  manager->registerForAction(
+      "envoy.overload_actions.stop_accepting_requests", *other_dispatcher,
+      [&](OverloadActionState state) { overload_action_states.push_back(state.value()); });
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  Stats::Gauge& pressure_gauge =
+      stats_.gauge("overload.envoy.resource_monitors.fake_synchronous_feedback_resource1.pressure",
+                   Stats::Gauge::ImportMode::NeverImport);
+  Stats::Gauge& scale_percent =
+      stats_.gauge("overload.test_point.scale_percent", Stats::Gauge::ImportMode::Accumulate);
+
+  // 1. Periodic timer poll updates pressure gauge and triggers OverloadAction, while
+  // LoadShedPoint synchronous feedback triggers are not mutated by periodic main-thread updates.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.95}));
+  timer_cb_();
+  other_dispatcher->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(95, pressure_gauge.value());
+  EXPECT_EQ(0, scale_percent.value());
+  ASSERT_EQ(1, overload_action_states.size());
+  EXPECT_EQ(UnitFloat(1), overload_action_states[0]);
+
+  // 2. Even though periodic state was 0.95, hot-path shouldShedLoad() queries instantaneous
+  // getResourceUsage() without being stuck on stale periodic state.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.20}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+
+  // Exercise base class default no-op onLoadAccepted.
+  sf_factory1_.monitor_->SynchronousFeedbackResourceMonitor::onLoadAccepted("test_point");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, SynchronousFeedbackResourceMonitorThresholdTrigger) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  Stats::Gauge& scale_percent =
+      stats_.gauge("overload.test_point.scale_percent", Stats::Gauge::ImportMode::Accumulate);
+  Stats::Counter& shed_load_count = stats_.counter("overload.test_point.shed_load_count");
+
+  // Pressure below threshold: shouldShedLoad() returns false, onLoadAccepted() is called.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.5}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+  EXPECT_EQ(0, shed_load_count.value());
+  EXPECT_EQ(0, scale_percent.value());
+
+  // Pressure above threshold: shouldShedLoad() returns true, onLoadAccepted() is NOT called.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.95}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_TRUE(point->shouldShedLoad());
+  EXPECT_EQ(1, shed_load_count.value());
+  EXPECT_EQ(0, scale_percent.value());
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest,
+       SynchronousFeedbackResourceMonitorScaledTriggerAndBernoulli) {
+  StrictMock<Random::MockRandomGenerator> mock_random;
+  api_ = Api::createApiForTest(stats_, mock_random);
+
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  Stats::Counter& shed_load_count = stats_.counter("overload.test_point.shed_load_count");
+
+  // 1. Pressure <= scaling_threshold (0.4): probability is 0, load accepted without random call.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.4}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+  EXPECT_EQ(0, shed_load_count.value());
+
+  // 2. Pressure >= saturation_threshold (1.0): probability is 1.0, load shed immediately without
+  // random call or onLoadAccepted().
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{1.0}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_TRUE(point->shouldShedLoad());
+  EXPECT_EQ(1, shed_load_count.value());
+
+  // 3. Pressure in scaling range (0.75 -> probability 0.5), bernoulli returns true.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.75}));
+  EXPECT_CALL(mock_random, random()).WillOnce(Return(0));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_TRUE(point->shouldShedLoad());
+  EXPECT_EQ(2, shed_load_count.value());
+
+  // 4. Pressure in scaling range (0.75 -> probability 0.5), bernoulli returns false.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.75}));
+  EXPECT_CALL(mock_random, random()).WillOnce(Return(Random::RandomGenerator::max()));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+  EXPECT_EQ(2, shed_load_count.value());
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest,
+       SynchronousFeedbackResourceMonitorMaxWithAsyncProbability) {
+  setDispatcherExpectation();
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  // Set async pressure to 1.0 so probability_shed_load_ becomes 1.0.
+  factory1_.monitor_->setPressure(1.0);
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.0}));
+  timer_cb_();
+
+  // Even when synchronous feedback pressure is 0.0, probability = std::max(1.0f, 0.0f) = 1.0f, so
+  // load is shed.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.0}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_TRUE(point->shouldShedLoad());
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, MultipleSynchronousFeedbackResourceMonitors) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource2
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Int64Value
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            threshold:
+              value: 0.9
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource2"
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  ASSERT_NE(sf_factory2_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  // Both monitors report low pressure -> load accepted, onLoadAccepted() called on BOTH.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.1}));
+  EXPECT_CALL(*sf_factory2_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.2}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_CALL(*sf_factory2_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+
+  // Monitor 2 reports saturated pressure -> load shed, onLoadAccepted() called on NEITHER.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.1}));
+  EXPECT_CALL(*sf_factory2_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{1.0}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_CALL(*sf_factory2_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_TRUE(point->shouldShedLoad());
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, SynchronousFeedbackResourceMonitorSafeAfterStop) {
+  setDispatcherExpectation();
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  EXPECT_CALL(*timer_, disableTimer());
+  manager->stop();
+
+  // Worker threads may still invoke shouldShedLoad() after overload_manager_->stop()
+  // before workers are stopped; verify the monitor remains alive.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.5}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
 }
 
 TEST(TriggerTest, EvaluateIsStateless) {
