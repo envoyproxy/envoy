@@ -452,7 +452,8 @@ private:
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
-    template <class StatType> using StatTypeOptConstRef = OptRef<const StatType>;
+    template <class StatType>
+    using StatTypeOptConstRef = std::optional<std::reference_wrapper<const StatType>>;
 
     /**
      * Looks up an existing stat, populating the local cache if necessary. Does
@@ -472,7 +473,7 @@ private:
         return std::nullopt;
       }
 
-      return *iter->second;
+      return std::cref(*iter->second);
     }
 
     StatName prefix() const override { return prefix_; }

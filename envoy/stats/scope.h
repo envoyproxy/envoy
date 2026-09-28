@@ -6,7 +6,6 @@
 #include <optional>
 #include <string>
 
-#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/refcount_ptr.h"
@@ -26,10 +25,10 @@ class Scope;
 class Store;
 class TextReadout;
 
-using CounterOptConstRef = OptRef<const Counter>;
-using GaugeOptConstRef = OptRef<const Gauge>;
-using HistogramOptConstRef = OptRef<const Histogram>;
-using TextReadoutOptConstRef = OptRef<const TextReadout>;
+using CounterOptConstRef = std::optional<std::reference_wrapper<const Counter>>;
+using GaugeOptConstRef = std::optional<std::reference_wrapper<const Gauge>>;
+using HistogramOptConstRef = std::optional<std::reference_wrapper<const Histogram>>;
+using TextReadoutOptConstRef = std::optional<std::reference_wrapper<const TextReadout>>;
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
@@ -472,7 +471,7 @@ public:
   // be used for the duration of the (synchronous) call.
   static std::optional<StatNameTagSpan> toTagSpan(StatNameTagVectorOptConstRef tags) {
     if (tags.has_value()) {
-      return StatNameTagSpan(tags.ref());
+      return StatNameTagSpan(tags->get());
     }
     return std::nullopt;
   }

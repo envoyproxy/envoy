@@ -928,10 +928,12 @@ struct ClusterCircuitBreakersStats {
 };
 
 using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
-using ClusterRequestResponseSizeStatsOptRef = OptRef<ClusterRequestResponseSizeStats>;
+using ClusterRequestResponseSizeStatsOptRef =
+    std::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>;
 
 using ClusterTimeoutBudgetStatsPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
-using ClusterTimeoutBudgetStatsOptRef = OptRef<ClusterTimeoutBudgetStats>;
+using ClusterTimeoutBudgetStatsOptRef =
+    std::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>>;
 
 /**
  * All extension protocol specific options returned by the method at
@@ -1273,13 +1275,14 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
-   * @return ClusterRequestResponseSizeStatsOptRef stats to track headers/body sizes of
-   * request/response for this cluster.
+   * @return std::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>> stats to track
+   * headers/body sizes of request/response for this cluster.
    */
   virtual ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const PURE;
 
   /**
-   * @return ClusterTimeoutBudgetStatsOptRef stats on timeout budgets for this cluster.
+   * @return std::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout
+   * budgets for this cluster.
    */
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
@@ -1496,7 +1499,7 @@ public:
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
-using ClusterConstOptRef = OptRef<const Cluster>;
+using ClusterConstOptRef = std::optional<std::reference_wrapper<const Cluster>>;
 
 } // namespace Upstream
 } // namespace Envoy
