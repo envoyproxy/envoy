@@ -70,7 +70,13 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
   }
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(extension_config.value());
-  extension->initializeInModuleExtension();
+  // A null in-module extension means the module reported a configuration error. Reject at load so
+  // later hooks do not silently no-op against a null extension.
+  if (!extension->initializeInModuleExtension()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, proto_config.extension_name(), Extensions::DynamicModules::ConfigInitErrorStat);
+    throwEnvoyExceptionOrPanic("Failed to initialize dynamic module bootstrap extension");
+  }
   return extension;
 }
 

@@ -278,6 +278,7 @@ envoy_cc_library(
         "//envoy/config:custom_config_validators_interface",
         "//envoy/server:instance_interface",
         "//source/common/config:utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

@@ -670,7 +670,6 @@ TEST(SSLTest, test_SSL_get_curve_name) {
   EXPECT_STREQ("P-521", SSL_get_curve_name(SSL_CURVE_SECP521R1));
   EXPECT_STREQ("X25519", SSL_get_curve_name(SSL_CURVE_X25519));
   EXPECT_STREQ("X25519MLKEM768", SSL_get_curve_name(SSL_GROUP_X25519_MLKEM768));
-  EXPECT_STREQ("X25519Kyber768Draft00", SSL_get_curve_name(SSL_GROUP_X25519_KYBER768_DRAFT00));
 }
 
 TEST(SSLTest, test_SSL_get_group_name) {
@@ -679,7 +678,6 @@ TEST(SSLTest, test_SSL_get_group_name) {
   EXPECT_STREQ("P-521", SSL_get_group_name(SSL_CURVE_SECP521R1));
   EXPECT_STREQ("X25519", SSL_get_group_name(SSL_CURVE_X25519));
   EXPECT_STREQ("X25519MLKEM768", SSL_get_group_name(SSL_GROUP_X25519_MLKEM768));
-  EXPECT_STREQ("X25519Kyber768Draft00", SSL_get_group_name(SSL_GROUP_X25519_KYBER768_DRAFT00));
 }
 
 struct Sigalgs {

@@ -405,6 +405,7 @@ envoy_cc_test(
     deps = [
         "//envoy/common:logger",
         "//source/common/common:notification_lib",
+        "//source/common/http:codes_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:allocator_lib",
         "//source/common/stats:symbol_table_lib",
