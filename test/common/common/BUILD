@@ -9,7 +9,7 @@ load(
 )
 load(
     "//bazel:execution_context_transition.bzl",
-    "execution_context_enabled_test",
+    "execution_context_dual_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -731,7 +731,7 @@ envoy_benchmark_test(
     benchmark_binary = "linked_object_speed_test",
 )
 
-envoy_cc_test(
+execution_context_dual_test(
     name = "execution_context_test",
     srcs = ["execution_context_test.cc"],
     rbe_pool = "linux_x64_small",
@@ -743,11 +743,6 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/stream_info:stream_info_mocks",
     ],
-)
-
-execution_context_enabled_test(
-    name = "execution_context_enabled_test",
-    test = ":execution_context_test",
 )
 
 envoy_cc_test(
