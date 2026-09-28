@@ -87,6 +87,8 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         ":mocks",
+        "//envoy/http:codes_interface",
+        "//source/common/http:headers_lib",
         "//source/extensions/filters/http/cache_v2:upstream_request_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",

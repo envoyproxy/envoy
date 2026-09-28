@@ -12,7 +12,6 @@ envoy_extension_cc_test(
     name = "network_configuration_filter_test",
     srcs = ["network_configuration_filter_test.cc"],
     extension_names = ["envoy.filters.http.network_configuration"],
-    repository = "@envoy",
     deps = [
         "//library/common/api:external_api_lib",
         "//library/common/bridge:utility_lib",

@@ -20,5 +20,6 @@ Contrib extensions
   wasm_filter_stats_sink/wasm_filter_stats_sink
   tap_sinks/tap_sinks
   load_balancing_policies/peak_ewma/peak_ewma
+  load_balancing_policies/per_worker_subset/per_worker_subset
   istio/istio
   reverse_tunnel_reporter/reverse_tunnel_reporter

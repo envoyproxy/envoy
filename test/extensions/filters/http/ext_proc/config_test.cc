@@ -1,9 +1,11 @@
 // Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
 // generally should not change or remove existing tests.
 
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/config.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -617,6 +619,65 @@ TEST(HttpExtProcConfigTest, PerRouteEmitClientSpanConfig) {
   const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config);
   EXPECT_TRUE(typed_config.emitClientSpan().has_value());
   EXPECT_FALSE(typed_config.emitClientSpan().value());
+}
+
+// The gRPC client is shared across listeners and clusters via a central cache, so it must always
+// be created with the server scope. In particular the scope of an upstream filter, which has a
+// 'cluster.<cluster_name>.' prefix, must not leak into the gRPC client stats.
+TEST(HttpExtProcConfigTest, GrpcClientIsCreatedWithServerScope) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  failure_mode_allow: true
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl cluster_store;
+  Stats::ScopeSharedPtr cluster_scope = cluster_store.createScope("cluster.fake_cluster");
+
+  // Create the filter as an upstream filter, that is with the cluster scope.
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
+  extra_context.scope = *cluster_scope;
+  extra_context.is_upstream = true;
+
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
+
+  Http::StreamFilterSharedPtr filter;
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_)).WillOnce(testing::SaveArg<0>(&filter));
+  cb(filter_callback);
+
+  // Opening the stream is the point at which the client asks for the raw async client with the
+  // scope that it was created with. Fail the creation to keep the test to the scope check.
+  Stats::Scope* client_scope = nullptr;
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              getOrCreateRawAsyncClientWithHashKey(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&client_scope](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope& scope,
+                          bool) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+            client_scope = &scope;
+            return absl::InternalError("no client for this test");
+          }));
+
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  filter->decodeHeaders(headers, true);
+
+  ASSERT_NE(client_scope, nullptr);
+  EXPECT_EQ(client_scope, &context.scope());
+  EXPECT_NE(client_scope, cluster_scope.get());
+
+  filter->onDestroy();
 }
 
 } // namespace

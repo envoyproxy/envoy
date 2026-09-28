@@ -116,6 +116,7 @@ envoy_cc_library(
         "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/router:context_lib",
+        "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/tcp:async_tcp_client_lib",

@@ -16,7 +16,6 @@ envoy_cc_library(
     name = "postgres_message_parser_lib",
     srcs = ["postgres_message_parser.cc"],
     hdrs = ["postgres_message_parser.h"],
-    repository = "@envoy",
     deps = [
         "//contrib/postgres/protocol:postgres_protocol_lib",
         "//envoy/buffer:buffer_interface",
@@ -29,7 +28,6 @@ envoy_cc_library(
     name = "postgres_inspector_lib",
     srcs = ["postgres_inspector.cc"],
     hdrs = ["postgres_inspector.h"],
-    repository = "@envoy",
     deps = [
         ":postgres_message_parser_lib",
         "//envoy/event:timer_interface",
@@ -52,7 +50,6 @@ envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":postgres_inspector_lib",
         "//envoy/registry",

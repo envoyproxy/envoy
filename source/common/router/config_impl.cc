@@ -46,6 +46,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/header_cluster_specifier.h"
 #include "source/common/router/matcher_visitor.h"
+#include "source/common/router/route_specifier_impl.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/custom_tag_impl.h"
@@ -124,6 +125,53 @@ public:
     return route;
   }
 };
+
+namespace {
+
+// Evaluates a route a specifier built the same way route matching evaluates a configured route.
+class MatchableRouteImpl : public MatchableRoute {
+public:
+  MatchableRouteImpl(RouteEntryImplBaseConstSharedPtr route, bool ignore_path_parameters)
+      : route_(std::move(route)), ignore_path_parameters_(ignore_path_parameters) {}
+
+  // Router::MatchableRoute
+  RouteConstSharedPtr match(const Http::RequestHeaderMap& headers,
+                            const StreamInfo::StreamInfo& stream_info,
+                            uint64_t random) const override {
+    if (headers.Path() == nullptr && !route_->supportsPathlessHeaders()) {
+      return nullptr;
+    }
+    RouteMatchContext context(headers, ignore_path_parameters_);
+    return route_->matches(context, stream_info, random);
+  }
+
+private:
+  const RouteEntryImplBaseConstSharedPtr route_;
+  const bool ignore_path_parameters_;
+};
+
+} // namespace
+
+absl::StatusOr<MatchableRouteConstSharedPtr>
+RouteBuilderImpl::build(const envoy::config::route::v3::Route& route, bool validate_clusters) {
+  if (!route.route_specifiers().empty()) {
+    return absl::InvalidArgumentError("route_specifiers are not supported on a built route");
+  }
+  // Building a route runs the extensions it configures, which throw on configuration they reject,
+  // so the caller only has to handle a status.
+  absl::StatusOr<RouteEntryImplBaseConstSharedPtr> route_or_error =
+      absl::InvalidArgumentError("unreachable");
+  TRY_ASSERT_MAIN_THREAD {
+    route_or_error = RouteCreator::createAndValidateRoute(
+        route, vhost_, factory_context_, validator_, init_manager_, validate_clusters);
+  }
+  END_TRY
+  CATCH(const EnvoyException& e, { route_or_error = absl::InvalidArgumentError(e.what()); });
+  RETURN_IF_NOT_OK_REF(route_or_error.status());
+  return std::make_shared<MatchableRouteImpl>(
+      std::move(route_or_error.value()),
+      vhost_->globalRouteConfig().ignorePathParametersInPathMatching());
+}
 
 namespace {
 
@@ -802,6 +850,13 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   } else {
     early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
+
+  RouteBuilderImpl route_builder(vhost, factory_context, validator, init_manager);
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, route_builder);
+  auto route_specifiers_or_error =
+      createRouteSpecifiers(route.route_specifiers(), specifier_context);
+  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
+  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -1822,9 +1877,16 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       routes_.emplace_back(route_or_error.value());
     }
   }
+
+  RouteBuilderImpl route_builder(shared_virtual_host_, factory_context, validator, init_manager);
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, route_builder);
+  auto route_specifiers_or_error =
+      createRouteSpecifiers(virtual_host.route_specifiers(), specifier_context);
+  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
+  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
-RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
+VirtualHostMatchResult VirtualHostImpl::getRouteFromRoutes(
     const RouteCallback& cb, const RouteMatchContext& route_match_context,
     const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
     absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const {
@@ -1840,7 +1902,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
     }
 
     if (cb == nullptr) {
-      return route_entry;
+      return {std::move(route_entry), (*route)->routeSpecifiers()};
     }
 
     RouteEvalStatus eval_status = (std::next(route) == routes.end())
@@ -1848,24 +1910,24 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
                                       : RouteEvalStatus::HasMoreRoutes;
     RouteMatchStatus match_status = cb(route_entry, eval_status);
     if (match_status == RouteMatchStatus::Accept) {
-      return route_entry;
+      return {std::move(route_entry), (*route)->routeSpecifiers()};
     }
     if (match_status == RouteMatchStatus::Continue &&
         eval_status == RouteEvalStatus::NoMoreRoutes) {
       ENVOY_LOG(debug,
                 "return null when route match status is Continue but there is no more routes");
-      return nullptr;
+      return {};
     }
   }
 
   ENVOY_LOG(debug, "route was resolved but final route list did not match incoming request");
-  return nullptr;
+  return {};
 }
 
-RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb,
-                                                         const Http::RequestHeaderMap& headers,
-                                                         const StreamInfo::StreamInfo& stream_info,
-                                                         uint64_t random_value) const {
+VirtualHostMatchResult
+VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                     const StreamInfo::StreamInfo& stream_info,
+                                     uint64_t random_value) const {
   // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
   // connection), force a redirect based on underlying protocol, rather than URL
   // scheme, so don't force a redirect for a http:// url served over a TLS
@@ -1874,15 +1936,15 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
   if (scheme.empty()) {
     // No scheme header. This normally only happens when ActiveStream::decodeHeaders
     // bails early (as it rejects a request), or a buggy filter removes the :scheme header.
-    return nullptr;
+    return {};
   }
 
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::All && scheme != "https") {
-    return ssl_redirect_route_;
+    return {ssl_redirect_route_, {}};
   } else if (ssl_requirements_ == SslRequirements::ExternalOnly && scheme != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
-    return ssl_redirect_route_;
+    return {ssl_redirect_route_, {}};
   }
 
   // Constructed once per request; derived values (query params, cookies, etc.) are computed
@@ -1914,7 +1976,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     ENVOY_LOG(debug, "failed to match incoming request: {}",
               match_result.isNoMatch() ? "no match" : "insufficient data");
 
-    return nullptr;
+    return {};
   }
 
   // Check for a route that matches the request.
@@ -1961,7 +2023,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            ProtobufMessage::ValidationVisitor& validator,
                            Init::Manager& init_manager, bool validate_clusters,
                            absl::Status& creation_status)
-    : vhost_scope_(factory_context.scope().scopeFromStatName(
+    : global_route_config_(global_route_config),
+      vhost_scope_(factory_context.scope().scopeFromStatName(
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()),
       vhost_header_(route_config.vhost_header()) {
@@ -2074,10 +2137,36 @@ VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::Reques
                                      const StreamInfo::StreamInfo& stream_info,
                                      uint64_t random_value) const {
   VirtualHostRoute route_result;
+
+  RouteSpecifierSpan config_specifiers = global_route_config_->routeSpecifiers();
+  RouteSpecifierSpan vhost_specifiers;
+  VirtualHostMatchResult match_result;
+
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
     route_result.vhost = virtual_host->virtualHost();
-    route_result.route = virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
+    vhost_specifiers = virtual_host->routeSpecifiers();
+    match_result = virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
+  }
+
+  const bool has_route_specifiers = !config_specifiers.empty() || !vhost_specifiers.empty() ||
+                                    !match_result.route_specifiers.empty();
+  if (!has_route_specifiers) {
+    // Quick return if there are no route specifiers at any level.
+    route_result.route = std::move(match_result.route);
+    return route_result;
+  }
+
+  // The route configuration and virtual host chains run whether or not a route matched, so that a
+  // specifier can supply a fallback route for a request that would otherwise get no route at all.
+  // The route level chain is empty unless a route matched.
+  route_result.route =
+      applyRouteSpecifiers(std::move(match_result.route), config_specifiers, vhost_specifiers,
+                           match_result.route_specifiers, headers, stream_info, random_value);
+  if (route_result.route != nullptr) {
+    if (std::addressof(route_result.route->virtualHost()) != route_result.vhost.get()) {
+      route_result.vhost = route_result.route->virtualHostSharedPtr();
+    }
   }
 
   return route_result;
@@ -2168,6 +2257,12 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
   if (config.has_metadata()) {
     metadata_ = std::make_unique<RouteMetadataPack>(config.metadata());
   }
+
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, {});
+  auto route_specifiers_or_error =
+      createRouteSpecifiers(config.route_specifiers(), specifier_context);
+  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
+  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
 absl::StatusOr<ClusterSpecifierPluginSharedPtr>

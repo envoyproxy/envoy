@@ -121,7 +121,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     std::string prefix = Runtime::runtimeFeatureEnabled(
                              "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
                              ? context.scope().symbolTable().toString(stat_prefix)
-                             : context.scope().symbolTable().toString(context.scope().prefix());
+                             : "";
     upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
