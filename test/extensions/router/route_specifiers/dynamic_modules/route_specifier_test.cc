@@ -498,6 +498,44 @@ TEST_F(DynamicModuleRouteSpecifierTest, RegexRewriteOverrideLoads) {
   EXPECT_TRUE(config.ok());
 }
 
+// A route override may carry tracing, built once when the specifier loads.
+TEST_F(DynamicModuleRouteSpecifierTest, TracingOverrideLoads) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      route_overrides:
+      - override_id: traced
+        tracing:
+          client_sampling: {numerator: 10}
+          overall_sampling: {numerator: 50}
+)EOF"));
+  EXPECT_TRUE(config.ok());
+}
+
+// An invalid tracing operation formatter is rejected when the specifier loads rather than throwing.
+TEST_F(DynamicModuleRouteSpecifierTest, InvalidTracingOperationRejected) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      route_overrides:
+      - override_id: traced
+        tracing:
+          operation: "%INVALID_COMMAND_THAT_DOES_NOT_EXIST%"
+)EOF"));
+  EXPECT_FALSE(config.ok());
+}
+
+// A route override may carry metadata, which is a route level property valid on any route.
+TEST_F(DynamicModuleRouteSpecifierTest, MetadataOverrideLoads) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      route_overrides:
+      - override_id: tagged
+        metadata:
+          filter_metadata:
+            envoy.test.override: {group: canary}
+)EOF"));
+  EXPECT_TRUE(config.ok());
+}
+
 // A shadow policy of a route override that names a cluster the cluster manager does not know
 // is rejected when clusters are validated, since a statically named cluster can be checked at load.
 TEST_F(DynamicModuleRouteSpecifierTest, ValidateClustersRejectsUnknownShadowCluster) {

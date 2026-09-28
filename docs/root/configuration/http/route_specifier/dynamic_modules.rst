@@ -115,6 +115,12 @@ Each override is built and validated once when the specifier is configured, and 
 one by ``override_id``. An override that replaces no property is rejected, so a module can rely on a
 declared override changing something.
 
+An override may also carry ``tracing`` and ``metadata``, which are route level properties valid on
+any route including a direct response or a redirect, unlike the retry policy and the other route
+entry properties. Module selected route metadata can change authorization decisions, rate limiting
+descriptors and access log fields, so the override set is static configuration chosen by trusted in
+process code.
+
 Notes
 -----
 

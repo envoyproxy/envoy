@@ -852,6 +852,14 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_override(
       context->overrides.path = std::move(*rewritten);
     }
   }
+  // A metadata bundle carried by the override layers onto the route metadata, per namespace, the
+  // same way module recorded metadata does.
+  for (const auto& [name, fields] : entry->metadata.filter_metadata()) {
+    (*context->overrides.route_metadata.mutable_filter_metadata())[name].MergeFrom(fields);
+  }
+  for (const auto& [name, typed] : entry->metadata.typed_filter_metadata()) {
+    (*context->overrides.route_metadata.mutable_typed_filter_metadata())[name] = typed;
+  }
   return true;
 }
 
