@@ -823,6 +823,9 @@ TranscodeRuleSet anthropicRequestFromIr() {
           TranscodeRule::valueMap("tool_choice.type", {{"required", "any"}, {"function", "tool"}}),
           TranscodeRule::move("tool_choice.function.name", "tool_choice.name"),
           TranscodeRule::drop("tool_choice.function"),
+          // 7. Anthropic has no stream options: it reports usage in every stream, and rejects
+          //    the field as unknown.
+          TranscodeRule::drop("stream_options"),
       });
 }
 

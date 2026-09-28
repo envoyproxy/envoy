@@ -1249,10 +1249,10 @@ TEST(TranscodingEngineTest, IrRequestToGeminiMovesTheModelAndStreamIntoThePath) 
   EXPECT_FALSE(unary.contains("stream"));
 
   // Anthropic names its model in the body, so there is no path to rewrite, and none survives from
-  // an earlier leg.
+  // an earlier leg. It rejects `stream_options` too, and reports usage in every stream anyway.
   nlohmann::json anthropic = nlohmann::json::parse(R"({
-    "model": "claude-sonnet-4-5", "stream": true, "max_completion_tokens": 16,
-    "messages": [{"role": "user", "content": "Hi"}]
+    "model": "claude-sonnet-4-5", "stream": true, "stream_options": {"include_usage": true},
+    "max_completion_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
   })");
   ASSERT_THAT(engine.transcode({PayloadKind::Request, TranscodeDirection::FromIr,
                                 LLMProtocol::AnthropicMessages},
@@ -1261,6 +1261,7 @@ TEST(TranscodingEngineTest, IrRequestToGeminiMovesTheModelAndStreamIntoThePath) 
   EXPECT_FALSE(ctx.rewritten_path.has_value());
   EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
   EXPECT_EQ(anthropic["stream"], true);
+  EXPECT_FALSE(anthropic.contains("stream_options"));
 }
 
 // The model becomes a path segment, so one that could escape it is refused, and no path is
