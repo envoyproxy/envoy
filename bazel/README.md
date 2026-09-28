@@ -115,11 +115,11 @@ for how to update or override dependencies.
     - `--config=gcc`: Uses `gcc` compiler with `libstdc++` (GNU standard library)
     - No config flag: Uses system default compiler settings
 
-    Note: While it's possible to use `clang` with `libstdc++` by setting CC/CXX environment variables without a config flag, this combination is not tested or supported.
+    Note: Envoy derives the default standard library from the active compiler/toolchain: `--config=clang` and Apple builds use `libc++`, while `--config=gcc` uses `libstdc++`. `clang` with `libstdc++` remains available via `--//bazel:libstdc++=true`, and `--//bazel:libc++=true` explicitly forces `libc++`.
 
     For more granular control:
     - `--config=clang-common`: Provides base clang configuration without standard library settings
-    - `--config=libc++`: Provides just the libc++ standard library flags
+    - `--config=libc++`: Provides just the libc++ standard library flags for local/non-hermetic builds
     - `--config=libstdc++`: Provides just the libstdc++ standard library flags
 
 

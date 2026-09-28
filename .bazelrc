@@ -181,13 +181,9 @@ common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
 common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
-common:libc++ --define force_libcpp=enabled
-common:libc++ --@envoy//bazel:libc++=true
 
 # libstdc++ - currently only used for gcc
 build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build:libstdc++ --@envoy//bazel:libc++=false
-build:libstdc++ --@envoy//bazel:libstdc++=true
 build:libstdc++ --repo_env=BAZEL_USE_LIBSTDCPP=True
 
 
@@ -402,7 +398,6 @@ build:oss-fuzz --linkopt=-fno-sanitize=vptr
 build:oss-fuzz --define=tcmalloc=disabled
 build:oss-fuzz --define=signal_trace=disabled
 build:oss-fuzz --copt=-D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
-build:oss-fuzz --define=force_libcpp=enabled
 build:oss-fuzz --linkopt=-lc++
 build:oss-fuzz --linkopt=-pthread
 
