@@ -773,6 +773,77 @@ TEST_F(DynamicModuleHttpFilterTest, SocketOptionMultipleOptions) {
   EXPECT_EQ(bytes_val, std::string(bytes_result.ptr, bytes_result.length));
 }
 
+// A module that sets the same option twice reads back the latest value, not the first one stored.
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionLatestValueWins) {
+  const int64_t level = 7;
+  const int64_t name = 8;
+  const std::string first = "first";
+  const std::string second = "second";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, {first.data(), first.size()}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, {second.data(), second.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, &result));
+  EXPECT_EQ(second, std::string(result.ptr, result.length));
+}
+
+// A module that sets the same int option twice reads back the latest value, not the first stored.
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionIntLatestValueWins) {
+  const int64_t level = 11;
+  const int64_t name = 12;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, 100));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, 200));
+
+  int64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, &result));
+  EXPECT_EQ(200, result);
+}
+
+// A bytes option view keeps a stable address as more options are appended, so a module holding the
+// view never reads freed memory where the old vector backed store would have reallocated.
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionBytesViewSurvivesAppends) {
+  const int64_t level = 9;
+  const int64_t name = 10;
+  const std::string value = "stable-bytes";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, {value.data(), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer first_view;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, &first_view));
+  const char* first_ptr = first_view.ptr;
+
+  // Append enough options to force a reallocation of the old vector backed store.
+  for (int64_t i = 0; i < 256; ++i) {
+    const std::string filler = "filler";
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+        filter_.get(), 1000 + i, 1000 + i, envoy_dynamic_module_type_socket_option_state_Bound,
+        envoy_dynamic_module_type_socket_direction_Upstream, {filler.data(), filler.size()}));
+  }
+
+  envoy_dynamic_module_type_envoy_buffer second_view;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, &second_view));
+  // The stored element never moved, so the address is unchanged and the bytes are intact.
+  EXPECT_EQ(first_ptr, second_view.ptr);
+  EXPECT_EQ(value, std::string(second_view.ptr, second_view.length));
+}
+
 TEST_F(DynamicModuleHttpFilterTest, SocketOptionDirectionDifferentiation) {
   // Set the same option with different directions - they should be stored separately.
   const int64_t level = 1;

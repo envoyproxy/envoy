@@ -3,7 +3,6 @@
 #include <atomic>
 #include <deque>
 #include <string>
-#include <vector>
 
 #include "envoy/http/async_client.h"
 #include "envoy/network/connection.h"
@@ -267,7 +266,9 @@ private:
     std::string byte_value;
   };
 
-  std::vector<StoredSocketOption> socket_options_;
+  // A deque keeps element addresses stable as options are appended, so a byte value view handed to
+  // a module stays valid until the filter is destroyed as the ABI promises.
+  std::deque<StoredSocketOption> socket_options_;
 };
 
 /**

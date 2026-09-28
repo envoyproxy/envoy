@@ -1706,6 +1706,71 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetSocketOptionBytes) {
   EXPECT_EQ(value, std::string(result.ptr, result.length));
 }
 
+// A module that sets the same option twice reads back the latest value, not the first one stored.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SocketOptionLatestValueWins) {
+  const int64_t level = 7;
+  const int64_t name = 8;
+  const std::string first = "first";
+  const std::string second = "second";
+  envoy_dynamic_module_callback_network_set_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      {first.data(), first.size()});
+  envoy_dynamic_module_callback_network_set_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      {second.data(), second.size()});
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound, &result));
+  EXPECT_EQ(second, std::string(result.ptr, result.length));
+}
+
+// A module that sets the same int option twice reads back the latest value, not the first stored.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SocketOptionIntLatestValueWins) {
+  const int64_t level = 11;
+  const int64_t name = 12;
+  envoy_dynamic_module_callback_network_set_socket_option_int(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, 100);
+  envoy_dynamic_module_callback_network_set_socket_option_int(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, 200);
+
+  int64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_int(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, &result));
+  EXPECT_EQ(200, result);
+}
+
+// A bytes option view keeps a stable address as more options are appended, so a module holding the
+// view never reads freed memory where the old vector backed store would have reallocated.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SocketOptionBytesViewSurvivesAppends) {
+  const int64_t level = 9;
+  const int64_t name = 10;
+  const std::string value = "stable-bytes";
+  envoy_dynamic_module_callback_network_set_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      {value.data(), value.size()});
+
+  envoy_dynamic_module_type_envoy_buffer first_view;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound, &first_view));
+  const char* first_ptr = first_view.ptr;
+
+  // Append enough options to force a reallocation of the old vector backed store.
+  for (int64_t i = 0; i < 256; ++i) {
+    const std::string filler = "filler";
+    envoy_dynamic_module_callback_network_set_socket_option_bytes(
+        filterPtr(), 1000 + i, 1000 + i, envoy_dynamic_module_type_socket_option_state_Bound,
+        {filler.data(), filler.size()});
+  }
+
+  envoy_dynamic_module_type_envoy_buffer second_view;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound, &second_view));
+  // The stored element never moved, so the address is unchanged and the bytes are intact.
+  EXPECT_EQ(first_ptr, second_view.ptr);
+  EXPECT_EQ(value, std::string(second_view.ptr, second_view.length));
+}
+
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSocketOptionIntMissing) {
   int64_t value = 0;
   EXPECT_FALSE(envoy_dynamic_module_callback_network_get_socket_option_int(

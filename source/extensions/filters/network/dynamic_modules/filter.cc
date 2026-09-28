@@ -199,7 +199,9 @@ void DynamicModuleNetworkFilter::storeSocketOptionBytes(
 bool DynamicModuleNetworkFilter::tryGetSocketOptionInt(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     int64_t& value_out) const {
-  for (const auto& opt : socket_options_) {
+  // Iterate newest first so a re-set option returns its latest value.
+  for (auto it = socket_options_.rbegin(); it != socket_options_.rend(); ++it) {
+    const auto& opt = *it;
     if (opt.is_int && opt.level == level && opt.name == name && opt.state == state) {
       value_out = opt.int_value;
       return true;
@@ -211,7 +213,9 @@ bool DynamicModuleNetworkFilter::tryGetSocketOptionInt(
 bool DynamicModuleNetworkFilter::tryGetSocketOptionBytes(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     absl::string_view& value_out) const {
-  for (const auto& opt : socket_options_) {
+  // Iterate newest first so a re-set option returns its latest value.
+  for (auto it = socket_options_.rbegin(); it != socket_options_.rend(); ++it) {
+    const auto& opt = *it;
     if (!opt.is_int && opt.level == level && opt.name == name && opt.state == state) {
       value_out = opt.byte_value;
       return true;
