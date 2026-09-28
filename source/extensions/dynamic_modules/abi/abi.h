@@ -17095,6 +17095,24 @@ void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
     uint64_t user_data);
 
 /**
+ * envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite records a prefix rewrite of the
+ * request path sent upstream. matched must be a case insensitive prefix of the current path without
+ * its query string, which is replaced by replacement while the query string is preserved. Envoy
+ * computes the rewritten path once, so it takes precedence over the rewrites of the route the same
+ * way set_path does.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param matched is the prefix of the path to replace. The buffer is owned by the module.
+ * @param replacement is the replacement for the matched prefix. The buffer is owned by the module.
+ * @return true when matched is a case insensitive prefix of the path and the rewritten path is
+ * within the configured maximum, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer matched,
+    envoy_dynamic_module_type_module_buffer replacement);
+
+/**
  * envoy_dynamic_module_callback_route_specifier_set_route_override selects a route override
  * declared in the route specifier configuration by override_id. It replaces the retry policy,
  * metadata match criteria, request mirroring policies, hash policy, hedge policy, rate limits and
