@@ -190,6 +190,13 @@ def envoy_cc_fuzz_test(
         define_regression_test = False,
     )
 
+def envoy_test_env(env = {}):
+    return env | select({
+        _LOCAL_ASAN_BUILD: {"ASAN_SYMBOLIZER_PATH": "%s/bin/llvm-symbolizer" % LLVM_PATH},
+        _ASAN_BUILD: {"ASAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
+        "//conditions:default": {},
+    })
+
 # Envoy C++ test targets should be specified with this function.
 def envoy_cc_test(
         name,
@@ -243,11 +250,7 @@ def envoy_cc_test(
         shard_count = shard_count,
         size = size,
         flaky = flaky,
-        env = env | select({
-            _LOCAL_ASAN_BUILD: {"ASAN_SYMBOLIZER_PATH": "%s/bin/llvm-symbolizer" % LLVM_PATH},
-            _ASAN_BUILD: {"ASAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
-            "//conditions:default": {},
-        }),
+        env = envoy_test_env(env),
         exec_properties = exec_properties,
     )
 

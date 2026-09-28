@@ -213,4 +213,15 @@ TEST_F(ExecutionContextTest, FilterManagerCompiles) {
 
 } // namespace Envoy
 
+#else
+
+namespace Envoy {
+
+TEST(ExecutionContextDisabledTest, FeatureIsDisabled) {
+  // Confirm that the test suite runs and succeeds when execution context is disabled.
+  SUCCEED();
+}
+
+} // namespace Envoy
+
 #endif
