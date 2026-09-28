@@ -48,6 +48,19 @@ public:
 
 REGISTER_FACTORY(TestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
+// A second typed object factory under a distinct name, so a test can store two filter-state values
+// and verify that consecutive getter calls do not invalidate each other.
+class SecondTestTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.typed_object_second"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(SecondTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 // A filter state object that does not support serialization. Used to test the
 // get_filter_state_typed fallback when serializeAsString() returns nullopt.
 class NonSerializableObject : public StreamInfo::FilterState::Object {};
@@ -1013,6 +1026,55 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetFilterStateTyped) {
   EXPECT_TRUE(ok);
   EXPECT_EQ(value.size(), result.length);
   EXPECT_EQ(value, std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ConsecutiveFilterStateGettersStayValid) {
+  const std::string key1 = "envoy.test.typed_object";
+  const std::string value1 = "first_value";
+  const std::string key2 = "envoy.test.typed_object_second";
+  const std::string value2 = "second_value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_set_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key1.data()), key1.size()},
+      {const_cast<char*>(value1.data()), value1.size()}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_set_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key2.data()), key2.size()},
+      {const_cast<char*>(value2.data()), value2.size()}));
+
+  // The first view must stay valid after the second getter call.
+  envoy_dynamic_module_type_envoy_buffer result1;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key1.data()), key1.size()}, &result1));
+  envoy_dynamic_module_type_envoy_buffer result2;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key2.data()), key2.size()}, &result2));
+
+  EXPECT_EQ(value1, std::string(result1.ptr, result1.length));
+  EXPECT_EQ(value2, std::string(result2.ptr, result2.length));
+}
+
+// A nested hook keeps the outer scratch, and only the outermost hook clears it.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, FilterStateScratchClearedAtOutermostHook) {
+  const std::string key = "envoy.test.typed_object";
+  const std::string value = "value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_set_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(value.data()), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  {
+    DynamicModuleNetworkFilter::HookScope outer(*filter_);
+    EXPECT_TRUE(envoy_dynamic_module_callback_network_get_filter_state_typed(
+        filterPtr(), {const_cast<char*>(key.data()), key.size()}, &result));
+    {
+      DynamicModuleNetworkFilter::HookScope inner(*filter_);
+      EXPECT_TRUE(envoy_dynamic_module_callback_network_get_filter_state_typed(
+          filterPtr(), {const_cast<char*>(key.data()), key.size()}, &result));
+    }
+    // A nested hook does not clear the scratch.
+    EXPECT_EQ(filter_->filterStateScratchSizeForTest(), 2);
+  }
+  // The outermost hook clears the scratch.
+  EXPECT_EQ(filter_->filterStateScratchSizeForTest(), 0);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetFilterStateTypedNoFactory) {
