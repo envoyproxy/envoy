@@ -841,6 +841,150 @@ TEST_F(BootstrapAbiImplTest, IterateGauges) {
   EXPECT_EQ(data.count, 2);
 }
 
+// iterate_counters honors a Stop return by ending iteration immediately.
+TEST_F(BootstrapAbiImplTest, IterateCountersHonorsStop) {
+  context_.store_.counterFromString("counter.one").add(1);
+  context_.store_.counterFromString("counter.two").add(2);
+  context_.store_.counterFromString("counter.three").add(3);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  struct VisitorData {
+    int count;
+  };
+  VisitorData data{0};
+  auto iterator = [](envoy_dynamic_module_type_envoy_buffer, uint64_t,
+                     void* user_data) -> envoy_dynamic_module_type_stats_iteration_action {
+    auto* d = static_cast<VisitorData*>(user_data);
+    d->count++;
+    return d->count == 2 ? envoy_dynamic_module_type_stats_iteration_action_Stop
+                         : envoy_dynamic_module_type_stats_iteration_action_Continue;
+  };
+  envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+      static_cast<void*>(extension.get()), iterator, &data);
+
+  EXPECT_EQ(data.count, 2);
+}
+
+// iterate_gauges honors a Stop return by ending iteration immediately.
+TEST_F(BootstrapAbiImplTest, IterateGaugesHonorsStop) {
+  context_.store_.gaugeFromString("gauge.one", Stats::Gauge::ImportMode::Accumulate).set(1);
+  context_.store_.gaugeFromString("gauge.two", Stats::Gauge::ImportMode::Accumulate).set(2);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  struct VisitorData {
+    int count;
+  };
+  VisitorData data{0};
+  auto iterator = [](envoy_dynamic_module_type_envoy_buffer, uint64_t,
+                     void* user_data) -> envoy_dynamic_module_type_stats_iteration_action {
+    auto* d = static_cast<VisitorData*>(user_data);
+    d->count++;
+    return envoy_dynamic_module_type_stats_iteration_action_Stop;
+  };
+  envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+      static_cast<void*>(extension.get()), iterator, &data);
+
+  EXPECT_EQ(data.count, 1);
+}
+
+// Iteration walks a snapshot taken before any callback runs, so a reentrant stats operation from
+// the callback completes and a counter it creates is not visited. `Snapshotting` is what avoids the
+// production deadlock.
+TEST_F(BootstrapAbiImplTest, IterateCountersSnapshotAllowsReentrantStatsCall) {
+  context_.store_.counterFromString("counter.one").add(1);
+  context_.store_.counterFromString("counter.two").add(2);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  struct VisitorData {
+    Stats::Store* store;
+    int count;
+  };
+  VisitorData data{&context_.store_, 0};
+  auto iterator = [](envoy_dynamic_module_type_envoy_buffer, uint64_t,
+                     void* user_data) -> envoy_dynamic_module_type_stats_iteration_action {
+    auto* d = static_cast<VisitorData*>(user_data);
+    d->count++;
+    d->store->counterFromString("counter.created_during_iteration").inc();
+    return envoy_dynamic_module_type_stats_iteration_action_Continue;
+  };
+  envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+      static_cast<void*>(extension.get()), iterator, &data);
+
+  // Only the two counters present when iteration began are visited.
+  EXPECT_EQ(data.count, 2);
+  // The reentrant stats call took effect, so the store now holds the counter created during
+  // iteration.
+  EXPECT_EQ(context_.store_.counters().size(), 3);
+}
+
+// Iteration walks a snapshot taken before any callback runs, so a reentrant stats operation from
+// the callback completes and a gauge it creates is not visited. `Snapshotting` is what avoids the
+// production deadlock.
+TEST_F(BootstrapAbiImplTest, IterateGaugesSnapshotAllowsReentrantStatsCall) {
+  context_.store_.gaugeFromString("gauge.one", Stats::Gauge::ImportMode::Accumulate).set(1);
+  context_.store_.gaugeFromString("gauge.two", Stats::Gauge::ImportMode::Accumulate).set(2);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  struct VisitorData {
+    Stats::Store* store;
+    int count;
+  };
+  VisitorData data{&context_.store_, 0};
+  auto iterator = [](envoy_dynamic_module_type_envoy_buffer, uint64_t,
+                     void* user_data) -> envoy_dynamic_module_type_stats_iteration_action {
+    auto* d = static_cast<VisitorData*>(user_data);
+    d->count++;
+    d->store
+        ->gaugeFromString("gauge.created_during_iteration", Stats::Gauge::ImportMode::Accumulate)
+        .set(1);
+    return envoy_dynamic_module_type_stats_iteration_action_Continue;
+  };
+  envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+      static_cast<void*>(extension.get()), iterator, &data);
+
+  // Only the two gauges present when iteration began are visited.
+  EXPECT_EQ(data.count, 2);
+  // The reentrant stats call took effect, so the store now holds the gauge created during
+  // iteration.
+  EXPECT_EQ(context_.store_.gauges().size(), 3);
+}
+
 // -----------------------------------------------------------------------------
 // Stats Definition and Update Tests
 // -----------------------------------------------------------------------------
