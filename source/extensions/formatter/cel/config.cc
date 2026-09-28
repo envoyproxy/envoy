@@ -1,22 +1,31 @@
 #include "source/extensions/formatter/cel/config.h"
 
 #include "envoy/extensions/formatter/cel/v3/cel.pb.h"
+#include "envoy/extensions/formatter/cel/v3/cel.pb.validate.h"
 
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/formatter/cel/cel.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Formatter {
 
-::Envoy::Formatter::CommandParserPtr
-CELFormatterFactory::createCommandParserFromProto(const Protobuf::Message&,
-                                                  Server::Configuration::GenericFactoryContext&) {
+::Envoy::Formatter::CommandParserPtr CELFormatterFactory::createCommandParserFromProto(
+    const Protobuf::Message& proto_config, Server::Configuration::GenericFactoryContext& context) {
 #if defined(USE_CEL_PARSER)
-  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), warn,
-                      "'CEL' formatter is treated as a built-in formatter and does not "
-                      "require configuration.");
-  return std::make_unique<CELFormatterCommandParser>();
+  const auto& config =
+      MessageUtil::downcastAndValidate<const envoy::extensions::formatter::cel::v3::Cel&>(
+          proto_config, context.messageValidationVisitor());
+  if (!config.has_cel_config()) {
+    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), warn,
+                        "'CEL' formatter is always enabled and only requires explicit "
+                        "configuration when 'cel_config' is set.");
+    return std::make_unique<CELFormatterCommandParser>();
+  }
+  return std::make_unique<CELFormatterCommandParser>(Filters::Common::Expr::getBuilder(
+      context.serverFactoryContext(), Envoy::makeOptRef(config.cel_config())));
 #else
+  UNREFERENCED_PARAMETER(proto_config);
   UNREFERENCED_PARAMETER(context);
   throw EnvoyException("CEL is not available for use in this environment.");
 #endif

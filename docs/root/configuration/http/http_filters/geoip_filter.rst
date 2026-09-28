@@ -50,6 +50,7 @@ comes from the owning HTTP connection manager.
    :widths: 1, 1, 2
 
    ``total``, Counter, Total number of requests for which geolocation filter was invoked.
+   ``skipped``, Counter, "Total number of requests for which no geolocation lookup was attempted because no IP address was available, for example when the downstream connection was accepted on an internal listener or a Unix domain socket."
 
 Besides Geolocation filter level statisctics, there is statistics emitted by the :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
 per geolocation database type (rooted at ``<stat_prefix>.maxmind.``). Database type can be one of `city_db <https://www.maxmind.com/en/geoip2-city>`_,
@@ -62,6 +63,17 @@ per geolocation database type (rooted at ``<stat_prefix>.maxmind.``). Database t
    ``<db_type>.total``, Counter, Total number of lookups performed for a given geolocation database file.
    ``<db_type>.hit``, Counter, Total number of successful lookups (with non empty lookup result) performed for a given geolocation database file.
    ``<db_type>.lookup_error``, Counter, Total number of errors that occurred during lookups for a given geolocation database file.
-   ``<db_type>.db_reload_success``, Counter, Total number of times when the geolocation database file was reloaded successfully.
-   ``<db_type>.db_reload_error``, Counter, Total number of times when the geolocation database file failed to reload.
-   ``<db_type>.db_build_epoch``, Gauge, The build timestamp of the geolocation database file represented as a Unix epoch value.
+
+Each geolocation database file is loaded once and shared by every provider configured with that
+file, so the statistics describing a file belong to no single listener. They are rooted at
+``maxmind.`` instead of at ``<stat_prefix>.maxmind.``, and they include the path of the file they
+describe in the statistic name, so two files of the same database type remain distinguishable.
+``<db_name>`` below is the path of the database file.
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   ``<db_type>.<db_name>.db_reload_success``, Counter, Total number of times when the geolocation database file was reloaded successfully.
+   ``<db_type>.<db_name>.db_reload_error``, Counter, Total number of times when the geolocation database file failed to reload.
+   ``<db_type>.<db_name>.db_build_epoch``, Gauge, The build timestamp of the geolocation database file represented as a Unix epoch value.

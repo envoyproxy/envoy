@@ -28,8 +28,10 @@ absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactory(
     absl::StatusOr<std::shared_ptr<CacheSessions>> status_or_cache =
         http_cache_factory->getCache(config, context);
     if (!status_or_cache.ok()) {
-      return absl::InvalidArgumentError(
-          fmt::format("Couldn't initialize cache: {}", status_or_cache.status()));
+      const absl::Status& status = status_or_cache.status();
+      return absl::InvalidArgumentError(fmt::format("Couldn't initialize cache: {}: {}",
+                                                    absl::StatusCodeToString(status.code()),
+                                                    status.message()));
     }
     cache = *std::move(status_or_cache);
   }

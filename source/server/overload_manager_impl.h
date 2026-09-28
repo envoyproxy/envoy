@@ -35,9 +35,16 @@ public:
   // Updates the current value of the metric and returns whether the trigger has changed state.
   virtual bool updateValue(double value) PURE;
 
+  // Evaluates the action state for the given metric value without modifying trigger state.
+  virtual OverloadActionState evaluate(double value) const = 0;
+
   // Returns the action state for the trigger.
   virtual OverloadActionState actionState() const PURE;
 };
+using TriggerPtr = std::unique_ptr<Trigger>;
+
+absl::StatusOr<TriggerPtr>
+createTriggerFromConfig(const envoy::config::overload::v3::Trigger& trigger_config);
 
 class OverloadAction {
 public:
@@ -55,7 +62,6 @@ private:
   OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
                  Stats::Scope& stats_scope, absl::Status& creation_status);
 
-  using TriggerPtr = std::unique_ptr<Trigger>;
   absl::node_hash_map<std::string, TriggerPtr> triggers_;
   OverloadActionState state_;
   Stats::Gauge& active_gauge_;
@@ -89,7 +95,6 @@ private:
   LoadShedPointImpl(const envoy::config::overload::v3::LoadShedPoint& config,
                     Stats::Scope& stats_scope, Random::RandomGenerator& random_generator,
                     absl::Status& creation_status);
-  using TriggerPtr = std::unique_ptr<Trigger>;
 
   // Helper to handle updating the probability to shed load given the triggers.
   void updateProbabilityShedLoad();

@@ -16,6 +16,7 @@
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_context_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/utility.h"
 
@@ -135,6 +136,41 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   ContextManagerImpl manager_{server_factory_context_};
 };
+
+// The session context id binds resumption to the certificate validation configuration. Two contexts
+// that differ only in the trust anchor produce different ids, and an identical configuration
+// reproduces the same id.
+TEST_F(SslContextImplTest, SessionContextIdReflectsValidationConfig) {
+  auto session_context_id = [this](const std::string& trusted_ca) -> std::vector<uint8_t> {
+    const std::string yaml = fmt::format(R"EOF(
+common_tls_context:
+  tls_certificates:
+    certificate_chain:
+      filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/unittest_cert.pem"
+    private_key:
+      filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/unittest_key.pem"
+  validation_context:
+    trusted_ca:
+      filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/{}"
+require_client_certificate: true
+)EOF",
+                                         trusted_ca);
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+    auto config = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+    Ssl::ServerContextSharedPtr context =
+        *manager_.createSslServerContext(*store_.rootScope(), *config, nullptr);
+    auto cleanup = cleanUpHelper(context);
+    const absl::Span<const uint8_t> id =
+        dynamic_cast<ServerContextImpl&>(*context).sessionContextId();
+    return {id.begin(), id.end()};
+  };
+
+  const std::vector<uint8_t> id = session_context_id("ca_cert.pem");
+  EXPECT_FALSE(id.empty());
+  EXPECT_NE(id, session_context_id("intermediate_ca_cert.pem"));
+  EXPECT_EQ(id, session_context_id("ca_cert.pem"));
+}
 
 TEST_F(SslContextImplTest, TestCipherSuites) {
   const std::string yaml = R"EOF(

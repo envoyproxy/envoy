@@ -202,9 +202,9 @@ public:
 };
 
 /** Host interface exposed while creating a thread-safe listener filter factory. */
-class ListenerFilterConfigHandle {
+class ListenerFilterConfigHandle : public CommonHandle {
 public:
-  virtual ~ListenerFilterConfigHandle();
+  ~ListenerFilterConfigHandle() override;
 
   /** Defines a histogram metric during config initialization. */
   virtual std::pair<MetricID, MetricsResult> defineHistogram(std::string_view name) = 0;

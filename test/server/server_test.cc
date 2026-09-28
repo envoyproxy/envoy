@@ -15,6 +15,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/notification.h"
+#include "source/common/http/codes.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
@@ -538,8 +539,9 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
 // first.
 //
 // With the runtime guard enabled and a default stats config (no custom tags), server initialization
-// turns on the explicit-tags logic on the real stats store. Guards against a regression where an
-// early scope creation would silently cause setUseExplicitTags() to be ignored.
+// turns on the explicit-tags logic on the real stats store, and hands the http context the matching
+// CodeStats implementation. Guards against a regression where an early scope creation would
+// silently cause setUseExplicitTags() to be ignored.
 TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
   Stats::SymbolTableImpl symbol_table;
@@ -557,6 +559,7 @@ TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
   server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                       component_factory_);
   EXPECT_TRUE(real_store->useExplicitTags());
+  EXPECT_NE(nullptr, dynamic_cast<Http::TaggedCodeStatsImpl*>(&server_->httpContext().codeStats()));
 
   // Tear down the server (which shuts down threading on real_store) before real_store is destroyed,
   // and restore the process-global runtime flag so it does not leak into other tests.

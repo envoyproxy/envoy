@@ -52,6 +52,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl OPENSSL_sk_set_cmp_func \
   --uncomment-func-decl OPENSSL_sk_shift \
   --uncomment-func-decl OPENSSL_sk_sort \
+  --uncomment-func-decl OPENSSL_sk_sort_and_dedup \
   --uncomment-func-decl OPENSSL_sk_zero \
   --uncomment-func-decl sk_new_null \
   --uncomment-func-decl sk_num \

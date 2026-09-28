@@ -22,6 +22,15 @@ impl MatchContext {
     Self { envoy_ptr }
   }
 
+  /// Reports through the ABI that the module could not complete this evaluation, so Envoy applies
+  /// its configured on_error policy instead of reading a match result. Used by the panic barrier.
+  #[doc(hidden)]
+  pub fn report_error(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_matcher_set_error(self.envoy_ptr);
+    }
+  }
+
   /// Get a request header value by key.
   ///
   /// Returns the header value as bytes, or `None` if the header is not present.
@@ -235,10 +244,15 @@ macro_rules! declare_matcher {
       ) -> bool {
         let config = unsafe { &*(config_ptr as *const $config_type) };
         let ctx = $crate::matcher::MatchContext::new(matcher_input_envoy_ptr);
-        config.on_matcher_match(&ctx)
+        <$config_type as $crate::matcher::MatcherConfig>::on_matcher_match(config, &ctx)
       }
-      // Fail-closed: a panic during match evaluation must not look like "matched".
-      on_panic = false
+      // A panic cannot report a match result, so tell Envoy the evaluation did not complete and let
+      // the matcher apply its configured on_error policy. The returned value is unused once the
+      // error is reported.
+      on_panic = {
+        $crate::matcher::MatchContext::new(matcher_input_envoy_ptr).report_error();
+        false
+      }
     }
   };
 }

@@ -164,12 +164,11 @@ ServerContextImpl::ServerContextImpl(
   // since we should have a common ID for session resumption no matter what cert
   // is used. We do this early because it can fail.
   // TODO(kuat): TLS selectors do not support resumption, so session ID is not populated.
-  std::optional<SessionContextID> session_id;
   if (!tls_certificates.empty()) {
     absl::StatusOr<SessionContextID> id_or_error =
         generateHashForSessionContextId(config.serverNames());
     SET_AND_RETURN_IF_NOT_OK(id_or_error.status(), creation_status);
-    session_id = *id_or_error;
+    session_context_id_ = *id_or_error;
   }
 
   for (uint32_t i = 0; i < tls_contexts_.size(); ++i) {
@@ -222,9 +221,9 @@ ServerContextImpl::ServerContextImpl(
       SSL_CTX_set_timeout(ctx.ssl_ctx_.get(), uint32_t(timeout));
     }
 
-    if (session_id) {
-      int rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_id->data(),
-                                              session_id->size());
+    if (session_context_id_.has_value()) {
+      int rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_context_id_->data(),
+                                              session_context_id_->size());
       RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
     }
 

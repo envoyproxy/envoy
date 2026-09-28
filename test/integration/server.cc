@@ -1,6 +1,8 @@
 #include "test/integration/server.h"
 
+#include <array>
 #include <memory>
+#include <random>
 #include <string>
 
 #include "envoy/http/header_map.h"
@@ -27,6 +29,50 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+namespace {
+
+class SeededRandomGenerator : public Random::RandomGenerator {
+public:
+  explicit SeededRandomGenerator(uint64_t seed) : generator_(seed) {}
+
+  uint64_t random() override {
+    Thread::LockGuard lock(mutex_);
+    return generator_();
+  }
+  std::string uuid() override {
+    Thread::LockGuard lock(mutex_);
+    std::array<uint8_t, 16> bytes;
+    for (size_t i = 0; i < bytes.size(); i += sizeof(uint64_t)) {
+      const uint64_t value = generator_();
+      for (size_t j = 0; j < sizeof(uint64_t); ++j) {
+        bytes[i + j] = static_cast<uint8_t>(value >> (sizeof(uint64_t) * 8 - 8 * (j + 1)));
+      }
+    }
+
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // UUID version 4 (random)
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // UUID variant 1 (RFC4122)
+
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string uuid;
+    uuid.reserve(36);
+    for (size_t i = 0; i < bytes.size(); ++i) {
+      if (i == 4 || i == 6 || i == 8 || i == 10) {
+        uuid.push_back('-');
+      }
+      uuid.push_back(hex[bytes[i] >> 4]);
+      uuid.push_back(hex[bytes[i] & 0x0f]);
+    }
+    return uuid;
+  }
+
+private:
+  Thread::MutexBasicLockable mutex_;
+  std::mt19937_64 generator_;
+};
+
+} // namespace
+
 namespace Server {
 
 OptionsImplBase
@@ -72,7 +118,7 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
     std::function<void(IntegrationTestServer&)> server_ready_function,
-    std::function<void()> on_server_init_function, std::optional<uint64_t> deterministic_value,
+    std::function<void()> on_server_init_function, TestRandomGeneratorConfig random_config,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
@@ -85,7 +131,7 @@ IntegrationTestServerPtr IntegrationTestServer::create(
   if (server_ready_function != nullptr) {
     server->setOnServerReadyCb(server_ready_function);
   }
-  server->start(version, on_server_init_function, deterministic_value, defer_listener_finalization,
+  server->start(version, on_server_init_function, random_config, defer_listener_finalization,
                 process_object, validation_config, concurrency, drain_time, drain_strategy,
                 watermark_factory, use_bootstrap_node_metadata, use_admin_server);
   return server;
@@ -143,7 +189,7 @@ void IntegrationTestServer::setAdsConfigSource(
 
 void IntegrationTestServer::start(
     const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
-    std::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
+    TestRandomGeneratorConfig random_config, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validator_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata,
@@ -151,10 +197,10 @@ void IntegrationTestServer::start(
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ = api_.threadFactory().createThread(
-      [version, deterministic_value, process_object, validator_config, concurrency, drain_time,
+      [version, random_config, process_object, validator_config, concurrency, drain_time,
        drain_strategy, watermark_factory, use_bootstrap_node_metadata, use_admin_server,
        this]() -> void {
-        threadRoutine(version, deterministic_value, process_object, validator_config, concurrency,
+        threadRoutine(version, random_config, process_object, validator_config, concurrency,
                       drain_time, drain_strategy, watermark_factory, use_bootstrap_node_metadata,
                       use_admin_server);
       });
@@ -230,7 +276,7 @@ void IntegrationTestServer::serverReady() {
 }
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
-                                          std::optional<uint64_t> deterministic_value,
+                                          TestRandomGeneratorConfig random_config,
                                           ProcessObjectOptRef process_object,
                                           Server::FieldValidationConfig validation_config,
                                           uint32_t concurrency, std::chrono::seconds drain_time,
@@ -243,9 +289,11 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   Thread::MutexBasicLockable lock;
 
   Random::RandomGeneratorPtr random_generator;
-  if (deterministic_value.has_value()) {
-    random_generator = std::make_unique<testing::NiceMock<Random::MockRandomGenerator>>(
-        deterministic_value.value());
+  if (const auto* value = absl::get_if<TestRandomValue>(&random_config)) {
+    random_generator =
+        std::make_unique<testing::NiceMock<Random::MockRandomGenerator>>(value->value);
+  } else if (const auto* seed = absl::get_if<TestRandomSeed>(&random_config)) {
+    random_generator = std::make_unique<SeededRandomGenerator>(seed->value);
   } else {
     random_generator = std::make_unique<Random::RandomGeneratorImpl>();
   }
