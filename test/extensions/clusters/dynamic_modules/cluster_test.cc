@@ -2516,8 +2516,9 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeaders) {
   ASSERT_EQ(2, size);
 
   std::vector<envoy_dynamic_module_type_envoy_http_header> result(size);
+  size_t size_out = 0;
   EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
-      context_ptr, result.data()));
+      context_ptr, result.data(), result.size(), &size_out));
 
   EXPECT_EQ(":method", absl::string_view(result[0].key_ptr, result[0].key_length));
   EXPECT_EQ("GET", absl::string_view(result[0].value_ptr, result[0].value_length));
@@ -2532,23 +2533,26 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNoHeaders) {
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   envoy_dynamic_module_type_envoy_http_header result;
-  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(context_ptr,
-                                                                                       &result));
+  size_t size_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+      context_ptr, &result, 1, &size_out));
 }
 
 // Test get_downstream_headers with nullptr context.
 TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNullContext) {
   envoy_dynamic_module_type_envoy_http_header result;
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(nullptr, &result));
+  size_t size_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+      nullptr, &result, 1, &size_out));
 }
 
 // Test get_downstream_headers with nullptr result.
 TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNullResult) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
-  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(context_ptr,
-                                                                                       nullptr));
+  size_t size_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+      context_ptr, nullptr, 0, &size_out));
 }
 
 // Test get_downstream_header by key.

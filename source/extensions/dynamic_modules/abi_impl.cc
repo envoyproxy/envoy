@@ -575,7 +575,7 @@ WEAK_STUB(size_t, envoy_dynamic_module_callback_cluster_lb_context_get_downstrea
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers, false,
           envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
-          envoy_dynamic_module_type_envoy_http_header*)
+          envoy_dynamic_module_type_envoy_http_header*, size_t, size_t*)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header, false,
           envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
@@ -828,7 +828,7 @@ WEAK_STUB(size_t, envoy_dynamic_module_callback_lb_context_get_downstream_header
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_lb_context_get_downstream_headers, false,
           envoy_dynamic_module_type_lb_context_envoy_ptr,
-          envoy_dynamic_module_type_envoy_http_header*)
+          envoy_dynamic_module_type_envoy_http_header*, size_t, size_t*)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_lb_context_get_downstream_header, false,
           envoy_dynamic_module_type_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
@@ -943,7 +943,8 @@ WEAK_STUB(size_t, envoy_dynamic_module_callback_matcher_get_headers_size, 0,
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_matcher_get_headers, false,
           envoy_dynamic_module_type_matcher_input_envoy_ptr,
-          envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_envoy_http_header*)
+          envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_envoy_http_header*,
+          size_t, size_t*)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_matcher_get_header_value, false,
           envoy_dynamic_module_type_matcher_input_envoy_ptr,
@@ -1548,7 +1549,8 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_access_logger_get_header_value, fa
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_access_logger_get_headers, false,
           envoy_dynamic_module_type_access_logger_envoy_ptr,
-          envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_envoy_http_header*)
+          envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_envoy_http_header*,
+          size_t, size_t*)
 
 WEAK_STUB(size_t, envoy_dynamic_module_callback_access_logger_get_headers_size, 0,
           envoy_dynamic_module_type_access_logger_envoy_ptr,
@@ -1784,7 +1786,7 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_cluster_specifier_get_request_head
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_cluster_specifier_get_request_headers, false,
           envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
-          envoy_dynamic_module_type_envoy_http_header*)
+          envoy_dynamic_module_type_envoy_http_header*, size_t, size_t*)
 
 WEAK_STUB(size_t, envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size, 0,
           envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr)
@@ -2056,7 +2058,7 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_get_request_header
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_get_request_headers, false,
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
-          envoy_dynamic_module_type_envoy_http_header*)
+          envoy_dynamic_module_type_envoy_http_header*, size_t, size_t*)
 
 WEAK_STUB(size_t, envoy_dynamic_module_callback_route_specifier_get_request_headers_size, 0,
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr)
@@ -2132,7 +2134,7 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_typed_me
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
 
-WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_template, false,
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_template, false,
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
@@ -2179,7 +2181,7 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_early_header_mutation_get_header_v
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_early_header_mutation_get_headers, false,
           envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
-          envoy_dynamic_module_type_envoy_http_header*)
+          envoy_dynamic_module_type_envoy_http_header*, size_t, size_t*)
 
 WEAK_STUB(size_t, envoy_dynamic_module_callback_early_header_mutation_get_headers_size, 0,
           envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr)
@@ -2221,7 +2223,8 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_formatter_get_header_value, false,
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_formatter_get_headers, false,
           envoy_dynamic_module_type_formatter_context_envoy_ptr,
-          envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_envoy_http_header*)
+          envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_envoy_http_header*,
+          size_t, size_t*)
 
 WEAK_STUB(size_t, envoy_dynamic_module_callback_formatter_get_headers_size, 0,
           envoy_dynamic_module_type_formatter_context_envoy_ptr,
@@ -2522,7 +2525,7 @@ WEAK_STUB(size_t, envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_req
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers, false,
           envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
-          envoy_dynamic_module_type_envoy_http_header*)
+          envoy_dynamic_module_type_envoy_http_header*, size_t, size_t*)
 
 WEAK_STUB_VOID(envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer,
                envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
@@ -2974,7 +2977,8 @@ WEAK_STUB(size_t, envoy_dynamic_module_callback_http_get_headers_size, 0,
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_headers, false,
           envoy_dynamic_module_type_http_filter_envoy_ptr,
-          envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_envoy_http_header*)
+          envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_envoy_http_header*,
+          size_t, size_t*)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_http_add_header, false,
           envoy_dynamic_module_type_http_filter_envoy_ptr,

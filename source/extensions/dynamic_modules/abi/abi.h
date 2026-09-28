@@ -2011,7 +2011,7 @@ size_t envoy_dynamic_module_callback_http_get_headers_size(
 bool envoy_dynamic_module_callback_http_get_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_envoy_http_header* result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * envoy_dynamic_module_callback_http_add_header is called by the module to add
@@ -7267,7 +7267,7 @@ size_t envoy_dynamic_module_callback_access_logger_get_headers_size(
 bool envoy_dynamic_module_callback_access_logger_get_headers(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_envoy_http_header* result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * Get a specific header value by key.
@@ -8583,7 +8583,7 @@ size_t envoy_dynamic_module_callback_formatter_get_headers_size(
 bool envoy_dynamic_module_callback_formatter_get_headers(
     envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_envoy_http_header* result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * Get a specific header value by key.
@@ -11175,7 +11175,7 @@ size_t envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_s
  */
 bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header retrieves a single
@@ -12034,7 +12034,7 @@ size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(
  */
 bool envoy_dynamic_module_callback_lb_context_get_downstream_headers(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * envoy_dynamic_module_callback_lb_context_get_downstream_header is called by the module to get
@@ -12411,7 +12411,7 @@ size_t envoy_dynamic_module_callback_matcher_get_headers_size(
 bool envoy_dynamic_module_callback_matcher_get_headers(
     envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_envoy_http_header* result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * Get a specific header value by key.
@@ -13175,7 +13175,7 @@ size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header
  */
 bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 // ----------------------- Request Buffer Operations ---------------------------
 
@@ -15579,7 +15579,7 @@ size_t envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size(
  */
 bool envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * envoy_dynamic_module_callback_cluster_specifier_get_request_header_value is called by the module
@@ -16163,7 +16163,8 @@ typedef enum envoy_dynamic_module_type_route_specifier_decision {
   envoy_dynamic_module_type_route_specifier_decision_PassThrough = 0,
   // Use the route the specifier was given with the recorded overrides applied.
   envoy_dynamic_module_type_route_specifier_decision_Override = 1,
-  // Use the template recorded with envoy_dynamic_module_callback_route_specifier_set_template,
+  // Use the template recorded with
+  // envoy_dynamic_module_callback_route_specifier_set_route_template,
   // evaluated against the request like a configured route, with the recorded overrides applied.
   envoy_dynamic_module_type_route_specifier_decision_SelectTemplate = 2,
   // Use no route, so the request is handled as if nothing had matched.
@@ -16216,7 +16217,7 @@ typedef enum envoy_dynamic_module_type_route_specifier_header_append_action {
  * envoy_dynamic_module_type_route_specifier_input_route holds the properties of the route the
  * module is resolving that are free to read, so that a module can take all of them in one call
  * instead of one call each. After a template is selected with
- * envoy_dynamic_module_callback_route_specifier_set_template it holds the properties of that
+ * envoy_dynamic_module_callback_route_specifier_set_route_template it holds the properties of that
  * template.
  *
  * A property the kind of the route does not carry is zero. The route entry properties are zero for
@@ -16379,9 +16380,9 @@ bool envoy_dynamic_module_callback_route_specifier_config_has_route_override(
  * it produces from its own configuration rather than only from the ones the route specifier
  * declares. Envoy builds and validates the route on the main thread while the configuration is
  * created, and the module selects it later with
- * envoy_dynamic_module_callback_route_specifier_set_template. This may only be called from inside
- * envoy_dynamic_module_on_route_specifier_config_new, because a route can only be built while the
- * configuration is created.
+ * envoy_dynamic_module_callback_route_specifier_set_route_template. This may only be called from
+ * inside envoy_dynamic_module_on_route_specifier_config_new, because a route can only be built
+ * while the configuration is created.
  *
  * @param config_envoy_ptr is the pointer to the route specifier configuration.
  * @param template_id is the identifier the module selects the template with. The buffer is owned by
@@ -16599,19 +16600,24 @@ size_t envoy_dynamic_module_callback_route_specifier_get_request_headers_size(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_route_specifier_get_request_headers is called by the module to get
- * all request headers.
+ * envoy_dynamic_module_callback_route_specifier_get_request_headers writes the request headers into
+ * a module owned array. On success it writes up to capacity entries and sets size_out to the header
+ * count. When capacity is smaller than the header count it writes nothing, sets size_out to the
+ * required count and returns false, so the module can grow the array and retry. When the header map
+ * is unavailable it sets size_out to zero and returns false.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
- * @param result_headers is the output array. The module must pre-allocate at least
- * envoy_dynamic_module_callback_route_specifier_get_request_headers_size entries. Envoy does not
- * bounds check the array, so passing a shorter one is undefined behavior. The buffers in the
- * entries are owned by Envoy and are valid until the end of the current event hook.
- * @return true if the operation is successful, false otherwise.
+ * @param result_headers is the output array, which may be null when capacity is zero. The buffers
+ * in the entries are owned by Envoy and are valid until the end of the current event hook.
+ * @param capacity is the number of entries result_headers can hold.
+ * @param size_out receives the header count on success and the required count when capacity is too
+ * small.
+ * @return true when the headers were written, false when capacity is too small or the header map is
+ * unavailable.
  */
 bool envoy_dynamic_module_callback_route_specifier_get_request_headers(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * envoy_dynamic_module_callback_route_specifier_get_request_header_value is called by the module to
@@ -16916,7 +16922,7 @@ bool envoy_dynamic_module_callback_route_specifier_get_input_route_metadata_numb
 
 /**
  * envoy_dynamic_module_callback_route_specifier_get_selected_template_id is called by the module to
- * get the identifier recorded by envoy_dynamic_module_callback_route_specifier_set_template.
+ * get the identifier recorded by envoy_dynamic_module_callback_route_specifier_set_route_template.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
  * @param result is the output buffer for the identifier. The buffer is owned by Envoy and is valid
@@ -16933,7 +16939,7 @@ bool envoy_dynamic_module_callback_route_specifier_get_selected_template_id(
 // nothing when an argument is rejected. Envoy copies every module buffer.
 
 /**
- * envoy_dynamic_module_callback_route_specifier_set_template selects the route template the
+ * envoy_dynamic_module_callback_route_specifier_set_route_template selects the route template the
  * SelectTemplate decision uses. Envoy evaluates the match of the template against the request when
  * this is called, like it does for a configured route, and applies the failure policy when the
  * match does not hold. After a successful selection the input route getters reflect the template.
@@ -16942,7 +16948,7 @@ bool envoy_dynamic_module_callback_route_specifier_get_selected_template_id(
  * @param template_id is the identifier of the template. The buffer is owned by the module.
  * @return true if the identifier is declared, false otherwise.
  */
-bool envoy_dynamic_module_callback_route_specifier_set_template(
+bool envoy_dynamic_module_callback_route_specifier_set_route_template(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer template_id);
 
@@ -17358,7 +17364,7 @@ size_t envoy_dynamic_module_callback_early_header_mutation_get_headers_size(
  */
 bool envoy_dynamic_module_callback_early_header_mutation_get_headers(
     envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * envoy_dynamic_module_callback_early_header_mutation_get_header_value is called by the module to

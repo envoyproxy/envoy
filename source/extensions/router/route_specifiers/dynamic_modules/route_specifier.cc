@@ -101,14 +101,16 @@ buildRuntimeFraction(const DynamicModuleRouteSpecifierProto& config) {
                          config.runtime_fraction().default_value()};
 }
 
-// Layers the metadata a module recorded onto the metadata of the route. Returns nullptr when the
-// module recorded none, so that both metadata accessors fall back to the route.
-Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory>
+// Layers the metadata a module recorded onto the metadata of the route and validates it. Returns a
+// null pack when the module recorded none, so that both metadata accessors fall back to the route,
+// and an error when a typed metadata factory rejects the merged metadata.
+absl::StatusOr<Envoy::Router::RouteMetadataPackPtr>
 buildMetadataPack(const Envoy::Router::Route& route,
                   const envoy::config::core::v3::Metadata& overrides) {
   if (overrides.filter_metadata().empty() && overrides.typed_filter_metadata().empty()) {
-    return nullptr;
+    return Envoy::Router::RouteMetadataPackPtr{};
   }
+  // One copy of the route metadata, merged in place and then moved into the pack.
   envoy::config::core::v3::Metadata merged = route.metadata();
   // Merge per namespace so an entry replaces only its own key while the other keys of the route
   // stay in effect. A top-level merge would replace the whole namespace instead.
@@ -118,9 +120,9 @@ buildMetadataPack(const Envoy::Router::Route& route,
   for (const auto& [name, typed] : overrides.typed_filter_metadata()) {
     (*merged.mutable_typed_filter_metadata())[name] = typed;
   }
-  // Building the pack runs the registered typed metadata factories, which throw on input they
-  // reject. The caller turns that into a decision failure.
-  return std::make_unique<Envoy::Router::RouteMetadataPack>(merged);
+  // create() runs the registered typed metadata factories once and returns an error instead of
+  // throwing, so the wrapper it feeds cannot throw when it is constructed.
+  return Envoy::Router::RouteMetadataPack::create(std::move(merged));
 }
 
 void applyHeaderMutations(Http::HeaderMap& headers,
@@ -375,12 +377,12 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
   return config;
 }
 
-DynamicModuleRoute::DynamicModuleRoute(Envoy::Router::RouteConstSharedPtr route,
-                                       DynamicModuleRouteSpecifierConfigSharedPtr config,
-                                       RouteOverrides&& overrides)
+DynamicModuleRoute::DynamicModuleRoute(
+    Envoy::Router::RouteConstSharedPtr route, DynamicModuleRouteSpecifierConfigSharedPtr config,
+    RouteOverrides&& overrides,
+    Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack)
     : Envoy::Router::DelegatingRoute(std::move(route)), config_(std::move(config)),
-      overrides_(std::move(overrides)),
-      metadata_pack_(buildMetadataPack(*base_route_, overrides_.route_metadata)) {}
+      overrides_(std::move(overrides)), metadata_pack_(std::move(metadata_pack)) {}
 
 const envoy::config::core::v3::Metadata& DynamicModuleRoute::metadata() const {
   return metadata_pack_ != nullptr ? metadata_pack_->proto_metadata_
@@ -399,12 +401,12 @@ std::optional<bool> DynamicModuleRoute::filterDisabled(absl::string_view name) c
              : Envoy::Router::DelegatingRoute::filterDisabled(name);
 }
 
-DynamicModuleRouteEntry::DynamicModuleRouteEntry(Envoy::Router::RouteConstSharedPtr route,
-                                                 DynamicModuleRouteSpecifierConfigSharedPtr config,
-                                                 RouteOverrides&& overrides)
+DynamicModuleRouteEntry::DynamicModuleRouteEntry(
+    Envoy::Router::RouteConstSharedPtr route, DynamicModuleRouteSpecifierConfigSharedPtr config,
+    RouteOverrides&& overrides,
+    Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack)
     : DelegatingRouteEntry(std::move(route)), config_(std::move(config)),
-      overrides_(std::move(overrides)),
-      metadata_pack_(buildMetadataPack(*base_route_, overrides_.route_metadata)) {}
+      overrides_(std::move(overrides)), metadata_pack_(std::move(metadata_pack)) {}
 
 const envoy::config::core::v3::Metadata& DynamicModuleRouteEntry::metadata() const {
   return metadata_pack_ != nullptr ? metadata_pack_->proto_metadata_
@@ -693,23 +695,23 @@ DynamicModuleRouteSpecifier::wrap(Envoy::Router::RouteConstSharedPtr route,
   if (route_entry_overrides && route->routeEntry() == nullptr) {
     return {nullptr, status, Failure::OverrideOnNonRouteEntry};
   }
-  // Building the metadata pack runs the registered typed metadata factories, which throw on input
-  // they reject, so a module cannot reach the worker with metadata Envoy cannot parse.
-  Decision decision{nullptr, status};
-  TRY_NEEDS_AUDIT {
-    if (route_entry_overrides) {
-      decision.route = std::make_shared<DynamicModuleRouteEntry>(std::move(route), config_,
-                                                                 std::move(context.overrides));
-    } else {
-      decision.route = std::make_shared<DynamicModuleRoute>(std::move(route), config_,
-                                                            std::move(context.overrides));
-    }
+  // Build and validate the metadata pack once, before the wrapper is constructed, so a namespace a
+  // typed metadata factory rejects becomes a decision failure rather than an exception the wrapper
+  // constructor throws.
+  auto metadata_pack = buildMetadataPack(*route, context.overrides.route_metadata);
+  if (!metadata_pack.ok()) {
+    ENVOY_LOG_EVERY_POW_2(warn, "dynamic module route metadata was rejected: {}",
+                          metadata_pack.status().message());
+    return {nullptr, status, Failure::RouteMetadata};
   }
-  END_TRY
-  CATCH(const EnvoyException& e, {
-    ENVOY_LOG_EVERY_POW_2(warn, "dynamic module route metadata was rejected: {}", e.what());
-    decision.failure = Failure::RouteMetadata;
-  });
+  Decision decision{nullptr, status};
+  if (route_entry_overrides) {
+    decision.route = std::make_shared<DynamicModuleRouteEntry>(
+        std::move(route), config_, std::move(context.overrides), std::move(metadata_pack.value()));
+  } else {
+    decision.route = std::make_shared<DynamicModuleRoute>(
+        std::move(route), config_, std::move(context.overrides), std::move(metadata_pack.value()));
+  }
   return decision;
 }
 
