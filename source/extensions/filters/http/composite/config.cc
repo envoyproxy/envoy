@@ -169,7 +169,7 @@ CompositeFilterFactory::createRouteSpecificFilterConfigTyped(
   if (match_tree == nullptr) {
     return nullptr;
   }
-  return std::make_shared<CompositePerRouteConfig>(match_tree);
+  return std::make_shared<CompositePerRouteConfig>(match_tree, context.mainThreadDispatcher());
 }
 
 /**
