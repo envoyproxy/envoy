@@ -11289,8 +11289,7 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
  * does not exist, or the object does not support serialization.
  *
  * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and is
- * guaranteed to be valid until the next invocation of this callback on the same worker thread
- * or until the end of the current host-selection callback, whichever comes first.
+ * guaranteed to be valid until the end of the current host-selection callback.
  */
 bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,

@@ -833,6 +833,9 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
   envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
+  // Bound the lifetime of any filter state views the module reads during host selection to this
+  // callback. The guard clears the backing storage when chooseHost returns.
+  ClusterLbFilterStateScratchGuard filter_state_scratch_guard;
   handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context, &host_ptr,
                                                           &async_handle);
 

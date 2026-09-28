@@ -305,8 +305,7 @@ pub trait ClusterLbContext {
   ///
   /// Returns `None` if the request has no stream info, the key is not present, or the object
   /// does not support serialization. The returned buffer borrows from Envoy and is valid until
-  /// the next call to `get_filter_state_typed` on the same worker thread, or until the end of
-  /// the current host-selection callback, whichever comes first.
+  /// the end of the current host-selection callback.
   fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
   /// Stores a `Router::StringAccessor` filter state on the request under `key`, so a later filter,
