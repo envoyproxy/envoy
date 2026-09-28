@@ -74,8 +74,16 @@ message LeastRequest {
   // host sets changes, e.g., whenever there is a host membership update or a host load balancing
   // weight change.
   //
+  // When this field is set, the effective weight above is used for host selection even if all host
+  // weights are equal. When this field is not set and all host weights are equal, the Least
+  // Request Load Balancer instead samples
+  // :ref:`choice_count <envoy_v3_api_field_extensions.load_balancing_policies.least_request.v3.LeastRequest.choice_count>`
+  // random hosts and picks the one with the fewest active requests.
+  //
   // .. note::
-  //   This setting only takes effect if all host weights are not equal.
+  //   If the runtime guard
+  //   ``envoy.reloadable_features.least_request_lb_active_request_bias_forces_weighted`` is
+  //   disabled, this setting only takes effect if all host weights are not equal.
   config.core.v3.RuntimeDouble active_request_bias = 2;
 
   // Configuration for slow start mode.
