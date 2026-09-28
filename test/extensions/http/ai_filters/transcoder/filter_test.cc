@@ -468,7 +468,7 @@ TEST(UnflattenFieldsTest, CompleteStringReplacesRatherThanJoins) {
 }
 
 // ---------------------------------------------------------------------------
-// Response goldens.
+// Response golden tests.
 
 // Response-side golden cases: every unary and SSE leg for every dialect, with the expected output
 // the transcoder produces. The corpus lives in `testdata/response_goldens.json`.
