@@ -303,6 +303,7 @@ build:asan-common --config=sanitizer
 # ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
 build:asan-common --define signal_trace=disabled
 build:asan-common --define ENVOY_CONFIG_ASAN=1
+build:asan-common --define=SANITIZER=asan
 build:asan-common --build_tag_filters=-no_san
 build:asan-common --test_tag_filters=-no_san
 build:asan-common --copt -fsanitize=address,undefined
@@ -336,6 +337,7 @@ build:msan --config=sanitizer
 build:msan --build_tag_filters=-no_san
 build:msan --test_tag_filters=-no_san
 build:msan --define ENVOY_CONFIG_MSAN=1
+build:msan --define=SANITIZER=msan
 build:msan --copt -fsanitize=memory
 build:msan --linkopt -fsanitize=memory
 build:msan --linkopt=-Wl,--allow-multiple-definition
