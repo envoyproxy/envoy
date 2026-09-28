@@ -85,7 +85,10 @@ public:
     // before the frame goes away. suspend_never destroys the frame here, so no
     // external owner ever has to. (Task uses FinalAwaiter instead, to
     // symmetric-transfer back to its awaiting parent.)
-    std::suspend_never final_suspend() noexcept { return {}; }
+    std::suspend_never final_suspend() noexcept {
+      on_coroutine_suspend(*this);
+      return {};
+    }
     void return_void() noexcept {}
   };
 

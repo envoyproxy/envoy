@@ -3,6 +3,7 @@
 #include <optional>
 #include <stdexcept>
 
+#include "source/common/coroutine/backtrace.h"
 #include "source/common/coroutine/context.h"
 #include "source/common/coroutine/launch.h"
 #include "source/common/coroutine/leaf_awaitable.h"
@@ -787,6 +788,80 @@ TEST(LeafAwaitableTest, SynchronousCompleteInsideOnStartResumesCleanly) {
       coro(), exec, [&final_status](absl::Status s) { final_status = s; }, StartMode::Inline);
   EXPECT_OK(final_status);
   EXPECT_EQ(sum, 1000 * 1001 / 2);
+}
+
+template <typename T> Task<absl::StatusOr<T>> backtraceLevel2(absl::AnyInvocable<T()> f) {
+  co_return std::move(f)();
+}
+
+template <typename T> Task<absl::StatusOr<T>> backtraceLevel1(absl::AnyInvocable<T()> f) {
+  co_return co_await backtraceLevel2(std::move(f));
+}
+
+template <typename T> Task<absl::StatusOr<T>> backtraceLevel0(absl::AnyInvocable<T()> f) {
+  co_return co_await backtraceLevel1(std::move(f));
+}
+
+TEST(BacktraceTest, BacktraceWorks) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+
+  absl::StatusOr<std::vector<std::string>> result = absl::UnavailableError("unset");
+  auto dump = []() {
+    std::vector<std::string> backtrace;
+
+    PromiseBase* frame = current_coroutine.load(std::memory_order_relaxed);
+    while (frame) {
+      char buf[1024];
+      EXPECT_TRUE(absl::Symbolize(frame->caller_, buf, sizeof(buf)));
+      backtrace.push_back({buf});
+
+      if (frame->continuation_) {
+        frame = &promiseBase(frame->continuation_);
+      } else {
+        frame = nullptr;
+      }
+    }
+
+    return backtrace;
+  };
+
+  DetachedHandle handle = launch(
+      backtraceLevel0<std::vector<std::string>>(std::move(dump)), exec,
+      [&result](absl::StatusOr<std::vector<std::string>> status) { result = std::move(status); });
+  exec->drain();
+  EXPECT_OK(result);
+
+  using ::testing::HasSubstr;
+  EXPECT_THAT((*result)[0], HasSubstr("backtraceLevel2"));
+  EXPECT_THAT((*result)[1], HasSubstr("backtraceLevel1"));
+  EXPECT_THAT((*result)[2], HasSubstr("backtraceLevel0"));
+}
+
+TEST(BacktraceClassTest, DumpsTrace) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+
+  absl::StatusOr<std::vector<std::string>> result = absl::UnavailableError("unset");
+  auto dump = []() {
+    Backtrace tracer;
+    std::ostringstream os;
+
+    tracer.printTrace(os);
+
+    return absl::StrSplit(os.str(), "\n");
+  };
+
+  DetachedHandle handle = launch(
+      backtraceLevel0<std::vector<std::string>>(std::move(dump)), exec,
+      [&result](absl::StatusOr<std::vector<std::string>> status) { result = std::move(status); });
+  exec->drain();
+  EXPECT_OK(result);
+
+  using ::testing::HasSubstr;
+  EXPECT_THAT((*result)[0], HasSubstr("backtraceLevel2"));
+  EXPECT_THAT((*result)[1], HasSubstr("backtraceLevel1"));
+  EXPECT_THAT((*result)[2], HasSubstr("backtraceLevel0"));
 }
 
 } // namespace

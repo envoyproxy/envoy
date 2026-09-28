@@ -151,6 +151,21 @@ concept CoroAwaitable = TaskAwaitable<A> || LeafAwaitable_<A>;
 // fallback overload is actually selected.
 template <class> inline constexpr bool dependent_false = false;
 
+struct PromiseBase;
+// Backtracing support: pointer to the active coroutine running on the current thread.
+// nullptr if no coroutines are running.
+constinit inline thread_local std::atomic<PromiseBase*> current_coroutine = nullptr;
+
+inline void on_coroutine_suspend(PromiseBase& promise) {
+  ASSERT(current_coroutine.load(std::memory_order_relaxed) == &promise);
+  current_coroutine.store(nullptr, std::memory_order_relaxed);
+}
+
+inline void on_coroutine_resume(PromiseBase& promise) {
+  ASSERT(current_coroutine.load(std::memory_order_relaxed) == nullptr);
+  current_coroutine.store(&promise, std::memory_order_relaxed);
+}
+
 // ---------------------------------------------------------------------------
 // Promise machinery shared by every coroutine type (Task<T> and the detached
 // RootTask). Holds the two things propagated down the chain -- the context and
@@ -161,7 +176,17 @@ template <class> inline constexpr bool dependent_false = false;
 struct PromiseBase {
   // Always lazy start: the frame suspends at creation so its context can be set
   // before it runs (a child inherits it at `co_await`; a root gets it from launch()).
-  std::suspend_always initial_suspend() noexcept { return {}; }
+  auto initial_suspend() noexcept {
+    struct Awaiter : public std::suspend_always {
+      PromiseBase& promise;
+
+      void await_resume() { on_coroutine_resume(promise); }
+    };
+
+    caller_ = __builtin_return_address(0);
+
+    return Awaiter{.promise = *this};
+  }
 
   // No exceptions on the data plane: errors travel as absl::Status values. A
   // coroutine that throws terminates the process.
@@ -191,6 +216,8 @@ struct PromiseBase {
   // Where to resume to once the current coroutine `co_return`s. Generally pointing to a caller
   // that called `co_await` on the current coroutine (null for a root coroutine).
   std::coroutine_handle<> continuation_{};
+  // Caller address for stack backtracing.
+  void* caller_ = nullptr;
 };
 
 // Recover the shared `PromiseBase` from a type-erased coroutine handle. Valid
@@ -213,6 +240,7 @@ struct FinalAwaiter {
   // resume the awaiting caller coroutine if it exists, or suspend.
   template <typename P>
   std::coroutine_handle<> await_suspend(std::coroutine_handle<P> me) noexcept {
+    on_coroutine_suspend(me.promise());
     std::coroutine_handle<> cont = me.promise().continuation_;
     return cont ? cont : std::noop_coroutine();
   }
@@ -241,13 +269,17 @@ template <TaskReturnType T> struct TaskAwaiter {
     // Context was already injected into the child by the parent promise's
     // await_transform (the single propagation choke point). Here we only record
     // where the child returns to and hand it control.
+    on_coroutine_suspend(parent.promise());
     child_.promise().continuation_ = parent;
     return child_;
   }
 
   // [[nodiscard]]: the result carries success/failure/cancellation, so a
   // `co_await task;` that drops it is almost always a bug.
-  [[nodiscard]] T await_resume() { return std::move(*child_.promise().result_); }
+  [[nodiscard]] T await_resume() {
+    on_coroutine_resume(promiseBase(child_.promise().continuation_));
+    return std::move(*child_.promise().result_);
+  }
 };
 
 /**
