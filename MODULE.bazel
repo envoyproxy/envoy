@@ -202,6 +202,17 @@ wee8_ext = use_extension("@envoy_toolshed//v8:extensions.bzl", "wee8_prebuilt_ex
 wee8_ext.setup()
 use_repo(wee8_ext, "wee8_prebuilt_aarch64", "wee8_prebuilt_x86_64", "wee8_prebuilt_x86_64_libstdcxx")
 
+# These (cmake/ninja) should be kept to latest stable for FIPS
+foreign_cc_tools = use_extension("@rules_foreign_cc//foreign_cc:extensions.bzl", "tools")
+foreign_cc_tools.cmake(
+    mode = "binary",
+    version = "4.0.7",
+)
+foreign_cc_tools.ninja(
+    mode = "binary",
+    version = "1.13.2",
+)
+
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.cxx_cross_lib(
     name = "llvm_toolchain",
