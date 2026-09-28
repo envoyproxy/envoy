@@ -37,6 +37,7 @@ bazel_dep(name = "rules_apple", version = "5.1.0")
 bazel_dep(name = "rules_robolectric", version = "4.16")
 bazel_dep(name = "rules_cc", version = "0.2.25")
 bazel_dep(name = "rules_detekt", version = "0.8.1.2")
+bazel_dep(name = "rules_go", version = "0.63.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_jvm_external", version = "7.1")
 bazel_dep(name = "rules_kotlin", version = "2.3.20")
@@ -209,4 +210,28 @@ quiche_dev.deps(
     quiche_test_impl_lib = "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     quiche_test_output_impl_lib = "@envoy//test/common/quic/platform:quiche_test_output_impl_lib",
     quiche_thread_impl_lib = "@envoy//test/common/quic/platform:quiche_thread_impl_lib",
+)
+
+# Golang
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk", dev_dependency = True)
+go_sdk.download(
+    name = "go_sdk",
+    version = "1.27.1",
+    sdks = {
+        "linux_amd64": ("go1.27.1.linux-amd64.tar.gz", "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445"),
+        "linux_arm64": ("go1.27.1.linux-arm64.tar.gz", "3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec"),
+        "darwin_arm64": ("go1.27.1.darwin-arm64.tar.gz", "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12"),
+        "darwin_amd64": ("go1.27.1.darwin-amd64.tar.gz", "8f8f52c6649542cf027bbc9b9c68d1ec042f9f34808a40413f0b8b3f66f3caa4"),
+    },
+)
+use_repo(
+    go_sdk,
+    "go_sdk",
+    "go_toolchains",
+    "io_bazel_rules_nogo",
+)
+
+register_toolchains(
+    "@go_toolchains//:all",
+    dev_dependency = True,
 )
