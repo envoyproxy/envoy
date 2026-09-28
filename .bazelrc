@@ -28,7 +28,7 @@ run --color=yes
 build --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/86855d5d9ae43755ad6648e4af39983c1c748874
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/6a42f80bb6ef909c8bfd44286a96a7e24388b86a
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -40,7 +40,6 @@ build --incompatible_strict_action_env
 build --copt=-DABSL_MIN_LOG_LEVEL=4
 # Global C++ standard and common warning suppressions
 build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
-build --copt=-Wno-deprecated-declarations
 build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
 build --experimental_cc_static_library
@@ -81,6 +80,13 @@ coverage --build_tests_only
 
 # Envoy deprecation
 common --@envoy//bazel:deprecated_repo_arg_allowed=false
+
+# BCR modules with no registry override — deprecated absl Mutex shims / TSA false positives / fuzz semantics.
+build --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-deprecated-declarations
+build --per_file_copt=external/c-ares.*@-Wno-unused-function
+build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
+build --per_file_copt=external/libprotobuf-mutator.*@-Wno-unused-result
+build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
 
 
 #############################################################################
@@ -146,6 +152,10 @@ common:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 # Clang installed to non-standard location (ie not /opt/llvm/)
 common:clang-local --config=clang-common
 common:clang-local --config=libc++
+
+# TODO(phlax): Remove this once a proper fix for the deprecated enum lands
+build:clang --copt=--system-header-prefix=envoy/config/route/v3/route_components.pb.h
+build:clang --per_file_copt=external/envoy_api.*/route_components\.pb\.cc@-Wno-deprecated-declarations
 
 # Use gold linker for gcc compiler.
 build:gcc --config=libstdc++
