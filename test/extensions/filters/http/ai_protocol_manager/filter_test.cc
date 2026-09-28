@@ -152,12 +152,17 @@ public:
   }
 
   // Parses unconfigured routes too, so a test can show the chain is not run there.
-  void createFilterWithAiFilters(AiFilterFactories ai_filter_factories) {
+  void createFilterWithAiFilters(
+      AiFilterFactories ai_filter_factories,
+      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::
+          BodyReserialization reserialize_body =
+              envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS) {
     if (filter_ != nullptr) {
       filter_->onDestroy();
     }
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
     proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
+    proto.mutable_request_handling()->set_reserialize_body(reserialize_body);
     filter_ = std::make_unique<AiProtocolManagerFilter>(
         factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
                                                        std::move(ai_filter_factories)));
@@ -1324,6 +1329,7 @@ public:
     LLMProtocol protocol;
     std::string path;
     const StreamInfo::StreamInfo* stream_info;
+    uint64_t payload_bytes;
   };
 
   ContextRecordingAiFilter(const AiFilterContext& context, std::vector<Seen>& seen)
@@ -1334,7 +1340,8 @@ public:
                                        LocalReplier) override {
     ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
     seen_.push_back({context_.request_protocol,
-                     std::string(context_.request_headers.getPathValue()), &context_.stream_info});
+                     std::string(context_.request_headers.getPathValue()), &context_.stream_info,
+                     context_.request_payload_bytes});
     request->json()["model"] = "rewritten";
     co_return co_await std::move(propagate_request)(std::move(request));
   }
@@ -1343,6 +1350,37 @@ private:
   const AiFilterContext context_;
   std::vector<Seen>& seen_;
 };
+
+// Receives the request and passes it on without editing it.
+class PassThroughAiFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+};
+
+TEST_F(AiProtocolManagerFilterTest, ForwardsTheReceivedBodyWhenReserializationIsDisabled) {
+  createFilterWithAiFilters(
+      {[](const AiFilterContext&) -> AiFilterSharedPtr {
+        return std::make_unique<PassThroughAiFilter>();
+      }},
+      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::DISABLE);
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload =
+      "{ \"model\": \"gpt-4\",  \"messages\": [ {\"role\": \"user\", \"content\": \"hi\"} ] }";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_TRUE(injected_end_stream_);
+}
 
 TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) {
   std::vector<ContextRecordingAiFilter::Seen> seen;
@@ -1366,6 +1404,27 @@ TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) 
   EXPECT_EQ(seen[0].stream_info, &callbacks_.stream_info_);
   EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
   EXPECT_TRUE(injected_end_stream_);
+}
+
+// The payload byte count a filter sees spans the whole body, not the frame that closed it.
+TEST_F(AiProtocolManagerFilterTest, AiFilterContextCarriesTotalPayloadBytes) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string first = R"({"model":"gpt-4","messages":)";
+  const std::string second = R"([{"role":"user","content":"hi"}]})";
+  Buffer::OwnedImpl head(first);
+  EXPECT_EQ(filter_->decodeData(head, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl tail(second);
+  EXPECT_EQ(filter_->decodeData(tail, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].payload_bytes, first.size() + second.size());
 }
 
 TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {

@@ -31,9 +31,13 @@ automatically manage the correct Bazel version.
 Java requirements
 --------------------
 
-- Java 8
+Bazel provisions a hermetic JDK 21 for Envoy Mobile builds via
+``--java_runtime_version=remotejdk_21`` and ``--tool_java_runtime_version=remotejdk_21``
+in :repo:`.bazelrc <.bazelrc>`, so no local JDK installation or ``JAVA_HOME``/``PATH``
+setup is required to build.
 
-Make sure that Java 8 set on `PATH` and that `JAVA_HOME` is set to the appropriate SDK.
+A local JDK 21+ is only needed if you want IDE integration or to run Java-based tools
+outside Bazel.
 
 --------------------
 Android requirements

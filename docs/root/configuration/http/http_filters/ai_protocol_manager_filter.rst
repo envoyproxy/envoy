@@ -163,6 +163,13 @@ may read or modify the document, or reject the request with a local reply.
 Routes without a per-route request declaration, and requests without a body,
 run no AI filters.
 
+Once the AI filters finish, the parsed document is re-serialized as the
+request body by default. With :ref:`reserialize_body
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.reserialize_body>`
+set to ``DISABLE``, the received body is forwarded byte for byte instead, and
+edits AI filters make to the document are not sent; use it only with AI filters
+that read the request.
+
 Request info
 ~~~~~~~~~~~~
 
@@ -202,6 +209,30 @@ Without a declared API, only ``model`` and ``stream`` are read. Every value is
 client-declared and optional. A value Envoy cannot use (wrong type, out of
 range, or a string over 256 bytes) is ignored and counted by
 ``request_info.partial``.
+
+Token estimation
+^^^^^^^^^^^^^^^^
+
+Configuring :ref:`token_estimation
+<envoy_v3_api_field_extensions.http.ai_filters.request_info.v3.RequestInfo.token_estimation>`
+adds ``estimated_input_tokens`` to the record, for consumers that must budget
+before the provider reports what it charged: a rate limit on tokens per minute,
+or a load balancer weighing queued work. It is ``ceil(tokens_per_byte *
+request payload bytes)`` over the body Envoy buffered, so it reads no JSON and
+is published whatever the route declares:
+
+.. code-block:: yaml
+
+  - name: envoy.http.ai_filters.request_info
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+      token_estimation:
+        tokens_per_byte: 0.5
+
+The ratio is a property of the payloads a deployment sees, and a size heuristic
+is not a tokenizer: an estimate does not replace the :ref:`token usage
+<envoy_v3_api_msg_data.ai.v3.TokenUsage>` the response reports. Rounding up
+keeps a sub-token payload from estimating zero.
 
 The record is written before the held request headers are released, so later
 decode filters see it from their first request-headers callback. An

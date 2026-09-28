@@ -43,6 +43,15 @@ public:
   static bool getHeaders(HeadersMapOptConstRef map,
                          envoy_dynamic_module_type_envoy_http_header* result_headers);
 
+  // Fill result_headers with all entries of the resolved header map when capacity is large enough.
+  // On success writes up to capacity entries and sets size_out to the header count. When capacity
+  // is smaller than the count, writes nothing, sets size_out to the required count and returns
+  // false. When the map is unavailable, sets size_out to zero and returns false. result_headers may
+  // be null when capacity is zero.
+  static bool getHeadersBounded(HeadersMapOptConstRef map,
+                                envoy_dynamic_module_type_envoy_http_header* result_headers,
+                                size_t capacity, size_t* size_out);
+
   // Look up a single header value by key. index selects the value for multi-value headers and
   // total_count_out, when non-null, receives the total number of values for the key.
   static bool getHeaderValue(HeadersMapOptConstRef map, envoy_dynamic_module_type_module_buffer key,
@@ -72,6 +81,10 @@ public:
   // or not a boolean.
   static bool getAttributeBool(const StreamInfo::StreamInfo& stream_info,
                                envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+  // fill timing_out with the stream's timing snapshot, using -1 for unavailable values
+  static void getTimingInfo(const StreamInfo::StreamInfo* stream_info,
+                            envoy_dynamic_module_type_timing_info* timing_out);
 
   // Get a string value from dynamic metadata by filter name and dotted key path. Returns false
   // when the path is absent or the value is not a string.

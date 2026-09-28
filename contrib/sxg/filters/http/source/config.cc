@@ -54,7 +54,7 @@ absl::StatusOr<Http::FilterFactoryCb> FilterFactory::createHttpFilterFactoryFrom
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
       std::move(secret_provider_certificate), std::move(secret_provider_private_key),
-      server_context.threadLocal(), server_context.api());
+      server_context.threadLocal(), server_context.api(), server_context.mainThreadDispatcher());
   auto config = std::make_shared<FilterConfig>(proto_config, server_context.timeSource(),
                                                secret_reader, extra_context.stats_prefix,
                                                extra_context.scopeOr(server_context));

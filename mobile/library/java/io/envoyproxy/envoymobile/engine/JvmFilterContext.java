@@ -251,6 +251,7 @@ class JvmFilterContext {
     return null;
   }
 
+  @SuppressWarnings("unchecked")
   private static byte[][] toJniHeaders(Object headers) {
     return JniBridgeUtility.toJniHeaders((Map<String, List<String>>)headers);
   }

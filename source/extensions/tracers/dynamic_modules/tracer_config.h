@@ -157,6 +157,10 @@ private:
   DynamicModuleTracerConfigSharedPtr config_;
   envoy_dynamic_module_type_tracer_span_module_ptr in_module_span_;
   Tracing::TraceContext* trace_context_;
+
+  // The sampling decision recorded by setSampled. A span is treated as exported until setSampled
+  // reports otherwise.
+  bool sampled_{true};
 };
 
 /**
