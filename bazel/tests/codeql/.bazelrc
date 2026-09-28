@@ -5,13 +5,9 @@ common --noincompatible_disallow_empty_glob
 common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
-build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
-build --incompatible_strict_action_env
-build --copt=-DABSL_MIN_LOG_LEVEL=4
-build --define absl=1
-
 common --@rules_python//python/config_settings:bootstrap_impl=script
 common --@protobuf//bazel/flags:prefer_prebuilt_protoc=true
 common --incompatible_enable_proto_toolchain_resolution
 
-try-import %workspace%/user.bazelrc
+try-import %workspace%/../../../ci.bazelrc
+try-import %workspace%/../../../user.bazelrc
