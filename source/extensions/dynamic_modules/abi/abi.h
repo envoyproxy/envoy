@@ -13446,6 +13446,8 @@ void envoy_dynamic_module_on_tracer_span_set_tag(
  * envoy_dynamic_module_on_tracer_span_reserve_tags is called to reserve capacity for tags that will
  * be set via envoy_dynamic_module_on_tracer_span_set_tag.
  *
+ * This is optional. If not implemented by the module, Envoy will skip calling it.
+ *
  * @param span_module_ptr is the pointer to the in-module span instance.
  * @param tags_size is the number of tags that will be set.
  */
