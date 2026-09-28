@@ -612,7 +612,7 @@ public:
 
 using SocketPtr = std::unique_ptr<Socket>;
 using SocketSharedPtr = std::shared_ptr<Socket>;
-using SocketOptRef = OptRef<Socket>;
+using SocketOptRef = std::optional<std::reference_wrapper<Socket>>;
 
 } // namespace Network
 } // namespace Envoy

@@ -1552,11 +1552,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   // Apply header sanity checks.
-  OptRef<const absl::string_view> error = HeaderUtility::requestHeadersValid(*request_headers_);
+  std::optional<std::reference_wrapper<const absl::string_view>> error =
+      HeaderUtility::requestHeadersValid(*request_headers_);
   if (error != std::nullopt) {
-    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt, *error);
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt, error.value().get());
     if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-      connection_manager_.handleCodecError(*error);
+      connection_manager_.handleCodecError(error.value().get());
     }
     return;
   }

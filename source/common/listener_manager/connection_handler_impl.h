@@ -32,8 +32,9 @@ class ConnectionHandlerImpl : public ConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  using UdpListenerCallbacksOptRef = OptRef<Network::UdpListenerCallbacks>;
-  using ActiveTcpListenerOptRef = OptRef<ActiveTcpListener>;
+  using UdpListenerCallbacksOptRef =
+      std::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
+  using ActiveTcpListenerOptRef = std::optional<std::reference_wrapper<ActiveTcpListener>>;
 
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index);
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index,
@@ -145,10 +146,11 @@ private:
     }
   };
 
-  using ActiveListenerDetailsOptRef = OptRef<ActiveListenerDetails>;
+  using ActiveListenerDetailsOptRef = std::optional<std::reference_wrapper<ActiveListenerDetails>>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
 
-  using PerAddressActiveListenerDetailsOptRef = OptRef<PerAddressActiveListenerDetails>;
+  using PerAddressActiveListenerDetailsOptRef =
+      std::optional<std::reference_wrapper<PerAddressActiveListenerDetails>>;
   PerAddressActiveListenerDetailsOptRef
   findPerAddressActiveListenerDetails(const ActiveListenerDetailsOptRef active_listener_details,
                                       const Network::Address::Instance& address);

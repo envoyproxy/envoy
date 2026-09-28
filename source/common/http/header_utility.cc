@@ -452,7 +452,7 @@ constexpr bool isInvalidToken(unsigned char c) {
   return true;
 }
 
-OptRef<const absl::string_view>
+std::optional<std::reference_wrapper<const absl::string_view>>
 HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.
   if (headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {

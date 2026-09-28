@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/common/optref.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/http/api_listener.h"
@@ -44,7 +43,7 @@ public:
 };
 
 using ApiListenerPtr = std::unique_ptr<ApiListener>;
-using ApiListenerOptRef = OptRef<ApiListener>;
+using ApiListenerOptRef = std::optional<std::reference_wrapper<ApiListener>>;
 
 class ApiListenerFactory : public Config::UntypedFactory {
 public:

@@ -150,7 +150,7 @@ private:
         const TagUtility::TagStatNameJoiner& joiner, Histogram::Unit)>;
     using TextReadoutAllocator = std::function<RefcountPtr<Base>(
         const TagUtility::TagStatNameJoiner& joiner, TextReadout::Type)>;
-    using BaseOptConstRef = OptRef<const Base>;
+    using BaseOptConstRef = std::optional<std::reference_wrapper<const Base>>;
 
     IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
     IsolatedStatsCache(GaugeAllocator alloc) : gauge_alloc_(alloc) {}
@@ -267,7 +267,7 @@ private:
       if (stat == stats_.end()) {
         return std::nullopt;
       }
-      return makeOptRefFromPtr(stat->second.get());
+      return std::cref(*stat->second);
     }
 
   private:

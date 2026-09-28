@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
-#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 
 #pragma once
@@ -47,6 +47,6 @@ public:
   virtual uint64_t count() const PURE;
 };
 
-using ResourceLimitOptRef = OptRef<ResourceLimit>;
+using ResourceLimitOptRef = std::optional<std::reference_wrapper<ResourceLimit>>;
 
 } // namespace Envoy

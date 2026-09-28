@@ -43,7 +43,7 @@ private:
   struct CertWithFilterChain {
     quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_;
     std::shared_ptr<quic::CertificatePrivateKey> private_key_;
-    OptRef<const Network::FilterChain> filter_chain_;
+    std::optional<std::reference_wrapper<const Network::FilterChain>> filter_chain_;
   };
 
   CertWithFilterChain getTlsCertAndFilterChain(const TransportSocketFactoryWithFilterChain& data,
