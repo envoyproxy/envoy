@@ -65,6 +65,16 @@ public:
   StreamInfo::MockStreamInfo stream_info_;
 };
 
+TEST_F(RateLimitGrpcClientTest, DefaultUnitMultiplierIsOmitted) {
+  envoy::service::ratelimit::v3::RateLimitRequest request;
+  GrpcClientImpl::createRequest(
+      request, "foo", {{{{"foo", "bar"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}}, 0);
+
+  ASSERT_EQ(1, request.descriptors_size());
+  ASSERT_TRUE(request.descriptors(0).has_limit());
+  EXPECT_FALSE(request.descriptors(0).limit().has_unit_multiplier());
+}
+
 TEST_F(RateLimitGrpcClientTest, Basic) {
   Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse> response;
 
