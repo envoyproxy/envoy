@@ -368,6 +368,67 @@ impl<'a> MetricSnapshot<'a> {
     })
   }
 
+  /// Reads the histogram's tag-extracted name into `name`. See
+  /// [`counter_tag_extracted_name`](Self::counter_tag_extracted_name).
+  ///
+  /// During [`StatSink::on_flush`], use the raw name from [`histogram`](Self::histogram) as a
+  /// cache key and copy this name and all tags into module-owned storage. This lets a sink keep
+  /// aggregating raw observations from [`StatSink::on_histogram_complete`] off-thread without
+  /// guessing labels from the flat name. These getters read metadata, not histogram statistics.
+  pub fn histogram_tag_extracted_name(&self, index: usize, name: &mut Vec<u8>) -> bool {
+    fill_buffer(name, |ptr, capacity, size| unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+        self.envoy_ptr,
+        index,
+        ptr,
+        capacity,
+        size,
+      )
+    })
+  }
+
+  /// The number of tags on the histogram at `index`, or `None` when the index is out of range.
+  pub fn histogram_tag_count(&self, index: usize) -> Option<usize> {
+    let mut count: usize = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+        self.envoy_ptr,
+        index,
+        &mut count,
+      )
+    };
+    found.then_some(count)
+  }
+
+  /// Reads tag `tag_index` of the histogram at `index` into `name` and `value`. See
+  /// [`counter_tag`](Self::counter_tag). Copy every tag before caching the histogram's identity;
+  /// an incomplete label set can conflate distinct histograms with the same tag-extracted name.
+  pub fn histogram_tag(
+    &self,
+    index: usize,
+    tag_index: usize,
+    name: &mut Vec<u8>,
+    value: &mut Vec<u8>,
+  ) -> bool {
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+          self.envoy_ptr,
+          index,
+          tag_index,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
+        )
+      },
+    )
+  }
+
   /// Copies the whole snapshot into an [`OwnedMetricSnapshot`].
   ///
   /// The returned value owns its data and is `Send`, so it can be moved to another thread to

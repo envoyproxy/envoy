@@ -71,7 +71,7 @@ public:
   findOrCreateGenericSecretProvider(const envoy::config::core::v3::ConfigSource& config_source,
                                     const std::string& config_name,
                                     Server::Configuration::ServerFactoryContext& server_context,
-                                    OptRef<Init::Manager> init_manager) override;
+                                    OptRef<Init::Manager> init_manager, bool warm) override;
 
   std::vector<std::string> dynamicActiveTlsCertificateSecretNames() const override;
 

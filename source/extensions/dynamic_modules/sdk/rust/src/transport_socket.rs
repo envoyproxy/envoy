@@ -10,6 +10,51 @@ use crate::{
 use mockall::*;
 use std::cell::RefCell;
 
+thread_local! {
+  // Scratch for the ABI write slice descriptors read by `copy_write_buffer`. Reused across writes on
+  // the same worker thread to avoid a per-call allocation. It is only borrowed within a single call.
+  static WRITE_SLICE_SCRATCH: RefCell<Vec<abi::envoy_dynamic_module_type_envoy_buffer>> =
+    const { RefCell::new(Vec::new()) };
+}
+
+// Copies the write buffer slices into `out`. The `get_slices` closure wraps the ABI slice getter so
+// this logic stays unit-testable. It is called first with a null buffer to learn the slice count and
+// then with the scratch buffer to fill it. The descriptor scratch is reused across calls and the
+// output is pre-sized from the summed slice lengths so a large write does not repeatedly reallocate.
+fn copy_write_buffer_slices(
+  out: &mut Vec<u8>,
+  get_slices: impl Fn(*mut abi::envoy_dynamic_module_type_envoy_buffer, *mut usize),
+) {
+  let mut count: usize = 0;
+  get_slices(std::ptr::null_mut(), &mut count);
+  if count == 0 {
+    return;
+  }
+  WRITE_SLICE_SCRATCH.with(|scratch| {
+    let mut slices = scratch.borrow_mut();
+    slices.clear();
+    slices.resize(
+      count,
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      },
+    );
+    let mut filled = count;
+    get_slices(slices.as_mut_ptr(), &mut filled);
+    let filled = filled.min(count);
+    let total: usize = slices[..filled].iter().map(|slice| slice.length).sum();
+    out.reserve(total);
+    for slice in &slices[..filled] {
+      if slice.ptr.is_null() || slice.length == 0 {
+        continue;
+      }
+      let bytes = unsafe { std::slice::from_raw_parts(slice.ptr as *const u8, slice.length) };
+      out.extend_from_slice(bytes);
+    }
+  });
+}
+
 /// What should happen to the connection after a transport socket read or write completes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PostIoAction {
@@ -293,39 +338,11 @@ impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
   }
 
   fn copy_write_buffer(&self, out: &mut Vec<u8>) {
-    let mut count: usize = 0;
-    unsafe {
+    copy_write_buffer_slices(out, |slices, count| unsafe {
       abi::envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
-        self.raw,
-        std::ptr::null_mut(),
-        &mut count,
+        self.raw, slices, count,
       );
-    }
-    if count == 0 {
-      return;
-    }
-    let mut slices = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      count
-    ];
-    let mut filled = count;
-    unsafe {
-      abi::envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
-        self.raw,
-        slices.as_mut_ptr(),
-        &mut filled,
-      );
-    }
-    for slice in &slices[..filled.min(count)] {
-      if slice.ptr.is_null() || slice.length == 0 {
-        continue;
-      }
-      let bytes = unsafe { std::slice::from_raw_parts(slice.ptr as *const u8, slice.length) };
-      out.extend_from_slice(bytes);
-    }
+    });
   }
 
   fn write_buffer_drain(&self, length: usize) {
@@ -686,4 +703,61 @@ ffi_export! {
     wrapper.socket.start_secure_transport(&mut envoy)
   }
   on_panic = false
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  // A stable buffer read as slices spelling substrings of "abcde".
+  static SLICE_BYTES: [u8; 5] = *b"abcde";
+
+  // Builds a slice getter that reports the slice count on the sizing call and fills the descriptors
+  // on the fill call. Each descriptor is an (offset, length) window into `SLICE_BYTES`.
+  fn slice_getter(
+    descriptors: &[(usize, usize)],
+  ) -> impl Fn(*mut abi::envoy_dynamic_module_type_envoy_buffer, *mut usize) + '_ {
+    move |slices, count| {
+      if slices.is_null() {
+        unsafe { *count = descriptors.len() };
+        return;
+      }
+      for (i, (offset, length)) in descriptors.iter().enumerate() {
+        unsafe {
+          *slices.add(i) = abi::envoy_dynamic_module_type_envoy_buffer {
+            ptr: SLICE_BYTES.as_ptr().add(*offset) as _,
+            length: *length,
+          };
+        }
+      }
+      unsafe { *count = descriptors.len() };
+    }
+  }
+
+  // Slices of differing lengths reassemble in order, exercising the summed output pre-sizing.
+  #[test]
+  fn copy_write_buffer_slices_concatenates_varying_length_slices() {
+    let mut out = Vec::new();
+    copy_write_buffer_slices(&mut out, slice_getter(&[(0, 2), (2, 1), (2, 3)]));
+    assert_eq!(out, b"abccde".to_vec());
+  }
+
+  // An empty write buffer appends nothing and never asks for slice descriptors.
+  #[test]
+  fn copy_write_buffer_slices_skips_empty() {
+    let mut out = vec![b'x'];
+    copy_write_buffer_slices(&mut out, slice_getter(&[]));
+    assert_eq!(out, vec![b'x']);
+  }
+
+  // A smaller copy after a larger one reuses the scratch and sees only its own slices.
+  #[test]
+  fn copy_write_buffer_slices_reuses_scratch() {
+    let mut large = Vec::new();
+    copy_write_buffer_slices(&mut large, slice_getter(&[(0, 1); 40]));
+    assert_eq!(large, vec![b'a'; 40]);
+    let mut small = Vec::new();
+    copy_write_buffer_slices(&mut small, slice_getter(&[(0, 2), (2, 3)]));
+    assert_eq!(small, b"abcde".to_vec());
+  }
 }

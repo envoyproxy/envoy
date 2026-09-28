@@ -190,11 +190,15 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:empty_string",
+        "//source/common/config:well_known_names",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stats:tag_producer_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 

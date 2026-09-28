@@ -177,7 +177,7 @@ public:
                                std::string calculated_signature) {
     std::vector<uint8_t> signature;
     auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-    auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
+    auto hash = crypto_util.getSha256Digest(string_to_sign);
     auto sigv4a_key_derivation = std::make_unique<SigV4AKeyDerivation>();
 
     auto ec_key_or =

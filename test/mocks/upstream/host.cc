@@ -2,6 +2,8 @@
 
 #include "source/common/network/utility.h"
 
+// NOLINT: cache-bust for corrupt RBE artifact, remove this on any change to this file.
+
 using testing::_;
 using testing::Invoke;
 using testing::Return;
