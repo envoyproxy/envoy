@@ -2027,10 +2027,75 @@ private:
   Init::ManagerImpl isolated_init_manager_;
 };
 
+bool hasDynamicDirectResponse(const envoy::config::route::v3::VirtualHost& vhost_proto) {
+  for (const auto& route : vhost_proto.routes()) {
+    if (route.has_direct_response() && route.direct_response().has_body()) {
+      if (Envoy::Config::DataSource::usesFileWatching(route.direct_response().body(), {})) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+static void preTranslateVirtualHost(envoy::config::route::v3::VirtualHost& vhost_proto) {
+  HeaderParser::translateHeaderValueOptions(*vhost_proto.mutable_request_headers_to_add());
+  HeaderParser::translateHeaderValueOptions(*vhost_proto.mutable_response_headers_to_add());
+  for (auto& route : *vhost_proto.mutable_routes()) {
+    HeaderParser::translateHeaderValueOptions(*route.mutable_request_headers_to_add());
+    HeaderParser::translateHeaderValueOptions(*route.mutable_response_headers_to_add());
+    if (route.has_route() && route.route().has_weighted_clusters()) {
+      for (auto& cluster :
+           *route.mutable_route()->mutable_weighted_clusters()->mutable_clusters()) {
+        HeaderParser::translateHeaderValueOptions(*cluster.mutable_request_headers_to_add());
+        HeaderParser::translateHeaderValueOptions(*cluster.mutable_response_headers_to_add());
+      }
+    }
+  }
+}
+
+static ArenaWrappedProto<envoy::config::route::v3::VirtualHost>
+createPreTranslatedProto(const envoy::config::route::v3::VirtualHost& vhost_proto) {
+  ArenaWrappedProto<envoy::config::route::v3::VirtualHost> wrapped(vhost_proto);
+  preTranslateVirtualHost(*wrapped);
+  return wrapped;
+}
+
+VirtualHostInitializationObject::VirtualHostInitializationObject(
+    const envoy::config::route::v3::VirtualHost& vhost_proto,
+    const CommonConfigSharedPtr& global_route_config,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    Stats::ScopeSharedPtr vhost_stats_scope, ProtobufMessage::ValidationVisitor& validator,
+    Init::Manager& init_manager, bool validate_clusters)
+    : vhost_proto_(createPreTranslatedProto(vhost_proto)),
+      global_route_config_(global_route_config), factory_context_(factory_context),
+      vhost_stats_scope_(std::move(vhost_stats_scope)), validator_(validator),
+      init_manager_(init_manager), validate_clusters_(validate_clusters) {}
+
+std::shared_ptr<const VirtualHostImpl> VirtualHostInitializationObject::createVirtualHost() const {
+  if (!vhost_proto_) {
+    return nullptr;
+  }
+  absl::Status creation_status = absl::OkStatus();
+  auto vhost = std::make_shared<VirtualHostImpl>(
+      *vhost_proto_, global_route_config_, factory_context_, *vhost_stats_scope_, validator_,
+      init_manager_, /*validate_clusters=*/false, creation_status);
+  if (!creation_status.ok()) {
+    ENVOY_LOG(error, "Failed to initialize deferred virtual host '{}': {}", vhost_proto_->name(),
+              creation_status.message());
+    return nullptr;
+  }
+  return vhost;
+}
+
 bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_proto,
                              const CommonConfigSharedPtr& global_route_config,
                              bool validate_clusters,
                              Server::Configuration::ServerFactoryContext& factory_context) {
+  if (hasDynamicDirectResponse(vhost_proto)) {
+    return true;
+  }
+
   if (vhost_proto.has_matcher()) {
     return true;
   }
@@ -2203,12 +2268,14 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()),
       vhost_header_(route_config.vhost_header()) {
   const bool deferred_vhost_enabled =
-      factory_context.bootstrap().has_route_manager() &&
+      !factory_context.bootstrap().has_route_manager() ||
       factory_context.bootstrap().route_manager().enable_deferred_virtual_host_creation();
 
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     DomainEntrySharedPtr domain_entry;
-    if (deferred_vhost_enabled) {
+    const bool eager_init =
+        !deferred_vhost_enabled || hasDynamicDirectResponse(virtual_host_config);
+    if (!eager_init) {
       if (requiresProbeValidation(virtual_host_config, global_route_config, validate_clusters,
                                   factory_context)) {
         // Sequential probe validation using an isolated validation context.

@@ -538,26 +538,9 @@ struct VirtualHostInitializationObject : Logger::Loggable<Logger::Id::router> {
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   Stats::ScopeSharedPtr vhost_stats_scope,
                                   ProtobufMessage::ValidationVisitor& validator,
-                                  Init::Manager& init_manager, bool validate_clusters)
-      : vhost_proto_(vhost_proto), global_route_config_(global_route_config),
-        factory_context_(factory_context), vhost_stats_scope_(std::move(vhost_stats_scope)),
-        validator_(validator), init_manager_(init_manager), validate_clusters_(validate_clusters) {}
+                                  Init::Manager& init_manager, bool validate_clusters);
 
-  std::shared_ptr<const VirtualHostImpl> createVirtualHost() const {
-    if (!vhost_proto_) {
-      return nullptr;
-    }
-    absl::Status creation_status = absl::OkStatus();
-    auto vhost = std::make_shared<VirtualHostImpl>(
-        *vhost_proto_, global_route_config_, factory_context_, *vhost_stats_scope_, validator_,
-        init_manager_, /*validate_clusters=*/false, creation_status);
-    if (!creation_status.ok()) {
-      ENVOY_LOG(error, "Failed to initialize deferred virtual host '{}': {}", vhost_proto_->name(),
-                creation_status.message());
-      return nullptr;
-    }
-    return vhost;
-  }
+  std::shared_ptr<const VirtualHostImpl> createVirtualHost() const;
 
   const ArenaWrappedProto<envoy::config::route::v3::VirtualHost> vhost_proto_;
   const CommonConfigSharedPtr global_route_config_;
@@ -569,6 +552,11 @@ struct VirtualHostInitializationObject : Logger::Loggable<Logger::Id::router> {
 };
 
 using VirtualHostInitObjectConstSharedPtr = std::shared_ptr<const VirtualHostInitializationObject>;
+
+/**
+ * Returns true if the virtual host contains any direct response route with a dynamic data source.
+ */
+bool hasDynamicDirectResponse(const envoy::config::route::v3::VirtualHost& vhost_proto);
 
 /**
  * Returns true if the virtual host configuration requires full probe validation at configuration

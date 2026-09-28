@@ -26,6 +26,7 @@
 #include "test/common/router/route_fuzz.pb.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/fuzz/utility.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -13735,7 +13736,7 @@ virtual_hosts:
   }
   {
     auto vhost = base_vhost;
-    vhost.mutable_routes(0)->mutable_match()->set_path_separated_prefix("/path_sep");
+    vhost.mutable_routes(0)->mutable_match()->set_path_separated_prefix("/path_separated");
     EXPECT_FALSE(requiresProbeValidation(vhost, global_route_config, true, factory_context_));
   }
 
@@ -14171,6 +14172,102 @@ virtual_hosts:
   const auto& typed_list_action = list_action->getTyped<RouteListMatchAction>();
   EXPECT_EQ(typed_list_action.routes().size(), 1);
   EXPECT_EQ(typed_list_action.routes()[0]->routeEntry()->clusterName(), "cluster_1");
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostDynamicDirectResponseEagerInit) {
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
+
+  auto* watcher = new Filesystem::MockWatcher();
+  EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_())
+      .WillRepeatedly(testing::Return(watcher));
+  EXPECT_CALL(*watcher, addWatch(testing::_, testing::_, testing::_))
+      .WillRepeatedly(testing::Return(absl::OkStatus()));
+
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("dynamic_body.txt", "dynamic content");
+
+  const std::string yaml = fmt::format(R"EOF(
+virtual_hosts:
+- name: dynamic_direct_response_vhost
+  domains: ["dynamic.example.com"]
+  routes:
+  - match: {{ prefix: "/" }}
+    direct_response:
+      status: 200
+      body:
+        filename: "{}"
+        watched_directory:
+          path: "{}"
+)EOF",
+                                       file_path, TestEnvironment::temporaryDirectory());
+
+  auto route_config = parseRouteConfigurationFromYaml(yaml);
+  const auto& vhost_proto = route_config.virtual_hosts(0);
+
+  EXPECT_TRUE(hasDynamicDirectResponse(vhost_proto));
+  EXPECT_TRUE(requiresProbeValidation(vhost_proto, nullptr, false, factory_context_));
+
+  TestConfigImpl config(route_config, factory_context_, true, creation_status_);
+  EXPECT_OK(creation_status_);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("dynamic.example.com", "/", "GET");
+  const auto route = config.route(headers, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("dynamic_direct_response_vhost", route->virtualHost().name());
+  ASSERT_NE(nullptr, route->directResponseEntry());
+  Http::TestRequestHeaderMapImpl req_headers;
+  Http::TestResponseHeaderMapImpl resp_headers;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  std::string body;
+  EXPECT_EQ("dynamic content",
+            route->directResponseEntry()->formatBody(req_headers, resp_headers, stream_info, body));
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostHeaderParserPreTranslation) {
+  factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+      true);
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster_1"}, {});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: legacy_headers_vhost
+  domains: ["headers.example.com"]
+  request_headers_to_add:
+  - header:
+      key: "x-translated"
+      value: "%UPSTREAM_METADATA([\"a\", \"b\"])% %PER_REQUEST_STATE(my_state)%"
+  routes:
+  - match: { prefix: "/" }
+    route:
+      weighted_clusters:
+        clusters:
+        - name: "cluster_1"
+          weight: 100
+          request_headers_to_add:
+          - header:
+              key: "x-weighted-translated"
+              value: "%UPSTREAM_METADATA([\"c\", \"d\"])%"
+    request_headers_to_add:
+    - header:
+        key: "x-route-translated"
+        value: "%DYNAMIC_METADATA([\"x\", \"y\"])%"
+)EOF";
+
+  auto route_config = parseRouteConfigurationFromYaml(yaml);
+  TestConfigImpl config(route_config, factory_context_, true, creation_status_);
+  EXPECT_OK(creation_status_);
+
+  // Match route on a separate worker thread to trigger inflation off the main thread.
+  // This verifies that TRY_ASSERT_MAIN_THREAD is not triggered during worker-thread inflation.
+  std::thread worker([&config]() {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("headers.example.com", "/", "GET");
+    const auto route = config.route(headers, 0);
+    ASSERT_NE(nullptr, route.route);
+    EXPECT_EQ("legacy_headers_vhost", route->virtualHost().name());
+  });
+  worker.join();
 }
 
 } // namespace
