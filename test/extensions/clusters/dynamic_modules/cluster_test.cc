@@ -79,6 +79,11 @@ public:
   // constructed: clears in_module_lb_ so chooseHost exercises the early-return path.
   static void clearInModuleLb(DynamicModuleLoadBalancer& lb) { lb.in_module_lb_ = nullptr; }
 
+  // Returns whether the load balancer registered the host membership update callback.
+  static bool hasMemberUpdateCb(const DynamicModuleLoadBalancer& lb) {
+    return lb.member_update_cb_ != nullptr;
+  }
+
   // Sets the borrowed host vectors that back the member update host accessors. These are only
   // populated by Envoy during an on_host_membership_update callback, so this lets the accessors
   // be exercised deterministically from a unit test.
@@ -232,6 +237,33 @@ cluster_type:
   EXPECT_NE(nullptr, result->first);
   // CLUSTER_PROVIDED should return a non-null thread-aware LB (module LB).
   EXPECT_NE(nullptr, result->second);
+}
+
+// A module that provides a load balancer and the membership hook registers the callback.
+TEST_F(DynamicModuleClusterTest, ValidLoadBalancerRegistersMembershipCallback) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  EXPECT_TRUE(DynamicModuleClusterTestPeer::hasMemberUpdateCb(*lb_instance));
+}
+
+// A module returning a null load balancer must not register the host membership update callback,
+// so a later membership change cannot invoke the module hook against a null load balancer.
+TEST_F(DynamicModuleClusterTest, NullLoadBalancerSkipsMembershipCallback) {
+  auto result = createCluster(makeYamlConfig("cluster_null_lb"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  EXPECT_FALSE(DynamicModuleClusterTestPeer::hasMemberUpdateCb(*lb_instance));
 }
 
 // Test that LEAST_REQUEST lb_policy is accepted and returns nullptr thread-aware LB.
@@ -2986,6 +3018,72 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedFound) {
   EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
       context_ptr, key_buf, &result));
   EXPECT_EQ("typed-v", absl::string_view(result.ptr, result.length));
+}
+
+// The typed getter keeps every serialized value alive for the whole host selection callback so a
+// module can hold several views at once, and the scope guard clears them when the outermost
+// callback returns.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedConsecutiveGettersStayValid) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k1",
+                                     std::make_unique<Router::StringAccessorImpl>("value-one"));
+  stream_info.filter_state_->setData("k2",
+                                     std::make_unique<Router::StringAccessorImpl>("value-two"));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  std::string key1 = "k1";
+  std::string key2 = "k2";
+  envoy_dynamic_module_type_module_buffer key1_buf = {key1.data(), key1.size()};
+  envoy_dynamic_module_type_module_buffer key2_buf = {key2.data(), key2.size()};
+  envoy_dynamic_module_type_envoy_buffer result1;
+  envoy_dynamic_module_type_envoy_buffer result2;
+  {
+    ClusterLbFilterStateScratchGuard guard;
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key1_buf, &result1));
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key2_buf, &result2));
+    // The first view is not clobbered by the second call.
+    EXPECT_EQ("value-one", absl::string_view(result1.ptr, result1.length));
+    EXPECT_EQ("value-two", absl::string_view(result2.ptr, result2.length));
+    EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+  }
+  EXPECT_EQ(0U, clusterLbFilterStateScratchSizeForTest());
+}
+
+// A nested guard keeps the outer scratch, and only the outermost guard clears it.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNestedGuardClearsAtOutermost) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k1",
+                                     std::make_unique<Router::StringAccessorImpl>("value-one"));
+  stream_info.filter_state_->setData("k2",
+                                     std::make_unique<Router::StringAccessorImpl>("value-two"));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  std::string key1 = "k1";
+  std::string key2 = "k2";
+  envoy_dynamic_module_type_module_buffer key1_buf = {key1.data(), key1.size()};
+  envoy_dynamic_module_type_module_buffer key2_buf = {key2.data(), key2.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  {
+    ClusterLbFilterStateScratchGuard outer;
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key1_buf, &result));
+    {
+      ClusterLbFilterStateScratchGuard inner;
+      EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+          context_ptr, key2_buf, &result));
+      EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+    }
+    // A nested guard does not clear the scratch.
+    EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+  }
+  // The outermost guard clears the scratch.
+  EXPECT_EQ(0U, clusterLbFilterStateScratchSizeForTest());
 }
 
 // Test set_filter_state_bytes with nullptr context.

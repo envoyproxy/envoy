@@ -35,7 +35,13 @@ public:
   // means the response is no longer trustworthy and the stream should be torn down.
   using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
 
+  enum class Mode {
+    Sse,
+    Unary,
+  };
+
   struct Config {
+    Mode mode{Mode::Sse};
     SseEventDecoder::Config sse{};
   };
 

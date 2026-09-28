@@ -583,6 +583,322 @@ TEST_F(ResponseFilterManagerTest, DestroyedInsideOnCompleteCallbackIsSafe) {
   EXPECT_EQ(manager_, nullptr);
 }
 
+// Appends a boolean field `{tag_: true}` at the end of the unary field stream and optionally
+// records its tag in a shared order vector.
+class TaggingUnaryFilter : public AiFilter {
+public:
+  explicit TaggingUnaryFilter(std::string tag, std::vector<std::string>* order = nullptr)
+      : tag_(std::move(tag)), order_(order) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive,
+                                            AiResponseStreamPropagator propagate) override {
+    if (order_ != nullptr) {
+      order_->push_back(tag_);
+    }
+    while (true) {
+      ASSIGN_OR_CO_RETURN(std::vector<FlattenJsonField> fields, co_await receive());
+      if (fields.empty()) {
+        break;
+      }
+      seen_batches_++;
+      seen_fields_ += fields.size();
+      CO_RETURN_IF_ERROR(co_await propagate(std::move(fields)));
+    }
+    std::vector<FlattenJsonField> tag_batch;
+    tag_batch.emplace_back(std::vector<FieldPathSegment>{tag_}, nlohmann::json(true));
+    CO_RETURN_IF_ERROR(co_await propagate(std::move(tag_batch)));
+    co_return absl::OkStatus();
+  }
+
+  std::string tag_;
+  std::vector<std::string>* order_;
+  size_t seen_batches_{0};
+  size_t seen_fields_{0};
+};
+
+// Forwards `limit` batches in encodeUnary and then returns early, splicing itself out of the chain.
+class BowOutUnaryFilter : public AiFilter {
+public:
+  explicit BowOutUnaryFilter(size_t limit) : limit_(limit) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive,
+                                            AiResponseStreamPropagator propagate) override {
+    for (size_t i = 0; i < limit_; ++i) {
+      ASSIGN_OR_CO_RETURN(std::vector<FlattenJsonField> fields, co_await receive());
+      if (fields.empty()) {
+        co_return absl::OkStatus();
+      }
+      ++seen_batches_;
+      CO_RETURN_IF_ERROR(co_await propagate(std::move(fields)));
+    }
+    co_return absl::OkStatus();
+  }
+
+  size_t limit_;
+  size_t seen_batches_{0};
+};
+
+// Propagates the first batch, then sends an empty vector to end the downstream stream early.
+class EarlyStreamEndingUnaryFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive,
+                                            AiResponseStreamPropagator propagate) override {
+    ASSIGN_OR_CO_RETURN(std::vector<FlattenJsonField> fields, co_await receive());
+    if (fields.empty()) {
+      co_return absl::OkStatus();
+    }
+    CO_RETURN_IF_ERROR(co_await propagate(std::move(fields)));
+    // Explicitly end the unary response stream after the first batch.
+    CO_RETURN_IF_ERROR(co_await propagate(std::vector<FlattenJsonField>{}));
+    co_return absl::OkStatus();
+  }
+};
+
+// Consumes every batch without propagating any fields.
+class DroppingAllUnaryFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive,
+                                            AiResponseStreamPropagator) override {
+    while (true) {
+      ASSIGN_OR_CO_RETURN(std::vector<FlattenJsonField> fields, co_await receive());
+      if (fields.empty()) {
+        co_return absl::OkStatus();
+      }
+    }
+  }
+};
+
+class FailingUnaryFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive,
+                                            AiResponseStreamPropagator) override {
+    ASSIGN_OR_CO_RETURN(std::vector<FlattenJsonField> fields, co_await receive());
+    (void)fields;
+    co_return absl::InternalError("unary filter error");
+  }
+};
+
+class SuspendingUnaryFilter : public AiFilter {
+public:
+  explicit SuspendingUnaryFilter(std::shared_ptr<Coroutine::AsyncQueue<bool>> gate)
+      : gate_(std::move(gate)) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive,
+                                            AiResponseStreamPropagator propagate) override {
+    bool first = true;
+    while (true) {
+      ASSIGN_OR_CO_RETURN(std::vector<FlattenJsonField> fields, co_await receive());
+      if (fields.empty()) {
+        co_return absl::OkStatus();
+      }
+      if (first) {
+        first = false;
+        ASSIGN_OR_CO_RETURN(auto unblock, co_await gate_->pop());
+        (void)unblock;
+      }
+      CO_RETURN_IF_ERROR(co_await propagate(std::move(fields)));
+    }
+  }
+
+private:
+  std::shared_ptr<Coroutine::AsyncQueue<bool>> gate_;
+};
+
+ResponseFilterManager::Config unaryConfig() {
+  ResponseFilterManager::Config config;
+  config.mode = ResponseFilterManager::Mode::Unary;
+  return config;
+}
+
+TEST_F(ResponseFilterManagerTest, UnaryNoFiltersReemitsJson) {
+  makeManager({}, unaryConfig());
+  feed(
+      R"({"model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"hi"}}]})");
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(
+      nlohmann::json::parse(output()),
+      nlohmann::json::parse(
+          R"({"model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"hi"}}]})"));
+}
+
+TEST_F(ResponseFilterManagerTest, UnaryInertFilterIsSplicedOutBeforeFirstBatch) {
+  makeManager({std::make_shared<InertFilter>()}, unaryConfig());
+  feed(R"({"id":"chatcmpl-1","object":"chat.completion"})");
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(nlohmann::json::parse(output()),
+            nlohmann::json::parse(R"({"id":"chatcmpl-1","object":"chat.completion"})"));
+}
+
+TEST_F(ResponseFilterManagerTest, UnaryMutatesFieldsAcrossMultipleFiltersInOrder) {
+  std::vector<std::string> order;
+  auto first = std::make_shared<TaggingUnaryFilter>("first", &order);
+  auto second = std::make_shared<TaggingUnaryFilter>("second", &order);
+  makeManager({first, second}, unaryConfig());
+  feed(R"({"a":1,"b":"two"})");
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(order, (std::vector<std::string>{"first", "second"}));
+  const nlohmann::json parsed = nlohmann::json::parse(output());
+  EXPECT_EQ(parsed["a"], 1);
+  EXPECT_EQ(parsed["b"], "two");
+  EXPECT_EQ(parsed["first"], true);
+  EXPECT_EQ(parsed["second"], true);
+}
+
+TEST_F(ResponseFilterManagerTest, UnaryMultiChunkPartialStringStreamsAndReserializes) {
+  auto filter = std::make_shared<TaggingUnaryFilter>("tagged");
+  makeManager({filter}, unaryConfig());
+
+  feed(R"({"text":"hel)", /*end_stream=*/false);
+  feed(R"(lo )", /*end_stream=*/false);
+  feed(R"(world","n":42})", /*end_stream=*/true);
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(filter->seen_batches_, 3u);
+  const nlohmann::json parsed = nlohmann::json::parse(output());
+  EXPECT_EQ(parsed["text"], "hello world");
+  EXPECT_EQ(parsed["n"], 42);
+  EXPECT_EQ(parsed["tagged"], true);
+}
+
+TEST_F(ResponseFilterManagerTest, UnaryTopLevelScalarFlushesOnEndStream) {
+  makeManager({}, unaryConfig());
+  feed("12345", /*end_stream=*/true);
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(output(), "12345");
+}
+
+TEST_F(ResponseFilterManagerTest, UnaryBowOutFilterSplicesRemainingBatches) {
+  auto bow_out = std::make_shared<BowOutUnaryFilter>(/*limit=*/1);
+  auto downstream = std::make_shared<TaggingUnaryFilter>("downstream");
+  makeManager({bow_out, downstream}, unaryConfig());
+
+  feed(R"({"a":1,)", /*end_stream=*/false);
+  feed(R"("b":2,)", /*end_stream=*/false);
+  feed(R"("c":3})", /*end_stream=*/true);
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(bow_out->seen_batches_, 1u);
+  EXPECT_EQ(downstream->seen_batches_, 3u);
+  const nlohmann::json parsed = nlohmann::json::parse(output());
+  EXPECT_EQ(parsed["a"], 1);
+  EXPECT_EQ(parsed["b"], 2);
+  EXPECT_EQ(parsed["c"], 3);
+  EXPECT_EQ(parsed["downstream"], true);
+}
+
+TEST_F(ResponseFilterManagerTest, UnaryEmptyPropagationTerminatesDownstreamStreamEarly) {
+  auto upstream = std::make_shared<TaggingUnaryFilter>("upstream");
+  auto ender = std::make_shared<EarlyStreamEndingUnaryFilter>();
+  auto downstream = std::make_shared<TaggingUnaryFilter>("downstream");
+  makeManager({upstream, ender, downstream}, unaryConfig());
+
+  // First chunk produces {"kept":1}, after which `ender` calls propagate({}) to end the
+  // downstream stream. `upstream` (earlier in the chain) must still see the second chunk
+  // {"ignored":2}, and pipeline completion must wait until the full response is fed.
+  feed(R"({"kept":1,)", /*end_stream=*/false);
+  EXPECT_EQ(complete_calls_, 0);
+  EXPECT_EQ(upstream->seen_batches_, 1u);
+  EXPECT_EQ(downstream->seen_batches_, 1u);
+
+  feed(R"("ignored":2})", /*end_stream=*/true);
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(upstream->seen_batches_, 2u);
+  EXPECT_EQ(upstream->seen_fields_, 2u);
+  EXPECT_EQ(downstream->seen_batches_, 1u);
+  const nlohmann::json parsed = nlohmann::json::parse(output());
+  EXPECT_EQ(parsed["kept"], 1);
+  EXPECT_FALSE(parsed.contains("ignored"));
+  EXPECT_FALSE(parsed.contains("upstream"));
+  EXPECT_EQ(parsed["downstream"], true);
+}
+
+TEST_F(ResponseFilterManagerTest, UnaryDroppingAllBatchesEmitsEmptyObject) {
+  makeManager({std::make_shared<DroppingAllUnaryFilter>()}, unaryConfig());
+  feed(R"({"a":1,"b":2})");
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(output(), "{}");
+}
+
+TEST_F(ResponseFilterManagerTest, UnaryFilterErrorFailsPipeline) {
+  makeManager({std::make_shared<FailingUnaryFilter>()}, unaryConfig());
+  feed(R"({"a":1})");
+
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(result_.code(), absl::StatusCode::kInternal);
+}
+
+TEST_F(ResponseFilterManagerTest, UnaryInvalidJsonFailsPipeline) {
+  makeManager({}, unaryConfig());
+  feed(R"({"a":1)", /*end_stream=*/true);
+
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(result_.code(), absl::StatusCode::kInvalidArgument);
+}
+
+TEST_F(ResponseFilterManagerTest, UnarySourceIsPausedWhenPipelineIsBackedUp) {
+  auto gate = std::make_shared<Coroutine::AsyncQueue<bool>>(/*max_size=*/1);
+  makeManager({std::make_shared<SuspendingUnaryFilter>(gate)}, unaryConfig(), /*buffer_limit=*/32);
+
+  Buffer::OwnedImpl b1(R"({"a":"1111111111",)");
+  Buffer::OwnedImpl b2(R"("b":"2222222222",)");
+  Buffer::OwnedImpl b3(R"("c":"3333333333"})");
+  manager_->onData(b1, /*end_stream=*/false);
+  manager_->onData(b2, /*end_stream=*/false);
+  manager_->onData(b3, /*end_stream=*/true);
+  EXPECT_EQ(bridge_->pause_source_calls_, 1);
+  EXPECT_EQ(bridge_->resume_source_calls_, 0);
+
+  gate->tryPush(true);
+  drain();
+
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(nlohmann::json::parse(output()),
+            nlohmann::json::parse(R"({"a":"1111111111","b":"2222222222","c":"3333333333"})"));
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

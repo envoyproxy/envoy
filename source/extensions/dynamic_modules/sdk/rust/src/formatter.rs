@@ -424,8 +424,8 @@ ffi_export! {
       Some(value) => {
         FORMAT_BUFFER.with(|cell| {
           let mut buf = cell.borrow_mut();
-          buf.clear();
-          buf.extend_from_slice(value.as_bytes());
+          // The provider owns the returned string, so move its buffer in instead of copying it.
+          *buf = value.into_bytes();
           unsafe {
             *result = bytes_to_module_buffer(buf.as_slice());
           }

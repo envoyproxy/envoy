@@ -87,6 +87,7 @@ void DynamicModuleNetworkFilter::initializeWriteFilterCallbacks(
 }
 
 Network::FilterStatus DynamicModuleNetworkFilter::onNewConnection() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     if (read_callbacks_ != nullptr) {
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
@@ -98,20 +99,22 @@ Network::FilterStatus DynamicModuleNetworkFilter::onNewConnection() {
 }
 
 Network::FilterStatus DynamicModuleNetworkFilter::onData(Buffer::Instance& data, bool end_stream) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
-  // Set the current read buffer for ABI callbacks. The buffer pointer is kept after the callback
-  // returns so that modules can access buffered data outside of on_read (e.g., in on_scheduled or
-  // on_http_callout_done). The buffer is the connection's persistent read buffer and remains valid
-  // for the lifetime of the connection.
+  // Expose the read buffer only while the hook runs. The argument may be a transient injected
+  // buffer, so it is cleared on return. Deferred access outside on_read resolves the connection
+  // read buffer in currentReadBuffer().
   current_read_buffer_ = &data;
   auto status = config_->on_network_filter_read_(thisAsVoidPtr(), in_module_filter_, data.length(),
                                                  end_stream);
+  current_read_buffer_ = nullptr;
   return toEnvoyFilterStatus(status);
 }
 
 Network::FilterStatus DynamicModuleNetworkFilter::onWrite(Buffer::Instance& data, bool end_stream) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
@@ -127,6 +130,7 @@ Network::FilterStatus DynamicModuleNetworkFilter::onWrite(Buffer::Instance& data
 }
 
 void DynamicModuleNetworkFilter::onEvent(Network::ConnectionEvent event) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return;
   }
@@ -135,12 +139,14 @@ void DynamicModuleNetworkFilter::onEvent(Network::ConnectionEvent event) {
 }
 
 void DynamicModuleNetworkFilter::onScheduled(uint64_t event_id) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ != nullptr && config_->on_network_filter_scheduled_ != nullptr) {
     config_->on_network_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
   }
 }
 
 void DynamicModuleNetworkFilter::onAboveWriteBufferHighWatermark() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr ||
       config_->on_network_filter_above_write_buffer_high_watermark_ == nullptr) {
     return;
@@ -149,6 +155,7 @@ void DynamicModuleNetworkFilter::onAboveWriteBufferHighWatermark() {
 }
 
 void DynamicModuleNetworkFilter::onBelowWriteBufferLowWatermark() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr ||
       config_->on_network_filter_below_write_buffer_low_watermark_ == nullptr) {
     return;
@@ -192,7 +199,9 @@ void DynamicModuleNetworkFilter::storeSocketOptionBytes(
 bool DynamicModuleNetworkFilter::tryGetSocketOptionInt(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     int64_t& value_out) const {
-  for (const auto& opt : socket_options_) {
+  // Iterate newest first so a re-set option returns its latest value.
+  for (auto it = socket_options_.rbegin(); it != socket_options_.rend(); ++it) {
+    const auto& opt = *it;
     if (opt.is_int && opt.level == level && opt.name == name && opt.state == state) {
       value_out = opt.int_value;
       return true;
@@ -204,7 +213,9 @@ bool DynamicModuleNetworkFilter::tryGetSocketOptionInt(
 bool DynamicModuleNetworkFilter::tryGetSocketOptionBytes(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     absl::string_view& value_out) const {
-  for (const auto& opt : socket_options_) {
+  // Iterate newest first so a re-set option returns its latest value.
+  for (auto it = socket_options_.rbegin(); it != socket_options_.rend(); ++it) {
+    const auto& opt = *it;
     if (!opt.is_int && opt.level == level && opt.name == name && opt.state == state) {
       value_out = opt.byte_value;
       return true;
@@ -304,6 +315,7 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onSuccess(
         envoy_dynamic_module_type_envoy_buffer{static_cast<const char*>(slice.mem_), slice.len_});
   }
 
+  DynamicModuleNetworkFilter::HookScope hook_scope(*filter);
   filter->config_->on_network_filter_http_callout_done_(
       filter->thisAsVoidPtr(), filter->in_module_filter_, callout_id,
       envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
@@ -328,6 +340,7 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onFailure(
     return;
   }
 
+  DynamicModuleNetworkFilter::HookScope hook_scope(*filter);
   envoy_dynamic_module_type_http_callout_result result =
       envoy_dynamic_module_type_http_callout_result_Reset;
   switch (reason) {

@@ -213,6 +213,7 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/rds:rds_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
