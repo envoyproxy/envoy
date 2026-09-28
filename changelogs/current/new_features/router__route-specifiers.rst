@@ -3,6 +3,8 @@ matching. Specifiers are executed in order and the output of each is the input o
 be configured on a :ref:`route configuration
 <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`, on a :ref:`virtual host
 <envoy_v3_api_field_config.route.v3.VirtualHost.route_specifiers>` and on a :ref:`route
-<envoy_v3_api_field_config.route.v3.Route.route_specifiers>`, evaluated in that order. A specifier
-may refine the route it is given, drop it, or generate a route of its own for a request that matched
+<envoy_v3_api_field_config.route.v3.Route.route_specifiers>`. A specifier configured on a route runs
+during matching, so it can drop the route and let matching carry on with the next route, and the
+route configuration and virtual host specifiers then run on the resolved route. A specifier may
+refine the route it is given, drop it, or generate a route of its own for a request that matched
 none, so routing decisions can be customized without changing route matching.

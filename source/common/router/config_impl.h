@@ -491,18 +491,17 @@ private:
 };
 
 /**
- * The outcome of route matching within a single virtual host: the matched route and the route
- * level specifier chain of the entry that produced it. Both are empty when nothing matched, and
- * `route_specifiers` alone is empty for the synthetic SSL redirect route, which has no configured
- * route entry behind it.
- *
- * Borrowing the chain rather than holding its owner is safe: the route entries are owned by the
- * virtual host, either through `routes_` or through the match tree, whose actions are built once
- * at config time. Both outlive any request routed through the configuration.
+ * The outcome of route matching within a single virtual host: the resolved route, which is nullptr
+ * when nothing matched, and the status the route level specifier chain ended on.
  */
 struct VirtualHostMatchResult {
   RouteConstSharedPtr route;
-  RouteSpecifierSpan route_specifiers;
+  // The status of the route level chain that ran during the match, so the outer chains are skipped
+  // when the route level chain made its result final.
+  OnRouteResultStatus status{OnRouteResultStatus::Continue};
+  // Whether the route level chain ran on the resolved route, so the outer levels can skip the
+  // virtual host correction when the route came straight from matching.
+  bool from_route_specifier{false};
 };
 
 /**

@@ -156,11 +156,12 @@ TEST_F(RouteSpecifierIntegrationTest, NoSpecifierLeavesTheRouteAlone) {
   EXPECT_EQ(std::nullopt, upstreamTestHeader());
 }
 
-// All three levels compose. Each level wraps the route produced by the one before it, so the
-// route configuration level ends up innermost and runs its header mutation first.
+// All three levels compose. The route level runs first, during matching, and the route
+// configuration and virtual host levels wrap its result, so the route level ends up innermost and
+// runs its header mutation first.
 TEST_F(RouteSpecifierIntegrationTest, AllLevelsComposeInOrder) {
   initializeWithSpecifiersAt(true, true, true);
-  EXPECT_EQ("config,vhost,route", upstreamTestHeader());
+  EXPECT_EQ("route,config,vhost", upstreamTestHeader());
 }
 
 // The specifiers run for a request that matched no route. This one declines to produce a route, so

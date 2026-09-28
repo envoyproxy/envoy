@@ -4,8 +4,10 @@ Route specifiers
 ================
 
 Route matching resolves at most one :ref:`route <envoy_v3_api_msg_config.route.v3.Route>` for a
-request. Route specifiers run after that, and are given the resolved route so that they can
-customize or monitor it. The route that comes out of them is the route Envoy uses for the request.
+request, and route specifiers are given that route so that they can customize or monitor it. The
+route that comes out of them is the route Envoy uses for the request. A specifier configured on a
+route also takes part in matching, so it can drop the route it was given and let matching carry on
+with the next route.
 
 A route specifier acts on the route, not on the request: it does not modify the request attributes
 (e.g., headers, path) directly. Everything it wants to change about the way the request is
@@ -21,26 +23,28 @@ Configuration
 
 Specifiers are configured with
 :ref:`TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>` at three levels
-of the route configuration, and the levels run in this order:
+of the route configuration. The route level chain runs first, during matching, so a specifier
+configured on a route can drop that route and let matching carry on with the next route. The route
+configuration and virtual host chains then run on the resolved route, in this order:
 
+#. :ref:`Route.route_specifiers <envoy_v3_api_field_config.route.v3.Route.route_specifiers>` of the
+   matched route, during matching
 #. :ref:`RouteConfiguration.route_specifiers
    <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`
 #. :ref:`VirtualHost.route_specifiers
    <envoy_v3_api_field_config.route.v3.VirtualHost.route_specifiers>` of the resolved virtual host
-#. :ref:`Route.route_specifiers <envoy_v3_api_field_config.route.v3.Route.route_specifiers>` of the
-   resolved route
 
-Within a level the specifiers run in the order they are configured. The route that route matching
-resolved is the input of the first specifier, the output of each specifier is the input of the
-next, and the output of the last one is the final route:
+Within a level the specifiers run in the order they are configured. The route the chain acts on is
+the input of the first specifier, the output of each specifier is the input of the next, and the
+output of the last one is the final route:
 
 .. code-block:: text
 
-  route matching  ->  route config level  ->  virtual host level  ->  route level  ->  final route
+  route matching (route level)  ->  route config level  ->  virtual host level  ->  final route
 
-In the following configuration, a request that reaches ``/api`` runs three specifiers - ``audit``,
-then ``canary``, then ``slow_timeout`` - while a request that reaches ``/`` runs only ``audit`` and
-``canary``:
+In the following configuration, a request that reaches ``/api`` runs three specifiers, ``slow_timeout``
+first during matching, then ``audit``, then ``canary``, while a request that reaches ``/`` runs only
+``audit`` and ``canary``:
 
 .. code-block:: yaml
 
@@ -93,9 +97,19 @@ Ending the chain early
 ----------------------
 
 A specifier may declare its result final. No further specifier runs, neither the rest of its own
-level nor any of the levels after it, and its result becomes the final route. This is how an
-specifier that has fully decided the route - a fallback route for an unresolved request, for
-instance - keeps later specifiers from overriding it.
+level nor any of the levels after it, and its result becomes the final route. This is how a
+specifier that has fully decided the route, for instance a fallback route for an unresolved request,
+keeps later specifiers from overriding it.
+
+Carrying on with matching
+-------------------------
+
+A specifier on the route level may drop the route it was given and ask route matching to carry on
+with the next route, rather than making the dropped route the result. This lets a route take part in
+matching and then step aside, for example a catch all route that a module owns for some requests and
+leaves to the routes below it for the rest. Only the route level honors this, since it is the only
+level that runs while matching is still in progress. When every route that matched asked to carry
+on, the request is handled as if nothing had matched.
 
 Writing a route specifier
 -------------------------
@@ -105,7 +119,8 @@ A route specifier implements the ``Envoy::Router::RouteSpecifier`` interface in
 ``envoy.router.route_specifiers`` category. The ``onRoute()`` method takes the route produced by
 the previous specifier, the request headers, the stream info of the downstream request, and a
 stable per-request random seed for specifiers that need to make a weighted choice. It returns the
-route to hand to the next specifier, and whether the chain carries on.
+route to hand to the next specifier, whether the chain carries on, and, for a route level specifier,
+whether to drop the route and carry on with matching.
 
 Two constraints are worth calling out:
 

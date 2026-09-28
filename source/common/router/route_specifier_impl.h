@@ -25,18 +25,20 @@ using RouteSpecifierSpan = absl::Span<const RouteSpecifierSharedPtr>;
 class RouteSpecifierFactoryContextImpl : public RouteSpecifierFactoryContext {
 public:
   RouteSpecifierFactoryContextImpl(Server::Configuration::ServerFactoryContext& factory_context,
-                                   OptRef<RouteBuilder> route_builder)
-      : factory_context_(factory_context), route_builder_(route_builder) {}
+                                   OptRef<RouteBuilder> route_builder, RouteSpecifierLevel level)
+      : factory_context_(factory_context), route_builder_(route_builder), level_(level) {}
 
   // Router::RouteSpecifierFactoryContext
   Server::Configuration::ServerFactoryContext& serverFactoryContext() override {
     return factory_context_;
   }
   OptRef<RouteBuilder> routeBuilder() override { return route_builder_; }
+  RouteSpecifierLevel level() const override { return level_; }
 
 private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   const OptRef<RouteBuilder> route_builder_;
+  const RouteSpecifierLevel level_;
 };
 
 /**
@@ -54,30 +56,42 @@ absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
     RouteSpecifierFactoryContext& context);
 
 /**
- * Run the route specifier chains of all three configuration levels. The levels run in order:
- * route configuration, then virtual host, then route. A nullptr route is a normal value flowing
- * through the chains rather than a stop condition, so a specifier can both drop a matched route
- * and supply one where matching found none. The one thing that does end the chain early is a
- * specifier declaring its result final, which skips every specifier after it, including those of
- * the later levels.
+ * Run one route specifier chain, stopping at the first specifier that declares its result final or
+ * asks matching to carry on. A nullptr route is not a stop condition, it is passed on to the next
+ * specifier, which is free to supply one.
+ *
+ * @param specifiers the chain to run, may be empty.
+ * @param route the route handed to the first specifier, may be nullptr.
+ * @param headers the HTTP request headers.
+ * @param stream_info the stream information for the request.
+ * @param random a random value for use by the specifiers.
+ * @return the result of the last specifier that ran, or the input route with a Continue status when
+ *         the chain is empty.
+ */
+OnRouteResult runRouteSpecifiers(RouteSpecifierSpan specifiers, RouteConstSharedPtr route,
+                                 const Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo& stream_info, uint64_t random);
+
+/**
+ * Run the route configuration and virtual host chains on the route the match resolved. The route
+ * level chain runs during matching, so it is not run here. The chains run even when @param route is
+ * nullptr, so a specifier can supply a route where matching found none. continue_matching has no
+ * meaning outside the route level chain and is ignored with a debug log.
  *
  * @param route the matched route, possibly already a wrapper produced by a cluster specifier
  *        plugin, or nullptr if nothing matched.
  * @param config_specifiers the route configuration level chain, may be empty.
  * @param vhost_specifiers the virtual host level chain, may be empty. Empty when no virtual host
  *        matched the request.
- * @param route_specifiers the route level chain, may be empty. Always empty when @param route is
- *        nullptr, since there is no route to take it from.
  * @param headers the HTTP request headers.
  * @param stream_info the stream information for the request.
  * @param random a random value for use by the specifiers.
- * @return the route to use for the request, @param route itself if every chain is empty, or
- *         nullptr if there is no route for the request.
+ * @return the route to use for the request, the input @param route when neither chain changes it,
+ *         or nullptr if there is no route for the request.
  */
 RouteConstSharedPtr
 applyRouteSpecifiers(RouteConstSharedPtr route, RouteSpecifierSpan config_specifiers,
-                     RouteSpecifierSpan vhost_specifiers, RouteSpecifierSpan route_specifiers,
-                     const Http::RequestHeaderMap& headers,
+                     RouteSpecifierSpan vhost_specifiers, const Http::RequestHeaderMap& headers,
                      const StreamInfo::StreamInfo& stream_info, uint64_t random);
 
 } // namespace Router

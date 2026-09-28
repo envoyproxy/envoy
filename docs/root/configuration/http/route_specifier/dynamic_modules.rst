@@ -10,7 +10,7 @@ The :ref:`DynamicModuleRouteSpecifier <envoy_v3_api_msg_extensions.router.route_
 configuration specifies a :ref:`route specifier <config_http_conn_man_route_specifiers>` backed by a
 :ref:`dynamic module <arch_overview_dynamic_modules>`. For each request the module keeps the route
 that route matching resolved, refines it, replaces it with one of the route templates it declares,
-or drops it.
+drops it, or lets route matching carry on with the next route.
 
 The module is invoked while the route is being resolved, and again whenever the route is recomputed,
 so it must be able to reach a decision from the request and the stream info alone. The call is
@@ -38,18 +38,22 @@ request the match accepts.
 Decisions
 ---------
 
-The module returns one of five decisions:
+The module returns one of six decisions:
 
 * ``PassThrough`` uses the route the specifier was given, unchanged.
 * ``Override`` uses that route with the properties the module recorded applied on top.
 * ``SelectTemplate`` uses the selected template, with the recorded properties applied on top.
 * ``NoRoute`` uses no route, so the request is handled as if nothing had matched.
 * ``Error`` reports that the module could not decide.
+* ``ContinueMatching`` drops the route the specifier was given and lets route matching carry on with
+  the next route. It is honored only for a specifier configured at the route level, and is ignored at
+  the other levels.
 
 A decision Envoy cannot honor is handled by the configured
 :ref:`failure_policy <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.failure_policy>`,
-which either passes the request through to the route table or drops the route. The SDK reports an
-error when the module panics, so a panic is handled by the same policy rather than crashing Envoy.
+which passes the request through to the route table, drops the route, or lets route matching carry on
+with the next route. The SDK reports an error when the module panics, so a panic is handled by the
+same policy rather than crashing Envoy.
 
 Shadowing a routing change
 --------------------------
@@ -61,6 +65,31 @@ returns ``PassThrough`` so that routing stays unchanged. Once the counts give co
 module returns ``Override`` or ``SelectTemplate`` to apply the decision. The
 ``route_specifier_shadow.rs`` test module under ``test/extensions/dynamic_modules/test_data/rust``
 shows both runs, comparing the cluster name.
+
+Migrating routing to a module
+-----------------------------
+
+A module can take over the routing of a virtual host one step at a time, while the route table it
+replaces stays in place as a fallback. The pattern is a catch all route placed first in the route
+table, carrying the specifier at the route level:
+
+* The catch all route matches every request, so the specifier runs first for each one. For a request
+  the module owns it returns ``Override`` or ``SelectTemplate``, and for a request the module leaves
+  to the route table it returns ``ContinueMatching``, which drops the catch all route and lets route
+  matching carry on with the routes below it.
+* :ref:`failure_policy <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.failure_policy>`
+  should be ``CONTINUE_MATCHING`` for the catch all route, so a module failure falls back to the
+  route table rather than to the catch all route's own action. This policy is valid only at the route
+  level.
+
+Start by shadowing at the virtual host level as above, so the module never changes routing while its
+counts are watched. Move the specifier to the catch all route once the counts give confidence, having
+the module return ``ContinueMatching`` for every request at first and then owning requests a group at
+a time. A module that gates itself on a runtime flag it reads with the runtime getters makes a good
+kill switch by returning ``ContinueMatching`` for every request while the flag is off, and removing
+the catch all route reverts to the plain route table without touching the routes below it. When the
+module owns the whole virtual host, the routes below the catch all route can be removed and the
+``failure_policy`` changed to ``NO_ROUTE``.
 
 Route overrides
 ---------------
@@ -101,6 +130,7 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   decision_select_template, Counter, Requests for which the module selected a route template.
   decision_no_route, Counter, Requests for which the module dropped the route.
   decision_error, Counter, Requests for which the module could not decide.
+  decision_continue_matching, Counter, Requests for which the module let route matching carry on with the next route.
   runtime_skipped, Counter, Requests outside ``runtime_fraction``.
   failure_module_error, Counter, Decisions not honored because the module reported an error.
   failure_template_not_selected, Counter, Decisions not honored because no known template was selected.

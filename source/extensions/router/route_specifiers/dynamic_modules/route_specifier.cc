@@ -202,6 +202,9 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
       runtime_fraction_(buildRuntimeFraction(proto_config)),
       fail_closed_(proto_config.failure_policy() ==
                    envoy::extensions::router::route_specifiers::dynamic_modules::v3::NO_ROUTE),
+      continue_matching_on_failure_(
+          proto_config.failure_policy() ==
+          envoy::extensions::router::route_specifiers::dynamic_modules::v3::CONTINUE_MATCHING),
       cluster_manager_(context.serverFactoryContext().clusterManager()),
       runtime_(context.serverFactoryContext().runtime()),
       time_source_(context.serverFactoryContext().timeSource()),
@@ -264,6 +267,13 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
   if (proto_config.failure_policy() == envoy::extensions::router::route_specifiers::
                                            dynamic_modules::v3::FAILURE_POLICY_UNSPECIFIED) {
     return absl::InvalidArgumentError("failure_policy must be set");
+  }
+  if (proto_config.failure_policy() ==
+          envoy::extensions::router::route_specifiers::dynamic_modules::v3::CONTINUE_MATCHING &&
+      context.level() != Envoy::Router::RouteSpecifierLevel::Route) {
+    return absl::InvalidArgumentError(
+        "failure_policy CONTINUE_MATCHING is only valid for a specifier configured at the route "
+        "level");
   }
   if (!proto_config.route_templates().empty() && !context.routeBuilder().has_value()) {
     return absl::InvalidArgumentError(
@@ -596,7 +606,7 @@ Envoy::Router::OnRouteResult DynamicModuleRouteSpecifier::onRoute(
   Decision result = resolve(context, decision);
 
   record_duration(config_->stats().specifier_duration_);
-  return {std::move(result.route), result.status};
+  return {std::move(result.route), result.status, result.continue_matching};
 }
 
 DynamicModuleRouteSpecifier::Decision
@@ -639,6 +649,9 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     }
     ENVOY_LOG(debug, "dynamic module route specifier could not honor the decision, reason {}",
               static_cast<int>(failure));
+    if (config_->continueMatchingOnFailure()) {
+      return Decision{context.input_route, Status::Continue, failure, /*continue_matching=*/true};
+    }
     if (config_->failClosed()) {
       return Decision{nullptr, Status::StopIteration, failure};
     }
@@ -655,6 +668,10 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
   case envoy_dynamic_module_type_route_specifier_decision_Error:
     config_->stats().decision_error_.inc();
     return fail(Failure::ModuleError);
+  case envoy_dynamic_module_type_route_specifier_decision_ContinueMatching:
+    config_->stats().decision_continue_matching_.inc();
+    return {context.input_route, status(Status::Continue), Failure::None,
+            /*continue_matching=*/true};
   case envoy_dynamic_module_type_route_specifier_decision_Override: {
     config_->stats().decision_override_.inc();
     if (context.input_route == nullptr) {

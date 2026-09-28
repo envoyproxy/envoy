@@ -30,6 +30,10 @@ pub enum RouteDecision {
   NoRoute,
   /// The module could not reach a decision, so Envoy applies the configured failure policy.
   Error,
+  /// Skip the route the specifier was given and let route matching carry on with the next route.
+  /// Valid only for a route level specifier, and has no effect at the other levels. The recorded
+  /// overrides and the returned route are ignored.
+  ContinueMatching,
 }
 
 impl RouteDecision {
@@ -42,6 +46,9 @@ impl RouteDecision {
       },
       Self::NoRoute => abi::envoy_dynamic_module_type_route_specifier_decision::NoRoute,
       Self::Error => abi::envoy_dynamic_module_type_route_specifier_decision::Error,
+      Self::ContinueMatching => {
+        abi::envoy_dynamic_module_type_route_specifier_decision::ContinueMatching
+      },
     }
   }
 }

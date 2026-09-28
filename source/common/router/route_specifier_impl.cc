@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 
 namespace Envoy {
@@ -39,33 +40,37 @@ absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
   return specifiers;
 }
 
-namespace {
-
-// Run a single level of the chain, stopping at the first specifier that declares its result final.
-// A nullptr route is not a stop condition: it is passed on to the next specifier, which is free to
-// supply one.
-OnRouteResult runSpecifiers(RouteSpecifierSpan specifiers, RouteConstSharedPtr route,
-                            const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info, uint64_t random) {
+OnRouteResult runRouteSpecifiers(RouteSpecifierSpan specifiers, RouteConstSharedPtr route,
+                                 const Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo& stream_info, uint64_t random) {
+  OnRouteResult result{std::move(route)};
   for (const auto& specifier : specifiers) {
-    auto result = specifier->onRoute(std::move(route), headers, stream_info, random);
-    if (result.status == OnRouteResultStatus::StopIteration) {
+    result = specifier->onRoute(std::move(result.route), headers, stream_info, random);
+    // A specifier that ends the chain, or that drops the route to carry on with matching, is the
+    // last one to run, since nothing after it can act on a route that is being left behind.
+    if (result.status == OnRouteResultStatus::StopIteration || result.continue_matching) {
       return result;
     }
-    route = std::move(result.route);
   }
-  return {std::move(route), OnRouteResultStatus::Continue};
+  return result;
 }
-
-} // namespace
 
 RouteConstSharedPtr
 applyRouteSpecifiers(RouteConstSharedPtr route, RouteSpecifierSpan config_specifiers,
-                     RouteSpecifierSpan vhost_specifiers, RouteSpecifierSpan route_specifiers,
-                     const Http::RequestHeaderMap& headers,
+                     RouteSpecifierSpan vhost_specifiers, const Http::RequestHeaderMap& headers,
                      const StreamInfo::StreamInfo& stream_info, uint64_t random) {
+  const auto run_outer = [&](RouteSpecifierSpan specifiers,
+                             RouteConstSharedPtr input) -> OnRouteResult {
+    OnRouteResult result =
+        runRouteSpecifiers(specifiers, std::move(input), headers, stream_info, random);
+    if (result.continue_matching) {
+      ENVOY_LOG_MISC(debug, "continue_matching from an outer route specifier chain is ignored");
+    }
+    return result;
+  };
+
   if (!config_specifiers.empty()) {
-    auto result = runSpecifiers(config_specifiers, std::move(route), headers, stream_info, random);
+    OnRouteResult result = run_outer(config_specifiers, std::move(route));
     route = std::move(result.route);
     if (result.status == OnRouteResultStatus::StopIteration) {
       return route;
@@ -73,15 +78,7 @@ applyRouteSpecifiers(RouteConstSharedPtr route, RouteSpecifierSpan config_specif
   }
 
   if (!vhost_specifiers.empty()) {
-    auto result = runSpecifiers(vhost_specifiers, std::move(route), headers, stream_info, random);
-    route = std::move(result.route);
-    if (result.status == OnRouteResultStatus::StopIteration) {
-      return route;
-    }
-  }
-
-  if (!route_specifiers.empty()) {
-    auto result = runSpecifiers(route_specifiers, std::move(route), headers, stream_info, random);
+    OnRouteResult result = run_outer(vhost_specifiers, std::move(route));
     route = std::move(result.route);
     if (result.status == OnRouteResultStatus::StopIteration) {
       return route;

@@ -33,6 +33,10 @@ struct OnRouteResult {
   // Whether the chain carries on. Defaults to Continue, so a specifier only has to say something
   // when it wants its result to be the final one.
   OnRouteResultStatus status{OnRouteResultStatus::Continue};
+  // When true the route this chain ran on is skipped and route matching carries on with the next
+  // route. It ends the chain, and only the route level chain honors it, with the route it returns
+  // ignored.
+  bool continue_matching{false};
 };
 
 /**
@@ -45,13 +49,15 @@ struct OnRouteResult {
  * the chain early by returning OnRouteResultStatus::StopIteration, which makes its own result the
  * final one.
  *
- * Specifiers are configured at three levels, which are evaluated in this order, each level's list
- * in configuration order:
- *   1. RouteConfiguration::route_specifiers
- *   2. VirtualHost::route_specifiers of the matched virtual host
- *   3. Route::route_specifiers of the matched route
- * A level is only reached once it has been matched, so a request matching no virtual host
- * evaluates the first level alone.
+ * Specifiers are configured at three levels, each level's list in configuration order. The route
+ * level chain runs first, during route matching, so a specifier can drop the matched route and let
+ * matching carry on to the next route by returning continue_matching. The route configuration and
+ * virtual host chains then run on the resolved route:
+ *   1. Route::route_specifiers of the matched route
+ *   2. RouteConfiguration::route_specifiers
+ *   3. VirtualHost::route_specifiers of the matched virtual host
+ * The route configuration and virtual host chains run even when no route matched, so a specifier
+ * can supply a fallback route.
  *
  * The route a specifier takes comes from route matching or from the previous specifier, and may
  * be nullptr: a specifier may generate a valid route from its own logic, or drop the valid route
@@ -90,7 +96,9 @@ public:
    *         together with whether the chain should carry on. Returning
    *         OnRouteResultStatus::StopIteration makes the returned route the final one: no later
    *         specifier runs, at this level or any of the levels after it. If the route that comes
-   *         out of the chain is nullptr the request is handled as if no route had matched.
+   *         out of the chain is nullptr the request is handled as if no route had matched. A route
+   *         level chain that sets continue_matching skips the matched route and resumes matching,
+   *         and its returned route is ignored.
    */
   virtual OnRouteResult onRoute(RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
                                 const StreamInfo::StreamInfo& info, uint64_t random) const PURE;
@@ -151,6 +159,15 @@ public:
 };
 
 /**
+ * The configuration level a route specifier is configured on.
+ */
+enum class RouteSpecifierLevel {
+  RouteConfiguration,
+  VirtualHost,
+  Route,
+};
+
+/**
  * Context handed to a route specifier factory. Only valid for the duration of the
  * createRouteSpecifier() call.
  */
@@ -171,6 +188,12 @@ public:
    *         host to build routes in.
    */
   virtual OptRef<RouteBuilder> routeBuilder() PURE;
+
+  /**
+   * @return the configuration level the specifier is configured on, so a factory can reject an
+   *         option that is only valid at a particular level.
+   */
+  virtual RouteSpecifierLevel level() const PURE;
 };
 
 /**

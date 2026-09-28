@@ -852,7 +852,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   RouteBuilderImpl route_builder(vhost, factory_context, validator, init_manager);
-  RouteSpecifierFactoryContextImpl specifier_context(factory_context, route_builder);
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, route_builder,
+                                                     RouteSpecifierLevel::Route);
   auto route_specifiers_or_error =
       createRouteSpecifiers(route.route_specifiers(), specifier_context);
   SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
@@ -1879,7 +1880,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
   }
 
   RouteBuilderImpl route_builder(shared_virtual_host_, factory_context, validator, init_manager);
-  RouteSpecifierFactoryContextImpl specifier_context(factory_context, route_builder);
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, route_builder,
+                                                     RouteSpecifierLevel::VirtualHost);
   auto route_specifiers_or_error =
       createRouteSpecifiers(virtual_host.route_specifiers(), specifier_context);
   SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
@@ -1901,16 +1903,34 @@ VirtualHostMatchResult VirtualHostImpl::getRouteFromRoutes(
       continue;
     }
 
+    // The route level chain runs during the match so a specifier can drop the matched route and let
+    // matching carry on with the next route by returning continue_matching.
+    OnRouteResult chain_result{std::move(route_entry)};
+    RouteSpecifierSpan route_specifiers = (*route)->routeSpecifiers();
+    const bool ran_route_specifier = !route_specifiers.empty();
+    if (ran_route_specifier) {
+      chain_result = runRouteSpecifiers(route_specifiers, std::move(chain_result.route),
+                                        route_match_context.headers(), stream_info, random_value);
+      if (chain_result.continue_matching) {
+        continue;
+      }
+    }
+
+    // A route level chain that dropped the route without asking to carry on is a final no route.
+    if (chain_result.route == nullptr) {
+      return {nullptr, chain_result.status, ran_route_specifier};
+    }
+
     if (cb == nullptr) {
-      return {std::move(route_entry), (*route)->routeSpecifiers()};
+      return {std::move(chain_result.route), chain_result.status, ran_route_specifier};
     }
 
     RouteEvalStatus eval_status = (std::next(route) == routes.end())
                                       ? RouteEvalStatus::NoMoreRoutes
                                       : RouteEvalStatus::HasMoreRoutes;
-    RouteMatchStatus match_status = cb(route_entry, eval_status);
+    RouteMatchStatus match_status = cb(chain_result.route, eval_status);
     if (match_status == RouteMatchStatus::Accept) {
-      return {std::move(route_entry), (*route)->routeSpecifiers()};
+      return {std::move(chain_result.route), chain_result.status, ran_route_specifier};
     }
     if (match_status == RouteMatchStatus::Continue &&
         eval_status == RouteEvalStatus::NoMoreRoutes) {
@@ -1941,10 +1961,10 @@ VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb, const Http::Reques
 
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::All && scheme != "https") {
-    return {ssl_redirect_route_, {}};
+    return {ssl_redirect_route_, OnRouteResultStatus::Continue};
   } else if (ssl_requirements_ == SslRequirements::ExternalOnly && scheme != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
-    return {ssl_redirect_route_, {}};
+    return {ssl_redirect_route_, OnRouteResultStatus::Continue};
   }
 
   // Constructed once per request; derived values (query params, cookies, etc.) are computed
@@ -2149,24 +2169,24 @@ VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::Reques
     match_result = virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
   }
 
-  const bool has_route_specifiers = !config_specifiers.empty() || !vhost_specifiers.empty() ||
-                                    !match_result.route_specifiers.empty();
-  if (!has_route_specifiers) {
-    // Quick return if there are no route specifiers at any level.
+  // The route level chain already ran during the match. When it made its result final, or when
+  // there is no outer chain, the resolved route is used as is. Otherwise the route configuration
+  // and virtual host chains run, whether or not a route matched, so a specifier can supply a
+  // fallback route for a request that would otherwise get no route at all.
+  bool ran_specifier = match_result.from_route_specifier;
+  if (match_result.status == OnRouteResultStatus::StopIteration ||
+      (config_specifiers.empty() && vhost_specifiers.empty())) {
     route_result.route = std::move(match_result.route);
-    return route_result;
+  } else {
+    route_result.route = applyRouteSpecifiers(std::move(match_result.route), config_specifiers,
+                                              vhost_specifiers, headers, stream_info, random_value);
+    ran_specifier = true;
   }
-
-  // The route configuration and virtual host chains run whether or not a route matched, so that a
-  // specifier can supply a fallback route for a request that would otherwise get no route at all.
-  // The route level chain is empty unless a route matched.
-  route_result.route =
-      applyRouteSpecifiers(std::move(match_result.route), config_specifiers, vhost_specifiers,
-                           match_result.route_specifiers, headers, stream_info, random_value);
-  if (route_result.route != nullptr) {
-    if (std::addressof(route_result.route->virtualHost()) != route_result.vhost.get()) {
-      route_result.vhost = route_result.route->virtualHostSharedPtr();
-    }
+  // Only a specifier can move the route to a virtual host other than the one that matched, so the
+  // correction is skipped on the hot path where no specifier ran.
+  if (ran_specifier && route_result.route != nullptr &&
+      std::addressof(route_result.route->virtualHost()) != route_result.vhost.get()) {
+    route_result.vhost = route_result.route->virtualHostSharedPtr();
   }
 
   return route_result;
@@ -2258,7 +2278,8 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
     metadata_ = std::make_unique<RouteMetadataPack>(config.metadata());
   }
 
-  RouteSpecifierFactoryContextImpl specifier_context(factory_context, {});
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, {},
+                                                     RouteSpecifierLevel::RouteConfiguration);
   auto route_specifiers_or_error =
       createRouteSpecifiers(config.route_specifiers(), specifier_context);
   SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
