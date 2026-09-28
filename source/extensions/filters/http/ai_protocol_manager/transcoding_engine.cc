@@ -1995,7 +1995,7 @@ absl::Status TranscodeRule::apply(nlohmann::json& json, TranscodeContext* ctx) c
           absl::StrCat("cannot write '", target_path_,
                        "' as JSON text because it holds a reference (ExternalRef)"));
     }
-    // `replace` writes invalid UTF-8 as U+FFFD rather than throwing.
+    // `replace` writes invalid UTF-8 as the replacement character rather than throwing.
     *node = node->dump(-1, ' ', /*ensure_ascii=*/false, nlohmann::json::error_handler_t::replace);
     return absl::OkStatus();
   }

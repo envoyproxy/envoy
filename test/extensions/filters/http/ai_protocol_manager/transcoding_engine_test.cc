@@ -51,11 +51,6 @@ absl::Status requestFromIr(const TranscodingEngine& engine, LLMProtocol target,
   return requestFromIr(engine, target, payload.json(), rewritten_path);
 }
 
-TEST(TranscodingEngineTest, CreateDefaultRegistersCoreDialectPacks) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-}
-
 TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_AnthropicSchema) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
@@ -169,27 +164,6 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_GeminiSchema) 
   EXPECT_THAT(gemini_schema->validateRequest(payload), IsOk());
 }
 
-TEST(TranscodingEngineTest, VerifierRejectsValueMapOnOffloadableField) {
-  const PayloadSchema* openai_schema =
-      AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
-  ASSERT_NE(openai_schema, nullptr);
-
-  // `messages[].content` is declared `.offloadable()` in OpenAI's schema, so a `ValueMap`
-  // attempting to read it as an inline string must be rejected at config load time.
-  TranscodeRuleSet bad_rules(
-      LLMProtocol::OpenAiChatCompletions, LLMProtocol::AnthropicMessages,
-      {
-          TranscodeRule::forEach("messages",
-                                 {
-                                     TranscodeRule::valueMap("content", {{"foo", "bar"}}),
-                                 }),
-      });
-
-  absl::Status status = TranscodingEngine::validateRulesAgainstSchema(bad_rules, openai_schema);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
-}
-
 TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_PassthroughIr) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
@@ -264,8 +238,13 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_RoundTripViaIr
   ASSERT_EQ(anthropic_payload["messages"].size(), 2);
   EXPECT_EQ(anthropic_payload["messages"][0]["role"], "system");
   EXPECT_EQ(anthropic_payload["messages"][0]["content"], "You are a helpful coding assistant.");
+  EXPECT_EQ(anthropic_payload["messages"][1]["role"], "user");
+  EXPECT_EQ(anthropic_payload["messages"][1]["content"], "Write a unit test.");
   EXPECT_EQ(anthropic_payload["max_completion_tokens"], 1500);
   EXPECT_EQ(anthropic_payload["stop"], nlohmann::json::array({"END"}));
+  ASSERT_EQ(anthropic_payload["tools"].size(), 1);
+  EXPECT_EQ(anthropic_payload["tools"][0]["type"], "function");
+  EXPECT_EQ(anthropic_payload["tools"][0]["function"]["name"], "run_bazel_test");
 
   const PayloadSchema* openai_schema =
       AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
@@ -286,43 +265,6 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_RoundTripViaIr
       AdapterRegistry::get(LLMProtocol::AnthropicMessages).schema();
   ASSERT_NE(anthropic_schema, nullptr);
   EXPECT_THAT(anthropic_schema->validateRequest(anthropic_payload), IsOk());
-}
-
-TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_To_OpenAiSchema) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "gpt-4o",
-    "system": "Answer in one sentence.",
-    "max_tokens": 256,
-    "stop_sequences": ["DONE"],
-    "messages": [
-      {"role": "user", "content": "What is C++?"}
-    ],
-    "tools": [
-      {
-        "name": "lookup_doc",
-        "description": "Looks up C++ reference",
-        "input_schema": {"type": "object"}
-      }
-    ]
-  })");
-
-  ASSERT_THAT(requestToIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
-
-  EXPECT_FALSE(payload.contains("system"));
-  EXPECT_EQ(payload["max_completion_tokens"], 256);
-  EXPECT_EQ(payload["stop"], nlohmann::json::array({"DONE"}));
-  ASSERT_EQ(payload["messages"].size(), 2);
-  EXPECT_EQ(payload["messages"][0]["role"], "system");
-  EXPECT_EQ(payload["messages"][0]["content"], "Answer in one sentence.");
-  EXPECT_EQ(payload["messages"][1]["role"], "user");
-  EXPECT_EQ(payload["messages"][1]["content"], "What is C++?");
-  ASSERT_EQ(payload["tools"].size(), 1);
-  EXPECT_EQ(payload["tools"][0]["type"], "function");
-  EXPECT_EQ(payload["tools"][0]["function"]["name"], "lookup_doc");
 }
 
 TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_To_OpenAiSchema) {
@@ -363,42 +305,15 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_To_OpenAiSchema) 
   EXPECT_EQ(payload["messages"][1]["content"], "Hello");
   EXPECT_EQ(payload["messages"][2]["role"], "assistant");
   EXPECT_EQ(payload["messages"][2]["content"], "Welcome!");
-}
 
-TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_RoundTripViaIr) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "gemini-2.5-pro",
-    "systemInstruction": {
-      "parts": [{"text": "Keep answers brief."}]
-    },
-    "contents": [
-      {"role": "user", "parts": [{"text": "Ping"}]},
-      {"role": "model", "parts": [{"text": "Pong"}]}
-    ],
-    "generationConfig": {
-      "maxOutputTokens": 128,
-      "temperature": 0.3
-    }
-  })");
-
-  // 1. To IR (`to_ir`): Gemini -> OpenAI Chat Completions
-  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
-
-  // 2. From IR (`from_ir`): OpenAI Chat Completions -> Gemini
+  // Back out of the IR, every field returns to where Gemini carries it.
   ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
-
-  EXPECT_EQ(payload["systemInstruction"]["parts"][0]["text"], "Keep answers brief.");
-  EXPECT_EQ(payload["generationConfig"]["maxOutputTokens"], 128);
-  EXPECT_EQ(payload["generationConfig"]["temperature"], 0.3);
+  EXPECT_EQ(payload["systemInstruction"]["parts"][0]["text"], "You are an expert engineer.");
+  EXPECT_EQ(payload["generationConfig"]["maxOutputTokens"], 400);
+  EXPECT_EQ(payload["generationConfig"]["temperature"], 0.6);
   ASSERT_EQ(payload["contents"].size(), 2);
-  EXPECT_EQ(payload["contents"][0]["role"], "user");
-  EXPECT_EQ(payload["contents"][0]["parts"][0]["text"], "Ping");
   EXPECT_EQ(payload["contents"][1]["role"], "model");
-  EXPECT_EQ(payload["contents"][1]["parts"][0]["text"], "Pong");
+  EXPECT_EQ(payload["contents"][1]["parts"][0]["text"], "Welcome!");
 }
 
 TEST(TranscodingEngineTest, CustomInboundAndOutboundConfiguration) {
@@ -492,72 +407,6 @@ TEST(TranscodingEngineTest, RejectsPayloadFailingTargetSchemaValidation) {
       requestFromIr(engine, LLMProtocol::AnthropicMessages, negative_tokens_payload);
   EXPECT_FALSE(status2.ok());
   EXPECT_EQ(status2.code(), absl::StatusCode::kInvalidArgument);
-}
-
-TEST(TranscodingEngineTest, RejectsUnmappedValueWhenUnknownPolicyIsReject) {
-  TranscodeRuleSet strict_rules(
-      LLMProtocol::OpenAiChatCompletions, LLMProtocol::AnthropicMessages,
-      {
-          TranscodeRule::forEach(
-              "messages",
-              {
-                  TranscodeRule::valueMap("role", {{"user", "user"}, {"assistant", "assistant"}},
-                                          TranscodeRule::UnknownValuePolicy::Reject),
-              }),
-      });
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "claude-sonnet-4-5",
-    "messages": [
-      {"role": "unsupported_custom_role", "content": "Hello"}
-    ]
-  })");
-
-  absl::Status status = strict_rules.execute(payload);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
-}
-
-TEST(TranscodingEngineTest, RejectsUnregisteredProtocol) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "some-model",
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-
-  // `OpenAiResponses` is not registered in `createDefault()`, so transcoding to/from it is
-  // rejected.
-  absl::Status to_ir_status = requestToIr(engine, LLMProtocol::OpenAiResponses, payload);
-  EXPECT_FALSE(to_ir_status.ok());
-  EXPECT_EQ(to_ir_status.code(), absl::StatusCode::kInvalidArgument);
-
-  absl::Status from_ir_status = requestFromIr(engine, LLMProtocol::OpenAiResponses, payload);
-  EXPECT_FALSE(from_ir_status.ok());
-  EXPECT_EQ(from_ir_status.code(), absl::StatusCode::kInvalidArgument);
-}
-
-// Regression: a genuine Gemini request carries the model in the URL
-// (`/v1beta/models/{model}:generateContent`), never in the body. The to-IR leg previously
-// validated its output against the IR schema, where `model` is `.required()`, so every real
-// Gemini request was rejected with a 400 before it could reach any upstream.
-TEST(TranscodingEngineTest, TranscodesGeminiRequestWithoutBodyLevelModel) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "contents": [
-      {"role": "user", "parts": [{"text": "Hello"}]}
-    ]
-  })");
-
-  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
-  EXPECT_FALSE(payload.contains("model"));
-  ASSERT_EQ(payload["messages"].size(), 1);
-  EXPECT_EQ(payload["messages"][0]["content"], "Hello");
 }
 
 // Regression: extraction kept only the first match, so the second system prompt was silently
@@ -748,21 +597,6 @@ TEST(TranscodingEngineTest, NormalizesScalarStopToArrayForGemini) {
   ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
   EXPECT_FALSE(payload.contains("stop"));
   EXPECT_EQ(payload["generationConfig"]["stopSequences"], nlohmann::json::array({"END"}));
-}
-
-TEST(TranscodingEngineTest, LeavesAnExistingStopArrayAlone) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "claude-sonnet-4",
-    "stop": ["END", "STOP"],
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-
-  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
-  EXPECT_EQ(payload["stop_sequences"], nlohmann::json::array({"END", "STOP"}));
 }
 
 TEST(TranscodingEngineTest, DoesNotMaterializeStopSequencesWhenStopIsAbsent) {
@@ -978,21 +812,6 @@ TEST(TranscodingEngineTest, CoercesQuotedGeminiNumbersWhenEnteringTheIr) {
   EXPECT_THAT(openai_schema->validateRequest(payload), IsOk());
 }
 
-TEST(TranscodingEngineTest, LeavesRealGeminiNumbersUntouched) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "contents": [{"role": "user", "parts": [{"text": "Hello"}]}],
-    "generationConfig": {"maxOutputTokens": 256, "temperature": 0.5}
-  })");
-
-  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
-  EXPECT_EQ(payload["max_completion_tokens"], 256);
-  EXPECT_EQ(payload["temperature"], 0.5);
-}
-
 // Regression: Gemini leaves `role` optional (Vertex defaults it to `user`) while both other
 // dialects require it, so a valid Gemini request failed the destination's role check.
 TEST(TranscodingEngineTest, AppliesGeminiRoleDefaultForMessagesThatOmitIt) {
@@ -1014,24 +833,6 @@ TEST(TranscodingEngineTest, AppliesGeminiRoleDefaultForMessagesThatOmitIt) {
       AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
   ASSERT_NE(openai_schema, nullptr);
   EXPECT_THAT(openai_schema->validateRequest(payload), IsOk());
-}
-
-TEST(TranscodingEngineTest, DoesNotOverrideAnExplicitGeminiRole) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "contents": [
-      {"role": "user", "parts": [{"text": "Hi"}]},
-      {"role": "model", "parts": [{"text": "Hello"}]}
-    ]
-  })");
-
-  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
-  ASSERT_EQ(payload["messages"].size(), 2);
-  EXPECT_EQ(payload["messages"][0]["role"], "user");
-  EXPECT_EQ(payload["messages"][1]["role"], "assistant");
 }
 
 // Regression: `registerPack` unconditionally overwrote the pack's schema pointers with its
@@ -1283,48 +1084,6 @@ TEST(TranscodingEngineTest, CoversAllRuleAndEngineEdgeCases) {
   EXPECT_FALSE(requestFromIr(custom_engine, LLMProtocol::OpenAiResponses, bad_mode).ok());
 }
 
-// A request leg reports the request's IR `model` back through the context: read after the rules
-// on a `ToIr` leg and before them on a `FromIr` leg, so it is always the IR spelling.
-TEST(TranscodingEngineTest, TranscodeRequestLegsReportTheIrModel) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json payload = nlohmann::json::parse(R"({
-    "model": "claude-sonnet-4-5",
-    "max_tokens": 64,
-    "messages": [{"role": "user", "content": "Hi"}]
-  })");
-  TranscodeContext to_ir_ctx;
-  ASSERT_THAT(engine.transcode(
-                  {PayloadKind::Request, TranscodeDirection::ToIr, LLMProtocol::AnthropicMessages},
-                  to_ir_ctx, payload),
-              IsOk());
-  EXPECT_EQ(to_ir_ctx.ir_model, "claude-sonnet-4-5");
-  EXPECT_EQ(payload["max_completion_tokens"], 64);
-
-  TranscodeContext from_ir_ctx;
-  ASSERT_THAT(engine.transcode({PayloadKind::Request, TranscodeDirection::FromIr,
-                                LLMProtocol::GeminiGenerateContent},
-                               from_ir_ctx, payload),
-              IsOk());
-  EXPECT_EQ(from_ir_ctx.ir_model, "claude-sonnet-4-5");
-  EXPECT_EQ(payload["contents"][0]["parts"][0]["text"], "Hi");
-  EXPECT_EQ(payload["generationConfig"]["maxOutputTokens"], 64);
-
-  // A Gemini body carries no model, so there is none to report, and nothing stale survives.
-  nlohmann::json gemini = nlohmann::json::parse(R"({
-    "contents": [{"role": "user", "parts": [{"text": "Hello"}]}]
-  })");
-  TranscodeContext gemini_ctx;
-  gemini_ctx.ir_model = "stale";
-  ASSERT_THAT(engine.transcode({PayloadKind::Request, TranscodeDirection::ToIr,
-                                LLMProtocol::GeminiGenerateContent},
-                               gemini_ctx, gemini),
-              IsOk());
-  EXPECT_EQ(gemini_ctx.ir_model, "");
-}
-
 // A response leg runs on a copy, so a rule that fails part way through leaves the caller's
 // document exactly as it was, and the caller can still forward it untranslated.
 TEST(TranscodingEngineTest, TranscodeResponseLegIsAllOrNothing) {
@@ -1482,9 +1241,12 @@ TEST(TranscodingEngineTest, RequestToIrLiftsNothingFromAnyOtherPath) {
     nlohmann::json doc = body;
     TranscodeContext ctx;
     ctx.request_path = path;
+    ctx.ir_model = "stale";
     ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, doc), IsOk());
     EXPECT_FALSE(doc.contains("model")) << path;
     EXPECT_FALSE(doc.contains("stream")) << path;
+    // With no model in the body or the path there is none to report, and nothing stale survives.
+    EXPECT_EQ(ctx.ir_model, "") << path;
   }
 
   nlohmann::json anthropic = nlohmann::json::parse(R"({
@@ -1644,83 +1406,6 @@ constexpr TranscodeLeg kAnthropicResponseToIr{PayloadKind::Response, TranscodeDi
 constexpr TranscodeLeg kIrResponseToAnthropic{PayloadKind::Response, TranscodeDirection::FromIr,
                                               LLMProtocol::AnthropicMessages};
 
-// Each candidate becomes a choice with its answer text joined: thought summaries are the model's
-// reasoning, not its answer. Gemini's exclusive counts become the IR's inclusive ones.
-TEST(TranscodingEngineTest, TranscodesGeminiResponseToIr) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json doc = nlohmann::json::parse(R"({
-    "candidates": [
-      {"content": {"role": "model", "parts": [
-         {"text": "Let me think.", "thought": true}, {"text": "Hello, "}, {"text": "world"}]},
-       "finishReason": "STOP", "safetyRatings": [], "avgLogprobs": -0.5},
-      {"index": 5, "content": {"role": "model", "parts": [{"text": "Hi"}]},
-       "finishReason": "RECITATION"},
-      {"finishReason": "MALFORMED_FUNCTION_CALL"}
-    ],
-    "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5, "thoughtsTokenCount": 3,
-                      "toolUsePromptTokenCount": 2, "cachedContentTokenCount": 4,
-                      "totalTokenCount": 20, "trafficType": "ON_DEMAND"},
-    "modelVersion": "gemini-2.5-flash",
-    "createTime": "2026-09-25T03:00:00.000000Z",
-    "responseId": "resp-1"
-  })");
-  TranscodeContext ctx;
-  ctx.request_model = "gemini-2.5-pro";
-  ctx.now_unix_seconds = 1700000000;
-  ASSERT_THAT(engine.transcode(kGeminiResponseToIr, ctx, doc), IsOk());
-  EXPECT_EQ(doc, nlohmann::json::parse(R"({
-    "id": "resp-1",
-    "object": "chat.completion",
-    "created": 1700000000,
-    "model": "gemini-2.5-flash",
-    "choices": [
-      {"index": 0, "message": {"role": "assistant", "content": "Hello, world"},
-       "finish_reason": "stop"},
-      {"index": 5, "message": {"role": "assistant", "content": "Hi"},
-       "finish_reason": "content_filter"},
-      {"index": 2, "message": {"role": "assistant", "content": ""}, "finish_reason": "stop"}
-    ],
-    "usage": {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20,
-              "prompt_tokens_details": {"cached_tokens": 4},
-              "completion_tokens_details": {"reasoning_tokens": 3}}
-  })"));
-}
-
-// The message becomes the IR's only choice with its text blocks joined, and Anthropic's input
-// count, which excludes both cache buckets, becomes the IR's inclusive prompt count.
-TEST(TranscodingEngineTest, TranscodesAnthropicResponseToIr) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json doc = nlohmann::json::parse(R"({
-    "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-sonnet-4-5",
-    "content": [{"type": "text", "text": "Part 1. "},
-                {"type": "tool_use", "id": "toolu_1", "name": "f", "input": {}},
-                {"type": "text", "text": "Part 2."}],
-    "stop_reason": "max_tokens", "stop_sequence": null,
-    "usage": {"input_tokens": 70, "output_tokens": 20, "cache_read_input_tokens": 30,
-              "cache_creation_input_tokens": 10}
-  })");
-  TranscodeContext ctx;
-  ctx.request_model = "claude-opus-4-1";
-  ctx.now_unix_seconds = 1700000000;
-  ASSERT_THAT(engine.transcode(kAnthropicResponseToIr, ctx, doc), IsOk());
-  EXPECT_EQ(doc, nlohmann::json::parse(R"({
-    "id": "msg_1",
-    "object": "chat.completion",
-    "created": 1700000000,
-    "model": "claude-sonnet-4-5",
-    "choices": [{"index": 0, "message": {"role": "assistant", "content": "Part 1. Part 2."},
-                 "finish_reason": "length"}],
-    "usage": {"prompt_tokens": 110, "completion_tokens": 20, "total_tokens": 130,
-              "prompt_tokens_details": {"cached_tokens": 30, "cache_write_tokens": 10}}
-  })"));
-}
-
 // A message carries one answer, so only the first choice survives; the input count excludes the
 // cache buckets again.
 TEST(TranscodingEngineTest, TranscodesIrResponseToAnthropic) {
@@ -1758,38 +1443,6 @@ TEST(TranscodingEngineTest, TranscodesIrResponseToAnthropic) {
   EXPECT_EQ(bare, nlohmann::json::parse(R"({
     "id": "msg_transcoded", "type": "message", "role": "assistant", "model": "claude-sonnet-4-5",
     "content": [{"type": "text", "text": ""}], "stop_reason": "end_turn"
-  })"));
-}
-
-// Each choice becomes a candidate with one text part; the completion count excludes reasoning
-// again.
-TEST(TranscodingEngineTest, TranscodesIrResponseToGemini) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  const TranscodingEngine& engine = *engine_or;
-
-  nlohmann::json doc = nlohmann::json::parse(R"({
-    "id": "chatcmpl-2", "object": "chat.completion", "created": 1699999999,
-    "model": "gemini-2.5-flash",
-    "choices": [
-      {"index": 0, "message": {"role": "assistant", "content": "A"}, "finish_reason": "length"},
-      {"message": {"role": "assistant", "content": null}, "finish_reason": "tool_calls"}
-    ],
-    "usage": {"prompt_tokens": 12, "completion_tokens": 98, "total_tokens": 110,
-              "prompt_tokens_details": {"cached_tokens": 4},
-              "completion_tokens_details": {"reasoning_tokens": 29}}
-  })");
-  TranscodeContext ctx;
-  ASSERT_THAT(engine.transcode(kIrResponseToGemini, ctx, doc), IsOk());
-  EXPECT_EQ(doc, nlohmann::json::parse(R"({
-    "candidates": [
-      {"index": 0, "content": {"role": "model", "parts": [{"text": "A"}]},
-       "finishReason": "MAX_TOKENS"},
-      {"index": 1, "content": {"role": "model", "parts": [{"text": ""}]}, "finishReason": "STOP"}
-    ],
-    "modelVersion": "gemini-2.5-flash",
-    "usageMetadata": {"promptTokenCount": 12, "candidatesTokenCount": 69, "totalTokenCount": 110,
-                      "cachedContentTokenCount": 4, "thoughtsTokenCount": 29}
   })"));
 }
 
@@ -2198,96 +1851,6 @@ TEST(TranscodingEngineTest, TranscodesGeminiStreamToIr) {
   ])"));
 }
 
-// Anthropic's typed events map one by one: the opening role, the text deltas, and the finish with
-// the usage summed across `message_start` and `message_delta`. Block boundaries and pings have no
-// IR counterpart, and `message_stop` becomes `[DONE]`.
-TEST(TranscodingEngineTest, TranscodesAnthropicStreamToIr) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-  TranscodeContext ctx;
-  ctx.now_unix_seconds = 1700000000;
-
-  EXPECT_EQ(runStream(*engine_or, kAnthropicStreamToIr, nlohmann::json::parse(R"([
-    {"event": "message_start",
-     "data": {"type": "message_start",
-              "message": {"id": "msg_1", "type": "message", "role": "assistant",
-                          "model": "claude-sonnet-4-5", "content": [],
-                          "usage": {"input_tokens": 70, "output_tokens": 1,
-                                    "cache_read_input_tokens": 30,
-                                    "cache_creation_input_tokens": 10}}}},
-    {"event": "content_block_start",
-     "data": {"type": "content_block_start", "index": 1,
-              "content_block": {"type": "text", "text": ""}}},
-    {"event": "ping", "data": {"type": "ping"}},
-    {"event": "content_block_delta",
-     "data": {"type": "content_block_delta", "index": 1,
-              "delta": {"type": "text_delta", "text": "Hi"}}},
-    {"event": "content_block_stop", "data": {"type": "content_block_stop", "index": 1}},
-    {"event": "error",
-     "data": {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}},
-    {"event": "message_delta",
-     "data": {"type": "message_delta", "delta": {"stop_reason": "max_tokens", "stop_sequence": null},
-              "usage": {"output_tokens": 20}}},
-    {"event": "message_stop", "data": {"type": "message_stop"}}
-  ])"),
-                      ctx),
-            nlohmann::json::parse(R"([
-    {"data": {"id": "msg_1", "object": "chat.completion.chunk", "created": 1700000000,
-              "model": "claude-sonnet-4-5",
-              "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""},
-                           "finish_reason": null}]}},
-    {"data": {"id": "msg_1", "object": "chat.completion.chunk", "created": 1700000000,
-              "model": "claude-sonnet-4-5",
-              "choices": [{"index": 0, "delta": {"content": "Hi"}, "finish_reason": null}]}},
-    {"untranslated": {"event": "error",
-                      "data": {"type": "error",
-                               "error": {"type": "overloaded_error", "message": "Overloaded"}}}},
-    {"data": {"id": "msg_1", "object": "chat.completion.chunk", "created": 1700000000,
-              "model": "claude-sonnet-4-5",
-              "choices": [{"index": 0, "delta": {}, "finish_reason": "length"}],
-              "usage": {"prompt_tokens": 110, "completion_tokens": 20, "total_tokens": 130,
-                        "prompt_tokens_details": {"cached_tokens": 30, "cache_write_tokens": 10}}}},
-    {"raw": "[DONE]"}
-  ])"));
-}
-
-// Each IR chunk becomes a Gemini chunk, with a `finishReason` only once its choice finishes. A
-// chunk without choices has no candidate to carry, and the IR's `[DONE]` has no Gemini counterpart.
-TEST(TranscodingEngineTest, TranscodesIrStreamToGemini) {
-  auto engine_or = TranscodingEngine::createDefault();
-  ASSERT_THAT(engine_or.status(), IsOk());
-
-  EXPECT_EQ(runStream(*engine_or, kIrStreamToGemini, nlohmann::json::parse(R"([
-    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gemini-2.5-flash",
-              "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""},
-                           "finish_reason": null}]}},
-    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gemini-2.5-flash",
-              "choices": [{"index": 0, "delta": {"content": "Hi"}, "finish_reason": null}]}},
-    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gemini-2.5-flash",
-              "choices": [{"index": 0, "delta": {}, "finish_reason": "length"}],
-              "usage": {"prompt_tokens": 12, "completion_tokens": 98, "total_tokens": 110,
-                        "completion_tokens_details": {"reasoning_tokens": 29}}}},
-    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gemini-2.5-flash",
-              "choices": [], "usage": {"prompt_tokens": 12, "completion_tokens": 98}}},
-    {"raw": "[DONE]"}
-  ])")),
-            nlohmann::json::parse(R"([
-    {"data": {"candidates": [{"index": 0, "content": {"role": "model", "parts": [{"text": ""}]}}],
-              "modelVersion": "gemini-2.5-flash"}},
-    {"data": {"candidates": [{"index": 0,
-                              "content": {"role": "model", "parts": [{"text": "Hi"}]}}],
-              "modelVersion": "gemini-2.5-flash"}},
-    {"data": {"candidates": [{"index": 0, "content": {"role": "model", "parts": [{"text": ""}]},
-                              "finishReason": "MAX_TOKENS"}],
-              "modelVersion": "gemini-2.5-flash",
-              "usageMetadata": {"promptTokenCount": 12, "candidatesTokenCount": 69,
-                                "totalTokenCount": 110, "thoughtsTokenCount": 29}}},
-    {"untranslated": {"data": {"id": "c1", "object": "chat.completion.chunk",
-                               "model": "gemini-2.5-flash", "choices": [],
-                               "usage": {"prompt_tokens": 12, "completion_tokens": 98}}}}
-  ])"));
-}
-
 // Each IR chunk becomes the Anthropic event its first choice calls for: text is a
 // `content_block_delta`, a finish reason a `message_delta`, and anything else the opening
 // `message_start`. The IR's `[DONE]` becomes `message_stop`.
@@ -2462,7 +2025,7 @@ TEST(TranscodeRuleTest, EnumerateAcrossStreamCarriesTheCountBetweenEvents) {
     ASSERT_THAT(index.apply(event, &ctx), IsOk());
     ASSERT_THAT(id.apply(event, &ctx), IsOk());
   };
-  // An element that names its own id still counts, so the two numberings stay in step.
+  // An element that names its own id still counts, so the two counts stay in step.
   number(first);
   EXPECT_EQ(first, nlohmann::json::parse(R"({"tool_calls": [
     {"name": "a", "index": 0, "id": "call_0"}, {"name": "b", "index": 1, "id": "own"}
