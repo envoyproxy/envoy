@@ -338,7 +338,7 @@ private:
       if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.tunnel_creation_callbacks_.has_value()) {
-        parent_.tunnel_creation_callbacks_.value().get().onStreamSuccess(*parent_.request_encoder_);
+        parent_.tunnel_creation_callbacks_->onStreamSuccess(*parent_.request_encoder_);
         parent_.tunnel_creation_callbacks_.reset();
       }
     }
@@ -375,7 +375,7 @@ private:
   UpstreamTunnelCallbacks& upstream_callbacks_;
   StreamInfo::StreamInfo& downstream_info_;
   const UdpTunnelingConfig& tunnel_config_;
-  std::optional<std::reference_wrapper<TunnelCreationCallbacks>> tunnel_creation_callbacks_;
+  OptRef<TunnelCreationCallbacks> tunnel_creation_callbacks_;
 };
 
 /**
@@ -588,13 +588,7 @@ protected:
     // Registers the session so the listener keeps it on this instance during a hot restart, unless
     // per-packet load balancing is enabled.
     void maybeRegisterForHotRestart();
-    std::optional<std::reference_wrapper<const Upstream::Host>> host() const {
-      if (host_) {
-        return *host_;
-      }
-
-      return std::nullopt;
-    }
+    OptRef<const Upstream::Host> host() const { return makeOptRefFromPtr(host_.get()); }
 
     bool onNewSession();
     void onData(Network::UdpRecvData& data);
@@ -804,7 +798,7 @@ protected:
 
   struct LocalPeerHostAddresses {
     const Network::UdpRecvData::LocalPeerAddresses& local_peer_addresses_;
-    std::optional<std::reference_wrapper<const Upstream::Host>> host_;
+    OptRef<const Upstream::Host> host_;
   };
 
   struct HeterogeneousActiveSessionHash {
@@ -825,7 +819,7 @@ protected:
     size_t operator()(const LocalPeerHostAddresses& value) const {
       auto hash = this->operator()(value.local_peer_addresses_);
       if (consider_host_) {
-        hash = absl::HashOf(hash, value.host_.value().get().address()->asStringView());
+        hash = absl::HashOf(hash, value.host_->address()->asStringView());
       }
       return hash;
     }
@@ -853,7 +847,7 @@ protected:
     }
     bool operator()(const ActiveSessionSharedPtr& lhs, const LocalPeerHostAddresses& rhs) const {
       return this->operator()(lhs, rhs.local_peer_addresses_) &&
-             (consider_host_ ? &lhs->host().value().get() == &rhs.host_.value().get() : true);
+             (consider_host_ ? lhs->host().ptr() == rhs.host_.ptr() : true);
     }
     bool operator()(const ActiveSessionSharedPtr& lhs, const ActiveSession* rhs) const {
       LocalPeerHostAddresses key{rhs->addresses(), rhs->host()};

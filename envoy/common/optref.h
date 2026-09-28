@@ -17,6 +17,8 @@ namespace Envoy {
 // This class also consumes less memory -- e.g. 8 bytes for a pointer rather
 // than 16 bytes for a pointer plus a bool with alignment padding.
 template <class T> struct OptRef {
+  using value_type = T; // NOLINT(readability-identifier-naming)
+
   OptRef(T& t) : ptr_(&t) {}
   OptRef() : ptr_(nullptr) {}
   OptRef(std::nullopt_t) : ptr_(nullptr) {}

@@ -480,7 +480,7 @@ public:
   uint64_t gaugeValue(const std::string& name) {
     auto gauge = cluster_->info_->stats_store_.findGaugeByString(name);
     ASSERT(gauge.has_value());
-    return gauge->get().value();
+    return gauge->value();
   }
   std::shared_ptr<MultiHealthChecker> health_checker_;
 };
