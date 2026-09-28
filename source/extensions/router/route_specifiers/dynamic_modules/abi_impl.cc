@@ -418,9 +418,10 @@ size_t envoy_dynamic_module_callback_route_specifier_get_request_headers_size(
 
 bool envoy_dynamic_module_callback_route_specifier_get_request_headers(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers) {
-  return ContextAccessor::getHeaders(routeSpecifierContext(context_envoy_ptr)->headers,
-                                     result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
+    size_t* size_out) {
+  return ContextAccessor::getHeadersBounded(routeSpecifierContext(context_envoy_ptr)->headers,
+                                            result_headers, capacity, size_out);
 }
 
 bool envoy_dynamic_module_callback_route_specifier_get_request_header_value(
@@ -698,7 +699,7 @@ bool envoy_dynamic_module_callback_route_specifier_get_selected_template_id(
 
 // ---------------------------------- Decision ---------------------------------
 
-bool envoy_dynamic_module_callback_route_specifier_set_template(
+bool envoy_dynamic_module_callback_route_specifier_set_route_template(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer template_id) {
   auto* context = routeSpecifierContext(context_envoy_ptr);

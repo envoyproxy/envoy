@@ -42,6 +42,7 @@ public:
           const std::string specifier_yaml = R"EOF(
 dynamic_module_config:
   name: route_specifier_integration_test
+  do_not_close: true
 specifier_name: test_route_specifier
 stat_prefix: test
 failure_policy: PASS_THROUGH
@@ -207,6 +208,7 @@ direct_response:
           const std::string specifier_yaml = absl::StrCat(R"EOF(
 dynamic_module_config:
   name: route_specifier_shadow
+  do_not_close: true
 specifier_name: shadow_example
 stat_prefix: test
 failure_policy: PASS_THROUGH

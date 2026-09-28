@@ -293,8 +293,10 @@ struct RouteSpecifierContext {
  */
 class DynamicModuleRoute : public Envoy::Router::DelegatingRoute {
 public:
-  DynamicModuleRoute(Envoy::Router::RouteConstSharedPtr route,
-                     DynamicModuleRouteSpecifierConfigSharedPtr config, RouteOverrides&& overrides);
+  DynamicModuleRoute(
+      Envoy::Router::RouteConstSharedPtr route, DynamicModuleRouteSpecifierConfigSharedPtr config,
+      RouteOverrides&& overrides,
+      Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack);
 
   // Router::Route
   const envoy::config::core::v3::Metadata& metadata() const override;
@@ -314,9 +316,10 @@ protected:
  */
 class DynamicModuleRouteEntry : public Envoy::Router::DelegatingRouteEntry {
 public:
-  DynamicModuleRouteEntry(Envoy::Router::RouteConstSharedPtr route,
-                          DynamicModuleRouteSpecifierConfigSharedPtr config,
-                          RouteOverrides&& overrides);
+  DynamicModuleRouteEntry(
+      Envoy::Router::RouteConstSharedPtr route, DynamicModuleRouteSpecifierConfigSharedPtr config,
+      RouteOverrides&& overrides,
+      Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack);
 
   // Router::Route
   const envoy::config::core::v3::Metadata& metadata() const override;

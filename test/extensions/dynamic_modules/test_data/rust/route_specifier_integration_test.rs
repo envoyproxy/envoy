@@ -208,6 +208,7 @@ fn read_echoed_value(ctx: &RouteSpecifierContext, name: &[u8]) -> String {
       .map_or_else(|| ABSENT.to_owned(), |(_, total)| total.to_string()),
     b"header-bulk" => ctx
       .get_all_request_headers()
+      .unwrap_or_default()
       .into_iter()
       .find(|(key, _)| key.as_slice() == b"x-multi")
       .map_or_else(|| ABSENT.to_owned(), |(_, value)| buffer_to_string(value)),
