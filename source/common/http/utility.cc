@@ -1499,8 +1499,9 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
   } else {
     route_retry_policy.set_retry_on(retry_policy.retry_on());
   }
-  route_retry_policy.mutable_per_try_timeout()->CopyFrom(
-      route_retry_policy.retry_back_off().max_interval());
+  if (retry_policy.has_per_try_timeout()) {
+    route_retry_policy.mutable_per_try_timeout()->CopyFrom(retry_policy.per_try_timeout());
+  }
 
   if (retry_policy.has_retry_priority()) {
     route_retry_policy.mutable_retry_priority()->set_name(retry_policy.retry_priority().name());
