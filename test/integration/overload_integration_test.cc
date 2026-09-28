@@ -1680,16 +1680,24 @@ TEST_P(LoadShedPointIntegrationTest, Http3ServerDispatchSendsGoAwayAndClosesConn
   test_server_->waitForCounter("http.config_test.downstream_rq_http3_total", Eq(1));
 
   // Put envoy in overloaded state to send GOAWAY frames and close the
-  // connection.
+  // connection on new stream creation.
   updateResource(0.95);
   test_server_->waitForGauge("overload.envoy.load_shed_points.http3_server_go_away_and_close_on_"
                              "dispatch.scale_percent",
                              Eq(100));
 
+  // Sending data on the existing in-flight stream should not trigger GOAWAY or close the
+  // connection.
+  Buffer::OwnedImpl first_request_body{"foo"};
+  first_request_encoder.encodeData(first_request_body, true);
+  ASSERT_TRUE(first_request_decoder->waitForEndStream());
+  EXPECT_TRUE(first_request_decoder->complete());
+  EXPECT_FALSE(codec_client_->sawGoAway());
+
   auto second_request_decoder = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // The downstream should receive the GOAWAY and the connection should be
-  // closed.
+  // closed when creating the new stream.
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(codec_client_->sawGoAway());
 
