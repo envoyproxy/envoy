@@ -757,6 +757,9 @@ protected:
   // Latched value of the `http2_include_cookies_in_limits` runtime feature, read once per
   // connection instead of on every header field in saveHeader().
   const bool http2_include_cookies_in_limits_ = false;
+  // Latched value of the `http2_reject_frames_after_end_stream` runtime feature, consulted for
+  // every received HEADERS and DATA frame instead of performing a runtime lookup on the data path.
+  const bool reject_frames_after_end_stream_ = false;
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and

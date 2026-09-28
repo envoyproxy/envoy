@@ -162,7 +162,10 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/config:well_known_names",
         "//source/common/stats:symbol_table_lib",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 

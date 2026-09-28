@@ -44,6 +44,7 @@ envoy_cc_library(
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
         "//source/common/init:watcher_lib",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:prefix_utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

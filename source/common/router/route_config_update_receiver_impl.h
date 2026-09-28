@@ -11,6 +11,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/rds/route_config_update_receiver_impl.h"
 #include "source/common/router/config_impl.h"

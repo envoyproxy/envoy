@@ -855,7 +855,10 @@ envoy_cc_benchmark_binary(
 envoy_cc_benchmark_binary(
     name = "metadata_comparison_benchmark",
     srcs = ["metadata_comparison_benchmark.cc"],
-    deps = ["//source/common/protobuf:utility_lib"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@benchmark",
+    ],
 )
 
 envoy_benchmark_test(

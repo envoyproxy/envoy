@@ -35,6 +35,10 @@ void DynamicModuleHttpFilter::maybeRegisterDownstreamWatermarkCallbacks() {
 }
 
 void DynamicModuleHttpFilter::onStreamComplete() {
+  HookScope hook_scope(*this);
+  if (in_module_filter_ == nullptr) {
+    return;
+  }
   config_->on_http_filter_stream_complete_(thisAsVoidPtr(), in_module_filter_);
 }
 
@@ -106,6 +110,14 @@ void DynamicModuleHttpFilter::destroy(OptRef<Event::Dispatcher> dispatcher) {
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
+  HookScope hook_scope(*this);
+  if (in_module_filter_ == nullptr) {
+    // The module failed to create the filter, so fail the request closed instead of calling a null
+    // filter. Network and listener filters guard the same way.
+    sendLocalReply(Code::InternalServerError, "", nullptr, std::nullopt,
+                   "dynamic_module_filter_init_failed");
+    return FilterHeadersStatus::StopIteration;
+  }
   const envoy_dynamic_module_type_on_http_filter_request_headers_status status =
       config_->on_http_filter_request_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   decode_in_continue_ =
@@ -114,6 +126,10 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bo
 };
 
 FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bool end_of_stream) {
+  HookScope hook_scope(*this);
+  if (in_module_filter_ == nullptr) {
+    return FilterDataStatus::StopIterationNoBuffer;
+  }
   current_request_body_ = &chunk;
   const envoy_dynamic_module_type_on_http_filter_request_body_status status =
       config_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
@@ -124,6 +140,10 @@ FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bo
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap&) {
+  HookScope hook_scope(*this);
+  if (in_module_filter_ == nullptr) {
+    return FilterTrailersStatus::StopIteration;
+  }
   const envoy_dynamic_module_type_on_http_filter_request_trailers_status status =
       config_->on_http_filter_request_trailers_(thisAsVoidPtr(), in_module_filter_);
   decode_in_continue_ =
@@ -144,7 +164,8 @@ Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderM
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, bool end_of_stream) {
-  if (sent_local_reply_) { // See the comment on the flag.
+  HookScope hook_scope(*this);
+  if (sent_local_reply_ || in_module_filter_ == nullptr) { // See the comment on the flag.
     return FilterHeadersStatus::Continue;
   }
   const envoy_dynamic_module_type_on_http_filter_response_headers_status status =
@@ -155,7 +176,8 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, b
 };
 
 FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bool end_of_stream) {
-  if (sent_local_reply_) { // See the comment on the flag.
+  HookScope hook_scope(*this);
+  if (sent_local_reply_ || in_module_filter_ == nullptr) { // See the comment on the flag.
     return FilterDataStatus::Continue;
   }
   current_response_body_ = &chunk;
@@ -168,7 +190,8 @@ FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bo
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&) {
-  if (sent_local_reply_) { // See the comment on the flag.
+  HookScope hook_scope(*this);
+  if (sent_local_reply_ || in_module_filter_ == nullptr) { // See the comment on the flag.
     return FilterTrailersStatus::Continue;
   }
   const envoy_dynamic_module_type_on_http_filter_response_trailers_status status =
@@ -262,6 +285,7 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::
     return;
   }
 
+  DynamicModuleHttpFilter::HookScope hook_scope(filter);
   absl::InlinedVector<envoy_dynamic_module_type_envoy_http_header, 16> headers_vector;
   headers_vector.reserve(response->headers().size());
   response->headers().iterate([&headers_vector](
@@ -300,6 +324,7 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
     return;
   }
 
+  DynamicModuleHttpFilter::HookScope hook_scope(filter);
   // request_ is not null if the callout is actually sent to the upstream cluster.
   // This allows us to avoid inlined calls to onFailure() method (which results in a reentrant to
   // the modules) when the async client immediately fails the callout.
@@ -320,6 +345,7 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
 }
 
 void DynamicModuleHttpFilter::onScheduled(uint64_t event_id) {
+  HookScope hook_scope(*this);
   // By the time this event is invoked, the filter might be destroyed.
   if (in_module_filter_) {
     config_->on_http_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
@@ -342,12 +368,14 @@ void DynamicModuleHttpFilter::continueEncoding() {
 
 void DynamicModuleHttpFilter::onAboveWriteBufferHighWatermark() {
   ASSERT(in_module_filter_ != nullptr);
+  HookScope hook_scope(*this);
   config_->on_http_filter_downstream_above_write_buffer_high_watermark_(thisAsVoidPtr(),
                                                                         in_module_filter_);
 }
 
 void DynamicModuleHttpFilter::onBelowWriteBufferLowWatermark() {
   ASSERT(in_module_filter_ != nullptr);
+  HookScope hook_scope(*this);
   config_->on_http_filter_downstream_below_write_buffer_low_watermark_(thisAsVoidPtr(),
                                                                        in_module_filter_);
 }
@@ -464,6 +492,7 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onHeaders(ResponseHeade
     return Http::HeaderMap::Iterate::Continue;
   });
 
+  DynamicModuleHttpFilter::HookScope hook_scope(filter);
   filter.config_->on_http_filter_http_stream_headers_(
       filter.thisAsVoidPtr(), filter.in_module_filter_, callout_id, headers_vector.data(),
       headers_vector.size(), end_stream);
@@ -489,6 +518,7 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onData(Buffer::Instance
     for (const auto& slice : slices) {
       buffers.push_back({static_cast<char*>(slice.mem_), slice.len_});
     }
+    DynamicModuleHttpFilter::HookScope hook_scope(filter);
     filter.config_->on_http_filter_http_stream_data_(filter.thisAsVoidPtr(),
                                                      filter.in_module_filter_, callout_id,
                                                      buffers.data(), buffers.size(), end_stream);
@@ -518,6 +548,7 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onTrailers(
     return Http::HeaderMap::Iterate::Continue;
   });
 
+  DynamicModuleHttpFilter::HookScope hook_scope(filter);
   filter_.config_->on_http_filter_http_stream_trailers_(
       filter.thisAsVoidPtr(), filter.in_module_filter_, callout_id, trailers_vector.data(),
       trailers_vector.size());
@@ -551,6 +582,7 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onComplete() {
     return;
   }
 
+  DynamicModuleHttpFilter::HookScope hook_scope(filter);
   filter.config_->on_http_filter_http_stream_complete_(filter.thisAsVoidPtr(),
                                                        filter.in_module_filter_, callout_id_);
 }
@@ -583,6 +615,7 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onReset() {
     return;
   }
 
+  DynamicModuleHttpFilter::HookScope hook_scope(filter);
   filter.config_->on_http_filter_http_stream_reset_(
       filter.thisAsVoidPtr(), filter.in_module_filter_, callout_id_,
       envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
@@ -593,6 +626,7 @@ DynamicModuleHttpFilter::onLocalReply(const Http::StreamFilterBase::LocalReplyDa
   if (!in_module_filter_ || config_->on_http_filter_local_reply_ == nullptr) {
     return Http::LocalErrorStatus::Continue;
   }
+  HookScope hook_scope(*this);
   envoy_dynamic_module_type_envoy_buffer details_buffer{data.details_.data(), data.details_.size()};
   const envoy_dynamic_module_type_on_http_filter_local_reply_status status =
       config_->on_http_filter_local_reply_(thisAsVoidPtr(), in_module_filter_,
@@ -618,7 +652,9 @@ void DynamicModuleHttpFilter::storeSocketOptionBytes(
 bool DynamicModuleHttpFilter::tryGetSocketOptionInt(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     envoy_dynamic_module_type_socket_direction direction, int64_t& value_out) const {
-  for (const auto& opt : socket_options_) {
+  // Iterate newest first so a re-set option returns its latest value.
+  for (auto it = socket_options_.rbegin(); it != socket_options_.rend(); ++it) {
+    const auto& opt = *it;
     if (opt.level == level && opt.name == name && opt.state == state &&
         opt.direction == direction && opt.is_int) {
       value_out = opt.int_value;
@@ -631,7 +667,9 @@ bool DynamicModuleHttpFilter::tryGetSocketOptionInt(
 bool DynamicModuleHttpFilter::tryGetSocketOptionBytes(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     envoy_dynamic_module_type_socket_direction direction, absl::string_view& value_out) const {
-  for (const auto& opt : socket_options_) {
+  // Iterate newest first so a re-set option returns its latest value.
+  for (auto it = socket_options_.rbegin(); it != socket_options_.rend(); ++it) {
+    const auto& opt = *it;
     if (opt.level == level && opt.name == name && opt.state == state &&
         opt.direction == direction && !opt.is_int) {
       value_out = opt.byte_value;

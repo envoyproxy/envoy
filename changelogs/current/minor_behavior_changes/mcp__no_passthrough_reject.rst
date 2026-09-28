@@ -1,0 +1,1 @@
+``McpFilter`` no longer rejects any requests in ``PASS_THROUGH`` mode. Previously, the filter could reject requests in some cases when it failed to parse the request as an MCP request. Parse failures are now recorded in the filter's dynamic metadata, under ``passthrough_reason``.

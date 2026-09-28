@@ -28,20 +28,7 @@ public:
   }
 
 protected:
-  // Builds a server context that requires a client certificate and trusts the test-data CA.
-  Extensions::TransportSockets::Tls::ContextImpl& serverContext() {
-    const std::string yaml = R"EOF(
-common_tls_context:
-  tls_certificates:
-  - certificate_chain:
-      filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
-    private_key:
-      filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
-  validation_context:
-    trusted_ca:
-      filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-require_client_certificate: true
-)EOF";
+  Extensions::TransportSockets::Tls::ContextImpl& buildServerContext(const std::string& yaml) {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
     auto config = THROW_OR_RETURN_VALUE(
@@ -53,6 +40,39 @@ require_client_certificate: true
         manager_.createSslServerContext(*store_.rootScope(), *config, nullptr),
         Ssl::ServerContextSharedPtr);
     return dynamic_cast<Extensions::TransportSockets::Tls::ContextImpl&>(*server_context_);
+  }
+
+  // Builds a server context that requires a client certificate and trusts the test-data CA.
+  Extensions::TransportSockets::Tls::ContextImpl& serverContext() {
+    return buildServerContext(R"EOF(
+common_tls_context:
+  tls_certificates:
+  - certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+  validation_context:
+    trusted_ca:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+require_client_certificate: true
+)EOF");
+  }
+
+  // Builds a server context that accepts untrusted client certificate chains via
+  // `ACCEPT_UNTRUSTED`.
+  Extensions::TransportSockets::Tls::ContextImpl& acceptUntrustedServerContext() {
+    return buildServerContext(R"EOF(
+common_tls_context:
+  tls_certificates:
+  - certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+  validation_context:
+    trusted_ca:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+    trust_chain_verification: ACCEPT_UNTRUSTED
+)EOF");
   }
 
   Stats::TestUtil::TestStore store_;
@@ -96,14 +116,39 @@ TEST_F(EnvoyQuicDownstreamCertVerifierTest, UntrustedCertificateRejected) {
 
   std::string error_details;
   std::unique_ptr<quic::ProofVerifyDetails> details;
+  bool cert_validated = true;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifyQuicClientCertChain(certs, serverContext(), &error_details, &details));
+            verifyQuicClientCertChain(certs, serverContext(), &error_details, &details,
+                                      /*out_alert=*/nullptr, &cert_validated));
   ASSERT_NE(details, nullptr);
   EXPECT_FALSE(static_cast<CertVerifyResult&>(*details).isValid());
+  EXPECT_FALSE(cert_validated);
 }
 
 // A certificate that chains to the trusted CA is accepted and the details are marked valid.
 TEST_F(EnvoyQuicDownstreamCertVerifierTest, TrustedCertificateAccepted) {
+  const std::string pem = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+  std::stringstream pem_stream{pem};
+  std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  ASSERT_FALSE(chain.empty());
+  std::vector<absl::string_view> certs{chain[0]};
+
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> details;
+  bool cert_validated = false;
+  EXPECT_EQ(quic::QUIC_SUCCESS,
+            verifyQuicClientCertChain(certs, serverContext(), &error_details, &details,
+                                      /*out_alert=*/nullptr, &cert_validated))
+      << error_details;
+  ASSERT_NE(details, nullptr);
+  EXPECT_TRUE(static_cast<CertVerifyResult&>(*details).isValid());
+  EXPECT_TRUE(cert_validated);
+  EXPECT_TRUE(error_details.empty());
+}
+
+// The `cert_validated` out-param is optional on the success path.
+TEST_F(EnvoyQuicDownstreamCertVerifierTest, TrustedCertificateAcceptedWithoutOutParam) {
   const std::string pem = TestEnvironment::readFileToStringForTest(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
   std::stringstream pem_stream{pem};
@@ -118,7 +163,24 @@ TEST_F(EnvoyQuicDownstreamCertVerifierTest, TrustedCertificateAccepted) {
       << error_details;
   ASSERT_NE(details, nullptr);
   EXPECT_TRUE(static_cast<CertVerifyResult&>(*details).isValid());
-  EXPECT_TRUE(error_details.empty());
+}
+
+// With `ACCEPT_UNTRUSTED`, an untrusted certificate is accepted but not reported as validated.
+TEST_F(EnvoyQuicDownstreamCertVerifierTest, AcceptUntrustedCertificateNotMarkedValidated) {
+  std::stringstream pem_stream{std::string(quic::test::kTestCertificateChainPem)};
+  std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  ASSERT_FALSE(chain.empty());
+  std::vector<absl::string_view> certs{chain[0]};
+
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> details;
+  bool cert_validated = true;
+  EXPECT_EQ(quic::QUIC_SUCCESS,
+            verifyQuicClientCertChain(certs, acceptUntrustedServerContext(), &error_details,
+                                      &details, /*out_alert=*/nullptr, &cert_validated))
+      << error_details;
+  ASSERT_NE(details, nullptr);
+  EXPECT_FALSE(cert_validated);
 }
 
 // `CertVerifyResult::Clone` preserves the validity bit so `quiche's` internal copies carry the same

@@ -22,7 +22,6 @@ envoy_cc_library(
     name = "assertion_filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    repository = "@envoy",
     deps = [
         "filter_cc_proto",
         "@envoy//envoy/http:codes_interface",
@@ -37,7 +36,6 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":assertion_filter_lib",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",
@@ -47,7 +45,6 @@ envoy_cc_library(
 envoy_cc_test(
     name = "assertion_filter_test",
     srcs = ["assertion_filter_test.cc"],
-    repository = "@envoy",
     deps = [
         ":config",
         ":filter_cc_proto",

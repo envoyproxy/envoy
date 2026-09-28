@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <coroutine>
+#include <memory>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -31,9 +32,10 @@ namespace Coroutine {
  * status to a normal `co_return`.
  *
  * Contract for derived types:
- *   - `onStart()` must arrange asynchronous completion. It must not call
- *     `complete()` synchronously within `onStart()` -- the frame is mid-suspend at
- *     that point and resuming it inline would be undefined.
+ *   - `onStart()` kicks off the operation and arranges to call `complete()`. If
+ *     `complete()` is called synchronously within `onStart()`, `await_suspend()`
+ *     detects it and returns `false` so the coroutine resumes immediately without
+ *     suspending or invoking `continuation_.resume()` mid-suspend.
  *   - `onCancel()` must cancel the pending op and must not call `complete()`: the
  *     cancel path already delivers the aborted value, so a `complete()` here would
  *     resume the parent twice (a use-after-free). It is guarded by an ENVOY_BUG.
@@ -75,7 +77,15 @@ public:
       onCancel();
       finish(abortedValue());
     });
-    onStart(); // derived kicks off the async op; must eventually call complete().
+    starting_ = true;
+    onStart(); // derived kicks off the op; may call complete() synchronously or asynchronously.
+    starting_ = false;
+    if (finished_) {
+      // Completed (or cancelled) synchronously inside onStart(). Returning false
+      // tells the C++ coroutine runtime not to suspend and to proceed directly to
+      // await_resume() on the caller's stack.
+      return false;
+    }
     return true;
   }
 
@@ -129,6 +139,11 @@ private:
     finished_ = true;
     context_->cancellation()->clearCancelCallback();
     result_ = std::move(value);
+    if (starting_) {
+      // Called synchronously inside onStart(). Do NOT call continuation_.resume()
+      // while mid-suspend; await_suspend() will see finished_ == true and return false.
+      return;
+    }
     // Inline resume at the event-loop boundary. Must touch no members after
     // this: resuming may run the coroutine to completion and destroy this leaf.
     if (continuation_) {
@@ -136,6 +151,7 @@ private:
     }
   }
 
+  bool starting_ = false;
   bool cancelling_ = false;
   bool finished_ = false;
   std::optional<T> result_;
@@ -171,6 +187,40 @@ private:
  * e.g. co_await sleep(500ms)
  * */
 inline TimerAwaitable sleep(std::chrono::milliseconds duration) { return TimerAwaitable(duration); }
+
+/**
+ * Suspends the awaiting coroutine and posts its resumption onto the coroutine's
+ * executor, yielding the current call stack back to the event loop.
+ */
+class YieldAwaitable : public LeafAwaitable<absl::Status> {
+public:
+  YieldAwaitable() = default;
+  ~YieldAwaitable() override { *self_ = nullptr; }
+
+protected:
+  void onStart() override {
+    context().executor().post([self = self_]() {
+      if (*self != nullptr) {
+        (*self)->complete(absl::OkStatus());
+      }
+    });
+  }
+
+  // `post()` cannot be recalled from the dispatcher queue; clearing `*self_` turns
+  // the queued callback into a no-op once the cancel path has resumed and destroyed
+  // this leaf.
+  void onCancel() override { *self_ = nullptr; }
+
+private:
+  std::shared_ptr<YieldAwaitable*> self_ = std::make_shared<YieldAwaitable*>(this);
+};
+
+/**
+ * Yields execution of the awaiting coroutine back to its executor's run loop.
+ *
+ * e.g. CO_RETURN_IF_ERROR(co_await yield());
+ */
+inline YieldAwaitable yield() { return YieldAwaitable(); }
 
 } // namespace Coroutine
 } // namespace Envoy

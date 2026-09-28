@@ -140,6 +140,7 @@ TEST_F(McpFilterTest, HeadersAttributeSourceUsesFastPath) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
                                          {"mcp-method", "tasks/get"},
                                          {"mcp-name", "task-123"}};
 
@@ -170,6 +171,7 @@ TEST_F(McpFilterTest, HeadersAttributeSourceUsesNamePath) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
                                          {"mcp-method", "tools/call"},
                                          {"mcp-name", "get_weather"}};
 
@@ -181,6 +183,39 @@ TEST_F(McpFilterTest, HeadersAttributeSourceUsesNamePath) {
 
         const auto& params = metadata.fields().at("params").struct_value();
         EXPECT_EQ("get_weather", params.fields().at("name").string_value());
+      });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, HeadersAttributeSourceDecodesBase64Name) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tools/call"},
+                                         // SPELLCHECKER(off)
+                                         {"mcp-name", "=?base64?SGVsbG8sIHdvcmxk?="}};
+  // SPELLCHECKER(on)
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(_)).Times(0);
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_EQ("tools/call", metadata.fields().at("method").string_value());
+
+        const auto& params = metadata.fields().at("params").struct_value();
+        EXPECT_EQ("Hello, world", params.fields().at("name").string_value());
       });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -200,6 +235,7 @@ TEST_F(McpFilterTest, HeadersAttributeSourceUsesResourceUriPath) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
                                          {"mcp-method", "resources/read"},
                                          {"mcp-name", "file:///tmp/foo"}};
 
@@ -319,6 +355,7 @@ TEST_F(McpFilterTest, HeadersAttributeSourceStoresFilterState) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
                                          {"mcp-method", "tasks/get"},
                                          {"mcp-name", "task-123"}};
 
@@ -347,6 +384,7 @@ TEST_F(McpFilterTest, HeadersAttributeSourceClearsRouteCache) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
                                          {"mcp-method", "tasks/get"},
                                          {"mcp-name", "task-123"}};
 
@@ -358,7 +396,7 @@ TEST_F(McpFilterTest, HeadersAttributeSourceClearsRouteCache) {
 
 TEST_F(McpFilterTest, VerifyRejectsMissingMethodHeader) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -370,18 +408,17 @@ TEST_F(McpFilterTest, VerifyRejectsMissingMethodHeader) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
                                          {"mcp-name", "task-123"}};
 
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     testing::AllOf(testing::HasSubstr("\"code\":-32020"),
+                                    testing::HasSubstr("Missing required Mcp-Method header")),
+                     _, _, _));
+
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-
-  Buffer::OwnedImpl buffer(
-      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})");
-
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest,
-                             "MCP header attributes do not match request body", _, _, _));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 
   EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
 }
@@ -457,7 +494,7 @@ TEST_F(McpFilterTest, HeadersAttributeSourceFallsBackWhenNameHeaderMissing) {
 
 TEST_F(McpFilterTest, VerifyRejectsMethodMismatch) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -469,6 +506,7 @@ TEST_F(McpFilterTest, VerifyRejectsMethodMismatch) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
                                          {"mcp-method", "tools/call"},
                                          {"mcp-name", "get_weather"}};
 
@@ -479,14 +517,17 @@ TEST_F(McpFilterTest, VerifyRejectsMethodMismatch) {
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
-                             "MCP header attributes do not match request body", _, _, _));
+                             testing::AllOf(testing::HasSubstr("\"code\":-32020"),
+                                            testing::HasSubstr(
+                                                "MCP header attributes do not match request body")),
+                             _, _, _));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
 TEST_F(McpFilterTest, VerifyRejectsNameMismatch) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -498,6 +539,7 @@ TEST_F(McpFilterTest, VerifyRejectsNameMismatch) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
                                          {"mcp-method", "tasks/get"},
                                          {"mcp-name", "task-123"}};
 
@@ -508,7 +550,10 @@ TEST_F(McpFilterTest, VerifyRejectsNameMismatch) {
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
-                             "MCP header attributes do not match request body", _, _, _));
+                             testing::AllOf(testing::HasSubstr("\"code\":-32020"),
+                                            testing::HasSubstr(
+                                                "MCP header attributes do not match request body")),
+                             _, _, _));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 
@@ -529,6 +574,7 @@ TEST_F(McpFilterTest, VerifyAcceptsMatchingAttributes) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
                                          {"mcp-method", "tasks/get"},
                                          {"mcp-name", "task-123"}};
 
@@ -658,6 +704,594 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
+TEST_F(McpFilterTest, SupportedProtocolVersionAllowed) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, MaxSupportedVersionAllowsMissingProtocolVersionHeader) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, ProtocolVersionBelowMaxAllowed) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"},
+                                         {"mcp-protocol-version", "2025-11-25"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, UnknownProtocolVersionIsUnsupported) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+
+  EXPECT_FALSE(config_->isProtocolVersionSupported("2099-01-01"));
+}
+
+TEST_F(McpFilterTest, UnknownMaxProtocolVersionIsUnsupported) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_supported_protocol_version()->set_value("2099-01-01");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+
+  EXPECT_FALSE(config_->isProtocolVersionSupported("2026-07-28"));
+}
+
+TEST_F(McpFilterTest, EmptySupportedVersionsAcceptsExplicitVersion) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"},
+                                         {"mcp-protocol-version", "2025-11-25"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, ProtocolVersionMetaMatchesHeader) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterTest, ProtocolVersionMetaMismatchRejects) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":"2025-11-25"}}})");
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     testing::AllOf(testing::HasSubstr("\"code\":-32020"),
+                                    testing::HasSubstr(
+                                        "MCP-Protocol-Version header does not match request body")),
+                     _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterTest, ProtocolVersionMetaMismatchPassThrough) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":"2025-11-25"}}})");
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterTest, ProtocolVersionMetaMismatchReply) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":"2025-11-25"}}})");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _))
+      .WillOnce([](Http::Code code, absl::string_view body,
+                   std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        EXPECT_EQ(Http::Code::BadRequest, code);
+        EXPECT_THAT(body, HasSubstr("\"jsonrpc\":\"2.0\""));
+        EXPECT_THAT(body, HasSubstr("\"code\":-32020"));
+        EXPECT_THAT(body, HasSubstr("MCP-Protocol-Version header does not match request body"));
+        EXPECT_THAT(body, HasSubstr("\"id\":1"));
+
+        Http::TestResponseHeaderMapImpl response_headers;
+        modify_headers(response_headers);
+
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
+                  response_headers.getContentTypeValue());
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_EQ(Filters::Common::Mcp::Status::NotJsonRpc, filter_state_obj->status());
+}
+
+TEST_F(McpFilterTest, MissingProtocolVersionMetaContinues) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterTest, NonStringProtocolVersionMetaRejects) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":123}}})");
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     testing::AllOf(testing::HasSubstr("\"code\":-32020"),
+                                    testing::HasSubstr(
+                                        "MCP-Protocol-Version header does not match request body")),
+                     _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterTest, NewSpecBodyRejectsMissingMethodHeader) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     testing::AllOf(testing::HasSubstr("\"code\":-32020"),
+                                    testing::HasSubstr("Missing required Mcp-Method header")),
+                     _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, NewSpecPassThroughAllowsMissingMethodHeader) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterTest, NewSpecBodyRejectsMissingNameHeader) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             testing::AllOf(testing::HasSubstr("\"code\":-32020"),
+                                            testing::HasSubstr("Missing required Mcp-Name header")),
+                             _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, NewSpecBodyRejectsHeaderBodyMismatch) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "header-task"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"body-task"}})");
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             testing::AllOf(testing::HasSubstr("\"code\":-32020"),
+                                            testing::HasSubstr(
+                                                "MCP header attributes do not match request body")),
+                             _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterTest, NewSpecPassThroughAllowsHeaderBodyMismatch) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "header-task"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"body-task"}})");
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterTest, NewSpecRejectsDeleteWithMethodNotAllowed) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "DELETE"},
+                                         {"mcp-session-id", "session-123"},
+                                         {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::MethodNotAllowed,
+                             "MCP DELETE is not supported for protocol version 2026-07-28", _, _,
+                             _))
+      .WillOnce([](Http::Code, absl::string_view,
+                   std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl response_headers;
+        modify_headers(response_headers);
+
+        const auto allow_headers = response_headers.get(Http::LowerCaseString("allow"));
+        ASSERT_EQ(1, allow_headers.size());
+        EXPECT_EQ("POST", allow_headers[0]->value().getStringView());
+      });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, NewSpecPassThroughAllowsDelete) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "DELETE"},
+                                         {"mcp-session-id", "session-123"},
+                                         {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, NewSpecRejectsSseGetWithMethodNotAllowed) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {"accept", "text/event-stream"}, {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::MethodNotAllowed,
+                             "MCP GET with SSE is not supported for protocol version 2026-07-28", _,
+                             _, _))
+      .WillOnce([](Http::Code, absl::string_view,
+                   std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl response_headers;
+        modify_headers(response_headers);
+
+        const auto allow_headers = response_headers.get(Http::LowerCaseString("allow"));
+        ASSERT_EQ(1, allow_headers.size());
+        EXPECT_EQ("POST", allow_headers[0]->value().getStringView());
+      });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, NewSpecPassThroughAllowsSseGet) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {"accept", "text/event-stream"}, {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, UnsupportedProtocolVersionReply) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2025-11-25");
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _))
+      .WillOnce([](Http::Code code, absl::string_view body,
+                   std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        EXPECT_EQ(Http::Code::BadRequest, code);
+
+        EXPECT_THAT(body, HasSubstr("\"jsonrpc\":\"2.0\""));
+        EXPECT_THAT(body, HasSubstr("\"code\":-32022"));
+        EXPECT_THAT(body, HasSubstr("\"requested\":\"2026-07-28\""));
+        EXPECT_THAT(body, HasSubstr("\"supported\":[\"2024-11-05\",\"2025-03-26\","
+                                    "\"2025-06-18\",\"2025-11-25\"]"));
+
+        Http::TestResponseHeaderMapImpl response_headers;
+        modify_headers(response_headers);
+
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
+                  response_headers.getContentTypeValue());
+      });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_EQ(Filters::Common::Mcp::Status::NotJsonRpc, filter_state_obj->status());
+}
+
 // Test per-route override configuration
 TEST_F(McpFilterTest, PerRouteOverride) {
   // Setup route-specific config to REJECT_NO_MCP
@@ -682,7 +1316,7 @@ TEST_F(McpFilterTest, NoopModePassesThroughNonMcp) {
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
@@ -721,7 +1355,7 @@ TEST_F(McpFilterTest, NoopModePerRouteOverride) {
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
 
   // Global REJECT_NO_MCP would reject this, but the NOOP override lets it through.
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
@@ -778,8 +1412,36 @@ TEST_F(McpFilterTest, DynamicMetadataContainsIsMcpRequest) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-// Test that malformed JSON is always rejected regardless of traffic mode
+// Test that malformed JSON is allowed in PASS_THROUGH mode
 TEST_F(McpFilterTest, PartialNoJsonData) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  Buffer::OwnedImpl buffer("partial data");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "mcp_ok"))),
+                  Contains(Pair("passthrough_reason",
+                                Property(&Protobuf::Value::string_value, "mcp_not_jsonrpc"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
+      });
+
+  // Malformed JSON — allowed in PASS_THROUGH mode.
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that malformed JSON is rejected in REJECT_NO_MCP mode
+TEST_F(McpFilterTest, PartialNoJsonDataRejectMode) {
+  setupRejectMode();
+
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -800,13 +1462,40 @@ TEST_F(McpFilterTest, PartialNoJsonData) {
                   Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
       });
 
-  // Malformed JSON — always rejected even in PASS_THROUGH mode.
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
 // Test that incomplete JSON (which is valid so far but incomplete at end_stream)
-// triggers a parse error.
+// is allowed in PASS_THROUGH mode.
 TEST_F(McpFilterTest, IncompleteJsonParseError) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send incomplete JSON body
+  Buffer::OwnedImpl buffer("{\"jsonrpc\": \"2.0\"");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "mcp_ok"))),
+                  Contains(Pair("passthrough_reason",
+                                Property(&Protobuf::Value::string_value, "mcp_parse_error"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that incomplete JSON triggers a parse error and rejection in REJECT_NO_MCP mode.
+TEST_F(McpFilterTest, IncompleteJsonParseErrorRejectMode) {
+  setupRejectMode();
+
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -1050,8 +1739,9 @@ TEST_F(McpFilterTest, RejectModeNonJsonRpcPopulatesFilterState) {
   EXPECT_EQ(filter_state_obj->status(), Filters::Common::Mcp::Status::NotJsonRpc);
 }
 
-// Test that truncated JSON with end_stream is rejected even in PASS_THROUGH mode.
-// Truncation here is caused by the client (not by size limit), so data is bad.
+// Test that truncated JSON with end_stream is allowed in PASS_THROUGH mode.
+// Truncation here is caused by the client (not by size limit), so data is bad, but we pass it
+// through.
 TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughMode) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
@@ -1070,18 +1760,14 @@ TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughMode) {
   std::string json = R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test")";
   Buffer::OwnedImpl buffer(json);
 
-  // Client-sent truncated data — rejected even in PASS_THROUGH mode.
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest,
-                             "reached end_stream or configured body size, don't get enough data.",
-                             _, _, _));
+  // Client-sent truncated data — allowed in PASS_THROUGH mode.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
 
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test that malformed JSON with length exactly equal to max_request_body_size and end_stream=true
-// is rejected in PASS_THROUGH mode, because the client terminated the stream and no further data
-// exists.
+// is allowed in PASS_THROUGH mode.
 TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughModeExactlyAtLimit) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
@@ -1104,15 +1790,10 @@ TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughModeExactlyAtLimit) {
 
   Buffer::OwnedImpl buffer(json);
 
-  // Even in PASS_THROUGH mode, it must be rejected because the total body length matches
-  // the limit, end_stream is true, and the JSON is genuinely malformed (not truncated by the
-  // limit).
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest,
-                             "reached end_stream or configured body size, don't get enough data.",
-                             _, _, _));
+  // Even in PASS_THROUGH mode, it must be allowed.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
 
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test that if a request in PASS_THROUGH mode exceeds the size limit before extracting any MCP
@@ -1144,7 +1825,7 @@ TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
   Buffer::OwnedImpl buffer(json);
 
   // In PASS_THROUGH mode, the request is allowed through.
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
 
   Protobuf::Struct captured_metadata;
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
@@ -1153,13 +1834,15 @@ TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
   // Verify that dynamic metadata still contains is_exceeding_limit, is_mcp_request, and status
-  EXPECT_THAT(captured_metadata.fields(),
-              AllOf(Contains(Pair(std::string(IS_EXCEEDING_LIMIT),
-                                  Property(&Protobuf::Value::bool_value, true))),
-                    Contains(Pair(std::string(IS_MCP_REQUEST),
-                                  Property(&Protobuf::Value::bool_value, false))),
-                    Contains(Pair(std::string(STATUS),
-                                  Property(&Protobuf::Value::string_value, "mcp_ok")))));
+  EXPECT_THAT(
+      captured_metadata.fields(),
+      AllOf(Contains(Pair(std::string(IS_EXCEEDING_LIMIT),
+                          Property(&Protobuf::Value::bool_value, true))),
+            Contains(
+                Pair(std::string(IS_MCP_REQUEST), Property(&Protobuf::Value::bool_value, false))),
+            Contains(Pair(std::string(STATUS), Property(&Protobuf::Value::string_value, "mcp_ok"))),
+            Contains(Pair("passthrough_reason",
+                          Property(&Protobuf::Value::string_value, "mcp_body_too_large")))));
 
   // Verify that FilterStateObject still exists and is populated with the exceeding limit state and
   // status
@@ -1173,9 +1856,46 @@ TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
 }
 
 // Test that if reject_duplicate_keys is explicitly set to true in the config,
-// the filter rejects requests containing duplicate JSON keys.
+// the filter still allows requests containing duplicate JSON keys in PASS_THROUGH mode.
 TEST_F(McpFilterTest, DuplicateKeyRejectionEnabledConfig) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_reject_duplicate_keys()->set_value(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send JSON body containing duplicate keys
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool1"}, "params": {"name": "tool2"}})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Expect request to be allowed in PASS_THROUGH mode
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "mcp_ok"))),
+                  Contains(Pair("passthrough_reason",
+                                Property(&Protobuf::Value::string_value, "mcp_duplicate_keys"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, true)))));
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(0u, config_->stats().duplicate_keys_rejected_.value());
+}
+
+// Test that duplicate keys are rejected in REJECT_NO_MCP mode if reject_duplicate_keys is true.
+TEST_F(McpFilterTest, DuplicateKeyRejectionEnabledConfigRejectMode) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.mutable_reject_duplicate_keys()->set_value(true);
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
@@ -1231,7 +1951,7 @@ TEST_F(McpFilterTest, DuplicateKeyAllowedByDefault) {
   Buffer::OwnedImpl buffer(json);
 
   // Expect request to be allowed through (no rejection calls)
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -1239,8 +1959,31 @@ TEST_F(McpFilterTest, DuplicateKeyAllowedByDefault) {
 }
 
 // Test that a complete MCP JSON object followed by trailing garbage in the same data chunk
-// is correctly rejected with BadRequest by the filter.
+// is allowed in PASS_THROUGH mode.
 TEST_F(McpFilterTest, TrailingGarbageRejectedInFilter) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator"}, "id": 1} trailing garbage)";
+  Buffer::OwnedImpl buffer(json);
+
+  // In PASS_THROUGH mode, it must be allowed.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(1u, config_->stats().invalid_json_.value());
+}
+
+// Test that a complete MCP JSON object followed by trailing garbage in the same data chunk
+// is correctly rejected with BadRequest in REJECT_NO_MCP mode.
+TEST_F(McpFilterTest, TrailingGarbageRejectedInFilterRejectMode) {
+  setupRejectMode();
+
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -1318,7 +2061,7 @@ TEST_F(McpFilterTest, PartialParsingSucceedsWithOptionalFieldConfig) {
   std::string json = prefix + padding + R"("}})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
@@ -1369,7 +2112,7 @@ TEST_F(McpFilterTest, OptionalMetaFieldExtractedWithPartialParsing) {
   std::string json = json_with_meta + padding + R"("}})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
@@ -1430,7 +2173,7 @@ TEST_F(McpFilterTest, ChunkByChunkParsingWithOptionalFields) {
   std::string chunk2 = R"("_meta": {"trace_id": "abc123"}}})";
   Buffer::OwnedImpl buffer2(chunk2);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
@@ -1734,7 +2477,7 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   Buffer::OwnedImpl buffer(json);
 
   // In PASS_THROUGH mode, request is allowed through (no rejection).
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   Protobuf::Struct captured_metadata;
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce(testing::SaveArg<1>(&captured_metadata));
@@ -1789,7 +2532,7 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughModeMultiChunk) {
   ASSERT_EQ(chunk2.size(), 20);
   Buffer::OwnedImpl buffer2(chunk2);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   Protobuf::Struct captured_metadata;
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce(testing::SaveArg<1>(&captured_metadata));
@@ -1988,7 +2731,7 @@ TEST_F(McpFilterTest, NonMcpJsonCompletesInPassThroughMode) {
   std::string json = R"({"foo": "bar", "nested": {"deep": 123}, "baz": true})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
 }
 
@@ -2005,7 +2748,7 @@ TEST_F(McpFilterTest, NonMcpJsonMultiChunkCompletion) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
 
   Buffer::OwnedImpl buffer2(R"("baz": 123})");
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, false));
 }
@@ -2028,6 +2771,67 @@ TEST_F(McpFilterTest, NonMcpJsonRejectedInRejectMode) {
               sendLocalReply(Http::Code::BadRequest,
                              "request must be a valid JSON-RPC 2.0 message for MCP", _, _, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
+}
+
+TEST_F(McpFilterTest, NewSpecDecodesBase64NameBeforeBodyValidation) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tools/call"},
+                                         // SPELLCHECKER(off)
+                                         {"mcp-name", "=?base64?SGVsbG8sIHdvcmxk?="}};
+  // SPELLCHECKER(on)
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"Hello, world","arguments":{}}})");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterTest, NewSpecRejectsInvalidBase64NameHeader) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tools/call"},
+                                         {"mcp-name", "=?base64?%%%?="}};
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     testing::AllOf(testing::HasSubstr("\"code\":-32020"),
+                                    testing::HasSubstr("Invalid Base64-encoded Mcp-Name header")),
+                     _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
 }
 
 // Test per-route max body size override with smaller limit
@@ -2156,9 +2960,10 @@ TEST_F(McpFilterTest, PerRouteRejectDuplicateKeys) {
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
-  // Per-route config overrides reject duplicate keys = true
+  // Per-route config overrides reject duplicate keys = true and traffic mode = REJECT_NO_MCP
   envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
   override_config.set_reject_duplicate_keys(true);
+  override_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   auto route_config = std::make_shared<McpOverrideConfig>(override_config);
 
   EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
