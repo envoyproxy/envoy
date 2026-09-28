@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <coroutine>
+#include <memory>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -186,6 +187,40 @@ private:
  * e.g. co_await sleep(500ms)
  * */
 inline TimerAwaitable sleep(std::chrono::milliseconds duration) { return TimerAwaitable(duration); }
+
+/**
+ * Suspends the awaiting coroutine and posts its resumption onto the coroutine's
+ * executor, yielding the current call stack back to the event loop.
+ */
+class YieldAwaitable : public LeafAwaitable<absl::Status> {
+public:
+  YieldAwaitable() = default;
+  ~YieldAwaitable() override { *self_ = nullptr; }
+
+protected:
+  void onStart() override {
+    context().executor().post([self = self_]() {
+      if (*self != nullptr) {
+        (*self)->complete(absl::OkStatus());
+      }
+    });
+  }
+
+  // `post()` cannot be recalled from the dispatcher queue; clearing `*self_` turns
+  // the queued callback into a no-op once the cancel path has resumed and destroyed
+  // this leaf.
+  void onCancel() override { *self_ = nullptr; }
+
+private:
+  std::shared_ptr<YieldAwaitable*> self_ = std::make_shared<YieldAwaitable*>(this);
+};
+
+/**
+ * Yields execution of the awaiting coroutine back to its executor's run loop.
+ *
+ * e.g. CO_RETURN_IF_ERROR(co_await yield());
+ */
+inline YieldAwaitable yield() { return YieldAwaitable(); }
 
 } // namespace Coroutine
 } // namespace Envoy

@@ -66,11 +66,13 @@ Network::FilterStatus DynamicModuleListenerFilter::onAccept(Network::ListenerFil
     return Network::FilterStatus::StopIteration;
   }
 
+  HookScope hook_scope(*this);
   auto status = config_->on_listener_filter_on_accept_(thisAsVoidPtr(), in_module_filter_);
   return toEnvoyFilterStatus(status);
 }
 
 Network::FilterStatus DynamicModuleListenerFilter::onData(Network::ListenerFilterBuffer& buffer) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
@@ -86,6 +88,7 @@ Network::FilterStatus DynamicModuleListenerFilter::onData(Network::ListenerFilte
 }
 
 void DynamicModuleListenerFilter::onClose() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return;
   }
@@ -101,6 +104,7 @@ size_t DynamicModuleListenerFilter::maxReadBytes() const {
 }
 
 void DynamicModuleListenerFilter::onScheduled(uint64_t event_id) {
+  HookScope hook_scope(*this);
   // By the time this event is invoked, the filter might be destroyed.
   if (in_module_filter_ && config_->on_listener_filter_scheduled_) {
     config_->on_listener_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
@@ -171,6 +175,7 @@ void DynamicModuleListenerFilter::HttpCalloutCallback::onSuccess(
           envoy_dynamic_module_type_envoy_buffer{static_cast<const char*>(slice.mem_), slice.len_});
     }
 
+    DynamicModuleListenerFilter::HookScope hook_scope(*filter);
     filter->config_->on_listener_filter_http_callout_done_(
         filter->thisAsVoidPtr(), filter->in_module_filter_, callout_id,
         envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
@@ -207,6 +212,7 @@ void DynamicModuleListenerFilter::HttpCalloutCallback::onFailure(
       break;
     }
 
+    DynamicModuleListenerFilter::HookScope hook_scope(*filter);
     filter->config_->on_listener_filter_http_callout_done_(filter->thisAsVoidPtr(),
                                                            filter->in_module_filter_, callout_id,
                                                            result, nullptr, 0, nullptr, 0);

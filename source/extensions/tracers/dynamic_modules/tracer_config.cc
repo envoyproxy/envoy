@@ -148,10 +148,7 @@ void DynamicModuleSpan::log(SystemTime timestamp, const std::string& event) {
   config_->on_span_log_(in_module_span_, timestamp_ns, event_buf);
 }
 
-bool DynamicModuleSpan::exportedSpan() const {
-  // TODO(jkoch): extend module ABI with hook as an optimization
-  return true;
-}
+bool DynamicModuleSpan::exportedSpan() const { return sampled_; }
 
 void DynamicModuleSpan::finishSpan() { config_->on_span_finish_(in_module_span_); }
 
@@ -178,6 +175,7 @@ Tracing::SpanPtr DynamicModuleSpan::spawnChild(const Tracing::Config&, const std
 }
 
 void DynamicModuleSpan::setSampled(bool sampled) {
+  sampled_ = sampled;
   config_->on_span_set_sampled_(in_module_span_, sampled);
 }
 

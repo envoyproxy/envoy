@@ -1104,6 +1104,20 @@ func (mr *MockHttpFilterHandleMockRecorder) GetSocketOptionInt(level, name, stat
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSocketOptionInt", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetSocketOptionInt), level, name, state, direction)
 }
 
+// GetTimingInfo mocks base method.
+func (m *MockHttpFilterHandle) GetTimingInfo() shared.TimingInfo {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTimingInfo")
+	ret0, _ := ret[0].(shared.TimingInfo)
+	return ret0
+}
+
+// GetTimingInfo indicates an expected call of GetTimingInfo.
+func (mr *MockHttpFilterHandleMockRecorder) GetTimingInfo() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTimingInfo", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetTimingInfo))
+}
+
 // GetWorkerIndex mocks base method.
 func (m *MockHttpFilterHandle) GetWorkerIndex() uint32 {
 	m.ctrl.T.Helper()

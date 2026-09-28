@@ -26,7 +26,7 @@ pub enum ResourcePriority {
 }
 
 impl ResourcePriority {
-  fn to_abi(self) -> abi::envoy_dynamic_module_type_resource_priority {
+  pub(crate) fn to_abi(self) -> abi::envoy_dynamic_module_type_resource_priority {
     match self {
       Self::Default => abi::envoy_dynamic_module_type_resource_priority::Default,
       Self::High => abi::envoy_dynamic_module_type_resource_priority::High,

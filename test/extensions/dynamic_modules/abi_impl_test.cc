@@ -1064,6 +1064,8 @@ WEAK_STUB(ListenerFilterConfigSchedulerCommit,
           envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(nullptr, 0))
 WEAK_STUB(AccessLoggerGetBytesInfo,
           envoy_dynamic_module_callback_access_logger_get_bytes_info(nullptr, nullptr))
+WEAK_STUB(AccessLoggerGetDownstreamWireBytes,
+          envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(nullptr, nullptr))
 WEAK_STUB(AccessLoggerGetTimingInfo,
           envoy_dynamic_module_callback_access_logger_get_timing_info(nullptr, nullptr))
 WEAK_STUB(ListenerFilterCloseSocket,
@@ -1818,6 +1820,16 @@ WEAK_STUB(StatSinkSnapshotGetTextReadout,
 WEAK_STUB(StatSinkSnapshotGetCounterTagExtractedName,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
               nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+              nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(nullptr, 0,
+                                                                                   nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(nullptr, 0, 0, nullptr,
+                                                                             0, nullptr, nullptr, 0,
+                                                                             nullptr))
 WEAK_STUB(StatSinkSnapshotGetCounterTagCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(nullptr, 0,
                                                                                  nullptr))
@@ -2018,6 +2030,7 @@ WEAK_STUB(HttpFilterGetAttributeInt,
 WEAK_STUB(HttpFilterGetAttributeBool,
           envoy_dynamic_module_callback_http_filter_get_attribute_bool(
               nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(HttpGetTimingInfo, envoy_dynamic_module_callback_http_get_timing_info(nullptr, nullptr))
 WEAK_STUB(NetworkFilterGetAttributeString,
           envoy_dynamic_module_callback_network_filter_get_attribute_string(
               nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))

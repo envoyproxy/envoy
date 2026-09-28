@@ -534,6 +534,78 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetBytesInfoWithUpstreamBytesMeter) {
   EXPECT_EQ(456, bytes.wire_bytes_sent);
 }
 
+TEST_F(DynamicModuleAccessLogAbiTest, GetDownstreamWireBytesWithoutMeter) {
+  auto upstream = std::make_shared<StreamInfo::BytesMeter>();
+  upstream->addWireBytesReceived(123);
+  upstream->addWireBytesSent(456);
+  stream_info_.setUpstreamBytesMeter(upstream);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_downstream_wire_bytes bytes{123, 456};
+  envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(env_ptr, &bytes);
+
+  EXPECT_EQ(0, bytes.bytes_received);
+  EXPECT_EQ(0, bytes.bytes_sent);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDownstreamWireBytesWithoutUpstream) {
+  auto meter = std::make_shared<StreamInfo::BytesMeter>();
+  meter->addWireBytesReceived(129);
+  meter->addWireBytesSent(476);
+  stream_info_.setDownstreamBytesMeter(meter);
+  stream_info_.setUpstreamBytesMeter(nullptr);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_downstream_wire_bytes bytes;
+  envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(env_ptr, &bytes);
+
+  EXPECT_EQ(129, bytes.bytes_received);
+  EXPECT_EQ(476, bytes.bytes_sent);
+
+  envoy_dynamic_module_type_bytes_info upstream_bytes;
+  envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &upstream_bytes);
+  EXPECT_EQ(0, upstream_bytes.wire_bytes_received);
+  EXPECT_EQ(0, upstream_bytes.wire_bytes_sent);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDownstreamWireBytesIndependentOfUpstreamAndBodyBytes) {
+  stream_info_.bytes_received_ = 11;
+  stream_info_.bytes_sent_ = 22;
+  auto downstream = std::make_shared<StreamInfo::BytesMeter>();
+  downstream->addWireBytesReceived(123);
+  downstream->addWireBytesSent(456);
+  stream_info_.setDownstreamBytesMeter(downstream);
+  auto upstream = std::make_shared<StreamInfo::BytesMeter>();
+  upstream->addWireBytesReceived(789);
+  upstream->addWireBytesSent(1024);
+  stream_info_.setUpstreamBytesMeter(upstream);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_downstream_wire_bytes bytes;
+  envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(env_ptr, &bytes);
+  EXPECT_EQ(123, bytes.bytes_received);
+  EXPECT_EQ(456, bytes.bytes_sent);
+
+  envoy_dynamic_module_type_bytes_info existing_bytes;
+  envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &existing_bytes);
+  EXPECT_EQ(11, existing_bytes.bytes_received);
+  EXPECT_EQ(22, existing_bytes.bytes_sent);
+  EXPECT_EQ(789, existing_bytes.wire_bytes_received);
+  EXPECT_EQ(1024, existing_bytes.wire_bytes_sent);
+
+  downstream->addWireBytesReceived(10);
+  downstream->addWireBytesSent(20);
+  envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(env_ptr, &bytes);
+  EXPECT_EQ(133, bytes.bytes_received);
+  EXPECT_EQ(476, bytes.bytes_sent);
+}
+
 // =============================================================================
 // Upstream Info and Transport Failure Tests
 // =============================================================================

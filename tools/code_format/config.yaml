@@ -37,6 +37,7 @@ paths:
   - bazel/external/cargo/remote/
   - bazel/external/http_parser/
   - bazel/rbe/toolchains/configs/
+  - bazel/tests/external/
   - bazel-
   - compat/openssl/
   - build
@@ -175,6 +176,7 @@ paths:
     - source/extensions/filters/udp
     - source/extensions/filters/listener
     - source/extensions/formatter
+    - source/extensions/geoip_providers/maxmind/config.cc
     - source/extensions/geoip_providers/maxmind/geoip_provider.cc
     - source/extensions/grpc_credentials
     - source/extensions/health_check/event_sinks/file/file_sink_impl.h

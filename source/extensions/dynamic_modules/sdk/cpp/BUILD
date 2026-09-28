@@ -24,6 +24,20 @@ cc_library(
     alwayslink = True,
 )
 
+# Shared helpers for the ABI export implementations, including the exception barrier. Header only so
+# it can be linked into unit tests without pulling in the ABI exports.
+cc_library(
+    name = "sdk_internal_common",
+    hdrs = [
+        "sdk_internal_common.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":sdk",
+        "//source/extensions/dynamic_modules/abi",
+    ],
+)
+
 # SDK implementation and underlying ABI selection.
 # Link this library and the :sdk to final output binaries.
 # The example practice is to link against :sdk only in plugins,
@@ -39,12 +53,10 @@ cc_library(
         "sdk_internal_listener.cc",
         "sdk_internal_network.cc",
     ],
-    hdrs = [
-        "sdk_internal_common.h",
-    ],
     visibility = ["//visibility:public"],
     deps = [
         ":sdk",
+        ":sdk_internal_common",
         "//source/extensions/dynamic_modules/abi",
     ],
     alwayslink = True,

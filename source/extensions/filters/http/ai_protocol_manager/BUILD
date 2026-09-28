@@ -15,7 +15,9 @@ envoy_cc_library(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/common:pure_lib",
+        "//envoy/config:typed_config_interface",
         "//envoy/event:dispatcher_interface",
+        "//envoy/server:factory_context_interface",
         "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
@@ -100,7 +102,7 @@ envoy_cc_library(
     name = "token_usage_lib",
     srcs = ["token_usage.cc"],
     hdrs = [
-        "api_protocol_adapter.h",
+        "llm_protocol_adapter.h",
         "token_usage.h",
     ],
     deps = [
@@ -113,8 +115,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "api_protocol_conversion_lib",
-    hdrs = ["api_protocol_conversion.h"],
+    name = "llm_protocol_conversion_lib",
+    hdrs = ["llm_protocol_conversion.h"],
     deps = [
         ":token_usage_lib",
         "//source/common/common:assert_lib",
@@ -123,14 +125,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "api_protocol_adapters_lib",
-    srcs = ["api_protocol_adapters.cc"],
+    name = "llm_protocol_adapters_lib",
+    srcs = ["llm_protocol_adapters.cc"],
     deps = [
         ":json_readers_lib",
         ":schema_lib",
         ":token_usage_lib",
         "//source/common/common:macros",
         "//source/extensions/filters/http/ai_protocol_manager/schema:anthropic_messages_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/schema:gemini_generate_content_lib",
         "//source/extensions/filters/http/ai_protocol_manager/schema:openai_chat_completions_lib",
         "@abseil-cpp//absl/strings",
     ],
@@ -149,8 +152,8 @@ envoy_cc_library(
     srcs = ["response_handler.cc"],
     hdrs = ["response_handler.h"],
     deps = [
-        ":api_protocol_adapters_lib",
         ":json_with_ext_buf_parser_lib",
+        ":llm_protocol_adapters_lib",
         ":stats_lib",
         ":token_usage_lib",
         "//envoy/buffer:buffer_interface",
@@ -178,11 +181,95 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "transcoding_engine_lib",
+    srcs = ["transcoding_engine.cc"],
+    hdrs = ["transcoding_engine.h"],
+    deps = [
+        ":json_with_ext_buf_lib",
+        ":llm_protocol_adapters_lib",
+        ":schema_lib",
+        ":token_usage_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
     name = "ai_request_lib",
     hdrs = ["ai_request.h"],
     deps = [
         ":json_with_ext_buf_lib",
         "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
+    name = "ai_response_lib",
+    hdrs = ["ai_response.h"],
+    deps = [
+        ":flattening_json_codec_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "task_group_lib",
+    hdrs = ["task_group.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_pipeline_lib",
+    hdrs = ["filter_pipeline.h"],
+    deps = [
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "response_filter_manager_lib",
+    srcs = ["response_filter_manager.cc"],
+    hdrs = ["response_filter_manager.h"],
+    deps = [
+        ":ai_filter_lib",
+        ":ai_response_lib",
+        ":buffer_manager_lib",
+        ":external_buffer_interface",
+        ":filter_pipeline_lib",
+        ":flattening_json_codec_lib",
+        ":task_group_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_codec_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 
@@ -195,6 +282,28 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/coroutine:leaf_awaitable_lib",
         "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
+    name = "flattening_json_codec_lib",
+    srcs = ["flattening_json_codec.cc"],
+    hdrs = ["flattening_json_codec.h"],
+    deps = [
+        ":buffer_manager_lib",
+        ":replay_awaitable_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+        "@abseil-cpp//absl/types:variant",
+        "@nlohmann_json//:json",
     ],
 )
 
@@ -225,6 +334,7 @@ envoy_cc_library(
     hdrs = ["ai_filter.h"],
     deps = [
         ":ai_request_lib",
+        ":ai_response_lib",
         ":token_usage_lib",
         "//envoy/common:pure_lib",
         "//envoy/config:typed_config_interface",
@@ -243,29 +353,50 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filter_manager_lib",
-    srcs = ["filter_manager.cc"],
-    hdrs = ["filter_manager.h"],
+    name = "request_filter_manager_lib",
+    srcs = ["request_filter_manager.cc"],
+    hdrs = ["request_filter_manager.h"],
     deps = [
         ":ai_filter_lib",
         ":ai_request_lib",
         ":buffer_manager_lib",
+        ":filter_pipeline_lib",
         ":json_with_ext_buf_lib",
+        ":replay_awaitable_lib",
         ":serializer_lib",
+        ":task_group_lib",
+        "//envoy/event:dispatcher_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
-        "//source/common/coroutine:async_queue_lib",
-        "//source/common/coroutine:dispatcher_executor_lib",
-        "//source/common/coroutine:launch_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_manager_lib",
+    srcs = ["filter_manager.cc"],
+    hdrs = ["filter_manager.h"],
+    deps = [
+        ":ai_filter_lib",
+        ":buffer_manager_lib",
+        ":external_buffer_interface",
+        ":json_with_ext_buf_lib",
+        ":request_filter_manager_lib",
+        ":response_filter_manager_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
     ],
 )
 
@@ -275,13 +406,13 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":ai_filter_lib",
-        ":api_protocol_conversion_lib",
         ":buffer_manager_lib",
         ":external_buffer_interface",
         ":filter_chain_bridge_lib",
         ":filter_manager_lib",
         ":json_with_ext_buf_lib",
         ":json_with_ext_buf_parser_lib",
+        ":llm_protocol_conversion_lib",
         ":response_handler_lib",
         ":schema_lib",
         ":serializer_lib",

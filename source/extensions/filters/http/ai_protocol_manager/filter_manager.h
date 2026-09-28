@@ -3,15 +3,17 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/coroutine/dispatcher_executor.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
-#include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
+#include "source/extensions/filters/http/ai_protocol_manager/request_filter_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/response_filter_manager.h"
 
 #include "absl/functional/any_invocable.h"
 #include "absl/status/status.h"
@@ -21,47 +23,50 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
+// Single per-stream manager that owns all AI filter instances for the stream and orchestrates
+// their execution across both request (decode) and response (encode) paths.
+//
+// Request and response pipelines are separated into dedicated classes (`RequestFilterManager` and
+// `ResponseFilterManager`) owned by this class. Filters execute in forward order (0..N-1) on the
+// request path and in reverse order (N-1..0) on the response path, sharing the same filter
+// instances across both directions.
 class FilterManager : public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
-  using LocalReplyFn = absl::AnyInvocable<void(Http::Code code, std::string details)>;
+  using LocalReplyFn = RequestFilterManager::LocalReplyFn;
+  using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
 
-  FilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
-                BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
-                StreamInfo::StreamInfo& stream_info,
-                Http::RequestHeaderMap* request_headers = nullptr,
-                LocalReplyFn local_reply_fn = nullptr);
+  explicit FilterManager(std::vector<AiFilterSharedPtr> filters);
   ~FilterManager();
 
-  // Launches the filter chain. Invokes `on_complete` with the final completion status.
-  //
-  // Contract between caller (`AiProtocolManagerFilter`) and `FilterManager`:
-  // 1. Success: when the filter chain completes and the payload is serialized and replayed,
-  //    `on_complete` is invoked with `absl::OkStatus()`.
-  // 2. Filter-initiated local reply: when an `AiFilter` invokes `LocalReplier`, all coroutines
-  //    are cancelled, `local_reply_fn` is called with the HTTP code and details string, and
-  //    `on_complete` is invoked with `absl::CancelledError`.
-  // 3. FilterManager internal error: when an `AiFilter` returns a non-OK status or an internal
-  //    error occurs, all coroutines are cancelled, `local_reply_fn` is called with a 502 Bad
-  //    Gateway local reply, and `on_complete` is invoked with that error status.
-  // 4. Cancellation: when `cancel()` is called, all coroutines are cancelled and neither
-  //    `local_reply_fn` nor `on_complete` is invoked.
-  void start(absl::AnyInvocable<void(absl::Status)> on_complete);
+  // Starts the request filter chain in forward filter order (0..N-1). Unless `always_serialize`,
+  // the received body is forwarded instead of the re-serialized document.
+  void startRequest(JsonWithExtBuf payload_index, BufferManager* buffer_manager,
+                    Event::Dispatcher& dispatcher, StreamInfo::StreamInfo& stream_info,
+                    OnCompleteFn on_complete, Http::RequestHeaderMap* request_headers = nullptr,
+                    LocalReplyFn local_reply_fn = nullptr, bool always_serialize = true);
 
-  // Cancels all in-flight coroutines and cleans up state on stream reset.
-  // It is safe to destruct the FilterManager immediately after calling cancel().
+  // Starts the SSE response filter chain in reverse filter order (N-1..0).
+  void startSseResponse(ExternalBufferFactory& buffer_factory, FilterChainBridge& bridge,
+                        BufferManager& out_buffer_manager, OnCompleteFn on_complete,
+                        ResponseFilterManager::Config config = {});
+
+  // Starts the unary JSON response filter chain in reverse filter order (N-1..0).
+  void startUnaryResponse(ExternalBufferFactory& buffer_factory, FilterChainBridge& bridge,
+                          BufferManager& out_buffer_manager, OnCompleteFn on_complete);
+
+  // Feeds response body bytes to the active response filter manager.
+  void onResponseData(Buffer::Instance& data, bool end_stream);
+
+  // Cancels all in-flight request and response coroutines on stream reset or teardown.
   void cancel();
 
 private:
-  struct AsyncState;
-
-  void launchFilters();
-  void launchSink();
-
   std::vector<AiFilterSharedPtr> filters_;
-  JsonWithExtBuf payload_index_;
-  std::shared_ptr<Coroutine::DispatcherExecutor> executor_;
-  std::shared_ptr<AsyncState> async_state_;
+  RequestFilterManagerPtr request_manager_;
+  ResponseFilterManagerPtr response_manager_;
 };
+
+using FilterManagerPtr = std::unique_ptr<FilterManager>;
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters
