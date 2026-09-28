@@ -157,13 +157,12 @@ pub trait MatcherDataInput: Sized + Send + Sync + 'static {
 #[macro_export]
 macro_rules! declare_matcher_data_input {
   ($config_type:ty) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_matcher_data_input_config_new(
-      _config_envoy_ptr: *mut ::std::ffi::c_void,
-      name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
-      config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
-    ) -> *const ::std::ffi::c_void {
-      ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_matcher_data_input_config_new(
+        _config_envoy_ptr: *mut ::std::ffi::c_void,
+        name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
+        config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
+      ) -> *const ::std::ffi::c_void {
         // Safe under `(nullptr, 0)` via `ffi_helpers`. The data input name is used as a registry
         // lookup key by user `MatcherDataInput::new` implementations, so invalid UTF-8 must map to
         // the empty string rather than being rewritten with `U+FFFD` substitutions. The latter
@@ -183,37 +182,25 @@ macro_rules! declare_matcher_data_input {
           Ok(c) => Box::into_raw(Box::new(c)) as *const ::std::ffi::c_void,
           Err(_) => ::std::ptr::null(),
         }
-      }))
-      .unwrap_or_else(|panic| {
-        $crate::log_ffi_panic(
-          "envoy_dynamic_module_on_matcher_data_input_config_new",
-          panic,
-        );
-        ::std::ptr::null()
-      })
+      }
+      on_panic = ::std::ptr::null()
     }
 
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_matcher_data_input_config_destroy(
-      config_ptr: *const ::std::ffi::c_void,
-    ) {
-      let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| unsafe {
-        drop(Box::from_raw(config_ptr as *mut $config_type));
-      }))
-      .map_err(|panic| {
-        $crate::log_ffi_panic(
-          "envoy_dynamic_module_on_matcher_data_input_config_destroy",
-          panic,
-        );
-      });
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_matcher_data_input_config_destroy(
+        config_ptr: *const ::std::ffi::c_void,
+      ) {
+        unsafe {
+          drop(Box::from_raw(config_ptr as *mut $config_type));
+        }
+      }
     }
 
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_matcher_data_input_get(
-      config_ptr: *const ::std::ffi::c_void,
-      data_input_envoy_ptr: *mut ::std::ffi::c_void,
-    ) {
-      let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_matcher_data_input_get(
+        config_ptr: *const ::std::ffi::c_void,
+        data_input_envoy_ptr: *mut ::std::ffi::c_void,
+      ) {
         let config = unsafe { &*(config_ptr as *const $config_type) };
         let ctx = $crate::matcher_data_input::DataInputContext::new(data_input_envoy_ptr);
         // A panic or a `None` result leaves the value unset, so the input has no value.
@@ -222,10 +209,7 @@ macro_rules! declare_matcher_data_input {
         {
           ctx.set_result(&value);
         }
-      }))
-      .map_err(|panic| {
-        $crate::log_ffi_panic("envoy_dynamic_module_on_matcher_data_input_get", panic);
-      });
+      }
     }
   };
 }

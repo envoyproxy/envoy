@@ -14,6 +14,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/router.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stream_info/filter_state_impl.h"
 
@@ -51,9 +52,13 @@ class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
       : http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
-        client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, cm_,
-                factory_context_, Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()},
-                http_context_, router_context_) {
+        router_config_(std::make_shared<Router::FilterConfig>(
+            factory_context_, http_context_.asyncClientStatPrefix(), *stats_store_.rootScope(), cm_,
+            factory_context_.runtime(), factory_context_.api().randomGenerator(),
+            Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, true, false, false,
+            false, false, false, false, Protobuf::RepeatedPtrField<std::string>{},
+            dispatcher_.timeSource(), http_context_, router_context_)),
+        client_(cm_.thread_local_cluster_.cluster_.info_, dispatcher_, router_config_) {
     message_->headers().setMethod("GET");
     message_->headers().setHost("host");
     message_->headers().setPath("/");
@@ -99,6 +104,7 @@ public:
   NiceMock<Event::MockDispatcher>& dispatcher_{factory_context_.dispatcher_};
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
+  Router::FilterConfigSharedPtr router_config_;
   AsyncClientImpl client_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };

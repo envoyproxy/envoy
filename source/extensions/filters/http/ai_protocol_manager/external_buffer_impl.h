@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
@@ -26,7 +27,7 @@ public:
   ~InMemoryExternalBuffer() override;
 
   // ExternalBuffer
-  void write(Buffer::InstancePtr data, WriteCallback cb) override;
+  void write(Buffer::InstancePtr data, bool end_stream, WriteCallback cb) override;
   void read(uint64_t offset, uint64_t length, ReadCallback cb) override;
   uint64_t length() const override { return data_.length(); }
 
@@ -44,8 +45,13 @@ private:
 // streams and workers.
 class InMemoryExternalBufferFactory : public ExternalBufferFactory {
 public:
+  using ExternalBufferFactory::createBuffer;
   ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
     return std::make_unique<InMemoryExternalBuffer>(dispatcher);
+  }
+  ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher,
+                                 std::optional<uint64_t> /*content_length*/) override {
+    return createBuffer(dispatcher);
   }
 };
 

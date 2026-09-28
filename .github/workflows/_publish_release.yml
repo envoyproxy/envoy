@@ -58,22 +58,23 @@ jobs:
         --//distribution:arm64-packages=//distribution:custom/arm64/packages.arm64.tar.gz
         --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst
         --//distribution:arm64-release=//distribution:custom/arm64/bin/release.tar.zst
+        ${{ !inputs.trusted && '--//distribution:signing-key=snakeoil' || '' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       downloads: |
         packages.arm64: container/envoy/arm64/
         packages.x64: container/envoy/x64/
         release.arm64: container/envoy/arm64/bin/
         release.x64: container/envoy/x64/bin/
-      import-gpg: true
+      signing: true
       request: ${{ inputs.request }}
       source: |
         export NO_BUILD_SETUP=1
       trusted: ${{ inputs.trusted }}
-      upload-name: release.signed
-      upload-path: container/envoy/release.signed.tar.zst
+      uploads: |
+        release.signed: container/envoy/release.signed.tar.zst
       steps-pre: |
         - run: |
-            mkdir distribution/custom
+            mkdir -p distribution/custom
             cp -a %{{ runner.temp }}/container/envoy/x64 %{{ runner.temp }}/container/envoy/arm64 distribution/custom
           shell: bash
 
@@ -113,7 +114,6 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       target: ${{ matrix.target }}
-      bazel-cache: true
       rbe: false
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       downloads: |
@@ -142,12 +142,12 @@ jobs:
     needs:
     - release
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/appauth@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/dispatch@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/dispatch@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}

@@ -59,7 +59,7 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
     // update that is still warming up is deliberately left alone.
     return absl::OkStatus();
   }
-  auto new_route_config = std::make_unique<envoy::config::route::v3::RouteConfiguration>();
+  ArenaWrappedProto<envoy::config::route::v3::RouteConfiguration> new_route_config;
   new_route_config->CheckTypeAndMergeFrom(rc);
   const uint64_t new_vhds_config_hash =
       new_route_config->has_vhds() ? MessageUtil::hash(new_route_config->vhds()) : 0ul;
@@ -175,8 +175,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     return false;
   }
 
-  auto route_config_after_this_update =
-      std::make_unique<envoy::config::route::v3::RouteConfiguration>();
+  ArenaWrappedProto<envoy::config::route::v3::RouteConfiguration> route_config_after_this_update;
   // Merge the latest RouteConfiguration with the updated VHDS. That is the one an update that is
   // still warming up built, if any, so that this update supersedes it instead of losing it.
   route_config_after_this_update->CheckTypeAndMergeFrom(latestProtobufConfiguration());
@@ -223,7 +222,7 @@ bool RouteConfigUpdateReceiverImpl::updateVhosts(VirtualHostMap& vhosts,
 absl::StatusOr<VhdsSubscriptionPtr> RouteConfigUpdateReceiverImpl::createVhdsSubscription(
     const envoy::config::route::v3::RouteConfiguration& route_config, Init::Manager& init_manager) {
   return VhdsSubscription::createVhdsSubscription(route_config, factory_context_, stat_prefix_,
-                                                  *this, init_manager);
+                                                  from_rds_, *this, init_manager);
 }
 
 } // namespace Router

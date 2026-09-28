@@ -15,7 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.rate_limit_descriptors.jwt_claim]
 
 // The following descriptor entry is appended with a value extracted from a
-// named claim in a JWT found in an HTTP request header.
+// named claim in a JWT found in an HTTP request header or cookie.
 //
 // .. code-block:: cpp
 //
@@ -50,20 +50,31 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    or :ref:`metadata
 //    <envoy_v3_api_field_config.route.v3.RateLimit.Action.metadata>`
 //    descriptor action instead of this extension.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message Descriptor {
   // The key to use in the descriptor entry.
   string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
 
   // The name of the HTTP header containing the JWT, e.g. "authorization".
+  //
+  // Exactly one of ``header_name`` or ``cookie`` must be set.
   string header_name = 2
-      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // The name of the cookie containing the JWT, e.g. "auth_token". The cookie
+  // is looked up in the request's ``Cookie`` header.
+  //
+  // Exactly one of ``header_name`` or ``cookie`` must be set.
+  string cookie = 7 [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The value prefix to strip before parsing the remainder as a JWT, e.g.
   // "Bearer " (with a trailing space) for an "authorization" header
-  // formatted as "Authorization: Bearer <token>". If the header value does
-  // not start with this prefix, the descriptor is not populated (falls
-  // through to ``default_value``/``skip_if_absent`` below).
+  // formatted as "Authorization: Bearer <token>". If the header or cookie
+  // value does not start with this prefix, the descriptor is not populated
+  // (falls through to ``default_value``/``skip_if_absent`` below).
+  //
+  // This is typically only needed for ``header_name``; cookie values do not
+  // usually carry a prefix.
   string value_prefix = 3
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
@@ -76,13 +87,13 @@ message Descriptor {
   // claim populates the descriptor with an empty value.
   string claim_name = 4 [(validate.rules).string = {min_len: 1}];
 
-  // The default value to use if the header is absent, is not a
+  // The default value to use if the header or cookie is absent, is not a
   // structurally valid JWT, or the named claim is absent/non-string.
   string default_value = 5;
 
   // If true, Envoy skips this descriptor entry (rather than aborting the
-  // whole descriptor for this action list) when the header is absent, the
-  // JWT cannot be parsed, or the named claim is absent/non-string, and
+  // whole descriptor for this action list) when the header or cookie is
+  // absent, the JWT cannot be parsed, or the named claim is absent/non-string, and
   // ``default_value`` is not specified. An empty string-valued claim is
   // present and produces an entry with an empty value regardless of this
   // setting.

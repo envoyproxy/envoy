@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/router:context_lib",
+        "//source/common/router:router_lib",
         "//source/extensions/upstreams/http/generic:config",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -58,6 +59,16 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:character_set_validation_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "codec_helper_test",
+    srcs = ["codec_helper_test.cc"],
+    deps = [
+        "//source/common/http:codec_helper_lib",
+        "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -145,6 +156,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -178,11 +190,15 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:empty_string",
+        "//source/common/config:well_known_names",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stats:tag_producer_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 
@@ -389,8 +405,10 @@ envoy_cc_test(
     deps = [
         "//source/common/http:date_provider_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 
@@ -483,8 +501,10 @@ envoy_cc_test(
     srcs = ["user_agent_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/config:well_known_names",
         "//source/common/http:header_map_lib",
         "//source/common/http:user_agent_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
@@ -510,11 +530,23 @@ envoy_cc_fuzz_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "header_formatter_test_lib",
+    hdrs = ["header_formatter_test_utils.h"],
+    deps = [
+        "//envoy/http:header_formatter_interface",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        ":header_formatter_test_lib",
+        "//envoy/http:header_formatter_interface",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
@@ -522,6 +554,8 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

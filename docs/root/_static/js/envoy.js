@@ -13,15 +13,15 @@
 import * as code from './envoy/code.js';
 import * as lists from './envoy/lists.js';
 import * as nav from './envoy/nav.js';
+import * as permalinks from './envoy/permalinks.js';
 import * as proto from './envoy/proto.js';
 import * as search from './envoy/search.js';
 import * as theme from './envoy/theme.js';
 import * as toc from './envoy/toc.js';
-import * as versions from './envoy/versions.js';
 
 // proto runs after toc: the outline links are rewritten there, and the kind
 // dots are prepended to whatever is left.
-const MODULES = [theme, nav, versions, code, lists, toc, proto, search];
+const MODULES = [theme, nav, code, lists, toc, proto, permalinks, search];
 
 function start() {
   MODULES.forEach((module) => {

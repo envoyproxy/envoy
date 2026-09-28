@@ -67,6 +67,10 @@ x-envoy-build-base: &envoy-build-base
   - ENVOY_PUBLISH_DRY_RUN
   - ENVOY_TARBALL_DIR
 
+  # Release signing
+  - ENVOY_SIGNING_KEY_PATH
+  - ENVOY_SIGNING_PASSPHRASE_PATH
+
   - MOBILE_DOCS_CHECKOUT_DIR
   - SYSTEM_STAGEDISPLAYNAME
   - SYSTEM_JOBDISPLAYNAME
@@ -101,14 +105,6 @@ services:
     - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build${MOUNT_ACCESS_MODE:-}
     - ${SOURCE_DIR:-..}:/source${MOUNT_ACCESS_MODE:-}
     - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}${MOUNT_ACCESS_MODE:-}
-
-  envoy-build-gpg:
-    <<: *envoy-build-base
-    volumes:
-    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
-    - ${SOURCE_DIR:-..}:/source
-    - ${ENVOY_GPG_DIR-${HOME}/.gnupg}:/build/.gnupg
-    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
 
   envoy-build-dind:
     privileged: true

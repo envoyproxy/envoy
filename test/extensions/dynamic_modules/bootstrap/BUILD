@@ -101,6 +101,7 @@ envoy_cc_dyn_module_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:bootstrap_extension_new_null",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_config_new",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
     ],
@@ -128,6 +129,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_http_combined_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_init_target_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_iterate_panic_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_listener_lifecycle_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_shared_data_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",

@@ -124,10 +124,14 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.gcp_authn"],
     deps = [
         "//envoy/api:api_interface",
+        "//source/common/common:base64_lib",
+        "//source/common/common:hex_lib",
         "//source/extensions/filters/http/gcp_authn:crypto_utils",
+        "//test/config/integration/certs:hashes",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )

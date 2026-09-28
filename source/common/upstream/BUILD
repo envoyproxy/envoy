@@ -116,6 +116,7 @@ envoy_cc_library(
         "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/router:context_lib",
+        "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/tcp:async_tcp_client_lib",
@@ -219,6 +220,18 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "multi_health_checker_lib",
+    srcs = ["multi_health_checker.cc"],
+    hdrs = ["multi_health_checker.h"],
+    deps = [
+        ":health_checker_lib",
+        "//envoy/upstream:health_checker_interface",
+        "//source/common/common:callback_impl_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -523,6 +536,7 @@ envoy_cc_library(
     deps = [
         ":cluster_factory_includes",
         ":health_checker_lib",
+        ":multi_health_checker_lib",
         ":upstream_includes",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",

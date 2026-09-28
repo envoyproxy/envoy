@@ -2,6 +2,8 @@
 
 // This file provides host-side implementations for ABI callbacks specific to bootstrap extensions.
 
+#include <vector>
+
 #include "envoy/server/admin.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -16,6 +18,26 @@ using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtens
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfig;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfigScheduler;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionTimer;
+using Envoy::Extensions::DynamicModules::MetricRegistry;
+
+namespace {
+
+// Serializes a metric name into the reused buffer and returns a view over it. This avoids the
+// std::string that Metric::name() allocates on every call. The view is valid until the buffer is
+// next written on the same thread.
+absl::string_view serializeMetricName(const Envoy::Stats::Metric& metric,
+                                      std::vector<char>& buffer) {
+  const Envoy::Stats::SymbolTable& symbol_table = metric.constSymbolTable();
+  const Envoy::Stats::StatName stat_name = metric.statName();
+  size_t required = symbol_table.serializeToBuffer(stat_name, buffer.data(), buffer.size());
+  if (required > buffer.size()) {
+    buffer.resize(required);
+    symbol_table.serializeToBuffer(stat_name, buffer.data(), buffer.size());
+  }
+  return absl::string_view(buffer.data(), required);
+}
+
+} // namespace
 
 extern "C" {
 
@@ -94,10 +116,11 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
   const absl::string_view name_view(name.ptr, name.length);
 
   // Use iterate() instead of forEachCounter() to enable early exit once the stat is found.
+  thread_local std::vector<char> name_buffer;
   bool found = false;
   Envoy::Stats::IterateFn<Envoy::Stats::Counter> counter_callback =
       [&name_view, &found, value_ptr](const Envoy::Stats::CounterSharedPtr& counter) -> bool {
-    if (counter->name() == name_view) {
+    if (serializeMetricName(*counter, name_buffer) == name_view) {
       *value_ptr = counter->value();
       found = true;
       return false; // Stop iteration.
@@ -116,10 +139,11 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
   const absl::string_view name_view(name.ptr, name.length);
 
   // Use iterate() instead of forEachGauge() to enable early exit once the stat is found.
+  thread_local std::vector<char> name_buffer;
   bool found = false;
   Envoy::Stats::IterateFn<Envoy::Stats::Gauge> gauge_callback =
       [&name_view, &found, value_ptr](const Envoy::Stats::GaugeSharedPtr& gauge) -> bool {
-    if (gauge->name() == name_view) {
+    if (serializeMetricName(*gauge, name_buffer) == name_view) {
       *value_ptr = gauge->value();
       found = true;
       return false; // Stop iteration.
@@ -138,11 +162,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
   Envoy::Stats::Store& stats_store = extension->statsStore();
   const absl::string_view name_view(name.ptr, name.length);
 
+  thread_local std::vector<char> name_buffer;
   bool found = false;
   stats_store.forEachHistogram(
       [](size_t) {},
       [&name_view, &found, sample_count_ptr, sample_sum_ptr](Envoy::Stats::ParentHistogram& hist) {
-        if (!found && hist.name() == name_view) {
+        if (!found && serializeMetricName(hist, name_buffer) == name_view) {
           const auto& stats = hist.cumulativeStatistics();
           *sample_count_ptr = stats.sampleCount();
           *sample_sum_ptr = stats.sampleSum();
@@ -158,12 +183,13 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
   auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
   Envoy::Stats::Store& stats_store = extension->statsStore();
 
+  thread_local std::vector<char> name_buffer;
   stats_store.forEachCounter([](size_t) {},
                              [iterator_fn, user_data](Envoy::Stats::Counter& counter) {
-                               std::string name = counter.name();
-                               envoy_dynamic_module_type_envoy_buffer name_buffer{name.data(),
-                                                                                  name.size()};
-                               auto action = iterator_fn(name_buffer, counter.value(), user_data);
+                               absl::string_view name = serializeMetricName(counter, name_buffer);
+                               envoy_dynamic_module_type_envoy_buffer name_buf{name.data(),
+                                                                               name.size()};
+                               auto action = iterator_fn(name_buf, counter.value(), user_data);
                                // Note: forEachCounter doesn't support early exit, so we ignore Stop
                                // action. The module should handle this by setting a flag in
                                // user_data.
@@ -177,12 +203,13 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
   auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
   Envoy::Stats::Store& stats_store = extension->statsStore();
 
+  thread_local std::vector<char> name_buffer;
   stats_store.forEachGauge([](size_t) {},
                            [iterator_fn, user_data](Envoy::Stats::Gauge& gauge) {
-                             std::string name = gauge.name();
-                             envoy_dynamic_module_type_envoy_buffer name_buffer{name.data(),
-                                                                                name.size()};
-                             auto action = iterator_fn(name_buffer, gauge.value(), user_data);
+                             absl::string_view name = serializeMetricName(gauge, name_buffer);
+                             envoy_dynamic_module_type_envoy_buffer name_buf{name.data(),
+                                                                             name.size()};
+                             auto action = iterator_fn(name_buf, gauge.value(), user_data);
                              // Note: forEachGauge doesn't support early exit, so we ignore Stop
                              // action. The module should handle this by setting a flag in
                              // user_data.
@@ -196,8 +223,8 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
 
 namespace {
 
-// Builds the tag vector using a caller-owned stack-local pool so the shared `stat_name_pool_`
-// is not mutated from worker threads. Returned tags borrow storage from `dynamic_pool`.
+// Builds the tag vector using a caller-owned stack-local pool so the registry's shared stat name
+// pool is not mutated from worker threads. Returned tags borrow storage from `dynamic_pool`.
 Envoy::Stats::StatNameTagVector buildTagsForBootstrapMetric(
     Envoy::Stats::StatNameDynamicPool& dynamic_pool, const Envoy::Stats::StatNameVec& label_names,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length) {
@@ -227,22 +254,23 @@ envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   absl::string_view name_view(name.ptr, name.length);
-  Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
+  Envoy::Stats::StatName main_stat_name = config->metrics().statNamePool().add(name_view);
 
   // Handle the special case where the labels size is zero.
   if (label_names_length == 0) {
     Envoy::Stats::Counter& c =
-        Envoy::Stats::Utility::counterFromStatNames(*config->stats_scope_, {main_stat_name});
-    *counter_id_ptr = config->addCounter({c});
+        Envoy::Stats::Utility::counterFromStatNames(config->metrics().scope(), {main_stat_name});
+    *counter_id_ptr = config->metrics().addCounter(MetricRegistry::CounterHandle(c));
     return envoy_dynamic_module_type_metrics_result_Success;
   }
 
   Envoy::Stats::StatNameVec label_names_vec;
   for (size_t i = 0; i < label_names_length; i++) {
     absl::string_view label_name_view(label_names[i].ptr, label_names[i].length);
-    label_names_vec.push_back(config->stat_name_pool_.add(label_name_view));
+    label_names_vec.push_back(config->metrics().statNamePool().add(label_name_view));
   }
-  *counter_id_ptr = config->addCounterVec({main_stat_name, label_names_vec});
+  *counter_id_ptr = config->metrics().addCounterVec(
+      MetricRegistry::CounterVecHandle(main_stat_name, std::move(label_names_vec)));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -255,7 +283,7 @@ envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
 
   // Handle the special case where the labels size is zero.
   if (label_values_length == 0) {
-    auto counter = config->getCounterById(id);
+    auto counter = config->metrics().getCounterById(id);
     if (!counter.has_value()) {
       return envoy_dynamic_module_type_metrics_result_MetricNotFound;
     }
@@ -263,17 +291,17 @@ envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
     return envoy_dynamic_module_type_metrics_result_Success;
   }
 
-  auto counter = config->getCounterVecById(id);
+  auto counter = config->metrics().getCounterVecById(id);
   if (!counter.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (label_values_length != counter->getLabelNames().size()) {
+  if (label_values_length != counter->labelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
-  auto tags = buildTagsForBootstrapMetric(dynamic_pool, counter->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->metrics().scope().symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, counter->labelNames(), label_values,
                                           label_values_length);
-  counter->add(*config->stats_scope_, tags, value);
+  counter->add(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -288,23 +316,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   absl::string_view name_view(name.ptr, name.length);
-  Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
+  Envoy::Stats::StatName main_stat_name = config->metrics().statNamePool().add(name_view);
   Envoy::Stats::Gauge::ImportMode import_mode = Envoy::Stats::Gauge::ImportMode::Accumulate;
 
   // Handle the special case where the labels size is zero.
   if (label_names_length == 0) {
     Envoy::Stats::Gauge& g = Envoy::Stats::Utility::gaugeFromStatNames(
-        *config->stats_scope_, {main_stat_name}, import_mode);
-    *gauge_id_ptr = config->addGauge({g});
+        config->metrics().scope(), {main_stat_name}, import_mode);
+    *gauge_id_ptr = config->metrics().addGauge(MetricRegistry::GaugeHandle(g));
     return envoy_dynamic_module_type_metrics_result_Success;
   }
 
   Envoy::Stats::StatNameVec label_names_vec;
   for (size_t i = 0; i < label_names_length; i++) {
     absl::string_view label_name_view(label_names[i].ptr, label_names[i].length);
-    label_names_vec.push_back(config->stat_name_pool_.add(label_name_view));
+    label_names_vec.push_back(config->metrics().statNamePool().add(label_name_view));
   }
-  *gauge_id_ptr = config->addGaugeVec({main_stat_name, label_names_vec, import_mode});
+  *gauge_id_ptr = config->metrics().addGaugeVec(
+      MetricRegistry::GaugeVecHandle(main_stat_name, std::move(label_names_vec), import_mode));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -316,24 +345,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
   // Handle the special case where the labels size is zero.
   if (label_values_length == 0) {
-    auto gauge = config->getGaugeById(id);
+    auto gauge = config->metrics().getGaugeById(id);
     if (!gauge.has_value()) {
       return envoy_dynamic_module_type_metrics_result_MetricNotFound;
     }
     gauge->set(value);
     return envoy_dynamic_module_type_metrics_result_Success;
   }
-  auto gauge = config->getGaugeVecById(id);
+  auto gauge = config->metrics().getGaugeVecById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (label_values_length != gauge->getLabelNames().size()) {
+  if (label_values_length != gauge->labelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
-  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->metrics().scope().symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->labelNames(), label_values,
                                           label_values_length);
-  gauge->set(*config->stats_scope_, tags, value);
+  gauge->set(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -345,24 +374,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
   // Handle the special case where the labels size is zero.
   if (label_values_length == 0) {
-    auto gauge = config->getGaugeById(id);
+    auto gauge = config->metrics().getGaugeById(id);
     if (!gauge.has_value()) {
       return envoy_dynamic_module_type_metrics_result_MetricNotFound;
     }
-    gauge->add(value);
+    gauge->increase(value);
     return envoy_dynamic_module_type_metrics_result_Success;
   }
-  auto gauge = config->getGaugeVecById(id);
+  auto gauge = config->metrics().getGaugeVecById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (label_values_length != gauge->getLabelNames().size()) {
+  if (label_values_length != gauge->labelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
-  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->metrics().scope().symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->labelNames(), label_values,
                                           label_values_length);
-  gauge->add(*config->stats_scope_, tags, value);
+  gauge->increase(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -374,24 +403,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
   // Handle the special case where the labels size is zero.
   if (label_values_length == 0) {
-    auto gauge = config->getGaugeById(id);
+    auto gauge = config->metrics().getGaugeById(id);
     if (!gauge.has_value()) {
       return envoy_dynamic_module_type_metrics_result_MetricNotFound;
     }
-    gauge->sub(value);
+    gauge->decrease(value);
     return envoy_dynamic_module_type_metrics_result_Success;
   }
-  auto gauge = config->getGaugeVecById(id);
+  auto gauge = config->metrics().getGaugeVecById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (label_values_length != gauge->getLabelNames().size()) {
+  if (label_values_length != gauge->labelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
-  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->metrics().scope().symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->labelNames(), label_values,
                                           label_values_length);
-  gauge->sub(*config->stats_scope_, tags, value);
+  gauge->decrease(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -406,23 +435,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   absl::string_view name_view(name.ptr, name.length);
-  Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
+  Envoy::Stats::StatName main_stat_name = config->metrics().statNamePool().add(name_view);
   Envoy::Stats::Histogram::Unit unit = Envoy::Stats::Histogram::Unit::Unspecified;
 
   // Handle the special case where the labels size is zero.
   if (label_names_length == 0) {
     Envoy::Stats::Histogram& h = Envoy::Stats::Utility::histogramFromStatNames(
-        *config->stats_scope_, {main_stat_name}, unit);
-    *histogram_id_ptr = config->addHistogram({h});
+        config->metrics().scope(), {main_stat_name}, unit);
+    *histogram_id_ptr = config->metrics().addHistogram(MetricRegistry::HistogramHandle(h));
     return envoy_dynamic_module_type_metrics_result_Success;
   }
 
   Envoy::Stats::StatNameVec label_names_vec;
   for (size_t i = 0; i < label_names_length; i++) {
     absl::string_view label_name_view(label_names[i].ptr, label_names[i].length);
-    label_names_vec.push_back(config->stat_name_pool_.add(label_name_view));
+    label_names_vec.push_back(config->metrics().statNamePool().add(label_name_view));
   }
-  *histogram_id_ptr = config->addHistogramVec({main_stat_name, label_names_vec, unit});
+  *histogram_id_ptr = config->metrics().addHistogramVec(
+      MetricRegistry::HistogramVecHandle(main_stat_name, std::move(label_names_vec), unit));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -434,24 +464,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
   // Handle the special case where the labels size is zero.
   if (label_values_length == 0) {
-    auto histogram = config->getHistogramById(id);
+    auto histogram = config->metrics().getHistogramById(id);
     if (!histogram.has_value()) {
       return envoy_dynamic_module_type_metrics_result_MetricNotFound;
     }
     histogram->recordValue(value);
     return envoy_dynamic_module_type_metrics_result_Success;
   }
-  auto histogram = config->getHistogramVecById(id);
+  auto histogram = config->metrics().getHistogramVecById(id);
   if (!histogram.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (label_values_length != histogram->getLabelNames().size()) {
+  if (label_values_length != histogram->labelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
-  auto tags = buildTagsForBootstrapMetric(dynamic_pool, histogram->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->metrics().scope().symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, histogram->labelNames(), label_values,
                                           label_values_length);
-  histogram->recordValue(*config->stats_scope_, tags, value);
+  histogram->recordValue(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 

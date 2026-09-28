@@ -106,7 +106,7 @@ protected:
   std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
       std::nullopt};
   NiceMock<Stats::MockStore> store_;
-  Server::Configuration::MockServerFactoryContext factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
   Ssl::MockCertificateValidationContextConfig cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
@@ -130,9 +130,14 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
                                        &error_details, &verify_details, nullptr, nullptr))
       << error_details;
   EXPECT_NE(verify_details, nullptr);
-  EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+  auto& result = static_cast<CertVerifyResult&>(*verify_details);
+  EXPECT_TRUE(result.isValid());
+  // The verifier-built chain (leaf + issuing CA) is captured so the connection info can report the
+  // validated issuer, and it survives cloning.
+  EXPECT_GE(result.validatedChain().size(), 2);
   std::unique_ptr<CertVerifyResult> cloned(static_cast<CertVerifyResult*>(verify_details->Clone()));
   EXPECT_TRUE(cloned->isValid());
+  EXPECT_EQ(cloned->validatedChain().size(), result.validatedChain().size());
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainSuccess) {
@@ -385,7 +390,7 @@ ie3qKR3an4KC20CtFbpZfv540BVuTTOCtQ5xqZ/LTE78
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
-  // This is a cert generated with the test/config/integration/certs/certs.sh. And the config that
+  // This is a cert generated from test/config/integration/certs/certs.spec. And the config that
   // used to generate this cert is same as test/config/integration/certs/servercert.cfg but with
   // 'extKeyUsage: clientAuth'.
   const std::string certs{R"(-----BEGIN CERTIFICATE-----

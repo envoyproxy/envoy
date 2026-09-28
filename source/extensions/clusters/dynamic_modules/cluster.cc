@@ -161,9 +161,9 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
 DynamicModuleClusterConfig::DynamicModuleClusterConfig(
     const std::string& cluster_name, const std::string& cluster_config,
     Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope)
-    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")),
-      stat_name_pool_(stats_scope_->symbolTable()), cluster_name_(cluster_name),
-      cluster_config_(cluster_config), dynamic_module_(std::move(module)) {}
+    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")), metrics_(*stats_scope_),
+      cluster_name_(cluster_name), cluster_config_(cluster_config),
+      dynamic_module_(std::move(module)) {}
 
 DynamicModuleClusterConfig::~DynamicModuleClusterConfig() {
   if (in_module_config_ != nullptr && on_cluster_config_destroy_ != nullptr) {
@@ -184,7 +184,7 @@ DynamicModuleClusterHandle::~DynamicModuleClusterHandle() {
   Event::Dispatcher& dispatcher = cluster->dispatcher_;
   // The lifecycle handle resets unregister from main-thread-owned notifiers. When the handle is
   // destroyed on a worker thread, post the full teardown onto the main dispatcher.
-  if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
+  if (!Thread::MainThread::isMainOrTestThread()) {
     dispatcher.post([cluster = std::move(cluster)]() mutable {
       cluster->server_initialized_handle_.reset();
       cluster->shutdown_handle_.reset();
@@ -210,6 +210,8 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
     : ClusterImplBase(cluster, context, creation_status), config_(std::move(config)),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       server_context_(context.serverFactoryContext()) {
+  // If the base cluster construction failed, do not run the module hook on an invalid cluster.
+  SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
 
   // Create the in-module cluster instance.
   in_module_cluster_ = config_->on_cluster_new_(config_->in_module_config_, this);
@@ -465,7 +467,7 @@ bool DynamicModuleCluster::addHosts(
     auto host_result = Upstream::HostImpl::create(
         cluster_info, hostname, std::move(resolved_address), std::move(endpoint_metadata), nullptr,
         weights[i], std::move(locality),
-        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
+        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), priority,
         envoy::config::core::v3::UNKNOWN);
     if (!host_result.ok()) {
       ENVOY_LOG(error, "Failed to create host for address: {}.", addresses[i]); // LCOV_EXCL_LINE
@@ -595,10 +597,6 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
     return 0;
   }
 
-  // Build the remaining host list and update the priority set once.
-  ASSERT(!priority_set_.hostSetsPerPriority().empty());
-  const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-
   // Build a set of removed host pointers for O(1) lookup.
   absl::flat_hash_set<Upstream::Host*> removed_set;
   removed_set.reserve(removed_hosts.size());
@@ -606,18 +604,30 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
     removed_set.insert(h.get());
   }
 
-  Upstream::HostVectorSharedPtr remaining_hosts(new Upstream::HostVector());
-  for (const auto& h : first_host_set.hosts()) {
-    if (removed_set.find(h.get()) == removed_set.end()) {
-      remaining_hosts->emplace_back(h);
+  // Removed hosts can span multiple priorities, so rebuild and republish every priority that held
+  // at least one of them. Republishing only priority 0 would leave stale endpoints on the worker
+  // load balancers for higher priorities.
+  const auto& host_sets = priority_set_.hostSetsPerPriority();
+  for (uint32_t priority = 0; priority < host_sets.size(); ++priority) {
+    Upstream::HostVector removed_from_priority;
+    Upstream::HostVectorSharedPtr remaining_hosts(new Upstream::HostVector());
+    for (const auto& h : host_sets[priority]->hosts()) {
+      if (removed_set.find(h.get()) != removed_set.end()) {
+        removed_from_priority.emplace_back(h);
+      } else {
+        remaining_hosts->emplace_back(h);
+      }
     }
+    if (removed_from_priority.empty()) {
+      continue;
+    }
+
+    auto hosts_per_locality = buildHostsPerLocality(*remaining_hosts);
+    priority_set_.updateHosts(
+        priority,
+        Upstream::HostSetImpl::partitionHosts(remaining_hosts, std::move(hosts_per_locality)), {},
+        {}, removed_from_priority, std::nullopt, std::nullopt);
   }
-
-  auto hosts_per_locality = buildHostsPerLocality(*remaining_hosts);
-
-  priority_set_.updateHosts(
-      0, Upstream::HostSetImpl::partitionHosts(remaining_hosts, std::move(hosts_per_locality)), {},
-      {}, removed_hosts, std::nullopt, std::nullopt);
 
   ENVOY_LOG(debug, "Removed {} hosts from dynamic module cluster.", removed_hosts.size());
   return removed_hosts.size();
@@ -771,9 +781,12 @@ DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(
   in_module_lb_ =
       handle_->cluster_->config()->on_cluster_lb_new_(handle_->cluster_->inModuleCluster(), this);
 
-  // Register for host membership updates if the module implements the hook. Subscribe on the
-  // worker local priority set so the callback list is only mutated on this worker thread.
-  if (handle_->cluster_->config()->on_cluster_lb_on_host_membership_update_ != nullptr) {
+  // Register for host membership updates only when the module provided a load balancer and
+  // implements the hook. A null load balancer means the module reported a configuration error, so
+  // no later hook may run against it. Subscribe on the worker local priority set so the callback
+  // list is only mutated on this worker thread.
+  if (in_module_lb_ != nullptr &&
+      handle_->cluster_->config()->on_cluster_lb_on_host_membership_update_ != nullptr) {
     member_update_cb_ = priority_set_.addMemberUpdateCb(
         [this](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
           hosts_added_ = &hosts_added;
@@ -801,35 +814,43 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
-  // Pre-capture the worker dispatcher and prepare the cancellation flag before calling into the
-  // module. The module's choose_host may spawn a background thread that calls
-  // async_host_selection_complete, which reads these fields. Setting them beforehand establishes
-  // a happens-before relationship via the thread::spawn synchronization in the module.
+  // Pre-capture the worker dispatcher and register the per-selection cancellation flag before
+  // calling into the module. The module's choose_host may spawn a background thread that calls
+  // async_host_selection_complete, which reads both. Publishing them beforehand establishes a
+  // happens-before relationship via the thread::spawn synchronization in the module.
+  //
+  // The flag and the registry entry are keyed by `context`, not held in a single slot on this load
+  // balancer, because a worker serves many concurrent async selections. A single slot would let a
+  // cancellation on one selection suppress the completion of an unrelated one.
   const auto* connection = context != nullptr ? context->downstreamConnection() : nullptr;
-  active_async_dispatcher_ = connection != nullptr ? &connection->dispatcher() : nullptr;
-  // Capture the worker dispatcher for worker timer creation. Sticky: keep any previously captured
-  // dispatcher when this call has no connection, since the worker dispatcher is stable.
-  if (active_async_dispatcher_ != nullptr) {
-    worker_dispatcher_ = active_async_dispatcher_;
+  // Sticky: keep any previously captured dispatcher when this call has no connection, since the
+  // worker dispatcher is stable for the worker's life.
+  if (connection != nullptr) {
+    worker_dispatcher_.store(&connection->dispatcher(), std::memory_order_release);
   }
-  active_async_cancelled_ = std::make_shared<std::atomic<bool>>(false);
+  auto cancelled = std::make_shared<std::atomic<bool>>(false);
+  async_selections_->add(context, cancelled);
 
   envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
+  // Bound the lifetime of any filter state views the module reads during host selection to this
+  // callback. The guard clears the backing storage when chooseHost returns.
+  ClusterLbFilterStateScratchGuard filter_state_scratch_guard;
   handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context, &host_ptr,
                                                           &async_handle);
 
   if (async_handle != nullptr) {
-    // Async pending: the module will call the completion callback later.
+    // Async pending: the module will call the completion callback later. The `cancelable` holds the
+    // registry so it can drop its entry even if it outlives this load balancer.
     auto cancelable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
         async_handle, in_module_lb_,
-        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_, active_async_cancelled_);
+        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_, std::move(cancelled),
+        async_selections_, context);
     return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
   }
 
-  // Synchronous result or no host. Clear the async state.
-  active_async_dispatcher_ = nullptr;
-  active_async_cancelled_ = nullptr;
+  // Synchronous result or no host. Nothing will complete for this context, so drop its entry.
+  async_selections_->remove(context);
 
   if (host_ptr == nullptr) {
     return {nullptr};
@@ -841,6 +862,11 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 }
 
 DynamicModuleAsyncHostSelectionHandle::~DynamicModuleAsyncHostSelectionHandle() {
+  // Drop the registry entry first. Once it is gone the completion callback drops the event instead
+  // of touching a LoadBalancerContext the router is about to reclaim.
+  if (registry_ != nullptr) {
+    registry_->remove(context_);
+  }
   // Free the module-side async handle. The cancel function takes ownership of the handle and
   // drops it, so this works for both cancellation and normal completion paths.
   if (async_handle_ != nullptr && cancel_fn_ != nullptr) {

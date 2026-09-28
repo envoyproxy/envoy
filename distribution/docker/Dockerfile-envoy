@@ -10,7 +10,7 @@ ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 # See https://github.com/docker/buildx/issues/510 for why this _must_ be this way
 ARG TARGETPLATFORM
 ENV TARGETPLATFORM="${TARGETPLATFORM:-linux/amd64}"
-ADD "${TARGETPLATFORM}/release.tar.zst" /usr/local/bin/
+ADD "${TARGETPLATFORM}/release.docker.tar.zst" /usr/local/bin/
 
 
 # STAGE: envoy-base
@@ -83,10 +83,14 @@ ADD --chown=0:0 --chmod=644 \
     configs/google-vrp/*.yaml /etc/envoy/
 ADD --chown=0:0 --chmod=755 \
     configs/google-vrp/launch_envoy.sh /usr/local/bin/launch_envoy.sh
-ADD --chown=0:0 --chmod=644 \
-    test/config/integration/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
-ADD --chown=0:0 --chmod=644 \
-    test/config/integration/certs/servercert.pem /etc/envoy/certs/servercert.pem
+# These certs come from //distribution/binary:vrp_cert_files (via the
+# `release.docker.tar.zst` release tarball added in the `binary` stage above).
+# They are generated, publicly-known TEST credentials -- not secret -- used
+# only by this fuzzing image, and are not shipped in signed release artifacts.
+COPY --from=binary --chown=0:0 --chmod=644 \
+    /usr/local/bin/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
+COPY --from=binary --chown=0:0 --chmod=644 \
+    /usr/local/bin/certs/servercert.pem /etc/envoy/certs/servercert.pem
 RUN --mount=type=tmpfs,target=/var/cache/apt \
     --mount=type=tmpfs,target=/var/lib/apt/lists \
     apt-get -qq update \

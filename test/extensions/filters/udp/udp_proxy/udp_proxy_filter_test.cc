@@ -74,6 +74,8 @@ public:
                      const UdpProxyFilterConfigSharedPtr& config)
       : UdpProxyFilter(callbacks, config) {}
 
+  const SessionStorageType& activeSessions() const { return sessions_; }
+
   MOCK_METHOD(Network::SocketPtr, createUdpSocket, (const Upstream::HostConstSharedPtr& host));
 };
 
@@ -280,6 +282,7 @@ public:
     ON_CALL(os_sys_calls_, supportsIpTransparent(_)).WillByDefault(Return(true));
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
+    EXPECT_CALL(callbacks_, registerHotRestartSession).Times(AtLeast(0));
     EXPECT_CALL(
         *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_,
         address())
@@ -710,6 +713,42 @@ matcher:
   filter_.reset();
   EXPECT_EQ(output_.size(), 1);
   EXPECT_EQ(output_.front(), "2 1");
+}
+
+class TestHotRestartSessionHandle : public Network::UdpHotRestartSessionHandle {
+public:
+  explicit TestHotRestartSessionHandle(bool& destroyed) : destroyed_(destroyed) {}
+  ~TestHotRestartSessionHandle() override { destroyed_ = true; }
+
+private:
+  bool& destroyed_;
+};
+
+TEST_F(UdpProxyFilterTest, HotRestartSessionHandleReleasedOnSessionComplete) {
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF"));
+
+  bool handle_released = false;
+  EXPECT_CALL(callbacks_, registerHotRestartSession)
+      .WillOnce(Return(ByMove(std::make_unique<TestHotRestartSessionHandle>(handle_released))));
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_FALSE(handle_released);
+
+  // Hold the session alive past completion.
+  auto session = *filter_->activeSessions().begin();
+  test_sessions_[0].idle_timer_->invokeCallback();
+  EXPECT_TRUE(handle_released);
 }
 
 // Verify downstream send and receive error handling.

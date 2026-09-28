@@ -54,12 +54,13 @@ class FuzzConfig : public ConnectionManagerConfig {
 public:
   FuzzConfig(envoy::extensions::filters::network::http_connection_manager::v3::
                  HttpConnectionManager::ForwardClientCertDetails forward_client_cert)
-      : stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
-                                        POOL_GAUGE(fake_stats_),
-                                        POOL_HISTOGRAM(*fake_stats_.rootScope()))},
-               "", *fake_stats_.rootScope()),
+      : stats_({ALL_HTTP_CONN_MAN_STATS(
+                   POOL_COUNTER(*fake_stats_.rootScope()), POOL_GAUGE(fake_stats_),
+                   POOL_HISTOGRAM(*fake_stats_.rootScope()), POOL_COUNTER(fake_stats_))},
+               *fake_stats_.rootScope()),
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
-        listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_))},
+        listener_stats_{
+            CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_), POOL_COUNTER(fake_stats_))},
         local_reply_(LocalReply::Factory::createDefault()) {
     ON_CALL(route_config_provider_, lastUpdated()).WillByDefault(Return(time_system_.systemTime()));
     ON_CALL(scoped_route_config_provider_, lastUpdated())

@@ -222,8 +222,9 @@ bool envoy_dynamic_module_on_lb_choose_host(
     // Test getting all headers at once.
     if (headers_size > 0) {
       envoy_dynamic_module_type_envoy_http_header all_headers[16];
+      size_t all_headers_size_out = 0;
       bool success = envoy_dynamic_module_callback_lb_context_get_downstream_headers(
-          context_envoy_ptr, all_headers);
+          context_envoy_ptr, all_headers, 16, &all_headers_size_out);
       (void)success;
     }
 

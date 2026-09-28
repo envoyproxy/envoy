@@ -75,6 +75,12 @@ crate-type = ["cdylib"]
 test = true
 
 [[example]]
+name = "bootstrap_signed_callout_test"
+path = "bootstrap_signed_callout_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
 name = "bootstrap_admin_handler_test"
 path = "bootstrap_admin_handler_test.rs"
 crate-type = ["cdylib"]

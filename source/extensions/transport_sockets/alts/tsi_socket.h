@@ -24,10 +24,11 @@ struct TsiInfo {
  * @param dispatcher the dispatcher for the thread where the socket is running on.
  * @param local_address the local address of the connection.
  * @param remote_address the remote address of the connection.
+ * @param target_name the unresolved name of the connection target.
  */
 using HandshakerFactory = std::function<TsiHandshakerPtr(
     Event::Dispatcher& dispatcher, const Network::Address::InstanceConstSharedPtr& local_address,
-    const Network::Address::InstanceConstSharedPtr& remote_address)>;
+    const Network::Address::InstanceConstSharedPtr& remote_address, absl::string_view target_name)>;
 
 /**
  * A function to validate the peer of the connection.
@@ -49,7 +50,8 @@ class TsiSocket : public Network::TransportSocket,
 public:
   // For Test
   TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
-            Network::TransportSocketPtr&& raw_socket_ptr, bool downstream);
+            Network::TransportSocketPtr&& raw_socket_ptr, bool downstream,
+            absl::string_view target_name = "");
 
   /**
    * @param handshaker_factory a function to initiate a TsiHandshaker
@@ -57,9 +59,10 @@ public:
    * after the handshake completed with peer data to do the peer validation.
    * The connection will be closed immediately if it returns false.
    * @param downstream is true for downstream transport socket.
+   * @param target_name the unresolved name of the connection target.
    */
   TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
-            bool downstream);
+            bool downstream, absl::string_view target_name = "");
   ~TsiSocket() override;
 
   // Network::TransportSocket
@@ -119,6 +122,7 @@ private:
   std::unique_ptr<TsiTransportSocketCallbacks> tsi_callbacks_;
   Network::TransportSocketPtr raw_buffer_socket_;
   const bool downstream_;
+  const std::string target_name_;
 
   Buffer::WatermarkBuffer raw_read_buffer_{[]() {}, []() {}, []() {}};
   Envoy::Buffer::OwnedImpl raw_write_buffer_;

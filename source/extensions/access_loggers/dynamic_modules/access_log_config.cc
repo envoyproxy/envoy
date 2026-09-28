@@ -16,8 +16,8 @@ DynamicModuleAccessLogConfig::DynamicModuleAccessLogConfig(
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope)
     : stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
-      stat_name_pool_(stats_scope_->symbolTable()), logger_name_(logger_name),
-      logger_config_(logger_config), dynamic_module_(std::move(dynamic_module)) {}
+      metrics_(*stats_scope_), logger_name_(logger_name), logger_config_(logger_config),
+      dynamic_module_(std::move(dynamic_module)) {}
 
 DynamicModuleAccessLogConfig::~DynamicModuleAccessLogConfig() {
   if (in_module_config_ != nullptr && on_config_destroy_ != nullptr) {

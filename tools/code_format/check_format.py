@@ -355,7 +355,6 @@ class FormatChecker:
     def allow_listed_for_protobuf_deps(self, file_path):
         return (
             file_path.endswith(self.config.suffixes["proto"])
-            or file_path.endswith(self.config.suffixes["repositories_bzl"])
             or any(file_path.startswith(path) for path in self.config.paths["protobuf"]["include"]))
 
     # Real-world time sources should not be instantiated in the source, except for a few
@@ -414,9 +413,6 @@ class FormatChecker:
 
         # As core code is mostly exception free, list individual files.
         return not file_path in self.config.paths["exception"]["include"]
-
-    def allow_listed_for_build_urls(self, file_path):
-        return file_path in self.config.paths["build_urls"]["include"]
 
     def is_api_file(self, file_path):
         return file_path.startswith(self.api_prefix)
@@ -834,9 +830,6 @@ class FormatChecker:
                 and not self.is_external_build_file(file_path)
                 and not self.is_docs_build_file(file_path) and "@envoy//" in line):
             report_error("Superfluous '@envoy//' prefix")
-        if not self.allow_listed_for_build_urls(file_path) and (" urls = " in line
-                                                                or " url = " in line):
-            report_error("Only repository_locations.bzl may contains URL references")
 
     def fix_build_line(self, file_path, line, line_number):
         if (self.envoy_build_rule_check and not self.is_starlark_file(file_path)

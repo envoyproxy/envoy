@@ -151,6 +151,11 @@ public:
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
   }
 
+  // Performs an in-place filter chain update against a gradual, 600s server drain and returns
+  // the drain event the workers were notified with, so that the strategy the filter chain drain
+  // picked is observable.
+  Network::ConnectionDrainEvent inPlaceUpdateAndCaptureDrainEvent();
+
   Network::MockListenSocket*
   expectUpdateToThenDrain(const envoy::config::listener::v3::Listener& new_listener_proto,
                           ListenerHandle* old_listener_handle,
@@ -695,6 +700,16 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   addOrUpdateListener(listener_proto);
   EXPECT_EQ(1u, manager_->listeners().size());
+
+  // Stopping listeners must not close connectionless UDP listen sockets, so a hot restart
+  // parent can keep reading from them during drain.
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
+                          std::function<void()> completion) { completion(); }));
+  EXPECT_CALL(server_.dispatcher_, post(_)).WillOnce([](Event::PostCb callback) { callback(); });
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
+  manager_->stopListeners(ListenerManager::StopListenersType::All, {});
+  EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AllowOnlyDefaultFilterChain) {
@@ -8209,13 +8224,12 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
 }
 
-// A draining filter chain is notified with DrainStrategy::Immediate regardless of the configured
-// strategy to keep backwards compatibility with existing filter chain drain behavior.
-TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, FilterChainDrainUsesImmediateStrategy) {
-  // Deliberately no InSequence: this test asserts the content of the drain notification, not the
+Network::ConnectionDrainEvent
+ListenerManagerImplForInPlaceFilterChainUpdateTest::inPlaceUpdateAndCaptureDrainEvent() {
+  // Deliberately no InSequence: the caller asserts the content of the drain notification, not the
   // ordering of the surrounding calls.
   EXPECT_CALL(*worker_, start(_, _, _));
-  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  EXPECT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -8257,7 +8271,7 @@ filter_chains:
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(listener_foo_update1_proto));
 
-  // Configure a gradual server drain strategy; the filter chain drain must override it.
+  // Configure a gradual server drain so that the strategy the filter chain drain picks is visible.
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));
 
@@ -8272,8 +8286,6 @@ filter_chains:
   listener_foo_update1->target_.ready();
   worker_->callAddCompletion();
 
-  EXPECT_EQ(Server::DrainStrategy::Immediate, captured.strategy);
-
   // Timer expires, the worker removes the draining filter chains, and once that completes the
   // main thread can destroy the original listener.
   EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
@@ -8282,6 +8294,22 @@ filter_chains:
   worker_->callDrainFilterChainsComplete();
 
   EXPECT_CALL(*listener_foo_update1, onDestroy());
+  return captured;
+}
+
+// A draining filter chain is notified with the configured server drain strategy.
+TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, FilterChainDrainUsesConfiguredStrategy) {
+  EXPECT_EQ(Server::DrainStrategy::Gradual, inPlaceUpdateAndCaptureDrainEvent().strategy);
+}
+
+// With the guard disabled the configured strategy is ignored and the legacy
+// DrainStrategy::Immediate is used instead.
+TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest,
+       FilterChainDrainUsesImmediateStrategyWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.filter_chain_drain_uses_configured_strategy", "false"}});
+  EXPECT_EQ(Server::DrainStrategy::Immediate, inPlaceUpdateAndCaptureDrainEvent().strategy);
 }
 
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, RemoveTheInplaceUpdatingListener) {

@@ -304,11 +304,19 @@ UdpProxyFilter::createSessionWithOptionalHost(Network::UdpRecvData::LocalPeerAdd
   if (new_session->onNewSession()) {
     auto new_session_ptr = new_session.get();
     sessions_.emplace(std::move(new_session));
+    new_session_ptr->maybeRegisterForHotRestart();
     return new_session_ptr;
   }
 
   new_session->onSessionComplete();
   return nullptr;
+}
+
+void UdpProxyFilter::ActiveSession::maybeRegisterForHotRestart() {
+  if (!filter_.config_->usingPerPacketLoadBalancing()) {
+    hot_restart_session_handle_ =
+        filter_.read_callbacks_->registerHotRestartSession(addresses_.local_, addresses_.peer_);
+  }
 }
 
 Upstream::HostSelectionResponse UdpProxyFilter::ClusterInfo::chooseHost(
@@ -359,6 +367,8 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
         .connections()
         .dec();
   }
+
+  hot_restart_session_handle_.reset();
 
   disableAccessLogFlushTimer();
 

@@ -147,7 +147,8 @@ impl Default for EnvoyMutBuffer<'_> {
 }
 
 // Envoy fills caller-allocated `Vec`s of these types in place by reinterpreting them as the ABI
-// buffer and HTTP header structs, so assert the layouts match to keep those reinterpretations sound.
+// buffer and HTTP header structs, so assert the layouts match to keep those reinterpretations
+// sound.
 const _: () = {
   type EnvoyBufferPair = (EnvoyBuffer<'static>, EnvoyBuffer<'static>);
 
@@ -209,6 +210,31 @@ const _: () = {
   );
 };
 
+/// Reads Envoy buffer chunk descriptors into a list and returns them with the total byte length
+/// summed from the chunks. `count` is the chunk count from a size callback and `fill` must write
+/// exactly `count` descriptors into the reserved storage when it returns true. Summing the chunk
+/// lengths drops a separate total size crossing that the caller would otherwise make. The caller
+/// binds the returned lifetime to its own borrow so the buffers cannot outlive the Envoy memory.
+pub(crate) fn read_buffer_chunks<'a>(
+  count: usize,
+  fill: impl FnOnce(*mut crate::abi::envoy_dynamic_module_type_envoy_buffer) -> bool,
+) -> (Vec<EnvoyBuffer<'a>>, usize) {
+  if count == 0 {
+    return (Vec::new(), 0);
+  }
+  let mut chunks: Vec<EnvoyBuffer<'a>> = Vec::with_capacity(count);
+  let filled = fill(chunks.as_mut_ptr() as *mut crate::abi::envoy_dynamic_module_type_envoy_buffer);
+  if !filled {
+    return (Vec::new(), 0);
+  }
+  // A successful fill initializes exactly `count` descriptors, matching the size callback.
+  unsafe {
+    chunks.set_len(count);
+  }
+  let total = chunks.iter().map(|chunk| chunk.length).sum();
+  (chunks, total)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -220,8 +246,8 @@ mod tests {
 
   #[test]
   fn test_envoy_buffer_as_slice_treats_null_and_empty_alike() {
-    // A null buffer and a non-null zero-length buffer both yield an empty slice, so the list getters
-    // can return Envoy-filled entries directly without normalizing empty ones.
+    // A null buffer and a non-null zero-length buffer both yield an empty slice, so the list
+    // getters can return Envoy-filled entries directly without normalizing empty ones.
     assert_eq!(EnvoyBuffer::default().as_slice(), b"");
     assert_eq!(EnvoyBuffer::new(b"").as_slice(), b"");
   }
@@ -240,5 +266,63 @@ mod tests {
     let mut buffer = EnvoyMutBuffer::default();
     assert_eq!(buffer.as_slice(), b"");
     assert_eq!(buffer.as_mut_slice(), b"");
+  }
+
+  #[test]
+  fn read_buffer_chunks_sums_lengths_across_varying_chunks() {
+    // Two chunks of differing lengths report the summed byte length and reassemble in order.
+    static DATA: [u8; 5] = *b"abcde";
+    let (chunks, total) = read_buffer_chunks(2, |ptr| {
+      unsafe {
+        *ptr.add(0) = crate::abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: DATA.as_ptr() as _,
+          length: 2,
+        };
+        *ptr.add(1) = crate::abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: DATA.as_ptr().wrapping_add(2) as _,
+          length: 3,
+        };
+      }
+      true
+    });
+    assert_eq!(total, 5);
+    assert_eq!(chunks.len(), 2);
+    assert_eq!(chunks[0].as_slice(), b"ab");
+    assert_eq!(chunks[1].as_slice(), b"cde");
+  }
+
+  #[test]
+  fn read_buffer_chunks_returns_empty_for_zero_count() {
+    let (chunks, total) =
+      read_buffer_chunks(0, |_| unreachable!("fill must not run for zero count"));
+    assert_eq!(total, 0);
+    assert!(chunks.is_empty());
+  }
+
+  #[test]
+  fn read_buffer_chunks_returns_empty_when_fill_fails() {
+    // A failed fill yields no chunks and a zero total so the caller sees an empty read.
+    let (chunks, total) = read_buffer_chunks(2, |_| false);
+    assert_eq!(total, 0);
+    assert!(chunks.is_empty());
+  }
+
+  #[test]
+  fn read_buffer_chunks_sums_many_chunks() {
+    // The total is summed across many chunks so a fragmented buffer sizes correctly.
+    static DATA: [u8; 1] = *b"a";
+    let (chunks, total) = read_buffer_chunks(6, |ptr| {
+      for i in 0..6 {
+        unsafe {
+          *ptr.add(i) = crate::abi::envoy_dynamic_module_type_envoy_buffer {
+            ptr: DATA.as_ptr() as _,
+            length: 1,
+          };
+        }
+      }
+      true
+    });
+    assert_eq!(total, 6);
+    assert_eq!(chunks.len(), 6);
   }
 }

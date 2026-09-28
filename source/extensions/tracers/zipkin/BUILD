@@ -41,6 +41,7 @@ envoy_cc_library(
         "zipkin_tracer_impl.h",
     ],
     deps = [
+        ":zipkin_cc_proto",
         "//envoy/common:time_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:address_interface",
@@ -59,16 +60,14 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:cluster_update_tracker_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@zipkin-api",
-    ] + select({
-        "//bazel:bzlmod_mode": [":zipkin_cc_proto"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 envoy_cc_extension(

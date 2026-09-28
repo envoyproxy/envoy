@@ -26,8 +26,15 @@ using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
  */
 class ContextAccessor {
 public:
+  struct HttpAttributeContext {
+    const Http::RequestHeaderMap* request_headers{};
+    const Http::ResponseHeaderMap* response_headers{};
+    const Http::ResponseTrailerMap* response_trailers{};
+    const Http::RequestTrailerMap* request_trailers{};
+  };
+
   // Resolve the header map for the given type from the formatting context. Supported types are
-  // RequestHeader, ResponseHeader, and ResponseTrailer.
+  // RequestHeader, RequestTrailer, ResponseHeader, and ResponseTrailer.
   static HeadersMapOptConstRef headerMapByType(const Formatter::Context& context,
                                                envoy_dynamic_module_type_http_header_type type);
 
@@ -35,6 +42,15 @@ public:
   // pre-allocated with at least map->size() entries.
   static bool getHeaders(HeadersMapOptConstRef map,
                          envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+  // Fill result_headers with all entries of the resolved header map when capacity is large enough.
+  // On success writes up to capacity entries and sets size_out to the header count. When capacity
+  // is smaller than the count, writes nothing, sets size_out to the required count and returns
+  // false. When the map is unavailable, sets size_out to zero and returns false. result_headers may
+  // be null when capacity is zero.
+  static bool getHeadersBounded(HeadersMapOptConstRef map,
+                                envoy_dynamic_module_type_envoy_http_header* result_headers,
+                                size_t capacity, size_t* size_out);
 
   // Look up a single header value by key. index selects the value for multi-value headers and
   // total_count_out, when non-null, receives the total number of values for the key.
@@ -51,6 +67,13 @@ public:
   // Get an integer attribute from the stream info. Returns false when the attribute is unavailable
   // or not an integer.
   static bool getAttributeInt(const StreamInfo::StreamInfo& stream_info,
+                              envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result,
+                              const HttpAttributeContext* http_context = nullptr);
+
+  // Get an integer attribute using the formatting context for HTTP header state. HTTP-only
+  // attributes are unavailable for non-HTTP streams.
+  static bool getAttributeInt(const StreamInfo::StreamInfo& stream_info,
+                              const Formatter::Context& context,
                               envoy_dynamic_module_type_attribute_id attribute_id,
                               uint64_t* result);
 
@@ -58,6 +81,10 @@ public:
   // or not a boolean.
   static bool getAttributeBool(const StreamInfo::StreamInfo& stream_info,
                                envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+  // fill timing_out with the stream's timing snapshot, using -1 for unavailable values
+  static void getTimingInfo(const StreamInfo::StreamInfo* stream_info,
+                            envoy_dynamic_module_type_timing_info* timing_out);
 
   // Get a string value from dynamic metadata by filter name and dotted key path. Returns false
   // when the path is absent or the value is not a string.
@@ -79,6 +106,14 @@ public:
                                      envoy_dynamic_module_type_module_buffer filter_name,
                                      envoy_dynamic_module_type_module_buffer path, bool* result);
 
+  // Get a bytes value from filter state by key. Only objects stored as Router::StringAccessor,
+  // which is what setFilterStateBytes() creates, are readable. Returns false when the key is absent
+  // or holds a different object type. Takes a const StreamInfo because FilterState::getDataReadOnly
+  // is const, so read-only contexts can use it too.
+  static bool getFilterStateBytes(const StreamInfo::StreamInfo& stream_info,
+                                  envoy_dynamic_module_type_module_buffer key,
+                                  envoy_dynamic_module_type_envoy_buffer* result);
+
   // Get the local reply body from the formatting context. Returns false when there is no body.
   static bool getLocalReplyBody(const Formatter::Context& context,
                                 envoy_dynamic_module_type_envoy_buffer* result);
@@ -92,6 +127,13 @@ public:
   static void setDynamicMetadataNumber(StreamInfo::StreamInfo& stream_info,
                                        absl::string_view filter_name, absl::string_view key,
                                        double value);
+
+  // Set multiple string values in dynamic metadata, merging into the named filter namespace once.
+  // An empty array is a no-op and does not create the namespace.
+  static void
+  setDynamicMetadataStringBatch(StreamInfo::StreamInfo& stream_info, absl::string_view filter_name,
+                                const envoy_dynamic_module_type_module_key_value_pair* entries,
+                                size_t entries_size);
 
   // Set a string value in filter state. When life_span is set, it is passed to setData.
   static bool

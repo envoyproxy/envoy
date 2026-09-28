@@ -318,6 +318,23 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "multi_health_checker_test",
+    srcs = ["multi_health_checker_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/upstream:multi_health_checker_lib",
+        "//source/extensions/health_checkers/http:health_checker_lib",
+        "//source/extensions/health_checkers/tcp:health_checker_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = [
         "health_checker_impl_test.cc",
@@ -855,7 +872,10 @@ envoy_cc_benchmark_binary(
 envoy_cc_benchmark_binary(
     name = "metadata_comparison_benchmark",
     srcs = ["metadata_comparison_benchmark.cc"],
-    deps = ["//source/common/protobuf:utility_lib"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@benchmark",
+    ],
 )
 
 envoy_benchmark_test(

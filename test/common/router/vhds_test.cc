@@ -87,7 +87,7 @@ vhds:
   }
   RouteConfigUpdatePtr makeReceiver() {
     return std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits_, factory_context_,
-                                                           context_);
+                                                           context_, /*from_rds=*/false);
   }
 
   // Applies an RDS update, which is what creates the VHDS subscription of the route configuration.

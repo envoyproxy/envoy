@@ -21,7 +21,6 @@ envoy_cc_library(
     name = "test_accessor_filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    repository = "@envoy",
     deps = [
         "filter_cc_proto",
         "//library/common/api:c_types",
@@ -36,7 +35,6 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":test_accessor_filter_lib",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",

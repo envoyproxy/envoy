@@ -42,6 +42,8 @@ sections:
 areas:
   access_log:
     title: access_log
+  alts:
+    title: alts
   attributes:
     title: attributes
   basic_auth:
@@ -54,6 +56,8 @@ areas:
     title: composite
   compressor:
     title: compressor
+  contrib:
+    title: contrib
   credential_injector:
     title: credential_injector
   dns_resolver:
@@ -62,6 +66,8 @@ areas:
     title: dynamic_modules
   gcp_authn:
     title: gcp_authn
+  geoip:
+    title: geoip
   golang:
     title: golang
   http:
@@ -70,6 +76,8 @@ areas:
     title: http2
   http_inspector:
     title: http_inspector
+  ip_tagging:
+    title: ip_tagging
   jwt_authn:
     title: jwt_authn
   load_balancing:

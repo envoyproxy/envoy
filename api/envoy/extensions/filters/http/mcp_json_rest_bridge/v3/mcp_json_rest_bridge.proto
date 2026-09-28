@@ -157,17 +157,16 @@ message TraceContextExtractionOptions {
 
 // Configuration for the server metadata.
 message ServerInfo {
-  // [#not-implemented-hide:]
-  // [#comment:TODO(guoyilin42): Implement supported_protocol_versions]
-  // Lists the MCP protocol versions supported by this MCP endpoint.
+  // The maximum MCP protocol version supported by this MCP endpoint.
   //
-  // - If provided: The extension enforces version negotiation according to the MCP specification:
-  //   https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#version-negotiation
-  // - If not provided: The extension accepts any version sent by the client during negotiation and
-  //   skips validation of the mcp-protocol-version header on subsequent requests.
+  // Supported values are ``2025-11-25`` and ``2026-07-28``. Versions prior
+  // to ``2025-11-25`` are rejected because the filter unconditionally supports features
+  // up to ``2025-11-25`` and does not support downgrading below that baseline.
+  // If not provided: Defaults to ``2025-11-25``.
   //
-  // Example values: ["2025-11-25", "2025-06-18"]
-  repeated string supported_protocol_versions = 1;
+  // Example value: "2026-07-28"
+  google.protobuf.StringValue max_supported_protocol_version = 1
+      [(validate.rules).string = {in: "2025-11-25" in: "2026-07-28"}];
 
   // [#not-implemented-hide:]
   // [#comment:TODO(guoyilin42): Implement description]
@@ -178,9 +177,9 @@ message ServerInfo {
   //
   // - If provided: The extension uses this version as the fallback protocol version.
   // - If not provided: The extension uses the fallback protocol version defined in the latest MCP
-  //   specification. For example, the current latest 2025-11-25 specification designates "2025-03-26"
+  //   specification. For example, the current latest 2026-07-28 specification designates "2025-03-26"
   //   as the fallback protocol version.
-  //   See https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#protocol-version-header
+  //   See https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http#protocol-version-header
   google.protobuf.StringValue fallback_protocol_version = 3;
 }
 
@@ -259,6 +258,10 @@ message ToolConfig {
   // When enabled, the response body is streamed directly to the client without buffering. Each
   // chunk is JSON escaped as it arrives and wrapped with a pre-built JSON-RPC prefix and suffix.
   //
+  // For Server-Sent Events (SSE) responses (i.e. ``text/event-stream`` content type), Envoy parses
+  // the stream and wraps each extracted complete event payload into a distinct text content item
+  // within the JSON-RPC ``content`` array on the fly.
+  //
   // Streaming flow:
   //
   // .. code-block:: text
@@ -286,8 +289,46 @@ message ToolConfig {
 //    - If specify a field: Only that specific argument becomes the HTTP JSON body.
 //    - If empty: No body is sent.
 // 3. Query: Any leaf arguments not mapped to Path or Body are added as URL query parameters.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message HttpRule {
+  // Represents a mapping from a request message field to an HTTP element.
+  // If the specified argument is missing from the tools/call request, the binding is silently
+  // ignored and the corresponding HTTP element (header or cookie) is not added.
+  message ParameterBinding {
+    // The target HTTP element type to bind to.
+    enum Type {
+      // Unspecified element type.
+      TYPE_UNSPECIFIED = 0;
+
+      // The argument value is bound to an HTTP request header.
+      // Conceptually maps to an OpenAPI parameter with ``in: header``.
+      HEADER = 1;
+
+      // The argument value is bound to an HTTP request cookie.
+      // Conceptually maps to an OpenAPI parameter with ``in: cookie``.
+      COOKIE = 2;
+    }
+
+    // The type of the HTTP element to bind to.
+    Type type = 1;
+
+    // The name of the HTTP header (e.g., "X-API-Key", "Authorization") or the
+    // name of the cookie (e.g.,"SESSION_ID"). Note: Envoy normalizes the header names to lowercase.
+    // The following headers are reserved for Envoy's internal use and cannot be overridden by
+    // bindings: ``content-length``, ``transfer-encoding``, ``host``, ``:authority``, ``cookie``,
+    // ``accept-encoding``, and any header starting with ``x-envoy-``. Attempting to bind to these
+    // will be ignored.
+    string name = 2
+        [(validate.rules).string =
+             {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+    // Path to the field within the JSON arguments object from a tools/call
+    // request. Uses dot-notation for nested fields.
+    // E.g. if arguments object is ``{"user":{"auth_token":"foo"}}``, then
+    // ``argument_path`` should be "user.auth_token".
+    string argument_path = 3 [(validate.rules).string = {min_len: 1}];
+  }
+
   // Determines the HTTP method and the URL path template.
   //
   // Path templating uses curly braces ``{}`` to mark a section of the URL path as replaceable.
@@ -321,6 +362,10 @@ message HttpRule {
   //   fields (e.g., "user.data" maps the value of the "data" field inside "user").
   // - If omitted: There is no HTTP request body; fields not in the path become query parameters.
   string body = 6;
+
+  // Bindings to extract values from the 'arguments' object of a tools/call
+  // request and inject them as HTTP elements.
+  repeated ParameterBinding bindings = 7;
 }
 
 // Per-route override configuration for the MCP JSON REST Bridge filter.

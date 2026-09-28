@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "envoy/api/api.h"
+#include "envoy/common/logger.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
@@ -65,7 +66,7 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt);
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupWithAuth() {
@@ -102,7 +103,7 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt);
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupAlwaysLogHealthCheckFailures() {
@@ -127,7 +128,7 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt);
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupExistsHealthcheck() {
@@ -152,7 +153,7 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt);
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupExistsHealthcheckWithAuth() {
@@ -190,7 +191,7 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt);
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupDontReuseConnection() {
@@ -215,7 +216,7 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt);
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
@@ -734,14 +735,13 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
 
 TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
   auto cluster = new NiceMock<Upstream::MockClusterMockPrioritySet>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   Api::ApiPtr api = Api::createApiForTest();
   Envoy::Extensions::Common::Aws::CredentialsPendingCallback capture;
@@ -829,7 +829,7 @@ TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
       *cluster, health_check_config, redis_config, dispatcher, runtime,
       Upstream::HealthCheckEventLoggerPtr(event_logger_), *api,
       NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_, aws_iam_config,
-      mock_authenticator);
+      mock_authenticator, Upstream::DefaultHealthFlagCallbacks::instance());
   health_checker->start();
   delete (cluster);
 }

@@ -23,6 +23,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.lua"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/singleton:manager_impl_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",
         "//test/mocks/api:api_mocks",
@@ -32,6 +33,7 @@ envoy_extension_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",

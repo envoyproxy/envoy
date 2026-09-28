@@ -90,6 +90,63 @@ private:
 // Returns the process-wide CRL cache, creating it on first use.
 std::shared_ptr<CrlCache> getCrlCache(Singleton::Manager& singleton_manager);
 
+class CaCertCache;
+
+// Holds the certificates - and any CRLs, since a trusted CA PEM blob is allowed
+// to carry both - parsed from a single trusted CA PEM blob. Instances are shared
+// (via shared_ptr) between every TLS context that references identical CA
+// content, so the parsed X509 structures, which for a large trust bundle
+// dominate a context's memory, are materialized in memory only once. A
+// shared_ptr to the owning cache is held so that holding a CaCertListSharedPtr
+// alone is enough to keep both the parsed certificates and the cache alive.
+struct CaCertList {
+  std::vector<bssl::UniquePtr<X509>> certs;
+  std::vector<bssl::UniquePtr<X509_CRL>> crls;
+  std::shared_ptr<CaCertCache> cache;
+};
+using CaCertListSharedPtr = std::shared_ptr<CaCertList>;
+
+// Process-wide cache that parses each distinct trusted CA blob once and shares
+// the parsed representation across all TLS contexts that reference it. Without
+// this, a trust bundle referenced from many `common_tls_context`s is parsed and
+// held in memory once per context. That is the common shape for upstream
+// clusters, which frequently share a single trust root, so the duplication grows
+// linearly with the number of clusters.
+//
+// Threading and lifetime model is identical to CrlCache above:
+//   - All methods must be called on the main (or test) thread. TLS context
+//     creation, the only caller, is confined to that thread.
+//   - Only a weak_ptr is stored, so an entry is released as soon as the last
+//     CaCertList referencing it is destroyed (for example after an xDS update).
+//     Each returned CaCertList holds a shared_ptr back to this cache, so the
+//     cache outlives every entry handed out from it.
+//   - The parsed X509s are reference counted by BoringSSL; each X509_STORE a
+//     certificate is added to holds its own reference, so it remains valid for
+//     that store's lifetime independent of this cache. Only the immutable parsed
+//     material is shared - each context keeps its own X509_STORE and therefore
+//     its own store flags.
+class CaCertCache : public Singleton::Instance, public std::enable_shared_from_this<CaCertCache> {
+public:
+  // Returns the shared parsed representation of `ca_pem`, parsing and caching it
+  // on first use. `ca_path` is only used to build the error message. Returns an
+  // error if `ca_pem` cannot be parsed or contains no certificate.
+  absl::StatusOr<CaCertListSharedPtr> getOrCreate(const std::string& ca_pem,
+                                                  const std::string& ca_path);
+
+  // Number of distinct CA blobs currently referenced by at least one context.
+  // Exposed for testing.
+  size_t size() const;
+
+private:
+  // Keyed by a SHA-256 digest of the CA PEM (rather than the PEM itself, to
+  // avoid holding a second full copy of potentially large trust bundles); stores
+  // a weak_ptr so entries do not outlive the contexts that use them.
+  absl::flat_hash_map<std::array<uint8_t, SHA256_DIGEST_LENGTH>, std::weak_ptr<CaCertList>> cache_;
+};
+
+// Returns the process-wide trusted CA cache, creating it on first use.
+std::shared_ptr<CaCertCache> getCaCertCache(Singleton::Manager& singleton_manager);
+
 class DefaultCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
   DefaultCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
@@ -182,6 +239,10 @@ private:
   // The parsed CRLs shared with other TLS contexts that reference the same CRL.
   // This also keeps the CRL cache alive for as long as the validator uses it.
   CrlListSharedPtr shared_crl_;
+  // The parsed trusted CA certificates shared with other TLS contexts that
+  // reference the same CA blob. This also keeps the CA cache alive for as long
+  // as the validator uses it.
+  CaCertListSharedPtr shared_ca_certs_;
   bool allow_untrusted_certificate_{false};
   bool verify_trusted_ca_{false};
   const bool auto_sni_san_match_{false};

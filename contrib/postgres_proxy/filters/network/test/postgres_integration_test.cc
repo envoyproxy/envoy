@@ -361,11 +361,10 @@ public:
     ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         downstream_tls_context, mock_factory_ctx, {}, false);
-    static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::DownstreamTransportSocketFactoryPtr tls_context =
         Network::DownstreamTransportSocketFactoryPtr{
             *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()))};
+                std::move(cfg), *tls_context_manager, server_factory_context_.serverScope())};
 
     Network::TransportSocketPtr ts = tls_context->createDownstreamTransportSocket();
     // Synchronization object used to suspend execution
@@ -580,11 +579,10 @@ public:
     ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(
         upstream_tls_context, mock_factory_ctx);
-    static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::UpstreamTransportSocketFactoryPtr tls_context =
         Network::UpstreamTransportSocketFactoryPtr{
             *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()))};
+                std::move(cfg), *tls_context_manager, server_factory_context_.serverScope())};
 
     Network::TransportSocketOptionsConstSharedPtr options;
 
