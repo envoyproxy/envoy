@@ -808,6 +808,21 @@ impl RouteSpecifierContext {
     }
   }
 
+  /// Record a prefix rewrite of the request path sent upstream.
+  ///
+  /// `matched` must be a case insensitive prefix of the current path without its query string,
+  /// which is replaced by `replacement` while the query string is preserved. Returns `false` when
+  /// `matched` is not such a prefix or the rewritten path exceeds the configured maximum.
+  pub fn set_prefix_rewrite(&mut self, matched: &str, replacement: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(matched),
+        crate::str_to_module_buffer(replacement),
+      )
+    }
+  }
+
   /// Select whether the route specifiers configured after this one run for the request.
   pub fn set_chain_status(&mut self, status: ChainStatus) {
     unsafe {

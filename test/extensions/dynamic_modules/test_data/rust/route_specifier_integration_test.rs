@@ -21,6 +21,8 @@
 //!   `x-override`       the override_id of the route override to select.
 //!   `x-set-path`       the path of the request sent upstream.
 //!   `x-set-host`       the authority of the request sent upstream.
+//!   `x-prefix-rewrite` a `matched=replacement` pair recorded as a prefix rewrite of the path.
+//!   `x-user-data`      a u64 recorded on the produced route, so the route destroy hook fires.
 //!   `x-append-action`  `append`, `add-if-absent`, `overwrite` or `overwrite-if-exists`, how an
 //!                      added header combines with one of the same name. Defaults to `overwrite`.
 //!   `x-add-request-header`  a `key=value` pair added to the request sent upstream.
@@ -461,6 +463,13 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
     }
     if let Some(host) = ctx.get_request_header("x-set-host") {
       let _ = ctx.set_host(&buffer_to_string(host));
+    }
+    if let Some(pair) = ctx.get_request_header("x-prefix-rewrite") {
+      let pair = buffer_to_string(pair);
+      if let Some((matched, replacement)) = split_pair(&pair) {
+        // Tests also pass a matched that is not a prefix, so a rejection is expected here.
+        let _ = ctx.set_prefix_rewrite(matched, replacement);
+      }
     }
     let append_action = read_append_action(ctx);
     if let Some(pair) = ctx.get_request_header("x-add-request-header") {

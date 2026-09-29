@@ -544,6 +544,45 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RewritesPathAndHost) {
   EXPECT_EQ("upstream.local", upstream_headers->getHostValue());
 }
 
+// A recorded prefix rewrite replaces the matched prefix of the path sent upstream, keeping the
+// query string.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, PrefixRewriteRewritesUpstreamPath) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{":path", "/api/foo?q=1"},
+                               {"x-decision", "override"},
+                               {"x-prefix-rewrite", "/api=/internal"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/internal/foo?q=1", upstream_headers->getPathValue());
+}
+
+// A regex rewrite carried by a selected route override rewrites the path sent upstream when
+// set_route_override applies it, keeping the query string the same way a prefix rewrite does.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RouteOverrideRegexRewritesUpstreamPath) {
+  setupTest(R"EOF(
+route_overrides:
+- override_id: regex
+  regex_rewrite:
+    pattern: {regex: "^/api/(.*)$"}
+    substitution: '/internal/\1'
+)EOF");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      sendRequest({{":path", "/api/foo?q=1"}, {"x-decision", "override"}, {"x-override", "regex"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/internal/foo?q=1", upstream_headers->getPathValue());
+}
+
 // A module reads the request, the stream info and the route through the context, which is how it
 // reaches a decision.
 TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsRequestAndRouteState) {
@@ -850,6 +889,35 @@ typed_config:
       {{"x-decision", "override"}, {"x-cluster", "canary"}, {"x-echo", "previous-route-cluster"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("canary", header(response->headers(), "x-echo-result"));
+}
+
+// When the route is recomputed the module reads the string metadata of the route the connection
+// manager last installed, which is how a module keeps a stream on a marker it wrote into a route it
+// built earlier.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsPreviousRouteMetadataOnRecompute) {
+  config_helper_.prependFilter(R"EOF(
+name: clear-route-cache
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.ClearRouteCacheFilterConfig
+)EOF");
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The first resolution selects the full template, whose route carries envoy.test.route metadata,
+  // and installs it. The cache clear recomputes, and the echo of the second resolution reports the
+  // string value read from the previous route.
+  auto response = sendRequest({{"x-decision", "select-template"},
+                               {"x-template", "full"},
+                               {"x-echo", "previous-route-metadata"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("value", header(response->headers(), "x-echo-result"));
+
+  // A previous route that carries no envoy.test.route metadata has no string value under the key,
+  // so the read reports the absent marker.
+  response = sendRequest(
+      {{"x-decision", "override"}, {"x-cluster", "canary"}, {"x-echo", "previous-route-metadata"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("absent", header(response->headers(), "x-echo-result"));
 }
 
 // ReusePrevious without a previous route is rejected and the failure policy passes it through.

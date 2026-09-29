@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/router/route_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/http/codes.h"
@@ -86,6 +87,9 @@ struct RouteOverride {
   std::unique_ptr<Envoy::Router::HedgePolicy> hedge_policy;
   std::unique_ptr<const Envoy::Router::RateLimitPolicy> rate_limit_policy;
   std::unique_ptr<const Envoy::Router::CorsPolicy> cors_policy;
+  // Regex rewrite of the request path, compiled once at configuration load. Null when unset.
+  Regex::CompiledMatcherPtr regex_rewrite;
+  std::string regex_rewrite_substitution;
 };
 
 using RouteOverrideMap = absl::flat_hash_map<std::string, RouteOverride>;
@@ -191,6 +195,7 @@ public:
   const std::optional<RuntimeFraction>& runtimeFraction() const { return runtime_fraction_; }
   const std::string& specifierInstanceId() const { return specifier_instance_id_; }
   OnRouteSpecifierRouteDestroyType onRouteDestroy() const { return on_route_destroy_; }
+  uint32_t maxRewrittenPathBytes() const { return max_rewritten_path_bytes_; }
   bool failClosed() const { return fail_closed_; }
   bool continueMatchingOnFailure() const { return continue_matching_on_failure_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
@@ -244,6 +249,7 @@ private:
   Envoy::Router::RouteBuilder* config_new_route_builder_{nullptr};
   bool config_new_validate_clusters_{false};
   const std::optional<RuntimeFraction> runtime_fraction_;
+  const uint32_t max_rewritten_path_bytes_;
   const bool fail_closed_;
   const bool continue_matching_on_failure_;
   Upstream::ClusterManager& cluster_manager_;

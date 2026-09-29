@@ -485,6 +485,19 @@ TEST_F(DynamicModuleRouteSpecifierTest, ConfigDestroyRunsOnTeardown) {
   EXPECT_EQ(before + 1, destroy_count.value()());
 }
 
+// A route override may carry a regex rewrite, which is compiled once when the specifier loads.
+TEST_F(DynamicModuleRouteSpecifierTest, RegexRewriteOverrideLoads) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      route_overrides:
+      - override_id: rewrite
+        regex_rewrite:
+          pattern: {regex: "^/api/(.*)$"}
+          substitution: '/internal/\1'
+)EOF"));
+  EXPECT_TRUE(config.ok());
+}
+
 // A shadow policy of a route override that names a cluster the cluster manager does not know
 // is rejected when clusters are validated, since a statically named cluster can be checked at load.
 TEST_F(DynamicModuleRouteSpecifierTest, ValidateClustersRejectsUnknownShadowCluster) {

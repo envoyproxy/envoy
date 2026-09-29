@@ -6,6 +6,7 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/hash_policy.h"
@@ -62,6 +63,13 @@ buildRouteOverride(const RouteOverrideProto& proto_override,
     entry.hedge_policy =
         std::make_unique<Envoy::Router::HedgePolicyImpl>(proto_override.hedge_policy());
   }
+  if (proto_override.has_regex_rewrite()) {
+    auto regex_or_error =
+        Regex::Utility::parseRegex(proto_override.regex_rewrite().pattern(), context.regexEngine());
+    RETURN_IF_NOT_OK_REF(regex_or_error.status());
+    entry.regex_rewrite = std::move(regex_or_error.value());
+    entry.regex_rewrite_substitution = proto_override.regex_rewrite().substitution();
+  }
   if (!proto_override.rate_limits().empty() || proto_override.has_cors()) {
     // RateLimitPolicyImpl and CorsPolicyImpl build extension backed matchers that throw on a
     // rejected input, so a build failure is turned into a configuration error.
@@ -86,7 +94,7 @@ buildRouteOverride(const RouteOverrideProto& proto_override,
   if (entry.retry_policy == nullptr && entry.metadata_match_criteria == nullptr &&
       entry.shadow_policies.empty() && entry.hash_policy == nullptr &&
       entry.hedge_policy == nullptr && entry.rate_limit_policy == nullptr &&
-      entry.cors_policy == nullptr) {
+      entry.cors_policy == nullptr && entry.regex_rewrite == nullptr) {
     return absl::InvalidArgumentError("Route override must replace at least one property");
   }
   return entry;
@@ -203,6 +211,8 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
       specifier_name_(proto_config.specifier_name()), specifier_config_(specifier_config),
       specifier_instance_id_(proto_config.specifier_instance_id()),
       runtime_fraction_(buildRuntimeFraction(proto_config)),
+      max_rewritten_path_bytes_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_rewritten_path_bytes, 65536)),
       fail_closed_(proto_config.failure_policy() ==
                    envoy::extensions::router::route_specifiers::dynamic_modules::v3::NO_ROUTE),
       continue_matching_on_failure_(
