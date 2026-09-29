@@ -463,6 +463,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
         "//source/extensions/filters/http/match_delegate:config",
         "//source/extensions/filters/http/set_metadata:config",
+        "//source/extensions/formatter/cel:config",
         "//source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder:mapped_attribute_builder_lib",
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/retry/host/previous_hosts:config",

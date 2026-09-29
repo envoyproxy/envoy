@@ -131,10 +131,10 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
 absl::StatusOr<RawAsyncClientPtr> GoogleAsyncClientFactoryImpl::createUncachedRawAsyncClient() {
 #ifdef ENVOY_GOOGLE_GRPC
   GoogleGenericStubFactory stub_factory;
-  return std::make_unique<GoogleAsyncClientImpl>(
-      factory_context_.threadLocal().dispatcher(),
-      google_tls_slot_->getTyped<GoogleAsyncClientThreadLocal>(), stub_factory, scope_, config_,
-      factory_context_, stat_names_, initial_metadata_);
+  return GoogleAsyncClientImpl::create(factory_context_.threadLocal().dispatcher(),
+                                       google_tls_slot_->getTyped<GoogleAsyncClientThreadLocal>(),
+                                       stub_factory, scope_, config_, factory_context_, stat_names_,
+                                       initial_metadata_);
 #else
   return nullptr;
 #endif

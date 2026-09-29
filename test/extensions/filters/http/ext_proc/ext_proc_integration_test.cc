@@ -3131,6 +3131,32 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcMetadata) {
   verifyDownstreamResponse(*response, 200);
 }
 
+#if defined(USE_CEL_PARSER)
+// Per-route grpc_initial_metadata is merged into the service's initial metadata when a request
+// arrives, so the gRPC client is created on the worker thread handling the request, where the
+// built-in %CEL()% command can't be parsed. Creating the client fails instead of crashing, and
+// with failure_mode_allow disabled, so does the request.
+TEST_P(ExtProcIntegrationTest, PerRouteGrpcMetadataWithCelFailsOnWorker) {
+  initializeConfig();
+
+  config_helper_.addConfigModifier([this](HttpConnectionManager& cm) {
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/foo");
+    ExtProcPerRoute per_route;
+    *per_route.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+        makeHeaderValue("x-cel", "%CEL('cel-value')%");
+    setPerRouteConfig(route, per_route);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response =
+      sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
+  verifyDownstreamResponse(*response, 500);
+}
+#endif
+
 // Sending new timeout API in both downstream request and upstream response
 // handling path with header mutation.
 TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMutation) {

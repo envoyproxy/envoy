@@ -175,12 +175,12 @@ public:
 // Google gRPC C++ client library implementation of Grpc::AsyncClient.
 class GoogleAsyncClientImpl final : public RawAsyncClient, Logger::Loggable<Logger::Id::grpc> {
 public:
-  GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
-                        GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::config::core::v3::GrpcService& config,
-                        Server::Configuration::ServerFactoryContext& context,
-                        const StatNames& stat_names,
-                        GrpcServiceInitialMetadataPtr initial_metadata);
+  static absl::StatusOr<std::unique_ptr<GoogleAsyncClientImpl>>
+  create(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
+         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
+         const envoy::config::core::v3::GrpcService& config,
+         Server::Configuration::ServerFactoryContext& context, const StatNames& stat_names,
+         GrpcServiceInitialMetadataPtr initial_metadata);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -197,6 +197,12 @@ public:
   uint64_t perStreamBufferLimitBytes() const { return per_stream_buffer_limit_bytes_; }
 
 private:
+  GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
+                        GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
+                        const envoy::config::core::v3::GrpcService& config,
+                        Server::Configuration::ServerFactoryContext& context,
+                        const StatNames& stat_names, GrpcServiceInitialMetadataPtr metadata_parser);
+
   Event::Dispatcher& dispatcher_;
   GoogleAsyncClientThreadLocal& tls_;
   // This is shared with child streams, so that they can cleanup independent of

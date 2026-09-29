@@ -445,9 +445,9 @@ public:
 #ifdef ENVOY_GOOGLE_GRPC
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
-    return std::make_unique<GoogleAsyncClientImpl>(
-        *dispatcher_, *google_tls_, stub_factory, stats_scope_, createGoogleGrpcConfig(),
-        server_factory_context_, google_grpc_stat_names_, nullptr);
+    return *GoogleAsyncClientImpl::create(*dispatcher_, *google_tls_, stub_factory, stats_scope_,
+                                          createGoogleGrpcConfig(), server_factory_context_,
+                                          google_grpc_stat_names_, nullptr);
 #else
     PANIC("reached unexpected code");
 #endif

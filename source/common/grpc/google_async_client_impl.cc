@@ -90,6 +90,22 @@ void GoogleAsyncClientThreadLocal::completionThread() {
   ENVOY_LOG(debug, "completionThread exiting");
 }
 
+absl::StatusOr<std::unique_ptr<GoogleAsyncClientImpl>>
+GoogleAsyncClientImpl::create(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
+                              GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
+                              const envoy::config::core::v3::GrpcService& config,
+                              Server::Configuration::ServerFactoryContext& context,
+                              const StatNames& stat_names,
+                              GrpcServiceInitialMetadataPtr initial_metadata) {
+  // This can run on a worker thread, where an exception wouldn't be caught, so parsing errors are
+  // returned instead.
+  auto metadata_parser_or_error = buildMetadataParser(config, std::move(initial_metadata));
+  RETURN_IF_NOT_OK_REF(metadata_parser_or_error.status());
+  return std::unique_ptr<GoogleAsyncClientImpl>(
+      new GoogleAsyncClientImpl(dispatcher, tls, stub_factory, std::move(scope), config, context,
+                                stat_names, std::move(*metadata_parser_or_error)));
+}
+
 GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleAsyncClientThreadLocal& tls,
                                              GoogleStubFactory& stub_factory,
@@ -97,14 +113,12 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              const envoy::config::core::v3::GrpcService& config,
                                              Server::Configuration::ServerFactoryContext& context,
                                              const StatNames& stat_names,
-                                             GrpcServiceInitialMetadataPtr initial_metadata)
+                                             GrpcServiceInitialMetadataPtr metadata_parser)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       target_uri_(config.google_grpc().target_uri()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
-      metadata_parser_(
-          THROW_OR_RETURN_VALUE(buildMetadataParser(config, std::move(initial_metadata)),
-                                GrpcServiceInitialMetadataPtr)) {
+      metadata_parser_(std::move(metadata_parser)) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive

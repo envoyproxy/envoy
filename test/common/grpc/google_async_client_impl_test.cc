@@ -70,8 +70,8 @@ public:
   }
 
   virtual void initialize() {
-    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(
-        *dispatcher_, *tls_, stub_factory_, scope_, config_, context_, stat_names_, nullptr);
+    grpc_client_ = *GoogleAsyncClientImpl::create(*dispatcher_, *tls_, stub_factory_, scope_,
+                                                  config_, context_, stat_names_, nullptr);
   }
 
   envoy::config::core::v3::GrpcService config_;
@@ -100,6 +100,16 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, ThreadSafe) {
                        "isThreadSafe");
   });
   thread->join();
+}
+
+// Validates that create() returns an error, rather than throwing, when the client parses its
+// initial metadata and that fails. The client may be created on a worker thread, where an
+// exception wouldn't be caught.
+TEST_F(EnvoyGoogleAsyncClientImplTest, CreateFailsForInvalidInitialMetadata) {
+  config_.mutable_initial_metadata(0)->set_value("%NOT_A_COMMAND%");
+  EXPECT_FALSE(GoogleAsyncClientImpl::create(*dispatcher_, *tls_, stub_factory_, scope_, config_,
+                                             context_, stat_names_, nullptr)
+                   .ok());
 }
 
 // Validate that a failure in gRPC stub call creation returns immediately with
@@ -199,8 +209,8 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
 class EnvoyGoogleLessMockedAsyncClientImplTest : public EnvoyGoogleAsyncClientImplTest {
 public:
   void initialize() override {
-    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(
-        *dispatcher_, *tls_, real_stub_factory_, scope_, config_, context_, stat_names_, nullptr);
+    grpc_client_ = *GoogleAsyncClientImpl::create(*dispatcher_, *tls_, real_stub_factory_, scope_,
+                                                  config_, context_, stat_names_, nullptr);
   }
 
   GoogleGenericStubFactory real_stub_factory_;
