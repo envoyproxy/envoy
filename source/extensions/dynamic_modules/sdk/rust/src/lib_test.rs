@@ -1,5 +1,6 @@
 #![allow(clippy::unnecessary_cast)]
 use crate::*;
+use std::num::NonZero;
 #[cfg(test)]
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize};
 
@@ -2147,7 +2148,7 @@ fn test_get_upstream_connection_id() {
     raw: std::ptr::null_mut(),
   };
 
-  assert_eq!(filter.get_upstream_connection_id(), 54321);
+  assert_eq!(filter.get_upstream_connection_id(), NonZero::new(54321));
 }
 
 #[test]
@@ -2158,7 +2159,7 @@ fn test_get_upstream_connection_id_unavailable() {
     raw: std::ptr::null_mut(),
   };
 
-  assert_eq!(filter.get_upstream_connection_id(), 0);
+  assert_eq!(filter.get_upstream_connection_id(), None);
 }
 
 static MOCK_HTTP_UPSTREAM_CONNECTION_ID: std::sync::atomic::AtomicU64 =
@@ -2179,7 +2180,7 @@ fn test_http_get_upstream_connection_id() {
     raw_ptr: std::ptr::null_mut(),
   };
 
-  assert_eq!(filter.get_upstream_connection_id(), 98765);
+  assert_eq!(filter.get_upstream_connection_id(), NonZero::new(98765));
   MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
 }
 
@@ -2191,7 +2192,7 @@ fn test_http_get_upstream_connection_id_unavailable() {
     raw_ptr: std::ptr::null_mut(),
   };
 
-  assert_eq!(filter.get_upstream_connection_id(), 0);
+  assert_eq!(filter.get_upstream_connection_id(), None);
 }
 
 #[no_mangle]
@@ -12265,6 +12266,32 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route() {
   };
   assert_eq!(
     abi::envoy_dynamic_module_type_route_specifier_decision::PassThrough,
+    decision
+  );
+  unsafe {
+    route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
+  }
+
+  // A config that asks matching to carry on maps to the ContinueMatching decision across the ABI.
+  let new_fn: NewRouteSpecifierConfigFunction = |_, _, _| {
+    Some(Box::new(TestRouteSpecifierConfig {
+      decision: route_specifier::RouteDecision::ContinueMatching,
+    }))
+  };
+  let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
+    std::ptr::null_mut(),
+    "test_route_specifier",
+    b"",
+    &new_fn,
+  );
+  let decision = unsafe {
+    route_specifier::envoy_dynamic_module_on_route_specifier_on_route(
+      config_ptr,
+      std::ptr::null_mut(),
+    )
+  };
+  assert_eq!(
+    abi::envoy_dynamic_module_type_route_specifier_decision::ContinueMatching,
     decision
   );
   unsafe {

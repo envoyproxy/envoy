@@ -24,8 +24,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // A :ref:`route specifier <config_http_conn_man_route_specifiers>` implemented by a
 // :ref:`dynamic module <arch_overview_dynamic_modules>`. For each request the module keeps the
 // route that route matching resolved, refines it, replaces it with one of the route templates
-// declared here, or drops it. Envoy builds every route from validated configuration, so a module
-// can never produce a malformed route.
+// declared here, drops it, or lets route matching carry on with the next route. Envoy builds every
+// route from validated configuration, so a module can never produce a malformed route.
 //
 // See :ref:`the dynamic modules route specifier
 // <config_http_route_specifiers_dynamic_modules>` for more details.
@@ -50,6 +50,12 @@ enum FailurePolicy {
   // this once the module owns the routing of the virtual host, so that a failure never falls back
   // to the routes that are left.
   NO_ROUTE = 2;
+
+  // Skip the route the specifier was given and let route matching carry on with the next route,
+  // keeping the route table the module replaces in effect for the request. Prefer this for the
+  // catch all route that owns routing during a migration, so a module failure falls back to the
+  // route table rather than to the catch all route's own action.
+  CONTINUE_MATCHING = 3;
 }
 
 // A named route the module may select for a request.

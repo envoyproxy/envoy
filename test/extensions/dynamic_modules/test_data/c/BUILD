@@ -229,6 +229,8 @@ test_program(name = "route_specifier_config_new_fail")
 
 test_program(name = "route_specifier_unknown_decision")
 
+test_program(name = "route_specifier_continue_matching")
+
 test_program(name = "route_specifier_select_template")
 
 test_program(name = "route_specifier_override")

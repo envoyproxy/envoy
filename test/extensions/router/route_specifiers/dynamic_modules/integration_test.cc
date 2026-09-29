@@ -228,6 +228,48 @@ specifier_config:
     HttpIntegrationTest::initialize();
   }
 
+  // Configures the catch all route with a route level specifier and adds a more specific route
+  // after it, so a test can see a ContinueMatching decision drop the catch all route and let
+  // matching carry on to the specific route.
+  void setupContinueMatchingTest(const std::string& failure_policy = "PASS_THROUGH") {
+    config_helper_.addConfigModifier(
+        [failure_policy](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          const std::string specifier_yaml = absl::StrCat(R"EOF(
+dynamic_module_config:
+  name: route_specifier_integration_test
+  do_not_close: true
+specifier_name: test_route_specifier
+stat_prefix: test
+failure_policy: )EOF",
+                                                          failure_policy, "\n");
+          DynamicModuleRouteSpecifierProto specifier_config;
+          TestUtility::loadFromYaml(specifier_yaml, specifier_config);
+
+          auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+          virtual_host->clear_domains();
+          virtual_host->add_domains("example.com");
+
+          auto* catch_all = virtual_host->mutable_routes(0);
+          catch_all->set_name("catch_all");
+          auto* specifier = catch_all->add_route_specifiers();
+          specifier->set_name("envoy.router.route_specifiers.dynamic_modules");
+          std::ignore = specifier->mutable_typed_config()->PackFrom(specifier_config);
+
+          auto* specific = virtual_host->add_routes();
+          TestUtility::loadFromYaml(R"EOF(
+name: specific
+match: {prefix: "/specific"}
+route: {cluster: canary}
+)EOF",
+                                    *specific);
+        });
+    addCanaryCluster();
+    setUpstreamCount(2);
+    HttpIntegrationTest::initialize();
+  }
+
   Http::TestRequestHeaderMapImpl
   requestHeaders(const std::vector<std::pair<std::string, std::string>>& extra_headers = {}) {
     Http::TestRequestHeaderMapImpl headers{
@@ -1076,6 +1118,50 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowExampleWetRunApplies) {
   // A wet run applies the decision instead of counting, so the dry run counters are never created.
   EXPECT_EQ(0, counterValue("dynamicmodulescustom.shadow_match"));
   EXPECT_EQ(0, counterValue("dynamicmodulescustom.shadow_mismatch"));
+}
+
+// A ContinueMatching decision drops the catch all route and lets matching carry on to a more
+// specific route.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ContinueMatchingSkipsCatchAllRoute) {
+  setupContinueMatchingTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Without a decision the catch all route stays in effect, so the request reaches its cluster.
+  auto baseline = sendRequest({{":path", "/specific"}});
+  EXPECT_EQ("200", baseline->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", testing::Ge(1));
+
+  // The ContinueMatching decision skips the catch all route, so matching reaches the specific
+  // route.
+  auto response = sendRequest({{":path", "/specific"}, {"x-decision", "continue-matching"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.canary.upstream_rq_200", testing::Ge(1));
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.test.decision_continue_matching", testing::Ge(1));
+}
+
+// A ContinueMatching decision on a request that matches no other route yields no route, so the
+// request gets a 404.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ContinueMatchingOnTheLastRouteReturns404) {
+  setupContinueMatchingTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The specific route does not match "/", so the catch all route is the last one to try.
+  auto response = sendRequest({{"x-decision", "continue-matching"}});
+  EXPECT_EQ("404", response->headers().getStatusValue());
+}
+
+// With the CONTINUE_MATCHING failure policy a module error drops the catch all route and lets
+// matching carry on to a more specific route.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ContinueMatchingFailurePolicyContinuesOnError) {
+  setupContinueMatchingTest("CONTINUE_MATCHING");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{":path", "/specific"}, {"x-decision", "error"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.canary.upstream_rq_200", testing::Ge(1));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.failure_module_error",
+                               testing::Ge(1));
 }
 
 } // namespace

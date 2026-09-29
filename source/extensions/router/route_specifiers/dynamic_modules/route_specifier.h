@@ -56,6 +56,7 @@ constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
   COUNTER(decision_no_route)                                                                       \
   COUNTER(decision_error)                                                                          \
   COUNTER(decision_reuse_previous)                                                                 \
+  COUNTER(decision_continue_matching)                                                              \
   COUNTER(runtime_skipped)                                                                         \
   COUNTER(failure_module_error)                                                                    \
   COUNTER(failure_template_not_selected)                                                           \
@@ -196,6 +197,7 @@ public:
   OnRouteSpecifierRouteDestroyType onRouteDestroy() const { return on_route_destroy_; }
   uint32_t maxRewrittenPathBytes() const { return max_rewritten_path_bytes_; }
   bool failClosed() const { return fail_closed_; }
+  bool continueMatchingOnFailure() const { return continue_matching_on_failure_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Runtime::Loader& runtime() const { return runtime_; }
   TimeSource& timeSource() const { return time_source_; }
@@ -249,6 +251,7 @@ private:
   const std::optional<RuntimeFraction> runtime_fraction_;
   const uint32_t max_rewritten_path_bytes_;
   const bool fail_closed_;
+  const bool continue_matching_on_failure_;
   Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
@@ -426,11 +429,13 @@ public:
                                        uint64_t random) const override;
 
 private:
-  // The route a decision produced, along with why it could not be produced.
+  // The outcome of a decision, holding the route it produced, the chain status, the reason it could
+  // not be honored, and whether route matching should carry on with the next route.
   struct Decision {
     Envoy::Router::RouteConstSharedPtr route;
     Envoy::Router::OnRouteChainStatus status{Envoy::Router::OnRouteChainStatus::Continue};
     Failure failure{Failure::None};
+    Envoy::Router::OnRouteMatchStatus match_status{Envoy::Router::OnRouteMatchStatus::Unspecified};
   };
 
   // decision is the raw value the module returned, which may be outside the known enum values.

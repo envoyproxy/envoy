@@ -215,6 +215,9 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_rewritten_path_bytes, 65536)),
       fail_closed_(proto_config.failure_policy() ==
                    envoy::extensions::router::route_specifiers::dynamic_modules::v3::NO_ROUTE),
+      continue_matching_on_failure_(
+          proto_config.failure_policy() ==
+          envoy::extensions::router::route_specifiers::dynamic_modules::v3::CONTINUE_MATCHING),
       cluster_manager_(context.serverFactoryContext().clusterManager()),
       runtime_(context.serverFactoryContext().runtime()),
       time_source_(context.serverFactoryContext().timeSource()),
@@ -633,7 +636,7 @@ Envoy::Router::OnRouteResult DynamicModuleRouteSpecifier::onRoute(
   Decision result = resolve(context, decision);
 
   record_duration(config_->stats().specifier_duration_);
-  return {std::move(result.route), result.status};
+  return {std::move(result.route), result.status, result.match_status};
 }
 
 DynamicModuleRouteSpecifier::Decision
@@ -679,6 +682,10 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     }
     ENVOY_LOG(debug, "dynamic module route specifier could not honor the decision, reason {}",
               static_cast<int>(failure));
+    if (config_->continueMatchingOnFailure()) {
+      return Decision{context.input_route, Status::Continue, failure,
+                      Envoy::Router::OnRouteMatchStatus::Continue};
+    }
     if (config_->failClosed()) {
       return Decision{nullptr, Status::StopIteration, failure};
     }
@@ -695,6 +702,10 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
   case envoy_dynamic_module_type_route_specifier_decision_Error:
     config_->stats().decision_error_.inc();
     return fail(Failure::ModuleError);
+  case envoy_dynamic_module_type_route_specifier_decision_ContinueMatching:
+    config_->stats().decision_continue_matching_.inc();
+    return {context.input_route, status(Status::Continue), Failure::None,
+            Envoy::Router::OnRouteMatchStatus::Continue};
   case envoy_dynamic_module_type_route_specifier_decision_Override: {
     config_->stats().decision_override_.inc();
     if (context.input_route == nullptr) {

@@ -16236,6 +16236,9 @@ typedef enum envoy_dynamic_module_type_route_specifier_decision {
   // previous route exists, otherwise Envoy applies the failure policy. Recorded overrides are
   // ignored. The chain stops by default.
   envoy_dynamic_module_type_route_specifier_decision_ReusePrevious = 5,
+  // Skip the route the specifier was given and let route matching carry on with the next route. The
+  // recorded overrides and the returned route are ignored.
+  envoy_dynamic_module_type_route_specifier_decision_ContinueMatching = 6,
 } envoy_dynamic_module_type_route_specifier_decision;
 
 /**
@@ -16243,8 +16246,8 @@ typedef enum envoy_dynamic_module_type_route_specifier_decision {
  * configured after this one run for the request.
  */
 typedef enum envoy_dynamic_module_type_route_specifier_chain_status {
-  // Envoy decides: the chain continues for the PassThrough and Override decisions and stops for the
-  // SelectTemplate and NoRoute decisions.
+  // Envoy decides. The chain continues for the PassThrough, Override and ContinueMatching decisions
+  // and stops for the SelectTemplate, NoRoute and ReusePrevious decisions.
   envoy_dynamic_module_type_route_specifier_chain_status_Default = 0,
   // The chain continues.
   envoy_dynamic_module_type_route_specifier_chain_status_Continue = 1,
