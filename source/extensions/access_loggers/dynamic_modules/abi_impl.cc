@@ -35,9 +35,22 @@ bool envoy_dynamic_module_callback_access_logger_get_headers(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers) {
+  // The deprecated callback takes no capacity, so the module guarantees that the array holds every
+  // header.
+  size_t size = 0;
+  return envoy_dynamic_module_callback_access_logger_get_headers_v2(
+      logger_envoy_ptr, header_type, result_headers, SIZE_MAX, &size);
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_headers_v2(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
+    size_t* size_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  return ContextAccessor::getHeaders(
-      ContextAccessor::headerMapByType(*logger->log_context_, header_type), result_headers);
+  return ContextAccessor::getHeadersBounded(
+      ContextAccessor::headerMapByType(*logger->log_context_, header_type), result_headers,
+      capacity, size_out);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_header_value(

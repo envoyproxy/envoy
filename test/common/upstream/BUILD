@@ -318,6 +318,23 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "multi_health_checker_test",
+    srcs = ["multi_health_checker_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/upstream:multi_health_checker_lib",
+        "//source/extensions/health_checkers/http:health_checker_lib",
+        "//source/extensions/health_checkers/tcp:health_checker_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = [
         "health_checker_impl_test.cc",
@@ -879,6 +896,19 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/upstream:default_local_address_selector_factory",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "udp_source_address_policy_test",
+    size = "small",
+    srcs = ["udp_source_address_policy_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/upstream:udp_source_address_policy_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/network:socket_mocks",
     ],
 )
 

@@ -89,6 +89,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         header_to_set: config_iter.next().unwrap().to_owned(),
       }))
     },
+    "upstream_connection_attempts" => Some(Box::new(UpstreamConnectionAttemptsFilterConfig {
+      observed_total: envoy_filter_config
+        .define_counter("upstream_connection_attempts_observed_total")
+        .unwrap(),
+    })),
     "generic_secret_callbacks" => {
       let secret_name = String::from_utf8(config.to_owned()).unwrap();
       // A secret that is not configured anywhere cannot be subscribed to.
@@ -595,7 +600,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    assert!(envoy_filter.get_upstream_connection_id() > 0);
+    assert_ne!(envoy_filter.get_upstream_connection_id(), None);
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
@@ -1725,6 +1730,40 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
     let method = method_ref.as_ref().unwrap().as_str();
     envoy_filter
       .decrease_gauge_vec(self.entrypoint_pending, &["on_response_headers", method], 1)
+      .unwrap();
+  }
+}
+
+struct UpstreamConnectionAttemptsFilterConfig {
+  observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UpstreamConnectionAttemptsFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(UpstreamConnectionAttemptsFilter {
+      observed_total: self.observed_total,
+    })
+  }
+}
+
+struct UpstreamConnectionAttemptsFilter {
+  observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionAttemptsFilter {
+  fn on_stream_complete(&self, envoy_filter: &mut EHF) {
+    assert!(!envoy_filter
+      .get_upstream_remote_address()
+      .unwrap()
+      .as_slice()
+      .is_empty());
+    assert_eq!(envoy_filter.get_upstream_hosts_attempted().len(), 1);
+    assert_eq!(
+      envoy_filter.get_upstream_connection_ids_attempted().len(),
+      1
+    );
+    envoy_filter
+      .increment_counter(self.observed_total, 1)
       .unwrap();
   }
 }

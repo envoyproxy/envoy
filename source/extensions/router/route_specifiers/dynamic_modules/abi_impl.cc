@@ -207,6 +207,12 @@ bool envoy_dynamic_module_callback_route_specifier_config_register_route_templat
       ->registerRouteTemplate(toStringView(template_id), toStringView(serialized_route));
 }
 
+void envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  setEnvoyBuffer(result, routeSpecifierConfig(config_envoy_ptr)->specifierInstanceId());
+}
+
 // ---------------------------------- Metrics ----------------------------------
 
 envoy_dynamic_module_type_metrics_result
@@ -418,9 +424,10 @@ size_t envoy_dynamic_module_callback_route_specifier_get_request_headers_size(
 
 bool envoy_dynamic_module_callback_route_specifier_get_request_headers(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers) {
-  return ContextAccessor::getHeaders(routeSpecifierContext(context_envoy_ptr)->headers,
-                                     result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
+    size_t* size_out) {
+  return ContextAccessor::getHeadersBounded(routeSpecifierContext(context_envoy_ptr)->headers,
+                                            result_headers, capacity, size_out);
 }
 
 bool envoy_dynamic_module_callback_route_specifier_get_request_header_value(
@@ -520,21 +527,18 @@ bool envoy_dynamic_module_callback_route_specifier_get_cluster_host_count(
 
 // --------------------------------- Input route -------------------------------
 
-bool envoy_dynamic_module_callback_route_specifier_get_input_route(
-    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_route_specifier_input_route* result) {
-  const auto& route = routeSpecifierContext(context_envoy_ptr)->currentRoute();
-  if (route == nullptr) {
-    return false;
-  }
+// Fills the free to read properties of a route into result. Shared by the input route and the
+// previous route getters, which differ only in which route they read.
+void fillInputRoute(const Envoy::Router::Route& route,
+                    envoy_dynamic_module_type_route_specifier_input_route* result) {
   *result = {};
-  const auto* entry = route->routeEntry();
+  const auto* entry = route.routeEntry();
   result->kind = entry != nullptr
                      ? envoy_dynamic_module_type_route_specifier_route_kind_RouteEntry
                      : envoy_dynamic_module_type_route_specifier_route_kind_DirectResponse;
-  setEnvoyBuffer(&result->name, route->routeName());
-  setEnvoyBuffer(&result->virtual_host_name, route->virtualHost().name());
-  const auto& metadata = route->metadata();
+  setEnvoyBuffer(&result->name, route.routeName());
+  setEnvoyBuffer(&result->virtual_host_name, route.virtualHost().name());
+  const auto& metadata = route.metadata();
   result->has_metadata =
       !metadata.filter_metadata().empty() || !metadata.typed_filter_metadata().empty();
   if (entry != nullptr) {
@@ -560,8 +564,46 @@ bool envoy_dynamic_module_callback_route_specifier_get_input_route(
     result->has_rate_limits = !entry->rateLimitPolicy().empty();
     result->request_mirror_policies_count = entry->shadowPolicies().size();
   } else {
-    result->response_code = static_cast<uint32_t>(route->directResponseEntry()->responseCode());
+    result->response_code = static_cast<uint32_t>(route.directResponseEntry()->responseCode());
   }
+}
+
+bool envoy_dynamic_module_callback_route_specifier_get_input_route(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_input_route* result) {
+  const auto& route = routeSpecifierContext(context_envoy_ptr)->currentRoute();
+  if (route == nullptr) {
+    return false;
+  }
+  fillInputRoute(*route, result);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_get_previous_route(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_input_route* result) {
+  const auto previous = routeSpecifierContext(context_envoy_ptr)->stream_info.routeSharedPtr();
+  if (previous == nullptr) {
+    return false;
+  }
+  fillInputRoute(*previous, result);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_get_previous_route_metadata(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto previous = routeSpecifierContext(context_envoy_ptr)->stream_info.routeSharedPtr();
+  if (previous == nullptr) {
+    return false;
+  }
+  const auto& value = Envoy::Config::Metadata::metadataValue(
+      &previous->metadata(), std::string(toStringView(ns)), std::string(toStringView(key)));
+  if (value.kind_case() != Protobuf::Value::kStringValue) {
+    return false;
+  }
+  setEnvoyBuffer(result, value.string_value());
   return true;
 }
 
@@ -698,7 +740,7 @@ bool envoy_dynamic_module_callback_route_specifier_get_selected_template_id(
 
 // ---------------------------------- Decision ---------------------------------
 
-bool envoy_dynamic_module_callback_route_specifier_set_template(
+bool envoy_dynamic_module_callback_route_specifier_set_route_template(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer template_id) {
   auto* context = routeSpecifierContext(context_envoy_ptr);
@@ -715,6 +757,12 @@ bool envoy_dynamic_module_callback_route_specifier_set_template(
   context->selected_route =
       route_template->route->match(context->headers, context->stream_info, context->random_value);
   return true;
+}
+
+void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t user_data) {
+  routeSpecifierContext(context_envoy_ptr)->user_data = user_data;
 }
 
 void envoy_dynamic_module_callback_route_specifier_set_chain_status(

@@ -70,13 +70,30 @@ size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header
 bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_envoy_http_header* result_headers) {
+  // The deprecated callback takes no capacity, so the module guarantees that the array holds every
+  // header.
+  size_t size = 0;
+  return envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2(
+      bridge_envoy_ptr, result_headers, SIZE_MAX, &size);
+}
+
+bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
+    size_t* size_out) {
+  *size_out = 0;
   auto* bridge = getBridge(bridge_envoy_ptr);
   const auto* headers = bridge->requestHeaders();
   if (headers == nullptr) {
     return false;
   }
+  const size_t count = headers->size();
+  *size_out = count;
+  if (count > capacity || (count > 0 && result_headers == nullptr)) {
+    return false;
+  }
   size_t i = 0;
-  headers->iterate([&i, &result_headers](
+  headers->iterate([&i, result_headers](
                        const Envoy::Http::HeaderEntry& header) -> Envoy::Http::HeaderMap::Iterate {
     auto& key = header.key();
     result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());

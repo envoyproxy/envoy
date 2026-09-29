@@ -91,6 +91,24 @@ TEST(DynamicModuleFormatterAbiTest, HttpIntegerAttributesRequireHttpProtocol) {
   }
 }
 
+// The deprecated get_headers callback keeps its released signature and behavior.
+TEST(DynamicModuleFormatterAbiTest, DeprecatedGetHeaders) {
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_headers{{"x-request-id", "req-123"}};
+  ::Envoy::Formatter::Context context(&request_headers, nullptr, nullptr);
+  FormatterContext formatter_context{&context, &stream_info};
+
+  envoy_dynamic_module_type_envoy_http_header header;
+  EXPECT_TRUE(envoy_dynamic_module_callback_formatter_get_headers(
+      &formatter_context, envoy_dynamic_module_type_http_header_type_RequestHeader, &header));
+  EXPECT_EQ("x-request-id", absl::string_view(header.key_ptr, header.key_length));
+  EXPECT_EQ("req-123", absl::string_view(header.value_ptr, header.value_length));
+
+  // The response headers are unavailable.
+  EXPECT_FALSE(envoy_dynamic_module_callback_formatter_get_headers(
+      &formatter_context, envoy_dynamic_module_type_http_header_type_ResponseHeader, &header));
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Formatter

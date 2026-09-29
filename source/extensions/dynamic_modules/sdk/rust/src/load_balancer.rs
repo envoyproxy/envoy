@@ -620,23 +620,14 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       return Vec::default();
     }
     let size = self.context_get_downstream_headers_size();
-    if size == 0 {
-      return Vec::default();
-    }
-    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(size);
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+    crate::utility::collect_headers(size, |ptr, capacity, size_out| unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers_v2(
         self.context_ptr,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
+        ptr,
+        capacity,
+        size_out,
       )
-    };
-    if !success {
-      return Vec::default();
-    }
-    unsafe {
-      headers.set_len(size);
-    }
-    headers
+    })
   }
 
   fn context_get_downstream_header(

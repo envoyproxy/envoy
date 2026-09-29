@@ -55,7 +55,7 @@ absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
 
 /**
  * Run the route specifier chains of all three configuration levels. The levels run in order:
- * route configuration, then virtual host, then route. A nullptr route is a normal value flowing
+ * route, then virtual host, then route configuration. A nullptr route is a normal value flowing
  * through the chains rather than a stop condition, so a specifier can both drop a matched route
  * and supply one where matching found none. The one thing that does end the chain early is a
  * specifier declaring its result final, which skips every specifier after it, including those of
@@ -71,14 +71,18 @@ absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
  * @param headers the HTTP request headers.
  * @param stream_info the stream information for the request.
  * @param random a random value for use by the specifiers.
+ * @param match_status set to the match status of the last specifier that returned one other than
+ *        Unspecified, and left alone if none did.
  * @return the route to use for the request, @param route itself if every chain is empty, or
  *         nullptr if there is no route for the request.
  */
-RouteConstSharedPtr
-applyRouteSpecifiers(RouteConstSharedPtr route, RouteSpecifierSpan config_specifiers,
-                     RouteSpecifierSpan vhost_specifiers, RouteSpecifierSpan route_specifiers,
-                     const Http::RequestHeaderMap& headers,
-                     const StreamInfo::StreamInfo& stream_info, uint64_t random);
+RouteConstSharedPtr applyRouteSpecifiers(RouteConstSharedPtr route,
+                                         RouteSpecifierSpan config_specifiers,
+                                         RouteSpecifierSpan vhost_specifiers,
+                                         RouteSpecifierSpan route_specifiers,
+                                         const Http::RequestHeaderMap& headers,
+                                         const StreamInfo::StreamInfo& stream_info, uint64_t random,
+                                         OnRouteMatchStatus& match_status);
 
 } // namespace Router
 } // namespace Envoy

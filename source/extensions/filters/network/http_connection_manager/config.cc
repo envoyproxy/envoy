@@ -41,6 +41,7 @@
 #include "source/common/quic/server_connection_factory.h"
 #endif
 #include "source/common/router/route_provider_manager.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
@@ -369,6 +370,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       // http.(<stat_prefix>.)*
       http_scope_(
           Http::ConnectionManagerImpl::createStatsScope(context.scope(), config.stat_prefix())),
+      // The HTTP filters only get the prefixed scope when the runtime feature is enabled. Note the
+      // scope itself is always created because this connection manager's own stats live in it.
+      http_filter_factory_context_(
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter")
+              ? std::make_unique<Http::HttpFilterFactoryContext>(context, http_scope_,
+                                                                 stats_prefix_)
+              : nullptr),
       stats_(Http::ConnectionManagerImpl::generateStats(*http_scope_)),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats(*http_scope_)),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
@@ -737,10 +746,19 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     return;
   }
 
+  // The filters see the 'http.<stat_prefix>.' scope of this connection manager as the prefixed
+  // scope of their factory context. The stats prefix is propagated unchanged either way: the extra
+  // factory context of a filter reports it as empty when that scope is used, see
+  // Server::Configuration::ExtraFactoryContext::statsPrefixOr().
+  Server::Configuration::FactoryContext& filter_factory_context =
+      http_filter_factory_context_ != nullptr
+          ? static_cast<Server::Configuration::FactoryContext&>(*http_filter_factory_context_)
+          : context_;
   Http::FilterChainHelper<Server::Configuration::FactoryContext,
                           Server::Configuration::NamedHttpFilterConfigFactory>
       helper(filter_config_provider_manager_, context_.serverFactoryContext(),
-             context_.serverFactoryContext().clusterManager(), context_, stats_prefix_);
+             context_.serverFactoryContext().clusterManager(), filter_factory_context,
+             stats_prefix_);
 
   SET_AND_RETURN_IF_NOT_OK(
       helper.processFilters(config.http_filters(), "http", "http", filter_factories_),
