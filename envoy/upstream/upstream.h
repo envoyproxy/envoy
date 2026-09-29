@@ -1346,9 +1346,11 @@ public:
   virtual bool warmHosts() const PURE;
 
   /**
-   * @return false if this cluster should not block CDS ACK during warming. When false the cluster
-   * remains in warming_clusters_ but does not hold a CDS pause handle, so a slow-warming cluster
-   * cannot stall unrelated cluster updates delivered over ADS.
+   * @return false if this cluster has opted out of gating the CDS ACK during warming
+   * (wait_for_warm_on_init: false in the cluster proto). When false, the cluster does not hold
+   * a CDS pause handle at any point during warming, including during initial health checks.
+   * For DNS and Redis cluster types, false additionally causes the cluster to complete
+   * initialization immediately without waiting for DNS resolution.
    */
   virtual bool waitForWarmOnInit() const PURE;
 
