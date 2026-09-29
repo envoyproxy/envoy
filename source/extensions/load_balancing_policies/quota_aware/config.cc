@@ -36,7 +36,8 @@ Upstream::ThreadAwareLoadBalancerPtr QuotaAwareLoadBalancerFactory::create(
   Upstream::ThreadAwareLoadBalancerPtr fallback_lb =
       quota_aware_lb_config.create(cluster_info, priority_set, runtime, random, time_source);
   ASSERT(fallback_lb != nullptr);
-  return std::make_unique<QuotaAwareLoadBalancer>(quota_aware_lb_config, std::move(fallback_lb));
+  return std::make_unique<QuotaAwareLoadBalancer>(quota_aware_lb_config, std::move(fallback_lb),
+                                                 cluster_info.statsScope());
 }
 
 REGISTER_FACTORY(QuotaAwareLoadBalancerFactory, Upstream::TypedLoadBalancerFactory);
