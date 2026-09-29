@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
@@ -338,7 +339,7 @@ public:
   /**
    * Finds the named stat, if it exists, returning it as an optional.
    */
-  std::optional<std::reference_wrapper<StatType>> get() {
+  OptRef<StatType> get() {
     StatType* stat = stat_.get([this]() -> StatType* {
       StatType* stat = nullptr;
       IterateFn<StatType> check_stat = [this,
@@ -352,10 +353,7 @@ public:
       scope_.iterate(check_stat);
       return stat;
     });
-    if (stat == nullptr) {
-      return std::nullopt;
-    }
-    return *stat;
+    return makeOptRefFromPtr(stat);
   }
 
 private:

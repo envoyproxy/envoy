@@ -607,7 +607,9 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithNullPointers) {
   // Test context callbacks with null.
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_compute_hash_key(nullptr, nullptr));
   EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(nullptr), 0);
-  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(nullptr, nullptr));
+  size_t downstream_headers_size_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+      nullptr, nullptr, 0, &downstream_headers_size_out));
   envoy_dynamic_module_type_module_buffer header_key = {"test-key", 8};
   envoy_dynamic_module_type_envoy_buffer header_result = {nullptr, 0};
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header(
@@ -1031,8 +1033,9 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {
 
   // Test get all headers.
   std::vector<envoy_dynamic_module_type_envoy_http_header> all_headers(3);
-  EXPECT_TRUE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(context_ptr,
-                                                                              all_headers.data()));
+  size_t all_headers_size_out = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+      context_ptr, all_headers.data(), all_headers.size(), &all_headers_size_out));
   for (size_t i = 0; i < 3; i++) {
     EXPECT_NE(all_headers[i].key_ptr, nullptr);
     EXPECT_GT(all_headers[i].key_length, 0);
@@ -1088,8 +1091,9 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksNoHeaders) {
 
   EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(context_ptr), 0);
 
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_lb_context_get_downstream_headers(context_ptr, nullptr));
+  size_t no_headers_size_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+      context_ptr, nullptr, 0, &no_headers_size_out));
 
   envoy_dynamic_module_type_module_buffer key = {":method", 7};
   envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
@@ -2321,7 +2325,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsFrozenAfterInit) {
 }
 
 // Drives concurrent labeled increments from multiple threads to verify no data race in the
-// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+// registry's shared stat name pool. Run under `--config=tsan` to verify.
 TEST_F(DynamicModulesLoadBalancerTest, MetricsConcurrentIncrementCounterVecNoRace) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;

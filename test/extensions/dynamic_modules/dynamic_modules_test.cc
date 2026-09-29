@@ -158,11 +158,15 @@ TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
 }
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
-  // We expect a warning log for ABI version mismatch but still load the module successfully.
+  // We expect a warning log for ABI version mismatch but still load the module successfully. The
+  // log carries the module version string, which confirms it was copied out of module memory. This
+  // module has a dedicated version so it is loaded fresh and on_program_init runs the check.
   std::string language = GetParam();
-  absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
-  EXPECT_OK(result);
+  EXPECT_LOG_CONTAINS("warn", "invalid-version-hash is deprecated", {
+    absl::StatusOr<DynamicModulePtr> result =
+        newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
+    EXPECT_OK(result);
+  });
 }
 
 TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {

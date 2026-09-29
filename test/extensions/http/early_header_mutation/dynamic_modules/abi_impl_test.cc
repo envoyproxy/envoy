@@ -41,8 +41,9 @@ TEST_F(EarlyHeaderMutationAbiImplTest, GetHeadersSize) {
 TEST_F(EarlyHeaderMutationAbiImplTest, GetHeadersPopulatesArray) {
   const size_t count = envoy_dynamic_module_callback_early_header_mutation_get_headers_size(ptr());
   std::vector<envoy_dynamic_module_type_envoy_http_header> result(count);
-  ASSERT_TRUE(
-      envoy_dynamic_module_callback_early_header_mutation_get_headers(ptr(), result.data()));
+  size_t size_out = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_early_header_mutation_get_headers(
+      ptr(), result.data(), result.size(), &size_out));
   bool found_single = false;
   for (const auto& header : result) {
     if (absl::string_view(header.key_ptr, header.key_length) == "x-single") {

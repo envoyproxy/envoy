@@ -4,6 +4,7 @@
 #include "envoy/rds/route_config_provider.h"
 #include "envoy/server/factory_context.h"
 
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/rds/route_config_provider_manager.h"
 
 namespace Envoy {
@@ -29,7 +30,7 @@ public:
   absl::Status onConfigUpdate() override { return absl::OkStatus(); }
 
 private:
-  ProtobufTypes::MessagePtr route_config_proto_;
+  ArenaWrappedProto<Protobuf::Message> route_config_proto_;
   ConfigConstSharedPtr config_;
   SystemTime last_updated_;
   std::optional<ConfigInfo> config_info_;

@@ -23,9 +23,23 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
     const envoy::config::core::v3::PathConfigSource& path_config_source,
     SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
     SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : path_(path_config_source.path()), callbacks_(callbacks), resource_decoder_(resource_decoder),
-      stats_(stats), api_(api), validation_visitor_(validation_visitor) {
-  if (!path_config_source.has_watched_directory()) {
+    : path_(path_config_source.path()),
+      poll_interval_(PROTOBUF_GET_OPTIONAL_MS(path_config_source, poll_interval)),
+      callbacks_(callbacks), resource_decoder_(resource_decoder), stats_(stats), api_(api),
+      validation_visitor_(validation_visitor) {
+  if (poll_interval_.has_value() && path_config_source.has_watched_directory()) {
+    throw EnvoyException("PathConfigSource poll_interval and watched_directory cannot both be set");
+  }
+
+  if (poll_interval_.has_value()) {
+    poll_timer_ = dispatcher.createTimer([this]() {
+      // Re-enable before refreshing because an update callback may destroy the subscription.
+      poll_timer_->enableTimer(*poll_interval_);
+      if (started_) {
+        refresh();
+      }
+    });
+  } else if (!path_config_source.has_watched_directory()) {
     file_watcher_ = dispatcher.createFilesystemWatcher();
     THROW_IF_NOT_OK(
         file_watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
@@ -50,6 +64,9 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
 // Config::Subscription
 void FilesystemSubscriptionImpl::start(const absl::flat_hash_set<std::string>&) {
   started_ = true;
+  if (poll_timer_ != nullptr) {
+    poll_timer_->enableTimer(*poll_interval_);
+  }
   // Attempt to read in case there is a file there already.
   refresh();
 }
@@ -72,11 +89,19 @@ std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePt
   auto& message = *owned_message;
   THROW_IF_NOT_OK(MessageUtil::loadFromFile(path_, message, validation_visitor_, api_));
   *config_update = std::move(owned_message);
+  std::optional<uint64_t> new_hash;
+  if (poll_timer_ != nullptr) {
+    new_hash = MessageUtil::hash(message);
+    if (new_hash == config_hash_) {
+      return message.version_info();
+    }
+  }
   const auto decoded_resources =
       THROW_OR_RETURN_VALUE(DecodedResourcesWrapper::create(*resource_decoder_, message.resources(),
                                                             message.version_info()),
                             std::unique_ptr<DecodedResourcesWrapper>);
   THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources->refvec_, message.version_info()));
+  config_hash_ = new_hash;
   return message.version_info();
 }
 

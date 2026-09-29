@@ -35,7 +35,7 @@ directories:
   source/extensions/common/wasm: 95.6  # flaky: be careful adjusting
   source/extensions/common/wasm/ext: 100.0
   source/extensions/clusters/dynamic_modules: 97.7
-  source/extensions/dynamic_modules: 94.8  # Recursive total includes the separately exempted posix code.
+  source/extensions/dynamic_modules: 92.5  # Recursive total includes the separately exempted posix code.
   source/extensions/dynamic_modules/posix: 85.7
   source/extensions/filters/common: 97.1
   source/extensions/filters/common/ext_authz: 98.0

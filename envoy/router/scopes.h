@@ -53,11 +53,9 @@ public:
 private:
   // Update the key's hash with the new fragment hash.
   void updateHash(const ScopeKeyFragmentBase& fragment) {
-    std::stringbuf buffer;
-    buffer.sputn(reinterpret_cast<const char*>(&hash_), sizeof(hash_));
-    const auto& fragment_hash = fragment.hash();
-    buffer.sputn(reinterpret_cast<const char*>(&fragment_hash), sizeof(fragment_hash));
-    hash_ = HashUtil::xxHash64(buffer.str());
+    const uint64_t hashes[2] = {hash_, fragment.hash()};
+    hash_ = HashUtil::xxHash64(
+        absl::string_view(reinterpret_cast<const char*>(hashes), sizeof(hashes)));
   }
 
   uint64_t hash_{0};

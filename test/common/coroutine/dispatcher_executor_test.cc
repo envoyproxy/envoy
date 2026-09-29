@@ -112,6 +112,38 @@ TEST_F(DispatcherExecutorTest, CancelDisarmsTimer) {
   EXPECT_TRUE(absl::IsCancelled(*result));
 }
 
+Task<absl::Status> yieldThenReturn() { co_return co_await yield(); }
+
+TEST_F(DispatcherExecutorTest, YieldSuspendsAndResumeAtEndOfCurrentIteration) {
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(
+      yieldThenReturn(), executor_, [&result](absl::Status status) { result = std::move(status); },
+      StartMode::Inline);
+  // Inline launch runs up to `co_await yield()`, which posts resumption rather than completing on
+  // the caller's stack.
+  EXPECT_FALSE(result.has_value());
+
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->ok());
+}
+
+TEST_F(DispatcherExecutorTest, CancelWhileYieldedSafelyIgnoresPostedCallback) {
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(
+      yieldThenReturn(), executor_, [&result](absl::Status status) { result = std::move(status); },
+      StartMode::Inline);
+  EXPECT_FALSE(result.has_value());
+
+  handle.cancel();
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(absl::IsCancelled(*result));
+
+  // Draining the already-posted callback after cancellation is a safe no-op.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(absl::IsCancelled(*result));
+}
+
 } // namespace
 } // namespace Coroutine
 } // namespace Envoy

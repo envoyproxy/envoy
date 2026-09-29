@@ -12,6 +12,7 @@ pub mod catch_unwind;
 pub mod cert_validator;
 pub mod cluster;
 pub mod cluster_specifier;
+pub mod config_validator;
 pub mod dns_resolver;
 pub mod early_header_mutation;
 // Implementation detail. Public so SDK-provided macros (for example, `declare_matcher!`) that
@@ -20,6 +21,7 @@ pub mod early_header_mutation;
 #[doc(hidden)]
 pub mod ffi_helpers;
 pub mod formatter;
+pub mod header_formatter;
 pub mod health_checker;
 pub mod http;
 pub mod listener;
@@ -27,7 +29,9 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
 pub mod network;
+pub mod route_specifier;
 pub mod stats_sink;
+pub mod timing;
 pub mod tracer;
 pub mod transport_socket;
 pub mod udp_listener;
@@ -38,11 +42,13 @@ pub use buffer::*;
 pub use catch_unwind::*;
 pub use cert_validator::*;
 pub use cluster::*;
+pub use config_validator::*;
 pub use dns_resolver::*;
 pub use http::*;
 pub use listener::*;
 pub use load_balancer::*;
 pub use network::*;
+pub use timing::*;
 pub use tracer::*;
 pub use transport_socket::*;
 pub use udp_listener::*;
@@ -189,6 +195,61 @@ pub unsafe fn get_server_concurrency() -> u32 {
 /// This function must be called on the main thread.
 pub unsafe fn is_validation_mode() -> bool {
   unsafe { abi::envoy_dynamic_module_callback_is_validation_mode() }
+}
+
+/// Read a runtime value as a boolean.
+///
+/// The runtime is the layered key/value configuration described by the `layered_runtime` bootstrap
+/// option, including RTDS layers and values set through the admin `/runtime_modify` endpoint.
+/// [`get_runtime_int`] and [`get_runtime_number`] read the same configuration as other types.
+///
+/// `default_value` is returned whenever the key does not exist, the stored value cannot be read as
+/// a boolean, or the runtime is not reachable from the calling thread.
+///
+/// This may be called from any thread. Note that the runtime is reached through the server context,
+/// which is only installed on the main thread, so a call from a worker thread returns
+/// `default_value`. A module that needs a runtime value on the data path should read it while its
+/// configuration is created (for example in `on_http_filter_config_new`, which runs on the main
+/// thread) and cache the result in its own configuration.
+pub fn get_runtime_bool(key: &str, default_value: bool) -> bool {
+  unsafe {
+    abi::envoy_dynamic_module_callback_get_runtime_bool(str_to_module_buffer(key), default_value)
+  }
+}
+
+/// Read a runtime value as an unsigned integer. See [`get_runtime_bool`] for the description of the
+/// runtime and the threading behavior, which are identical here.
+///
+/// Envoy stores every numeric runtime value as a double, so this conversion is lossy at both ends.
+/// A value above 2^53 loses precision and is rounded to the nearest representable value, and a
+/// fractional value is truncated toward zero; in both cases the converted value is returned rather
+/// than `default_value`. Only a negative value, or one beyond the range of a `u64`, stores no
+/// integer at all and therefore yields `default_value`. Use [`get_runtime_number`] to read the
+/// value without either conversion.
+///
+/// Note that `key` must not name one of Envoy's own `envoy.reloadable_features.*` or
+/// `envoy.restart_features.*` guards: those are boolean guards and Envoy asserts against reading
+/// them as a number in debug builds, so read them with [`get_runtime_bool`] instead.
+pub fn get_runtime_int(key: &str, default_value: u64) -> u64 {
+  unsafe {
+    abi::envoy_dynamic_module_callback_get_runtime_int(str_to_module_buffer(key), default_value)
+  }
+}
+
+/// Read a runtime value as a double. See [`get_runtime_bool`] for the description of the runtime
+/// and the threading behavior, which are identical here.
+///
+/// This is the lossless counterpart to [`get_runtime_int`]: it returns the value exactly as Envoy
+/// stores it, so it neither rounds nor truncates, and it reads negative values, which
+/// [`get_runtime_int`] answers with its default.
+///
+/// Note that, as with [`get_runtime_int`], `key` must not name one of Envoy's own
+/// `envoy.reloadable_features.*` or `envoy.restart_features.*` guards; read those with
+/// [`get_runtime_bool`] instead.
+pub fn get_runtime_number(key: &str, default_value: f64) -> f64 {
+  unsafe {
+    abi::envoy_dynamic_module_callback_get_runtime_number(str_to_module_buffer(key), default_value)
+  }
 }
 
 /// Register a function pointer under a name in the process-wide function registry.
@@ -507,9 +568,14 @@ pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_mo
   }
 }
 
+/// Converts label name or value strings to module buffers for a labeled metric call.
+///
+/// The result is a `SmallVec` inlined for the common case of a few labels, so the typical one to
+/// four labels need no heap allocation. Callers must take `as_ptr` or `as_mut_ptr` on the bound
+/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that pointer.
 pub(crate) fn strs_to_module_buffers(
   strs: &[&str],
-) -> Vec<abi::envoy_dynamic_module_type_module_buffer> {
+) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_buffer; 4]> {
   strs.iter().map(|s| str_to_module_buffer(s)).collect()
 }
 
@@ -731,16 +797,19 @@ macro_rules! declare_network_filter_init_functions {
 /// - `http_per_route:` — [`NewHttpFilterPerRouteConfigFunction`] for HTTP per-route configs
 /// - `load_balancer:` — [`NewLoadBalancerConfigFunction`] for load balancer policies
 /// - `cluster:` — [`NewClusterConfigFunction`] for custom clusters
+/// - `config_validator:` — [`NewConfigValidatorConfigFunction`] for xDS config validators
 /// - `tracer:` — [`NewTracerConfigFunction`] for tracers
 /// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
 /// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
 /// - `access_logger:` — [`NewAccessLoggerConfigFunction`] for access loggers
 /// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
 /// - `cluster_specifier:` — [`NewClusterSpecifierConfigFunction`] for cluster specifiers
+/// - `route_specifier:` — [`NewRouteSpecifierConfigFunction`] for route specifiers
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 /// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
 /// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
 ///   mutations
+/// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
 ///
 /// # Examples
 ///
@@ -905,6 +974,13 @@ macro_rules! declare_all_init_functions {
       "NEW_CERT_VALIDATOR_CONFIG_FUNCTION"
     );
   };
+  (@register config_validator : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION"
+    );
+  };
   (@register upstream_http_tcp_bridge : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
       envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
@@ -954,6 +1030,13 @@ macro_rules! declare_all_init_functions {
       "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
     );
   };
+  (@register route_specifier : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION"
+    );
+  };
   (@register stat_sink : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
       envoy_proxy_dynamic_modules_rust_sdk::NEW_STAT_SINK_CONFIG_FUNCTION,
@@ -973,6 +1056,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION,
       $fn,
       "NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION"
+    );
+  };
+  (@register header_formatter : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HEADER_FORMATTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HEADER_FORMATTER_CONFIG_FUNCTION"
     );
   };
 }
@@ -1368,6 +1458,89 @@ macro_rules! declare_cluster_specifier_init_functions {
 }
 
 // =================================================================================================
+// Route Specifier Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new route specifier configuration.
+///
+/// The `name` is the value of `specifier_name` from the `dynamic_modules` route specifier
+/// configuration, allowing a single module to dispatch to different route specifier
+/// implementations. The `config` is the raw bytes from the `specifier_config` field. The
+/// `envoy_config` handle reports what the route specifier configuration declares and defines
+/// metrics. Returning `None` causes Envoy to reject the route specifier configuration.
+pub type NewRouteSpecifierConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    envoy_config: std::sync::Arc<dyn route_specifier::EnvoyRouteSpecifierConfig>,
+  ) -> Option<Box<dyn route_specifier::RouteSpecifierConfig>>;
+
+/// The global factory function for route specifiers. This is set via the `route_specifier:` arm of
+/// [`declare_all_init_functions!`] (or the [`declare_route_specifier_init_functions!`] shim) and is
+/// not intended to be set directly.
+pub static NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION: OnceLock<NewRouteSpecifierConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a route specifier dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewRouteSpecifierConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::route_specifier::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_route_specifier_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _envoy_config: std::sync::Arc<dyn EnvoyRouteSpecifierConfig>,
+/// ) -> Option<Box<dyn RouteSpecifierConfig>> {
+///   Some(Box::new(MyRouteSpecifierConfig {}))
+/// }
+///
+/// struct MyRouteSpecifierConfig {}
+///
+/// impl RouteSpecifierConfig for MyRouteSpecifierConfig {
+///   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision {
+///     if ctx.select_template("canary") {
+///       RouteDecision::SelectTemplate
+///     } else {
+///       RouteDecision::PassThrough
+///     }
+///   }
+/// }
+///
+/// declare_route_specifier_init_functions!(program_init, new_route_specifier_config);
+/// ```
+#[macro_export]
+macro_rules! declare_route_specifier_init_functions {
+  ($f:ident, $new_route_specifier_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION,
+          $new_route_specifier_config_fn,
+          "NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =================================================================================================
 // Stats Sink Dynamic Module
 // =================================================================================================
 
@@ -1483,6 +1656,25 @@ pub type NewEarlyHeaderMutationConfigFunction =
 pub static NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION: OnceLock<
   NewEarlyHeaderMutationConfigFunction,
 > = OnceLock::new();
+
+// =================================================================================================
+// Header Formatter Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new HTTP/1 header formatter configuration.
+///
+/// The `name` is the value of `header_formatter_name` from the `dynamic_modules` header formatter
+/// configuration, allowing a single module to dispatch to different implementations. The `config`
+/// is the raw configuration bytes. Returning `None` causes Envoy to reject the header formatter
+/// configuration.
+pub type NewHeaderFormatterConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn header_formatter::HeaderFormatterConfig>>;
+
+/// The global factory function for header formatter configurations. This is set via the
+/// `header_formatter:` arm of [`declare_all_init_functions!`] and is not intended to be set
+/// directly.
+pub static NEW_HEADER_FORMATTER_CONFIG_FUNCTION: OnceLock<NewHeaderFormatterConfigFunction> =
+  OnceLock::new();
 
 // =================================================================================================
 // Cluster Dynamic Module
@@ -1780,6 +1972,92 @@ macro_rules! declare_cert_validator_init_functions {
   };
 }
 
+// =============================================================================
+// Config Validator
+// =============================================================================
+
+/// The function signature for creating a new xDS config validator configuration.
+pub type NewConfigValidatorConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn config_validator::ConfigValidatorConfig>>;
+
+/// Global function for creating xDS config validator configurations.
+pub static NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewConfigValidatorConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a config validator dynamic module.
+///
+/// This macro generates the necessary `extern "C"` functions for the config validator module.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::config_validator::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_config_validator_config(
+///   name: &str,
+///   config: &[u8],
+/// ) -> Option<Box<dyn ConfigValidatorConfig>> {
+///   Some(Box::new(MyConfigValidatorConfig {}))
+/// }
+///
+/// declare_config_validator_init_functions!(program_init, new_config_validator_config);
+///
+/// struct MyConfigValidatorConfig {}
+///
+/// impl ConfigValidatorConfig for MyConfigValidatorConfig {
+///   fn validate(
+///     &self,
+///     _context: &ConfigValidatorContext,
+///     _type_url: &str,
+///     _resources: &[ConfigValidatorResource],
+///   ) -> Result<(), String> {
+///     Ok(())
+///   }
+///
+///   fn validate_delta(
+///     &self,
+///     _context: &ConfigValidatorContext,
+///     _type_url: &str,
+///     _added_resources: &[ConfigValidatorResource],
+///     _removed_resources: &[&str],
+///   ) -> Result<(), String> {
+///     Ok(())
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_config_validator_init_functions {
+  ($f:ident, $new_config_validator_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION,
+          $new_config_validator_config_fn,
+          "NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
+      }
+    }
+  };
+}
+
 // =================================================================================================
 // Upstream HTTP TCP Bridge Dynamic Module Support
 // =================================================================================================
@@ -1857,8 +2135,8 @@ pub static NEW_DNS_RESOLVER_CONFIG_FUNCTION: OnceLock<NewDnsResolverConfigFuncti
 ///   fn new_resolver(
 ///     &self,
 ///     envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
-///   ) -> Box<dyn DnsResolverInstance> {
-///     Box::new(MyDnsResolver { envoy_callback })
+///   ) -> Option<Box<dyn DnsResolverInstance>> {
+///     Some(Box::new(MyDnsResolver { envoy_callback }))
 ///   }
 /// }
 ///

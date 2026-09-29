@@ -1,7 +1,7 @@
 load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
 load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_extension_package",
@@ -65,6 +65,15 @@ cargo_build_script(
 rust_library(
     name = "envoy_proxy_dynamic_modules_rust_sdk",
     srcs = glob(["src/**/*.rs"]),
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+    ) + [":build_script"],
+)
+
+rust_test(
+    name = "envoy_proxy_dynamic_modules_rust_sdk_test",
+    crate = ":envoy_proxy_dynamic_modules_rust_sdk",
     edition = "2021",
     deps = all_crate_deps(
         normal = True,

@@ -1117,9 +1117,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 }
 
 void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
-  const Formatter::Context log_context{
+  Formatter::Context log_context{
       request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, type,
       active_span_.get()};
+  if (request_trailers_ != nullptr) {
+    log_context.setRequestTrailers(*request_trailers_);
+  }
 
   filter_manager_.log(log_context);
 
@@ -1549,12 +1552,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   // Apply header sanity checks.
-  std::optional<std::reference_wrapper<const absl::string_view>> error =
-      HeaderUtility::requestHeadersValid(*request_headers_);
+  OptRef<const absl::string_view> error = HeaderUtility::requestHeadersValid(*request_headers_);
   if (error != std::nullopt) {
-    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt, error.value().get());
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt, *error);
     if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-      connection_manager_.handleCodecError(error.value().get());
+      connection_manager_.handleCodecError(*error);
     }
     return;
   }
@@ -2326,9 +2328,12 @@ void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span,
   ASSERT(connection_manager_tracing_config_.has_value());
 
   const Tracing::HttpTraceContext trace_context(*request_headers_);
-  const Formatter::Context formatter_context{
+  Formatter::Context formatter_context{
       request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, {},
       active_span_.get()};
+  if (request_trailers_ != nullptr) {
+    formatter_context.setRequestTrailers(*request_trailers_);
+  }
   const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo(),
                                       formatter_context};
 

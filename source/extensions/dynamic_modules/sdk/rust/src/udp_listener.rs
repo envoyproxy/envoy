@@ -1,4 +1,4 @@
-use crate::buffer::EnvoyBuffer;
+use crate::buffer::{read_buffer_chunks, EnvoyBuffer};
 use crate::{
   abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
   wrap_into_c_void_ptr, EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId,
@@ -322,35 +322,13 @@ impl EnvoyUdpListenerFilterImpl {
 
 impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
   fn get_datagram_data(&self) -> (Vec<EnvoyBuffer<'_>>, usize) {
-    let size = unsafe {
-      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(self.raw)
+    let raw = self.raw;
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(raw)
     };
-    if size == 0 {
-      return (Vec::new(), 0);
-    }
-    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
-        self.raw,
-        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
-      )
-    };
-    if !ok {
-      return (Vec::new(), 0);
-    }
-
-    let total_length = unsafe {
-      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(self.raw)
-    };
-    if total_length == 0 {
-      // This shouldn't happen if chunks were retrieved, but we guard for safety.
-      return (Vec::new(), 0);
-    }
-
-    unsafe {
-      buffers.set_len(size);
-    }
-    (buffers, total_length)
+    read_buffer_chunks(count, |chunks| unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(raw, chunks)
+    })
   }
 
   fn set_datagram_data(&mut self, data: &[u8]) -> bool {

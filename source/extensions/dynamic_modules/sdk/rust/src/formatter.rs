@@ -208,26 +208,15 @@ impl FormatterContext {
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     let count = self.get_headers_count(header_type);
-    if count == 0 {
-      return Vec::new();
-    }
-
-    // Fill the pairs in place as ABI headers to avoid a second allocation.
-    let mut headers: Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> = Vec::with_capacity(count);
-    let success = unsafe {
+    crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
       abi::envoy_dynamic_module_callback_formatter_get_headers(
         self.envoy_ptr,
         header_type,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
+        ptr,
+        capacity,
+        size_out,
       )
-    };
-    if !success {
-      return Vec::new();
-    }
-    unsafe {
-      headers.set_len(count);
-    }
-    headers
+    })
   }
 
   /// Get a value from dynamic metadata.
@@ -424,8 +413,8 @@ ffi_export! {
       Some(value) => {
         FORMAT_BUFFER.with(|cell| {
           let mut buf = cell.borrow_mut();
-          buf.clear();
-          buf.extend_from_slice(value.as_bytes());
+          // The provider owns the returned string, so move its buffer in instead of copying it.
+          *buf = value.into_bytes();
           unsafe {
             *result = bytes_to_module_buffer(buf.as_slice());
           }

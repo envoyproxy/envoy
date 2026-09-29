@@ -13,6 +13,7 @@ import (
 	"unsafe"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
+	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/recovery"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
 
@@ -88,12 +89,16 @@ func (h *dymEarlyHeaderMutationHeaderMap) GetAll() [][2]shared.UnsafeEnvoyBuffer
 	}
 
 	resultHeaders := make([]C.envoy_dynamic_module_type_envoy_http_header, headerCount)
+	var sizeOut C.size_t
 	if !bool(C.envoy_dynamic_module_callback_early_header_mutation_get_headers(
 		h.hostPtr,
 		unsafe.SliceData(resultHeaders),
+		C.size_t(len(resultHeaders)),
+		&sizeOut,
 	)) {
 		return nil
 	}
+	resultHeaders = resultHeaders[:int(sizeOut)]
 	finalResult := envoyHttpHeaderSliceToUnsafeHeaderSlice(resultHeaders)
 	runtime.KeepAlive(resultHeaders)
 	return finalResult
@@ -280,6 +285,8 @@ func (h *dymEarlyHeaderMutationHandle) IsLogLevelEnabled(level shared.LogLevel) 
 // header mutation exposes no config-scoped callbacks yet, so it only carries the Envoy-side
 // configuration pointer for future use.
 type dymEarlyHeaderMutationConfigHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr C.envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr
 }
 
@@ -304,7 +311,8 @@ func envoy_dynamic_module_on_early_header_mutation_config_new(
 	hostConfigPtr C.envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr,
 	name C.envoy_dynamic_module_type_envoy_buffer,
 	config C.envoy_dynamic_module_type_envoy_buffer,
-) C.envoy_dynamic_module_type_early_header_mutation_config_module_ptr {
+) (modulePtr C.envoy_dynamic_module_type_early_header_mutation_config_module_ptr) {
+	defer recovery.Export("envoy_dynamic_module_on_early_header_mutation_config_new", nil, &modulePtr)
 	nameString := envoyBufferToStringUnsafe(name)
 	configBytes := envoyBufferToBytesUnsafe(config)
 
@@ -332,6 +340,7 @@ func envoy_dynamic_module_on_early_header_mutation_config_new(
 func envoy_dynamic_module_on_early_header_mutation_config_destroy(
 	configPtr C.envoy_dynamic_module_type_early_header_mutation_config_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_early_header_mutation_config_destroy")
 	wrapper := earlyHeaderMutationConfigManager.unwrap(unsafe.Pointer(configPtr))
 	if wrapper == nil {
 		return
@@ -344,7 +353,8 @@ func envoy_dynamic_module_on_early_header_mutation_config_destroy(
 func envoy_dynamic_module_on_early_header_mutation_mutate(
 	configPtr C.envoy_dynamic_module_type_early_header_mutation_config_module_ptr,
 	hostPtr C.envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
-) C.bool {
+) (continueChain C.bool) {
+	defer recovery.Export("envoy_dynamic_module_on_early_header_mutation_mutate", C.bool(true), &continueChain)
 	wrapper := earlyHeaderMutationConfigManager.unwrap(unsafe.Pointer(configPtr))
 	if wrapper == nil {
 		// The return value selects chain continuation, not success, so a missing mutation must not

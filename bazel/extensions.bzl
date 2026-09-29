@@ -116,8 +116,8 @@ def _envoy_toolchains_impl(module_ctx):
     arch_alias(
         name = "clang_platform",
         aliases = {
-            "amd64": "@envoy//bazel/platforms/rbe:linux_x64",
-            "aarch64": "@envoy//bazel/platforms/rbe:linux_arm64",
+            "amd64": str(Label("//bazel/platforms/rbe:linux_x64")),
+            "aarch64": str(Label("//bazel/platforms/rbe:linux_arm64")),
         },
     )
 

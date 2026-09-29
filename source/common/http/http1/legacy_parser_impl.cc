@@ -80,7 +80,7 @@ public:
     };
   }
 
-  size_t execute(const char* slice, int len) {
+  size_t execute(const char* slice, size_t len) {
     return http_parser_execute(&parser_, &settings_, slice, len);
   }
 
@@ -138,7 +138,7 @@ LegacyHttpParserImpl::LegacyHttpParserImpl(MessageType type, ParserCallbacks* da
 // same compilation unit so that the destructor has a complete definition of Impl.
 LegacyHttpParserImpl::~LegacyHttpParserImpl() = default;
 
-size_t LegacyHttpParserImpl::execute(const char* slice, int len) {
+size_t LegacyHttpParserImpl::execute(const char* slice, size_t len) {
   return impl_->execute(slice, len);
 }
 

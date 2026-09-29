@@ -73,6 +73,26 @@ struct WaitForSuccessfulUpstreamResponseOpts {
   bool failure_mode_allowed_header = false;
 };
 
+namespace {
+
+void cleanupExtAuthzConnection(FakeHttpConnectionPtr& connection) {
+  if (connection == nullptr) {
+    return;
+  }
+
+  AssertionResult result = connection->close();
+  RELEASE_ASSERT(result, result.message());
+  result = connection->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  // The disconnect notification can run inside another fake-upstream event callback. Wait for
+  // that callback to unwind before destroying the connection wrapper it may still reference.
+  result = connection->waitForDispatcherBarrier();
+  RELEASE_ASSERT(result, result.message());
+  connection.reset();
+}
+
+} // namespace
+
 class ExtAuthzGrpcIntegrationTest
     : public Grpc::BaseGrpcClientIntegrationParamTest,
       public HttpIntegrationTest,
@@ -615,10 +635,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -851,12 +868,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -2606,12 +2618,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -3522,12 +3529,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
