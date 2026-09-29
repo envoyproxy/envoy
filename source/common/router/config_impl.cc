@@ -2020,10 +2020,13 @@ public:
         isolated_init_manager_("isolated_validation") {}
 
   // Server::Configuration::ServerFactoryContext
+
+  // Scope and init manager are isolated; initialization is just to run checks.
   Stats::Scope& scope() override { return *isolated_scope_; }
   Stats::Scope& serverScope() override { return *isolated_scope_; }
   Init::Manager& initManager() override { return isolated_init_manager_; }
 
+  // The remainder of the methods delegate to the parent context.
   Upstream::ClusterManager& clusterManager() override { return parent_context_.clusterManager(); }
   Envoy::Config::XdsManager& xdsManager() override { return parent_context_.xdsManager(); }
   Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
@@ -2140,6 +2143,19 @@ std::shared_ptr<const VirtualHostImpl> VirtualHostInitializationObject::createVi
   return vhost;
 }
 
+static bool hasUnrecognizedFields(const Protobuf::Message& message,
+                                  const absl::flat_hash_set<int>& allowed_field_numbers) {
+  const auto* reflection = message.GetReflection();
+  std::vector<const Protobuf::FieldDescriptor*> set_fields;
+  reflection->ListFields(message, &set_fields);
+  for (const auto* field : set_fields) {
+    if (!allowed_field_numbers.contains(field->number())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_proto,
                              const CommonConfigSharedPtr& global_route_config,
                              bool validate_clusters,
@@ -2148,18 +2164,14 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
     return true;
   }
 
-  if (vhost_proto.has_matcher()) {
-    return true;
-  }
+  static const auto* const allowed_vhost_fields = new absl::flat_hash_set<int>{
+      envoy::config::route::v3::VirtualHost::kNameFieldNumber,
+      envoy::config::route::v3::VirtualHost::kDomainsFieldNumber,
+      envoy::config::route::v3::VirtualHost::kRoutesFieldNumber,
+      envoy::config::route::v3::VirtualHost::kRequireTlsFieldNumber,
+  };
 
-  if (vhost_proto.virtual_clusters_size() > 0 || vhost_proto.rate_limits_size() > 0 ||
-      vhost_proto.has_cors() || vhost_proto.typed_per_filter_config_size() > 0 ||
-      vhost_proto.request_mirror_policies_size() > 0 || vhost_proto.has_retry_policy() ||
-      vhost_proto.has_retry_policy_typed_config() || vhost_proto.has_hedge_policy() ||
-      vhost_proto.has_metadata() || !vhost_proto.request_headers_to_add().empty() ||
-      !vhost_proto.request_headers_to_remove().empty() ||
-      !vhost_proto.response_headers_to_add().empty() ||
-      !vhost_proto.response_headers_to_remove().empty()) {
+  if (hasUnrecognizedFields(vhost_proto, *allowed_vhost_fields)) {
     return true;
   }
 
@@ -2178,45 +2190,59 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
     }
   }
 
+  static const auto* const allowed_route_fields = new absl::flat_hash_set<int>{
+      envoy::config::route::v3::Route::kNameFieldNumber,
+      envoy::config::route::v3::Route::kMatchFieldNumber,
+      envoy::config::route::v3::Route::kRouteFieldNumber,
+  };
+
+  static const auto* const allowed_match_fields = new absl::flat_hash_set<int>{
+      envoy::config::route::v3::RouteMatch::kPrefixFieldNumber,
+      envoy::config::route::v3::RouteMatch::kPathFieldNumber,
+      envoy::config::route::v3::RouteMatch::kPathSeparatedPrefixFieldNumber,
+      envoy::config::route::v3::RouteMatch::kCaseSensitiveFieldNumber,
+  };
+
+  static const auto* const allowed_action_fields = new absl::flat_hash_set<int>{
+      envoy::config::route::v3::RouteAction::kClusterFieldNumber,
+      envoy::config::route::v3::RouteAction::kClusterNotFoundResponseCodeFieldNumber,
+      envoy::config::route::v3::RouteAction::kPriorityFieldNumber,
+      envoy::config::route::v3::RouteAction::kTimeoutFieldNumber,
+      envoy::config::route::v3::RouteAction::kIdleTimeoutFieldNumber,
+      envoy::config::route::v3::RouteAction::kFlushTimeoutFieldNumber,
+      envoy::config::route::v3::RouteAction::kMaxGrpcTimeoutFieldNumber,
+      envoy::config::route::v3::RouteAction::kGrpcTimeoutOffsetFieldNumber,
+      envoy::config::route::v3::RouteAction::kMaxStreamDurationFieldNumber,
+      envoy::config::route::v3::RouteAction::kInternalRedirectActionFieldNumber,
+  };
+
+  static const auto* const allowed_max_stream_duration_fields = new absl::flat_hash_set<int>{
+      envoy::config::route::v3::RouteAction::MaxStreamDuration::kMaxStreamDurationFieldNumber,
+      envoy::config::route::v3::RouteAction::MaxStreamDuration::kGrpcTimeoutHeaderMaxFieldNumber,
+      envoy::config::route::v3::RouteAction::MaxStreamDuration::kGrpcTimeoutHeaderOffsetFieldNumber,
+  };
+
   for (const auto& route : vhost_proto.routes()) {
-    if (route.action_case() != envoy::config::route::v3::Route::ActionCase::kRoute) {
+    if (route.action_case() != envoy::config::route::v3::Route::ActionCase::kRoute ||
+        hasUnrecognizedFields(route, *allowed_route_fields)) {
       return true;
     }
 
-    if (route.typed_per_filter_config_size() > 0 || !route.request_headers_to_add().empty() ||
-        !route.request_headers_to_remove().empty() || !route.response_headers_to_add().empty() ||
-        !route.response_headers_to_remove().empty() || route.has_metadata() ||
-        route.has_decorator() || route.has_tracing()) {
-      return true;
-    }
-
-    switch (route.match().path_specifier_case()) {
-    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
-    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
-    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
-      break;
-    default:
-      return true;
-    }
-
-    if (route.match().headers_size() > 0 || route.match().query_parameters_size() > 0 ||
-        route.match().dynamic_metadata_size() > 0 || route.match().has_grpc() ||
-        route.match().has_tls_context() || !route.match().cookies().empty() ||
-        !route.match().filter_state().empty() || route.match().has_runtime_fraction()) {
+    if (route.match().path_specifier_case() ==
+            envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET ||
+        hasUnrecognizedFields(route.match(), *allowed_match_fields)) {
       return true;
     }
 
     const auto& route_action = route.route();
 
     if (route_action.cluster_specifier_case() !=
-        envoy::config::route::v3::RouteAction::ClusterSpecifierCase::kCluster) {
+            envoy::config::route::v3::RouteAction::ClusterSpecifierCase::kCluster ||
+        hasUnrecognizedFields(route_action, *allowed_action_fields)) {
       return true;
     }
 
-    if (route_action.cluster().empty() || route_action.has_weighted_clusters() ||
-        route_action.has_cluster_specifier_plugin() ||
-        route_action.has_inline_cluster_specifier_plugin() ||
-        !route_action.cluster_header().empty()) {
+    if (route_action.cluster().empty()) {
       return true;
     }
 
@@ -2262,6 +2288,9 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
     }
     if (route_action.has_max_stream_duration()) {
       const auto& msd = route_action.max_stream_duration();
+      if (hasUnrecognizedFields(msd, *allowed_max_stream_duration_fields)) {
+        return true;
+      }
       if (msd.has_max_stream_duration() &&
           !DurationUtil::validateDurationNoThrow(msd.max_stream_duration()).ok()) {
         return true;
@@ -2274,20 +2303,6 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
           !DurationUtil::validateDurationNoThrow(msd.grpc_timeout_header_offset()).ok()) {
         return true;
       }
-    }
-
-    if (route_action.has_retry_policy() || route_action.has_retry_policy_typed_config() ||
-        route_action.has_hedge_policy() || route_action.has_metadata_match() ||
-        !route_action.prefix_rewrite().empty() || !route_action.path_rewrite().empty() ||
-        route_action.has_regex_rewrite() || route_action.has_path_rewrite_policy() ||
-        !route_action.host_rewrite_literal().empty() || route_action.has_auto_host_rewrite() ||
-        !route_action.host_rewrite_header().empty() || route_action.has_host_rewrite_path_regex() ||
-        !route_action.host_rewrite().empty() || route_action.append_x_forwarded_host() ||
-        route_action.request_mirror_policies_size() > 0 || route_action.rate_limits_size() > 0 ||
-        route_action.hash_policy_size() > 0 || route_action.has_cors() ||
-        route_action.upgrade_configs_size() > 0 || route_action.has_internal_redirect_policy() ||
-        route_action.has_early_data_policy()) {
-      return true;
     }
   }
 
