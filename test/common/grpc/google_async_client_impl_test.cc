@@ -70,8 +70,8 @@ public:
   }
 
   virtual void initialize() {
-    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, stub_factory_,
-                                                           scope_, config_, context_, stat_names_);
+    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(
+        *dispatcher_, *tls_, stub_factory_, scope_, config_, context_, stat_names_, nullptr);
   }
 
   envoy::config::core::v3::GrpcService config_;
@@ -199,8 +199,8 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
 class EnvoyGoogleLessMockedAsyncClientImplTest : public EnvoyGoogleAsyncClientImplTest {
 public:
   void initialize() override {
-    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, real_stub_factory_,
-                                                           scope_, config_, context_, stat_names_);
+    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(
+        *dispatcher_, *tls_, real_stub_factory_, scope_, config_, context_, stat_names_, nullptr);
   }
 
   GoogleGenericStubFactory real_stub_factory_;

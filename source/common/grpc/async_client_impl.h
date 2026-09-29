@@ -37,7 +37,7 @@ public:
   static absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
   create(const envoy::config::core::v3::GrpcService& config,
          Server::Configuration::ServerFactoryContext& context,
-         GrpcServiceInitialMetadataPtr initial_metadata = nullptr);
+         GrpcServiceInitialMetadataPtr initial_metadata);
   ~AsyncClientImpl() override;
 
   // Grpc::AsyncClient

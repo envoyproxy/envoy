@@ -425,7 +425,7 @@ public:
     config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
 
     fillServiceWideInitialMetadata(config);
-    return *AsyncClientImpl::create(config, server_factory_context_);
+    return *AsyncClientImpl::create(config, server_factory_context_, nullptr);
   }
 
   virtual envoy::config::core::v3::GrpcService createGoogleGrpcConfig() {
@@ -447,7 +447,7 @@ public:
     GoogleGenericStubFactory stub_factory;
     return std::make_unique<GoogleAsyncClientImpl>(
         *dispatcher_, *google_tls_, stub_factory, stats_scope_, createGoogleGrpcConfig(),
-        server_factory_context_, google_grpc_stat_names_);
+        server_factory_context_, google_grpc_stat_names_, nullptr);
 #else
     PANIC("reached unexpected code");
 #endif

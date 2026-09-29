@@ -70,8 +70,9 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
         });
     // Set tls callback in the HttpGrpcAccessLog constructor,
     // but it is not called yet since we have defer_data_ = true.
-    const auto access_log = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter},
-                                                                config, tls, logger_cache);
+    const auto access_log =
+        std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter}, config, tls, logger_cache,
+                                            Formatter::CommandParserPtrVector{}, nullptr);
     // Intentionally make access_log die earlier in this scope to simulate the situation where the
     // creator has been deleted yet the tls callback is not called yet.
   }
@@ -99,7 +100,8 @@ public:
               return logger_;
             });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
-                                                      logger_cache_);
+                                                      logger_cache_,
+                                                      Formatter::CommandParserPtrVector{}, nullptr);
   }
 
   void initWithCommandParsers(const std::vector<Formatter::CommandParserPtr>& command_parsers) {
@@ -120,7 +122,7 @@ public:
               return logger_;
             });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
-                                                      logger_cache_, command_parsers);
+                                                      logger_cache_, command_parsers, nullptr);
   }
 
   void expectLog(const std::string& expected_log_entry_yaml) {

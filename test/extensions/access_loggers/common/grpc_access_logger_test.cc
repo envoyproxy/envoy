@@ -651,25 +651,30 @@ TEST_F(GrpcAccessLoggerCacheTest, Deduplication) {
 
   expectClientCreation();
   MockGrpcAccessLoggerImpl::SharedPtr logger1 =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
-  EXPECT_EQ(logger1, logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP));
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr);
+  EXPECT_EQ(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr));
 
   // Do not deduplicate different types of logger
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::TCP));
+  EXPECT_NE(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::TCP, nullptr));
 
   // Changing log name leads to another logger.
   config.set_log_name("log-2");
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP));
+  EXPECT_NE(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr));
 
   config.set_log_name("log-1");
-  EXPECT_EQ(logger1, logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP));
+  EXPECT_EQ(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr));
 
   // Changing cluster name leads to another logger.
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-2");
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP));
+  EXPECT_NE(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr));
 }
 
 } // namespace

@@ -136,7 +136,8 @@ TEST(TcpGrpcAccessLog, TlsLifetimeCheck) {
     // Set tls callback in the TcpGrpcAccessLog constructor,
     // but it is not called yet since we have defer_data_ = true.
     const auto access_log =
-        std::make_unique<TcpGrpcAccessLog>(AccessLog::FilterPtr{filter}, config, tls, logger_cache);
+        std::make_unique<TcpGrpcAccessLog>(AccessLog::FilterPtr{filter}, config, tls, logger_cache,
+                                           Formatter::CommandParserPtrVector{}, nullptr);
     // Intentionally make access_log die earlier in this scope to simulate the situation where the
     // creator has been deleted yet the tls callback is not called yet.
   }

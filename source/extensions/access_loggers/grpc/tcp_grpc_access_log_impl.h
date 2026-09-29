@@ -32,8 +32,8 @@ public:
   TcpGrpcAccessLog(AccessLog::FilterPtr&& filter, const TcpGrpcAccessLogConfig config,
                    ThreadLocal::SlotAllocator& tls,
                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-                   const Formatter::CommandParserPtrVector& command_parsers = {},
-                   Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata = nullptr);
+                   const Formatter::CommandParserPtrVector& command_parsers,
+                   Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata);
 
 private:
   /**

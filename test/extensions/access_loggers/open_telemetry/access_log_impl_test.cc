@@ -85,7 +85,8 @@ public:
     auto commands =
         *Formatter::SubstitutionFormatStringUtils::parseFormatters(config_.formatters(), context_);
 
-    return std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_, commands);
+    return std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_, commands,
+                                       nullptr);
   }
 
   void expectLog(const std::string& expected_log_entry_yaml) {

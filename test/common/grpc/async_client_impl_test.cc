@@ -59,7 +59,7 @@ public:
     config.mutable_retry_policy()->mutable_num_retries()->set_value(3);
     *config.mutable_retry_policy()->mutable_retry_on() = "5xx";
 
-    grpc_client_ = *AsyncClientImpl::create(config, context_);
+    grpc_client_ = *AsyncClientImpl::create(config, context_, nullptr);
     cm_.initializeThreadLocalClusters({"test_cluster"});
     ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
   }
@@ -204,7 +204,7 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
   config.mutable_envoy_grpc()->set_authority("demo.com");
 
-  grpc_client_ = *AsyncClientImpl::create(config, context_);
+  grpc_client_ = *AsyncClientImpl::create(config, context_, nullptr);
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
@@ -247,7 +247,7 @@ TEST_F(EnvoyAsyncClientImplTest, BinaryMetadataInClientInitialMetadataIsBase64Es
   initial_metadata_entry->set_key("hello-world-in-japanese-bin");
   initial_metadata_entry->set_value("こんにちは 世界");
 
-  grpc_client_ = *AsyncClientImpl::create(config, context_);
+  grpc_client_ = *AsyncClientImpl::create(config, context_, nullptr);
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
@@ -426,7 +426,7 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerInitialMetadataAreNotUnescap
   envoy::config::core::v3::GrpcService config;
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
   config.mutable_envoy_grpc()->set_authority("demo.com");
-  grpc_client_ = *AsyncClientImpl::create(config, context_);
+  grpc_client_ = *AsyncClientImpl::create(config, context_, nullptr);
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
@@ -481,7 +481,7 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerTrailinglMetadataAreNotUnesc
   envoy::config::core::v3::GrpcService config;
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
   config.mutable_envoy_grpc()->set_authority("demo.com");
-  grpc_client_ = *AsyncClientImpl::create(config, context_);
+  grpc_client_ = *AsyncClientImpl::create(config, context_, nullptr);
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;

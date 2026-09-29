@@ -180,7 +180,7 @@ public:
                         const envoy::config::core::v3::GrpcService& config,
                         Server::Configuration::ServerFactoryContext& context,
                         const StatNames& stat_names,
-                        GrpcServiceInitialMetadataPtr initial_metadata = nullptr);
+                        GrpcServiceInitialMetadataPtr initial_metadata);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
