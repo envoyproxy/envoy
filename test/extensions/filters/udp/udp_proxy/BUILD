@@ -48,6 +48,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/udp/udp_proxy/session_filters:psc_setter_filter_proto_cc_proto",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:stream_encoder_mock",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/network:socket_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -102,6 +103,8 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/network:listen_socket_lib",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//test/extensions/filters/udp/udp_proxy/session_filters:buffer_filter_config_lib",
         "//test/extensions/filters/udp/udp_proxy/session_filters:buffer_filter_proto_cc_proto",

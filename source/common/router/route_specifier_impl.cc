@@ -9,7 +9,7 @@ namespace Router {
 
 absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& configs,
-    Server::Configuration::ServerFactoryContext& context) {
+    RouteSpecifierFactoryContext& context) {
   RouteSpecifierList specifiers;
   specifiers.reserve(configs.size());
 
@@ -23,7 +23,7 @@ absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
     }
 
     auto typed_config = Envoy::Config::Utility::translateToFactoryConfig(
-        proto_config, context.messageValidationVisitor(), *factory);
+        proto_config, context.serverFactoryContext().messageValidationVisitor(), *factory);
     auto specifier_or_error = factory->createRouteSpecifier(*typed_config, context);
     RETURN_IF_NOT_OK_REF(specifier_or_error.status());
 

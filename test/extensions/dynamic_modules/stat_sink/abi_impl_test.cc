@@ -169,6 +169,156 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterOutOfRange) {
 // Tag callbacks
 // =============================================================================
 
+TEST_F(DynamicModuleStatsSinkAbiTest, GetHistogramTagExtractedNameAndTags) {
+  NiceMock<Stats::MockParentHistogram> h0, h1;
+  Stats::MockParentHistogram* histograms[] = {&h0, &h1};
+  const std::string prefixes[] = {"ingress_http", "egress_http"};
+  for (size_t i = 0; i < 2; ++i) {
+    auto& histogram = *histograms[i];
+    histogram.name_ = "http." + prefixes[i] + ".downstream_rq_time";
+    histogram.setTagExtractedName("http.downstream_rq_time");
+    // Include a fixed/custom tag that cannot be recovered from the raw name.
+    histogram.setTags({{"envoy.http_conn_manager_prefix", prefixes[i]}, {"region", "us-east-4"}});
+    snapshot_.histograms_.push_back(histogram);
+    // The new callbacks must only read metadata, never statistics or samples.
+    EXPECT_CALL(histogram, intervalStatistics()).Times(0);
+    EXPECT_CALL(histogram, cumulativeStatistics()).Times(0);
+    EXPECT_CALL(histogram, recordValue(_)).Times(0);
+  }
+
+  for (size_t i = 0; i < 2; ++i) {
+    char name_buffer[256];
+    size_t name_size = 0;
+    ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+        snapshotHandle(), i, name_buffer, sizeof(name_buffer), &name_size));
+    EXPECT_EQ("http.downstream_rq_time", written(name_buffer, name_size, sizeof(name_buffer)));
+
+    size_t tag_count = 0;
+    ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+        snapshotHandle(), i, &tag_count));
+    ASSERT_EQ(2u, tag_count);
+    const Stats::TagVector expected = {{"envoy.http_conn_manager_prefix", prefixes[i]},
+                                       {"region", "us-east-4"}};
+    for (size_t t = 0; t < tag_count; ++t) {
+      char value_buffer[256];
+      size_t value_size = 0;
+      ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+          snapshotHandle(), i, t, name_buffer, sizeof(name_buffer), &name_size, value_buffer,
+          sizeof(value_buffer), &value_size));
+      EXPECT_EQ(expected[t].name_, written(name_buffer, name_size, sizeof(name_buffer)));
+      EXPECT_EQ(expected[t].value_, written(value_buffer, value_size, sizeof(value_buffer)));
+    }
+  }
+}
+
+TEST_F(DynamicModuleStatsSinkAbiTest, GetHistogramTagCountZero) {
+  NiceMock<Stats::MockParentHistogram> histogram;
+  histogram.name_ = "server.initialization_time_ms";
+  histogram.setTagExtractedName(histogram.name());
+  snapshot_.histograms_.push_back(histogram);
+
+  size_t tag_count = 12345;
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+      snapshotHandle(), 0, &tag_count));
+  EXPECT_EQ(0u, tag_count);
+
+  char name_buffer[64];
+  size_t name_size = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size));
+  EXPECT_EQ(histogram.name(), written(name_buffer, name_size, sizeof(name_buffer)));
+
+  char value_buffer[64];
+  size_t value_size = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+      snapshotHandle(), 0, 0, name_buffer, sizeof(name_buffer), &name_size, value_buffer,
+      sizeof(value_buffer), &value_size));
+}
+
+TEST_F(DynamicModuleStatsSinkAbiTest, GetHistogramTagOutOfRange) {
+  char name_buffer[16] = {'N'};
+  char value_buffer[16] = {'V'};
+  size_t name_size = 12345;
+  size_t value_size = 6789;
+  size_t tag_count = 42;
+  auto check_invalid_histogram = [&](size_t index) {
+    EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+        snapshotHandle(), index, name_buffer, sizeof(name_buffer), &name_size));
+    EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+        snapshotHandle(), index, &tag_count));
+    EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+        snapshotHandle(), index, 0, name_buffer, sizeof(name_buffer), &name_size, value_buffer,
+        sizeof(value_buffer), &value_size));
+  };
+  check_invalid_histogram(0); // Empty snapshot.
+
+  NiceMock<Stats::MockParentHistogram> histogram;
+  histogram.setTags({{"envoy.cluster_name", "foo"}});
+  snapshot_.histograms_.push_back(histogram);
+  check_invalid_histogram(1);
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+      snapshotHandle(), 0, 1, name_buffer, sizeof(name_buffer), &name_size, value_buffer,
+      sizeof(value_buffer), &value_size));
+  EXPECT_EQ(12345u, name_size);
+  EXPECT_EQ(6789u, value_size);
+  EXPECT_EQ(42u, tag_count);
+  EXPECT_EQ('N', name_buffer[0]);
+  EXPECT_EQ('V', value_buffer[0]);
+}
+
+TEST_F(DynamicModuleStatsSinkAbiTest, GetHistogramTagExtractedNameTruncatedThenRetry) {
+  NiceMock<Stats::MockParentHistogram> histogram;
+  histogram.setTagExtractedName("http.downstream_rq_time");
+  snapshot_.histograms_.push_back(histogram);
+
+  size_t name_size = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+      snapshotHandle(), 0, nullptr, 0, &name_size));
+  EXPECT_EQ(std::string("http.downstream_rq_time").size(), name_size);
+
+  char small[5] = {'Z', 'Z', 'Z', 'Z', 'Z'};
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+      snapshotHandle(), 0, small, 4, &name_size));
+  EXPECT_EQ("http", written(small, name_size, 4));
+  EXPECT_EQ('Z', small[4]); // No terminator or write beyond the supplied capacity.
+
+  std::string retry(name_size, '\0');
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+      snapshotHandle(), 0, retry.data(), retry.size(), &name_size));
+  EXPECT_EQ("http.downstream_rq_time", retry);
+}
+
+TEST_F(DynamicModuleStatsSinkAbiTest, GetHistogramTagTruncatedThenRetry) {
+  NiceMock<Stats::MockParentHistogram> histogram;
+  const std::string tag_name = "custom.tag";
+  const std::string tag_value = std::string(300, 'x') + "\"\\\n";
+  histogram.setTags({{tag_name, tag_value}});
+  snapshot_.histograms_.push_back(histogram);
+
+  size_t name_size = 0;
+  size_t value_size = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+      snapshotHandle(), 0, 0, nullptr, 0, &name_size, nullptr, 0, &value_size));
+  EXPECT_EQ(tag_name.size(), name_size);
+  EXPECT_EQ(tag_value.size(), value_size);
+
+  char name_small[4];
+  char value_small[3];
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+      snapshotHandle(), 0, 0, name_small, sizeof(name_small), &name_size, value_small,
+      sizeof(value_small), &value_size));
+  EXPECT_EQ("cust", written(name_small, name_size, sizeof(name_small)));
+  EXPECT_EQ("xxx", written(value_small, value_size, sizeof(value_small)));
+
+  std::string name_retry(name_size, '\0');
+  std::string value_retry(value_size, '\0');
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+      snapshotHandle(), 0, 0, name_retry.data(), name_retry.size(), &name_size, value_retry.data(),
+      value_retry.size(), &value_size));
+  EXPECT_EQ(tag_name, name_retry);   // Keys are not sanitized by the ABI.
+  EXPECT_EQ(tag_value, value_retry); // Values are not escaped by the ABI.
+}
+
 TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterTagExtractedNameAndTags) {
   c0_.name_ = "cluster.foo.rq_total";
   c0_.setTagExtractedName("cluster.rq_total");

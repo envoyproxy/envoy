@@ -182,7 +182,12 @@ TEST_F(DriverTest, SpanSetSampled) {
 
   auto span =
       driver_->startSpan(tracing_config_, trace_context, stream_info_, "test_operation", decision);
+  // A span defaults to exported until the sampling decision is set, then reports that decision.
+  EXPECT_TRUE(span->exportedSpan());
   span->setSampled(false);
+  EXPECT_FALSE(span->exportedSpan());
+  span->setSampled(true);
+  EXPECT_TRUE(span->exportedSpan());
 }
 
 TEST_F(DriverTest, SpanUseLocalDecision) {
