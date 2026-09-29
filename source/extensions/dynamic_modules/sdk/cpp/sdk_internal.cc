@@ -98,8 +98,8 @@ public:
 
     std::vector<envoy_dynamic_module_type_envoy_http_header> raw(header_count);
     size_t size_out = 0;
-    if (!envoy_dynamic_module_callback_http_get_headers(host_plugin_ptr_, Type, raw.data(),
-                                                        raw.size(), &size_out)) {
+    if (!envoy_dynamic_module_callback_http_get_headers_v2(host_plugin_ptr_, Type, raw.data(),
+                                                           raw.size(), &size_out)) {
       return {};
     }
     std::vector<HeaderView> result_headers;

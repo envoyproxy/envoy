@@ -734,8 +734,9 @@ WEAK_STUB(ClusterLbContextComputeHashKey,
 WEAK_STUB(ClusterLbContextGetDownstreamHeadersSize,
           envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(nullptr))
 WEAK_STUB(ClusterLbContextGetDownstreamHeaders,
-          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(nullptr, nullptr,
-                                                                                  0, nullptr))
+          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(nullptr,
+                                                                                     nullptr, 0,
+                                                                                     nullptr))
 WEAK_STUB(ClusterLbContextGetDownstreamHeader,
           envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
               nullptr, {nullptr, 0}, nullptr, 0, nullptr))
@@ -936,8 +937,8 @@ WEAK_STUB(LbContextComputeHashKey,
 WEAK_STUB(LbContextGetDownstreamHeadersSize,
           envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(nullptr))
 WEAK_STUB(LbContextGetDownstreamHeaders,
-          envoy_dynamic_module_callback_lb_context_get_downstream_headers(nullptr, nullptr, 0,
-                                                                          nullptr))
+          envoy_dynamic_module_callback_lb_context_get_downstream_headers_v2(nullptr, nullptr, 0,
+                                                                             nullptr))
 WEAK_STUB(LbContextGetDownstreamHeader,
           envoy_dynamic_module_callback_lb_context_get_downstream_header(nullptr, {nullptr, 0},
                                                                          nullptr, 0, nullptr))
@@ -995,7 +996,7 @@ WEAK_STUB(LbConfigRecordHistogramValue,
 WEAK_STUB(MatcherGetHeadersSize,
           envoy_dynamic_module_callback_matcher_get_headers_size(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader))
-WEAK_STUB(MatcherGetHeaders, envoy_dynamic_module_callback_matcher_get_headers(
+WEAK_STUB(MatcherGetHeaders, envoy_dynamic_module_callback_matcher_get_headers_v2(
                                  nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader,
                                  nullptr, 0, nullptr))
 WEAK_STUB(MatcherGetHeaderValue,
@@ -1253,7 +1254,7 @@ WEAK_STUB(AccessLoggerGetHeaderValue,
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
               nullptr, 0, nullptr))
 WEAK_STUB(AccessLoggerGetHeaders,
-          envoy_dynamic_module_callback_access_logger_get_headers(
+          envoy_dynamic_module_callback_access_logger_get_headers_v2(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr, 0,
               nullptr))
 WEAK_STUB(AccessLoggerGetJa3Hash,
@@ -1619,9 +1620,9 @@ WEAK_STUB(UpstreamBridgeGetRequestHeader,
 WEAK_STUB(UpstreamBridgeGetRequestHeadersSize,
           envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_size(nullptr))
 WEAK_STUB(UpstreamBridgeGetRequestHeaders,
-          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(nullptr,
-                                                                                     nullptr, 0,
-                                                                                     nullptr))
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2(nullptr,
+                                                                                        nullptr, 0,
+                                                                                        nullptr))
 WEAK_STUB(UpstreamBridgeGetRequestBuffer,
           envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(nullptr,
                                                                                     nullptr,
@@ -1917,7 +1918,7 @@ WEAK_STUB(HttpGetHeaderValues,
 WEAK_STUB(HttpGetHeadersSize,
           envoy_dynamic_module_callback_http_get_headers_size(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader))
-WEAK_STUB(HttpGetHeaders, envoy_dynamic_module_callback_http_get_headers(
+WEAK_STUB(HttpGetHeaders, envoy_dynamic_module_callback_http_get_headers_v2(
                               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader,
                               nullptr, 0, nullptr))
 WEAK_STUB(HttpAddHeader, envoy_dynamic_module_callback_http_add_header(
@@ -2348,7 +2349,7 @@ WEAK_STUB(FormatterGetHeaderValue,
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
               nullptr, 0, nullptr))
 WEAK_STUB(FormatterGetHeaders,
-          envoy_dynamic_module_callback_formatter_get_headers(
+          envoy_dynamic_module_callback_formatter_get_headers_v2(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr, 0,
               nullptr))
 WEAK_STUB(FormatterGetHeadersSize,
@@ -2377,6 +2378,27 @@ WEAK_STUB(HealthCheckerGetHostMetadataBool,
                                                                               nullptr))
 WEAK_STUB(HealthCheckerGetHostHealth,
           envoy_dynamic_module_callback_health_checker_get_host_health(nullptr))
+
+// The deprecated unbounded get headers callbacks.
+WEAK_STUB(HttpGetHeadersDeprecated,
+          envoy_dynamic_module_callback_http_get_headers(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr))
+WEAK_STUB(AccessLoggerGetHeadersDeprecated,
+          envoy_dynamic_module_callback_access_logger_get_headers(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr))
+WEAK_STUB(FormatterGetHeadersDeprecated,
+          envoy_dynamic_module_callback_formatter_get_headers(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr))
+WEAK_STUB(MatcherGetHeadersDeprecated,
+          envoy_dynamic_module_callback_matcher_get_headers(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr))
+WEAK_STUB(ClusterLbContextGetDownstreamHeadersDeprecated,
+          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(nullptr, nullptr))
+WEAK_STUB(LbContextGetDownstreamHeadersDeprecated,
+          envoy_dynamic_module_callback_lb_context_get_downstream_headers(nullptr, nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestHeadersDeprecated,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(nullptr,
+                                                                                     nullptr))
 
 } // namespace
 } // namespace DynamicModules

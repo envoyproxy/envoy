@@ -69,6 +69,16 @@ size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header
 
 bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers) {
+  // The deprecated callback takes no capacity, so the module guarantees that the array holds every
+  // header.
+  size_t size = 0;
+  return envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2(
+      bridge_envoy_ptr, result_headers, SIZE_MAX, &size);
+}
+
+bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
     size_t* size_out) {
   *size_out = 0;

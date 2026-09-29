@@ -4378,7 +4378,7 @@ impl EnvoyHttpFilterImpl {
       abi::envoy_dynamic_module_callback_http_get_headers_size(self.raw_ptr, header_type)
     };
     crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_http_get_headers(
+      abi::envoy_dynamic_module_callback_http_get_headers_v2(
         self.raw_ptr,
         header_type,
         ptr,

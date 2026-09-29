@@ -608,7 +608,7 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithNullPointers) {
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_compute_hash_key(nullptr, nullptr));
   EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(nullptr), 0);
   size_t downstream_headers_size_out = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_headers_v2(
       nullptr, nullptr, 0, &downstream_headers_size_out));
   envoy_dynamic_module_type_module_buffer header_key = {"test-key", 8};
   envoy_dynamic_module_type_envoy_buffer header_result = {nullptr, 0};
@@ -1034,7 +1034,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {
   // Test get all headers.
   std::vector<envoy_dynamic_module_type_envoy_http_header> all_headers(3);
   size_t all_headers_size_out = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_context_get_downstream_headers_v2(
       context_ptr, all_headers.data(), all_headers.size(), &all_headers_size_out));
   for (size_t i = 0; i < 3; i++) {
     EXPECT_NE(all_headers[i].key_ptr, nullptr);
@@ -1092,7 +1092,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksNoHeaders) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(context_ptr), 0);
 
   size_t no_headers_size_out = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_headers_v2(
       context_ptr, nullptr, 0, &no_headers_size_out));
 
   envoy_dynamic_module_type_module_buffer key = {":method", 7};
@@ -2402,6 +2402,39 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsConcurrentIncrementCounterVecNoRac
     total += counter->value();
   }
   EXPECT_EQ(static_cast<uint64_t>(kNumThreads) * kIncrementsPerThread, total);
+}
+
+// The deprecated get_downstream_headers callback keeps its released signature and behavior.
+TEST_F(DynamicModulesLoadBalancerTest, ContextDeprecatedGetDownstreamHeaders) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-test", "value"}};
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::vector<envoy_dynamic_module_type_envoy_http_header> result(2);
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_lb_context_get_downstream_headers(context_ptr, result.data()));
+
+  EXPECT_EQ(":method", absl::string_view(result[0].key_ptr, result[0].key_length));
+  EXPECT_EQ("GET", absl::string_view(result[0].value_ptr, result[0].value_length));
+  EXPECT_EQ("x-test", absl::string_view(result[1].key_ptr, result[1].key_length));
+  EXPECT_EQ("value", absl::string_view(result[1].value_ptr, result[1].value_length));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, ContextDeprecatedGetDownstreamHeadersUnavailable) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(nullptr));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  envoy_dynamic_module_type_envoy_http_header result;
+
+  // No headers available.
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_context_get_downstream_headers(context_ptr, &result));
+  // Null context.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(nullptr, &result));
+  // Null result.
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_context_get_downstream_headers(context_ptr, nullptr));
 }
 
 } // namespace
