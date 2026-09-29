@@ -7,8 +7,9 @@
 //! the decision setters, and the configuration metrics recorded on each decision.
 //!
 //! The headers the module reads are:
-//!   `x-decision`       `override`, `select-template`, `no-route` or `error`. Without it the
-//!                      module leaves the resolved route in place.
+//!   `x-decision`       `override`, `select-template`, `no-route`, `error`, `reuse-previous` or
+//!                      `continue-matching`. Without it the module leaves the resolved route in
+//!                      place.
 //!   `x-template`       the identifier of the route template to select.
 //!   `x-cluster`        the upstream cluster to route to.
 //!   `x-timeout-ms`     the route timeout to set, in milliseconds.
@@ -395,6 +396,7 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
         b"no-route" => RouteDecision::NoRoute,
         b"error" => RouteDecision::Error,
         b"reuse-previous" => RouteDecision::ReusePrevious,
+        b"continue-matching" => RouteDecision::ContinueMatching,
         _ => RouteDecision::PassThrough,
       },
       None => RouteDecision::PassThrough,

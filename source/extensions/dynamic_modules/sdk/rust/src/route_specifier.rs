@@ -34,6 +34,9 @@ pub enum RouteDecision {
   /// Use the previous route of the stream unchanged, without building a new route. Valid only when
   /// a previous route exists, otherwise Envoy applies the failure policy.
   ReusePrevious,
+  /// Skip the route the specifier was given and let route matching carry on with the next route.
+  /// The recorded overrides and the returned route are ignored.
+  ContinueMatching,
 }
 
 impl RouteDecision {
@@ -47,6 +50,9 @@ impl RouteDecision {
       Self::NoRoute => abi::envoy_dynamic_module_type_route_specifier_decision::NoRoute,
       Self::Error => abi::envoy_dynamic_module_type_route_specifier_decision::Error,
       Self::ReusePrevious => abi::envoy_dynamic_module_type_route_specifier_decision::ReusePrevious,
+      Self::ContinueMatching => {
+        abi::envoy_dynamic_module_type_route_specifier_decision::ContinueMatching
+      },
     }
   }
 }
