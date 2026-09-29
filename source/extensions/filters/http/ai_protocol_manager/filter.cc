@@ -151,6 +151,9 @@ FilterConfig::FilterConfig(
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
       parse_unconfigured_routes_(proto.request_handling().parse_unconfigured_routes()),
+      always_serialize_request_(
+          proto.request_handling().reserialize_body() ==
+          envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS),
       inline_string_threshold_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto.request_handling().limits(), inline_string_threshold_bytes,
           JsonWithExtBufParser::kDefaultInlineStringThresholdBytes)),
@@ -473,7 +476,8 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
           payload_rejected_ = true;
           decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
                                              "ai_protocol_manager_filter_rejected");
-        });
+        },
+        config_->alwaysSerializeRequest());
   } else {
     decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
   }

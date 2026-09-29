@@ -658,6 +658,12 @@ EXTENSIONS = {
     "envoy.router.cluster_specifier_plugin.dynamic_modules": "//source/extensions/router/cluster_specifiers/dynamic_modules:config",
     "envoy.router.cluster_specifier_plugin.lua":             "//source/extensions/router/cluster_specifiers/lua:config",
     "envoy.router.cluster_specifier_plugin.matcher":         "//source/extensions/router/cluster_specifiers/matcher:config",
+    "envoy.router.cluster_specifier_plugin.priority_group":  "//source/extensions/router/cluster_specifiers/priority_group:config",
+
+    #
+    # Route specifier
+    #
+    "envoy.router.route_specifiers.dynamic_modules":         "//source/extensions/router/route_specifiers/dynamic_modules:config",
 
     #
     # Extensions for generic proxy

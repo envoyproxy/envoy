@@ -73,6 +73,9 @@ public:
     return attribute_source_;
   }
   bool earlyTerminateWhenRoutable() const { return early_terminate_when_routable_; }
+
+  bool isProtocolVersionSupported(absl::string_view version) const;
+
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
     return request_storage_mode_ ==
@@ -101,7 +104,9 @@ private:
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attribute_source_;
+
   const bool early_terminate_when_routable_;
+  const std::optional<std::string> max_supported_protocol_version_;
   const std::string metadata_namespace_;
   ParserConfig parser_config_;
   McpFilterStats stats_;
@@ -184,14 +189,25 @@ private:
   bool canEarlyTerminate();
   const McpOverrideConfig* routeOverride() const;
 
+  void recordErrorState(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
+  void sendUnsupportedProtocolVersionReply(absl::string_view requested_version);
+  void sendHeaderMismatchReply(absl::string_view error_msg);
+  void sendMethodNotAllowedReply(absl::string_view error_msg);
   bool needsBody() const;
   bool hasCompleteHeaderAttributes() const;
   bool headerAttributesMatch() const;
   bool verifyHeaderAttributes() const;
+  enum class ProtocolVersionValidationResult {
+    Ok,
+    Missing,
+    Mismatch,
+  };
+  ProtocolVersionValidationResult validateProtocolVersion() const;
   Http::FilterDataStatus completeParsing();
   void setDynamicMetadataStatus(Protobuf::Struct metadata);
   void populateMetadataFromHeaders();
+  bool shouldUseNewSpecSemantics() const;
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -203,8 +219,10 @@ private:
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
   bool skip_body_parsing_{false};
+  bool use_new_spec_semantics_{false};
   std::string header_method_;
   std::string header_name_;
+  std::optional<std::string> protocol_version_;
   Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
   std::optional<Filters::Common::Mcp::Status> passthrough_reason_;
 };

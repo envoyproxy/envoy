@@ -90,6 +90,19 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_stats_test"));
 }
 
+// This test verifies that a panic inside a stats iterator visitor is caught by the SDK trampoline
+// so Envoy stays up instead of aborting, and iteration returns to the module.
+TEST_P(DynamicModulesBootstrapIntegrationTest, IteratePanicRust) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"error", "bootstrap_extension_iterate_counters: caught panic at FFI boundary"},
+           {"error", "bootstrap_extension_iterate_gauges: caught panic at FFI boundary"},
+           {"info", "Survived panic inside iterate_counters visitor"},
+           {"info", "Survived panic inside iterate_gauges visitor"},
+           {"info", "Bootstrap iterate panic test completed successfully!"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_iterate_panic_test"));
+}
+
 // This test verifies that the Rust bootstrap extension can register and resolve functions
 // via the process-wide function registry.
 TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {

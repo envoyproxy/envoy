@@ -166,6 +166,7 @@ envoy_cc_library(
     hdrs = ["route_specifier.h"],
     deps = [
         ":router_interface",
+        "//envoy/common:optref_lib",
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",
     ],
