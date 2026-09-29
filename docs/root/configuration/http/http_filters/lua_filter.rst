@@ -604,6 +604,7 @@ body. May be nil.
 .. code-block:: lua
 
   local metadata = handle:metadata()
+  local metadata = handle:metadata(ns)
 
 Returns the current route entry metadata. Note that the metadata should be specified
 under the :ref:`filter config name
@@ -611,6 +612,10 @@ under the :ref:`filter config name
 If no entry could be found by the filter config name, then the filter canonical name
 i.e. ``envoy.filters.http.lua`` will be used as an alternative. Note that this downgrade will be
 deprecated in the future.
+
+``ns`` is an optional string that supplies the namespace, i.e. the key in the ``filter_metadata``
+of the route entry, to get the metadata from. If it is set, only the metadata under the given
+namespace is returned and neither the filter config name nor the filter canonical name is used.
 
 .. note::
 
@@ -1978,10 +1983,15 @@ Route object API
 .. code-block:: lua
 
   local metadata = route:metadata()
+  local metadata = route:metadata(ns)
 
 Returns the route metadata. Note that the metadata should be specified
 under the :ref:`filter config name
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+
+``ns`` is an optional string that supplies the namespace, i.e. the key in the ``filter_metadata``
+of the route entry, to get the metadata from. If it is set, the metadata under the given
+namespace is returned rather than the metadata under the filter config name.
 
 Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
