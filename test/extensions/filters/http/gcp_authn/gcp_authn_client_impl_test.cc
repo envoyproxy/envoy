@@ -183,7 +183,7 @@ TEST_F(GcpAuthnClientImplTest, SuccessAccessTokenWithScopes) {
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/"
-            "token?scopes=https://www.googleapis.com/auth/cloud-platform,openid");
+            "token?scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid");
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
   EXPECT_EQ(options_.retry_policy->retry_back_off().base_interval().seconds(), 1);
@@ -203,6 +203,22 @@ TEST_F(GcpAuthnClientImplTest, SuccessAccessTokenWithScopes) {
   GcpToken expected_token{"mock_access_token", expected_exp_time, audience};
   EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<GcpToken>(expected_token)));
   client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnClientImplTest, SuccessAccessTokenWithReservedCharScopes) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token()->add_scopes("https://www.googleapis.com/auth/cloud-platform");
+  audience.mutable_access_token()->add_scopes("custom:scope/read");
+  audience.mutable_access_token()->add_scopes("foo&bar=baz#qux");
+  client_->fetchUnboundAccessToken(audience, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  EXPECT_EQ(message_->headers().Path()->value().getStringView(),
+            "/computeMetadata/v1/instance/service-accounts/default/"
+            "token?scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,"
+            "custom%3Ascope%2Fread,foo%26bar%3Dbaz%23qux");
 }
 
 TEST_F(GcpAuthnClientImplTest, AccessTokenParsingFailure) {
@@ -562,7 +578,7 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessTokenWithScopes) {
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/"
             "token?bindCertificateFingerprint=abc%252Bdef%252Fghi%253D"
-            "&scopes=https://www.googleapis.com/auth/cloud-platform,openid");
+            "&scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid");
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
 

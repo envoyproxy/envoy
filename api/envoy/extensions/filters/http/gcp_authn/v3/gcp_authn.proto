@@ -80,7 +80,11 @@ message Audience {
     // metadata server token request. Note that the metadata server replaces default
     // scopes with the provided list rather than appending; to preserve general GCP API
     // access, callers should explicitly include "https://www.googleapis.com/auth/cloud-platform".
-    repeated string scopes = 1;
+    // Validation rules require each scope to be non-empty and disallow whitespace or commas,
+    // as commas are used as the delimiter for the metadata server and OAuth 2.0 scopes
+    // cannot contain whitespace (RFC 6749 Section 3.3).
+    repeated string scopes = 1
+        [(validate.rules).repeated = {items {string {min_len: 1 pattern: "^[^\\s,]+$"}}}];
   }
 
   message BoundJwt {
@@ -95,7 +99,11 @@ message Audience {
     // metadata server token request. Note that the metadata server replaces default
     // scopes with the provided list rather than appending; to preserve general GCP API
     // access, callers should explicitly include "https://www.googleapis.com/auth/cloud-platform".
-    repeated string scopes = 1;
+    // Validation rules require each scope to be non-empty and disallow whitespace or commas,
+    // as commas are used as the delimiter for the metadata server and OAuth 2.0 scopes
+    // cannot contain whitespace (RFC 6749 Section 3.3).
+    repeated string scopes = 1
+        [(validate.rules).repeated = {items {string {min_len: 1 pattern: "^[^\\s,]+$"}}}];
   }
 
   // Default lifetime is 1h.

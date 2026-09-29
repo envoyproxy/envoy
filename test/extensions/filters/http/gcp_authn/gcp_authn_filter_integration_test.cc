@@ -686,7 +686,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, AccessTokenWithScopesSuccess) {
 
   const std::string expected_path =
       "/computeMetadata/v1/instance/service-accounts/default/"
-      "token?scopes=https://www.googleapis.com/auth/cloud-platform,openid";
+      "token?scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid";
 
   waitForGcpAuthnServerResponseToken(expected_path);
 
@@ -744,7 +744,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenWithScopesSuccess) {
                    "?bindCertificateFingerprint=",
                    Http::Utility::PercentEncoding::urlEncode(
                        Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)),
-                   "&scopes=https://www.googleapis.com/auth/cloud-platform,openid");
+                   "&scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid");
 
   waitForGcpAuthnServerResponseToken(expected_path);
 

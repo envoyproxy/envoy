@@ -28,6 +28,15 @@ constexpr char MetadataFlavor[] = "Google";
 constexpr char BindCertificateFingerprintKey[] = "bindCertificateFingerprint";
 constexpr absl::string_view ScopesQueryKey = "scopes";
 
+std::string encodeAndJoinScopes(const Protobuf::RepeatedPtrField<std::string>& scopes) {
+  std::vector<std::string> encoded_scopes;
+  encoded_scopes.reserve(scopes.size());
+  for (const auto& scope : scopes) {
+    encoded_scopes.push_back(Envoy::Http::Utility::PercentEncoding::urlEncode(scope));
+  }
+  return absl::StrJoin(encoded_scopes, ",");
+}
+
 Http::RequestMessagePtr buildRequest(absl::string_view url) {
   absl::string_view host;
   absl::string_view path;
@@ -156,7 +165,7 @@ void GcpAuthnClientImpl::fetchUnboundAccessToken(
     GcpAuthnClient::Callbacks& callbacks) {
   Http::Utility::QueryParamsMulti query_params;
   if (!audience.access_token().scopes().empty()) {
-    query_params.add(ScopesQueryKey, absl::StrJoin(audience.access_token().scopes(), ","));
+    query_params.add(ScopesQueryKey, encodeAndJoinScopes(audience.access_token().scopes()));
   }
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, TokenUrlPath, query_params.toString());
@@ -186,7 +195,7 @@ void GcpAuthnClientImpl::fetchBoundAccessToken(
                    Http::Utility::PercentEncoding::urlEncode(
                        Http::Utility::PercentEncoding::urlEncode(fingerprint)));
   if (!audience.bound_access_token().scopes().empty()) {
-    query_params.add(ScopesQueryKey, absl::StrJoin(audience.bound_access_token().scopes(), ","));
+    query_params.add(ScopesQueryKey, encodeAndJoinScopes(audience.bound_access_token().scopes()));
   }
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, TokenUrlPath, query_params.toString());
