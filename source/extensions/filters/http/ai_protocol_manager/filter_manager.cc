@@ -18,11 +18,11 @@ FilterManager::~FilterManager() { cancel(); }
 void FilterManager::startRequest(JsonWithExtBuf payload_index, BufferManager* buffer_manager,
                                  Event::Dispatcher& dispatcher, StreamInfo::StreamInfo& stream_info,
                                  OnCompleteFn on_complete, Http::RequestHeaderMap* request_headers,
-                                 LocalReplyFn local_reply_fn) {
+                                 LocalReplyFn local_reply_fn, bool always_serialize) {
   ASSERT(request_manager_ == nullptr);
   request_manager_ = std::make_unique<RequestFilterManager>(
       filters_, std::move(payload_index), buffer_manager, dispatcher, stream_info,
-      std::move(on_complete), request_headers, std::move(local_reply_fn));
+      std::move(on_complete), request_headers, std::move(local_reply_fn), always_serialize);
   request_manager_->start();
 }
 

@@ -126,7 +126,7 @@ createFilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Con
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
       std::move(secret_provider_client_secret), std::move(secret_provider_hmac_secret),
-      server_context.threadLocal(), server_context.api());
+      server_context.threadLocal(), server_context.api(), server_context.mainThreadDispatcher());
   absl::Status creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<FilterConfig>(proto_config, server_context, secret_reader,
                                                       scope, stats_prefix, creation_status);

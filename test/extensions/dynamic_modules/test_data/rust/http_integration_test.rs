@@ -89,6 +89,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         header_to_set: config_iter.next().unwrap().to_owned(),
       }))
     },
+    "upstream_connection_attempts" => Some(Box::new(UpstreamConnectionAttemptsFilterConfig {
+      observed_total: envoy_filter_config
+        .define_counter("upstream_connection_attempts_observed_total")
+        .unwrap(),
+    })),
     "generic_secret_callbacks" => {
       let secret_name = String::from_utf8(config.to_owned()).unwrap();
       // A secret that is not configured anywhere cannot be subscribed to.
@@ -115,6 +120,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "reentrant_stream_complete" => Some(Box::new(ReentrantStreamCompleteFilterConfig {
       stream_complete_total: envoy_filter_config
         .define_counter("reentrant_stream_complete_total")
+        .unwrap(),
+    })),
+    "stream_timing" => Some(Box::new(StreamTimingFilterConfig {
+      timing_observed_total: envoy_filter_config
+        .define_counter("stream_timing_observed_total")
         .unwrap(),
     })),
     "buffer_limit_filter" => Some(Box::new(BufferLimitFilterConfig {})),
@@ -1724,6 +1734,40 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
   }
 }
 
+struct UpstreamConnectionAttemptsFilterConfig {
+  observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UpstreamConnectionAttemptsFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(UpstreamConnectionAttemptsFilter {
+      observed_total: self.observed_total,
+    })
+  }
+}
+
+struct UpstreamConnectionAttemptsFilter {
+  observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionAttemptsFilter {
+  fn on_stream_complete(&self, envoy_filter: &mut EHF) {
+    assert!(!envoy_filter
+      .get_upstream_remote_address()
+      .unwrap()
+      .as_slice()
+      .is_empty());
+    assert_eq!(envoy_filter.get_upstream_hosts_attempted().len(), 1);
+    assert_eq!(
+      envoy_filter.get_upstream_connection_ids_attempted().len(),
+      1
+    );
+    envoy_filter
+      .increment_counter(self.observed_total, 1)
+      .unwrap();
+  }
+}
+
 // Terminal filter that creates a response without an upstream.
 // This filter demonstrates a bidirectional stream with trailers - response processing
 // can happen in filter callbacks or scheduled events. We test scheduled events here
@@ -1948,6 +1992,33 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantStreamCompleteFilter {
   fn on_stream_complete(&self, envoy_filter: &mut EHF) {
     envoy_filter
       .increment_counter(self.stream_complete_total, 1)
+      .unwrap();
+  }
+}
+
+struct StreamTimingFilterConfig {
+  timing_observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamTimingFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(StreamTimingFilter {
+      timing_observed_total: self.timing_observed_total,
+    })
+  }
+}
+
+struct StreamTimingFilter {
+  timing_observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamTimingFilter {
+  fn on_stream_complete(&self, envoy_filter: &mut EHF) {
+    let timing = envoy_filter.get_timing_info();
+    assert!(timing.start_time_unix_ns > 0);
+    assert!(timing.request_complete_duration_ns >= 0);
+    envoy_filter
+      .increment_counter(self.timing_observed_total, 1)
       .unwrap();
   }
 }

@@ -26,8 +26,9 @@ namespace AiProtocolManager {
 // Runs the configured AI filters over a request payload index.
 //
 // Owned and managed by FilterManager for the decode path. Filters execute in forward order
-// (0..N-1). Once all filters propagate the request index, the sink serializes the resulting
-// payload index back into the stream's BufferManager.
+// (0..N-1). Once all filters propagate the request, the sink writes it out through the stream's
+// BufferManager: the re-serialized document, or the received body when `always_serialize` is
+// false.
 class RequestFilterManager : public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
   using LocalReplyFn = absl::AnyInvocable<void(Http::Code code, std::string details)>;
@@ -37,7 +38,7 @@ public:
                        BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
                        StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
                        Http::RequestHeaderMap* request_headers = nullptr,
-                       LocalReplyFn local_reply_fn = nullptr);
+                       LocalReplyFn local_reply_fn = nullptr, bool always_serialize = true);
   ~RequestFilterManager();
 
   // Starts the request filter pipeline and sink coroutines.

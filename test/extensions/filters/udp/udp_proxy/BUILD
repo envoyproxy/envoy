@@ -48,6 +48,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/udp/udp_proxy/session_filters:psc_setter_filter_proto_cc_proto",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:stream_encoder_mock",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/network:socket_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",

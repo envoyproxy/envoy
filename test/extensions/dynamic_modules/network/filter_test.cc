@@ -41,6 +41,8 @@ public:
 
     ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
     ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
+    ON_CALL(read_callbacks_, readBuffer())
+        .WillByDefault(testing::Return(makeOptRef<Buffer::Instance>(connection_read_buffer_)));
   }
 
   // Runs the reentrancy probe with an inline callout completion and returns how many times the
@@ -84,6 +86,7 @@ public:
   NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
   NiceMock<Network::MockConnection> connection_;
+  Buffer::OwnedImpl connection_read_buffer_;
 };
 
 TEST_F(DynamicModuleNetworkFilterTest, BasicDataFlow) {
@@ -109,6 +112,23 @@ TEST_F(DynamicModuleNetworkFilterTest, BasicDataFlow) {
   // returns.
   EXPECT_NE(nullptr, filter->currentReadBuffer());
   EXPECT_EQ(nullptr, filter->currentWriteBuffer());
+}
+
+TEST_F(DynamicModuleNetworkFilterTest, DeferredReadBufferResolvesConnectionBuffer) {
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+
+  // injectReadDataToFilterChain delivers on_read a transient buffer that is freed when the
+  // injecting frame returns. Scope it so it is gone before the deferred access below.
+  {
+    Buffer::OwnedImpl transient("transient");
+    EXPECT_EQ(Network::FilterStatus::Continue, filter->onData(transient, false));
+  }
+
+  // Outside on_read, deferred access resolves the connection read buffer, never the freed transient
+  // one.
+  EXPECT_EQ(&connection_read_buffer_, filter->currentReadBuffer());
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, AllConnectionEvents) {

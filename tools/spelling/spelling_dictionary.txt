@@ -129,6 +129,7 @@ FIXME
 decrypted
 decrypts
 gperf
+gperftools
 HEXDIG
 HEXDIGIT
 HPE
@@ -1829,3 +1830,6 @@ MLKEM
 PQC
 quantum
 X25519MLKEM768
+cpaths
+SynchronousFeedbackResourceMonitor
+bernoulli
