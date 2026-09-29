@@ -2022,6 +2022,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return nullptr;
                                      });
                                }}},
+                             {"UPSTREAM_LOCAL_CERT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.urlEncodedPemEncodedLocalCertificate();
+                                     });
+                               }}},
                              {"UPSTREAM_REMOTE_ADDRESS",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {

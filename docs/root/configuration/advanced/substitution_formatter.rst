@@ -1539,6 +1539,13 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%UPSTREAM_LOCAL_CERT%``
+  HTTP/TCP/THRIFT
+    The local (client) certificate in the URL-encoded PEM format used to establish the upstream TLS
+    connection. This is empty when no client certificate is presented (for example, non-mTLS).
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 .. _config_access_log_format_upstream_peer_cert_v_start:
 
 ``%UPSTREAM_PEER_CERT_V_START%``
