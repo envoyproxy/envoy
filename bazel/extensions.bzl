@@ -1,9 +1,11 @@
+# TODO(phlax): Move this to toolsheds toolchain alias
 """Module extensions for Envoy's non-module dependencies.
 
 This file defines module extensions to support Envoy's bzlmod migration while
 respecting existing WORKSPACE patches and custom BUILD files.
 """
 
+load("@envoy_toolshed//compile:llvm_minimal.bzl", "render_llvm_repo_build")
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("//bazel/external/cargo/remote:crates.bzl", "crate_repositories")
 load(":envoy_build_config.bzl", "default_envoy_build_config")
@@ -12,6 +14,130 @@ load(":repo.bzl", "envoy_repo")
 _LOCKFILE_LABEL = Label("//:MODULE.bazel.lock")
 _MODULES_SEGMENT = "/modules/"
 _SOURCE_JSON_SUFFIX = "/source.json"
+_LLVM_VERSION = "22.1.8"
+
+_LLVM_LIBRARY_TARGETS = """
+
+filegroup(
+    name = "libclang_cpp",
+    srcs = glob(["lib/**/libclang-cpp.so*"], allow_empty = True),
+)
+
+filegroup(
+    name = "libllvm",
+    srcs = glob(["lib/**/libLLVM.so*"], allow_empty = True),
+)
+
+cc_library(
+    name = "clang_tooling_headers",
+    hdrs = glob(["include/clang/**", "include/clang-c/**", "include/llvm/**", "include/llvm-c/**"], allow_empty = True),
+    includes = ["include"],
+)
+"""
+
+def _llvm_repo_build(llvm_version):
+    build = render_llvm_repo_build(llvm_version.split(".")[0])
+    libclang_glob = 'glob(["lib/libclang.so*", "lib/libclang*.dylib"], allow_empty = True)'
+    if libclang_glob not in build:
+        fail("The envoy_toolshed LLVM repository BUILD template changed")
+    return build.replace(
+        libclang_glob,
+        'glob(["lib/**/libclang.so*", "lib/**/libclang*.dylib"], allow_empty = True)',
+    ) + _LLVM_LIBRARY_TARGETS
+
+def _host_llvm_repo_impl(repository_ctx):
+    llvm_root = repository_ctx.path(repository_ctx.attr.path)
+    for directory in ["bin", "include", "lib"]:
+        path = llvm_root.get_child(directory)
+        if not path.exists:
+            fail("Host LLVM directory does not exist: %s" % path)
+        _symlink_directory_contents(repository_ctx, path, directory)
+    repository_ctx.file(
+        "BUILD.bazel",
+        _llvm_repo_build(repository_ctx.attr.llvm_version),
+    )
+
+_host_llvm_repo = repository_rule(
+    implementation = _host_llvm_repo_impl,
+    local = True,
+    attrs = {
+        "llvm_version": attr.string(mandatory = True),
+        "path": attr.string(mandatory = True),
+    },
+)
+
+def _symlink_directory_contents(repository_ctx, source, destination):
+    for child in source.readdir():
+        repository_ctx.symlink(child, destination + "/" + child.basename)
+
+def _llvm_alias_repo_impl(repository_ctx):
+    os_name = repository_ctx.os.name.lower()
+    arch = repository_ctx.os.arch.lower()
+    if os_name.startswith("linux") and (arch.startswith("x86_64") or arch.startswith("amd64")):
+        llvm_root = repository_ctx.path(repository_ctx.attr.minimal_linux_x64).dirname
+    elif os_name.startswith("linux") and (arch.startswith("aarch64") or arch.startswith("arm64")):
+        llvm_root = repository_ctx.path(repository_ctx.attr.minimal_linux_arm64).dirname
+    elif (os_name.startswith("mac os x") or os_name.startswith("darwin")) and (
+        arch.startswith("aarch64") or arch.startswith("arm64")
+    ):
+        llvm_root = repository_ctx.path(repository_ctx.attr.minimal_macos_arm64).dirname
+    else:
+        fail(
+            "Unsupported host platform for llvm_toolchain_llvm: %s %s" %
+            (repository_ctx.os.name, repository_ctx.os.arch),
+        )
+
+    for directory in ["bin", "include", "lib"]:
+        _symlink_directory_contents(repository_ctx, llvm_root.get_child(directory), directory)
+    repository_ctx.file(
+        "BUILD.bazel",
+        _llvm_repo_build(_LLVM_VERSION),
+    )
+
+_llvm_alias_repo = repository_rule(
+    implementation = _llvm_alias_repo_impl,
+    attrs = {
+        "minimal_linux_arm64": attr.label(mandatory = True),
+        "minimal_linux_x64": attr.label(mandatory = True),
+        "minimal_macos_arm64": attr.label(mandatory = True),
+    },
+)
+
+def _envoy_llvm_impl(module_ctx):
+    host = None
+    for module in module_ctx.modules:
+        for tag in module.tags.host:
+            if not module.is_root:
+                fail("envoy_llvm_extension.host may only be specified by the root module")
+            if host != None:
+                fail("envoy_llvm_extension.host may only be specified once")
+            host = tag
+
+    if host:
+        _host_llvm_repo(
+            name = "llvm_toolchain_llvm",
+            llvm_version = host.llvm_version,
+            path = host.path,
+        )
+    else:
+        _llvm_alias_repo(
+            name = "llvm_toolchain_llvm",
+            minimal_linux_x64 = Label("@llvm_minimal_linux_x64//:BUILD.bazel"),
+            minimal_linux_arm64 = Label("@llvm_minimal_linux_arm64//:BUILD.bazel"),
+            minimal_macos_arm64 = Label("@llvm_minimal_macos_arm64//:BUILD.bazel"),
+        )
+
+_host_llvm = tag_class(
+    attrs = {
+        "llvm_version": attr.string(default = _LLVM_VERSION),
+        "path": attr.string(mandatory = True),
+    },
+)
+
+envoy_llvm_extension = module_extension(
+    implementation = _envoy_llvm_impl,
+    tag_classes = {"host": _host_llvm},
+)
 
 def _module_dep_from_lock_entry(url):
     if not url.endswith(_SOURCE_JSON_SUFFIX):

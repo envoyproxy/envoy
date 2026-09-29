@@ -1174,7 +1174,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_build_config_ext": {
       "general": {
-        "bzlTransitiveDigest": "uzRoe/51pnfLsBWXGrYIlYDaxKpHgTNnf4SOK+4LXfo=",
+        "bzlTransitiveDigest": "a4LvOHmBqjtws9zt2Wv+3Ej6BYtphSjfFQmvAvWdTYE=",
         "usagesDigest": "tVjUC/AXn5BY++mOLvM39y/v8aptsI1/E2/UzZ0HBf0=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1192,9 +1192,36 @@
         }
       }
     },
+    "@@envoy+//bazel:extensions.bzl%envoy_llvm_extension": {
+      "general": {
+        "bzlTransitiveDigest": "a4LvOHmBqjtws9zt2Wv+3Ej6BYtphSjfFQmvAvWdTYE=",
+        "usagesDigest": "EUxFc9QgJ6zp1vAQkblU7ycnbimXuB5nWso+Ls1AnaY=",
+        "recordedInputs": [
+          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
+          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,llvm_minimal_linux_x64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_x64",
+          "REPO_MAPPING:envoy+,llvm_minimal_linux_arm64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_arm64",
+          "REPO_MAPPING:envoy+,llvm_minimal_macos_arm64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_macos_arm64"
+        ],
+        "generatedRepoSpecs": {
+          "llvm_toolchain_llvm": {
+            "repoRuleId": "@@envoy+//bazel:extensions.bzl%_llvm_alias_repo",
+            "attributes": {
+              "minimal_linux_x64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_x64//:BUILD.bazel",
+              "minimal_linux_arm64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_arm64//:BUILD.bazel",
+              "minimal_macos_arm64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_macos_arm64//:BUILD.bazel"
+            }
+          }
+        }
+      }
+    },
     "@@envoy+//bazel:extensions.bzl%envoy_module_graph_extension": {
       "general": {
-        "bzlTransitiveDigest": "uzRoe/51pnfLsBWXGrYIlYDaxKpHgTNnf4SOK+4LXfo=",
+        "bzlTransitiveDigest": "a4LvOHmBqjtws9zt2Wv+3Ej6BYtphSjfFQmvAvWdTYE=",
         "usagesDigest": "3kZLOs4LMLPfk4sJrOzP9Uiqq6maNbEmvUx7u9y0WpU=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1216,7 +1243,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_repo_extension": {
       "general": {
-        "bzlTransitiveDigest": "uzRoe/51pnfLsBWXGrYIlYDaxKpHgTNnf4SOK+4LXfo=",
+        "bzlTransitiveDigest": "a4LvOHmBqjtws9zt2Wv+3Ej6BYtphSjfFQmvAvWdTYE=",
         "usagesDigest": "JPan5EJba0XH4g5z0LkIL3XzA6Lo8N5AuJMtajlHkqg=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1236,7 +1263,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "uzRoe/51pnfLsBWXGrYIlYDaxKpHgTNnf4SOK+4LXfo=",
+        "bzlTransitiveDigest": "a4LvOHmBqjtws9zt2Wv+3Ej6BYtphSjfFQmvAvWdTYE=",
         "usagesDigest": "MQblS0t2o4qQ3kavs8kyevP2n9WhQBZeujl+ZXIY1i4=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1373,47 +1400,6 @@
               "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.21/llvm-minimal-22.1.8-macOS-ARM64.tar.zst",
               "sha256": "928e51aa7c97fbb8c5c50075118f4b36e36363b1a2c3af2dfef9aea1ef526ade",
               "strip_prefix": "llvm-minimal-22.1.8-macOS-ARM64"
-            }
-          }
-        }
-      }
-    },
-    "@@envoy_toolshed+//compile:extensions.bzl%llvm_toolchain_alias_extension": {
-      "general": {
-        "bzlTransitiveDigest": "DByL0zbcWRQWNeeOB8C0be8S9X4qWb3H5Q6nWZlT3wE=",
-        "usagesDigest": "2KW7m0FL20Q0UbngzA462Lub31Yv8Cg5pWUsMmzzX3s=",
-        "recordedInputs": [],
-        "generatedRepoSpecs": {
-          "llvm_minimal_linux_x64": {
-            "repoRuleId": "@@envoy_toolshed+//compile:llvm_minimal.bzl%llvm_minimal_repo",
-            "attributes": {
-              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.21/llvm-minimal-22.1.8-Linux-X64.tar.zst",
-              "sha256": "6cb4cca6df33be00c80fa1639062c973d1cafe4e7ad98a9b4bdf21bf9dec5806",
-              "strip_prefix": "llvm-minimal-22.1.8-Linux-X64"
-            }
-          },
-          "llvm_minimal_linux_arm64": {
-            "repoRuleId": "@@envoy_toolshed+//compile:llvm_minimal.bzl%llvm_minimal_repo",
-            "attributes": {
-              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.21/llvm-minimal-22.1.8-Linux-ARM64.tar.zst",
-              "sha256": "9a6cc0a84d524342e578db739b04e8a3875adb40b38887e4e074661e925f8a9c",
-              "strip_prefix": "llvm-minimal-22.1.8-Linux-ARM64"
-            }
-          },
-          "llvm_minimal_macos_arm64": {
-            "repoRuleId": "@@envoy_toolshed+//compile:llvm_minimal.bzl%llvm_minimal_repo",
-            "attributes": {
-              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.21/llvm-minimal-22.1.8-macOS-ARM64.tar.zst",
-              "sha256": "928e51aa7c97fbb8c5c50075118f4b36e36363b1a2c3af2dfef9aea1ef526ade",
-              "strip_prefix": "llvm-minimal-22.1.8-macOS-ARM64"
-            }
-          },
-          "llvm_toolchain_llvm": {
-            "repoRuleId": "@@envoy_toolshed+//compile:llvm_minimal.bzl%llvm_toolchain_alias",
-            "attributes": {
-              "minimal_linux_x64": "@@envoy_toolshed++llvm_toolchain_alias_extension+llvm_minimal_linux_x64//:BUILD.bazel",
-              "minimal_linux_arm64": "@@envoy_toolshed++llvm_toolchain_alias_extension+llvm_minimal_linux_arm64//:BUILD.bazel",
-              "minimal_macos_arm64": "@@envoy_toolshed++llvm_toolchain_alias_extension+llvm_minimal_macos_arm64//:BUILD.bazel"
             }
           }
         }

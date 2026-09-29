@@ -232,23 +232,16 @@ and Python). Downstream projects that embed Envoy may prefer to use the versions
 the build host instead. Under bzlmod this is done from the embedding project's own `MODULE.bazel`,
 by registering host toolchains so that they take precedence over Envoy's hermetic ones.
 
-To use a host-installed Clang/LLVM toolchain instead of the hermetic one downloaded
-by Bazel, add the following to your `user.bazelrc`:
-
-```
-build --repo_env=BAZEL_USE_HOST_SYSROOT=True
-build --repo_env=BAZEL_LLVM_PATH=/usr
-build --config=clang-local
-```
-
-`BAZEL_LLVM_PATH` should point to the root of your LLVM installation.
+The CI-tested example in [`bazel/tests/codeql`](tests/codeql) shows how a downstream root module can
+select a host-installed Clang, libc++, and lld under bzlmod. It registers a `toolchains_llvm`
+toolchain rooted at the host installation and calls `envoy_llvm.host(...)` so Envoy targets that
+directly reference LLVM tools and libraries use the same installation. No Envoy `.bazelrc`
+compiler configuration is required.
 
 **Note:** Building with host-provided toolchains is **not supported** by the Envoy project. The
-hermetic toolchain versions are the only configuration tested in CI. Using host tools may result
-in build failures or unexpected behavior depending on the versions installed. This option is
-provided as a convenience for downstream repositories that build inside controlled environments
-(e.g. container-based CI) where tools are pre-installed at known versions. Upstream Envoy builds
-are unaffected when no host toolchains are registered.
+hermetic toolchain remains the supported configuration. The specific host LLVM configuration in
+the example is exercised by CodeQL CI, but other host tools or versions may fail depending on the
+build environment. Upstream Envoy builds are unaffected when no host toolchain is registered.
 
 ## Linking against libc++ on Linux
 

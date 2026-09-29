@@ -109,6 +109,7 @@ def envoy_copts(test = False):
                    "-fno-limit-debug-info",
                    "-Wgnu-conditional-omitted-operand",
                    "-Wc++2a-extensions",
+                   "-Wno-nullability-completeness",
                    "-Wrange-loop-analysis",
                ],
                _GCC_BUILD: [
