@@ -123,13 +123,13 @@ go_deps.module(
 )
 go_deps.module(
     path = "google.golang.org/genproto/googleapis/rpc",
-    sum = "h1:OxYkA3wjPsZyBylwymxSHa7ViiW1Sml4ToBrncvFehI=",
-    version = "v0.0.0-20250115164207-1a7da9e5054f",
+    sum = "h1:mZHHdPZl0dbGHCflZgAq/Q468DWVFcU2whhB2KAo8fk=",
+    version = "v0.0.0-20260526163538-3dc84a4a5aaa",
 )
 go_deps.module(
     path = "google.golang.org/genproto/googleapis/api",
-    sum = "h1:gap6+3Gk41EItBuyi4XX/bp4oqJ3UwuIMl25yGinuAA=",
-    version = "v0.0.0-20250115164207-1a7da9e5054f",
+    sum = "h1:Kjn0N0tCrDgiAFW+lGO4JZ3ck44CehvJQMAwj9QF0G8=",
+    version = "v0.0.0-20260526163538-3dc84a4a5aaa",
 )
 go_deps.module(
     path = "github.com/golang/protobuf",

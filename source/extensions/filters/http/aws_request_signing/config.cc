@@ -49,8 +49,8 @@ AwsRequestSigningFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const AwsRequestSigningProtoConfig& config,
     Server::Configuration::ServerFactoryContext& server_context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactoryFromProtoHelper(config, extra_context.stats_prefix, server_context,
-                                            extra_context.scopeOr(server_context));
+  return createFilterFactoryFromProtoHelper(config, extra_context.statsPrefixOr(), server_context,
+                                            extra_context.statsPrefixScopeOr(server_context));
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

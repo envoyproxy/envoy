@@ -8,6 +8,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/stats/custom_stat_namespaces_impl.h"
+#include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/router/route_specifiers/dynamic_modules/config.h"
 
@@ -53,6 +54,34 @@ virtual_hosts:
                      specifier_yaml);
 }
 
+// Builds a route configuration whose first route is a catch all carrying the given route level
+// specifier, followed by a specific route, so a test can see matching carry on past the catch all.
+std::string catchAllRouteConfigYaml(absl::string_view module_name,
+                                    absl::string_view failure_policy) {
+  return fmt::format(R"EOF(
+name: test_route_config
+virtual_hosts:
+- name: test_vhost
+  domains: ["*"]
+  routes:
+  - match: {{prefix: "/"}}
+    route: {{cluster: catch_all_cluster}}
+    route_specifiers:
+    - name: envoy.router.route_specifiers.dynamic_modules
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier
+        dynamic_module_config:
+          name: {}
+          do_not_close: true
+        specifier_name: test_route_specifier
+        stat_prefix: test
+        failure_policy: {}
+  - match: {{prefix: "/specific"}}
+    route: {{cluster: specific_cluster}}
+)EOF",
+                     module_name, failure_policy);
+}
+
 // Indents a specifier configuration so that it nests under `typed_config`.
 std::string specifierYaml(absl::string_view module_name, absl::string_view body) {
   return fmt::format(R"EOF(      dynamic_module_config:
@@ -87,8 +116,12 @@ public:
 
   absl::StatusOr<std::shared_ptr<Envoy::Router::ConfigImpl>>
   loadConfig(absl::string_view specifier_yaml) {
+    return loadRaw(routeConfigYaml(specifier_yaml));
+  }
+
+  absl::StatusOr<std::shared_ptr<Envoy::Router::ConfigImpl>> loadRaw(absl::string_view yaml) {
     envoy::config::route::v3::RouteConfiguration proto_config;
-    TestUtility::loadFromYaml(routeConfigYaml(specifier_yaml), proto_config);
+    TestUtility::loadFromYaml(std::string(yaml), proto_config);
     return Envoy::Router::ConfigImpl::create(proto_config, context_, creation_status_visitor_,
                                              init_manager_, false);
   }
@@ -141,6 +174,59 @@ TEST_F(DynamicModuleRouteSpecifierTest, ConfigNewFail) {
 TEST_F(DynamicModuleRouteSpecifierTest, FailurePolicyRequired) {
   const auto config = loadConfig(specifierYaml("route_specifier_no_op", ""));
   EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr("failure_policy must be set")));
+}
+
+TEST_F(DynamicModuleRouteSpecifierTest, DoNotCloseRequired) {
+  const auto config = loadConfig(R"EOF(      dynamic_module_config:
+        name: route_specifier_no_op
+        do_not_close: false
+      specifier_name: test_route_specifier
+      stat_prefix: test
+      failure_policy: PASS_THROUGH
+)EOF");
+  EXPECT_THAT(config.status(),
+              HasStatusMessage(HasSubstr(
+                  "dynamic_module_config.do_not_close must be true for a dynamic module route "
+                  "specifier")));
+}
+
+// Verifies the capacity aware request header fill callback contract.
+TEST(DynamicModuleRouteSpecifierHeaderFillTest, BoundedCapacity) {
+  using Envoy::Extensions::DynamicModules::ContextAccessor;
+  Http::TestRequestHeaderMapImpl headers{
+      {":authority", "host"}, {":path", "/"}, {"x-multi", "a"}, {"x-multi", "b"}};
+  const size_t count = headers.size();
+
+  // Zero capacity with a null array writes nothing, reports the required count and fails.
+  size_t size_out = 0;
+  EXPECT_FALSE(ContextAccessor::getHeadersBounded(headers, nullptr, 0, &size_out));
+  EXPECT_EQ(count, size_out);
+
+  // A null array with a capacity that would otherwise fit is rejected rather than dereferenced.
+  size_out = 0;
+  EXPECT_FALSE(ContextAccessor::getHeadersBounded(headers, nullptr, count, &size_out));
+
+  // A capacity below the count writes nothing and still reports the required count.
+  std::vector<envoy_dynamic_module_type_envoy_http_header> too_small(count - 1);
+  size_out = 0;
+  EXPECT_FALSE(
+      ContextAccessor::getHeadersBounded(headers, too_small.data(), too_small.size(), &size_out));
+  EXPECT_EQ(count, size_out);
+
+  // Exact and oversized capacities both fill every entry in order, keeping duplicate values.
+  for (const size_t capacity : {count, count + 4}) {
+    std::vector<envoy_dynamic_module_type_envoy_http_header> filled(capacity);
+    size_out = 0;
+    EXPECT_TRUE(ContextAccessor::getHeadersBounded(headers, filled.data(), capacity, &size_out));
+    EXPECT_EQ(count, size_out);
+    std::vector<std::string> pairs;
+    for (size_t i = 0; i < size_out; i++) {
+      pairs.emplace_back(std::string(filled[i].key_ptr, filled[i].key_length) + "=" +
+                         std::string(filled[i].value_ptr, filled[i].value_length));
+    }
+    EXPECT_THAT(pairs, testing::Contains("x-multi=a"));
+    EXPECT_THAT(pairs, testing::Contains("x-multi=b"));
+  }
 }
 
 TEST_F(DynamicModuleRouteSpecifierTest, DuplicateTemplateId) {
@@ -654,6 +740,53 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteMetadataRejectionFailsOpen) {
   EXPECT_EQ(
       1, context_.store_.counter("dynamicmodulescustom.route_specifier.test.failure_route_metadata")
              .value());
+}
+
+// A ContinueMatching decision drops the matched route and lets matching carry on to the next route.
+TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingDecisionSkipsToTheNextRoute) {
+  const auto config =
+      loadRaw(catchAllRouteConfigYaml("route_specifier_continue_matching", "PASS_THROUGH"));
+  ASSERT_TRUE(config.ok());
+
+  const auto route = config.value()->route(requestHeaders("/specific"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  ASSERT_NE(nullptr, route.route->routeEntry());
+  EXPECT_EQ("specific_cluster", route.route->routeEntry()->clusterName());
+  EXPECT_EQ(1, context_.store_
+                   .counter("dynamicmodulescustom.route_specifier.test.decision_continue_matching")
+                   .value());
+}
+
+// A ContinueMatching decision on the last route that matches yields no route, since there is
+// nothing left to match.
+TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingDecisionOnTheLastRouteYieldsNoRoute) {
+  const auto config =
+      loadRaw(catchAllRouteConfigYaml("route_specifier_continue_matching", "PASS_THROUGH"));
+  ASSERT_TRUE(config.ok());
+
+  // The specific route does not match this path, so the catch all is the last route to try.
+  const auto route = config.value()->route(requestHeaders("/"), stream_info_, 0);
+  EXPECT_EQ(nullptr, route.route);
+}
+
+// With the CONTINUE_MATCHING failure policy a module error drops the matched route and lets
+// matching carry on to the next route.
+TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingFailurePolicyContinuesOnError) {
+  const auto config =
+      loadRaw(catchAllRouteConfigYaml("route_specifier_unknown_decision", "CONTINUE_MATCHING"));
+  ASSERT_TRUE(config.ok());
+
+  const auto route = config.value()->route(requestHeaders("/specific"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  ASSERT_NE(nullptr, route.route->routeEntry());
+  EXPECT_EQ("specific_cluster", route.route->routeEntry()->clusterName());
+  EXPECT_EQ(
+      1, context_.store_.counter("dynamicmodulescustom.route_specifier.test.failure_module_error")
+             .value());
+  // The failure path does not count as a ContinueMatching decision.
+  EXPECT_EQ(0, context_.store_
+                   .counter("dynamicmodulescustom.route_specifier.test.decision_continue_matching")
+                   .value());
 }
 
 } // namespace
