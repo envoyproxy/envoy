@@ -104,6 +104,15 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
   cb_.onReadReady();
+  if (paused()) {
+    // The socket is inherited from a hot restart parent that is still serving it, and this
+    // listener must not read it until the parent is gone: the parent forwards the packets that are
+    // ours, and whatever we would dequeue here belongs to the parent's connections (a QUIC
+    // listener would answer each with a stateless reset). Read events are not enabled while
+    // paused, so this one was injected (activateRead()) to run onReadReady() above, e.g. to
+    // process the handshakes buffered from forwarded packets; it is not a signal to read.
+    return;
+  }
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->connectionInfoProvider().localAddress(), *this, time_source_,
       config_.prefer_gro_, /*allow_mmsg=*/true, packets_dropped_);
