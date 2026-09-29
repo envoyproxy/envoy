@@ -142,6 +142,16 @@
     "https://bcr.bazel.build/modules/boost.headers/1.89.0.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/boringssl-fips/0.20260813.0.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/boringssl-source/0.20260813.0.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/boringssl/0.0.0-20211025-d4f1ab9/MODULE.bazel": "6ee6353f8b1a701fe2178e1d925034294971350b6d3ac37e67e5a7d463267834",
+    "https://bcr.bazel.build/modules/boringssl/0.0.0-20230215-5c22014/MODULE.bazel": "4b03dc0d04375fa0271174badcd202ed249870c8e895b26664fd7298abea7282",
+    "https://bcr.bazel.build/modules/boringssl/0.0.0-20240530-2db0eb3/MODULE.bazel": "d0405b762c5e87cd445b7015f2b8da5400ef9a8dbca0bfefa6c1cea79d528a97",
+    "https://bcr.bazel.build/modules/boringssl/0.20240913.0/MODULE.bazel": "fcaa7503a5213290831a91ed1eb538551cf11ac0bc3a6ad92d0fef92c5bd25fb",
+    "https://bcr.bazel.build/modules/boringssl/0.20241024.0/MODULE.bazel": "b540cff73d948cb79cb0bc108d7cef391d2098a25adabfda5043e4ef548dbc87",
+    "https://bcr.bazel.build/modules/boringssl/0.20250415.0/MODULE.bazel": "db800eec7f06173c8faf04f63df45e2200cb1060eaaeb85b246f99bcc5e86425",
+    "https://bcr.bazel.build/modules/boringssl/0.20250514.0/MODULE.bazel": "b69867e7340e06cbfc6fedfbba3124d4d047b1a1af207504be18d0abff4a9580",
+    "https://bcr.bazel.build/modules/boringssl/0.20260413.0/MODULE.bazel": "f10930bd8ebc5f571be21f6c3503b8bec48bae852fda7958b1181c2ff7cb4fa0",
+    "https://bcr.bazel.build/modules/boringssl/0.20260508.0/MODULE.bazel": "9a64e0d941ae836940d7274f50712e2082cca4d3c67bb9f792295e01d439a62f",
+    "https://bcr.bazel.build/modules/boringssl/0.20260616.0/MODULE.bazel": "ce7110330099b915f8ee2645df8fe456cd5a07948865a85cbd6cc49c97205dcf",
     "https://bcr.bazel.build/modules/boringssl/0.20260813.0/MODULE.bazel": "2c9df6fc69bcabacb716cd92db47bd0687531ab087cf846b74046b97b9a093d0",
     "https://bcr.bazel.build/modules/boringssl/0.20260813.0/source.json": "efe2468331e3717dcebea3c291764b043d7a0477218bd4154b86ac5d80cc5eaf",
     "https://bcr.bazel.build/modules/brotli/1.1.0/MODULE.bazel": "3b5b90488995183419c4b5c9b063a164f6c0bc4d0d6b40550a612a5e860cc0fe",
@@ -346,7 +356,10 @@
     "https://bcr.bazel.build/modules/opencensus-proto/0.4.1.bcr.2/MODULE.bazel": "789706a714855f92c5c8cfcf1ef32bbb64dcd3b7c9066756ad7986ec59709d29",
     "https://bcr.bazel.build/modules/opencensus-proto/0.4.1.bcr.2/source.json": "aadf3f53e08b72376506b7c4ea3d167010c9efb160d7d6e1e304ed646bac1b36",
     "https://bcr.bazel.build/modules/opencensus-proto/0.4.1/MODULE.bazel": "4a2e8b4d0b544002502474d611a5a183aa282251e14f6a01afe841c0c1b10372",
+    "https://bcr.bazel.build/modules/openssl/3.3.1.bcr.1/MODULE.bazel": "49c0c07e8fb87b480bccb842cfee1b32617f11dac590f732573c69058699a3d1",
     "https://bcr.bazel.build/modules/openssl/3.5.7.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/openssl/4.0.1.bcr.0/MODULE.bazel": "e8191f8fbe7c8d2c5bfcdfa3c8cd5d99ad30ae086eaaa1fabbe2427c2fe599ee",
+    "https://bcr.bazel.build/modules/openssl/4.0.1.bcr.0/source.json": "e2689ff963fd358f0f7db300f41cc684e5fb596972f2508030338efea1e298e9",
     "https://bcr.bazel.build/modules/opentelemetry-cpp/1.14.2/MODULE.bazel": "089a5613c2a159c7dfde098dabfc61e966889c7d6a81a98422a84c51535ed17d",
     "https://bcr.bazel.build/modules/opentelemetry-cpp/1.16.0/MODULE.bazel": "b7379a140f538cea3f749179a2d481ed81942cc6f7b05a6113723eb34ac3b3e7",
     "https://bcr.bazel.build/modules/opentelemetry-cpp/1.19.0/MODULE.bazel": "3455326c08b28415648a3d60d8e3c811847ebdbe64474f75b25878f25585aea1",
@@ -588,6 +601,9 @@
     "https://bcr.bazel.build/modules/rules_nodejs/6.3.2/MODULE.bazel": "42e8d5254b6135f890fecca7c8d7f95a7d27a45f8275b276f66ec337767530ef",
     "https://bcr.bazel.build/modules/rules_nodejs/6.3.3/MODULE.bazel": "b66eadebd10f1f1b25f52f95ab5213a57e82c37c3f656fcd9a57ad04d2264ce7",
     "https://bcr.bazel.build/modules/rules_nodejs/6.3.3/source.json": "45bd343155bdfed2543f0e39b80ff3f6840efc31975da4b5795797f4c94147ad",
+    "https://bcr.bazel.build/modules/rules_perl/0.2.4/MODULE.bazel": "5f5af7be4bf5fb88d91af7469518f0fd2161718aefc606188f7cd51f436ca938",
+    "https://bcr.bazel.build/modules/rules_perl/1.1.2/MODULE.bazel": "7ccaaa5c42fa272d6e7d391a756b3d378fed645f0481baa55cfac0b97d6298af",
+    "https://bcr.bazel.build/modules/rules_perl/1.1.2/source.json": "6facc4dceb7d8eeb54f712399b9b933d5498e1906deffc06e66b5526c85ebe27",
     "https://bcr.bazel.build/modules/rules_pkg/0.7.0/MODULE.bazel": "df99f03fc7934a4737122518bb87e667e62d780b610910f0447665a7e2be62dc",
     "https://bcr.bazel.build/modules/rules_pkg/1.0.1/MODULE.bazel": "5b1df97dbc29623bccdf2b0dcd0f5cb08e2f2c9050aab1092fd39a41e82686ff",
     "https://bcr.bazel.build/modules/rules_pkg/1.3.0/MODULE.bazel": "ae0bdefbacc990c91f843206c90cf0f4be620639a5bf22119043599ba86d51a3",
@@ -647,11 +663,8 @@
     "https://bcr.bazel.build/modules/rules_shell/0.4.0/MODULE.bazel": "0f8f11bb3cd11755f0b48c1de0bbcf62b4b34421023aa41a2fc74ef68d9584f0",
     "https://bcr.bazel.build/modules/rules_shell/0.4.1/MODULE.bazel": "00e501db01bbf4e3e1dd1595959092c2fadf2087b2852d3f553b5370f5633592",
     "https://bcr.bazel.build/modules/rules_shell/0.6.1/MODULE.bazel": "72e76b0eea4e81611ef5452aa82b3da34caca0c8b7b5c0c9584338aa93bae26b",
-    "https://bcr.bazel.build/modules/rules_shell/0.7.1/MODULE.bazel": "257dd8d667371de804918dfceb86f6ddd2e1b5e025f5d9322878d4a73dc8aa58",
     "https://bcr.bazel.build/modules/rules_shell/0.8.0/MODULE.bazel": "f6a89f1d6a669a26f28fe814503857055d76306b79cfc11d12399af08d0b80ae",
     "https://bcr.bazel.build/modules/rules_shell/0.8.0/source.json": "eb53cc815bc503c6683c5fe12d943f98883f81fc22f51403ec8a95610cba4195",
-    "https://bcr.bazel.build/modules/rules_shellcheck/0.6.4/MODULE.bazel": "c2bc5271e5e6c0a732f14527f167f50cc51537ac49244db3187754ac82104a08",
-    "https://bcr.bazel.build/modules/rules_shellcheck/0.6.4/source.json": "145ce8525188d23871d9ee105e3a7635b7a45671a20c400b34a4124420700f8f",
     "https://bcr.bazel.build/modules/rules_swift/1.16.0/MODULE.bazel": "4a09f199545a60d09895e8281362b1ff3bb08bbde69c6fc87aff5b92fcc916ca",
     "https://bcr.bazel.build/modules/rules_swift/1.18.0/MODULE.bazel": "a6aba73625d0dc64c7b4a1e831549b6e375fbddb9d2dde9d80c9de6ec45b24c9",
     "https://bcr.bazel.build/modules/rules_swift/2.1.1/MODULE.bazel": "494900a80f944fc7aa61500c2073d9729dff0b764f0e89b824eb746959bc1046",
@@ -812,7 +825,6 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/b565623d89166dd153aee61ba421ec1638bf7a3e/modules/ocp-diag-core/0.0.0-230505-e965ac0.envoy/MODULE.bazel": "e946ff0e3eec7f94a76189c47f8aefb086b753ae012c7455eb6d5a7d7d52d340",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/b565623d89166dd153aee61ba421ec1638bf7a3e/modules/ocp-diag-core/0.0.0-230505-e965ac0.envoy/source.json": "bfec9a281eaea5ccdc59af0d9ac808abb5d567286c55bccf34810d4a8993e2de",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/b565623d89166dd153aee61ba421ec1638bf7a3e/modules/openssl/3.5.7.envoy/MODULE.bazel": "3d5416cfc1931483924fdf1c6f4e7c5489d24f0cf2d600bc63701e962fc86c67",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/b565623d89166dd153aee61ba421ec1638bf7a3e/modules/openssl/3.5.7.envoy/source.json": "4d2b33594d83e4db4e4d0b559f28cb4bfeb934ad77682e24049ec6c2d17de303",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/b565623d89166dd153aee61ba421ec1638bf7a3e/modules/perfetto/57.2.envoy/MODULE.bazel": "5df6589649d07db7a587cbe64363825a0fa01f0c83f6282c4142cff7fa8259b2",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/b565623d89166dd153aee61ba421ec1638bf7a3e/modules/perfetto/57.2.envoy/source.json": "f823054d455b84c3c5fd40462b4fdb9c06f15bdc918846ce5ba06b16498e28b3",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/b565623d89166dd153aee61ba421ec1638bf7a3e/modules/prometheus-metrics-model/0.6.2.envoy/MODULE.bazel": "40e1b9b9db52c3238fcc3e85c08ef35eb9157783e620009ed01eeed7631a9f67",
@@ -874,120 +886,6 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
-    "//bazel:extensions.bzl%envoy_build_config_ext": {
-      "general": {
-        "bzlTransitiveDigest": "u5vMSZh6CIb5u7O9SHn7Eya9Y4oQSWa/gvDPU1tS97Q=",
-        "usagesDigest": "MLWuM137EhOdY1+qM/X+w9CfebbWM2X9iYFKV4d9YnA=",
-        "recordedInputs": [
-          "REPO_MAPPING:,bazel_skylib bazel_skylib+",
-          "REPO_MAPPING:,bazel_tools bazel_tools",
-          "REPO_MAPPING:,cu +wasm_cargo+cu",
-          "REPO_MAPPING:,envoy_toolshed envoy_toolshed+",
-          "REPO_MAPPING:,rules_rust rules_rust+",
-          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
-        ],
-        "generatedRepoSpecs": {
-          "envoy_build_config": {
-            "repoRuleId": "@@//bazel:envoy_build_config.bzl%default_envoy_build_config",
-            "attributes": {}
-          }
-        }
-      }
-    },
-    "//bazel:extensions.bzl%envoy_llvm_extension": {
-      "general": {
-        "bzlTransitiveDigest": "u5vMSZh6CIb5u7O9SHn7Eya9Y4oQSWa/gvDPU1tS97Q=",
-        "usagesDigest": "Rby+IbUGH9TRwVnqeu4bivT3LHiCOT/l+NEUifhw6UA=",
-        "recordedInputs": [
-          "REPO_MAPPING:,bazel_skylib bazel_skylib+",
-          "REPO_MAPPING:,bazel_tools bazel_tools",
-          "REPO_MAPPING:,cu +wasm_cargo+cu",
-          "REPO_MAPPING:,envoy_toolshed envoy_toolshed+",
-          "REPO_MAPPING:,rules_rust rules_rust+",
-          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
-          "REPO_MAPPING:,llvm_minimal_linux_x64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_x64",
-          "REPO_MAPPING:,llvm_minimal_linux_arm64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_arm64",
-          "REPO_MAPPING:,llvm_minimal_macos_arm64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_macos_arm64"
-        ],
-        "generatedRepoSpecs": {
-          "llvm_toolchain_llvm": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_llvm_alias_repo",
-            "attributes": {
-              "minimal_linux_x64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_x64//:BUILD.bazel",
-              "minimal_linux_arm64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_arm64//:BUILD.bazel",
-              "minimal_macos_arm64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_macos_arm64//:BUILD.bazel"
-            }
-          }
-        }
-      }
-    },
-    "//bazel:extensions.bzl%envoy_module_graph_extension": {
-      "general": {
-        "bzlTransitiveDigest": "u5vMSZh6CIb5u7O9SHn7Eya9Y4oQSWa/gvDPU1tS97Q=",
-        "usagesDigest": "QEMWbIKM//Mp+xCyiZ6VMSO5cBWwkmyOj5c0RVLU65c=",
-        "recordedInputs": [
-          "REPO_MAPPING:,bazel_skylib bazel_skylib+",
-          "REPO_MAPPING:,bazel_tools bazel_tools",
-          "REPO_MAPPING:,cu +wasm_cargo+cu",
-          "REPO_MAPPING:,envoy_toolshed envoy_toolshed+",
-          "REPO_MAPPING:,rules_rust rules_rust+",
-          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
-        ],
-        "generatedRepoSpecs": {
-          "envoy_mod_graph": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_envoy_mod_graph_repo",
-            "attributes": {
-              "lockfile": "@@//:MODULE.bazel.lock"
-            }
-          }
-        }
-      }
-    },
-    "//bazel:extensions.bzl%envoy_repo_extension": {
-      "general": {
-        "bzlTransitiveDigest": "u5vMSZh6CIb5u7O9SHn7Eya9Y4oQSWa/gvDPU1tS97Q=",
-        "usagesDigest": "ev3JwF8T3t1Lzq4LDmr0bcVYncB0jj3HOaH1Ax9SG60=",
-        "recordedInputs": [
-          "REPO_MAPPING:,bazel_skylib bazel_skylib+",
-          "REPO_MAPPING:,bazel_tools bazel_tools",
-          "REPO_MAPPING:,cu +wasm_cargo+cu",
-          "REPO_MAPPING:,envoy_toolshed envoy_toolshed+",
-          "REPO_MAPPING:,rules_rust rules_rust+",
-          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
-        ],
-        "generatedRepoSpecs": {
-          "envoy_repo": {
-            "repoRuleId": "@@//bazel:repo.bzl%_envoy_repo",
-            "attributes": {}
-          }
-        }
-      }
-    },
-    "//bazel:extensions.bzl%envoy_toolchains_extension": {
-      "general": {
-        "bzlTransitiveDigest": "u5vMSZh6CIb5u7O9SHn7Eya9Y4oQSWa/gvDPU1tS97Q=",
-        "usagesDigest": "b/0RV7ukcWBwz6aM5tK8DEVFn5uk77wUWSuVYT/DDjo=",
-        "recordedInputs": [
-          "REPO_MAPPING:,bazel_skylib bazel_skylib+",
-          "REPO_MAPPING:,bazel_tools bazel_tools",
-          "REPO_MAPPING:,cu +wasm_cargo+cu",
-          "REPO_MAPPING:,envoy_toolshed envoy_toolshed+",
-          "REPO_MAPPING:,rules_rust rules_rust+",
-          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
-        ],
-        "generatedRepoSpecs": {
-          "clang_platform": {
-            "repoRuleId": "@@envoy_toolshed+//repository:utils.bzl%arch_alias",
-            "attributes": {
-              "aliases": {
-                "amd64": "'@@//bazel/platforms/rbe:linux_x64'",
-                "aarch64": "'@@//bazel/platforms/rbe:linux_arm64'"
-              }
-            }
-          }
-        }
-      }
-    },
     "@@aspect_rules_esbuild+//esbuild:extensions.bzl%esbuild": {
       "general": {
         "bzlTransitiveDigest": "zHTxEUJi37HHbuoiJkToNOdzMWPcyGFW+RzKIesV/Gg=",
@@ -1265,10 +1163,120 @@
         }
       }
     },
+    "@@envoy+//bazel:extensions.bzl%envoy_build_config_ext": {
+      "general": {
+        "bzlTransitiveDigest": "u5vMSZh6CIb5u7O9SHn7Eya9Y4oQSWa/gvDPU1tS97Q=",
+        "usagesDigest": "mwAW/rvYn9ibhK4sqo33vg61ksBGCK+SCZUIRJGoVtQ=",
+        "recordedInputs": [
+          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
+          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "envoy_build_config": {
+            "repoRuleId": "@@envoy+//bazel:envoy_build_config.bzl%default_envoy_build_config",
+            "attributes": {}
+          }
+        }
+      }
+    },
+    "@@envoy+//bazel:extensions.bzl%envoy_llvm_extension": {
+      "general": {
+        "bzlTransitiveDigest": "u5vMSZh6CIb5u7O9SHn7Eya9Y4oQSWa/gvDPU1tS97Q=",
+        "usagesDigest": "nRt9FxgXAvip0HGI2p6J/uqPKNtVnaECN9lsnRxOi6o=",
+        "recordedInputs": [
+          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
+          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "llvm_toolchain_llvm": {
+            "repoRuleId": "@@envoy+//bazel:extensions.bzl%_host_llvm_repo",
+            "attributes": {
+              "llvm_version": "",
+              "path": "/usr/lib/llvm-22"
+            }
+          }
+        }
+      }
+    },
+    "@@envoy+//bazel:extensions.bzl%envoy_module_graph_extension": {
+      "general": {
+        "bzlTransitiveDigest": "u5vMSZh6CIb5u7O9SHn7Eya9Y4oQSWa/gvDPU1tS97Q=",
+        "usagesDigest": "3kZLOs4LMLPfk4sJrOzP9Uiqq6maNbEmvUx7u9y0WpU=",
+        "recordedInputs": [
+          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
+          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "envoy_mod_graph": {
+            "repoRuleId": "@@envoy+//bazel:extensions.bzl%_envoy_mod_graph_repo",
+            "attributes": {
+              "lockfile": "@@envoy+//:MODULE.bazel.lock"
+            }
+          }
+        }
+      }
+    },
+    "@@envoy+//bazel:extensions.bzl%envoy_repo_extension": {
+      "general": {
+        "bzlTransitiveDigest": "u5vMSZh6CIb5u7O9SHn7Eya9Y4oQSWa/gvDPU1tS97Q=",
+        "usagesDigest": "JPan5EJba0XH4g5z0LkIL3XzA6Lo8N5AuJMtajlHkqg=",
+        "recordedInputs": [
+          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
+          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "envoy_repo": {
+            "repoRuleId": "@@envoy+//bazel:repo.bzl%_envoy_repo",
+            "attributes": {}
+          }
+        }
+      }
+    },
+    "@@envoy+//bazel:extensions.bzl%envoy_toolchains_extension": {
+      "general": {
+        "bzlTransitiveDigest": "u5vMSZh6CIb5u7O9SHn7Eya9Y4oQSWa/gvDPU1tS97Q=",
+        "usagesDigest": "WY4QAn4jcr1k1UynWUX8idOJIvH/64ZyE0GQQvqAI+8=",
+        "recordedInputs": [
+          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
+          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
+          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "clang_platform": {
+            "repoRuleId": "@@envoy_toolshed+//repository:utils.bzl%arch_alias",
+            "attributes": {
+              "aliases": {
+                "amd64": "'@@envoy+//bazel/platforms/rbe:linux_x64'",
+                "aarch64": "'@@envoy+//bazel/platforms/rbe:linux_arm64'"
+              }
+            }
+          }
+        }
+      }
+    },
     "@@envoy_toolshed+//compile:extensions.bzl%libcxx_extension": {
       "general": {
         "bzlTransitiveDigest": "DByL0zbcWRQWNeeOB8C0be8S9X4qWb3H5Q6nWZlT3wE=",
-        "usagesDigest": "zlcuQuN/w8RuftzjE5cZrfHR/kZu/2RJF3Xq+9Yjar8=",
+        "usagesDigest": "KpydMUF67Thjj7dxFRyP1XfRypHyTi2PieulXg/q++8=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "llvm_libcxx_aarch64": {
@@ -1293,7 +1301,7 @@
     "@@envoy_toolshed+//compile:extensions.bzl%libcxx_libs_extension": {
       "general": {
         "bzlTransitiveDigest": "DByL0zbcWRQWNeeOB8C0be8S9X4qWb3H5Q6nWZlT3wE=",
-        "usagesDigest": "Lp09oT+2dmvx/nJqJU272xUbZOHo82vMsUFN8hZjEXQ=",
+        "usagesDigest": "z47Defo42ymUqFSeAV/Zd/WotswORz2XQzadP9dIQ/I=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "libcxx_libs_aarch64": {
@@ -1318,7 +1326,7 @@
     "@@envoy_toolshed+//compile:extensions.bzl%llvm_minimal_build_extension": {
       "general": {
         "bzlTransitiveDigest": "DByL0zbcWRQWNeeOB8C0be8S9X4qWb3H5Q6nWZlT3wE=",
-        "usagesDigest": "XOl+kJerJ6eg8+K94rh60xWQjMRY7D9EYcHWpB2zWho=",
+        "usagesDigest": "jRuNylX+Wvm9FUqKjwwEVWdejsJARKKUNm6FKUUVu90=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "llvm_tarball_linux_x86_64": {
@@ -1354,7 +1362,7 @@
     "@@envoy_toolshed+//compile:extensions.bzl%llvm_minimal_extension": {
       "general": {
         "bzlTransitiveDigest": "DByL0zbcWRQWNeeOB8C0be8S9X4qWb3H5Q6nWZlT3wE=",
-        "usagesDigest": "leHHhPDLPJnyuJVV2SC2F2s/xNkSaHeIfsm0FV1eROY=",
+        "usagesDigest": "nd8zmbfX+BIKHjNpn0Uu3prvphO/8AKVvH0kNcKYxq8=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "llvm_minimal_linux_x64": {
@@ -1387,7 +1395,7 @@
     "@@envoy_toolshed+//compile:extensions.bzl%sanitizer_extension": {
       "general": {
         "bzlTransitiveDigest": "DByL0zbcWRQWNeeOB8C0be8S9X4qWb3H5Q6nWZlT3wE=",
-        "usagesDigest": "6D8SuAn0bGgzXMCdQCiJJKJD8uT0lLxCJQJA1OTd2XE=",
+        "usagesDigest": "hakpQpF46t2OQfRzm/zoeJQF2gQG+W9JVF7J4xeiVFk=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "msan_libs": {
@@ -1410,7 +1418,7 @@
     "@@envoy_toolshed+//coverage/grcov:extensions.bzl%grcov_extension": {
       "general": {
         "bzlTransitiveDigest": "SyRcRSF+Fq3fTnEFDCNdy6s7CoJ04VJDp7lP6OLpgOM=",
-        "usagesDigest": "qDbzJW9jSFtU9v08FiocS8kDkzwUnFC0H1+QISz4rDA=",
+        "usagesDigest": "vKRLRKLTY5/jItKBUf9U/LlwpptIF7KnxaoBSXw/adU=",
         "recordedInputs": [
           "REPO_MAPPING:envoy_toolshed+,bazel_tools bazel_tools"
         ],
@@ -1500,7 +1508,7 @@
     "@@envoy_toolshed+//sysroot:extensions.bzl%sysroot_extension": {
       "general": {
         "bzlTransitiveDigest": "mqFPk+rRx8qraJl4kmhKN33NfV8Cwh3IJCaDE/7wRxQ=",
-        "usagesDigest": "MsL7b1DsmEoFRFAsDjkrY7p8a6Dfz1WONdw+VvgzHoM=",
+        "usagesDigest": "nSDDX99vyIfwgBgpFKfFOenma3fzdgW2DxMaRUaLQuk=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "sysroot_linux_amd64": {
@@ -1758,7 +1766,7 @@
     "@@proxy-wasm-rust-sdk+//bazel:extensions.bzl%crates_deps": {
       "general": {
         "bzlTransitiveDigest": "2H2PMKVKLkLRlPcq2OuGHbQEsf0Ww+HPAsb0O1c1d1A=",
-        "usagesDigest": "n2RkZaE4sWZD3bFJ2ya3FIT7jA8Vdm0cd9ifbiOKbXs=",
+        "usagesDigest": "DoeyjeHdit/bqF+1HIB6+05yHVIdzQU1NCYHuH53F8s=",
         "recordedInputs": [
           "REPO_MAPPING:proxy-wasm-rust-sdk+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:proxy-wasm-rust-sdk+,bazel_tools bazel_tools",
@@ -1972,7 +1980,7 @@
     "@@rules_buf+//buf:extensions.bzl%buf": {
       "general": {
         "bzlTransitiveDigest": "IjW2he5lp+L/zEfsBKIilXijyHH6PC4Lf3y19MA6G4c=",
-        "usagesDigest": "IPP/e+o+u5uPLO6bkNC5AnSMtHb3qdjMsGQixJiIN08=",
+        "usagesDigest": "Qg1rLbuptbACkOJHg4/XUGk3PZu3kdJ8kvvXmQ0GRFo=",
         "recordedInputs": [
           "REPO_MAPPING:rules_buf+,bazel_tools bazel_tools"
         ],
@@ -2261,97 +2269,6 @@
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",
           "reproducible": false
-        }
-      }
-    },
-    "@@rules_shellcheck+//shellcheck/internal:extensions.bzl%shellcheck": {
-      "general": {
-        "bzlTransitiveDigest": "eJ7QFVTBwd025Ap9sazmZQJk/lmEdym4BDQ6pjr4q0U=",
-        "usagesDigest": "3t/q483JeN1GKD2lzKSiuOkCNHKauy/bUnmoh1fkL6w=",
-        "recordedInputs": [
-          "REPO_MAPPING:rules_shellcheck+,bazel_tools bazel_tools",
-          "REPO_MAPPING:rules_shellcheck+,rules_shellcheck rules_shellcheck+"
-        ],
-        "generatedRepoSpecs": {
-          "shellcheck_darwin_aarch64": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "strip_prefix": "shellcheck-v0.11.0",
-              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_darwin_aarch64\",\n    shellcheck = \"shellcheck\",\n)\n",
-              "sha256": "56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79",
-              "urls": [
-                "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.aarch64.tar.xz"
-              ]
-            }
-          },
-          "shellcheck_darwin_x86_64": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "strip_prefix": "shellcheck-v0.11.0",
-              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_darwin_x86_64\",\n    shellcheck = \"shellcheck\",\n)\n",
-              "sha256": "3c89db4edcab7cf1c27bff178882e0f6f27f7afdf54e859fa041fca10febe4c6",
-              "urls": [
-                "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.x86_64.tar.xz"
-              ]
-            }
-          },
-          "shellcheck_linux_aarch64": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "strip_prefix": "shellcheck-v0.11.0",
-              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_linux_aarch64\",\n    shellcheck = \"shellcheck\",\n)\n",
-              "sha256": "12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588",
-              "urls": [
-                "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.aarch64.tar.xz"
-              ]
-            }
-          },
-          "shellcheck_linux_armv6hf": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "strip_prefix": "shellcheck-v0.11.0",
-              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_linux_armv6hf\",\n    shellcheck = \"shellcheck\",\n)\n",
-              "sha256": "8afc50b302d5feeac9381ea114d563f0150d061520042b254d6eb715797c8223",
-              "urls": [
-                "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.armv6hf.tar.xz"
-              ]
-            }
-          },
-          "shellcheck_linux_x86_64": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "strip_prefix": "shellcheck-v0.11.0",
-              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_linux_x86_64\",\n    shellcheck = \"shellcheck\",\n)\n",
-              "sha256": "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198",
-              "urls": [
-                "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz"
-              ]
-            }
-          },
-          "shellcheck_windows_x86_64": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "strip_prefix": "",
-              "build_file_content": "load(\"@rules_shellcheck//shellcheck/internal:extensions.bzl\", \"create_shellcheck_repository_targets\")\n\ncreate_shellcheck_repository_targets(\n    name = \"shellcheck_windows_x86_64\",\n    shellcheck = \"shellcheck.exe\",\n)\n",
-              "sha256": "8a4e35ab0b331c85d73567b12f2a444df187f483e5079ceffa6bda1faa2e740e",
-              "urls": [
-                "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.zip"
-              ]
-            }
-          },
-          "shellcheck_toolchains": {
-            "repoRuleId": "@@rules_shellcheck+//shellcheck/internal:extensions.bzl%shellcheck_toolchains_hub",
-            "attributes": {
-              "toolchains": {
-                "@@rules_shellcheck++shellcheck+shellcheck_darwin_aarch64//:toolchain": "darwin_aarch64",
-                "@@rules_shellcheck++shellcheck+shellcheck_darwin_x86_64//:toolchain": "darwin_x86_64",
-                "@@rules_shellcheck++shellcheck+shellcheck_linux_aarch64//:toolchain": "linux_aarch64",
-                "@@rules_shellcheck++shellcheck+shellcheck_linux_armv6hf//:toolchain": "linux_armv6hf",
-                "@@rules_shellcheck++shellcheck+shellcheck_linux_x86_64//:toolchain": "linux_x86_64",
-                "@@rules_shellcheck++shellcheck+shellcheck_windows_x86_64//:toolchain": "windows_x86_64"
-              }
-            }
-          }
         }
       }
     },
