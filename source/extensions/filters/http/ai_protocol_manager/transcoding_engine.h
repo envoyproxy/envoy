@@ -13,6 +13,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -522,6 +523,8 @@ struct TranscodeStreamState {
   // The native usage `accumulateUsage` has merged so far. Never finalized itself: renders
   // finalize a copy.
   TokenUsage usage{};
+  // The events of `StreamOutput::once` outputs already written, by SSE event name.
+  absl::flat_hash_set<std::string> written_once{};
   // Set once the stream has ended, by a `Terminate` case or by `finishStream()`, after which
   // `finishStream()` appends nothing.
   bool terminated{false};
@@ -621,6 +624,22 @@ struct StreamEmit {
   nlohmann::json json{};
   // The payload of an event whose payload is not JSON (e.g. OpenAI's `[DONE]`).
   std::string raw_data{};
+  // For a JSON payload: rules that complete a copy of `json` from the stream's state (e.g. the
+  // finish reason and usage earlier events captured) when the event is written.
+  TranscodeRuleSet rules{};
+};
+
+// One of the events a `Transcode` case with `outputs` writes for each event it matches. Its rules
+// run on a copy of the matched event, after the case's own `rules`.
+struct StreamOutput {
+  // The SSE `event:` name of the event written; empty for none.
+  std::string event{};
+  TranscodeRuleSet rules{};
+  // Written only when the matched event, after the case's `rules`, matches this.
+  TranscodePredicate when{};
+  // Written at most once per stream (per `event` name), for the first matched event that reaches
+  // it: e.g. the opening event a destination dialect needs but the source does not send.
+  bool once{false};
 };
 
 // One row of a stream grammar: the events it matches, and what becomes of them. Only a JSON
@@ -632,6 +651,10 @@ struct StreamEventCase {
   TranscodeRuleSet rules{};
   // For `Transcode`: the SSE `event:` name of the converted event; empty for none.
   std::string output_event{};
+  // For `Transcode`: when set, the case writes these events, in order, instead of the converted
+  // event, and `rules` only prepare them (and the stream's state). One source event can then
+  // become several destination events, or none.
+  std::vector<StreamOutput> outputs{};
 };
 
 // How one dialect's streamed response events convert into another's. The first case that matches

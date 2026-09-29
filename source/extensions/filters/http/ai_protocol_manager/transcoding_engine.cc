@@ -674,10 +674,20 @@ absl::Status verifyEventName(absl::string_view leg, absl::string_view name) {
 // - an SSE `event:` name with a CR or LF in it, or raw data with a CR in it, either of which
 //   would break the framing of the events the grammar writes (Envoy treats both as bugs);
 // - a `setFromState` whose slot no `captureToState` in the grammar writes, which never sets
-//   anything.
+//   anything;
+// - `outputs` on a case that does not transcode, which would never be written.
 absl::Status verifyStreamGrammar(const StreamGrammar& grammar, absl::string_view leg) {
   absl::flat_hash_set<std::string> captured_slots;
   std::vector<const TranscodeRule*> slot_readers;
+  const auto track_slots = [&captured_slots, &slot_readers](const TranscodeRuleSet& rules) {
+    for (const TranscodeRule* rule : flattenRules(rules)) {
+      if (rule->op() == TranscodeRule::Op::CaptureToState) {
+        captured_slots.insert(rule->slot());
+      } else if (rule->op() == TranscodeRule::Op::SetFromState) {
+        slot_readers.push_back(rule);
+      }
+    }
+  };
   for (size_t i = 0; i < grammar.cases.size(); ++i) {
     const StreamEventCase& event_case = grammar.cases[i];
     const StreamEventMatch::Kind kind = event_case.match.kind();
@@ -687,15 +697,19 @@ absl::Status verifyStreamGrammar(const StreamGrammar& grammar, absl::string_view
                                                 " transcodes events without a JSON payload, which "
                                                 "cannot be transcoded"));
     }
+    if (event_case.disposition != StreamDisposition::Transcode && !event_case.outputs.empty()) {
+      return legVerifierError(
+          leg, absl::StrCat("grammar case ", i, " has outputs but does not transcode"));
+    }
     if (absl::Status status = verifyEventName(leg, event_case.output_event); !status.ok()) {
       return status;
     }
-    for (const TranscodeRule* rule : flattenRules(event_case.rules)) {
-      if (rule->op() == TranscodeRule::Op::CaptureToState) {
-        captured_slots.insert(rule->slot());
-      } else if (rule->op() == TranscodeRule::Op::SetFromState) {
-        slot_readers.push_back(rule);
+    track_slots(event_case.rules);
+    for (const StreamOutput& output : event_case.outputs) {
+      if (absl::Status status = verifyEventName(leg, output.event); !status.ok()) {
+        return status;
       }
+      track_slots(output.rules);
     }
   }
   for (const std::vector<StreamEmit>* emits : {&grammar.on_terminate, &grammar.on_source_end}) {
@@ -706,6 +720,7 @@ absl::Status verifyStreamGrammar(const StreamGrammar& grammar, absl::string_view
       if (emit.raw_data.find('\r') != std::string::npos) {
         return legVerifierError(leg, "grammar writes raw SSE data that contains a CR");
       }
+      track_slots(emit.rules);
     }
   }
   for (const TranscodeRule* reader : slot_readers) {
@@ -999,40 +1014,26 @@ StreamGrammar anthropicStreamToIr() {
   };
 }
 
-// An IR content chunk -> Anthropic `content_block_delta`, into the message's one text block.
-TranscodeRuleSet anthropicTextDeltaFromIr() {
-  return TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
-                          {
-                              TranscodeRule::takeFirst("choices", "choice"),
-                              TranscodeRule::setConst("type", "content_block_delta"),
-                              TranscodeRule::setConst("index", 0),
-                              TranscodeRule::setConst("delta.type", "text_delta"),
-                              TranscodeRule::move("choice.delta.content", "delta.text"),
-                              TranscodeRule::retainOnly("", {"type", "index", "delta"}),
-                          });
+// Reads an IR chunk by its first choice, and remembers the finish reason and usage it may carry
+// for the closing `message_delta`. The IR reports the usage of the whole stream, once, near the
+// end (OpenAI's `include_usage` chunk, or Gemini's last chunk), so the last usage seen is the
+// total.
+TranscodeRuleSet anthropicChunkFromIr() {
+  return TranscodeRuleSet(
+      TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
+      {
+          TranscodeRule::takeFirst("choices", "choice"),
+          TranscodeRule::captureToState("choice.finish_reason", "finish_reason"),
+          TranscodeRule::captureToState("usage", "usage"),
+      });
 }
 
-// The IR's closing chunk -> Anthropic `message_delta`.
-TranscodeRuleSet anthropicMessageDeltaFromIr() {
-  return TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
-                          {
-                              TranscodeRule::convertUsage(TranscodingEngine::kIrProtocol,
-                                                          LLMProtocol::AnthropicMessages),
-                              TranscodeRule::takeFirst("choices", "choice"),
-                              TranscodeRule::setConst("type", "message_delta"),
-                              TranscodeRule::move("choice.finish_reason", "delta.stop_reason"),
-                              irFinishReasonToAnthropic("delta.stop_reason"),
-                              TranscodeRule::setConst("delta.stop_sequence", nullptr),
-                              TranscodeRule::retainOnly("", {"type", "delta", "usage"}),
-                          });
-}
-
-// Any other IR chunk -> Anthropic `message_start`.
+// The first IR chunk -> Anthropic `message_start`, which opens the message. Its usage is only
+// known at the end, so it starts at zero and `message_delta` reports it.
 TranscodeRuleSet anthropicMessageStartFromIr() {
   return TranscodeRuleSet(
       TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
       {
-          TranscodeRule::require("choices", JsonShape::NonEmptyArray),
           TranscodeRule::setConst("type", "message_start"),
           TranscodeRule::move("id", "message.id"),
           TranscodeRule::setDefault("message.id", "msg_transcoded"),
@@ -1042,32 +1043,92 @@ TranscodeRuleSet anthropicMessageStartFromIr() {
           TranscodeRule::setFromContext("message.model", TranscodeRule::ContextField::RequestModel),
           TranscodeRule::setDefault("message.model", kUnknownModel),
           TranscodeRule::setConst("message.content", nlohmann::json::array()),
+          TranscodeRule::setConst("message.stop_reason", nullptr),
+          TranscodeRule::setConst("message.stop_sequence", nullptr),
+          TranscodeRule::setConst(
+              "message.usage", nlohmann::json::object({{"input_tokens", 0}, {"output_tokens", 0}})),
           TranscodeRule::retainOnly("", {"type", "message"}),
       });
 }
 
-// IR chunk stream -> Anthropic Messages stream. Each chunk is read by what its first choice
-// carries: text, else a finish reason, else nothing but the opening role.
+// Opens the message's one text block, which Anthropic requires before the block's deltas.
+TranscodeRuleSet anthropicContentBlockStartFromIr() {
+  return TranscodeRuleSet(
+      TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
+      {
+          TranscodeRule::setConst("type", "content_block_start"),
+          TranscodeRule::setConst("index", 0),
+          TranscodeRule::setConst("content_block",
+                                  nlohmann::json::object({{"type", "text"}, {"text", ""}})),
+          TranscodeRule::retainOnly("", {"type", "index", "content_block"}),
+      });
+}
+
+// An IR chunk's text -> Anthropic `content_block_delta`, into the message's one text block.
+TranscodeRuleSet anthropicTextDeltaFromIr() {
+  return TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
+                          {
+                              TranscodeRule::setConst("type", "content_block_delta"),
+                              TranscodeRule::setConst("index", 0),
+                              TranscodeRule::setConst("delta.type", "text_delta"),
+                              TranscodeRule::move("choice.delta.content", "delta.text"),
+                              TranscodeRule::retainOnly("", {"type", "index", "delta"}),
+                          });
+}
+
+// Completes the closing `message_delta` with the stop reason and usage the IR chunks carried.
+// Anthropic requires both, so a stream that carried neither still gets `end_turn` and zero
+// output tokens.
+TranscodeRuleSet anthropicMessageDeltaFromIr() {
+  return TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::AnthropicMessages,
+                          {
+                              TranscodeRule::setFromState("delta.stop_reason", "finish_reason"),
+                              irFinishReasonToAnthropic("delta.stop_reason"),
+                              TranscodeRule::setDefault("delta.stop_reason", "end_turn"),
+                              TranscodeRule::setConst("delta.stop_sequence", nullptr),
+                              TranscodeRule::setFromState("usage", "usage"),
+                              TranscodeRule::convertUsage(TranscodingEngine::kIrProtocol,
+                                                          LLMProtocol::AnthropicMessages),
+                              TranscodeRule::setDefault("usage.output_tokens", 0),
+                          });
+}
+
+// IR chunk stream -> Anthropic Messages stream. The IR has no message or content block
+// boundaries, so the first chunk also opens the message and its one text block, and the end of
+// the stream closes both.
 StreamGrammar anthropicStreamFromIr() {
   return StreamGrammar{
       .cases =
           {
               {.match = StreamEventMatch::isDone(), .disposition = StreamDisposition::Terminate},
               {.match = StreamEventMatch::notJson(), .disposition = StreamDisposition::Passthrough},
-              {.match = StreamEventMatch::json(
-                   TranscodePredicate::fieldIs("choices.0.delta.content", JsonShape::Text)),
-               .rules = anthropicTextDeltaFromIr(),
-               .output_event = "content_block_delta"},
-              {.match = StreamEventMatch::json(
-                   TranscodePredicate::fieldIs("choices.0.finish_reason", JsonShape::String)),
-               .rules = anthropicMessageDeltaFromIr(),
-               .output_event = "message_delta"},
               {.match = StreamEventMatch::json(),
-               .rules = anthropicMessageStartFromIr(),
-               .output_event = "message_start"},
+               .rules = anthropicChunkFromIr(),
+               .outputs =
+                   {
+                       {.event = "message_start",
+                        .rules = anthropicMessageStartFromIr(),
+                        .once = true},
+                       {.event = "content_block_start",
+                        .rules = anthropicContentBlockStartFromIr(),
+                        .once = true},
+                       {.event = "content_block_delta",
+                        .rules = anthropicTextDeltaFromIr(),
+                        .when =
+                            TranscodePredicate::fieldIs("choice.delta.content", JsonShape::Text)},
+                   }},
           },
-      .on_terminate = {StreamEmit{.event = "message_stop",
-                                  .json = nlohmann::json::object({{"type", "message_stop"}})}},
+      .on_terminate =
+          {
+              StreamEmit{
+                  .event = "content_block_stop",
+                  .json = nlohmann::json::object({{"type", "content_block_stop"}, {"index", 0}})},
+              StreamEmit{.event = "message_delta",
+                         .json = nlohmann::json::object({{"type", "message_delta"}}),
+                         .rules = anthropicMessageDeltaFromIr()},
+              StreamEmit{.event = "message_stop",
+                         .json = nlohmann::json::object({{"type", "message_stop"}})},
+          },
   };
 }
 
@@ -2762,25 +2823,91 @@ absl::Status transcodeResponse(const DialectTranscodePack& pack, TranscodeDirect
   return absl::OkStatus();
 }
 
-// Builds the events a stream grammar writes itself.
-absl::StatusOr<std::vector<SseEventPtr>> makeStreamEvents(const std::vector<StreamEmit>& emits) {
+// Builds an SSE event named `name` around the JSON payload `json`.
+absl::StatusOr<SseEventPtr> makeJsonEvent(const std::string& name, nlohmann::json json) {
+  auto event = std::make_unique<SseEvent>();
+  JsonWithExtBuf payload;
+  payload.setJson(std::move(json));
+  event->set_json(std::move(payload));
+  if (absl::Status status = event->set_event(name); !status.ok()) {
+    return status;
+  }
+  return event;
+}
+
+// Builds the events a stream grammar writes itself, completing each JSON payload with its rules.
+absl::StatusOr<std::vector<SseEventPtr>> makeStreamEvents(const std::vector<StreamEmit>& emits,
+                                                          TranscodeContext& ctx) {
   std::vector<SseEventPtr> events;
   events.reserve(emits.size());
   for (const StreamEmit& emit : emits) {
-    auto event = std::make_unique<SseEvent>();
     if (emit.json.is_null()) {
+      auto event = std::make_unique<SseEvent>();
       event->set_raw_data(std::make_unique<Buffer::OwnedImpl>(emit.raw_data));
-    } else {
-      JsonWithExtBuf payload;
-      payload.setJson(emit.json);
-      event->set_json(std::move(payload));
+      if (absl::Status status = event->set_event(emit.event); !status.ok()) {
+        return status;
+      }
+      events.push_back(std::move(event));
+      continue;
     }
-    if (absl::Status status = event->set_event(emit.event); !status.ok()) {
+    nlohmann::json json = emit.json;
+    if (absl::Status status = emit.rules.execute(json, &ctx); !status.ok()) {
       return status;
     }
-    events.push_back(std::move(event));
+    absl::StatusOr<SseEventPtr> event = makeJsonEvent(emit.event, std::move(json));
+    if (!event.ok()) {
+      return event.status();
+    }
+    events.push_back(*std::move(event));
   }
   return events;
+}
+
+// Runs a case's `outputs` on `working`, the matched event's payload after the case's own rules.
+// The last event written reuses `event`, the only one whose payload store can back an offloaded
+// `ExternalRef`; an earlier one that would carry one is an error.
+absl::StatusOr<std::vector<SseEventPtr>> writeOutputs(const std::vector<StreamOutput>& outputs,
+                                                      const nlohmann::json& working,
+                                                      TranscodeContext& ctx, SseEventPtr& event) {
+  std::vector<std::pair<const StreamOutput*, nlohmann::json>> written;
+  for (const StreamOutput& output : outputs) {
+    if ((output.once && ctx.stream_state->written_once.contains(output.event)) ||
+        !output.when.matches(working)) {
+      continue;
+    }
+    nlohmann::json doc = working;
+    if (absl::Status status = output.rules.execute(doc, &ctx); !status.ok()) {
+      return status;
+    }
+    if (output.once) {
+      ctx.stream_state->written_once.insert(output.event);
+    }
+    written.emplace_back(&output, std::move(doc));
+  }
+  std::vector<SseEventPtr> out;
+  for (size_t i = 0; i + 1 < written.size(); ++i) {
+    if (containsExternalRef(written[i].second)) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("stream output '", written[i].first->event,
+                       "' carries offloaded payload, which only the last output can"));
+    }
+    absl::StatusOr<SseEventPtr> made =
+        makeJsonEvent(written[i].first->event, std::move(written[i].second));
+    if (!made.ok()) {
+      return made.status();
+    }
+    out.push_back(*std::move(made));
+  }
+  if (written.empty()) {
+    event.reset();
+    return out;
+  }
+  if (absl::Status status = event->set_event(written.back().first->event); !status.ok()) {
+    return status;
+  }
+  event->json().json() = std::move(written.back().second);
+  out.push_back(std::move(event));
+  return out;
 }
 
 } // namespace
@@ -2856,7 +2983,8 @@ TranscodingEngine::transcodeStreamEvent(const TranscodeLeg& leg, TranscodeContex
     event.reset();
     return out;
   case StreamDisposition::Terminate: {
-    absl::StatusOr<std::vector<SseEventPtr>> emitted = makeStreamEvents((*grammar)->on_terminate);
+    absl::StatusOr<std::vector<SseEventPtr>> emitted =
+        makeStreamEvents((*grammar)->on_terminate, ctx);
     if (!emitted.ok()) {
       return emitted.status();
     }
@@ -2879,7 +3007,14 @@ TranscodingEngine::transcodeStreamEvent(const TranscodeLeg& leg, TranscodeContex
   nlohmann::json working = event->json().json();
   TranscodeStreamState saved_state = *ctx.stream_state;
   absl::Status status = matched->rules.execute(working, &ctx);
-  if (status.ok()) {
+  if (status.ok() && !matched->outputs.empty()) {
+    absl::StatusOr<std::vector<SseEventPtr>> written =
+        writeOutputs(matched->outputs, working, ctx, event);
+    if (written.ok()) {
+      return written;
+    }
+    status = written.status();
+  } else if (status.ok()) {
     status = event->set_event(matched->output_event);
   }
   if (!status.ok()) {
@@ -2900,7 +3035,8 @@ TranscodingEngine::finishStream(const TranscodeLeg& leg, TranscodeContext& ctx) 
   if (*grammar == nullptr || ctx.stream_state->terminated) {
     return std::vector<SseEventPtr>();
   }
-  absl::StatusOr<std::vector<SseEventPtr>> emitted = makeStreamEvents((*grammar)->on_source_end);
+  absl::StatusOr<std::vector<SseEventPtr>> emitted =
+      makeStreamEvents((*grammar)->on_source_end, ctx);
   if (!emitted.ok()) {
     return emitted.status();
   }

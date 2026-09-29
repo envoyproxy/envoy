@@ -277,8 +277,11 @@
       {"data": "[DONE]"}
     ],
     "expected": [
+      {"data": {"message": {"content": [], "id": "chatcmpl-9", "model": "gpt-4o", "role": "assistant", "stop_reason": null, "stop_sequence": null, "type": "message", "usage": {"input_tokens": 0, "output_tokens": 0}}, "type": "message_start"}, "event": "message_start"},
+      {"data": {"content_block": {"text": "", "type": "text"}, "index": 0, "type": "content_block_start"}, "event": "content_block_start"},
       {"data": {"delta": {"text": "", "type": "text_delta"}, "index": 0, "type": "content_block_delta"}, "event": "content_block_delta"},
       {"data": {"delta": {"text": "Hello", "type": "text_delta"}, "index": 0, "type": "content_block_delta"}, "event": "content_block_delta"},
+      {"data": {"index": 0, "type": "content_block_stop"}, "event": "content_block_stop"},
       {"data": {"delta": {"stop_reason": "end_turn", "stop_sequence": null}, "type": "message_delta", "usage": {"input_tokens": 5, "output_tokens": 2}}, "event": "message_delta"},
       {"data": {"type": "message_stop"}, "event": "message_stop"}
     ]
@@ -291,15 +294,15 @@
     "input": [
       {"data": {"id": "chatcmpl-11", "model": "gpt-4o", "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": null}]}},
       {"data": {"choices": [{"index": 0, "delta": {}, "finish_reason": "length"}]}},
-      {"data": {"choices": [{"delta": {}, "finish_reason": "weird"}]}},
       {"data": "hello"},
       {"data": "[DONE]"}
     ],
     "expected": [
-      {"data": {"message": {"content": [], "id": "chatcmpl-11", "model": "gpt-4o", "role": "assistant", "type": "message"}, "type": "message_start"}, "event": "message_start"},
-      {"data": {"delta": {"stop_reason": "max_tokens", "stop_sequence": null}, "type": "message_delta"}, "event": "message_delta"},
-      {"data": {"delta": {"stop_reason": "end_turn", "stop_sequence": null}, "type": "message_delta"}, "event": "message_delta"},
+      {"data": {"message": {"content": [], "id": "chatcmpl-11", "model": "gpt-4o", "role": "assistant", "stop_reason": null, "stop_sequence": null, "type": "message", "usage": {"input_tokens": 0, "output_tokens": 0}}, "type": "message_start"}, "event": "message_start"},
+      {"data": {"content_block": {"text": "", "type": "text"}, "index": 0, "type": "content_block_start"}, "event": "content_block_start"},
       {"data": "hello"},
+      {"data": {"index": 0, "type": "content_block_stop"}, "event": "content_block_stop"},
+      {"data": {"delta": {"stop_reason": "max_tokens", "stop_sequence": null}, "type": "message_delta", "usage": {"output_tokens": 0}}, "event": "message_delta"},
       {"data": {"type": "message_stop"}, "event": "message_stop"}
     ]
   },

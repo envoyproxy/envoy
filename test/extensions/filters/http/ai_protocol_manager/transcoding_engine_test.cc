@@ -1707,6 +1707,80 @@ TEST(TranscodingEngineTest, StreamEventLegIsAllOrNothing) {
   EXPECT_TRUE(state.usage.hasAny());
 }
 
+// A case with `outputs` writes each output the event reaches, in order: a `once` output for the
+// first event only, the others when their `when` matches, so an event can become several events
+// or none. Only the last output written can carry an offloaded reference, and an event refused
+// for one leaves the stream as it was.
+TEST(TranscodingEngineTest, StreamCaseOutputsWriteSeveralEventsOrNone) {
+  const auto rule_set = [](std::vector<TranscodeRule> rules) {
+    return TranscodeRuleSet(LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+                            std::move(rules));
+  };
+  TranscodingEngine engine;
+  DialectTranscodePack
+      pack{
+          .protocol = LLMProtocol::OpenAiResponses,
+          .stream =
+              {.to_ir =
+                   {
+                       .cases =
+                           {
+                               {.match = StreamEventMatch::isDone(),
+                                .disposition = StreamDisposition::Terminate},
+                               {.match = StreamEventMatch::json(),
+                                .rules = rule_set({TranscodeRule::captureToState("id", "id")}),
+                                .outputs =
+                                    {
+                                        {.event = "open",
+                                         .rules = rule_set({
+                                             TranscodeRule::setConst("type", "open"),
+                                             TranscodeRule::retainOnly("", {"type", "text"}),
+                                         }),
+                                         .once = true},
+                                        {.event = "text",
+                                         .rules = rule_set(
+                                             {TranscodeRule::retainOnly("", {"text"})}),
+                                         .when = TranscodePredicate::fieldIs("text",
+                                                                             JsonShape::Text)},
+                                    }},
+                           },
+                       .on_terminate = {{.event = "end",
+                                         .json = nlohmann::json::object({{"type", "end"}}),
+                                         .rules =
+                                             rule_set({TranscodeRule::setFromState("id", "id")})}},
+                   }},
+      };
+  ASSERT_THAT(engine.registerPack(std::move(pack)), IsOk());
+  const TranscodeLeg leg{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                         LLMProtocol::OpenAiResponses};
+
+  TranscodeStreamState state;
+  TranscodeContext ctx;
+  ctx.stream_state = &state;
+  nlohmann::json offloaded = nlohmann::json::parse(R"({"data": {"id": "a"}})");
+  offloaded["data"]["text"] = JsonWithExtBuf::makeExternalRef({/*offset=*/0, /*length=*/5});
+  SseEventPtr event = makeEvent(offloaded);
+  const absl::Status refused = engine.transcodeStreamEvent(leg, ctx, event).status();
+  EXPECT_THAT(refused.message(), testing::HasSubstr("stream output 'open' carries offloaded"));
+  ASSERT_NE(event, nullptr);
+  EXPECT_EQ(describeEvent(*event), offloaded);
+  EXPECT_TRUE(state.slots.empty());
+  EXPECT_TRUE(state.written_once.empty());
+
+  EXPECT_EQ(runStream(engine, leg, nlohmann::json::parse(R"([
+    {"data": {"id": "a", "text": "Hi"}},
+    {"data": {"id": "b"}},
+    {"data": {"text": "yo"}},
+    {"raw": "[DONE]"}
+  ])")),
+            nlohmann::json::parse(R"([
+    {"event": "open", "data": {"type": "open", "text": "Hi"}},
+    {"event": "text", "data": {"text": "Hi"}},
+    {"event": "text", "data": {"text": "yo"}},
+    {"event": "end", "data": {"type": "end", "id": "b"}}
+  ])"));
+}
+
 // A stream event leg needs a stream kind, per-stream state, a registered dialect and an event, and
 // a refused call consumes nothing.
 TEST(TranscodingEngineTest, StreamEventLegsRefuseWhatTheyCannotRun) {
@@ -1807,9 +1881,11 @@ TEST(TranscodingEngineTest, TranscodesGeminiStreamToIr) {
   ])"));
 }
 
-// Each IR chunk becomes the Anthropic event its first choice calls for: text is a
-// `content_block_delta`, a finish reason a `message_delta`, and anything else the opening
-// `message_start`. The IR's `[DONE]` becomes `message_stop`.
+// The IR has no message or content block boundaries, so the first IR chunk also opens the
+// Anthropic message and its one text block, each chunk's text becomes a `content_block_delta`, and
+// the IR's `[DONE]` closes both. The finish reason and the usage go in the closing
+// `message_delta`, wherever in the stream they came: with the last text (as from Gemini), or in a
+// chunk of their own (OpenAI's usage-only chunk).
 TEST(TranscodingEngineTest, TranscodesIrStreamToAnthropic) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
@@ -1822,7 +1898,8 @@ TEST(TranscodingEngineTest, TranscodesIrStreamToAnthropic) {
     {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gpt-4o",
               "choices": [{"index": 0, "delta": {"content": "Hi"}, "finish_reason": null}]}},
     {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gpt-4o",
-              "choices": [{"index": 0, "delta": {}, "finish_reason": "length"}],
+              "choices": [{"index": 0, "delta": {"content": " there"}, "finish_reason": "length"}]}},
+    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gpt-4o", "choices": [],
               "usage": {"prompt_tokens": 100, "completion_tokens": 7, "total_tokens": 107,
                         "prompt_tokens_details": {"cached_tokens": 60}}}},
     {"raw": "[DONE]"}
@@ -1832,15 +1909,42 @@ TEST(TranscodingEngineTest, TranscodesIrStreamToAnthropic) {
     {"event": "message_start",
      "data": {"type": "message_start",
               "message": {"id": "c1", "type": "message", "role": "assistant",
-                          "model": "claude-sonnet-4-5", "content": []}}},
+                          "model": "claude-sonnet-4-5", "content": [], "stop_reason": null,
+                          "stop_sequence": null,
+                          "usage": {"input_tokens": 0, "output_tokens": 0}}}},
+    {"event": "content_block_start",
+     "data": {"type": "content_block_start", "index": 0,
+              "content_block": {"type": "text", "text": ""}}},
     {"event": "content_block_delta",
      "data": {"type": "content_block_delta", "index": 0,
               "delta": {"type": "text_delta", "text": "Hi"}}},
+    {"event": "content_block_delta",
+     "data": {"type": "content_block_delta", "index": 0,
+              "delta": {"type": "text_delta", "text": " there"}}},
+    {"event": "content_block_stop", "data": {"type": "content_block_stop", "index": 0}},
     {"event": "message_delta",
      "data": {"type": "message_delta", "delta": {"stop_reason": "max_tokens", "stop_sequence": null},
               "usage": {"input_tokens": 40, "output_tokens": 7, "cache_read_input_tokens": 60}}},
     {"event": "message_stop", "data": {"type": "message_stop"}}
   ])"));
+}
+
+// A stream that carried neither a finish reason nor usage still closes the way Anthropic
+// requires: `end_turn`, and zero output tokens.
+TEST(TranscodingEngineTest, IrStreamToAnthropicClosesWithoutAFinishReasonOrUsage) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+
+  const nlohmann::json out = runStream(*engine_or, kIrStreamToAnthropic, nlohmann::json::parse(R"([
+    {"data": {"choices": [{"index": 0, "delta": {"content": "Hi"}}]}},
+    {"raw": "[DONE]"}
+  ])"));
+  ASSERT_EQ(out.size(), 6U);
+  EXPECT_EQ(out[0]["data"]["message"]["id"], "msg_transcoded");
+  EXPECT_EQ(out[0]["data"]["message"]["model"], "transcoded-model");
+  EXPECT_EQ(out[4], nlohmann::json::parse(R"({"event": "message_delta", "data": {
+    "type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": null},
+    "usage": {"output_tokens": 0}}})"));
 }
 
 // Offloaded text is a reference into the event's own payload, and every stream leg that carries
@@ -1850,6 +1954,8 @@ TEST(TranscodingEngineTest, StreamLegsKeepTextHeldByReference) {
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
   const JsonWithExtBuf::ExternalRef ref{/*offset=*/64, /*length=*/40000};
+  // The event carrying the text is the last written: into Anthropic, the first chunk also opens
+  // the message and its text block.
   const auto transcode_one = [&engine](const TranscodeLeg& leg, nlohmann::json data) {
     TranscodeStreamState state;
     TranscodeContext ctx;
@@ -1858,8 +1964,8 @@ TEST(TranscodingEngineTest, StreamLegsKeepTextHeldByReference) {
     absl::StatusOr<std::vector<SseEventPtr>> transcoded =
         engine.transcodeStreamEvent(leg, ctx, event);
     EXPECT_THAT(transcoded.status(), IsOk());
-    return transcoded.ok() && transcoded->size() == 1 ? transcoded->front()->json().json()
-                                                      : nlohmann::json();
+    return transcoded.ok() && !transcoded->empty() ? transcoded->back()->json().json()
+                                                   : nlohmann::json();
   };
   const auto held_ref = [](const nlohmann::json& node) {
     absl::StatusOr<JsonWithExtBuf::ExternalRef> held = JsonWithExtBuf::externalRef(node);
@@ -2820,6 +2926,29 @@ TEST(TranscodingEngineTest, RegisterPackRefusesStreamGrammarsThatCannotRun) {
               refusedBecause("OPENAI_RESPONSES stream from_ir set_from_state reads slot "
                              "'message_id', which no capture_to_state in the grammar writes"));
   EXPECT_THAT(registered({.cases = {event_case({restore}), event_case({capture})}}), IsOk());
+
+  // A case's outputs and the events the grammar writes itself count too, both as readers and as
+  // writers.
+  const auto rule_set = [](std::vector<TranscodeRule> rules) {
+    return TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiResponses,
+                            std::move(rules));
+  };
+  EXPECT_THAT(registered({.on_terminate = {{.event = "end",
+                                            .json = nlohmann::json::object(),
+                                            .rules = rule_set({restore})}}}),
+              refusedBecause("set_from_state reads slot 'message_id'"));
+  EXPECT_THAT(registered({.cases = {{.outputs = {{.event = "open", .rules = rule_set({capture})}}}},
+                          .on_terminate = {{.event = "end",
+                                            .json = nlohmann::json::object(),
+                                            .rules = rule_set({restore})}}}),
+              IsOk());
+  EXPECT_THAT(registered({.cases = {{.outputs = {{.event = "open\n"}}}}}),
+              refusedBecause(R"(grammar writes SSE event name 'open\n')"));
+  // Only a case that transcodes writes its outputs.
+  EXPECT_THAT(registered({.cases = {{.match = StreamEventMatch::json(),
+                                     .disposition = StreamDisposition::Drop,
+                                     .outputs = {{.event = "open"}}}}}),
+              refusedBecause("grammar case 0 has outputs but does not transcode"));
 
   // The pack's other grammar is another stream, so a slot it writes does not count.
   TranscodingEngine engine;
