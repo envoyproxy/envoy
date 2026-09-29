@@ -54,6 +54,7 @@ jobs:
       bazel-extra: >-
         --config=rbe
         --noremote_upload_local_results
+        ${{ ! inputs.trusted && '--//distribution:signing-key=snakeoil' || '' }}
         --//distribution:x64-packages=//distribution:custom/x64/packages.x64.tar.gz
         --//distribution:arm64-packages=//distribution:custom/arm64/packages.arm64.tar.gz
         --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst
@@ -64,7 +65,6 @@ jobs:
         packages.x64: container/envoy/x64/
         release.arm64: container/envoy/arm64/bin/
         release.x64: container/envoy/x64/bin/
-      import-gpg: true
       request: ${{ inputs.request }}
       source: |
         export NO_BUILD_SETUP=1

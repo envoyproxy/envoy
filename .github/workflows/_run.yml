@@ -377,6 +377,16 @@ jobs:
         passphrase-path: "${{ runner.temp }}/container/gpg-passphrase"
         configured-passphrase-path: /build/gpg-passphrase
 
+    - name: Prepare release signing key
+      if: inputs.target == 'release.signed' && !inputs.import-gpg
+      run: |
+        umask 077
+        printf '%s' "$SIGNING_KEY" > "${RUNNER_TEMP}/container/signing.key"
+        printf '%s' "$SIGNING_PASSPHRASE" > "${RUNNER_TEMP}/container/signing-passphrase"
+      env:
+        SIGNING_KEY: ${{ secrets.gpg-key }}
+        SIGNING_PASSPHRASE: ${{ secrets.gpg-key-password }}
+
     - run: |
         echo "e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9" > .BAZEL_FAKE_SCM_REVISION
       name: Configure PR Bazel settings
@@ -458,6 +468,8 @@ jobs:
         CI_SHA1: ${{ github.sha }}
         CI_TARGET_BRANCH: ${{ fromJSON(inputs.request).request.target-branch }}
         MOUNT_GPG_HOME: ${{ inputs.import-gpg && 1 || '' }}
+        ENVOY_SIGNING_KEY_PATH: ${{ inputs.target == 'release.signed' && !inputs.import-gpg && '/build/signing.key' || '' }}
+        ENVOY_SIGNING_PASSPHRASE_PATH: ${{ inputs.target == 'release.signed' && !inputs.import-gpg && '/build/signing-passphrase' || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
         ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
         ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
