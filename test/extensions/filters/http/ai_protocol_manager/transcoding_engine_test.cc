@@ -1218,6 +1218,39 @@ TEST(TranscodingEngineTest, RequestToIrLiftsNothingFromAnyOtherPath) {
   EXPECT_FALSE(anthropic.contains("stream"));
 }
 
+// Gemini and Anthropic always report a stream's usage, while an IR upstream does only when asked,
+// so a streaming request bound for the IR asks. A unary one has no stream to ask about.
+TEST(TranscodingEngineTest, StreamingRequestsToIrAskForTheUsage) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const nlohmann::json include_usage = nlohmann::json::parse(R"({"include_usage": true})");
+
+  nlohmann::json gemini =
+      nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
+  nlohmann::json gemini_unary = gemini;
+  TranscodeContext ctx;
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, gemini), IsOk());
+  EXPECT_EQ(gemini["stream_options"], include_usage);
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:generateContent";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, gemini_unary), IsOk());
+  EXPECT_FALSE(gemini_unary.contains("stream_options"));
+
+  const TranscodeLeg anthropic_to_ir{PayloadKind::Request, TranscodeDirection::ToIr,
+                                     LLMProtocol::AnthropicMessages};
+  nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5", "max_tokens": 16, "stream": true,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  nlohmann::json anthropic_unary = anthropic;
+  anthropic_unary["stream"] = false;
+  ASSERT_THAT(engine.transcode(anthropic_to_ir, ctx, anthropic), IsOk());
+  EXPECT_EQ(anthropic["stream_options"], include_usage);
+  ASSERT_THAT(engine.transcode(anthropic_to_ir, ctx, anthropic_unary), IsOk());
+  EXPECT_FALSE(anthropic_unary.contains("stream_options"));
+}
+
 // Bound for Gemini, the IR's model and streaming mode move into the path: Gemini rejects both, and
 // `stream_options`, as unknown fields in the body.
 TEST(TranscodingEngineTest, IrRequestToGeminiMovesTheModelAndStreamIntoThePath) {
@@ -1945,6 +1978,24 @@ TEST(TranscodingEngineTest, IrStreamToAnthropicClosesWithoutAFinishReasonOrUsage
   EXPECT_EQ(out[4], nlohmann::json::parse(R"({"event": "message_delta", "data": {
     "type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": null},
     "usage": {"output_tokens": 0}}})"));
+}
+
+// The IR's usage-only chunk, which has no choices to become candidates, becomes a Gemini chunk
+// that carries only the usage.
+TEST(TranscodingEngineTest, IrStreamToGeminiCarriesTheUsageOnlyChunk) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+
+  EXPECT_EQ(runStream(*engine_or, kIrStreamToGemini, nlohmann::json::parse(R"([
+    {"data": {"id": "c1", "model": "gpt-4o", "choices": [],
+              "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}}},
+    {"raw": "[DONE]"}
+  ])")),
+            nlohmann::json::parse(R"([
+    {"data": {"modelVersion": "gpt-4o",
+              "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5,
+                                "totalTokenCount": 15}}}
+  ])"));
 }
 
 // Offloaded text is a reference into the event's own payload, and every stream leg that carries

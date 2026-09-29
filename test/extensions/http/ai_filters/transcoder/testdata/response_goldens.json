@@ -262,7 +262,7 @@
     ],
     "expected": [
       {"data": {"candidates": [{"content": {"parts": [{"text": "Hi"}], "role": "model"}, "finishReason": "MAX_TOKENS", "index": 0}], "modelVersion": "gpt-4o"}},
-      {"data": {"choices": [], "id": "chatcmpl-10", "model": "gpt-4o", "object": "chat.completion.chunk", "usage": {"completion_tokens": 1, "prompt_tokens": 5, "total_tokens": 6}}}
+      {"data": {"modelVersion": "gpt-4o", "usageMetadata": {"candidatesTokenCount": 1, "promptTokenCount": 5, "totalTokenCount": 6}}}
     ]
   },
   {

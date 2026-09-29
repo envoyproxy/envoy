@@ -761,6 +761,13 @@ absl::Status verifyPackLegs(const DialectTranscodePack& pack) {
 // TODO(ginama): make this configurable per route rather than a compiled-in default.
 constexpr int kDefaultAnthropicMaxTokens = 4096;
 
+// A streaming IR request asks for the chunk that reports the stream's usage, which an IR
+// (OpenAI Chat) upstream otherwise leaves out.
+TranscodeRule irStreamIncludeUsage() {
+  return TranscodeRule::when(TranscodePredicate::fieldEquals("stream", true),
+                             {TranscodeRule::setDefault("stream_options.include_usage", true)});
+}
+
 // Anthropic Messages request -> IR request.
 TranscodeRuleSet anthropicRequestToIr() {
   return TranscodeRuleSet(
@@ -793,6 +800,9 @@ TranscodeRuleSet anthropicRequestToIr() {
           TranscodeRule::valueMap("tool_choice.type", {{"any", "required"}, {"tool", "function"}}),
           TranscodeRule::move("tool_choice.name", "tool_choice.function.name"),
           TranscodeRule::unwrapSingleKeyObject("tool_choice", "type"),
+          // 5. Anthropic always reports a stream's usage, while the IR reports it only when
+          //    asked, so ask.
+          irStreamIncludeUsage(),
       });
 }
 
@@ -1202,6 +1212,9 @@ TranscodeRuleSet geminiRequestToIr() {
           // Gemini uses `mode: "ANY"` for both `"required"` (when `allowedFunctionNames` is
           // omitted) and `{"type": "function", "function": {"name": "fn"}}` (when
           // `allowedFunctionNames` is set), which requires conditional mapping support.
+          // 4. Gemini reports usage in every stream chunk, while the IR reports a stream's usage
+          //    only when asked, so ask.
+          irStreamIncludeUsage(),
       });
 }
 
@@ -1419,7 +1432,7 @@ TranscodeRuleSet geminiChunkFromIr() {
       TranscodingEngine::kIrProtocol, LLMProtocol::GeminiGenerateContent,
       {
           // A chunk without choices (e.g. OpenAI's trailing usage-only chunk) has no candidate
-          // to carry.
+          // to carry; the grammar sends it to `geminiUsageChunkFromIr()` instead.
           TranscodeRule::require("choices", JsonShape::NonEmptyArray),
           TranscodeRule::move("model", "modelVersion"),
           TranscodeRule::convertUsage(TranscodingEngine::kIrProtocol,
@@ -1446,6 +1459,18 @@ TranscodeRuleSet geminiChunkFromIr() {
       });
 }
 
+// The IR's usage-only chunk (OpenAI's `include_usage` chunk, which has no choices) -> a Gemini
+// chunk that carries only the usage.
+TranscodeRuleSet geminiUsageChunkFromIr() {
+  return TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::GeminiGenerateContent,
+                          {
+                              TranscodeRule::move("model", "modelVersion"),
+                              TranscodeRule::convertUsage(TranscodingEngine::kIrProtocol,
+                                                          LLMProtocol::GeminiGenerateContent),
+                              TranscodeRule::retainOnly("", {"modelVersion", "usageMetadata"}),
+                          });
+}
+
 // IR chunk stream -> Gemini GenerateContent stream.
 StreamGrammar geminiStreamFromIr() {
   return StreamGrammar{
@@ -1454,6 +1479,9 @@ StreamGrammar geminiStreamFromIr() {
               // A Gemini stream has no terminator of its own: it just ends.
               {.match = StreamEventMatch::isDone(), .disposition = StreamDisposition::Terminate},
               {.match = StreamEventMatch::notJson(), .disposition = StreamDisposition::Passthrough},
+              {.match = StreamEventMatch::json(TranscodePredicate::negate(
+                   TranscodePredicate::fieldIs("choices", JsonShape::NonEmptyArray))),
+               .rules = geminiUsageChunkFromIr()},
               {.match = StreamEventMatch::json(), .rules = geminiChunkFromIr()},
           },
   };
