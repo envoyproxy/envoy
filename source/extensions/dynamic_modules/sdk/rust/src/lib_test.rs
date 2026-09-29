@@ -7990,7 +7990,13 @@ pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers(
   if !MOCK_MATCHER_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
     return false;
   }
-  for (i, (key, value)) in MOCK_MATCHER_HEADERS.iter().enumerate() {
+  // An empty header map is filled successfully with no entries, as Envoy does.
+  let count = if MOCK_MATCHER_MAP_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    MOCK_MATCHER_HEADERS.len()
+  };
+  for (i, (key, value)) in MOCK_MATCHER_HEADERS.iter().take(count).enumerate() {
     unsafe {
       *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
         key_ptr: key.as_ptr() as *mut _,
@@ -8057,29 +8063,25 @@ fn test_matcher_get_all_headers() {
   // A populated map yields every key-value pair in fill order.
   MOCK_MATCHER_MAP_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
   MOCK_MATCHER_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
-  let headers = ctx
-    .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
-    .expect("header map is available");
-  assert_eq!(
-    headers,
-    vec![
-      (b":path".as_slice(), b"/index".as_slice()),
-      (b"content-type".as_slice(), b"text/plain".as_slice()),
-    ]
-  );
+  let headers = ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader);
+  assert_eq!(2, headers.len());
+  assert_eq!(b":path".as_slice(), headers[0].0.as_slice());
+  assert_eq!(b"/index".as_slice(), headers[0].1.as_slice());
+  assert_eq!(b"content-type".as_slice(), headers[1].0.as_slice());
+  assert_eq!(b"text/plain".as_slice(), headers[1].1.as_slice());
 
-  // An empty map returns None without invoking the fill callback.
+  // An empty map yields an empty vector.
   MOCK_MATCHER_MAP_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
   assert!(ctx
     .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
-    .is_none());
+    .is_empty());
 
-  // A failed fill returns None rather than exposing the uninitialized capacity.
+  // A failed fill yields an empty vector rather than exposing the uninitialized capacity.
   MOCK_MATCHER_MAP_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
   MOCK_MATCHER_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
   assert!(ctx
     .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
-    .is_none());
+    .is_empty());
 }
 
 // =============================================================================
@@ -10126,8 +10128,13 @@ static EHM_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
 static FMT_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
 static FMT_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
 
-fn fill_getter_headers(result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header) {
-  for (i, (key, value)) in GETTER_HEADERS.iter().enumerate() {
+// An empty header map is filled successfully with no entries, as Envoy does.
+fn fill_getter_headers(
+  result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+  empty: bool,
+) {
+  let count = if empty { 0 } else { GETTER_HEADERS.len() };
+  for (i, (key, value)) in GETTER_HEADERS.iter().take(count).enumerate() {
     unsafe {
       *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
         key_ptr: key.as_ptr() as *mut _,
@@ -10158,7 +10165,10 @@ pub extern "C" fn envoy_dynamic_module_callback_early_header_mutation_get_header
   if !EHM_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
     return false;
   }
-  fill_getter_headers(result_headers);
+  fill_getter_headers(
+    result_headers,
+    EHM_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst),
+  );
   true
 }
 
@@ -10183,11 +10193,15 @@ pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers(
   if !FMT_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
     return false;
   }
-  fill_getter_headers(result_headers);
+  fill_getter_headers(
+    result_headers,
+    FMT_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst),
+  );
   true
 }
 
-// The rewritten getters fill the returned pairs in one allocation, so cover the three branches.
+// The getters read the headers through the shared size and fill helper, so cover the three
+// branches.
 #[test]
 fn test_early_header_mutation_get_all_headers_single_allocation() {
   let ctx = unsafe { early_header_mutation::EarlyHeaderMutationContext::new(std::ptr::null_mut()) };
@@ -10250,7 +10264,13 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_request_he
   if !STUB_SPECIFIER_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
     return false;
   }
-  for (i, (key, value)) in STUB_SPECIFIER_HEADERS.iter().enumerate() {
+  // An empty header map is filled successfully with no entries, as Envoy does.
+  let count = if STUB_SPECIFIER_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    STUB_SPECIFIER_HEADERS.len()
+  };
+  for (i, (key, value)) in STUB_SPECIFIER_HEADERS.iter().take(count).enumerate() {
     unsafe {
       *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
         key_ptr: key.as_ptr() as *mut _,
@@ -11468,7 +11488,13 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_get_request_head
   if !STUB_ROUTE_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
     return false;
   }
-  for (index, (key, value)) in STUB_ROUTE_HEADERS.iter().enumerate() {
+  // An empty header map is filled successfully with no entries, as Envoy does.
+  let count = if STUB_ROUTE_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    STUB_ROUTE_HEADERS.len()
+  };
+  for (index, (key, value)) in STUB_ROUTE_HEADERS.iter().take(count).enumerate() {
     unsafe {
       *result_headers.add(index) = abi::envoy_dynamic_module_type_envoy_http_header {
         key_ptr: key.as_ptr() as *mut _,
@@ -12255,7 +12281,9 @@ fn test_route_specifier_context_reads_request_state() {
   STUB_ROUTE_STATE_PRESENT.store(true, std::sync::atomic::Ordering::SeqCst);
 
   assert_eq!(2, ctx.get_request_headers_count());
-  let headers = ctx.get_all_request_headers();
+  let headers = ctx
+    .get_all_request_headers()
+    .expect("request headers present");
   assert_eq!(2, headers.len());
   assert_eq!(b":path".as_slice(), headers[0].0.as_slice());
   assert_eq!(b"/index".as_slice(), headers[0].1.as_slice());
@@ -12303,14 +12331,52 @@ fn test_route_specifier_context_reads_request_state() {
   assert_eq!(4, host_count.healthy);
   assert_eq!(1, host_count.degraded);
 
-  // Envoy reports no request headers when the map is empty, and the fill callback can fail when
-  // the map changes between the size call and the fill call.
+  // An empty header map yields an empty vector, while an absent map yields an error, so a caller
+  // cannot confuse the two.
   STUB_ROUTE_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
-  assert!(ctx.get_all_request_headers().is_empty());
+  assert!(ctx
+    .get_all_request_headers()
+    .expect("empty header map")
+    .is_empty());
   STUB_ROUTE_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
   STUB_ROUTE_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
-  assert!(ctx.get_all_request_headers().is_empty());
+  assert!(ctx.get_all_request_headers().is_err());
   STUB_ROUTE_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+
+  // The view over a caller owned buffer reads the same headers, and the buffer is reused across
+  // calls whatever the previous call left in it.
+  let mut buf = Vec::new();
+  {
+    let view = ctx
+      .get_request_headers_into(&mut buf)
+      .expect("request headers present");
+    assert_eq!(2, view.len());
+    assert!(!view.is_empty());
+    let (key, value) = view.get(0).unwrap();
+    assert_eq!(b":path".as_slice(), key.as_slice());
+    assert_eq!(b"/index".as_slice(), value.as_slice());
+    assert!(view.get(2).is_none());
+    assert_eq!(2, view.iter().count());
+  }
+  STUB_ROUTE_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx
+    .get_request_headers_into(&mut buf)
+    .expect("empty header map")
+    .is_empty());
+  STUB_ROUTE_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  STUB_ROUTE_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert_eq!(
+    Some(route_specifier::FillError::Unavailable),
+    ctx.get_request_headers_into(&mut buf).err()
+  );
+  STUB_ROUTE_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert_eq!(
+    2,
+    ctx
+      .get_request_headers_into(&mut buf)
+      .expect("request headers present")
+      .len()
+  );
 
   // Absent state is reported as such rather than as a default value.
   STUB_ROUTE_STATE_PRESENT.store(false, std::sync::atomic::Ordering::SeqCst);

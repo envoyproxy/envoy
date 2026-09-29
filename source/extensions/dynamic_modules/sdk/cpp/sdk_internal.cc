@@ -97,9 +97,12 @@ public:
     }
 
     std::vector<HeaderView> result_headers(header_count);
-    envoy_dynamic_module_callback_http_get_headers(
-        host_plugin_ptr_, Type,
-        reinterpret_cast<envoy_dynamic_module_type_envoy_http_header*>(result_headers.data()));
+    if (!envoy_dynamic_module_callback_http_get_headers(
+            host_plugin_ptr_, Type,
+            reinterpret_cast<envoy_dynamic_module_type_envoy_http_header*>(
+                result_headers.data()))) {
+      return {};
+    }
     return result_headers;
   }
 

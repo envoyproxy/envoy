@@ -12,6 +12,7 @@ use crate::{
 };
 use mockall::*;
 use std::ffi::c_void;
+use std::mem::MaybeUninit;
 use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -177,6 +178,59 @@ pub struct InputRoute<'a> {
   pub response_code: Option<u32>,
 }
 
+/// Why filling the request headers into a buffer failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FillError {
+  /// The request header map was not available.
+  Unavailable,
+}
+
+/// A read only view over the request headers filled into a caller owned buffer.
+///
+/// The buffer holds the ABI header structs and the view borrows both it and the context, so a view
+/// cannot outlive either. Each entry yields a key and value [`EnvoyBuffer`] that point into Envoy
+/// owned request memory.
+pub struct HeaderView<'a> {
+  headers: &'a [MaybeUninit<abi::envoy_dynamic_module_type_envoy_http_header>],
+}
+
+impl<'a> HeaderView<'a> {
+  /// The number of headers.
+  pub fn len(&self) -> usize {
+    self.headers.len()
+  }
+
+  /// Whether there are no headers.
+  pub fn is_empty(&self) -> bool {
+    self.headers.is_empty()
+  }
+
+  /// The key and value at the given index, or `None` when it is out of range.
+  pub fn get(&self, index: usize) -> Option<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)> {
+    self.headers.get(index).map(header_pair)
+  }
+
+  /// Iterates the headers as key and value [`EnvoyBuffer`] pairs.
+  pub fn iter(&self) -> impl Iterator<Item = (EnvoyBuffer<'a>, EnvoyBuffer<'a>)> + '_ {
+    self.headers.iter().map(header_pair)
+  }
+}
+
+// Builds the key and value pair of a filled header entry field by field, never reinterpreting the
+// Rust type as the C struct. The buffers point into Envoy owned request memory.
+fn header_pair<'a>(
+  entry: &MaybeUninit<abi::envoy_dynamic_module_type_envoy_http_header>,
+) -> (EnvoyBuffer<'a>, EnvoyBuffer<'a>) {
+  // Safety: Envoy initialized every entry in the filled range during the fill callback.
+  let header = unsafe { entry.assume_init_ref() };
+  unsafe {
+    (
+      EnvoyBuffer::new_from_raw(header.key_ptr as *const u8, header.key_length),
+      EnvoyBuffer::new_from_raw(header.value_ptr as *const u8, header.value_length),
+    )
+  }
+}
+
 /// Context for a single route decision.
 ///
 /// It provides read access to the request, to the stream info and to the route that route matching
@@ -206,29 +260,52 @@ impl RouteSpecifierContext {
     }
   }
 
-  /// Get all request headers as key-value [`EnvoyBuffer`] pairs.
+  // Fills buf with the request headers. On success buf holds the header count and every entry is
+  // initialized. The size and fill callbacks are paired by the shared helper, so the buffer always
+  // has room for what Envoy writes. Returns Unavailable when the header map is absent, which never
+  // happens during on_route but is handled for safety.
+  fn fill_request_headers(
+    &self,
+    buf: &mut Vec<MaybeUninit<abi::envoy_dynamic_module_type_envoy_http_header>>,
+  ) -> Result<(), FillError> {
+    crate::utility::fill_headers(
+      buf,
+      || self.get_request_headers_count(),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_route_specifier_get_request_headers(
+          self.envoy_ptr,
+          headers,
+        )
+      },
+    )
+    .map(|_| ())
+    .ok_or(FillError::Unavailable)
+  }
+
+  /// Fills the caller owned buffer with the request headers and returns a [`HeaderView`] over it.
   ///
-  /// Returns an empty vector when there are no headers.
-  pub fn get_all_request_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_request_headers_count();
-    if count == 0 {
-      return Vec::new();
-    }
-    // Fill the pairs in place as ABI headers to avoid a second allocation.
-    let mut headers: Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> = Vec::with_capacity(count);
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_route_specifier_get_request_headers(
-        self.envoy_ptr,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-      )
-    };
-    if !success {
-      return Vec::new();
-    }
-    unsafe {
-      headers.set_len(count);
-    }
-    headers
+  /// The buffer is reused across calls so a module that resolves many routes allocates once. The
+  /// returned view borrows both the buffer and the context.
+  pub fn get_request_headers_into<'a>(
+    &'a self,
+    buf: &'a mut Vec<MaybeUninit<abi::envoy_dynamic_module_type_envoy_http_header>>,
+  ) -> Result<HeaderView<'a>, FillError> {
+    self.fill_request_headers(buf)?;
+    let headers: &'a [MaybeUninit<abi::envoy_dynamic_module_type_envoy_http_header>] = buf;
+    Ok(HeaderView { headers })
+  }
+
+  /// Get all request headers as key and value [`EnvoyBuffer`] pairs.
+  ///
+  /// Returns an empty vector when there are no headers, and an error when the header map is absent,
+  /// so a caller cannot confuse a failed fill with an empty one.
+  pub fn get_all_request_headers(
+    &self,
+  ) -> Result<Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)>, FillError> {
+    let mut buf: Vec<MaybeUninit<abi::envoy_dynamic_module_type_envoy_http_header>> = Vec::new();
+    self.fill_request_headers(&mut buf)?;
+    // The pairs point into Envoy owned request memory, so they outlive the local buffer.
+    Ok(buf.iter().map(header_pair).collect())
   }
 
   /// Get the first value of the request header with the given key.
