@@ -26,6 +26,7 @@ Extensions
   health_check_event_sinks/health_check_event_sinks
   health_checker/health_checker
   http/ai_filters
+  http/ai_protocol_manager
   http/early_header_mutation
   http/cache_v2
   http/custom_response

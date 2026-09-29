@@ -1,9 +1,11 @@
+#include "envoy/extensions/ai_protocol_manager/external_buffer/in_memory/v3/in_memory.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/config.h"
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -373,6 +375,56 @@ TEST(AiProtocolManagerConfigTest, NoAiFiltersByDefault) {
       FilterConfig::create(proto, context.server_factory_context_, *stats_store.rootScope());
   ASSERT_TRUE(config.ok());
   EXPECT_TRUE((*config)->aiFilterFactories().empty());
+}
+
+// Explicit external_buffer_config resolves the registered
+// InMemoryExternalBufferConfigFactory.
+TEST(AiProtocolManagerConfigTest, ResolvesConfiguredExternalBufferFactory) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+  auto* ext_buf = proto_config.mutable_external_buffer_config();
+  ext_buf->set_name("envoy.ai_protocol_manager.external_buffer.in_memory");
+  ASSERT_TRUE(ext_buf->mutable_typed_config()->PackFrom(
+      envoy::extensions::ai_protocol_manager::external_buffer::in_memory::v3::InMemory()));
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AiProtocolManagerFilterConfigFactory factory;
+  auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  ASSERT_TRUE(cb_or.ok()) << cb_or.status();
+
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb_or.value()(filter_callbacks);
+}
+
+class NullExternalBufferConfigFactory : public ExternalBufferConfigFactory {
+public:
+  ExternalBufferFactorySharedPtr
+  createExternalBufferFactory(const Protobuf::Message&,
+                              Server::Configuration::ServerFactoryContext&) override {
+    return nullptr;
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  std::string name() const override { return "test.external_buffer.null"; }
+};
+
+// A custom ExternalBufferConfigFactory returning nullptr fails filter creation
+// cleanly.
+TEST(AiProtocolManagerConfigTest, ReturnsErrorWhenExternalBufferFactoryReturnsNull) {
+  NullExternalBufferConfigFactory null_factory;
+  Registry::InjectFactory<ExternalBufferConfigFactory> registration(null_factory);
+
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+  auto* ext_buf = proto_config.mutable_external_buffer_config();
+  ext_buf->set_name("test.external_buffer.null");
+  ASSERT_TRUE(ext_buf->mutable_typed_config()->PackFrom(Protobuf::Struct()));
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AiProtocolManagerFilterConfigFactory factory;
+  auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_EQ(cb_or.status().code(), absl::StatusCode::kInternal);
+  EXPECT_EQ(cb_or.status().message(), "Failed to create ExternalBufferFactory");
 }
 
 } // namespace

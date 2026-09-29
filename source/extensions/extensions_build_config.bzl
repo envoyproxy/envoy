@@ -500,6 +500,11 @@ EXTENSIONS = {
     "envoy.http.ai_filters.request_info":               "//source/extensions/http/ai_filters/request_info:config",
 
     #
+    # AI Protocol Manager External Buffer
+    #
+    "envoy.ai_protocol_manager.external_buffer.in_memory": "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+
+    #
     # Injected credentials
     #
 
