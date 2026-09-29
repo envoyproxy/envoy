@@ -58,10 +58,6 @@ common:clang --config=libc++
 common:clang --host_platform=@clang_platform
 common:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
-# Clang installed to non-standard location (ie not /opt/llvm/)
-common:clang-local --config=clang-common
-common:clang-local --config=libc++
-
 # libc++ - default for clang
 common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"

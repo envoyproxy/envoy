@@ -1,0 +1,3 @@
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/6a42f80bb6ef909c8bfd44286a96a7e24388b86a
+try-import %workspace%/user.bazelrc

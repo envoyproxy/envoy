@@ -141,17 +141,12 @@ build:macos --cxxopt=-Wno-nullability-completeness
 
 # Common flags for Clang (shared between all clang variants)
 common:clang-common --linkopt=-fuse-ld=lld
-common:clang-common --cxxopt=-Wno-nullability-completeness
 
 # Clang with libc++ (default)
 common:clang --config=clang-common
 common:clang --config=libc++
 common:clang --host_platform=@clang_platform
 common:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-
-# Clang installed to non-standard location (ie not /opt/llvm/)
-common:clang-local --config=clang-common
-common:clang-local --config=libc++
 
 # TODO(phlax): Remove this once a proper fix for the deprecated enum lands
 build:clang --copt=--system-header-prefix=envoy/config/route/v3/route_components.pb.h
