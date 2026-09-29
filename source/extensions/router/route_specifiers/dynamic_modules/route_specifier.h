@@ -40,6 +40,8 @@ using OnRouteSpecifierConfigNewType = decltype(&envoy_dynamic_module_on_route_sp
 using OnRouteSpecifierConfigDestroyType =
     decltype(&envoy_dynamic_module_on_route_specifier_config_destroy);
 using OnRouteSpecifierOnRouteType = decltype(&envoy_dynamic_module_on_route_specifier_on_route);
+using OnRouteSpecifierRouteDestroyType =
+    decltype(&envoy_dynamic_module_on_route_specifier_route_destroy);
 
 // The default custom stat namespace which prepends all user-defined metrics.
 // This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
@@ -52,6 +54,7 @@ constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
   COUNTER(decision_select_template)                                                                \
   COUNTER(decision_no_route)                                                                       \
   COUNTER(decision_error)                                                                          \
+  COUNTER(decision_reuse_previous)                                                                 \
   COUNTER(runtime_skipped)                                                                         \
   COUNTER(failure_module_error)                                                                    \
   COUNTER(failure_template_not_selected)                                                           \
@@ -59,6 +62,8 @@ constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
   COUNTER(failure_override_without_route)                                                          \
   COUNTER(failure_override_on_non_route_entry)                                                     \
   COUNTER(failure_route_metadata)                                                                  \
+  COUNTER(reuse_previous_rejected)                                                                 \
+  COUNTER(route_destroy)                                                                           \
   HISTOGRAM(on_route_duration, Microseconds)                                                       \
   HISTOGRAM(specifier_duration, Microseconds)
 
@@ -183,6 +188,8 @@ public:
 
   const std::deque<std::string>& templateIds() const { return template_ids_; }
   const std::optional<RuntimeFraction>& runtimeFraction() const { return runtime_fraction_; }
+  const std::string& specifierInstanceId() const { return specifier_instance_id_; }
+  OnRouteSpecifierRouteDestroyType onRouteDestroy() const { return on_route_destroy_; }
   bool failClosed() const { return fail_closed_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Runtime::Loader& runtime() const { return runtime_; }
@@ -196,6 +203,9 @@ public:
   // newDynamicModuleRouteSpecifierConfig() succeeds.
   OnRouteSpecifierConfigDestroyType on_config_destroy_{nullptr};
   OnRouteSpecifierOnRouteType on_route_{nullptr};
+  // Optional hook, null when the module does not export it, in which case route user data is a no
+  // op.
+  OnRouteSpecifierRouteDestroyType on_route_destroy_{nullptr};
 
   // ----------------------------- Metrics Support -----------------------------
   // The shared registry holding all module-defined metrics.
@@ -219,6 +229,7 @@ private:
   const Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
   const std::string specifier_name_;
   const std::string specifier_config_;
+  const std::string specifier_instance_id_;
   // Immutable after configuration load, so that the pointers routeTemplate() and
   // routeOverride() hand out stay valid. A module may add templates during config creation
   // with registerRouteTemplate(). template_ids_ is a deque so that a template id buffer handed to
@@ -274,6 +285,9 @@ struct RouteSpecifierContext {
   envoy_dynamic_module_type_route_specifier_chain_status chain_status{
       envoy_dynamic_module_type_route_specifier_chain_status_Default};
   RouteOverrides overrides;
+  // A u64 the module recorded on the route it produces. Forces the produced route to be wrapped
+  // even with no override, so the route destroy hook fires for it. Unset when the module set none.
+  std::optional<uint64_t> user_data;
   // Redirect locations built for the getters, kept in a stable container so a buffer handed to the
   // module stays valid until the hook returns even after the current route changes. Built once per
   // route so repeated reads for the same route return the same buffer.
@@ -296,7 +310,9 @@ public:
   DynamicModuleRoute(
       Envoy::Router::RouteConstSharedPtr route, DynamicModuleRouteSpecifierConfigSharedPtr config,
       RouteOverrides&& overrides,
-      Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack);
+      Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack,
+      std::optional<uint64_t> user_data);
+  ~DynamicModuleRoute() override;
 
   // Router::Route
   const envoy::config::core::v3::Metadata& metadata() const override;
@@ -308,6 +324,9 @@ protected:
   const RouteOverrides overrides_;
   // Null when the module recorded no route metadata, so that both accessors fall back to the route.
   const Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack_;
+  // Set when the module recorded user data, passed to the route destroy hook when this is
+  // destroyed.
+  const std::optional<uint64_t> user_data_;
 };
 
 /**
@@ -319,7 +338,9 @@ public:
   DynamicModuleRouteEntry(
       Envoy::Router::RouteConstSharedPtr route, DynamicModuleRouteSpecifierConfigSharedPtr config,
       RouteOverrides&& overrides,
-      Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack);
+      Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack,
+      std::optional<uint64_t> user_data);
+  ~DynamicModuleRouteEntry() override;
 
   // Router::Route
   const envoy::config::core::v3::Metadata& metadata() const override;
@@ -359,6 +380,7 @@ private:
   const DynamicModuleRouteSpecifierConfigSharedPtr config_;
   const RouteOverrides overrides_;
   const Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack_;
+  const std::optional<uint64_t> user_data_;
 };
 
 // Why Envoy could not honor the decision of a module. There is one value per failure statistic of
@@ -378,6 +400,8 @@ enum class Failure {
   OverrideOnNonRouteEntry,
   // The recorded route metadata was rejected by a typed metadata factory.
   RouteMetadata,
+  // ReusePrevious was returned but the stream has no previous route.
+  ReusePreviousRejected,
 };
 
 /**
