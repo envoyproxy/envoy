@@ -1,9 +1,10 @@
-Fixed a crash loop for the ``envoy.resource_monitors.cpu_utilization`` monitor in ``CONTAINER``
-mode on cgroup v2 hosts. Detection of the cgroup v2 CPU controller is now keyed only on
-``cpu.stat`` instead of also requiring ``cpu.max`` and ``cpuset.cpus.effective``, which are
-frequently absent on Kubernetes pods (no CPU limit set, or the cpuset controller not delegated
-into the pod's leaf cgroup). When ``cpuset.cpus.effective`` is absent the reader now falls back
-to the host's online CPU count, and an absent ``cpu.max`` is treated as "no CPU limit". If no
-supported cgroup CPU implementation is found at all, the monitor now falls back to reporting zero
-utilization instead of aborting server startup, so this optional overload input can no longer take
-down the data plane at boot.
+Fixed the ``envoy.resource_monitors.cpu_utilization`` monitor in ``CONTAINER`` mode when Envoy shares
+the host cgroup namespace, for example in a privileged container. ``/sys/fs/cgroup`` is then the
+cgroup v2 root, which has no ``cpu.max``, so detection failed and config initialization aborted
+the server. The monitor now resolves its own cgroup from ``/proc/self/cgroup`` and
+``/proc/self/mountinfo`` and reports container rather than host usage. cgroup v2 detection is keyed
+on ``cpu.stat``: an absent ``cpu.max`` means no CPU limit and an absent ``cpuset.cpus.effective``
+falls back to the CPU affinity count, while a file that exists but cannot be read fails the sample.
+If no supported cgroup CPU implementation is found, startup continues and every update fails,
+which is counted in ``failed_updates``. The cgroup resolution can be disabled with the runtime
+guard ``envoy.reloadable_features.cpu_utilization_resolve_container_cgroup``.

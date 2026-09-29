@@ -226,6 +226,14 @@ std::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::In
 }
 
 // Constructs complete cgroup path by combining mount metadata and process assignment.
+std::optional<CgroupInfo> CgroupCpuUtil::getCurrentCgroupInfo(Filesystem::Instance& fs) {
+  const std::optional<CgroupMount> mount = discoverCgroupMount(fs);
+  if (!mount.has_value()) {
+    return std::nullopt;
+  }
+  return constructCgroupPath(*mount, fs);
+}
+
 std::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const CgroupMount& mount,
                                                              Filesystem::Instance& fs) {
 

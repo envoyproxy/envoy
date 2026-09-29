@@ -84,8 +84,7 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
 
   auto monitor_or_error = factory->createResourceMonitor(config, context);
   // Container mode always produces a monitor: on hosts without a supported cgroup
-  // CPU implementation the factory falls back to a fail-open reader instead of
-  // failing config initialization.
+  // CPU implementation its updates fail instead of config initialization.
   ASSERT_TRUE(monitor_or_error.ok());
   EXPECT_NE(monitor_or_error.value(), nullptr);
 }
