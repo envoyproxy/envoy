@@ -600,7 +600,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    assert!(envoy_filter.get_upstream_connection_id() > 0);
+    assert_ne!(envoy_filter.get_upstream_connection_id(), None);
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
