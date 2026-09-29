@@ -35,7 +35,7 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(proto_config.rate_limit_service()));
   auto initial_metadata = THROW_OR_RETURN_VALUE(
       server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
-          proto_config.rate_limit_service().grpc_service()),
+          proto_config.rate_limit_service().grpc_service(), context),
       Grpc::GrpcServiceInitialMetadataPtr);
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(
       proto_config.rate_limit_service().grpc_service(), std::move(initial_metadata));

@@ -180,8 +180,15 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::Grp
 
 absl::StatusOr<GrpcServiceInitialMetadataPtr>
 AsyncClientManagerImpl::parseGrpcServiceInitialMetadata(
+    const envoy::config::core::v3::GrpcService& config,
+    Server::Configuration::GenericFactoryContext& context) {
+  return Grpc::parseGrpcServiceInitialMetadata(config, context);
+}
+
+absl::StatusOr<GrpcServiceInitialMetadataPtr>
+AsyncClientManagerImpl::parseGrpcServiceInitialMetadataForServer(
     const envoy::config::core::v3::GrpcService& config) {
-  return Grpc::parseGrpcServiceInitialMetadata(config, context_);
+  return Grpc::parseGrpcServiceInitialMetadataForServer(config, context_);
 }
 
 absl::StatusOr<RawAsyncClientSharedPtr> AsyncClientManagerImpl::getOrCreateRawAsyncClient(

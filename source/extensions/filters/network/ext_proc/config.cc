@@ -51,12 +51,12 @@ Network::FilterFactoryCb NetworkExtProcConfigFactory::createFilterFactoryFromPro
   if (!creation_status.ok()) {
     throw EnvoyException(std::string(creation_status.message()));
   }
-  auto parsed_grpc_initial_metadata =
-      THROW_OR_RETURN_VALUE(context.serverFactoryContext()
-                                .clusterManager()
-                                .grpcAsyncClientManager()
-                                .parseGrpcServiceInitialMetadata(proto_config.grpc_service()),
-                            Grpc::GrpcServiceInitialMetadataPtr);
+  auto parsed_grpc_initial_metadata = THROW_OR_RETURN_VALUE(
+      context.serverFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .parseGrpcServiceInitialMetadata(proto_config.grpc_service(), context),
+      Grpc::GrpcServiceInitialMetadataPtr);
 
   return [ext_proc_config, parsed_grpc_initial_metadata,
           &context](Network::FilterManager& filter_manager) -> void {

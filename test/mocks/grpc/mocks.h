@@ -7,6 +7,7 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/grpc/typed_async_client.h"
@@ -129,6 +130,10 @@ public:
                bool skip_cluster_check));
 
   MOCK_METHOD(absl::StatusOr<GrpcServiceInitialMetadataPtr>, parseGrpcServiceInitialMetadata,
+              (const envoy::config::core::v3::GrpcService& grpc_service,
+               Server::Configuration::GenericFactoryContext& context));
+  MOCK_METHOD(absl::StatusOr<GrpcServiceInitialMetadataPtr>,
+              parseGrpcServiceInitialMetadataForServer,
               (const envoy::config::core::v3::GrpcService& grpc_service));
 };
 

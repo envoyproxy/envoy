@@ -14,6 +14,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -57,9 +58,11 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
             ? std::nullopt
             : std::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
     RETURN_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config));
+    Server::GenericFactoryContextImpl generic_context(
+        server_context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
     auto initial_metadata_or_error =
         server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
-            proto_config.grpc_service());
+            proto_config.grpc_service(), generic_context);
     RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(
         proto_config.grpc_service(), std::move(*initial_metadata_or_error));
@@ -82,12 +85,14 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::ServerFactoryContext& context,
+    ProtobufMessage::ValidationVisitor& validator) {
   Grpc::GrpcServiceInitialMetadataPtr initial_metadata;
   if (proto_config.has_check_settings() && proto_config.check_settings().has_grpc_service()) {
+    Server::GenericFactoryContextImpl generic_context(context, validator);
     auto initial_metadata_or_error =
         context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
-            proto_config.check_settings().grpc_service());
+            proto_config.check_settings().grpc_service(), generic_context);
     RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
     initial_metadata = std::move(*initial_metadata_or_error);
   }

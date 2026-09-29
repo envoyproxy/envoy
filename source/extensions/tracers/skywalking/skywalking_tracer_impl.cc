@@ -35,8 +35,9 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
   tracing_context_factory_ = std::make_unique<TracingContextFactory>(config_);
   auto& factory_context = context.serverFactoryContext();
   auto grpc_initial_metadata = THROW_OR_RETURN_VALUE(
-      factory_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
-          proto_config.grpc_service()),
+      factory_context.clusterManager()
+          .grpcAsyncClientManager()
+          .parseGrpcServiceInitialMetadataForServer(proto_config.grpc_service()),
       Grpc::GrpcServiceInitialMetadataPtr);
   tls_slot_ptr_->set([proto_config, &factory_context, this,
                       grpc_initial_metadata](Event::Dispatcher& dispatcher) {

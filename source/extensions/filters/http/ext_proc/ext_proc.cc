@@ -269,6 +269,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                            const std::string& stats_prefix, bool is_upstream,
                            Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                            Server::Configuration::CommonFactoryContext& context,
+                           Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata,
                            absl::Status& creation_status)
     : stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       untyped_forwarding_namespaces_(
@@ -292,6 +293,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
       allowed_override_modes_(config.allowed_override_modes()),
       grpc_service_(getFilterGrpcService(config)),
+      parsed_grpc_initial_metadata_(std::move(parsed_grpc_initial_metadata)),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
       filter_metadata_(config.filter_metadata()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
@@ -325,14 +327,6 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
 
   thread_local_stream_manager_slot_->set(
       [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
-
-  if (grpc_service_.has_value()) {
-    auto initial_metadata_or_error =
-        context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
-            *grpc_service_);
-    SET_AND_RETURN_IF_NOT_OK(initial_metadata_or_error.status(), creation_status);
-    parsed_grpc_initial_metadata_ = std::move(*initial_metadata_or_error);
-  }
 }
 
 void ExtProcLoggingInfo::recordGrpcCall(

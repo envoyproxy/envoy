@@ -132,7 +132,7 @@ TEST(NetworkExtProcConfigTest, ParsesGrpcServiceInitialMetadata) {
                             proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
-              parseGrpcServiceInitialMetadata(ProtoEq(proto_config.grpc_service())));
+              parseGrpcServiceInitialMetadata(ProtoEq(proto_config.grpc_service()), _));
   NetworkExtProcConfigFactory factory;
   EXPECT_TRUE(factory.createFilterFactoryFromProto(proto_config, context).ok());
 }
@@ -148,7 +148,7 @@ TEST(NetworkExtProcConfigTest, ParseGrpcInitialMetadataError) {
                             proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
-              parseGrpcServiceInitialMetadata(_))
+              parseGrpcServiceInitialMetadata(_, _))
       .WillOnce(testing::Return(absl::InvalidArgumentError("bad formatters")));
   NetworkExtProcConfigFactory factory;
   EXPECT_THROW_WITH_MESSAGE(auto cb = factory.createFilterFactoryFromProto(proto_config, context),

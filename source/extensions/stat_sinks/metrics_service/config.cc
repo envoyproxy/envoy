@@ -28,7 +28,7 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
   auto initial_metadata_or_error =
-      server.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+      server.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadataForServer(
           grpc_service);
   RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
   auto client_or_error = server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(

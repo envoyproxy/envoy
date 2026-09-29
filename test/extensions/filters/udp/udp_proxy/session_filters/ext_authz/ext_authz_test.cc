@@ -53,8 +53,7 @@ public:
   }
 
   void build(const FilterConfig& proto_config) {
-    config_ =
-        std::make_shared<Config>(proto_config, context_.scope(), context_.server_factory_context_);
+    config_ = std::make_shared<Config>(proto_config, context_.scope(), context_);
 
     auto client = std::make_unique<NiceMock<Filters::Common::ExtAuthz::MockClient>>();
     client_ = client.get();
@@ -345,8 +344,7 @@ TEST_F(ExtAuthzFilterTest, ConfigThrowsWhenGrpcClientFactoryFails) {
 
   FilterConfig proto_config;
   proto_config.set_stat_prefix("test");
-  EXPECT_THROW(std::ignore = std::make_shared<Config>(proto_config, context_.scope(),
-                                                      context_.server_factory_context_),
+  EXPECT_THROW(std::ignore = std::make_shared<Config>(proto_config, context_.scope(), context_),
                EnvoyException);
 }
 

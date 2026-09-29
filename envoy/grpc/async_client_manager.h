@@ -11,6 +11,11 @@ namespace Envoy {
 namespace Http {
 class HeaderEvaluator;
 } // namespace Http
+namespace Server {
+namespace Configuration {
+class GenericFactoryContext;
+} // namespace Configuration
+} // namespace Server
 
 namespace Grpc {
 
@@ -162,11 +167,23 @@ public:
    *
    * Must be called on the main thread.
    * @param grpc_service envoy::config::core::v3::GrpcService configuration.
+   * @param context the factory context of the config that owns `grpc_service`. Formatters are
+   * loaded with its validation visitor and stats scope, and register init targets with its init
+   * manager, or start them immediately if it has already initialized.
    * @return a handle on success, or an error if the formatters or the initial metadata fail to
    * parse.
    */
   virtual absl::StatusOr<GrpcServiceInitialMetadataPtr>
-  parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& grpc_service) PURE;
+  parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& grpc_service,
+                                  Server::Configuration::GenericFactoryContext& context) PURE;
+
+  /**
+   * Like parseGrpcServiceInitialMetadata(), for a gRPC service that isn't owned by a config with
+   * its own factory context, e.g. an xDS client. Formatters are loaded with the server's
+   * validation visitor and stats scope, and their init targets start immediately.
+   */
+  virtual absl::StatusOr<GrpcServiceInitialMetadataPtr> parseGrpcServiceInitialMetadataForServer(
+      const envoy::config::core::v3::GrpcService& grpc_service) PURE;
 };
 
 using AsyncClientManagerPtr = std::unique_ptr<AsyncClientManager>;

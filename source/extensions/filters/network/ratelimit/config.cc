@@ -36,7 +36,8 @@ absl::StatusOr<Network::FilterFactoryCb> RateLimitConfigFactory::createFilterFac
       context.serverFactoryContext()
           .clusterManager()
           .grpcAsyncClientManager()
-          .parseGrpcServiceInitialMetadata(proto_config.rate_limit_service().grpc_service());
+          .parseGrpcServiceInitialMetadata(proto_config.rate_limit_service().grpc_service(),
+                                           context);
   RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(
       proto_config.rate_limit_service().grpc_service(),

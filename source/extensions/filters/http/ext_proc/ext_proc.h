@@ -272,7 +272,9 @@ public:
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix, bool is_upstream,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-               Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status);
+               Server::Configuration::CommonFactoryContext& context,
+               Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata,
+               absl::Status& creation_status);
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -416,7 +418,7 @@ private:
   const AllowedOverrideModesSet allowed_override_modes_;
 
   const std::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
-  Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata_;
+  const Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
   const Protobuf::Struct filter_metadata_;
   const ExpressionManager expression_manager_;

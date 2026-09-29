@@ -46,7 +46,9 @@ MockAsyncClientManager::MockAsyncClientManager() {
   ON_CALL(*this, getOrCreateRawAsyncClientWithHashKey(_, _, _)).WillByDefault(Invoke([] {
     return std::make_shared<testing::NiceMock<Grpc::MockAsyncClient>>();
   }));
-  ON_CALL(*this, parseGrpcServiceInitialMetadata(_))
+  ON_CALL(*this, parseGrpcServiceInitialMetadata(_, _))
+      .WillByDefault(Return(GrpcServiceInitialMetadataPtr(nullptr)));
+  ON_CALL(*this, parseGrpcServiceInitialMetadataForServer(_))
       .WillByDefault(Return(GrpcServiceInitialMetadataPtr(nullptr)));
 }
 

@@ -19,6 +19,7 @@
 #include "source/extensions/filters/http/rate_limit_quota/filter_persistence.h"
 #include "source/extensions/filters/http/rate_limit_quota/global_client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,9 +40,11 @@ RateLimitQuotaFilterFactory::createHttpFilterFactoryFromProtoTyped(
       envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig>(
       filter_config);
 
+  Server::GenericFactoryContextImpl generic_context(
+      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
   auto initial_metadata_or_error =
       context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
-          config->rlqs_server());
+          config->rlqs_server(), generic_context);
   RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(config->rlqs_server(),
                                                           std::move(*initial_metadata_or_error));

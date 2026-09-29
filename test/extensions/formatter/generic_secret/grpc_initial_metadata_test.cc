@@ -6,6 +6,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 
 #include "source/common/grpc/async_client_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -92,7 +93,7 @@ TEST_F(GrpcInitialMetadataFormatterTest, InitialMetadataResolvedFromFormatterExt
   (*generic_secret_cfg.mutable_secret_configs())["api-token"].set_name("api-token");
   ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(generic_secret_cfg));
 
-  auto formatters = parseGrpcServiceInitialMetadata(config, context_);
+  auto formatters = parseGrpcServiceInitialMetadataForServer(config, context_);
   ASSERT_TRUE(formatters.ok());
   grpc_client_ = *AsyncClientImpl::create(config, context_, *formatters);
   cm_.initializeThreadLocalClusters({"test_cluster"});
@@ -102,14 +103,13 @@ TEST_F(GrpcInitialMetadataFormatterTest, InitialMetadataResolvedFromFormatterExt
 }
 
 // Validates the SDS/init path: a secret sourced from an ``sds_config`` registers an init target
-// with the (server) init manager the gRPC client provides to the formatter extension. The secret
+// with the init manager of the context passed to parseGrpcServiceInitialMetadata(). The secret
 // resolves to empty (header omitted) until initialization delivers it, after which it appears in
 // the initial metadata.
 TEST_F(GrpcInitialMetadataFormatterTest, SdsBackedSecretResolvesAfterInitialization) {
   context_.resetSecretManager();
 
-  // Capture the init target the generic_secret SDS subscription registers with the init manager
-  // that the gRPC client passes through (the server init manager).
+  // Capture the init target the generic_secret SDS subscription registers with the init manager.
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(context_.init_manager_, add(_))
       .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
@@ -131,7 +131,8 @@ TEST_F(GrpcInitialMetadataFormatterTest, SdsBackedSecretResolvesAfterInitializat
   secret_config.mutable_sds_config()->mutable_ads();
   ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(generic_secret_cfg));
 
-  auto formatters = parseGrpcServiceInitialMetadata(config, context_);
+  Server::GenericFactoryContextImpl owner_context(context_, context_.messageValidationVisitor());
+  auto formatters = parseGrpcServiceInitialMetadata(config, owner_context);
   ASSERT_TRUE(formatters.ok());
   grpc_client_ = *AsyncClientImpl::create(config, context_, *formatters);
   cm_.initializeThreadLocalClusters({"test_cluster"});

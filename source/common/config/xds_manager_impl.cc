@@ -87,7 +87,7 @@ absl::Status createSharedClients(Grpc::AsyncClientManager& async_client_manager,
   RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
   if (maybe_grpc_service.value().has_value()) {
     auto initial_metadata =
-        async_client_manager.parseGrpcServiceInitialMetadata(*maybe_grpc_service.value());
+        async_client_manager.parseGrpcServiceInitialMetadataForServer(*maybe_grpc_service.value());
     RETURN_IF_NOT_OK_REF(initial_metadata.status());
     absl::StatusOr<Grpc::RawAsyncClientSharedPtr> success =
         async_client_manager.getOrCreateRawAsyncClientWithHashKey(
@@ -103,8 +103,8 @@ absl::Status createSharedClients(Grpc::AsyncClientManager& async_client_manager,
                                                   xdstp_config_source);
     RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
     if (maybe_grpc_service.value().has_value()) {
-      auto initial_metadata =
-          async_client_manager.parseGrpcServiceInitialMetadata(*maybe_grpc_service.value());
+      auto initial_metadata = async_client_manager.parseGrpcServiceInitialMetadataForServer(
+          *maybe_grpc_service.value());
       RETURN_IF_NOT_OK_REF(initial_metadata.status());
       absl::StatusOr<Grpc::RawAsyncClientSharedPtr> success =
           async_client_manager.getOrCreateRawAsyncClientWithHashKey(

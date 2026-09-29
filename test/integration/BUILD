@@ -620,6 +620,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/extensions/formatter/cel:config",
         "//source/extensions/formatter/file_content:config",
+        "//source/extensions/formatter/generic_secret:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration/filters:server_factory_context_filter_config_proto_cc_proto",
         "//test/integration/filters:server_factory_context_filter_lib",
@@ -627,8 +628,11 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/formatter/file_content/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/formatter/generic_secret/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 

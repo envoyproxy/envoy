@@ -763,7 +763,7 @@ TEST(HttpExtProcConfigTest, ParsedGrpcInitialMetadataPassedToClient) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_formatters = std::make_shared<const NoopHeaderEvaluator>();
   EXPECT_CALL(context.cluster_manager_.async_client_manager_,
-              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server")))
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server"), _))
       .WillOnce(testing::Return(filter_formatters));
 
   EXPECT_EQ(filter_formatters, formattersForRequest(FilterConfigYaml, context));
@@ -771,7 +771,7 @@ TEST(HttpExtProcConfigTest, ParsedGrpcInitialMetadataPassedToClient) {
 
 TEST(HttpExtProcConfigTest, ParseGrpcInitialMetadataError) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, parseGrpcServiceInitialMetadata(_))
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, parseGrpcServiceInitialMetadata(_, _))
       .WillOnce(testing::Return(absl::InvalidArgumentError("bad formatters")));
 
   ExternalProcessingFilterConfig factory;
@@ -790,10 +790,10 @@ TEST(HttpExtProcConfigTest, PerRouteParsedGrpcInitialMetadataPassedToClient) {
   auto filter_formatters = std::make_shared<const NoopHeaderEvaluator>();
   auto route_formatters = std::make_shared<const NoopHeaderEvaluator>();
   EXPECT_CALL(context.cluster_manager_.async_client_manager_,
-              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server")))
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server"), _))
       .WillOnce(testing::Return(filter_formatters));
   EXPECT_CALL(context.cluster_manager_.async_client_manager_,
-              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("route_server")))
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("route_server"), _))
       .WillOnce(testing::Return(route_formatters));
 
   auto route_config = createRouteConfig(R"EOF(
@@ -826,7 +826,7 @@ TEST(HttpExtProcConfigTest, PerRouteParsedGrpcInitialMetadataPassedToClient) {
 TEST(HttpExtProcConfigTest, PerRouteGrpcInitialMetadataDropsParsedInitialMetadata) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_CALL(context.cluster_manager_.async_client_manager_,
-              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server")))
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server"), _))
       .WillOnce(testing::Return(std::make_shared<const NoopHeaderEvaluator>()));
 
   auto route_config = createRouteConfig(R"EOF(
@@ -861,7 +861,7 @@ TEST(HttpExtProcConfigTest, PerRouteRejectsFormattersWithGrpcInitialMetadata) {
                             *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, parseGrpcServiceInitialMetadata(_))
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, parseGrpcServiceInitialMetadata(_, _))
       .Times(0);
   EXPECT_THAT(factory.createRouteSpecificFilterConfig(*proto_config, context,
                                                       context.messageValidationVisitor()),
@@ -883,7 +883,7 @@ TEST(HttpExtProcConfigTest, PerRouteParseGrpcInitialMetadataError) {
                             *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, parseGrpcServiceInitialMetadata(_))
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, parseGrpcServiceInitialMetadata(_, _))
       .WillOnce(testing::Return(absl::InvalidArgumentError("bad formatters")));
   EXPECT_THAT(factory.createRouteSpecificFilterConfig(*proto_config, context,
                                                       context.messageValidationVisitor()),

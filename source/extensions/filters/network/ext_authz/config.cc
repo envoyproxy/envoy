@@ -32,7 +32,7 @@ absl::StatusOr<Network::FilterFactoryCb> ExtAuthzConfigFactory::createFilterFact
       context.serverFactoryContext()
           .clusterManager()
           .grpcAsyncClientManager()
-          .parseGrpcServiceInitialMetadata(proto_config.grpc_service());
+          .parseGrpcServiceInitialMetadata(proto_config.grpc_service(), context);
   RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
   auto initial_metadata = std::move(initial_metadata_or_error.value());
   return [grpc_service = proto_config.grpc_service(), &context, ext_authz_config, timeout_ms,

@@ -142,7 +142,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(grpc_service, timeout, 200);
   auto initial_metadata = THROW_OR_RETURN_VALUE(
       server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
-          grpc_service),
+          grpc_service, context),
       Grpc::GrpcServiceInitialMetadataPtr);
 
   return [has_external_auth_provider_, grpc_service, &context, splitter, filter_config, timeout_ms,

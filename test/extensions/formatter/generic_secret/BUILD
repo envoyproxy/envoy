@@ -38,6 +38,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/grpc:async_client_lib",
         "//source/extensions/formatter/generic_secret:config",
+        "//source/server:generic_factory_context_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",

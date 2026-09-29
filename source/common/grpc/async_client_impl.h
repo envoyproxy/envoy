@@ -21,11 +21,20 @@ namespace Envoy {
 namespace Grpc {
 
 // Parses `config.initial_metadata()` using the built-in substitution commands and the formatter
-// extensions declared in `config.formatters()`, returning the parsed metadata. Must be called on
-// the main thread.
+// extensions declared in `config.formatters()`, returning the parsed metadata. Formatters are
+// loaded with the validation visitor and stats scope of `context`, which belongs to the config that
+// owns `config`, and register init targets with its init manager, or start them immediately if it
+// has already initialized. Must be called on the main thread.
 absl::StatusOr<GrpcServiceInitialMetadataPtr>
 parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& config,
-                                Server::Configuration::ServerFactoryContext& context);
+                                Server::Configuration::GenericFactoryContext& context);
+
+// Like parseGrpcServiceInitialMetadata(), for a gRPC service that isn't owned by a config with its
+// own factory context, e.g. an xDS client. Formatters are loaded with the server's validation
+// visitor and stats scope, and their init targets start immediately.
+absl::StatusOr<GrpcServiceInitialMetadataPtr>
+parseGrpcServiceInitialMetadataForServer(const envoy::config::core::v3::GrpcService& config,
+                                         Server::Configuration::ServerFactoryContext& context);
 
 class AsyncRequestImpl;
 

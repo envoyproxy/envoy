@@ -8,6 +8,7 @@
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/integration/filters/server_factory_context_filter_config.pb.h"
 #include "test/integration/filters/server_factory_context_filter_config.pb.validate.h"
@@ -122,12 +123,13 @@ private:
   bool filter_chain_continued_ = false;
 };
 
-absl::StatusOr<Http::FilterFactoryCb> createServerFactoryContextFilterFactory(
-    const envoy::config::core::v3::GrpcService& grpc_service,
-    Server::Configuration::ServerFactoryContext& server_context) {
+absl::StatusOr<Http::FilterFactoryCb>
+createServerFactoryContextFilterFactory(const envoy::config::core::v3::GrpcService& grpc_service,
+                                        Server::Configuration::GenericFactoryContext& context) {
+  Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
   auto initial_metadata_or_error =
       server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
-          grpc_service);
+          grpc_service, context);
   RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
   return [&server_context, grpc_service, initial_metadata = std::move(*initial_metadata_or_error)](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -155,8 +157,10 @@ private:
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfig& proto_config,
       Server::Configuration::ServerFactoryContext& server_context,
-      Server::Configuration::ExtraFactoryContext&) override {
-    return createServerFactoryContextFilterFactory(proto_config.grpc_service(), server_context);
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
+    Server::GenericFactoryContextImpl generic_context(
+        server_context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
+    return createServerFactoryContextFilterFactory(proto_config.grpc_service(), generic_context);
   }
 };
 
@@ -173,16 +177,20 @@ public:
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
-      const std::string&, DualInfo,
+      const std::string&, DualInfo info,
       Server::Configuration::ServerFactoryContext& server_context) override {
-    return createServerFactoryContextFilterFactory(proto_config.grpc_service(), server_context);
+    Server::GenericFactoryContextImpl generic_context(
+        server_context, info.scope, server_context.messageValidationVisitor(), info.init_manager);
+    return createServerFactoryContextFilterFactory(proto_config.grpc_service(), generic_context);
   }
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
       Server::Configuration::ServerFactoryContext& server_context,
-      Server::Configuration::ExtraFactoryContext&) override {
-    return createServerFactoryContextFilterFactory(proto_config.grpc_service(), server_context);
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
+    Server::GenericFactoryContextImpl generic_context(
+        server_context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
+    return createServerFactoryContextFilterFactory(proto_config.grpc_service(), generic_context);
   }
 };
 

@@ -85,12 +85,12 @@ getHttpAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& c
         context.serverFactoryContext(), commands);
   }
 
-  auto initial_metadata =
-      THROW_OR_RETURN_VALUE(context.serverFactoryContext()
-                                .clusterManager()
-                                .grpcAsyncClientManager()
-                                .parseGrpcServiceInitialMetadata(getGrpcService(proto_config)),
-                            Grpc::GrpcServiceInitialMetadataPtr);
+  auto initial_metadata = THROW_OR_RETURN_VALUE(
+      context.serverFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .parseGrpcServiceInitialMetadata(getGrpcService(proto_config), context),
+      Grpc::GrpcServiceInitialMetadataPtr);
 
   return std::make_shared<AccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),

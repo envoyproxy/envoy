@@ -36,7 +36,7 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
     const auto& grpc_service = sink_config.grpc_service();
 
     auto initial_metadata_or_error =
-        server.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+        server.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadataForServer(
             grpc_service);
     RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
     auto client_or_error =

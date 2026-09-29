@@ -10,6 +10,8 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/watcher_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/server/generic_factory_context.h"
 
@@ -44,13 +46,19 @@ void base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
     headers.addCopy(key_string, value);
   }
 }
-} // namespace
 
+// Parses `config.initial_metadata()`. Formatters register their init targets with `init_manager`,
+// or, if it is nullopt, with a local init manager that starts them once parsing is done.
 absl::StatusOr<GrpcServiceInitialMetadataPtr>
-parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& config,
-                                Server::Configuration::ServerFactoryContext& context) {
+parseInitialMetadata(const envoy::config::core::v3::GrpcService& config,
+                     Server::Configuration::ServerFactoryContext& server_context,
+                     Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+                     OptRef<Init::Manager> init_manager) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  Server::GenericFactoryContextImpl generic_context{context, context.messageValidationVisitor()};
+  Init::ManagerImpl local_init_manager("gRPC service initial metadata");
+  Server::GenericFactoryContextImpl generic_context{
+      server_context, scope, validation_visitor,
+      init_manager.has_value() ? init_manager : makeOptRef<Init::Manager>(local_init_manager)};
   auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(config.formatters(),
                                                                             generic_context);
   RETURN_IF_NOT_OK_REF(commands.status());
@@ -60,7 +68,28 @@ parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& conf
       config.initial_metadata(),
       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, *commands);
   RETURN_IF_NOT_OK_REF(parser_or_error.status());
+  local_init_manager.initialize(Init::WatcherImpl("gRPC service initial metadata", [] {}));
   return GrpcServiceInitialMetadataPtr(std::move(*parser_or_error));
+}
+} // namespace
+
+absl::StatusOr<GrpcServiceInitialMetadataPtr>
+parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& config,
+                                Server::Configuration::GenericFactoryContext& context) {
+  Init::Manager& init_manager = context.initManager();
+  // Init targets can't be added to an init manager that has already initialized, e.g. the
+  // listener's when an ECDS update arrives after it has warmed.
+  return parseInitialMetadata(
+      config, context.serverFactoryContext(), context.scope(), context.messageValidationVisitor(),
+      init_manager.state() == Init::Manager::State::Initialized ? OptRef<Init::Manager>()
+                                                                : makeOptRef(init_manager));
+}
+
+absl::StatusOr<GrpcServiceInitialMetadataPtr>
+parseGrpcServiceInitialMetadataForServer(const envoy::config::core::v3::GrpcService& config,
+                                         Server::Configuration::ServerFactoryContext& context) {
+  return parseInitialMetadata(config, context, context.scope(), context.messageValidationVisitor(),
+                              absl::nullopt);
 }
 
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>

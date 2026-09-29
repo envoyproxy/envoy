@@ -72,7 +72,10 @@ public:
                         GrpcServiceInitialMetadataPtr initial_metadata) override;
 
   absl::StatusOr<GrpcServiceInitialMetadataPtr>
-  parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& config) override;
+  parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& config,
+                                  Server::Configuration::GenericFactoryContext& context) override;
+  absl::StatusOr<GrpcServiceInitialMetadataPtr> parseGrpcServiceInitialMetadataForServer(
+      const envoy::config::core::v3::GrpcService& config) override;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     explicit RawAsyncClientCache(Event::Dispatcher& dispatcher,

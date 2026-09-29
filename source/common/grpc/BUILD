@@ -45,6 +45,8 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/http:async_client_lib",
+        "//source/common/init:manager_lib",
+        "//source/common/init:watcher_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

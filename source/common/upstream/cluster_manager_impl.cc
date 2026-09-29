@@ -525,8 +525,8 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
                                                                    /*xdstp_config_source*/ false);
       RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
       if (maybe_grpc_service.value().has_value()) {
-        auto initial_metadata =
-            async_client_manager_->parseGrpcServiceInitialMetadata(*maybe_grpc_service.value());
+        auto initial_metadata = async_client_manager_->parseGrpcServiceInitialMetadataForServer(
+            *maybe_grpc_service.value());
         RETURN_IF_NOT_OK_REF(initial_metadata.status());
         client_or_error = async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
             Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value(),

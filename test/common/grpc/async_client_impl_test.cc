@@ -2,9 +2,14 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/grpc/async_client_impl.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/target_impl.h"
+#include "source/common/init/watcher_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/http/mocks.h"
@@ -27,8 +32,9 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
-// A formatter command parser factory that records the GenericFactoryContext it is handed. Used to
-// verify that the gRPC client wires the server factory context and init manager through to
+// A formatter command parser factory that records the GenericFactoryContext it is handed, and
+// registers an init target with its init manager. Used to verify which factory context
+// parseGrpcServiceInitialMetadata() and parseGrpcServiceInitialMetadataForServer() hand to
 // formatter extensions (the init manager is what SDS-backed formatter extensions register their
 // init targets with).
 class ContextCapturingCommandFactory : public Envoy::Formatter::TestCommandFactory {
@@ -37,13 +43,23 @@ public:
   createCommandParserFromProto(const Protobuf::Message& message,
                                Server::Configuration::GenericFactoryContext& context) override {
     captured_server_context = &context.serverFactoryContext();
+    captured_scope = &context.scope();
+    captured_validation_visitor = &context.messageValidationVisitor();
     captured_init_manager = &context.initManager();
+    context.initManager().add(init_target);
     return Envoy::Formatter::TestCommandFactory::createCommandParserFromProto(message, context);
   }
   std::string name() const override { return "envoy.formatter.ContextCapturing"; }
 
   Server::Configuration::ServerFactoryContext* captured_server_context{};
+  Stats::Scope* captured_scope{};
+  ProtobufMessage::ValidationVisitor* captured_validation_visitor{};
   Init::Manager* captured_init_manager{};
+  bool init_target_initialized{};
+  Init::TargetImpl init_target{"ContextCapturing", [this] {
+                                 init_target_initialized = true;
+                                 init_target.ready();
+                               }};
 };
 
 class EnvoyAsyncClientImplTest : public testing::Test {
@@ -312,7 +328,7 @@ TEST_F(EnvoyAsyncClientImplTest, InitialMetadataUsesFormatterExtension) {
   formatter->set_name("envoy.formatter.TestFormatter");
   ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
 
-  auto formatters = parseGrpcServiceInitialMetadata(config, context_);
+  auto formatters = parseGrpcServiceInitialMetadataForServer(config, context_);
   ASSERT_TRUE(formatters.ok());
   grpc_client_ = *AsyncClientImpl::create(config, context_, *formatters);
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
@@ -363,7 +379,7 @@ TEST_F(EnvoyAsyncClientImplTest, InitialMetadataFormatterExtensionUnusedForStati
   formatter->set_name("envoy.formatter.TestFormatter");
   ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
 
-  auto formatters = parseGrpcServiceInitialMetadata(config, context_);
+  auto formatters = parseGrpcServiceInitialMetadataForServer(config, context_);
   ASSERT_TRUE(formatters.ok());
   grpc_client_ = *AsyncClientImpl::create(config, context_, *formatters);
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
@@ -399,11 +415,10 @@ TEST_F(EnvoyAsyncClientImplTest, InitialMetadataFormatterExtensionUnusedForStati
 }
 
 // Validates that parseGrpcServiceInitialMetadata hands formatter extensions a factory context
-// carrying the server factory context and its init manager. SDS-backed formatter extensions (such
-// as
-// ``envoy.formatter.generic_secret`` with an ``sds_config``) register their init targets with this
-// init manager, so this wiring is what allows dynamic secrets to load.
-TEST_F(EnvoyAsyncClientImplTest, FormatterExtensionReceivesServerContextAndInitManager) {
+// carrying the server factory context, and the stats scope, validation visitor and init manager of
+// the given context. SDS-backed formatter extensions (such as ``envoy.formatter.generic_secret``
+// with an ``sds_config``) register their init targets with this init manager.
+TEST_F(EnvoyAsyncClientImplTest, FormatterExtensionReceivesOwnerContext) {
   ContextCapturingCommandFactory factory;
   Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(factory);
 
@@ -413,10 +428,65 @@ TEST_F(EnvoyAsyncClientImplTest, FormatterExtensionReceivesServerContextAndInitM
   formatter->set_name("envoy.formatter.ContextCapturing");
   ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
 
-  EXPECT_TRUE(parseGrpcServiceInitialMetadata(config, context_).ok());
+  Stats::ScopeSharedPtr scope = context_.scope().createScope("owner.");
+  Init::ManagerImpl init_manager("test");
+  Server::GenericFactoryContextImpl owner_context(
+      context_, *scope, ProtobufMessage::getNullValidationVisitor(), init_manager);
+  EXPECT_TRUE(parseGrpcServiceInitialMetadata(config, owner_context).ok());
 
   EXPECT_EQ(factory.captured_server_context, &context_);
-  EXPECT_EQ(factory.captured_init_manager, &context_.initManager());
+  EXPECT_EQ(factory.captured_scope, scope.get());
+  EXPECT_EQ(factory.captured_validation_visitor, &ProtobufMessage::getNullValidationVisitor());
+  EXPECT_EQ(factory.captured_init_manager, &init_manager);
+  EXPECT_FALSE(factory.init_target_initialized);
+
+  init_manager.initialize(Init::WatcherImpl("test", [] {}));
+  EXPECT_TRUE(factory.init_target_initialized);
+}
+
+// Validates that for a gRPC service without an owning config, formatter extensions get the server's
+// stats scope and validation visitor, and their init targets start immediately, rather than being
+// registered with the server's init manager.
+TEST_F(EnvoyAsyncClientImplTest, FormatterExtensionForServer) {
+  ContextCapturingCommandFactory factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(factory);
+
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  auto* formatter = config.mutable_formatters()->Add();
+  formatter->set_name("envoy.formatter.ContextCapturing");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  EXPECT_CALL(context_.init_manager_, add(_)).Times(0);
+  EXPECT_TRUE(parseGrpcServiceInitialMetadataForServer(config, context_).ok());
+
+  EXPECT_EQ(factory.captured_server_context, &context_);
+  EXPECT_EQ(factory.captured_scope, &context_.scope());
+  EXPECT_EQ(factory.captured_validation_visitor, &context_.messageValidationVisitor());
+  EXPECT_TRUE(factory.init_target_initialized);
+}
+
+// Validates that an init manager that has already initialized, which init targets can't be added
+// to, is treated as absent.
+TEST_F(EnvoyAsyncClientImplTest, FormatterExtensionInitTargetsStartWithInitializedInitManager) {
+  ContextCapturingCommandFactory factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(factory);
+
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  auto* formatter = config.mutable_formatters()->Add();
+  formatter->set_name("envoy.formatter.ContextCapturing");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  Init::ManagerImpl init_manager("test");
+  init_manager.initialize(Init::WatcherImpl("test", [] {}));
+  ASSERT_EQ(init_manager.state(), Init::Manager::State::Initialized);
+  Server::GenericFactoryContextImpl owner_context(
+      context_, context_.scope(), context_.messageValidationVisitor(), init_manager);
+  EXPECT_TRUE(parseGrpcServiceInitialMetadata(config, owner_context).ok());
+
+  EXPECT_NE(factory.captured_init_manager, &init_manager);
+  EXPECT_TRUE(factory.init_target_initialized);
 }
 
 // Validates that "*-bin" server init metadata are NOT based64 decoded.
