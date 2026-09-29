@@ -423,7 +423,7 @@ private:
   // The route a decision produced, along with why it could not be produced.
   struct Decision {
     Envoy::Router::RouteConstSharedPtr route;
-    Envoy::Router::OnRouteResultStatus status{Envoy::Router::OnRouteResultStatus::Continue};
+    Envoy::Router::OnRouteChainStatus status{Envoy::Router::OnRouteChainStatus::Continue};
     Failure failure{Failure::None};
   };
 
@@ -431,7 +431,7 @@ private:
   Decision resolve(RouteSpecifierContext& context, uint32_t decision) const;
   // The route the module asked for, without the failure policy applied.
   Decision wrap(Envoy::Router::RouteConstSharedPtr route, RouteSpecifierContext& context,
-                Envoy::Router::OnRouteResultStatus status) const;
+                Envoy::Router::OnRouteChainStatus status) const;
 
   const DynamicModuleRouteSpecifierConfigSharedPtr config_;
 };
