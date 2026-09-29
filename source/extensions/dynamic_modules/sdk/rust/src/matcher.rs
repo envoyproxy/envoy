@@ -78,7 +78,7 @@ impl MatchContext {
       Vec::with_capacity(size);
     let mut size_out: usize = 0;
     let success = unsafe {
-      abi::envoy_dynamic_module_callback_matcher_get_headers(
+      abi::envoy_dynamic_module_callback_matcher_get_headers_v2(
         self.envoy_ptr,
         header_type,
         headers.as_mut_ptr(),

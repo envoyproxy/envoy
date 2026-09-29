@@ -748,6 +748,25 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, InvalidTcpPool) {
   EXPECT_EQ(pool, nullptr);
 }
 
+// The deprecated get_request_headers callback keeps its released signature and behavior.
+TEST_F(HttpTcpBridgeTest, DeprecatedGetRequestHeaders) {
+  envoy_dynamic_module_type_envoy_http_header result[2];
+
+  // The request headers are unavailable before encodeHeaders.
+  EXPECT_FALSE(envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
+      bridge_.get(), result));
+
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
+      bridge_.get(), result));
+  EXPECT_EQ(":method", absl::string_view(result[0].key_ptr, result[0].key_length));
+  EXPECT_EQ("GET", absl::string_view(result[0].value_ptr, result[0].value_length));
+  EXPECT_EQ(":path", absl::string_view(result[1].key_ptr, result[1].key_length));
+  EXPECT_EQ("/test", absl::string_view(result[1].value_ptr, result[1].value_length));
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Http

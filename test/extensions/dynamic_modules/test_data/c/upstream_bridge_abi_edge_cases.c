@@ -52,7 +52,7 @@ envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
   (void)size;
 
   size_t request_headers_size_out = 0;
-  envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
+  envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2(
       bridge_envoy_ptr, NULL, 0, &request_headers_size_out);
 
   // Exercise get_request_buffer with new envoy_buffer* signature when the request buffer is empty.

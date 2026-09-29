@@ -51,7 +51,7 @@ void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
   if (num_headers > 0) {
     envoy_dynamic_module_type_envoy_http_header headers[16];
     size_t headers_size_out = 0;
-    envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
+    envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2(
         bridge_envoy_ptr, headers, 16, &headers_size_out);
   }
 

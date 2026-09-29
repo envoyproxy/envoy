@@ -1293,7 +1293,7 @@ impl LogContext {
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     let count = self.get_headers_count(header_type);
     crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_headers(
+      abi::envoy_dynamic_module_callback_access_logger_get_headers_v2(
         self.envoy_ptr,
         header_type,
         ptr,

@@ -5992,7 +5992,7 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstrea
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
   _result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
   _capacity: usize,
@@ -7986,7 +7986,7 @@ pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers_size(
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers(
+pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers_v2(
   _matcher_input_envoy_ptr: abi::envoy_dynamic_module_type_matcher_input_envoy_ptr,
   _header_type: abi::envoy_dynamic_module_type_http_header_type,
   result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
@@ -10217,7 +10217,7 @@ pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers_size(
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers(
+pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers_v2(
   _envoy_ptr: abi::envoy_dynamic_module_type_formatter_context_envoy_ptr,
   _header_type: abi::envoy_dynamic_module_type_http_header_type,
   result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,

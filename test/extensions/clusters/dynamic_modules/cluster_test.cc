@@ -2517,7 +2517,7 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeaders) {
 
   std::vector<envoy_dynamic_module_type_envoy_http_header> result(size);
   size_t size_out = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
       context_ptr, result.data(), result.size(), &size_out));
 
   EXPECT_EQ(":method", absl::string_view(result[0].key_ptr, result[0].key_length));
@@ -2534,7 +2534,7 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNoHeaders) {
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   envoy_dynamic_module_type_envoy_http_header result;
   size_t size_out = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
       context_ptr, &result, 1, &size_out));
 }
 
@@ -2542,7 +2542,7 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNoHeaders) {
 TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNullContext) {
   envoy_dynamic_module_type_envoy_http_header result;
   size_t size_out = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
       nullptr, &result, 1, &size_out));
 }
 
@@ -2551,7 +2551,7 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNullResult) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   size_t size_out = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
       context_ptr, nullptr, 0, &size_out));
 }
 
@@ -5216,6 +5216,40 @@ TEST_F(DynamicModuleClusterTest, DestructorCancelsPendingHttpCallouts) {
   // The thread-aware LB inside `result` still holds an internal handle to the cluster; reset it so
   // the cluster is actually destroyed inside this test body, where the EXPECT_CALL is in scope.
   result = absl::InternalError("cleanup");
+}
+
+// The deprecated get_downstream_headers callback keeps its released signature and behavior.
+TEST_F(DynamicModuleClusterTest, LbContextDeprecatedGetDownstreamHeaders) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-test", "value"}};
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::vector<envoy_dynamic_module_type_envoy_http_header> result(2);
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+      context_ptr, result.data()));
+
+  EXPECT_EQ(":method", absl::string_view(result[0].key_ptr, result[0].key_length));
+  EXPECT_EQ("GET", absl::string_view(result[0].value_ptr, result[0].value_length));
+  EXPECT_EQ("x-test", absl::string_view(result[1].key_ptr, result[1].key_length));
+  EXPECT_EQ("value", absl::string_view(result[1].value_ptr, result[1].value_length));
+}
+
+TEST_F(DynamicModuleClusterTest, LbContextDeprecatedGetDownstreamHeadersUnavailable) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(nullptr));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  envoy_dynamic_module_type_envoy_http_header result;
+
+  // No headers available.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(context_ptr,
+                                                                                       &result));
+  // Null context.
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(nullptr, &result));
+  // Null result.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(context_ptr,
+                                                                                       nullptr));
 }
 
 } // namespace
