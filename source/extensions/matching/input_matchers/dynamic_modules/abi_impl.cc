@@ -53,12 +53,19 @@ bool getHeaderValueImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_mod
 }
 
 bool getHeadersImpl(HeadersMapOptConstRef map,
-                    envoy_dynamic_module_type_envoy_http_header* result_headers) {
+                    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
+                    size_t* size_out) {
+  *size_out = 0;
   if (!map) {
     return false;
   }
+  const size_t count = map->size();
+  *size_out = count;
+  if (count > capacity || (count > 0 && result_headers == nullptr)) {
+    return false;
+  }
   size_t i = 0;
-  map->iterate([&i, &result_headers](
+  map->iterate([&i, result_headers](
                    const ::Envoy::Http::HeaderEntry& header) -> ::Envoy::Http::HeaderMap::Iterate {
     auto& key = header.key();
     result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());
@@ -94,11 +101,12 @@ size_t envoy_dynamic_module_callback_matcher_get_headers_size(
 bool envoy_dynamic_module_callback_matcher_get_headers(
     envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_envoy_http_header* result_headers) {
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
+    size_t* size_out) {
   using namespace Envoy::Extensions::Matching::InputMatchers::DynamicModules;
   auto* context = static_cast<MatchContext*>(matcher_input_envoy_ptr);
   auto map = getHeaderMapByType(context, header_type);
-  return getHeadersImpl(map, result_headers);
+  return getHeadersImpl(map, result_headers, capacity, size_out);
 }
 
 bool envoy_dynamic_module_callback_matcher_get_header_value(
@@ -110,6 +118,13 @@ bool envoy_dynamic_module_callback_matcher_get_header_value(
   auto* context = static_cast<MatchContext*>(matcher_input_envoy_ptr);
   auto map = getHeaderMapByType(context, header_type);
   return getHeaderValueImpl(map, key, result, index, total_count_out);
+}
+
+void envoy_dynamic_module_callback_matcher_set_error(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr) {
+  using namespace Envoy::Extensions::Matching::InputMatchers::DynamicModules;
+  auto* context = static_cast<MatchContext*>(matcher_input_envoy_ptr);
+  context->module_error = true;
 }
 
 } // extern "C"

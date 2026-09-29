@@ -23,10 +23,12 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro CBS_ASN1_SEQUENCE \
   --uncomment-macro CBS_ASN1_GENERALIZEDTIME \
   --uncomment-func-decl CBS_get_asn1 \
+  --uncomment-func-decl CBS_peek_any_asn1_tag \
   --uncomment-func-decl CBS_peek_asn1_tag \
   --uncomment-func-decl CBS_get_any_asn1_element \
   --uncomment-func-decl CBS_get_optional_asn1 \
   --uncomment-func-decl CBS_asn1_oid_to_text \
+  --uncomment-func-decl CBS_get_asn1_oid_component \
   --uncomment-struct cbb_buffer_st \
   --uncomment-struct cbb_child_st \
   --uncomment-struct cbb_st \

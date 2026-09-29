@@ -73,9 +73,11 @@ size_t envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size(
 
 bool envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers) {
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
+    size_t* size_out) {
   auto* context = clusterSpecifierContext(context_envoy_ptr);
-  return ContextAccessor::getHeaders(HeadersMapOptConstRef(context->headers), result_headers);
+  return ContextAccessor::getHeadersBounded(HeadersMapOptConstRef(context->headers), result_headers,
+                                            capacity, size_out);
 }
 
 bool envoy_dynamic_module_callback_cluster_specifier_get_request_header_value(
@@ -99,7 +101,9 @@ bool envoy_dynamic_module_callback_cluster_specifier_get_attribute_int(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result) {
   auto* context = clusterSpecifierContext(context_envoy_ptr);
-  return ContextAccessor::getAttributeInt(context->stream_info, attribute_id, result);
+  const ContextAccessor::HttpAttributeContext http_context{&context->headers, nullptr, nullptr};
+  return ContextAccessor::getAttributeInt(context->stream_info, attribute_id, result,
+                                          &http_context);
 }
 
 bool envoy_dynamic_module_callback_cluster_specifier_get_attribute_bool(

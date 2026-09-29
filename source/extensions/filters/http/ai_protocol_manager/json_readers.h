@@ -27,10 +27,7 @@ namespace AiProtocolManager {
 // magnitude below it.
 constexpr uint64_t MaxSafeCount = (uint64_t(1) << 53) - 1;
 
-// Response strings are upstream-controlled; the cap keeps one response from
-// turning into a multi-megabyte metadata value or access-log entry. A string
-// offloaded as an external reference is not a string node and reads as
-// absent.
+// Caps peer-controlled strings so one record cannot become a multi-megabyte metadata value.
 constexpr size_t MaxStringValueSize = 256;
 
 // Whether a present-but-null object position is benignly absent or malformed.
@@ -40,17 +37,24 @@ constexpr size_t MaxStringValueSize = 256;
 // malformed when null.
 enum class NullPolicy { AllowNullAsAbsent, NullIsMalformed };
 
-// Read a token count (integer or JSON double). Returns nullopt for a missing
-// key; a key that is present but unusable -- wrong type, container, null
-// (no dialect documents null counts), negative, fractional, or out of range
-// -- also sets `malformed`, so a corrupt final cumulative update cannot leave
-// an earlier value published as complete.
+// Reads a count (integer or integral double, at most MaxSafeCount). A present but unusable
+// value, null included unless `null_policy` allows it, reads as absent and sets `malformed`,
+// so a corrupt final update is never published as complete.
 std::optional<uint64_t> readCount(const nlohmann::json& json, absl::string_view key,
-                                  bool& malformed);
+                                  bool& malformed,
+                                  NullPolicy null_policy = NullPolicy::NullIsMalformed);
 
-// Read a non-empty string value of at most MaxStringValueSize; anything else
-// reads as absent.
+// Reads a non-empty string of at most MaxStringValueSize. The second overload also flags a
+// present non-string (an offloaded reference included) or oversized value; null and "" do not.
+// The first stays silent for shape probes, where a mismatch means another dialect.
 std::optional<std::string> readString(const nlohmann::json& json, absl::string_view key);
+std::optional<std::string> readString(const nlohmann::json& json, absl::string_view key,
+                                      bool& malformed);
+
+// A present value of the wrong type sets `malformed`; null reads as absent.
+std::optional<bool> readBool(const nlohmann::json& json, absl::string_view key, bool& malformed);
+std::optional<uint32_t> readArrayLength(const nlohmann::json& json, absl::string_view key,
+                                        bool& malformed);
 
 // Read a nested object, applying the null policy above.
 const nlohmann::json* readObject(const nlohmann::json& json, absl::string_view key, bool& malformed,
@@ -100,6 +104,17 @@ constexpr absl::string_view ObjectKey = "object";
 constexpr absl::string_view Type = "type";
 constexpr absl::string_view Role = "role";
 constexpr absl::string_view Delta = "delta";
+constexpr absl::string_view Stream = "stream";
+constexpr absl::string_view MaxTokens = "max_tokens";
+constexpr absl::string_view MaxCompletionTokens = "max_completion_tokens";
+constexpr absl::string_view MaxOutputTokens = "max_output_tokens";
+constexpr absl::string_view MaxOutputTokensCamel = "maxOutputTokens";
+constexpr absl::string_view GenerationConfig = "generationConfig";
+constexpr absl::string_view GenerationConfigSnake = "generation_config";
+constexpr absl::string_view Messages = "messages";
+constexpr absl::string_view Input = "input";
+constexpr absl::string_view Contents = "contents";
+constexpr absl::string_view Tools = "tools";
 } // namespace Keys
 
 } // namespace AiProtocolManager

@@ -25,6 +25,7 @@ Extensions
   grpc_credential/grpc_credential
   health_check_event_sinks/health_check_event_sinks
   health_checker/health_checker
+  http/ai_filters
   http/early_header_mutation
   http/cache_v2
   http/custom_response
@@ -55,4 +56,5 @@ Extensions
   load_balancing_policies/load_balancing_policies
   queue_policy/queue_policy
   cluster_specifier/cluster_specifier
+  route_specifier/route_specifier
   local_address_selectors/local_address_selectors

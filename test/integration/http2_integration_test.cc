@@ -381,6 +381,119 @@ TEST_P(Http2FrameIntegrationTest, UpstreamResponseTrailersWithoutEndStream_DataF
   }
 }
 
+// Verifies that a client which sends a second HEADERS frame on a stream it has already ended is
+// rejected. Without the `http2_reject_frames_after_end_stream` guard the frame is dispatched to
+// the request decoder of a stream in the "half-closed (remote)" state when using oghttp2.
+TEST_P(Http2FrameIntegrationTest, DownstreamHeadersAfterEndStream) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_reject_frames_after_end_stream", "true");
+  beginSession();
+
+  // Header-only request: the stream is half-closed (remote) as soon as it is created.
+  sendFrame(Http2Frame::makeRequest(1, "host", "/"));
+
+  // A second HEADERS frame on the same stream violates RFC 9113 Section 5.1.
+  Http2Frame extra_headers = Http2Frame::makeEmptyHeadersFrame(
+      1, static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+             Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+  extra_headers.appendHeaderWithoutIndexing(Http2Frame::Header("x", "y"));
+  extra_headers.adjustPayloadSize();
+  sendFrame(extra_headers);
+
+  tcp_client_->waitForDisconnect();
+  test_server_->waitForCounter("http.config_test.downstream_cx_protocol_error", Ge(1));
+}
+
+// As above, but the offending frame is a DATA frame.
+TEST_P(Http2FrameIntegrationTest, DownstreamDataAfterEndStream) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_reject_frames_after_end_stream", "true");
+  beginSession();
+
+  sendFrame(Http2Frame::makeRequest(1, "host", "/"));
+  sendFrame(Http2Frame::makeDataFrame(1, "unexpected data"));
+
+  tcp_client_->waitForDisconnect();
+  test_server_->waitForCounter("http.config_test.downstream_cx_protocol_error", Ge(1));
+}
+
+// Regression test for a use-after-free of the upstream response decoder.
+//
+// An upstream that pins the stream send window to zero prevents Envoy from writing the request
+// body, so oghttp2 never marks the stream half-closed locally and keeps it in its stream map. When
+// the upstream then completes the response, CodecClient::completeRequest() deletes the
+// ActiveRequest that owns the ResponseDecoder the codec stream still references. Any further frame
+// on that stream is dispatched into freed memory.
+TEST_P(Http2FrameIntegrationTest, UpstreamHeadersAfterEndStream) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_reject_frames_after_end_stream", "true");
+  beginSession();
+  FakeRawConnectionPtr upstream;
+
+  // Downstream -> Envoy: POST without END_STREAM, so Envoy has a body to forward.
+  const uint32_t stream_id = Http2Frame::makeClientStreamId(0);
+  sendFrame(Http2Frame::makePostRequest(stream_id, "host", "/"));
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+
+  // Upstream -> Envoy: SETTINGS with INITIAL_WINDOW_SIZE=0, stalling the request body.
+  ASSERT_TRUE(upstream->write(std::string(Http2Frame::makeSettingsFrame(
+      Http2Frame::SettingsFlags::None,
+      {{static_cast<uint16_t>(Http2Frame::Setting::InitialWindowSize), 0}}))));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Ge(15));
+
+  // Downstream -> Envoy: request body with END_STREAM. It cannot be written to the upstream.
+  sendFrame(Http2Frame::makeDataFrame(stream_id, "abcd", Http2Frame::DataFlags::EndStream));
+  test_server_->waitForGauge("cluster.cluster_0.http2.pending_send_bytes", Ge(1));
+
+  // Upstream -> Envoy: complete response. This deletes the ActiveRequest owning the decoder.
+  ASSERT_TRUE(
+      upstream->write(std::string(Http2Frame::makeHeadersFrameWithStatus("200", stream_id))));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+
+  // Upstream -> Envoy: another HEADERS frame on the completed stream. This is the frame that used
+  // to be dispatched to the freed decoder; it must now be rejected as a protocol error.
+  Http2Frame extra_headers = Http2Frame::makeEmptyHeadersFrame(
+      stream_id, static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+                     Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+  extra_headers.appendHeaderWithoutIndexing(Http2Frame::Header("x", "y"));
+  extra_headers.adjustPayloadSize();
+  ASSERT_TRUE(upstream->write(std::string(extra_headers)));
+
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_protocol_error", Ge(1));
+
+  tcp_client_->close();
+  if (upstream->connected()) {
+    ASSERT_TRUE(upstream->close());
+  }
+}
+
+// Verifies that the runtime guard reverts to the previous behavior. Only nghttp2 is exercised:
+// with the guard disabled, oghttp2 dispatches the frame to a decoder that may already have been
+// destroyed, which is the defect this guard protects against.
+TEST_P(Http2FrameIntegrationTest, DownstreamHeadersAfterEndStreamGuardDisabled) {
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    GTEST_SKIP() << "Without the guard oghttp2 dispatches frames received after END_STREAM.";
+  }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_reject_frames_after_end_stream", "false");
+  beginSession();
+
+  sendFrame(Http2Frame::makeRequest(1, "host", "/"));
+
+  Http2Frame extra_headers = Http2Frame::makeEmptyHeadersFrame(
+      1, static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+             Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+  extra_headers.appendHeaderWithoutIndexing(Http2Frame::Header("x", "y"));
+  extra_headers.adjustPayloadSize();
+  sendFrame(extra_headers);
+
+  // nghttp2 rejects the frame itself, so the connection is torn down regardless of the guard.
+  tcp_client_->waitForDisconnect();
+}
+
 TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   // Configure max concurrent streams to 2.
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {

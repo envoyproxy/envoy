@@ -1100,6 +1100,8 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/common/http/http2:http2_frame",
+        "//test/config/integration/certs:certs_info",
+        "//test/config/integration/certs:hashes",
         "//test/integration/filters:add_invalid_data_filter_lib",
         "//test/integration/filters:buffer_continue_filter_lib",
         "//test/integration/filters:continue_after_local_reply_filter_lib",
@@ -1122,6 +1124,8 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "@quiche//:quic_core_crypto_encryption_lib",
     ]),
@@ -2888,6 +2892,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":integration_lib",
+        "//source/common/upstream:multi_health_checker_lib",
         "//test/common/http/http2:http2_frame",
         "//test/config:v2_link_hacks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -3157,7 +3162,6 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:resources_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
@@ -3265,6 +3269,8 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",
         "//source/common/quic:quic_ssl_connection_info_lib",
+        "//source/extensions/formatter/cel:config",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ]),
 )

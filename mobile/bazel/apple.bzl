@@ -1,5 +1,6 @@
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines")
+load("@envoy//bazel:envoy_select.bzl", "deprecate_repository")
 load("@rules_apple//apple:ios.bzl", "ios_unit_test")
 load("@rules_cc//cc:objc_library.bzl", "objc_library")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
@@ -10,7 +11,7 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
         srcs = srcs,
         hdrs = hdrs,
         copts = ["-ObjC++", "-std=c++20", "-Wno-shorten-64-to-32"],
-        defines = envoy_mobile_defines("@envoy"),
+        defines = envoy_mobile_defines(),
         module_name = module_name,
         sdk_frameworks = sdk_frameworks,
         visibility = visibility,
@@ -35,15 +36,16 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
 #     ],
 # )
 #
-def envoy_mobile_swift_test(name, srcs, size = None, data = [], deps = [], tags = [], repository = "", visibility = [], flaky = False, exec_properties = {}):
+def envoy_mobile_swift_test(name, srcs, size = None, data = [], deps = [], tags = [], visibility = [], flaky = False, exec_properties = {}, repository = ""):
     test_lib_name = name + "_lib"
+    deprecated_repo = deprecate_repository("envoy_mobile_swift_test", repository)
     swift_library(
         name = test_lib_name,
         srcs = srcs,
         data = data,
         deps = [
-            repository + "//library/swift:ios_lib",
-        ] + deps,
+            Label("//library/swift:ios_lib"),
+        ] + deps + deprecated_repo,
         linkopts = ["-lresolv.9"],
         testonly = True,
         visibility = ["//visibility:private"],
