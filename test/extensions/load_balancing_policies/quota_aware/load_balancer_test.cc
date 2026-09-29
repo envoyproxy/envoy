@@ -81,22 +81,27 @@ protected:
     }
   }
 
-  envoy::config::core::v3::Metadata hostMetadata(absl::string_view backend_id,
-                                                 absl::string_view model = "") {
+  envoy::config::core::v3::Metadata
+  hostMetadata(absl::string_view id, absl::string_view secondary = "",
+               absl::string_view ns = "envoy.lb", absl::string_view id_key = "id",
+               absl::string_view secondary_key = "secondary_id") {
     envoy::config::core::v3::Metadata metadata;
-    Config::Metadata::mutableMetadataValue(metadata, "aigateway.envoy.io",
-                                           "per_route_rule_backend_name")
-        .set_string_value(std::string(backend_id));
-    if (!model.empty()) {
-      Config::Metadata::mutableMetadataValue(metadata, "aigateway.envoy.io", "model_name_override")
-          .set_string_value(std::string(model));
+    Config::Metadata::mutableMetadataValue(metadata, std::string(ns), std::string(id_key))
+        .set_string_value(std::string(id));
+    if (!secondary.empty()) {
+      Config::Metadata::mutableMetadataValue(metadata, std::string(ns), std::string(secondary_key))
+          .set_string_value(std::string(secondary));
     }
     return metadata;
   }
 
-  HostSharedPtr makeHost(const std::string& url, absl::string_view backend_id,
-                         absl::string_view model = "") {
-    return Upstream::makeTestHost(cluster_info_, url, hostMetadata(backend_id, model));
+  HostSharedPtr makeHost(const std::string& url, absl::string_view id,
+                         absl::string_view secondary = "") {
+    return Upstream::makeTestHost(cluster_info_, url, hostMetadata(id, secondary));
+  }
+
+  uint64_t counterValue(absl::string_view name) {
+    return cluster_info_->stats_store_.counterFromString(std::string(name)).value();
   }
 
   HostSharedPtr makeHostNoMetadata(const std::string& url) {
@@ -111,26 +116,25 @@ protected:
     host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
   }
 
-  void setPassedBackends(
-      const std::vector<std::pair<std::string, std::string>>& backends_and_models) {
+  void setCandidates(const std::vector<std::pair<std::string, std::string>>& pairs) {
     Protobuf::Value list;
     list.mutable_list_value();
-    for (const auto& [backend, model] : backends_and_models) {
+    for (const auto& [id, secondary] : pairs) {
       auto* item = list.mutable_list_value()->add_values()->mutable_struct_value();
-      (*item->mutable_fields())["backend_name"].set_string_value(backend);
-      (*item->mutable_fields())["model_name_override"].set_string_value(model);
+      (*item->mutable_fields())["id"].set_string_value(id);
+      (*item->mutable_fields())["secondary_id"].set_string_value(secondary);
     }
     (*(*stream_info_.metadata_.mutable_filter_metadata())["envoy.filters.http.ratelimit"]
-          .mutable_fields())["passedBackends"] = list;
+          .mutable_fields())["candidates"] = list;
   }
 
-  void setPassedBackendStrings(const std::vector<std::string>& backends) {
+  void setCandidateStrings(const std::vector<std::string>& ids) {
     Protobuf::Value list;
-    for (const auto& backend : backends) {
-      list.mutable_list_value()->add_values()->set_string_value(backend);
+    for (const auto& id : ids) {
+      list.mutable_list_value()->add_values()->set_string_value(id);
     }
     (*(*stream_info_.metadata_.mutable_filter_metadata())["envoy.filters.http.ratelimit"]
-          .mutable_fields())["passedBackends"] = list;
+          .mutable_fields())["candidates"] = list;
   }
 
   QuotaAwareLoadBalancerFactory factory_;
@@ -148,8 +152,8 @@ protected:
 };
 
 TEST_F(QuotaAwareLoadBalancerTest, MissingMetadataFailOpenPicksInner) {
-  auto east = makeHost("tcp://127.0.0.1:80", "default/pt-east/route/r/rule/0/ref/0");
-  auto west = makeHost("tcp://127.0.0.1:81", "default/pt-west/route/r/rule/0/ref/1");
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
+  auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east});
   setHosts(1, {west});
   createLoadBalancer(makeConfig());
@@ -161,7 +165,7 @@ TEST_F(QuotaAwareLoadBalancerTest, MissingMetadataFailOpenPicksInner) {
 }
 
 TEST_F(QuotaAwareLoadBalancerTest, MissingMetadataFailClosedReturns429) {
-  auto east = makeHost("tcp://127.0.0.1:80", "default/pt-east/route/r/rule/0/ref/0");
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   setHosts(0, {east});
   createLoadBalancer(makeConfig(true));
 
@@ -170,13 +174,15 @@ TEST_F(QuotaAwareLoadBalancerTest, MissingMetadataFailClosedReturns429) {
   EXPECT_EQ("quota_metadata_missing", response.details);
   ASSERT_TRUE(response.failure_status.has_value());
   EXPECT_EQ(Http::Code::TooManyRequests, *response.failure_status);
+  EXPECT_EQ(1, counterValue("quota_aware.rq_metadata_missing"));
+  EXPECT_EQ(0, counterValue("quota_aware.rq_exhausted"));
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, IdentityJoinFromLongHostId) {
-  auto east = makeHost("tcp://127.0.0.1:80", "default/pt-east/route/r/rule/0/ref/0");
-  auto west = makeHost("tcp://127.0.0.1:81", "default/pt-west/route/r/rule/0/ref/1");
+TEST_F(QuotaAwareLoadBalancerTest, HierarchicalIdMatchesCandidatePrefix) {
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
+  auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east, west});
-  setPassedBackends({{"default/pt-west", ""}});
+  setCandidates({{"dc1/svc-b", ""}});
   createLoadBalancer(makeConfig());
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
@@ -184,11 +190,25 @@ TEST_F(QuotaAwareLoadBalancerTest, IdentityJoinFromLongHostId) {
   EXPECT_EQ(west.get(), response.host.get());
 }
 
+TEST_F(QuotaAwareLoadBalancerTest, HierarchicalIdDoesNotMatchSiblingPrefix) {
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a-west/shard/0/member/0");
+  setHosts(0, {east});
+  setCandidates({{"dc1/svc-a", ""}});
+  createLoadBalancer(makeConfig());
+
+  auto response = load_balancer_->chooseHost(&load_balancer_context_);
+  EXPECT_EQ(nullptr, response.host);
+  EXPECT_EQ("quota_exhausted", response.details);
+  ASSERT_TRUE(response.failure_status.has_value());
+  EXPECT_EQ(Http::Code::TooManyRequests, *response.failure_status);
+  EXPECT_EQ(1, counterValue("quota_aware.rq_exhausted"));
+}
+
 TEST_F(QuotaAwareLoadBalancerTest, MixedP0SkipsExhaustedHost) {
-  auto east = makeHost("tcp://127.0.0.1:80", "default/pt-east/route/r/rule/0/ref/0");
-  auto west = makeHost("tcp://127.0.0.1:81", "default/pt-west/route/r/rule/0/ref/1");
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
+  auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east, west});
-  setPassedBackends({{"default/pt-east", ""}});
+  setCandidates({{"dc1/svc-a", ""}});
   createLoadBalancer(makeConfig());
 
   for (int i = 0; i < 4; ++i) {
@@ -199,11 +219,11 @@ TEST_F(QuotaAwareLoadBalancerTest, MixedP0SkipsExhaustedHost) {
 }
 
 TEST_F(QuotaAwareLoadBalancerTest, P0ExhaustedPicksP1) {
-  auto east = makeHost("tcp://127.0.0.1:80", "default/pt-east/route/r/rule/0/ref/0");
-  auto west = makeHost("tcp://127.0.0.1:81", "default/pt-west/route/r/rule/0/ref/1");
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
+  auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east});
   setHosts(1, {west});
-  setPassedBackends({{"default/pt-west", ""}});
+  setCandidates({{"dc1/svc-b", ""}});
   createLoadBalancer(makeConfig());
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
@@ -212,11 +232,11 @@ TEST_F(QuotaAwareLoadBalancerTest, P0ExhaustedPicksP1) {
 }
 
 TEST_F(QuotaAwareLoadBalancerTest, AllExhaustedReturns429) {
-  auto east = makeHost("tcp://127.0.0.1:80", "default/pt-east/route/r/rule/0/ref/0");
-  auto west = makeHost("tcp://127.0.0.1:81", "default/pt-west/route/r/rule/0/ref/1");
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
+  auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east});
   setHosts(1, {west});
-  setPassedBackends({});
+  setCandidates({});
   createLoadBalancer(makeConfig());
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
@@ -224,13 +244,14 @@ TEST_F(QuotaAwareLoadBalancerTest, AllExhaustedReturns429) {
   EXPECT_EQ("quota_exhausted", response.details);
   ASSERT_TRUE(response.failure_status.has_value());
   EXPECT_EQ(Http::Code::TooManyRequests, *response.failure_status);
+  EXPECT_EQ(1, counterValue("quota_aware.rq_exhausted"));
 }
 
 TEST_F(QuotaAwareLoadBalancerTest, UnknownHostMetadataNotSkipped) {
   auto unknown = makeHostNoMetadata("tcp://127.0.0.1:80");
-  auto east = makeHost("tcp://127.0.0.1:81", "default/pt-east/route/r/rule/0/ref/0");
+  auto east = makeHost("tcp://127.0.0.1:81", "dc1/svc-a/shard/0/member/0");
   setHosts(0, {unknown, east});
-  setPassedBackends({{"default/pt-west", ""}});
+  setCandidates({{"dc1/svc-b", ""}});
   createLoadBalancer(makeConfig());
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
@@ -239,10 +260,10 @@ TEST_F(QuotaAwareLoadBalancerTest, UnknownHostMetadataNotSkipped) {
 }
 
 TEST_F(QuotaAwareLoadBalancerTest, InnerRetryPredicateStillFires) {
-  auto east = makeHost("tcp://127.0.0.1:80", "default/pt-east/route/r/rule/0/ref/0");
-  auto west = makeHost("tcp://127.0.0.1:81", "default/pt-west/route/r/rule/0/ref/1");
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
+  auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east, west});
-  setPassedBackends({{"default/pt-east", ""}, {"default/pt-west", ""}});
+  setCandidates({{"dc1/svc-a", ""}, {"dc1/svc-b", ""}});
   ON_CALL(load_balancer_context_, shouldSelectAnotherHost(_))
       .WillByDefault(Invoke([east](const Upstream::Host& host) { return &host == east.get(); }));
   createLoadBalancer(makeConfig());
@@ -253,10 +274,10 @@ TEST_F(QuotaAwareLoadBalancerTest, InnerRetryPredicateStillFires) {
 }
 
 TEST_F(QuotaAwareLoadBalancerTest, StringListCandidates) {
-  auto east = makeHost("tcp://127.0.0.1:80", "default/pt-east/route/r/rule/0/ref/0");
-  auto west = makeHost("tcp://127.0.0.1:81", "default/pt-west/route/r/rule/0/ref/1");
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
+  auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east, west});
-  setPassedBackendStrings({"default/pt-west"});
+  setCandidateStrings({"dc1/svc-b"});
   createLoadBalancer(makeConfig());
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
@@ -265,7 +286,7 @@ TEST_F(QuotaAwareLoadBalancerTest, StringListCandidates) {
 }
 
 TEST_F(QuotaAwareLoadBalancerTest, NoContextFailOpen) {
-  auto east = makeHost("tcp://127.0.0.1:80", "default/pt-east/route/r/rule/0/ref/0");
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   setHosts(0, {east});
   createLoadBalancer(makeConfig());
   auto response = load_balancer_->chooseHost(nullptr);
@@ -273,31 +294,26 @@ TEST_F(QuotaAwareLoadBalancerTest, NoContextFailOpen) {
   EXPECT_EQ(east.get(), response.host.get());
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, SameBackendDifferentModelsPicksLiveRef) {
-  auto gpt5 = makeHost("tcp://127.0.0.1:80",
-                       "nai-admin/openai/route/r/rule/0/ref/0", "gpt-5");
-  auto gpt4 = makeHost("tcp://127.0.0.1:81",
-                       "nai-admin/openai/route/r/rule/0/ref/1", "gpt-4");
-  auto gpt3 = makeHost("tcp://127.0.0.1:82",
-                       "nai-admin/openai/route/r/rule/0/ref/2", "gpt-3");
-  setHosts(0, {gpt5, gpt4, gpt3});
-  setPassedBackends({{"nai-admin/openai", "gpt-4"}, {"nai-admin/openai", "gpt-3"}});
+TEST_F(QuotaAwareLoadBalancerTest, SamePrimaryDifferentSecondaryPicksLiveMember) {
+  auto sku5 = makeHost("tcp://127.0.0.1:80", "prod/svc-x/shard/0/member/0", "sku-5");
+  auto sku4 = makeHost("tcp://127.0.0.1:81", "prod/svc-x/shard/0/member/1", "sku-4");
+  auto sku3 = makeHost("tcp://127.0.0.1:82", "prod/svc-x/shard/0/member/2", "sku-3");
+  setHosts(0, {sku5, sku4, sku3});
+  setCandidates({{"prod/svc-x", "sku-4"}, {"prod/svc-x", "sku-3"}});
   createLoadBalancer(makeConfig());
 
   for (int i = 0; i < 6; ++i) {
     auto response = load_balancer_->chooseHost(&load_balancer_context_);
     ASSERT_NE(nullptr, response.host);
-    EXPECT_NE(gpt5.get(), response.host.get());
+    EXPECT_NE(sku5.get(), response.host.get());
   }
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, SameBackendStampedHostIgnoresEmptyModelPair) {
-  auto gpt5 = makeHost("tcp://127.0.0.1:80",
-                       "nai-admin/openai/route/r/rule/0/ref/0", "gpt-5");
-  auto gpt4 = makeHost("tcp://127.0.0.1:81",
-                       "nai-admin/openai/route/r/rule/0/ref/1", "gpt-4");
-  setHosts(0, {gpt5, gpt4});
-  setPassedBackends({{"nai-admin/openai", ""}});
+TEST_F(QuotaAwareLoadBalancerTest, StampedSecondaryIgnoresEmptySecondaryCandidate) {
+  auto sku5 = makeHost("tcp://127.0.0.1:80", "prod/svc-x/shard/0/member/0", "sku-5");
+  auto sku4 = makeHost("tcp://127.0.0.1:81", "prod/svc-x/shard/0/member/1", "sku-4");
+  setHosts(0, {sku5, sku4});
+  setCandidates({{"prod/svc-x", ""}});
   createLoadBalancer(makeConfig());
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
@@ -307,29 +323,59 @@ TEST_F(QuotaAwareLoadBalancerTest, SameBackendStampedHostIgnoresEmptyModelPair) 
   EXPECT_EQ(Http::Code::TooManyRequests, *response.failure_status);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, SameBackendUnstampedHostsMatchAnyLivePair) {
-  auto ref0 = makeHost("tcp://127.0.0.1:80", "nai-admin/openai/route/r/rule/0/ref/0");
-  auto ref1 = makeHost("tcp://127.0.0.1:81", "nai-admin/openai/route/r/rule/0/ref/1");
-  setHosts(0, {ref0, ref1});
-  setPassedBackends({{"nai-admin/openai", "gpt-4"}});
+TEST_F(QuotaAwareLoadBalancerTest, UnstampedHostsMatchAnyLivePairOnPrimary) {
+  auto member0 = makeHost("tcp://127.0.0.1:80", "prod/svc-x/shard/0/member/0");
+  auto member1 = makeHost("tcp://127.0.0.1:81", "prod/svc-x/shard/0/member/1");
+  setHosts(0, {member0, member1});
+  setCandidates({{"prod/svc-x", "sku-4"}});
   createLoadBalancer(makeConfig());
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
   ASSERT_NE(nullptr, response.host);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, DifferentBackendsSameModel) {
-  auto pt = makeHost("tcp://127.0.0.1:80", "default/pt-east/route/r/rule/0/ref/0",
-                     "claude-4-sonnet");
-  auto od = makeHost("tcp://127.0.0.1:81", "default/od-west/route/r/rule/0/ref/1",
-                     "claude-4-sonnet");
-  setHosts(0, {pt, od});
-  setPassedBackends({{"default/od-west", "claude-4-sonnet"}});
+TEST_F(QuotaAwareLoadBalancerTest, DifferentPrimariesSameSecondary) {
+  auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0", "sku-shared");
+  auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1", "sku-shared");
+  setHosts(0, {east, west});
+  setCandidates({{"dc1/svc-b", "sku-shared"}});
   createLoadBalancer(makeConfig());
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
   ASSERT_NE(nullptr, response.host);
-  EXPECT_EQ(od.get(), response.host.get());
+  EXPECT_EQ(west.get(), response.host.get());
+}
+
+// Control plane binds RLS/host wire names onto the generic proto. Same join as
+// HierarchicalIdMatchesCandidatePrefix + pair match.
+TEST_F(QuotaAwareLoadBalancerTest, ConfiguredWireNamesStillJoin) {
+  QuotaAware config = makeConfig();
+  config.set_candidates_key("passedBackends");
+  config.set_host_metadata_namespace("ext.host");
+  config.set_host_id_key("primary_name");
+  config.set_host_secondary_id_key("variant");
+  config.set_candidate_id_field("primary_name");
+  config.set_candidate_secondary_id_field("variant");
+
+  auto live = Upstream::makeTestHost(
+      cluster_info_, "tcp://127.0.0.1:80",
+      hostMetadata("dc1/svc-b/shard/0/member/1", "sku-4", "ext.host", "primary_name", "variant"));
+  auto dead = Upstream::makeTestHost(
+      cluster_info_, "tcp://127.0.0.1:81",
+      hostMetadata("dc1/svc-a/shard/0/member/0", "sku-5", "ext.host", "primary_name", "variant"));
+  setHosts(0, {dead, live});
+
+  Protobuf::Value list;
+  auto* item = list.mutable_list_value()->add_values()->mutable_struct_value();
+  (*item->mutable_fields())["primary_name"].set_string_value("dc1/svc-b");
+  (*item->mutable_fields())["variant"].set_string_value("sku-4");
+  (*(*stream_info_.metadata_.mutable_filter_metadata())["envoy.filters.http.ratelimit"]
+        .mutable_fields())["passedBackends"] = list;
+
+  createLoadBalancer(config);
+  auto response = load_balancer_->chooseHost(&load_balancer_context_);
+  ASSERT_NE(nullptr, response.host);
+  EXPECT_EQ(live.get(), response.host.get());
 }
 
 } // namespace

@@ -2,6 +2,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
+#include "source/common/network/socket_impl.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -44,6 +46,23 @@ public:
     setUpstreamCount(2);
   }
 
+  void SetUp() override {
+    // AF_INET6 can exist while [::1] is missing (typical docker without IPv6).
+    // getIpVersionsForTest() still instantiates v6, skip before listener bind.
+    try {
+      const auto addr = Network::Test::getCanonicalLoopbackAddress(GetParam());
+      Network::SocketImpl sock(Network::Socket::Type::Stream, addr, nullptr, {});
+      const Api::SysCallIntResult bind_rc = sock.bind(addr);
+      sock.close();
+      if (bind_rc.return_value_ != 0) {
+        GTEST_SKIP() << "cannot bind " << addr->asString()
+                     << ": loopback unavailable for this IP version";
+      }
+    } catch (const EnvoyException& e) {
+      GTEST_SKIP() << e.what();
+    }
+  }
+
   void initializeCluster(absl::string_view policy_yaml, bool two_priority = true) {
     const auto ip_version = GetParam();
     config_helper_.addConfigModifier(
@@ -66,8 +85,8 @@ endpoints:
           port_value: 0
     metadata:
       filter_metadata:
-        aigateway.envoy.io:
-          per_route_rule_backend_name: "default/pt-east/route/r/rule/0/ref/0"
+        envoy.lb:
+          id: "dc1/svc-a/shard/0/member/0"
 - priority: 1
   lb_endpoints:
   - endpoint:
@@ -77,8 +96,8 @@ endpoints:
           port_value: 0
     metadata:
       filter_metadata:
-        aigateway.envoy.io:
-          per_route_rule_backend_name: "default/pt-west/route/r/rule/0/ref/1"
+        envoy.lb:
+          id: "dc1/svc-b/shard/0/member/1"
 )EOF",
                                                   local_address, local_address),
                                       *assignment);
@@ -134,9 +153,9 @@ typed_config:
   metadata:
   - metadata_namespace: envoy.filters.http.ratelimit
     value:
-      passedBackends:
-      - backend_name: default/pt-west
-        model_name_override: ""
+      candidates:
+      - id: dc1/svc-b
+        secondary_id: ""
 )EOF");
   initializeCluster(kQuotaAwarePolicy);
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -148,7 +167,7 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(QuotaAwareIntegrationTest, SameBackendDifferentModelsPicksLiveRef) {
+TEST_P(QuotaAwareIntegrationTest, SamePrimaryDifferentSecondaryPicksLiveMember) {
   config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.set_metadata
 typed_config:
@@ -156,9 +175,9 @@ typed_config:
   metadata:
   - metadata_namespace: envoy.filters.http.ratelimit
     value:
-      passedBackends:
-      - backend_name: nai-admin/openai
-        model_name_override: gpt-4
+      candidates:
+      - id: prod/svc-x
+        secondary_id: sku-4
 )EOF");
   const auto ip_version = GetParam();
   config_helper_.addConfigModifier(
@@ -179,9 +198,9 @@ endpoints:
           port_value: 0
     metadata:
       filter_metadata:
-        aigateway.envoy.io:
-          per_route_rule_backend_name: "nai-admin/openai/route/r/rule/0/ref/0"
-          model_name_override: "gpt-5"
+        envoy.lb:
+          id: "prod/svc-x/shard/0/member/0"
+          secondary_id: "sku-5"
   - endpoint:
       address:
         socket_address:
@@ -189,9 +208,9 @@ endpoints:
           port_value: 0
     metadata:
       filter_metadata:
-        aigateway.envoy.io:
-          per_route_rule_backend_name: "nai-admin/openai/route/r/rule/0/ref/1"
-          model_name_override: "gpt-4"
+        envoy.lb:
+          id: "prod/svc-x/shard/0/member/1"
+          secondary_id: "sku-4"
 )EOF",
                                               local_address, local_address),
                                   *assignment);
@@ -208,7 +227,7 @@ endpoints:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(QuotaAwareIntegrationTest, EmptyPassedBackendsReturns429) {
+TEST_P(QuotaAwareIntegrationTest, EmptyCandidatesReturns429) {
   config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.set_metadata
 typed_config:
@@ -216,7 +235,7 @@ typed_config:
   metadata:
   - metadata_namespace: envoy.filters.http.ratelimit
     value:
-      passedBackends: []
+      candidates: []
 )EOF");
   initializeCluster(kQuotaAwarePolicy);
   codec_client_ = makeHttpConnection(lookupPort("http"));
