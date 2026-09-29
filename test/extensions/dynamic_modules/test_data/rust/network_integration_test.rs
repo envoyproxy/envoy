@@ -403,7 +403,7 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for UpstreamConnectionIdFilter 
     _data_length: usize,
     _end_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
-    assert!(envoy_filter.get_upstream_connection_id() > 0);
+    assert_ne!(envoy_filter.get_upstream_connection_id(), None);
     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   }
 }

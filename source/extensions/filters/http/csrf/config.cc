@@ -16,7 +16,7 @@ absl::StatusOr<Http::FilterFactoryCb> CsrfFilterFactory::createHttpFilterFactory
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   CsrfFilterConfigSharedPtr config = std::make_shared<CsrfFilterConfig>(
-      policy, extra_context.stats_prefix, extra_context.scopeOr(context), context);
+      policy, extra_context.statsPrefixOr(), extra_context.statsPrefixScopeOr(context), context);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<CsrfFilter>(config));
   };

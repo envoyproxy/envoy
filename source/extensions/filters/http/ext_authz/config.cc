@@ -25,6 +25,9 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
     Server::Configuration::ServerFactoryContext& server_context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   absl::Status creation_status = absl::OkStatus();
+  // Like the router, this filter charges response code stats to the scope it is given, under names
+  // of their own rather than under its stat prefix, so that scope stays the server's one and the
+  // prefix of the filter chain is carried in the stat prefix instead.
   const auto filter_config =
       std::make_shared<FilterConfig>(proto_config, server_context.scope(),
                                      extra_context.stats_prefix, server_context, creation_status);

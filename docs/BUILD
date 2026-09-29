@@ -1,6 +1,7 @@
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("//bazel:sphinx_html.bzl", "sphinx_html")
 
 licenses(["notice"])  # Apache 2
 
@@ -10,6 +11,24 @@ licenses(["notice"])  # Apache 2
 bool_flag(
     name = "pretty_links",
     build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "sphinx_args",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "build_sha",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "docs_tag",
+    build_setting_default = "",
     visibility = ["//visibility:public"],
 )
 
@@ -265,55 +284,31 @@ pkg_tar(
     ],
 )
 
-# TODO(phlax): Add `envoy_sphinx` rule to encapsulate these and above targets
-genrule(
+sphinx_html(
     name = "html_release",
-    outs = ["html_release.tar.gz"],
-    # BUILD_SHA must be set in release builds
-    # The Envoy workspace will provide this on stamped builds. For external builds
-    # you must either pass an env var or pass it through the workspace's status.
-    cmd = _LINK_SUFFIX_ENV + """
-    . $(location @envoy//bazel:volatile_env) \
-    && _BUILD_SHA=$${BUILD_DOCS_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${BUILD_SCM_REVISION}}} \
-    && $(location //tools:sphinx_runner) \
-         $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$$_BUILD_SHA" \
-         --docs_tag="$${BUILD_DOCS_TAG:-}" \
-         --version_file=$(location @envoy//:VERSION.txt) \
-         --descriptor_path=$(location @envoy_api//:v3_proto_set) \
-         $(location rst) \
-         $@
-    """,
+    out = "html_release.tar.gz",
+    descriptor_path = "@envoy_api//:v3_proto_set",
+    link_suffix_env = _LINK_SUFFIX_ENV,
+    # Build sha/tag may be supplied with --@envoy-docs//:build_sha=<sha> and
+    # --@envoy-docs//:docs_tag=<tag>. When unset, stamped builds fall back to workspace status
+    # (ENVOY_BUILD_SCM_REVISION), BUILD_DOCS_SHA, and BUILD_DOCS_TAG environment variables.
+    rst = ":rst",
+    sphinx_runner = "//tools:sphinx_runner",
     stamp = 1,
-    tools = [
-        ":rst",
-        "//tools:sphinx_runner",
-        "@envoy//:VERSION.txt",
-        "@envoy//bazel:volatile_env",
-        "@envoy_api//:v3_proto_set",
-    ],
+    version_file = "@envoy//:VERSION.txt",
     visibility = ["//visibility:public"],
+    volatile_env = "@envoy//bazel:volatile_env",
 )
 
 # No git stamping, speeds up local dev switching branches
-genrule(
+sphinx_html(
     name = "html",
-    outs = ["html.tar.gz"],
-    cmd = _LINK_SUFFIX_ENV + """
-    $(location //tools:sphinx_runner) \
-         $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$${BUILD_DOCS_SHA:-}" \
-         --version_file=$(location @envoy//:VERSION.txt) \
-         --descriptor_path=$(location @envoy_api//:v3_proto_set) \
-         $(location :rst) \
-         $@
-    """,
-    tools = [
-        ":rst",
-        "//tools:sphinx_runner",
-        "@envoy//:VERSION.txt",
-        "@envoy_api//:v3_proto_set",
-    ],
+    out = "html.tar.gz",
+    descriptor_path = "@envoy_api//:v3_proto_set",
+    link_suffix_env = _LINK_SUFFIX_ENV,
+    rst = ":rst",
+    sphinx_runner = "//tools:sphinx_runner",
+    version_file = "@envoy//:VERSION.txt",
     visibility = ["//visibility:public"],
 )
 

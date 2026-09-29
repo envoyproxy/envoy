@@ -74,8 +74,8 @@ absl::StatusOr<Http::FilterFactoryCb> BasicAuthFilterFactory::createHttpFilterFa
   FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
       std::move(users_or.value()), proto_config.forward_username_header(),
       proto_config.authentication_header(), proto_config.allow_missing(),
-      proto_config.emit_dynamic_metadata(), extra_context.stats_prefix,
-      extra_context.scopeOr(context));
+      proto_config.emit_dynamic_metadata(), extra_context.statsPrefixOr(),
+      extra_context.statsPrefixScopeOr(context));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BasicAuthFilter>(config));
   };

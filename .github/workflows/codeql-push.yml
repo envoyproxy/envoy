@@ -18,34 +18,23 @@ concurrency:
 env:
   SEARCH_FOLDER: //source/common/...
 
-
 jobs:
-  CodeQL-Build:
-    permissions:
-      actions: read
-      contents: read
-      # for github/codeql-action/analyze to upload SARIF results
-      security-events: write
-      pull-requests: read
-    runs-on: ubuntu-22.04
+  targets:
     if: github.repository == 'envoyproxy/envoy'
+    permissions:
+      contents: read
+    runs-on: ubuntu-22.04
+    outputs:
+      build_targets: ${{ steps.build-targets.outputs.targets }}
+      cpp_changed: ${{ steps.detect.outputs.cpp_changed }}
     steps:
-    - uses: envoyproxy/toolshed/actions/bind-mounts@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
-      with:
-        mounts: |
-          - src: /mnt/workspace
-            target: GITHUB_WORKSPACE
-            chown: "runner:runner"
-          - src: /mnt/runner-cache
-            target: /home/runner/.cache
-            chown: "runner:runner"
-
     - name: Checkout repository
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       with:
         fetch-depth: 2
 
     - name: Detect C++ changes
+      id: detect
       run: |
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch --depth=1 "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" main 2>/dev/null
@@ -53,109 +42,67 @@ jobs:
         else
             TO_OTHER=HEAD^1
         fi
+        echo "to_other=${TO_OTHER}" >> "$GITHUB_OUTPUT"
         if git diff --name-only HEAD "${TO_OTHER}" -- source/common/ envoy/ | grep -q .; then
-            echo "CPP_CHANGED=true" >> "$GITHUB_ENV"
+            echo "cpp_changed=true" >> "$GITHUB_OUTPUT"
         else
-            echo "CPP_CHANGED=false" >> "$GITHUB_ENV"
+            echo "cpp_changed=false" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: Free disk space
-      if: env.CPP_CHANGED == 'true'
-      uses: envoyproxy/toolshed/actions/diskspace@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
-      with:
-        to_remove: |
-          /usr/local/.ghcup
-          /usr/local/lib/android
-
     - name: Get build targets
-      if: env.CPP_CHANGED == 'true'
+      id: build-targets
+      if: steps.detect.outputs.cpp_changed == 'true'
+      env:
+        TO_OTHER: ${{ steps.detect.outputs.to_other }}
       run: |
         # TODO(phlax): Shift this to an action
         compare_head () {
             while IFS= read -r line; do
                 if [[ -n "$line" ]]; then
-                    bazel query "rdeps($SEARCH_FOLDER, $line, 1)"  2> /dev/null
+                    bazel query "rdeps($SEARCH_FOLDER, $line, 1)" 2>/dev/null
                 fi
-            done < <(git diff --name-only HEAD "${1}" -- source/common/* envoy/*)
+            done < <(git diff --name-only HEAD "${TO_OTHER}" -- source/common/* envoy/*)
         }
-        if [[ "$GIT_EVENT" == "pull_request" ]]; then
-            git fetch "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" main 2> /dev/null
-            TO_OTHER=FETCH_HEAD
-        else
-            TO_OTHER=HEAD^1
+        BUILD_TARGETS="$(compare_head | grep -v '\.cc\|\.h' | sort -u | head -n 3)"
+        if [[ -z "$BUILD_TARGETS" ]]; then
+            BUILD_TARGETS="//source/common/common:assert_lib"
         fi
-        BUILD_TARGETS="$(compare_head "$TO_OTHER" | grep -v '\.cc\|\.h' | sort -u | head -n 3)"
-        echo 'BUILD_TARGETS<<EOF' >> $GITHUB_ENV
-        echo "$BUILD_TARGETS" >> $GITHUB_ENV
-        echo 'EOF' >> $GITHUB_ENV
-      env:
-        GIT_EVENT: ${{ github.event_name }}
+        {
+            echo 'targets<<EOF'
+            sed 's|^//|@envoy//|' <<< "$BUILD_TARGETS"
+            echo 'EOF'
+        } >> "$GITHUB_OUTPUT"
 
-    - name: Set default build target
-      if: env.CPP_CHANGED == 'true' && env.BUILD_TARGETS == ''
-      run: |
-        echo "MINIMAL_BUILD_TARGET=//source/common/common:assert_lib" >> $GITHUB_ENV
+  CodeQL-Build:
+    if: needs.targets.outputs.cpp_changed == 'true'
+    needs: targets
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      pull-requests: read
+    uses: ./.github/workflows/_codeql.yml
+    with:
+      targets: ${{ needs.targets.outputs.build_targets }}
 
-    - name: Initialize CodeQL
-      if: env.CPP_CHANGED == 'true'
-      uses: github/codeql-action/init@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1
-      with:
-        languages: cpp
-        trap-caching: false
+  CodeQL-Noop:
+    if: needs.targets.outputs.cpp_changed != 'true'
+    needs: targets
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
-    # No-op analysis to satisfy Scorecard SAST check when no C++ changes are present.
-    # Running codeql-action/analyze unconditionally ensures every merge commit gets
-    # a github-code-scanning check run with conclusion 'success', which Scorecard
-    # requires to award full SAST score.
+    # No-op analysis satisfies Scorecard SAST when no C++ changes are present.
     - name: Initialize CodeQL (noop)
-      if: env.CPP_CHANGED != 'true'
       uses: github/codeql-action/init@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1
       with:
         languages: javascript
         trap-caching: false
-
-    - name: Install deps
-      if: env.CPP_CHANGED == 'true'
-      shell: bash
-      run: |
-       sudo apt-get -qq update --error-on=any
-       sudo apt-get -qq install --yes \
-           libtool libtinfo5 automake autoconf curl unzip
-       # Note: the llvm/clang version should match the version specified in:
-       #  - bazel/toolchains.bzl
-       #  - .github/workflows/codeql-daily.yml
-       #
-       # IMPORTANT: the clang bundle MUST be unpacked outside $GITHUB_WORKSPACE (we use $RUNNER_TEMP).
-       # The CodeQL C++ extractor treats anything under the source root as project code, so headers
-       # under a checkout subdirectory would be analysed as Envoy source and produce false positives
-       # (e.g. cpp/new-free-mismatch in <vector>, alert #1881). Keeping it under $RUNNER_TEMP makes
-       # CodeQL classify those headers as system headers — same as /usr/include/c++/** on a normal
-       # build. Do NOT move this back into the checkout tree.
-       mkdir -p "${RUNNER_TEMP}/clang22.1.8"
-       cd "${RUNNER_TEMP}/clang22.1.8"
-       wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz
-       tar -xf LLVM-22.1.8-Linux-X64.tar.xz --strip-components 1
-
-    - name: Build
-      if: env.CPP_CHANGED == 'true'
-      run: |
-        bazel shutdown
-        bazel build \
-            -c fastbuild \
-            --repo_env=BAZEL_LLVM_PATH="${RUNNER_TEMP}/clang22.1.8" \
-            --spawn_strategy=local \
-            --discard_analysis_cache \
-            --nouse_action_cache \
-            --features="-layering_check" \
-            --config=clang \
-            --config=ci \
-            ${BUILD_TARGETS:-${MINIMAL_BUILD_TARGET}}
-        echo -e "Built targets...\n${BUILD_TARGETS:-${MINIMAL_BUILD_TARGET}}"
-
-    - name: Clean Artifacts
-      if: env.CPP_CHANGED == 'true'
-      run: |
-        git clean -xdf
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1

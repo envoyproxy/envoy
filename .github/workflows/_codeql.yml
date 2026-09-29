@@ -1,0 +1,94 @@
+name: CodeQL
+
+on:
+  workflow_call:
+    inputs:
+      targets:
+        description: Newline-separated, @envoy-prefixed Bazel targets to build
+        required: true
+        type: string
+      llvm-version:
+        description: Host LLVM major version
+        default: '22'
+        required: false
+        type: string
+
+jobs:
+  CodeQL-Build:
+    if: github.repository == 'envoyproxy/envoy'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      pull-requests: read
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: envoyproxy/toolshed/actions/bind-mounts@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+      if: |
+        ! github.event.repository.private
+      with:
+        mounts: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/runner-home
+            target: /home/runner/.cache
+            chown: "runner:runner"
+
+    - name: Free disk space
+      if: github.event.repository.private
+      uses: envoyproxy/toolshed/actions/diskspace@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+      with:
+        to_remove: |
+          /usr/local/.ghcup
+          /usr/local/lib/android
+
+    - name: Checkout repository
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1
+      with:
+        languages: cpp
+        trap-caching: false
+
+    - name: Install host LLVM
+      env:
+        LLVM_VERSION: ${{ inputs.llvm-version }}
+      run: |
+        sudo apt-get -qq update --error-on=any
+        sudo apt-get -qq install --yes libtool libtinfo5 automake autoconf curl unzip
+        wget -q https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh "${LLVM_VERSION}"
+        sudo apt-get -qq install --yes \
+            "libc++-${LLVM_VERSION}-dev" \
+            "libc++abi-${LLVM_VERSION}-dev" \
+            "libclang-${LLVM_VERSION}-dev" \
+            "libclang-cpp${LLVM_VERSION}-dev" \
+            "lld-${LLVM_VERSION}"
+        # IMPORTANT: LLVM must be installed outside $GITHUB_WORKSPACE. The CodeQL C++ extractor
+        # treats in-tree headers as project code, producing false positives such as alert #1881.
+        # apt.llvm.org installs it under /usr/lib/llvm-N, which CodeQL treats as a system location.
+
+    - name: Build
+      env:
+        TARGETS: ${{ inputs.targets }}
+      working-directory: bazel/tests/codeql
+      run: |
+        readarray -t targets <<< "${TARGETS}"
+        bazel build \
+            -c fastbuild \
+            --spawn_strategy=local \
+            --discard_analysis_cache \
+            --nouse_action_cache \
+            --features=-layering_check \
+            --noshow_progress \
+            --noshow_loading_progress \
+            "${targets[@]}"
+
+    - name: Clean Artifacts
+      run: git clean -xdf
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1

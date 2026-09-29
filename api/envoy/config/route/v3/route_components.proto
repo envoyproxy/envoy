@@ -265,10 +265,10 @@ message VirtualHost {
   // the request attributes (e.g., headers, path) directly.
   //
   // Specifiers are executed in order, and the output of each is the input of the next. The
-  // specifiers here will run after the ``route_specifiers`` of
-  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`
-  // and before the ``route_specifiers`` of the resolved
-  // :ref:`route <envoy_v3_api_field_config.route.v3.Route.route_specifiers>`.
+  // specifiers here will run after the ``route_specifiers`` of the resolved
+  // :ref:`route <envoy_v3_api_field_config.route.v3.Route.route_specifiers>`
+  // and before the ``route_specifiers`` of
+  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`.
   //
   // .. note::
   //   If the route matching resolves no route, the route specifiers at the route configuration
@@ -448,10 +448,11 @@ message Route {
   // the request attributes (e.g., headers, path) directly.
   //
   // Specifiers are executed in order, and the output of each is the input of the next. The
-  // specifiers here will run last, after the ``route_specifiers`` of
-  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`
-  // and :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.route_specifiers>`, so
-  // the route that comes out of the last specifier here is the final route used by Envoy.
+  // specifiers here will run first, before the ``route_specifiers`` of
+  // :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.route_specifiers>` and
+  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`,
+  // so the route that comes out of the last specifier here is the input of the specifiers of
+  // these two levels.
   //
   // .. note::
   //   If the route matching resolves no route, the route specifiers at the route configuration

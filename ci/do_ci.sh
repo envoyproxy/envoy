@@ -47,6 +47,7 @@ readonly LOCKFILE_PATHSPEC=':(glob)**/MODULE.bazel.lock'
 readonly -a REGISTRY_BAZELRC_FILES=(
     ".bazelrc"
     "api/.bazelrc"
+    "bazel/tests/codeql/.bazelrc"
     "bazel/tests/external/.bazelrc"
 )
 
@@ -67,7 +68,7 @@ lockfiles_check() {
 
 lockfiles_generate() {
     local module_dir
-    for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/external/; do
+    for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/codeql/ bazel/tests/external/; do
         pushd "$module_dir" > /dev/null
         bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
@@ -953,8 +954,7 @@ case $CI_TARGET in
         fi
         pushd "$ENVOY_DOCS_PATH"
         if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
-            export SPHINX_RUNNER_ARGS="-v warn"
-            BAZEL_BUILD_OPTIONS+=("--action_env=SPHINX_RUNNER_ARGS")
+            BAZEL_BUILD_OPTIONS+=("--//:sphinx_args=-v warn")
         fi
         if [[ -n "${DOCS_BUILD_RST}" ]]; then
             bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //:rst

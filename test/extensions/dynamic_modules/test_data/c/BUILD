@@ -229,6 +229,8 @@ test_program(name = "route_specifier_config_new_fail")
 
 test_program(name = "route_specifier_unknown_decision")
 
+test_program(name = "route_specifier_continue_matching")
+
 test_program(name = "route_specifier_select_template")
 
 test_program(name = "route_specifier_override")
@@ -318,6 +320,8 @@ test_program(name = "upstream_bridge_headers_end_stream_no_body")
 test_program(name = "upstream_bridge_terminal_response")
 
 test_program(name = "tracer_no_op")
+
+test_program(name = "tracer_no_op_no_reserve_tags")
 
 test_program(name = "tracer_config_fail")
 

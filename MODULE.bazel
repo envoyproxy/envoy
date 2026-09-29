@@ -273,8 +273,8 @@ llvm_minimal_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llv
 llvm_minimal_ext.setup()
 use_repo(llvm_minimal_ext, "llvm_minimal_linux_arm64", "llvm_minimal_linux_x64", "llvm_minimal_macos_arm64")
 
-llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
-use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
+envoy_llvm_ext = use_extension("//bazel:extensions.bzl", "envoy_llvm_extension")
+use_repo(envoy_llvm_ext, "llvm_toolchain_llvm")
 
 cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
 use_repo(cc_configure, "local_config_cc", "local_config_cc_toolchains")

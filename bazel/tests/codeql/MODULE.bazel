@@ -1,0 +1,45 @@
+module(name = "envoy_codeql")
+
+bazel_dep(name = "envoy", version = "1.40.0-dev")
+bazel_dep(name = "envoy_api", version = "1.40.0-dev")
+bazel_dep(name = "envoy_toolshed", version = "0.5.1.envoy")
+bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "protobuf", version = "35.1.bcr.envoy")
+bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
+bazel_dep(name = "rules_python", version = "2.3.3")
+
+bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = True, repo_name = "buildifier")
+bazel_dep(name = "google_benchmark", version = "1.9.5", dev_dependency = True, repo_name = "benchmark")
+bazel_dep(name = "googletest", version = "1.18.0.bcr.1", dev_dependency = True)
+bazel_dep(name = "tclap", version = "1.2.5.bcr.1", dev_dependency = True)
+bazel_dep(name = "toolchains_llvm", version = "1.9.1.envoy")
+
+local_path_override(
+    module_name = "envoy",
+    path = "../../../",
+)
+
+local_path_override(
+    module_name = "envoy_api",
+    path = "../../../api",
+)
+
+LLVM_PREFIX = "/usr/lib/llvm-22"
+
+llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
+llvm.toolchain(
+    name = "llvm_toolchain",
+    cxx_standard = {"": "c++20"},
+    llvm_version = "22.1.8",
+    stdlib = {"": "libc++"},
+)
+llvm.toolchain_root(
+    name = "llvm_toolchain",
+    path = LLVM_PREFIX,
+)
+use_repo(llvm, "llvm_toolchain")
+
+register_toolchains("@llvm_toolchain//:all")
+
+envoy_llvm = use_extension("@envoy//bazel:extensions.bzl", "envoy_llvm_extension")
+envoy_llvm.host(path = LLVM_PREFIX)

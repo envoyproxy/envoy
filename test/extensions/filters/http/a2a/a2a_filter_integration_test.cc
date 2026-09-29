@@ -23,6 +23,18 @@ class A2aFilterIntegrationTest : public testing::TestWithParam<Network::Address:
 public:
   A2aFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
+  // The stat names asserted below must be the same whether or not the HTTP filters are created
+  // with the connection manager's prefixed scope. Exercise both modes of the runtime guard without
+  // doubling the test matrix: the two IP versions run the server with the guard on and off.
+  bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
+        prefixedScope() ? "true" : "false");
+    HttpIntegrationTest::initialize();
+  }
+
   void initializeFilter(const std::string& config = "") {
     const std::string filter_config = config.empty() ? R"EOF(
       name: envoy.filters.http.a2a
@@ -310,6 +322,8 @@ TEST_P(A2aFilterIntegrationTest, RejectModeRejectsNonA2aContentType) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_FALSE(upstream_request_);
   EXPECT_EQ("400", response->headers().getStatusValue());
+  // The filter creates its stats in the connection manager's scope, so they carry its stat prefix.
+  test_server_->waitForCounter("http.config_test.a2a.requests_rejected", testing::Eq(1));
 }
 
 TEST_P(A2aFilterIntegrationTest, RejectModeRejectsNonDiscoveryGetRequest) {
@@ -403,6 +417,7 @@ TEST_P(A2aFilterIntegrationTest, BodyTooLargeRejected) {
   EXPECT_FALSE(upstream_request_);
   EXPECT_EQ("413", response->headers().getStatusValue());
   EXPECT_THAT(response->body(), testing::HasSubstr("request body is too large"));
+  test_server_->waitForCounter("http.config_test.a2a.body_too_large", testing::Eq(1));
 }
 
 // Test that invalid JSON syntax triggers an immediate error during parsing (before end of stream).
@@ -424,6 +439,7 @@ TEST_P(A2aFilterIntegrationTest, ImmediateInvalidJsonRejected) {
   EXPECT_EQ("400", response->headers().getStatusValue());
   EXPECT_THAT(response->body(), testing::HasSubstr("not a valid JSON"));
   EXPECT_THAT(response->body(), testing::Not(testing::HasSubstr("(incomplete)")));
+  test_server_->waitForCounter("http.config_test.a2a.invalid_json", testing::Eq(1));
 }
 
 // Test that a chunked A2A request is buffered and successfully parsed.

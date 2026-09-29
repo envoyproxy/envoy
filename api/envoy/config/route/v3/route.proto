@@ -174,12 +174,12 @@ message RouteConfiguration {
   //
   // Specifiers are configured at three levels. Specifiers in three levels will run in this order:
   //
-  // 1. The ``route_specifiers`` of
-  //    :ref:`route configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`
+  // 1. The ``route_specifiers`` of resolved
+  //    :ref:`route <envoy_v3_api_msg_config.route.v3.Route>`
   // 2. The ``route_specifiers`` of resolved
   //    :ref:`virtual host <envoy_v3_api_msg_config.route.v3.VirtualHost>`
-  // 3. The ``route_specifiers`` of resolved
-  //    :ref:`route <envoy_v3_api_msg_config.route.v3.Route>`.
+  // 3. The ``route_specifiers`` of
+  //    :ref:`route configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`.
   //
   // .. note::
   //   If the route matching resolves no route, the route specifiers at the route configuration

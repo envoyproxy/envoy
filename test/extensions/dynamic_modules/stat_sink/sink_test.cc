@@ -35,6 +35,9 @@ struct CallRecorder {
   int histogram_complete_calls = 0;
   std::vector<std::string> histogram_names;
   std::vector<uint64_t> histogram_values;
+  // Used by the `re-entrancy` test so the outer histogram callback can record a nested histogram.
+  DynamicModuleStatsSink* sink = nullptr;
+  Stats::Histogram* reentrant_histogram = nullptr;
 };
 
 // Globally-addressable recorder so our test-time lambda-style hook
@@ -240,6 +243,46 @@ TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompleteReusesAndGrowsNameBuffer) 
   EXPECT_EQ("hh", recorder.histogram_names[0]);
   EXPECT_EQ("a_much_longer_histogram_name_than_before", recorder.histogram_names[1]);
   EXPECT_EQ("hh", recorder.histogram_names[2]);
+  g_recorder = nullptr;
+}
+
+// A module that records a histogram from inside on_histogram_complete re-enters onHistogramComplete
+// on the same thread. The nested call must not clobber the name the outer callback still reads.
+TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompleteReentrantCallKeepsOuterName) {
+  CallRecorder recorder;
+  g_recorder = &recorder;
+
+  DynamicModuleStatsSink sink(config_);
+  NiceMock<Stats::MockHistogram> outer_histogram;
+  outer_histogram.name_ = "outer_histogram_name";
+  NiceMock<Stats::MockHistogram> inner_histogram;
+  inner_histogram.name_ = "inner";
+  recorder.sink = &sink;
+  recorder.reentrant_histogram = &inner_histogram;
+
+  config_->on_histogram_complete_ = [](envoy_dynamic_module_type_stat_sink_config_module_ptr,
+                                       envoy_dynamic_module_type_envoy_buffer name,
+                                       uint64_t value) {
+    // The outer call records a nested histogram before reading its own name back, so a shared
+    // buffer would clobber the outer name here.
+    if (g_recorder->reentrant_histogram != nullptr) {
+      Stats::Histogram* nested = g_recorder->reentrant_histogram;
+      g_recorder->reentrant_histogram = nullptr;
+      g_recorder->sink->onHistogramComplete(*nested, 999);
+    }
+    g_recorder->histogram_complete_calls++;
+    g_recorder->histogram_names.emplace_back(name.ptr, name.length);
+    g_recorder->histogram_values.push_back(value);
+  };
+
+  sink.onHistogramComplete(outer_histogram, 123);
+
+  ASSERT_EQ(2, recorder.histogram_complete_calls);
+  // The nested call is recorded first, and the outer name survives it intact.
+  EXPECT_EQ("inner", recorder.histogram_names[0]);
+  EXPECT_EQ("outer_histogram_name", recorder.histogram_names[1]);
+  EXPECT_EQ(999u, recorder.histogram_values[0]);
+  EXPECT_EQ(123u, recorder.histogram_values[1]);
   g_recorder = nullptr;
 }
 

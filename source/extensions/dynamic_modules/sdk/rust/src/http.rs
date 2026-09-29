@@ -11,6 +11,7 @@ use crate::{
 use mockall::*;
 use std::any::Any;
 use std::ffi::c_void;
+use std::num::NonZero;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::rc::Rc;
 
@@ -2102,8 +2103,8 @@ pub trait EnvoyHttpFilter {
   /// Returns `true` if the override was set successfully, `false` if the host address is invalid.
   fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool;
 
-  /// Get the upstream connection ID, or 0 if not available.
-  fn get_upstream_connection_id(&self) -> u64;
+  /// Get the upstream connection ID, or `None` if not available.
+  fn get_upstream_connection_id(&self) -> Option<NonZero<u64>>;
 
   /// Get the remote address of the connected upstream socket, including the port.
   ///
@@ -4244,8 +4245,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_upstream_connection_id(&self) -> u64 {
-    unsafe { abi::envoy_dynamic_module_callback_http_get_upstream_connection_id(self.raw_ptr) }
+  fn get_upstream_connection_id(&self) -> Option<NonZero<u64>> {
+    NonZero::new(unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_connection_id(self.raw_ptr)
+    })
   }
 
   fn get_upstream_remote_address(&self) -> Option<EnvoyBuffer<'_>> {

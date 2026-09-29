@@ -14,12 +14,11 @@ fetch --color=yes
 run --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/6a42f80bb6ef909c8bfd44286a96a7e24388b86a
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/b565623d89166dd153aee61ba421ec1638bf7a3e
 common --noincompatible_disallow_empty_glob
 
 build --workspace_status_command="bash get_workspace_status"
 build --incompatible_strict_action_env
-build --action_env=SPHINX_RUNNER_ARGS
 build --copt=-Wno-deprecated-declarations
 build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build --action_env=BUILD_DOCS_SHA
@@ -57,10 +56,6 @@ common:clang --config=clang-common
 common:clang --config=libc++
 common:clang --host_platform=@clang_platform
 common:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-
-# Clang installed to non-standard location (ie not /opt/llvm/)
-common:clang-local --config=clang-common
-common:clang-local --config=libc++
 
 # libc++ - default for clang
 common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
