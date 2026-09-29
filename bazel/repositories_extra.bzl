@@ -3,8 +3,11 @@ load("@bazel_features//:deps.bzl", "bazel_features_deps")
 load("@com_google_protobuf//bazel/private:proto_bazel_features.bzl", "proto_bazel_features")
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 load("@envoy_examples//bazel:env.bzl", "envoy_examples_env")
+load("@envoy_toolshed//pgp:repositories.bzl", "setup_sq")
+load("@envoy_toolshed//pgp:toolchain.bzl", "load_pgp_toolchains")
 load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:crates.bzl", "crate_repositories")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
+load("//bazel:repositories.bzl", "external_http_archive")
 load("//bazel/external/cargo:crates.bzl", "raze_fetch_remote_crates")
 
 def _python_minor_version(python_version):
@@ -18,6 +21,11 @@ PYTHON_MINOR_VERSION = _python_minor_version(PYTHON_VERSION)
 def envoy_dependencies_extra(
         python_version = PYTHON_VERSION,
         ignore_root_user_error = False):
+    external_http_archive("sq_linux_x86_64")
+    external_http_archive("sq_linux_arm64")
+    setup_sq()
+    load_pgp_toolchains()
+
     bazel_features_deps()
     emsdk_deps()
     raze_fetch_remote_crates()
