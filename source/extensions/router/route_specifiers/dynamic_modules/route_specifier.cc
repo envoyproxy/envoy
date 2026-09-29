@@ -601,7 +601,7 @@ Envoy::Router::OnRouteResult DynamicModuleRouteSpecifier::onRoute(
 
 DynamicModuleRouteSpecifier::Decision
 DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t decision) const {
-  using Status = Envoy::Router::OnRouteResultStatus;
+  using Status = Envoy::Router::OnRouteChainStatus;
   const auto status = [&context](Status by_decision) {
     switch (context.chain_status) {
     case envoy_dynamic_module_type_route_specifier_chain_status_Continue:
@@ -685,7 +685,7 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
 DynamicModuleRouteSpecifier::Decision
 DynamicModuleRouteSpecifier::wrap(Envoy::Router::RouteConstSharedPtr route,
                                   RouteSpecifierContext& context,
-                                  Envoy::Router::OnRouteResultStatus status) const {
+                                  Envoy::Router::OnRouteChainStatus status) const {
   const bool route_entry_overrides = context.overrides.hasRouteEntryOverrides();
   if (!route_entry_overrides && !context.overrides.hasRouteOverrides()) {
     return {std::move(route), status};
