@@ -991,7 +991,7 @@ public:
    * Records the wall time of one route resolution, adding to the total time and the count.
    * @param duration the wall time the resolution took.
    */
-  virtual void addRouteResolutionSample(std::chrono::nanoseconds duration) PURE;
+  virtual void addRouteResolutionTime(std::chrono::nanoseconds duration) PURE;
 
   /**
    * @return the total wall time spent resolving the route of this stream.

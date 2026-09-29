@@ -339,8 +339,8 @@ TEST(SubstitutionFormatterTest, routeResolutionFormatters) {
 
   // Two resolutions accumulate the total time in microseconds and the count.
   {
-    stream_info.addRouteResolutionSample(std::chrono::microseconds(30));
-    stream_info.addRouteResolutionSample(std::chrono::microseconds(70));
+    stream_info.addRouteResolutionTime(std::chrono::microseconds(30));
+    stream_info.addRouteResolutionTime(std::chrono::microseconds(70));
     StreamInfoFormatter time_format("ROUTE_RESOLUTION_TIME_US");
     StreamInfoFormatter count_format("ROUTE_RESOLUTION_COUNT");
     EXPECT_EQ("100", formatForTest(time_format, {}, stream_info));

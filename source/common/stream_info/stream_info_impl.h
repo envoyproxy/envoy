@@ -336,7 +336,7 @@ struct StreamInfoImpl : public StreamInfo {
   }
   Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return vhost_; }
 
-  void addRouteResolutionSample(std::chrono::nanoseconds duration) override {
+  void addRouteResolutionTime(std::chrono::nanoseconds duration) override {
     route_resolution_time_ += duration;
     ++route_resolution_count_;
   }

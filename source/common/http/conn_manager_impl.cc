@@ -245,11 +245,15 @@ ConnectionManagerImpl::ConnectionManagerImpl(
       "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
       "found. Is it configured?");
   if (config_->recordRouteResolutionStats()) {
-    Stats::StatNamePool pool(stats_.scope_.symbolTable());
-    route_resolution_time_us_histogram_ = &stats_.scope_.histogramFromStatName(
-        pool.add("downstream_rq_route_resolution_time_us"), Stats::Histogram::Unit::Microseconds);
-    route_resolutions_histogram_ = &stats_.scope_.histogramFromStatName(
-        pool.add("downstream_rq_route_resolutions"), Stats::Histogram::Unit::Unspecified);
+    Stats::SymbolTable& symbol_table = stats_.scope_.symbolTable();
+    Stats::StatNameManagedStorage route_resolution_time_us_stat_name(
+        "downstream_rq_route_resolution_time_us", symbol_table);
+    route_resolution_time_us_histogram_ = stats_.scope_.histogramFromStatName(
+        route_resolution_time_us_stat_name.statName(), Stats::Histogram::Unit::Microseconds);
+    Stats::StatNameManagedStorage route_resolutions_stat_name("downstream_rq_route_resolutions",
+                                                              symbol_table);
+    route_resolutions_histogram_ = stats_.scope_.histogramFromStatName(
+        route_resolutions_stat_name.statName(), Stats::Histogram::Unit::Unspecified);
   }
 }
 
@@ -1141,7 +1145,7 @@ void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
 
-  if (connection_manager_.route_resolution_time_us_histogram_ != nullptr) {
+  if (connection_manager_.route_resolution_time_us_histogram_.has_value()) {
     const StreamInfo::StreamInfo& stream_info = filter_manager_.streamInfo();
     connection_manager_.route_resolution_time_us_histogram_->recordValue(
         std::chrono::duration_cast<std::chrono::microseconds>(stream_info.routeResolutionTime())
@@ -1949,7 +1953,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
       const MonotonicTime start = connection_manager_.timeSource().monotonicTime();
       route_result = snapped_route_config_->route(cb, *request_headers_,
                                                   filter_manager_.streamInfo(), stream_id_);
-      filter_manager_.streamInfo().addRouteResolutionSample(
+      filter_manager_.streamInfo().addRouteResolutionTime(
           std::chrono::duration_cast<std::chrono::nanoseconds>(
               connection_manager_.timeSource().monotonicTime() - start));
     }
