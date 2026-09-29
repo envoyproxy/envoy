@@ -26,7 +26,8 @@ TEST(GenerateNewPathTest, StripLongerThanOriginIsRejected) {
 }
 
 TEST(GenerateNewPathTest, ResultOverTheBoundIsRejected) {
-  // The result `"/newxx"` is six bytes, so a bound of five rejects it and a bound of six accepts it.
+  // The result `/newxx` is six bytes, so a bound of five rejects it and a bound of six accepts
+  // it.
   EXPECT_EQ(std::nullopt, generateNewPath("/xx", "", "/new", 5));
   EXPECT_EQ("/new/xx", generateNewPath("/xx", "", "/new", 7));
 }
