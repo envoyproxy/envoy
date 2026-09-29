@@ -42,10 +42,12 @@ using ::Envoy::Upstream::ThreadAwareLoadBalancerPtr;
 using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
 inline constexpr absl::string_view kDefaultMetadataNamespace = "envoy.filters.http.ratelimit";
-inline constexpr absl::string_view kDefaultCandidatesKey = "passedBackends";
-inline constexpr absl::string_view kDefaultHostMetadataNamespace = "aigateway.envoy.io";
-inline constexpr absl::string_view kDefaultHostBackendIdKey = "per_route_rule_backend_name";
-inline constexpr absl::string_view kDefaultHostModelIdKey = "model_name_override";
+inline constexpr absl::string_view kDefaultCandidatesKey = "candidates";
+inline constexpr absl::string_view kDefaultHostMetadataNamespace = "envoy.lb";
+inline constexpr absl::string_view kDefaultHostIdKey = "id";
+inline constexpr absl::string_view kDefaultHostSecondaryIdKey = "secondary_id";
+inline constexpr absl::string_view kDefaultCandidateIdField = "id";
+inline constexpr absl::string_view kDefaultCandidateSecondaryIdField = "secondary_id";
 
 class QuotaAwareLbConfig : public Upstream::LoadBalancerConfig {
 public:
@@ -59,14 +61,18 @@ public:
   const std::string& metadataNamespace() const { return metadata_namespace_; }
   const std::string& candidatesKey() const { return candidates_key_; }
   const std::string& hostMetadataNamespace() const { return host_metadata_namespace_; }
-  const std::string& hostBackendIdKey() const { return host_backend_id_key_; }
-  const std::string& hostModelIdKey() const { return host_model_id_key_; }
+  const std::string& hostIdKey() const { return host_id_key_; }
+  const std::string& hostSecondaryIdKey() const { return host_secondary_id_key_; }
+  const std::string& candidateIdField() const { return candidate_id_field_; }
+  const std::string& candidateSecondaryIdField() const { return candidate_secondary_id_field_; }
   bool failClosedOnMissingMetadata() const { return fail_closed_on_missing_metadata_; }
 
 private:
   QuotaAwareLbConfig(std::string metadata_namespace, std::string candidates_key,
-                     std::string host_metadata_namespace, std::string host_backend_id_key,
-                     std::string host_model_id_key, bool fail_closed_on_missing_metadata,
+                     std::string host_metadata_namespace, std::string host_id_key,
+                     std::string host_secondary_id_key, std::string candidate_id_field,
+                     std::string candidate_secondary_id_field,
+                     bool fail_closed_on_missing_metadata,
                      TypedLoadBalancerFactory* fallback_load_balancer_factory,
                      LoadBalancerConfigPtr&& fallback_load_balancer_config);
 
@@ -78,8 +84,10 @@ private:
   const std::string metadata_namespace_;
   const std::string candidates_key_;
   const std::string host_metadata_namespace_;
-  const std::string host_backend_id_key_;
-  const std::string host_model_id_key_;
+  const std::string host_id_key_;
+  const std::string host_secondary_id_key_;
+  const std::string candidate_id_field_;
+  const std::string candidate_secondary_id_field_;
   const bool fail_closed_on_missing_metadata_;
 };
 

@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -21,7 +22,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/protobuf.h"
 
-#include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -42,50 +42,59 @@ using ::Envoy::Upstream::LoadBalancerConfig;
 using ::Envoy::Upstream::LoadBalancerContext;
 using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
-absl::string_view stripToNamespaceBackend(absl::string_view id) {
-  const size_t first = id.find('/');
-  if (first == absl::string_view::npos) {
-    return id;
+// Equal, or host_id is a '/' -delimited child of candidate_id.
+// "svc-a" matches "svc-a/shard/0"; "svc-a" does not match "svc-a-west/..." .
+bool hierarchicalIdMatches(absl::string_view host_id, absl::string_view candidate_id) {
+  if (candidate_id.empty() || host_id.size() < candidate_id.size()) {
+    return false;
   }
-  const size_t second = id.find('/', first + 1);
-  if (second == absl::string_view::npos) {
-    return id;
+  if (host_id.substr(0, candidate_id.size()) != candidate_id) {
+    return false;
   }
-  return id.substr(0, second);
+  return host_id.size() == candidate_id.size() || host_id[candidate_id.size()] == '/';
 }
 
-// RLS quota-mode DynamicMetadata: list of {backend_name, model_name_override}.
-// Host with a model stamp matches the exact pair. Host without a model stamp
-// matches any live pair on that backend.
-class PassedBackends {
+struct CandidatePair {
+  std::string id;
+  std::string secondary;
+};
+
+// Host with a secondary id matches the exact pair. Host without a secondary
+// id matches any live pair whose primary id hierarchically matches.
+class PassedCandidates {
 public:
-  void add(absl::string_view backend, absl::string_view model) {
-    if (backend.empty()) {
+  void add(absl::string_view id, absl::string_view secondary) {
+    if (id.empty()) {
       return;
     }
-    pairs_.emplace(absl::StrCat(backend, "|", model));
-    backends_.emplace(backend);
+    pairs_.push_back({std::string(id), std::string(secondary)});
   }
 
-  bool matches(absl::string_view backend, absl::string_view host_model) const {
-    if (host_model.empty()) {
-      return backends_.contains(std::string(backend));
+  bool matches(absl::string_view host_id, absl::string_view host_secondary) const {
+    for (const auto& pair : pairs_) {
+      if (!hierarchicalIdMatches(host_id, pair.id)) {
+        continue;
+      }
+      if (host_secondary.empty() || pair.secondary == host_secondary) {
+        return true;
+      }
     }
-    return pairs_.contains(absl::StrCat(backend, "|", host_model));
+    return false;
   }
 
 private:
-  absl::flat_hash_set<std::string> pairs_;
-  absl::flat_hash_set<std::string> backends_;
+  // Candidate lists are small (one entry per live quota group). Linear scan,
+  // upgrade to a trie if this is ever large.
+  std::vector<CandidatePair> pairs_;
 };
 
-absl::string_view hostModel(const Host& host, const QuotaAwareLbConfig& config) {
+absl::string_view hostSecondaryId(const Host& host, const QuotaAwareLbConfig& config) {
   const auto metadata = host.metadata();
   if (metadata == nullptr) {
     return {};
   }
   const Protobuf::Value& value = Config::Metadata::metadataValue(
-      metadata.get(), config.hostMetadataNamespace(), config.hostModelIdKey());
+      metadata.get(), config.hostMetadataNamespace(), config.hostSecondaryIdKey());
   if (!value.has_string_value()) {
     return {};
   }
@@ -93,28 +102,37 @@ absl::string_view hostModel(const Host& host, const QuotaAwareLbConfig& config) 
 }
 
 bool hostHasQuota(const Host& host, const QuotaAwareLbConfig& config,
-                  const PassedBackends& passed) {
+                  const PassedCandidates& passed) {
   const auto metadata = host.metadata();
   if (metadata == nullptr) {
     return true;
   }
   const Protobuf::Value& value = Config::Metadata::metadataValue(
-      metadata.get(), config.hostMetadataNamespace(), config.hostBackendIdKey());
+      metadata.get(), config.hostMetadataNamespace(), config.hostIdKey());
   if (!value.has_string_value() || value.string_value().empty()) {
     return true;
   }
-  return passed.matches(stripToNamespaceBackend(value.string_value()), hostModel(host, config));
+  return passed.matches(value.string_value(), hostSecondaryId(host, config));
+}
+
+std::string structFieldString(const Protobuf::Struct& fields, const std::string& key) {
+  const auto it = fields.fields().find(key);
+  if (it != fields.fields().end() && it->second.has_string_value()) {
+    return it->second.string_value();
+  }
+  return {};
 }
 
 // nullopt: key missing or not a list. value: parsed set, possibly empty.
-std::optional<PassedBackends> parsePassedBackends(const envoy::config::core::v3::Metadata& metadata,
-                                                  const QuotaAwareLbConfig& config) {
+std::optional<PassedCandidates>
+parseCandidates(const envoy::config::core::v3::Metadata& metadata,
+                const QuotaAwareLbConfig& config) {
   const Protobuf::Value& value = Config::Metadata::metadataValue(
       &metadata, config.metadataNamespace(), config.candidatesKey());
   if (!value.has_list_value()) {
     return std::nullopt;
   }
-  PassedBackends passed;
+  PassedCandidates passed;
   for (const auto& item : value.list_value().values()) {
     if (item.has_string_value() && !item.string_value().empty()) {
       passed.add(item.string_value(), "");
@@ -123,18 +141,8 @@ std::optional<PassedBackends> parsePassedBackends(const envoy::config::core::v3:
     if (!item.has_struct_value()) {
       continue;
     }
-    const auto& fields = item.struct_value().fields();
-    std::string backend;
-    std::string model;
-    const auto backend_it = fields.find("backend_name");
-    if (backend_it != fields.end() && backend_it->second.has_string_value()) {
-      backend = backend_it->second.string_value();
-    }
-    const auto model_it = fields.find("model_name_override");
-    if (model_it != fields.end() && model_it->second.has_string_value()) {
-      model = model_it->second.string_value();
-    }
-    passed.add(backend, model);
+    passed.add(structFieldString(item.struct_value(), config.candidateIdField()),
+               structFieldString(item.struct_value(), config.candidateSecondaryIdField()));
   }
   return passed;
 }
@@ -210,9 +218,8 @@ void redistributeLoad(HealthyAndDegradedLoad& load, const std::vector<uint8_t>& 
 class QuotaHostExclusionContext : public LoadBalancerContext {
 public:
   QuotaHostExclusionContext(LoadBalancerContext& inner, const QuotaAwareLbConfig& config,
-                            const PassedBackends& passed_backends, const PrioritySet& priority_set)
-      : inner_(inner), config_(config), passed_backends_(passed_backends),
-        priority_set_(priority_set) {
+                            const PassedCandidates& passed, const PrioritySet& priority_set)
+      : inner_(inner), config_(config), passed_(passed), priority_set_(priority_set) {
     uint32_t host_count = 0;
     for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
       host_count += host_set->healthyHosts().size() + host_set->degradedHosts().size();
@@ -245,13 +252,13 @@ public:
     std::vector<uint8_t> degraded_ok(host_sets.size(), 0);
     for (size_t i = 0; i < host_sets.size(); ++i) {
       for (const auto& host : host_sets[i]->healthyHosts()) {
-        if (hostHasQuota(*host, config_, passed_backends_)) {
+        if (hostHasQuota(*host, config_, passed_)) {
           healthy_ok[i] = 1;
           break;
         }
       }
       for (const auto& host : host_sets[i]->degradedHosts()) {
-        if (hostHasQuota(*host, config_, passed_backends_)) {
+        if (hostHasQuota(*host, config_, passed_)) {
           degraded_ok[i] = 1;
           break;
         }
@@ -262,7 +269,7 @@ public:
   }
 
   bool shouldSelectAnotherHost(const Host& host) override {
-    if (!hostHasQuota(host, config_, passed_backends_)) {
+    if (!hostHasQuota(host, config_, passed_)) {
       return true;
     }
     return inner_.shouldSelectAnotherHost(host);
@@ -288,7 +295,7 @@ public:
 private:
   LoadBalancerContext& inner_;
   const QuotaAwareLbConfig& config_;
-  const PassedBackends& passed_backends_;
+  const PassedCandidates& passed_;
   const PrioritySet& priority_set_;
   uint32_t retry_count_;
   HealthyAndDegradedLoad filtered_load_;
@@ -316,7 +323,7 @@ bool anyHealthyHosts(const PrioritySet& priority_set) {
 }
 
 bool anyQuotaAvailableHost(const PrioritySet& priority_set, const QuotaAwareLbConfig& config,
-                           const PassedBackends& passed) {
+                           const PassedCandidates& passed) {
   for (const auto& host_set : priority_set.hostSetsPerPriority()) {
     for (const auto& host : host_set->healthyHosts()) {
       if (hostHasQuota(*host, config, passed)) {
@@ -335,9 +342,10 @@ bool anyQuotaAvailableHost(const PrioritySet& priority_set, const QuotaAwareLbCo
 } // namespace
 
 QuotaAwareLbConfig::QuotaAwareLbConfig(std::string metadata_namespace, std::string candidates_key,
-                                       std::string host_metadata_namespace,
-                                       std::string host_backend_id_key,
-                                       std::string host_model_id_key,
+                                       std::string host_metadata_namespace, std::string host_id_key,
+                                       std::string host_secondary_id_key,
+                                       std::string candidate_id_field,
+                                       std::string candidate_secondary_id_field,
                                        bool fail_closed_on_missing_metadata,
                                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                                        LoadBalancerConfigPtr&& fallback_load_balancer_config)
@@ -346,8 +354,10 @@ QuotaAwareLbConfig::QuotaAwareLbConfig(std::string metadata_namespace, std::stri
       metadata_namespace_(std::move(metadata_namespace)),
       candidates_key_(std::move(candidates_key)),
       host_metadata_namespace_(std::move(host_metadata_namespace)),
-      host_backend_id_key_(std::move(host_backend_id_key)),
-      host_model_id_key_(std::move(host_model_id_key)),
+      host_id_key_(std::move(host_id_key)),
+      host_secondary_id_key_(std::move(host_secondary_id_key)),
+      candidate_id_field_(std::move(candidate_id_field)),
+      candidate_secondary_id_field_(std::move(candidate_secondary_id_field)),
       fail_closed_on_missing_metadata_(fail_closed_on_missing_metadata) {}
 
 absl::StatusOr<std::unique_ptr<QuotaAwareLbConfig>>
@@ -373,8 +383,10 @@ QuotaAwareLbConfig::make(const QuotaAwareProto& config, ServerFactoryContext& co
           orDefault(config.metadata_namespace(), kDefaultMetadataNamespace),
           orDefault(config.candidates_key(), kDefaultCandidatesKey),
           orDefault(config.host_metadata_namespace(), kDefaultHostMetadataNamespace),
-          orDefault(config.host_backend_id_key(), kDefaultHostBackendIdKey),
-          orDefault(config.host_model_id_key(), kDefaultHostModelIdKey),
+          orDefault(config.host_id_key(), kDefaultHostIdKey),
+          orDefault(config.host_secondary_id_key(), kDefaultHostSecondaryIdKey),
+          orDefault(config.candidate_id_field(), kDefaultCandidateIdField),
+          orDefault(config.candidate_secondary_id_field(), kDefaultCandidateSecondaryIdField),
           config.fail_closed_on_missing_metadata(), factory,
           std::move(fallback_load_balancer_config.value())));
     }
@@ -438,7 +450,7 @@ QuotaAwareLoadBalancer::LoadBalancerImpl::peekAnotherHost(LoadBalancerContext* c
     return fallback_picker_lb_->peekAnotherHost(context);
   }
   const auto passed =
-      parsePassedBackends(context->requestStreamInfo()->dynamicMetadata(), config_);
+      parseCandidates(context->requestStreamInfo()->dynamicMetadata(), config_);
   if (!passed.has_value()) {
     if (config_.failClosedOnMissingMetadata()) {
       return nullptr;
@@ -459,7 +471,7 @@ QuotaAwareLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* contex
   }
 
   const auto passed =
-      parsePassedBackends(context->requestStreamInfo()->dynamicMetadata(), config_);
+      parseCandidates(context->requestStreamInfo()->dynamicMetadata(), config_);
   if (!passed.has_value()) {
     if (config_.failClosedOnMissingMetadata()) {
       return quotaMetadataMissing();

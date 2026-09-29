@@ -97,7 +97,7 @@ TEST(QuotaAwareLbConfigTest, EmptyConfigProto) {
   EXPECT_EQ("envoy.load_balancing_policies.quota_aware", factory.name());
 }
 
-TEST(QuotaAwareLbConfigTest, DefaultsMatchLockedContract) {
+TEST(QuotaAwareLbConfigTest, DefaultsAreGeneric) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   QuotaAware config_msg;
   addRoundRobinFallback(config_msg);
@@ -109,8 +109,10 @@ TEST(QuotaAwareLbConfigTest, DefaultsMatchLockedContract) {
   EXPECT_EQ(kDefaultMetadataNamespace, cfg->metadataNamespace());
   EXPECT_EQ(kDefaultCandidatesKey, cfg->candidatesKey());
   EXPECT_EQ(kDefaultHostMetadataNamespace, cfg->hostMetadataNamespace());
-  EXPECT_EQ(kDefaultHostBackendIdKey, cfg->hostBackendIdKey());
-  EXPECT_EQ(kDefaultHostModelIdKey, cfg->hostModelIdKey());
+  EXPECT_EQ(kDefaultHostIdKey, cfg->hostIdKey());
+  EXPECT_EQ(kDefaultHostSecondaryIdKey, cfg->hostSecondaryIdKey());
+  EXPECT_EQ(kDefaultCandidateIdField, cfg->candidateIdField());
+  EXPECT_EQ(kDefaultCandidateSecondaryIdField, cfg->candidateSecondaryIdField());
   EXPECT_FALSE(cfg->failClosedOnMissingMetadata());
 }
 
