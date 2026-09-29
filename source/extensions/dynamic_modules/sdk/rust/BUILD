@@ -1,4 +1,3 @@
-load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
 load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
@@ -18,15 +17,6 @@ cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],
     build_script_env = select({
-        "@envoy_repo//:use_local_llvm": {
-            "LIBCLANG_PATH": "%s/lib/libclang.so" % LLVM_PATH,
-            "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-                "-resource-dir %s/lib/clang/%s" % (LLVM_PATH, LLVM_MAJOR),
-                "-isystem %s/lib/clang/%s/include" % (LLVM_PATH, LLVM_MAJOR),
-                "-isystem %s/include/x86_64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
-                "-isystem %s/include/aarch64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
-            ]),
-        },
         "@platforms//os:linux": {
             "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
             "ENVOY_LLVM_ANCHOR": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
@@ -40,7 +30,6 @@ cargo_build_script(
     data = [
         ":abi/abi.h",
     ] + select({
-        "@envoy_repo//:use_local_llvm": [],
         "@platforms//os:linux": [
             "@llvm_toolchain_llvm//:include",
             "@llvm_toolchain_llvm//:lib/libclang.so",

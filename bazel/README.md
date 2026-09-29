@@ -238,10 +238,14 @@ toolchain rooted at the host installation and calls `envoy_llvm.host(...)` so En
 directly reference LLVM tools and libraries use the same installation. No Envoy `.bazelrc`
 compiler configuration is required.
 
+The `envoy_llvm.host(path = ...)` extension detects the installed LLVM version by running
+`bin/clang --version`. Its optional `llvm_version` attribute can be set to cross-check the detected
+major version. This mechanism supports host LLVM versions other than 22; the separate
+`toolchains_llvm` toolchain's `llvm_version` must also match the installed host version.
+
 **Note:** Building with host-provided toolchains is **not supported** by the Envoy project. The
-hermetic toolchain remains the supported configuration. The specific host LLVM configuration in
-the example is exercised by CodeQL CI, but other host tools or versions may fail depending on the
-build environment. Upstream Envoy builds are unaffected when no host toolchain is registered.
+hermetic toolchain remains the supported default. Other host tools may fail depending on the build
+environment. Upstream Envoy builds are unaffected when no host toolchain is registered.
 
 ## Linking against libc++ on Linux
 

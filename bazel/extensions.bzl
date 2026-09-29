@@ -20,12 +20,12 @@ _LLVM_LIBRARY_TARGETS = """
 
 filegroup(
     name = "libclang_cpp",
-    srcs = glob(["lib/**/libclang-cpp.so*"], allow_empty = True),
+    srcs = glob(["lib/**/libclang-cpp.so*", "lib64/**/libclang-cpp.so*"], allow_empty = True),
 )
 
 filegroup(
     name = "libllvm",
-    srcs = glob(["lib/**/libLLVM.so*"], allow_empty = True),
+    srcs = glob(["lib/**/libLLVM.so*", "lib64/**/libLLVM.so*"], allow_empty = True),
 )
 
 cc_library(
@@ -40,28 +40,87 @@ def _llvm_repo_build(llvm_version):
     libclang_glob = 'glob(["lib/libclang.so*", "lib/libclang*.dylib"], allow_empty = True)'
     if libclang_glob not in build:
         fail("The envoy_toolshed LLVM repository BUILD template changed")
-    return build.replace(
-        libclang_glob,
-        'glob(["lib/**/libclang.so*", "lib/**/libclang*.dylib"], allow_empty = True)',
-    ) + _LLVM_LIBRARY_TARGETS
+    return (
+        build.replace(
+            libclang_glob,
+            'glob(["lib/**/libclang.so*", "lib/**/libclang*.dylib", "lib64/**/libclang.so*", "lib64/**/libclang*.dylib"], allow_empty = True)',
+        ) + _LLVM_LIBRARY_TARGETS + '\nexports_files(["llvm.bzl"])\n'
+    )
+
+def _write_llvm_bzl(repository_ctx, llvm_version, llvm_lib_dir, is_host):
+    major = llvm_version.split(".")[0]
+    major_minor = ".".join(llvm_version.split(".")[:2])
+    repository_ctx.file("llvm.bzl", """
+LLVM_VERSION = %r
+LLVM_MAJOR = %r
+LLVM_MAJOR_MINOR = %r
+LLVM_LIB_DIR = %r
+LLVM_IS_HOST = %s
+""" % (llvm_version, major, major_minor, llvm_lib_dir, is_host))
+
+def _detect_llvm_version(repository_ctx, llvm_root, declared_version):
+    clang = llvm_root.get_child("bin/clang")
+    result = repository_ctx.execute([str(clang), "--version"])
+    if result.return_code != 0:
+        fail("Could not run %s --version (exit code %s): %s" % (clang, result.return_code, result.stderr))
+
+    version = ""
+    marker = "clang version "
+    for line in result.stdout.split("\n"):
+        if marker in line:
+            version_parts = line[line.find(marker) + len(marker):].strip().split(" ")
+            if version_parts:
+                version = version_parts[0].split("-")[0]
+                components = version.split(".")
+                if len(components) != 3:
+                    version = ""
+                else:
+                    for component in components:
+                        if not component.isdigit():
+                            version = ""
+                            break
+            break
+    if not version:
+        fail("Could not parse a full clang version from %s --version output: %s" % (clang, result.stdout))
+    if declared_version and declared_version.split(".")[0] != version.split(".")[0]:
+        fail(
+            "envoy_llvm.host(llvm_version = %r) does not match the installed clang version %s" %
+            (declared_version, version),
+        )
+    return version
+
+def _detect_llvm_lib_dir(llvm_root, major):
+    library_name = "libclang-cpp.so.%s" % major
+    for candidate in ["lib", "lib64", "lib/x86_64-linux-gnu", "lib/aarch64-linux-gnu"]:
+        directory = llvm_root.get_child(candidate)
+        if not directory.exists:
+            continue
+        for library in directory.readdir():
+            if library.basename == library_name or library.basename.startswith(library_name + "."):
+                return candidate
+    fail("Could not find %s under %s in lib, lib64, lib/x86_64-linux-gnu, or lib/aarch64-linux-gnu" % (library_name, llvm_root))
 
 def _host_llvm_repo_impl(repository_ctx):
     llvm_root = repository_ctx.path(repository_ctx.attr.path)
-    for directory in ["bin", "include", "lib"]:
+    version = _detect_llvm_version(repository_ctx, llvm_root, repository_ctx.attr.llvm_version)
+    lib_dir = _detect_llvm_lib_dir(llvm_root, version.split(".")[0])
+    for directory in ["bin", "include", "lib", "lib64"]:
         path = llvm_root.get_child(directory)
-        if not path.exists:
+        if not path.exists and directory in ["bin", "include"]:
             fail("Host LLVM directory does not exist: %s" % path)
-        _symlink_directory_contents(repository_ctx, path, directory)
+        if path.exists:
+            _symlink_directory_contents(repository_ctx, path, directory)
     repository_ctx.file(
         "BUILD.bazel",
-        _llvm_repo_build(repository_ctx.attr.llvm_version),
+        _llvm_repo_build(version),
     )
+    _write_llvm_bzl(repository_ctx, version, lib_dir, True)
 
 _host_llvm_repo = repository_rule(
     implementation = _host_llvm_repo_impl,
     local = True,
     attrs = {
-        "llvm_version": attr.string(mandatory = True),
+        "llvm_version": attr.string(default = ""),
         "path": attr.string(mandatory = True),
     },
 )
@@ -93,6 +152,7 @@ def _llvm_alias_repo_impl(repository_ctx):
         "BUILD.bazel",
         _llvm_repo_build(_LLVM_VERSION),
     )
+    _write_llvm_bzl(repository_ctx, _LLVM_VERSION, "lib", False)
 
 _llvm_alias_repo = repository_rule(
     implementation = _llvm_alias_repo_impl,
@@ -129,7 +189,7 @@ def _envoy_llvm_impl(module_ctx):
 
 _host_llvm = tag_class(
     attrs = {
-        "llvm_version": attr.string(default = _LLVM_VERSION),
+        "llvm_version": attr.string(default = ""),
         "path": attr.string(mandatory = True),
     },
 )
