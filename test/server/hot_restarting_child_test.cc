@@ -461,6 +461,30 @@ TEST_F(HotRestartingChildWaitingForParentTest, WritesParentOffAfterReplyTimeout)
   EXPECT_TRUE(helper_->parentTerminated());
 }
 
+// A listen socket request has its own, shorter deadline: a listener add must not stall the main
+// thread for as long as a stats merge may. After it the parent is written off like after any
+// other timeout, and the caller binds its own socket (paused, since the parent never answered).
+TEST_F(HotRestartingChildWaitingForParentTest, ListenSocketRequestGivesUpAfterItsOwnDeadline) {
+  // The general deadline stays long; only the listen socket one is exhausted at once.
+  helper_->setParentReplyTimeout(std::chrono::seconds(30));
+  helper_->setParentListenSocketReplyTimeout(std::chrono::milliseconds(0));
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+              envoy::HotRestartMessage::Request::kPassListenSocket);
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  parentNeverReplies();
+  EXPECT_FALSE(hot_restarting_child_->parentUnresponsive());
+  EXPECT_LOG_CONTAINS(
+      "error", "hot restart parent is unresponsive (no reply within 0ms)",
+      EXPECT_EQ(hot_restarting_child_->duplicateParentListenSocket("udp://127.0.0.1:5678", 0, ""),
+                -1));
+  EXPECT_TRUE(hot_restarting_child_->parentUnresponsive());
+  EXPECT_FALSE(helper_->parentTerminated());
+  // Nothing else waits on the parent afterwards (no further sendmsg/recvmsg expectations).
+  EXPECT_EQ(hot_restarting_child_->getParentStats(), nullptr);
+}
+
 TEST_F(HotRestartingChildWaitingForParentTest, CompletesDrainsWhenProbeFindsParentGone) {
   helper_->setParentProbeInterval(std::chrono::milliseconds(0));
   {

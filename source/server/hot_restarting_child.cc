@@ -144,7 +144,8 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
     return -1;
   }
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply();
+  std::unique_ptr<HotRestartMessage> wrapped_reply =
+      waitForParentReply(parent_listen_socket_reply_timeout_);
   if (!main_rpc_stream_.replyIsExpectedType(wrapped_reply.get(),
                                             HotRestartMessage::Reply::kPassListenSocket)) {
     return -1;
@@ -152,9 +153,10 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
   return wrapped_reply->reply().pass_listen_socket().fd();
 }
 
-std::unique_ptr<HotRestartMessage> HotRestartingChild::waitForParentReply() {
+std::unique_ptr<HotRestartMessage>
+HotRestartingChild::waitForParentReply(std::chrono::milliseconds timeout) {
   const absl::Time start = absl::Now();
-  const absl::Duration reply_timeout = absl::FromChrono(parent_reply_timeout_);
+  const absl::Duration reply_timeout = absl::FromChrono(timeout);
   const absl::Duration probe_interval = absl::FromChrono(parent_probe_interval_);
   absl::Time next_probe = start + probe_interval;
   while (true) {
@@ -174,7 +176,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::waitForParentReply() {
     }
     const absl::Time now = absl::Now();
     if (now - start >= reply_timeout) {
-      onParentUnreachable(fmt::format("no reply within {}ms", parent_reply_timeout_.count()));
+      onParentUnreachable(fmt::format("no reply within {}ms", timeout.count()));
       return nullptr;
     }
     if (now >= next_probe) {
@@ -235,7 +237,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
     return nullptr;
   }
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply();
+  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply(parent_reply_timeout_);
   if (wrapped_reply == nullptr) {
     return nullptr;
   }
@@ -300,7 +302,7 @@ HotRestartingChild::sendParentAdminShutdownRequest() {
     return std::nullopt;
   }
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply();
+  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply(parent_reply_timeout_);
   if (wrapped_reply == nullptr) {
     return std::nullopt;
   }

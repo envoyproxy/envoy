@@ -27,6 +27,9 @@ public:
   void setParentProbeInterval(std::chrono::milliseconds interval) {
     child_.parent_probe_interval_ = interval;
   }
+  void setParentListenSocketReplyTimeout(std::chrono::milliseconds timeout) {
+    child_.parent_listen_socket_reply_timeout_ = timeout;
+  }
   bool parentUnresponsive() const { return child_.parent_unresponsive_; }
   bool parentTerminated() const { return child_.parent_terminated_; }
 

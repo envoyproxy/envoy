@@ -395,8 +395,21 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     return std::make_shared<Network::TcpListenSocket>(
         address, options, bind_type != BindType::NoBind, creation_options);
   } else {
+    // The parent had no socket for this address, or it never answered. In the latter case the
+    // parent may still be serving this very address, and a fresh socket in the same reuse-port
+    // group would dequeue its packets (which a QUIC listener would answer with stateless resets):
+    // start such a listener paused, like an inherited one, until the parent is gone. A parent that
+    // answered "none" leaves nothing to collide with, and the listener reads from the start.
+    OptRef<Network::ParentDrainedCallbackRegistrar> registrar;
+    if (bind_type != BindType::NoBind && server_.hotRestart().parentUnresponsive()) {
+      ENVOY_LOG(warn,
+                "hot restart parent did not answer for address {}; starting the fresh UDP "
+                "listener paused until the parent is gone",
+                addr);
+      registrar = server_.hotRestart().parentDrainedCallbackRegistrar();
+    }
     return std::make_shared<Network::UdpListenSocket>(
-        address, options, bind_type != BindType::NoBind, creation_options);
+        address, options, bind_type != BindType::NoBind, creation_options, registrar);
   }
 }
 

@@ -109,6 +109,7 @@ public:
       Network::Address::InstanceConstSharedPtr address,
       std::shared_ptr<Network::UdpListenerConfig> listener_config) override;
   OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() override;
+  bool parentUnresponsive() const override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   std::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override;
   void sendParentTerminateRequest() override;
