@@ -1,5 +1,9 @@
+#include <algorithm>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/network/connection_balancer.h"
+#include "envoy/registry/registry.h"
 
 #include "test/integration/integration.h"
 #include "test/test_common/logging.h"
@@ -9,6 +13,58 @@ using testing::Eq;
 namespace Envoy {
 
 namespace {
+
+// A connection balancer that always hands a connection off to a *different* registered handler
+// than the one that accepted it, guaranteeing every connection actually exercises
+// ActiveTcpListener::onAcceptWorker()'s post()-based cross-worker rebalance path, rather than
+// relying on ExactConnectionBalancerImpl's load-based picking to do so by chance.
+class AlwaysRebalanceConnectionBalancerImpl : public Network::ConnectionBalancer {
+public:
+  void registerHandler(Network::BalancedConnectionHandler& handler) override {
+    absl::MutexLock lock(&lock_);
+    handlers_.push_back(&handler);
+  }
+
+  void unregisterHandler(Network::BalancedConnectionHandler& handler) override {
+    absl::MutexLock lock(&lock_);
+    handlers_.erase(std::remove(handlers_.begin(), handlers_.end(), &handler), handlers_.end());
+  }
+
+  Network::BalancedConnectionHandler&
+  pickTargetHandler(Network::BalancedConnectionHandler& current_handler) override {
+    absl::MutexLock lock(&lock_);
+    for (auto* handler : handlers_) {
+      if (handler != &current_handler) {
+        handler->preIncNumConnections();
+        handler->postIncNumConnections();
+        return *handler;
+      }
+    }
+    current_handler.preIncNumConnections();
+    current_handler.postIncNumConnections();
+    return current_handler;
+  }
+
+private:
+  absl::Mutex lock_;
+  std::vector<Network::BalancedConnectionHandler*> handlers_ ABSL_GUARDED_BY(lock_);
+};
+
+class AlwaysRebalanceConnectionBalanceFactory : public Network::ConnectionBalanceFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    // Using Struct instead of a custom empty config proto. This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
+  }
+  Network::ConnectionBalancerSharedPtr
+  createConnectionBalancerFromProto(const Protobuf::Message&,
+                                    Server::Configuration::FactoryContext&) override {
+    return std::make_shared<AlwaysRebalanceConnectionBalancerImpl>();
+  }
+  std::string name() const override {
+    return "envoy.network.connection_balance.always_rebalance_test";
+  }
+};
 
 envoy::config::overload::v3::OverloadManager
 generateMaxDownstreamConnectionsOverloadConfig(uint32_t max_cx) {
@@ -178,6 +234,51 @@ TEST_F(GlobalDownstreamCxLimitIntegrationTest, PerListenerLimitAndGlobalLimitInO
   for (auto& tcp_client : tcp_clients) {
     tcp_client->close();
   }
+}
+
+// Regression test for a cross-thread use-after-free: with a real (not mocked) OverloadManager
+// and multiple worker threads, force every connection to be handed off to a different worker
+// than the one that accepted it (mirroring connection_balance_config.exact_balance), and verify
+// that closing those connections -- which runs AcceptedSocketImpl::~AcceptedSocketImpl()'s
+// tryDeallocateResource() against the real ThreadLocalOverloadStateImpl -- completes cleanly.
+// ThreadLocalOverloadStateImpl asserts dispatcher_.isThreadSafe() on every access, so this test
+// would fail immediately (by aborting the test server) if the rebind in
+// ActiveTcpListener::onAcceptWorker() ever regressed and let a stale, cross-worker handle reach
+// this code path again.
+TEST_F(GlobalDownstreamCxLimitIntegrationTest, RebalancedConnectionUsesRealThreadLocalOverloadState) {
+  concurrency_ = 2;
+
+  AlwaysRebalanceConnectionBalanceFactory factory;
+  Registry::InjectFactory<Envoy::Network::ConnectionBalanceFactory> registered(factory);
+
+  auto overload_manager_config = generateMaxDownstreamConnectionsOverloadConfig(100);
+  config_helper_.addConfigModifier(
+      [overload_manager_config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        *bootstrap.mutable_overload_manager() = overload_manager_config;
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        auto* connection_balance_config = listener->mutable_connection_balance_config();
+        auto* extend_balance_config = connection_balance_config->mutable_extend_balance();
+        extend_balance_config->set_name("envoy.network.connection_balance.always_rebalance_test");
+        extend_balance_config->mutable_typed_config()->set_type_url(
+            "type.googleapis.com/google.protobuf.Struct");
+      });
+  initialize();
+
+  std::vector<IntegrationTcpClientPtr> tcp_clients;
+  std::vector<FakeRawConnectionPtr> raw_conns;
+  for (int i = 0; i < 4; ++i) {
+    tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+    FakeRawConnectionPtr conn;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn));
+    raw_conns.push_back(std::move(conn));
+    ASSERT_TRUE(tcp_clients.back()->connected());
+  }
+  ASSERT_TRUE(waitForConnections(4));
+
+  for (auto& tcp_client : tcp_clients) {
+    tcp_client->close();
+  }
+  ASSERT_TRUE(waitForConnections(0));
 }
 
 } // namespace
