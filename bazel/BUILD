@@ -31,6 +31,7 @@ exports_files([
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",
     "deps.yaml",
+    "toolchains_llvm_1_7.patch",
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
 ])

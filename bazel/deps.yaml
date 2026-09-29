@@ -837,7 +837,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-06-10"
+  release_date: "2026-09-29"
   use_category:
   - build
   - controlplane
@@ -1442,6 +1442,28 @@ skywalking_data_collect_protocol:
   - envoy.tracers.skywalking
   cpe: "cpe:2.3:a:apache:skywalking:*"
   license: "Apache-2.0"
+
+sq_linux_arm64:
+  project_name: "Sequoia OpenPGP sq"
+  project_desc: "Command-line interface for Sequoia OpenPGP"
+  project_url: "https://gitlab.com/sequoia-pgp/sequoia-sq"
+  release_date: "2026-09-08"
+  use_category:
+  - build
+  cpe: "N/A"
+  license: "GPL-2.0-or-later"
+  license_url: "https://gitlab.com/sequoia-pgp/sequoia-sq/-/blob/main/LICENSE.txt"
+
+sq_linux_x86_64:
+  project_name: "Sequoia OpenPGP sq"
+  project_desc: "Command-line interface for Sequoia OpenPGP"
+  project_url: "https://gitlab.com/sequoia-pgp/sequoia-sq"
+  release_date: "2026-09-08"
+  use_category:
+  - build
+  cpe: "N/A"
+  license: "GPL-2.0-or-later"
+  license_url: "https://gitlab.com/sequoia-pgp/sequoia-sq/-/blob/main/LICENSE.txt"
 
 thrift:
   project_name: "Apache Thrift"
