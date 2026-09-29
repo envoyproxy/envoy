@@ -107,6 +107,20 @@ func stringToModuleBuffer(str string) C.envoy_dynamic_module_type_module_buffer 
 	}
 }
 
+// emptyHeaderValue backs the pointer of an empty header value. Envoy treats a null value pointer
+// as "remove the header", and unsafe.StringData may return nil for an empty string.
+var emptyHeaderValue byte
+
+func headerValueToModuleBuffer(value string) C.envoy_dynamic_module_type_module_buffer {
+	if len(value) == 0 {
+		return C.envoy_dynamic_module_type_module_buffer{
+			ptr:    (*C.char)(unsafe.Pointer(&emptyHeaderValue)),
+			length: 0,
+		}
+	}
+	return stringToModuleBuffer(value)
+}
+
 func bytesToModuleBuffer(b []byte) C.envoy_dynamic_module_type_module_buffer {
 	return C.envoy_dynamic_module_type_module_buffer{
 		ptr:    (*C.char)(unsafe.Pointer(unsafe.SliceData(b))),
@@ -280,7 +294,7 @@ func (h *dymHeaderMap) Set(key, value string) {
 		(C.envoy_dynamic_module_type_http_filter_envoy_ptr)(h.hostPluginPtr),
 		(C.envoy_dynamic_module_type_http_header_type)(h.headerType),
 		stringToModuleBuffer(key),
-		stringToModuleBuffer(value),
+		headerValueToModuleBuffer(value),
 	)
 	runtime.KeepAlive(key)
 	runtime.KeepAlive(value)
@@ -291,7 +305,7 @@ func (h *dymHeaderMap) Add(key, value string) {
 		(C.envoy_dynamic_module_type_http_filter_envoy_ptr)(h.hostPluginPtr),
 		(C.envoy_dynamic_module_type_http_header_type)(h.headerType),
 		stringToModuleBuffer(key),
-		stringToModuleBuffer(value),
+		headerValueToModuleBuffer(value),
 	)
 	runtime.KeepAlive(key)
 	runtime.KeepAlive(value)

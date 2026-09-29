@@ -336,6 +336,21 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, AddHeaderValue) {
   EXPECT_EQ(values3[0]->value().getStringView(), "value1");
   EXPECT_EQ(values3[1]->value().getStringView(), "value2");
   EXPECT_EQ(values3[2]->value().getStringView(), value3);
+
+  // A non-null pointer with zero length adds an empty value.
+  const std::string empty_key = "empty";
+  const std::string empty_value;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_add_header(
+      filter_.get(), header_type, {empty_key.data(), empty_key.size()}, {empty_value.data(), 0}));
+  auto empty_values = header_map->get(Envoy::Http::LowerCaseString(empty_key));
+  ASSERT_EQ(empty_values.size(), 1);
+  EXPECT_EQ(empty_values[0]->value().getStringView(), "");
+
+  // A null pointer is rejected and adds nothing.
+  const std::string null_key = "null_value";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_add_header(
+      filter_.get(), header_type, {null_key.data(), null_key.size()}, {nullptr, 0}));
+  EXPECT_EQ(header_map->get(Envoy::Http::LowerCaseString(null_key)).size(), 0);
 }
 
 TEST_P(DynamicModuleHttpFilterHeaderTest, SetHeaderValue) {
@@ -412,6 +427,14 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, SetHeaderValue) {
       filter_.get(), header_type, {remove_key.data(), remove_key.size()}, {nullptr, 0}));
   auto removed_values = header_map->get(Envoy::Http::LowerCaseString(remove_key));
   EXPECT_EQ(removed_values.size(), 0);
+
+  // A non-null pointer with zero length sets an empty value instead of removing the header.
+  const std::string empty_value;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_header(
+      filter_.get(), header_type, {key3.data(), key3.size()}, {empty_value.data(), 0}));
+  auto empty_values = header_map->get(Envoy::Http::LowerCaseString(key3));
+  ASSERT_EQ(empty_values.size(), 1);
+  EXPECT_EQ(empty_values[0]->value().getStringView(), "");
 }
 
 TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeadersCount) {
