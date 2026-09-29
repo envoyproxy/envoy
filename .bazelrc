@@ -103,6 +103,8 @@ build --@librdkafka//:with_ssl=false
 build --@librdkafka//:with_zlib=false
 build --per_file_copt=contrib/kafka/.*\.cc@-Wno-old-style-cast
 
+common --incompatible_enable_proto_toolchain_resolution
+
 # these are here to detect if the toolchain attempts to compile protoc
 common --per_file_copt=bazel-out/.*/bin/external/protobuf.*/protoc@--THIS_CC_TOOLCHAIN_IS_BROKEN
 

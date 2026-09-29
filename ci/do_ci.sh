@@ -12,17 +12,17 @@ CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
 CI_TARGET=$1
 
+# TODO(phlax): Remove this once ci lands
+if [[ -e repo.bazelrc ]]; then
+    cp -a repo.bazelrc user.bazelrc
+fi
+
 # shellcheck source=ci/build_setup.sh
 . "${CURRENT_SCRIPT_DIR}"/build_setup.sh
 
 echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
-
-# TODO(phlax): Remove this once ci lands
-if [[ -e repo.bazelrc ]]; then
-    cp -a repo.bazelrc user.bazelrc
-fi
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
   BUILD_ARCH_DIR="/linux/amd64"
