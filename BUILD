@@ -72,5 +72,6 @@ package_group(
 )
 
 exports_files([
+    "envoy-maintainers-public.key",
     "rustfmt.toml",
 ])

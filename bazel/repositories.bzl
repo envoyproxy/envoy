@@ -961,7 +961,9 @@ def _toolchains_llvm():
         name = "toolchains_llvm",
         patch_args = ["-p1"],
         patches = [
-            "@envoy_toolshed//:patches/toolchains_llvm.patch",
+            # Pinned copy of `@envoy_toolshed//:patches/toolchains_llvm.patch` from
+            # toolshed `bazel-v0.3.35`, matching `toolchains_llvm` 1.7.0 used here.
+            "@envoy//bazel:toolchains_llvm.patch",
             "@envoy//bazel/foreign_cc:toolchains_llvm_stdc++.patch",
         ],
     )
