@@ -520,6 +520,26 @@ cpp2sky:
   license: "Apache-2.0"
   license_url: "https://github.com/SkyAPM/cpp2sky/blob/v{version}/LICENSE"
 
+sq_linux_x86_64:
+  project_name: "Sequoia OpenPGP sq"
+  project_desc: "Command-line interface for Sequoia OpenPGP"
+  project_url: "https://gitlab.com/sequoia-pgp/sequoia-sq"
+  release_date: "2026-09-08"
+  use_category:
+  - build
+  license: "GPL-2.0-or-later"
+  license_url: "https://gitlab.com/sequoia-pgp/sequoia-sq/-/blob/main/LICENSE.txt"
+
+sq_linux_arm64:
+  project_name: "Sequoia OpenPGP sq"
+  project_desc: "Command-line interface for Sequoia OpenPGP"
+  project_url: "https://gitlab.com/sequoia-pgp/sequoia-sq"
+  release_date: "2026-09-08"
+  use_category:
+  - build
+  license: "GPL-2.0-or-later"
+  license_url: "https://gitlab.com/sequoia-pgp/sequoia-sq/-/blob/main/LICENSE.txt"
+
 icu:
   project_name: "ICU Library"
   project_desc: "Development files for International Components for Unicode"
@@ -799,7 +819,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-06-10"
+  release_date: "2026-09-29"
   use_category:
   - build
   - controlplane
