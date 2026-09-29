@@ -443,9 +443,8 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaders) {
 
   // Test with nullptr accessors.
   envoy_dynamic_module_type_envoy_http_header result_headers[3];
-  size_t size_out = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type,
-                                                              result_headers, 3, &size_out));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type, result_headers));
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
@@ -461,9 +460,8 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaders) {
   EXPECT_CALL(encoder_callbacks_, responseTrailers())
       .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
 
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type,
-                                                             result_headers, 3, &size_out));
-  EXPECT_EQ(size_out, 3);
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type, result_headers));
 
   EXPECT_EQ(result_headers[0].key_length, 6);
   EXPECT_EQ(std::string(result_headers[0].key_ptr, result_headers[0].key_length), "single");

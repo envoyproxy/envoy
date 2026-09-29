@@ -259,17 +259,11 @@ func (h *dymHeaderMap) GetAll() [][2]shared.UnsafeEnvoyBuffer {
 	}
 
 	resultHeaders := make([]C.envoy_dynamic_module_type_envoy_http_header, headerCount)
-	var sizeOut C.size_t
-	if !bool(C.envoy_dynamic_module_callback_http_get_headers(
+	C.envoy_dynamic_module_callback_http_get_headers(
 		(C.envoy_dynamic_module_type_http_filter_envoy_ptr)(h.hostPluginPtr),
 		(C.envoy_dynamic_module_type_http_header_type)(h.headerType),
 		unsafe.SliceData(resultHeaders),
-		C.size_t(len(resultHeaders)),
-		&sizeOut,
-	)) {
-		return nil
-	}
-	resultHeaders = resultHeaders[:int(sizeOut)]
+	)
 	finalResult := envoyHttpHeaderSliceToUnsafeHeaderSlice(resultHeaders)
 	runtime.KeepAlive(resultHeaders)
 	return finalResult

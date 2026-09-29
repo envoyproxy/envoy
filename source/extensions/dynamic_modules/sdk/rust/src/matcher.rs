@@ -76,14 +76,11 @@ impl MatchContext {
 
     let mut headers: Vec<abi::envoy_dynamic_module_type_envoy_http_header> =
       Vec::with_capacity(size);
-    let mut size_out: usize = 0;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_matcher_get_headers(
         self.envoy_ptr,
         header_type,
         headers.as_mut_ptr(),
-        headers.capacity(),
-        &mut size_out,
       )
     };
 
@@ -91,7 +88,7 @@ impl MatchContext {
       return None;
     }
     unsafe {
-      headers.set_len(size_out);
+      headers.set_len(size);
     }
 
     Some(
