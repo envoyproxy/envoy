@@ -1,5 +1,7 @@
 """Build Sphinx HTML archives."""
 
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+
 def _sphinx_html_impl(ctx):
     rst = ctx.file.rst
     runner = ctx.executable.sphinx_runner
@@ -10,9 +12,12 @@ def _sphinx_html_impl(ctx):
     if volatile_env:
         inputs.extend([volatile_env, ctx.version_file])
 
+    sphinx_args = ctx.attr._sphinx_args[BuildSettingInfo].value
+    sphinx_args = sphinx_args.replace("\t", " ").replace("\n", " ").replace("\r", " ")
+
     ctx.actions.run_shell(
         inputs = inputs,
-        tools = [runner],
+        tools = [ctx.attr.sphinx_runner[DefaultInfo].files_to_run],
         outputs = [ctx.outputs.out],
         arguments = [
             "1" if ctx.attr.stamp else "0",
@@ -22,7 +27,7 @@ def _sphinx_html_impl(ctx):
             descriptor_path.path,
             rst.path,
             ctx.outputs.out.path,
-        ] + ctx.attr._sphinx_args[BuildSettingInfo].value.split(),
+        ] + [arg for arg in sphinx_args.split(" ") if arg],
         command = ctx.attr.link_suffix_env + """
             set -e
             if [[ "$1" == "1" ]]; then
