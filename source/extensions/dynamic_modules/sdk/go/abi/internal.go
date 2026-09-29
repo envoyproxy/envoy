@@ -259,11 +259,17 @@ func (h *dymHeaderMap) GetAll() [][2]shared.UnsafeEnvoyBuffer {
 	}
 
 	resultHeaders := make([]C.envoy_dynamic_module_type_envoy_http_header, headerCount)
-	C.envoy_dynamic_module_callback_http_get_headers(
+	var sizeOut C.size_t
+	if !bool(C.envoy_dynamic_module_callback_http_get_headers(
 		(C.envoy_dynamic_module_type_http_filter_envoy_ptr)(h.hostPluginPtr),
 		(C.envoy_dynamic_module_type_http_header_type)(h.headerType),
 		unsafe.SliceData(resultHeaders),
-	)
+		C.size_t(len(resultHeaders)),
+		&sizeOut,
+	)) {
+		return nil
+	}
+	resultHeaders = resultHeaders[:int(sizeOut)]
 	finalResult := envoyHttpHeaderSliceToUnsafeHeaderSlice(resultHeaders)
 	runtime.KeepAlive(resultHeaders)
 	return finalResult
@@ -1290,6 +1296,58 @@ func (h *dymHttpFilterHandle) GetClusterHostCounts(priority uint32) (shared.Clus
 		Healthy:  uint64(healthy),
 		Degraded: uint64(degraded),
 	}, true
+}
+
+func (h *dymHttpFilterHandle) GetUpstreamRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_http_get_upstream_remote_address(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
+func (h *dymHttpFilterHandle) GetUpstreamHostsAttempted() []shared.UnsafeEnvoyBuffer {
+	size := C.envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(h.hostPluginPtr)
+	if size == 0 {
+		return nil
+	}
+	buffers := make([]C.envoy_dynamic_module_type_envoy_buffer, size)
+	ret := C.envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(
+		h.hostPluginPtr,
+		unsafe.SliceData(buffers),
+	)
+	if !bool(ret) {
+		return nil
+	}
+	hosts := envoyBufferSliceToUnsafeEnvoyBufferSlice(buffers)
+	runtime.KeepAlive(buffers)
+	return hosts
+}
+
+func (h *dymHttpFilterHandle) GetUpstreamConnectionIDsAttempted() []uint64 {
+	size := C.envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+		h.hostPluginPtr,
+	)
+	if size == 0 {
+		return nil
+	}
+	connectionIDs := make([]uint64, size)
+	ret := C.envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+		h.hostPluginPtr,
+		(*C.uint64_t)(unsafe.Pointer(unsafe.SliceData(connectionIDs))),
+	)
+	runtime.KeepAlive(connectionIDs)
+	if !bool(ret) {
+		return nil
+	}
+	return connectionIDs
 }
 
 func (h *dymHttpFilterHandle) SetUpstreamOverrideHost(host string, strict bool) bool {

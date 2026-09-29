@@ -121,7 +121,7 @@ message RouteOverride {
 }
 
 // Configuration for the dynamic modules route specifier.
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message DynamicModuleRouteSpecifier {
   // Specifies the shared object level configuration. This field is required.
   //
@@ -183,4 +183,11 @@ message DynamicModuleRouteSpecifier {
   // that references them. An unknown cluster then fails the request with the
   // ``cluster_not_found_response_code`` of the route instead.
   google.protobuf.BoolValue validate_clusters = 9;
+
+  // An opaque identifier the module reads with ``get_config_specifier_instance_id``, so that two
+  // specifier instances sharing one module can tell the routes they build apart, for example by
+  // writing it into the route metadata they mark their routes with. It is documentation and
+  // convenience for the module and Envoy enforces nothing about it. If not specified, defaults to
+  // an empty string.
+  string specifier_instance_id = 11 [(validate.rules).string = {max_len: 256}];
 }

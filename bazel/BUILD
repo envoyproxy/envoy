@@ -20,6 +20,10 @@ default_java_toolchain(
     name = "envoy_java_toolchain",
     java_runtime = "@rules_java//toolchains:remotejdk_25",
     javabuilder_jvm_opts = ["--sun-misc-unsafe-memory-access=allow"],
+    # protobuf-java's UnsafeUtil uses sun.misc.Unsafe memory accessors that JDK 23+ marks
+    # forRemoval (JEP 471). Compile-time counterpart of
+    # --sun-misc-unsafe-memory-access=allow above; remove once protobuf migrates off Unsafe.
+    misc = ["-Xlint:-removal"],
     source_version = "11",
     target_version = "11",
 )

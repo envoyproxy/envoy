@@ -42,6 +42,7 @@ public:
           const std::string specifier_yaml = R"EOF(
 dynamic_module_config:
   name: route_specifier_integration_test
+  do_not_close: true
 specifier_name: test_route_specifier
 stat_prefix: test
 failure_policy: PASS_THROUGH
@@ -207,6 +208,7 @@ direct_response:
           const std::string specifier_yaml = absl::StrCat(R"EOF(
 dynamic_module_config:
   name: route_specifier_shadow
+  do_not_close: true
 specifier_name: shadow_example
 stat_prefix: test
 failure_policy: PASS_THROUGH
@@ -831,6 +833,68 @@ typed_config:
   test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.decision_override",
                                testing::Ge(2));
   test_server_->waitForCounter("cluster.canary.upstream_rq_200", testing::Ge(1));
+}
+
+// When the route is recomputed the module reads the route the connection manager last installed.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsPreviousRouteOnRecompute) {
+  config_helper_.prependFilter(R"EOF(
+name: clear-route-cache
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.ClearRouteCacheFilterConfig
+)EOF");
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The first resolution overrides to canary and installs that route. The cache clear recomputes,
+  // and the echo of the second resolution reports the cluster of the previous route.
+  auto response = sendRequest(
+      {{"x-decision", "override"}, {"x-cluster", "canary"}, {"x-echo", "previous-route-cluster"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("canary", header(response->headers(), "x-echo-result"));
+}
+
+// ReusePrevious without a previous route is rejected and the failure policy passes it through.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReusePreviousWithoutPreviousRoute) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{"x-decision", "reuse-previous"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.reuse_previous_rejected",
+                               testing::Ge(1));
+}
+
+// After a route is installed, ReusePrevious keeps it on a recompute without building a new route.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReusePreviousKeepsInstalledRoute) {
+  config_helper_.prependFilter(R"EOF(
+name: clear-route-cache
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.ClearRouteCacheFilterConfig
+)EOF");
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The first resolution has no previous route and passes through to the static route, which is
+  // installed. The cache clear recomputes, and the second resolution reuses that route.
+  auto response = sendRequest({{"x-decision", "reuse-previous"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.decision_reuse_previous",
+                               testing::Ge(2));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.reuse_previous_rejected",
+                               testing::Ge(1));
+}
+
+// A route built with user data is wrapped even with no other override, and the route destroy hook
+// fires when it is destroyed at stream end.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RouteUserDataFiresDestroyHook) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest(
+      {{"x-decision", "select-template"}, {"x-template", "canary"}, {"x-user-data", "42"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.route_destroy",
+                               testing::Ge(1));
 }
 
 // A decision that stops the chain skips the specifiers configured after it, which the second

@@ -22,6 +22,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
+#include "source/extensions/load_balancing_policies/common/orca_oob_manager.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
@@ -97,6 +98,8 @@ public:
                             double remote_probe_fraction,
                             std::chrono::milliseconds weight_expiration_period,
                             std::vector<std::string> metric_names_for_computing_utilization,
+                            bool enable_oob_load_report,
+                            Common::OrcaOobManagerConfig oob_manager_config,
                             Event::Dispatcher& main_thread_dispatcher,
                             ThreadLocal::SlotAllocator& tls_slot_allocator)
       : endpoint_picking_policy_factory_(endpoint_picking_policy_factory),
@@ -106,6 +109,8 @@ public:
         remote_probe_fraction_(remote_probe_fraction),
         weight_expiration_period_(weight_expiration_period),
         metric_names_for_computing_utilization_(std::move(metric_names_for_computing_utilization)),
+        enable_oob_load_report_(enable_oob_load_report),
+        oob_manager_config_(std::move(oob_manager_config)),
         main_thread_dispatcher_(main_thread_dispatcher), tls_slot_allocator_(tls_slot_allocator) {}
 
   Upstream::TypedLoadBalancerFactory& endpointPickingPolicyFactory() const {
@@ -123,6 +128,8 @@ public:
   const std::vector<std::string>& metricNamesForComputingUtilization() const {
     return metric_names_for_computing_utilization_;
   }
+  bool enableOobLoadReport() const { return enable_oob_load_report_; }
+  const Common::OrcaOobManagerConfig& oobManagerConfig() const { return oob_manager_config_; }
   Event::Dispatcher& mainThreadDispatcher() const { return main_thread_dispatcher_; }
   ThreadLocal::SlotAllocator& tlsSlotAllocator() const { return tls_slot_allocator_; }
   absl::Status validateEndpoints(const Upstream::PriorityState& priorities) const override {
@@ -140,6 +147,8 @@ private:
   const double remote_probe_fraction_;
   const std::chrono::milliseconds weight_expiration_period_;
   const std::vector<std::string> metric_names_for_computing_utilization_;
+  const bool enable_oob_load_report_;
+  const Common::OrcaOobManagerConfig oob_manager_config_;
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::SlotAllocator& tls_slot_allocator_;
 };
@@ -391,6 +400,9 @@ private:
   Upstream::ThreadAwareLoadBalancerPtr child_thread_aware_lb_;
   std::shared_ptr<WorkerLocalLbFactory> factory_;
   Envoy::Common::CallbackHandlePtr priority_update_cb_;
+  // Opens one OOB ORCA stream per host when enable_oob_load_report is set; initialized last so
+  // per-host LocalityLbHostData slots exist before the first report decodes.
+  std::unique_ptr<Common::OrcaOobManager> orca_oob_manager_;
 };
 
 } // namespace LoadAwareLocality

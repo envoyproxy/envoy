@@ -321,6 +321,8 @@ test_program(name = "upstream_bridge_terminal_response")
 
 test_program(name = "tracer_no_op")
 
+test_program(name = "tracer_no_op_no_reserve_tags")
+
 test_program(name = "tracer_config_fail")
 
 test_program(name = "tracer_with_values")
