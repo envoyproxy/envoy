@@ -953,8 +953,7 @@ case $CI_TARGET in
         fi
         pushd "$ENVOY_DOCS_PATH"
         if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
-            export SPHINX_RUNNER_ARGS="-v warn"
-            BAZEL_BUILD_OPTIONS+=("--action_env=SPHINX_RUNNER_ARGS")
+            BAZEL_BUILD_OPTIONS+=("--//:sphinx_args=-v warn")
         fi
         if [[ -n "${DOCS_BUILD_RST}" ]]; then
             bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //:rst
