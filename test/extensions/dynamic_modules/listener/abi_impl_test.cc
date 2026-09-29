@@ -49,6 +49,19 @@ public:
 
 REGISTER_FACTORY(ListenerTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
+// A second typed object factory under a distinct name, so a test can store two filter-state values
+// and verify that consecutive getter calls do not invalidate each other.
+class ListenerSecondTestTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.listener_set_typed_object_second"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(ListenerSecondTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 #ifdef SOL_IP
 // Helper action to set sockaddr in arg2 for getSocketOption mocking.
 ACTION_P(SetArg2Sockaddr, val) {
@@ -1664,6 +1677,52 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateTyped) {
   EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
       filterPtr(), key_buf, &result_buf));
   EXPECT_EQ("typed_value", std::string(result_buf.ptr, result_buf.length));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ConsecutiveFilterStateGettersStayValid) {
+  std::string key1 = "envoy.test.listener_set_typed_object";
+  std::string value1 = "first_value";
+  std::string key2 = "envoy.test.listener_set_typed_object_second";
+  std::string value2 = "second_value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), {key1.data(), key1.size()}, {value1.data(), value1.size()}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), {key2.data(), key2.size()}, {value2.data(), value2.size()}));
+
+  // The first view must stay valid after the second getter call.
+  envoy_dynamic_module_type_envoy_buffer result1 = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+      filterPtr(), {key1.data(), key1.size()}, &result1));
+  envoy_dynamic_module_type_envoy_buffer result2 = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+      filterPtr(), {key2.data(), key2.size()}, &result2));
+
+  EXPECT_EQ(value1, std::string(result1.ptr, result1.length));
+  EXPECT_EQ(value2, std::string(result2.ptr, result2.length));
+}
+
+// A nested hook keeps the outer scratch, and only the outermost hook clears it.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, FilterStateScratchClearedAtOutermostHook) {
+  std::string key = "envoy.test.listener_set_typed_object";
+  std::string value = "value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), {key.data(), key.size()}, {value.data(), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  {
+    DynamicModuleListenerFilter::HookScope outer(*filter_);
+    EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+        filterPtr(), {key.data(), key.size()}, &result));
+    {
+      DynamicModuleListenerFilter::HookScope inner(*filter_);
+      EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+          filterPtr(), {key.data(), key.size()}, &result));
+    }
+    // A nested hook does not clear the scratch.
+    EXPECT_EQ(filter_->filterStateScratchSizeForTest(), 2);
+  }
+  // The outermost hook clears the scratch.
+  EXPECT_EQ(filter_->filterStateScratchSizeForTest(), 0);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateTypedNullCallbacks) {

@@ -210,6 +210,8 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
     : ClusterImplBase(cluster, context, creation_status), config_(std::move(config)),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       server_context_(context.serverFactoryContext()) {
+  // If the base cluster construction failed, do not run the module hook on an invalid cluster.
+  SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
 
   // Create the in-module cluster instance.
   in_module_cluster_ = config_->on_cluster_new_(config_->in_module_config_, this);
@@ -779,9 +781,12 @@ DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(
   in_module_lb_ =
       handle_->cluster_->config()->on_cluster_lb_new_(handle_->cluster_->inModuleCluster(), this);
 
-  // Register for host membership updates if the module implements the hook. Subscribe on the
-  // worker local priority set so the callback list is only mutated on this worker thread.
-  if (handle_->cluster_->config()->on_cluster_lb_on_host_membership_update_ != nullptr) {
+  // Register for host membership updates only when the module provided a load balancer and
+  // implements the hook. A null load balancer means the module reported a configuration error, so
+  // no later hook may run against it. Subscribe on the worker local priority set so the callback
+  // list is only mutated on this worker thread.
+  if (in_module_lb_ != nullptr &&
+      handle_->cluster_->config()->on_cluster_lb_on_host_membership_update_ != nullptr) {
     member_update_cb_ = priority_set_.addMemberUpdateCb(
         [this](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
           hosts_added_ = &hosts_added;
@@ -828,6 +833,9 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
   envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
+  // Bound the lifetime of any filter state views the module reads during host selection to this
+  // callback. The guard clears the backing storage when chooseHost returns.
+  ClusterLbFilterStateScratchGuard filter_state_scratch_guard;
   handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context, &host_ptr,
                                                           &async_handle);
 

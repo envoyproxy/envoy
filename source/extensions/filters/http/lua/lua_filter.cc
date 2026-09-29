@@ -13,12 +13,16 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/thread.h"
 #include "source/common/config/datasource.h"
 #include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/escaping.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -211,6 +215,85 @@ Stats::Gauge& lookupLuaVmCountGauge(Stats::Scope& server_scope) {
 }
 
 } // namespace
+
+SINGLETON_MANAGER_REGISTRATION(lua_shared_http_filter_code_setups);
+
+namespace {
+
+// Identifies a shareable VM setup. The digest covers the package search paths as well as the
+// code, because two configurations that agree on an id and on a script but disagree on where
+// `require` looks for modules do not describe equivalent VMs and must not share one. Each part
+// is length-prefixed so that no two distinct inputs produce the same string to digest.
+std::string sharedVmKey(absl::string_view shared_vm_id, absl::string_view lua_code,
+                        const Filters::Common::Lua::PackagePaths& package_paths) {
+  const std::string digest_input =
+      absl::StrCat(lua_code.size(), ":", lua_code, package_paths.path.size(), ":",
+                   package_paths.path, package_paths.cpath.size(), ":", package_paths.cpath);
+  // The digest is a fixed-length hex string at the end of the key, so an id that happens to
+  // contain the separator cannot be mistaken for a different id with a different digest.
+  return absl::StrCat(
+      shared_vm_id, "/",
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(digest_input)));
+}
+
+SharedLuaCodeSetupRegistrySharedPtr sharedCodeSetupRegistry(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<SharedLuaCodeSetupRegistry>(
+      SINGLETON_MANAGER_REGISTERED_NAME(lua_shared_http_filter_code_setups),
+      [] { return std::make_shared<SharedLuaCodeSetupRegistry>(); });
+}
+
+// Builds the VM setup for one configured script, reusing an already built one when the
+// configuration opted into sharing. `registry` is null when it did not, which keeps the
+// original behavior of one dedicated set of VMs per configured script.
+PerLuaCodeSetupSharedPtr
+createPerLuaCodeSetup(const SharedLuaCodeSetupRegistrySharedPtr& registry,
+                      absl::string_view shared_vm_id, const std::string& lua_code,
+                      const Filters::Common::Lua::PackagePaths& package_paths,
+                      ThreadLocal::SlotAllocator& tls, Stats::Gauge& vm_count_gauge,
+                      uint32_t concurrency, absl::Status& creation_status) {
+  if (registry == nullptr) {
+    return std::make_shared<PerLuaCodeSetup>(lua_code, package_paths, tls, vm_count_gauge,
+                                             concurrency, creation_status);
+  }
+  return registry->getOrCreate(shared_vm_id, lua_code, package_paths, tls, vm_count_gauge,
+                               concurrency, creation_status);
+}
+
+} // namespace
+
+PerLuaCodeSetupSharedPtr SharedLuaCodeSetupRegistry::getOrCreate(
+    absl::string_view shared_vm_id, const std::string& lua_code,
+    const Filters::Common::Lua::PackagePaths& package_paths, ThreadLocal::SlotAllocator& tls,
+    Stats::Gauge& vm_count_gauge, uint32_t concurrency, absl::Status& creation_status) {
+  // Filter and route configurations are only ever built on the main thread, so the map needs no
+  // lock. Nothing touches it when a setup is released, which is what makes that safe: a setup
+  // whose last owner goes away on a worker thread just leaves an expired entry behind.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+  const std::string key = sharedVmKey(shared_vm_id, lua_code, package_paths);
+  const auto it = setups_.find(key);
+  if (it != setups_.end()) {
+    if (PerLuaCodeSetupSharedPtr setup = it->second.lock()) {
+      ENVOY_LOG(debug, "reusing shared Lua VM for shared_vm_id '{}'", shared_vm_id);
+      return setup;
+    }
+  }
+
+  PerLuaCodeSetupSharedPtr setup = std::make_shared<PerLuaCodeSetup>(
+      lua_code, package_paths, tls, vm_count_gauge, concurrency, creation_status);
+  if (!creation_status.ok()) {
+    // A script that does not parse is rejected for this configuration; it must not be handed to
+    // the next one that asks for the same id.
+    return nullptr;
+  }
+
+  // Drop the entries whose last user has gone away, so that a server churning through scripts
+  // over its lifetime does not accumulate dead keys.
+  absl::erase_if(setups_, [](const auto& entry) { return entry.second.expired(); });
+  setups_[key] = setup;
+  ENVOY_LOG(debug, "created shared Lua VM for shared_vm_id '{}'", shared_vm_id);
+  return setup;
+}
 
 PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code,
                                  const Filters::Common::Lua::PackagePaths& package_paths,
@@ -925,7 +1008,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager, Api::Api& api,
                            Stats::Scope& scope, const std::string& stats_prefix,
-                           uint32_t concurrency, absl::Status& creation_status)
+                           uint32_t concurrency, Singleton::Manager& singleton_manager,
+                           absl::Status& creation_status)
     : cluster_manager_(cluster_manager),
       clear_route_cache_(
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
@@ -938,6 +1022,11 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
   Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(api.rootScope());
   const Filters::Common::Lua::PackagePaths package_paths =
       packagePaths(proto_config.package_paths(), proto_config.package_cpaths());
+  // Left null when no id is configured, which is what tells the helper below to build VMs that
+  // belong to this configuration alone.
+  if (!proto_config.shared_vm_id().empty()) {
+    shared_code_setup_registry_ = sharedCodeSetupRegistry(singleton_manager);
+  }
 
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
@@ -949,21 +1038,23 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 
     auto code_or = Config::DataSource::read(proto_config.default_source_code(), true, api);
     SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
-    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(
-        code_or.value(), package_paths, tls, vm_count_gauge, concurrency, creation_status);
+    default_lua_code_setup_ = createPerLuaCodeSetup(
+        shared_code_setup_registry_, proto_config.shared_vm_id(), code_or.value(), package_paths,
+        tls, vm_count_gauge, concurrency, creation_status);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   } else if (!proto_config.inline_code().empty()) {
-    default_lua_code_setup_ =
-        std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), package_paths, tls,
-                                          vm_count_gauge, concurrency, creation_status);
+    default_lua_code_setup_ = createPerLuaCodeSetup(
+        shared_code_setup_registry_, proto_config.shared_vm_id(), proto_config.inline_code(),
+        package_paths, tls, vm_count_gauge, concurrency, creation_status);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   }
 
   for (const auto& source : proto_config.source_codes()) {
     auto code_or = Config::DataSource::read(source.second, true, api);
     SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
-    auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(
-        code_or.value(), package_paths, tls, vm_count_gauge, concurrency, creation_status);
+    auto per_lua_code_setup_ptr = createPerLuaCodeSetup(
+        shared_code_setup_registry_, proto_config.shared_vm_id(), code_or.value(), package_paths,
+        tls, vm_count_gauge, concurrency, creation_status);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
     per_lua_code_setups_map_[source.first] = std::move(per_lua_code_setup_ptr);
   }
@@ -982,9 +1073,13 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     auto code_or = Config::DataSource::read(config.source_code(), true, context.api());
     SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
     Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(context.api().rootScope());
-    per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(
-        code_or.value(), packagePaths(config.package_paths(), config.package_cpaths()),
-        context.threadLocal(), vm_count_gauge, context.options().concurrency(), creation_status);
+    if (!config.shared_vm_id().empty()) {
+      shared_code_setup_registry_ = sharedCodeSetupRegistry(context.singletonManager());
+    }
+    per_lua_code_setup_ptr_ = createPerLuaCodeSetup(
+        shared_code_setup_registry_, config.shared_vm_id(), code_or.value(),
+        packagePaths(config.package_paths(), config.package_cpaths()), context.threadLocal(),
+        vm_count_gauge, context.options().concurrency(), creation_status);
   }
 }
 
