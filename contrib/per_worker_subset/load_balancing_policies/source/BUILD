@@ -13,7 +13,6 @@ envoy_cc_library(
     name = "per_worker_subset_lb_lib",
     srcs = ["per_worker_subset_lb.cc"],
     hdrs = ["per_worker_subset_lb.h"],
-    repository = "@envoy",
     visibility = [
         "//contrib/per_worker_subset/load_balancing_policies/test:__pkg__",
         "//test/extensions/load_balancing_policies/per_worker_subset:__pkg__",

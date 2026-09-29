@@ -1588,7 +1588,7 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
 
   auto context = server_->processContext();
-  auto& object_from_context = dynamic_cast<TestObject&>(context->get().get());
+  auto& object_from_context = dynamic_cast<TestObject&>(context->get());
   EXPECT_EQ(&object_from_context, &object);
   EXPECT_TRUE(object_from_context.boolean_flag_);
 

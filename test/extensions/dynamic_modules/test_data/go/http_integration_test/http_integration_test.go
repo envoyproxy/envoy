@@ -18,6 +18,7 @@ import (
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
 		"passthrough":                  &PassthroughConfigFactory{},
+		"filter_new_panic":             &FilterNewPanicConfigFactory{},
 		"local_reply_response_headers": &LocalReplyResponseHeadersConfigFactory{},
 		"header_callbacks_on_creation": &HeaderCallbacksOnCreationConfigFactory{},
 		"header_callbacks":             &HeaderCallbacksConfigFactory{},
@@ -29,6 +30,8 @@ func init() {
 		"span_across_callbacks":        &SpanAcrossCallbacksConfigFactory{},
 		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
 		"stats_callbacks":              &StatsCallbacksConfigFactory{},
+		"stream_timing":                &StreamTimingConfigFactory{},
+		"upstream_connection_attempts": &UpstreamConnectionAttemptsConfigFactory{},
 		"streaming_terminal_filter":    &StreamingTerminalConfigFactory{},
 		"buffer_limit_filter":          &BufferLimitConfigFactory{},
 		"http_stream_basic":            &HttpStreamBasicConfigFactory{},
@@ -172,6 +175,30 @@ func (p *PassthroughFilter) OnRequestHeaders(headers shared.HeaderMap,
 	p.handle.Log(shared.LogLevelError, "on_request_headers called")
 	p.handle.Log(shared.LogLevelCritical, "on_request_headers called")
 	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// FilterNewPanic
+// -----------------------------------------------------------------------------
+
+// FilterNewPanicConfigFactory exercises the Go SDK panic barrier. Its filter constructor panics, so
+// on_http_filter_new recovers the panic, returns a null filter, and Envoy fails the request closed
+// with a 500 instead of aborting the process.
+type FilterNewPanicConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *FilterNewPanicConfigFactory) Create(shared.HttpFilterConfigHandle,
+	[]byte) (shared.HttpFilterFactory, error) {
+	return &FilterNewPanicFilterFactory{}, nil
+}
+
+type FilterNewPanicFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *FilterNewPanicFilterFactory) Create(shared.HttpFilterHandle) shared.HttpFilter {
+	panic("filter constructor failed on purpose")
 }
 
 // -----------------------------------------------------------------------------
@@ -959,6 +986,84 @@ func (p *StatsCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap, endOf
 
 func (p *StatsCallbacksFilter) OnStreamComplete() {
 	p.handle.DecrementGaugeValue(p.ids.epPending, 1, "on_response_headers", p.method)
+}
+
+// -----------------------------------------------------------------------------
+// StreamTiming
+// -----------------------------------------------------------------------------
+
+type StreamTimingConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *StreamTimingConfigFactory) Create(h shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	timingObservedTotal, result := h.DefineCounter("stream_timing_observed_total")
+	assertEq(result, shared.MetricsSuccess, "timing counter definition")
+	return &StreamTimingFilterFactory{timingObservedTotal: timingObservedTotal}, nil
+}
+
+type StreamTimingFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	timingObservedTotal shared.MetricID
+}
+
+func (f *StreamTimingFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &StreamTimingFilter{handle: h, timingObservedTotal: f.timingObservedTotal}
+}
+
+type StreamTimingFilter struct {
+	shared.EmptyHttpFilter
+	handle              shared.HttpFilterHandle
+	timingObservedTotal shared.MetricID
+}
+
+func (f *StreamTimingFilter) OnStreamComplete() {
+	timing := f.handle.GetTimingInfo()
+	assert(timing.StartTimeUnixNs > 0, "start time")
+	assert(timing.RequestCompleteDurationNs >= 0, "request complete duration")
+	assertEq(f.handle.IncrementCounterValue(f.timingObservedTotal, 1), shared.MetricsSuccess,
+		"timing counter")
+}
+
+// -----------------------------------------------------------------------------
+// UpstreamConnectionAttempts
+// -----------------------------------------------------------------------------
+
+type UpstreamConnectionAttemptsConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *UpstreamConnectionAttemptsConfigFactory) Create(h shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	observedTotal, result := h.DefineCounter("upstream_connection_attempts_observed_total")
+	assertEq(result, shared.MetricsSuccess, "upstream attempts counter definition")
+	return &UpstreamConnectionAttemptsFilterFactory{observedTotal: observedTotal}, nil
+}
+
+type UpstreamConnectionAttemptsFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	observedTotal shared.MetricID
+}
+
+func (f *UpstreamConnectionAttemptsFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &UpstreamConnectionAttemptsFilter{handle: h, observedTotal: f.observedTotal}
+}
+
+type UpstreamConnectionAttemptsFilter struct {
+	shared.EmptyHttpFilter
+	handle        shared.HttpFilterHandle
+	observedTotal shared.MetricID
+}
+
+func (f *UpstreamConnectionAttemptsFilter) OnStreamComplete() {
+	remoteAddress, ok := f.handle.GetUpstreamRemoteAddress()
+	assert(ok && remoteAddress.Len > 0, "upstream remote address")
+	assertEq(len(f.handle.GetUpstreamHostsAttempted()), 1, "upstream hosts attempted")
+	assertEq(len(f.handle.GetUpstreamConnectionIDsAttempted()), 1,
+		"upstream connection IDs attempted")
+	assertEq(f.handle.IncrementCounterValue(f.observedTotal, 1), shared.MetricsSuccess,
+		"upstream attempts counter")
 }
 
 // -----------------------------------------------------------------------------

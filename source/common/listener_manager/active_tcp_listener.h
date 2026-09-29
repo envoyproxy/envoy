@@ -103,6 +103,6 @@ public:
   Network::Address::InstanceConstSharedPtr listen_address_;
 };
 
-using ActiveTcpListenerOptRef = std::optional<std::reference_wrapper<ActiveTcpListener>>;
+using ActiveTcpListenerOptRef = OptRef<ActiveTcpListener>;
 } // namespace Server
 } // namespace Envoy

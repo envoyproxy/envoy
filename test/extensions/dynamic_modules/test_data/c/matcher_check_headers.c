@@ -60,8 +60,10 @@ bool envoy_dynamic_module_on_matcher_match(
       (envoy_dynamic_module_type_envoy_http_header*)calloc(
           num_headers, sizeof(envoy_dynamic_module_type_envoy_http_header));
 
-  bool result = envoy_dynamic_module_callback_matcher_get_headers(
-      matcher_input_envoy_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers);
+  size_t size_out = 0;
+  bool result = envoy_dynamic_module_callback_matcher_get_headers_v2(
+      matcher_input_envoy_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers,
+      num_headers, &size_out);
 
   if (!result) {
     free(headers);

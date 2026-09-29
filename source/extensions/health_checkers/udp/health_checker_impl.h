@@ -39,7 +39,7 @@ public:
       const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
       const envoy::extensions::health_checkers::udp::v3::UdpHealthCheck& udp_config,
       Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
-      HealthCheckEventLoggerPtr&& event_logger);
+      HealthCheckEventLoggerPtr&& event_logger, HealthFlagCallbacks& health_flag_callbacks);
 
 protected:
   virtual Network::SocketPtr

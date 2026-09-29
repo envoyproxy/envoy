@@ -96,10 +96,18 @@ public:
       return {};
     }
 
-    std::vector<HeaderView> result_headers(header_count);
-    envoy_dynamic_module_callback_http_get_headers(
-        host_plugin_ptr_, Type,
-        reinterpret_cast<envoy_dynamic_module_type_envoy_http_header*>(result_headers.data()));
+    std::vector<envoy_dynamic_module_type_envoy_http_header> raw(header_count);
+    size_t size_out = 0;
+    if (!envoy_dynamic_module_callback_http_get_headers_v2(host_plugin_ptr_, Type, raw.data(),
+                                                           raw.size(), &size_out)) {
+      return {};
+    }
+    std::vector<HeaderView> result_headers;
+    result_headers.reserve(size_out);
+    for (size_t i = 0; i < size_out; i++) {
+      result_headers.emplace_back(raw[i].key_ptr, raw[i].key_length, raw[i].value_ptr,
+                                  raw[i].value_length);
+    }
     return result_headers;
   }
 
@@ -607,6 +615,21 @@ public:
     return value;
   }
 
+  TimingInfo getTimingInfo() override {
+    envoy_dynamic_module_type_timing_info info{};
+    envoy_dynamic_module_callback_http_get_timing_info(host_plugin_ptr_, &info);
+    return TimingInfo{
+        info.start_time_unix_ns,
+        info.request_complete_duration_ns,
+        info.first_upstream_tx_byte_sent_ns,
+        info.last_upstream_tx_byte_sent_ns,
+        info.first_upstream_rx_byte_received_ns,
+        info.last_upstream_rx_byte_received_ns,
+        info.first_downstream_tx_byte_sent_ns,
+        info.last_downstream_tx_byte_sent_ns,
+    };
+  }
+
   void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
                          std::string_view body, std::string_view detail) override {
     local_reply_sent_ = true;
@@ -741,6 +764,47 @@ public:
     }
     return ClusterHostCounts{static_cast<uint64_t>(total), static_cast<uint64_t>(healthy),
                              static_cast<uint64_t>(degraded)};
+  }
+
+  std::optional<std::string_view> getUpstreamRemoteAddress() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_get_upstream_remote_address(
+        host_plugin_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  std::vector<std::string_view> getUpstreamHostsAttempted() override {
+    const size_t count =
+        envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(host_plugin_ptr_);
+    if (count == 0) {
+      return {};
+    }
+    std::vector<envoy_dynamic_module_type_envoy_buffer> buffers(count);
+    if (!envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(host_plugin_ptr_,
+                                                                         buffers.data())) {
+      return {};
+    }
+    std::vector<std::string_view> hosts;
+    hosts.reserve(count);
+    for (const auto& buffer : buffers) {
+      hosts.emplace_back(buffer.ptr, buffer.length);
+    }
+    return hosts;
+  }
+
+  std::vector<uint64_t> getUpstreamConnectionIdsAttempted() override {
+    const size_t count =
+        envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+            host_plugin_ptr_);
+    if (count == 0) {
+      return {};
+    }
+    std::vector<uint64_t> connection_ids(count);
+    if (!envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+            host_plugin_ptr_, connection_ids.data())) {
+      return {};
+    }
+    return connection_ids;
   }
 
   bool setUpstreamOverrideHost(std::string_view host, bool strict) override {

@@ -231,15 +231,19 @@ impl EnvoyUpstreamHttpTcpBridge for EnvoyUpstreamHttpTcpBridgeImpl {
       };
       size
     ];
+    let mut size_out: usize = 0;
     let ok = unsafe {
-      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2(
         self.raw,
         headers.as_mut_ptr(),
+        headers.len(),
+        &mut size_out,
       )
     };
     if !ok {
       return Vec::new();
     }
+    headers.truncate(size_out);
     headers
       .iter()
       .map(|h| unsafe {

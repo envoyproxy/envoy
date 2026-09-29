@@ -1,5 +1,6 @@
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 
+#include <chrono>
 #include <functional>
 #include <optional>
 #include <string>
@@ -22,6 +23,14 @@ namespace Extensions {
 namespace DynamicModules {
 
 namespace {
+
+int64_t monotonicTimeToNanos(const std::optional<MonotonicTime>& time,
+                             const MonotonicTime& start_time) {
+  if (!time.has_value()) {
+    return -1;
+  }
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() - start_time).count();
+}
 
 // Extract a downstream SSL string attribute from the stream info.
 bool getDownstreamSslAttribute(
@@ -101,6 +110,37 @@ bool ContextAccessor::getHeaders(HeadersMapOptConstRef map,
   }
   size_t i = 0;
   map->iterate([&i, &result_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    auto& key = header.key();
+    result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());
+    result_headers[i].key_length = key.size();
+    auto& value = header.value();
+    result_headers[i].value_ptr = const_cast<char*>(value.getStringView().data());
+    result_headers[i].value_length = value.size();
+    i++;
+    return Http::HeaderMap::Iterate::Continue;
+  });
+  return true;
+}
+
+bool ContextAccessor::getHeadersBounded(HeadersMapOptConstRef map,
+                                        envoy_dynamic_module_type_envoy_http_header* result_headers,
+                                        size_t capacity, size_t* size_out) {
+  if (!map) {
+    *size_out = 0;
+    return false;
+  }
+  const size_t count = map->size();
+  *size_out = count;
+  if (count > capacity) {
+    return false;
+  }
+  // A null array is only valid when there is nothing to write, so a non-empty map with a null array
+  // is rejected rather than dereferenced.
+  if (count > 0 && result_headers == nullptr) {
+    return false;
+  }
+  size_t i = 0;
+  map->iterate([&i, result_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     auto& key = header.key();
     result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());
     result_headers[i].key_length = key.size();
@@ -622,6 +662,45 @@ bool ContextAccessor::getAttributeBool(const StreamInfo::StreamInfo& stream_info
     break;
   }
   return ok;
+}
+
+void ContextAccessor::getTimingInfo(const StreamInfo::StreamInfo* stream_info,
+                                    envoy_dynamic_module_type_timing_info* timing_out) {
+  *timing_out = {-1, -1, -1, -1, -1, -1, -1, -1};
+  if (stream_info == nullptr) {
+    return;
+  }
+
+  const MonotonicTime start_time = stream_info->startTimeMonotonic();
+  timing_out->start_time_unix_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                       stream_info->startTime().time_since_epoch())
+                                       .count();
+
+  const auto request_complete = stream_info->requestComplete();
+  if (request_complete.has_value()) {
+    timing_out->request_complete_duration_ns = request_complete->count();
+  }
+
+  const auto downstream = stream_info->downstreamTiming();
+  if (downstream.has_value()) {
+    timing_out->first_downstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(downstream->firstDownstreamTxByteSent(), start_time);
+    timing_out->last_downstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(downstream->lastDownstreamTxByteSent(), start_time);
+  }
+
+  const auto upstream = stream_info->upstreamInfo();
+  if (upstream.has_value()) {
+    const auto& upstream_timing = upstream->upstreamTiming();
+    timing_out->first_upstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(upstream_timing.first_upstream_tx_byte_sent_, start_time);
+    timing_out->last_upstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(upstream_timing.last_upstream_tx_byte_sent_, start_time);
+    timing_out->first_upstream_rx_byte_received_ns =
+        monotonicTimeToNanos(upstream_timing.first_upstream_rx_byte_received_, start_time);
+    timing_out->last_upstream_rx_byte_received_ns =
+        monotonicTimeToNanos(upstream_timing.last_upstream_rx_byte_received_, start_time);
+  }
 }
 
 bool ContextAccessor::getDynamicMetadata(const StreamInfo::StreamInfo& stream_info,

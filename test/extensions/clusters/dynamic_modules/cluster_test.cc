@@ -79,6 +79,11 @@ public:
   // constructed: clears in_module_lb_ so chooseHost exercises the early-return path.
   static void clearInModuleLb(DynamicModuleLoadBalancer& lb) { lb.in_module_lb_ = nullptr; }
 
+  // Returns whether the load balancer registered the host membership update callback.
+  static bool hasMemberUpdateCb(const DynamicModuleLoadBalancer& lb) {
+    return lb.member_update_cb_ != nullptr;
+  }
+
   // Sets the borrowed host vectors that back the member update host accessors. These are only
   // populated by Envoy during an on_host_membership_update callback, so this lets the accessors
   // be exercised deterministically from a unit test.
@@ -232,6 +237,33 @@ cluster_type:
   EXPECT_NE(nullptr, result->first);
   // CLUSTER_PROVIDED should return a non-null thread-aware LB (module LB).
   EXPECT_NE(nullptr, result->second);
+}
+
+// A module that provides a load balancer and the membership hook registers the callback.
+TEST_F(DynamicModuleClusterTest, ValidLoadBalancerRegistersMembershipCallback) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  EXPECT_TRUE(DynamicModuleClusterTestPeer::hasMemberUpdateCb(*lb_instance));
+}
+
+// A module returning a null load balancer must not register the host membership update callback,
+// so a later membership change cannot invoke the module hook against a null load balancer.
+TEST_F(DynamicModuleClusterTest, NullLoadBalancerSkipsMembershipCallback) {
+  auto result = createCluster(makeYamlConfig("cluster_null_lb"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  EXPECT_FALSE(DynamicModuleClusterTestPeer::hasMemberUpdateCb(*lb_instance));
 }
 
 // Test that LEAST_REQUEST lb_policy is accepted and returns nullptr thread-aware LB.
@@ -1983,7 +2015,7 @@ TEST_F(DynamicModuleClusterTest, MetricsResolveAndRecordByHandle) {
   auto counter_stat = server_context_.store_.findCounterByString(
       "dynamicmodulescustom.handle_counter.outcome.resolved");
   ASSERT_TRUE(counter_stat.has_value());
-  EXPECT_EQ(8, counter_stat->get().value());
+  EXPECT_EQ(8, counter_stat->value());
 
   // Resolving the same tuple again yields the same child, which is what makes a cached handle
   // equivalent to the id path rather than a second stat.
@@ -2011,7 +2043,7 @@ TEST_F(DynamicModuleClusterTest, MetricsResolveAndRecordByHandle) {
   auto gauge_stat = server_context_.store_.findGaugeByString(
       "dynamicmodulescustom.handle_gauge.outcome.resolved");
   ASSERT_TRUE(gauge_stat.has_value());
-  EXPECT_EQ(12, gauge_stat->get().value());
+  EXPECT_EQ(12, gauge_stat->value());
 
   // Histogram vec. The record forwards the value to the resolved child, which the isolated store
   // delivers to sinks, so intercept that to assert the tagged child receives the value.
@@ -2484,8 +2516,9 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeaders) {
   ASSERT_EQ(2, size);
 
   std::vector<envoy_dynamic_module_type_envoy_http_header> result(size);
-  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
-      context_ptr, result.data()));
+  size_t size_out = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
+      context_ptr, result.data(), result.size(), &size_out));
 
   EXPECT_EQ(":method", absl::string_view(result[0].key_ptr, result[0].key_length));
   EXPECT_EQ("GET", absl::string_view(result[0].value_ptr, result[0].value_length));
@@ -2500,23 +2533,26 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNoHeaders) {
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   envoy_dynamic_module_type_envoy_http_header result;
-  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(context_ptr,
-                                                                                       &result));
+  size_t size_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
+      context_ptr, &result, 1, &size_out));
 }
 
 // Test get_downstream_headers with nullptr context.
 TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNullContext) {
   envoy_dynamic_module_type_envoy_http_header result;
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(nullptr, &result));
+  size_t size_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
+      nullptr, &result, 1, &size_out));
 }
 
 // Test get_downstream_headers with nullptr result.
 TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNullResult) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
-  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(context_ptr,
-                                                                                       nullptr));
+  size_t size_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
+      context_ptr, nullptr, 0, &size_out));
 }
 
 // Test get_downstream_header by key.
@@ -2986,6 +3022,72 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedFound) {
   EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
       context_ptr, key_buf, &result));
   EXPECT_EQ("typed-v", absl::string_view(result.ptr, result.length));
+}
+
+// The typed getter keeps every serialized value alive for the whole host selection callback so a
+// module can hold several views at once, and the scope guard clears them when the outermost
+// callback returns.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedConsecutiveGettersStayValid) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k1",
+                                     std::make_unique<Router::StringAccessorImpl>("value-one"));
+  stream_info.filter_state_->setData("k2",
+                                     std::make_unique<Router::StringAccessorImpl>("value-two"));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  std::string key1 = "k1";
+  std::string key2 = "k2";
+  envoy_dynamic_module_type_module_buffer key1_buf = {key1.data(), key1.size()};
+  envoy_dynamic_module_type_module_buffer key2_buf = {key2.data(), key2.size()};
+  envoy_dynamic_module_type_envoy_buffer result1;
+  envoy_dynamic_module_type_envoy_buffer result2;
+  {
+    ClusterLbFilterStateScratchGuard guard;
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key1_buf, &result1));
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key2_buf, &result2));
+    // The first view is not clobbered by the second call.
+    EXPECT_EQ("value-one", absl::string_view(result1.ptr, result1.length));
+    EXPECT_EQ("value-two", absl::string_view(result2.ptr, result2.length));
+    EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+  }
+  EXPECT_EQ(0U, clusterLbFilterStateScratchSizeForTest());
+}
+
+// A nested guard keeps the outer scratch, and only the outermost guard clears it.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNestedGuardClearsAtOutermost) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k1",
+                                     std::make_unique<Router::StringAccessorImpl>("value-one"));
+  stream_info.filter_state_->setData("k2",
+                                     std::make_unique<Router::StringAccessorImpl>("value-two"));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  std::string key1 = "k1";
+  std::string key2 = "k2";
+  envoy_dynamic_module_type_module_buffer key1_buf = {key1.data(), key1.size()};
+  envoy_dynamic_module_type_module_buffer key2_buf = {key2.data(), key2.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  {
+    ClusterLbFilterStateScratchGuard outer;
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key1_buf, &result));
+    {
+      ClusterLbFilterStateScratchGuard inner;
+      EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+          context_ptr, key2_buf, &result));
+      EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+    }
+    // A nested guard does not clear the scratch.
+    EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+  }
+  // The outermost guard clears the scratch.
+  EXPECT_EQ(0U, clusterLbFilterStateScratchSizeForTest());
 }
 
 // Test set_filter_state_bytes with nullptr context.
@@ -5114,6 +5216,40 @@ TEST_F(DynamicModuleClusterTest, DestructorCancelsPendingHttpCallouts) {
   // The thread-aware LB inside `result` still holds an internal handle to the cluster; reset it so
   // the cluster is actually destroyed inside this test body, where the EXPECT_CALL is in scope.
   result = absl::InternalError("cleanup");
+}
+
+// The deprecated get_downstream_headers callback keeps its released signature and behavior.
+TEST_F(DynamicModuleClusterTest, LbContextDeprecatedGetDownstreamHeaders) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-test", "value"}};
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::vector<envoy_dynamic_module_type_envoy_http_header> result(2);
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+      context_ptr, result.data()));
+
+  EXPECT_EQ(":method", absl::string_view(result[0].key_ptr, result[0].key_length));
+  EXPECT_EQ("GET", absl::string_view(result[0].value_ptr, result[0].value_length));
+  EXPECT_EQ("x-test", absl::string_view(result[1].key_ptr, result[1].key_length));
+  EXPECT_EQ("value", absl::string_view(result[1].value_ptr, result[1].value_length));
+}
+
+TEST_F(DynamicModuleClusterTest, LbContextDeprecatedGetDownstreamHeadersUnavailable) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(nullptr));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  envoy_dynamic_module_type_envoy_http_header result;
+
+  // No headers available.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(context_ptr,
+                                                                                       &result));
+  // Null context.
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(nullptr, &result));
+  // Null result.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(context_ptr,
+                                                                                       nullptr));
 }
 
 } // namespace
