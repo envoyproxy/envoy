@@ -899,4 +899,39 @@ absl::Status MessageUtil::loadFromFile(const std::string& path, Protobuf::Messag
   return absl::OkStatus();
 }
 
+bool MessageUtil::hasUnrecognizedFields(const Protobuf::Message& message,
+                                        const absl::flat_hash_set<int>& allowed_field_numbers) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  const auto* reflection = message.GetReflection();
+  std::vector<const Protobuf::FieldDescriptor*> set_fields;
+  reflection->ListFields(message, &set_fields);
+  for (const auto* field : set_fields) {
+    if (!allowed_field_numbers.contains(field->number())) {
+      return true;
+    }
+  }
+  return false;
+#else
+  return hasUnrecognizedFieldsLite(message, allowed_field_numbers);
+#endif
+}
+
+bool MessageUtil::hasUnrecognizedFieldsLite(const Protobuf::MessageLite& message,
+                                            const absl::flat_hash_set<int>& allowed_field_numbers) {
+  std::string serialized = message.SerializeAsString();
+  Protobuf::io::CodedInputStream input(reinterpret_cast<const uint8_t*>(serialized.data()),
+                                       serialized.size());
+  uint32_t tag = 0;
+  while ((tag = input.ReadTag()) != 0) {
+    int field_number = Protobuf::internal::WireFormatLite::GetTagFieldNumber(tag);
+    if (!allowed_field_numbers.contains(field_number)) {
+      return true;
+    }
+    if (!Protobuf::internal::WireFormatLite::SkipField(&input, tag)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 } // namespace Envoy

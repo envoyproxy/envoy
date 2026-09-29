@@ -16,6 +16,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/singleton/const_singleton.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
@@ -625,6 +626,28 @@ public:
    * @return text representation of the proto `message`.
    */
   static std::string toTextProto(const Protobuf::Message& message);
+
+  /**
+   * Check if a message contains any populated fields whose field numbers are not in the allowed
+   * set. Uses Protobuf reflection.
+   *
+   * @param message Protobuf message to inspect.
+   * @param allowed_field_numbers set of allowed field numbers.
+   * @return true if an unrecognized/unallowed field is set, false otherwise.
+   */
+  static bool hasUnrecognizedFields(const Protobuf::Message& message,
+                                    const absl::flat_hash_set<int>& allowed_field_numbers);
+
+  /**
+   * Check if a MessageLite contains any serialized fields whose field numbers are not in the
+   * allowed set. Uses wire-format stream parsing without reflection.
+   *
+   * @param message Protobuf MessageLite to inspect.
+   * @param allowed_field_numbers set of allowed field numbers.
+   * @return true if an unrecognized/unallowed field is present or parsing fails, false otherwise.
+   */
+  static bool hasUnrecognizedFieldsLite(const Protobuf::MessageLite& message,
+                                        const absl::flat_hash_set<int>& allowed_field_numbers);
 };
 
 class ValueUtil {

@@ -2143,19 +2143,6 @@ std::shared_ptr<const VirtualHostImpl> VirtualHostInitializationObject::createVi
   return vhost;
 }
 
-static bool hasUnrecognizedFields(const Protobuf::Message& message,
-                                  const absl::flat_hash_set<int>& allowed_field_numbers) {
-  const auto* reflection = message.GetReflection();
-  std::vector<const Protobuf::FieldDescriptor*> set_fields;
-  reflection->ListFields(message, &set_fields);
-  for (const auto* field : set_fields) {
-    if (!allowed_field_numbers.contains(field->number())) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_proto,
                              const CommonConfigSharedPtr& global_route_config,
                              bool validate_clusters,
@@ -2171,7 +2158,7 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
       envoy::config::route::v3::VirtualHost::kRequireTlsFieldNumber,
   };
 
-  if (hasUnrecognizedFields(vhost_proto, *allowed_vhost_fields)) {
+  if (MessageUtil::hasUnrecognizedFields(vhost_proto, *allowed_vhost_fields)) {
     return true;
   }
 
@@ -2224,13 +2211,13 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
 
   for (const auto& route : vhost_proto.routes()) {
     if (route.action_case() != envoy::config::route::v3::Route::ActionCase::kRoute ||
-        hasUnrecognizedFields(route, *allowed_route_fields)) {
+        MessageUtil::hasUnrecognizedFields(route, *allowed_route_fields)) {
       return true;
     }
 
     if (route.match().path_specifier_case() ==
             envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET ||
-        hasUnrecognizedFields(route.match(), *allowed_match_fields)) {
+        MessageUtil::hasUnrecognizedFields(route.match(), *allowed_match_fields)) {
       return true;
     }
 
@@ -2238,7 +2225,7 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
 
     if (route_action.cluster_specifier_case() !=
             envoy::config::route::v3::RouteAction::ClusterSpecifierCase::kCluster ||
-        hasUnrecognizedFields(route_action, *allowed_action_fields)) {
+        MessageUtil::hasUnrecognizedFields(route_action, *allowed_action_fields)) {
       return true;
     }
 
@@ -2288,7 +2275,7 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
     }
     if (route_action.has_max_stream_duration()) {
       const auto& msd = route_action.max_stream_duration();
-      if (hasUnrecognizedFields(msd, *allowed_max_stream_duration_fields)) {
+      if (MessageUtil::hasUnrecognizedFields(msd, *allowed_max_stream_duration_fields)) {
         return true;
       }
       if (msd.has_max_stream_duration() &&
