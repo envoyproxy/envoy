@@ -544,7 +544,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 
 void ConnectionManagerImpl::handleCodecErrorImpl(absl::string_view error, absl::string_view details,
                                                  StreamInfo::CoreResponseFlag response_flag) {
-  ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
+  ENVOY_CONN_LOG(error, "dispatch error: {}", read_callbacks_->connection(), error);
   read_callbacks_->connection().streamInfo().setResponseFlag(response_flag);
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
