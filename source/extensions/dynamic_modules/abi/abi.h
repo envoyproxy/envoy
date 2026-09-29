@@ -140,8 +140,8 @@ const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
  * differs from Envoy's own does not prevent the module from loading. See the ABI compatibility
  * policy at the top of this file.
  *
- * OWNERSHIP: Module owns the pointer. The string must remain valid until the end of
- * envoy_dynamic_module_on_program_init function.
+ * OWNERSHIP: Module owns the pointer. Envoy copies the string immediately after on_program_init
+ * returns, so it only needs to remain valid until then. Returning a static string satisfies this.
  */
 typedef const char* envoy_dynamic_module_type_abi_version_module_ptr;
 
@@ -12769,8 +12769,8 @@ int envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
 /**
  * envoy_dynamic_module_on_cert_validator_update_digest is called to contribute to the session
  * context hash. The module should provide bytes that uniquely identify its validation configuration
- * so that configuration changes invalidate existing TLS sessions. The output buffer must remain
- * valid until the end of this event hook.
+ * so that configuration changes invalidate existing TLS sessions. Envoy reads the buffer
+ * immediately after this event hook returns, so it must remain valid until then.
  *
  * @param config_module_ptr is the pointer to the in-module cert validator configuration.
  * @param out_data is a pointer to a buffer that the module should fill with the digest data.
