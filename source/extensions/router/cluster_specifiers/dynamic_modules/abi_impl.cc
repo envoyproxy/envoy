@@ -73,9 +73,11 @@ size_t envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size(
 
 bool envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers) {
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
+    size_t* size_out) {
   auto* context = clusterSpecifierContext(context_envoy_ptr);
-  return ContextAccessor::getHeaders(HeadersMapOptConstRef(context->headers), result_headers);
+  return ContextAccessor::getHeadersBounded(HeadersMapOptConstRef(context->headers), result_headers,
+                                            capacity, size_out);
 }
 
 bool envoy_dynamic_module_callback_cluster_specifier_get_request_header_value(

@@ -7,6 +7,7 @@
 //! `logger_name`. The legacy [`crate::declare_access_logger!`] macro is preserved as a
 //! single-config shim over the same factory.
 
+pub use crate::timing::TimingInfo;
 use crate::{abi, ffi_export, EnvoyBuffer};
 use std::ffi::c_void;
 use std::ptr;
@@ -303,27 +304,6 @@ pub trait AccessLogger: Send {
   ///
   /// This is optional. The default implementation does nothing.
   fn flush(&mut self) {}
-}
-
-/// Timing information from the stream info.
-#[derive(Debug, Clone, Default)]
-pub struct TimingInfo {
-  /// Request start time as Unix timestamp in nanoseconds.
-  pub start_time_unix_ns: i64,
-  /// Duration from start to request complete in nanoseconds, or -1 if not available.
-  pub request_complete_duration_ns: i64,
-  /// Time of first upstream TX byte sent in nanoseconds, or -1 if not available.
-  pub first_upstream_tx_byte_sent_ns: i64,
-  /// Time of last upstream TX byte sent in nanoseconds, or -1 if not available.
-  pub last_upstream_tx_byte_sent_ns: i64,
-  /// Time of first upstream RX byte received in nanoseconds, or -1 if not available.
-  pub first_upstream_rx_byte_received_ns: i64,
-  /// Time of last upstream RX byte received in nanoseconds, or -1 if not available.
-  pub last_upstream_rx_byte_received_ns: i64,
-  /// Time of first downstream TX byte sent in nanoseconds, or -1 if not available.
-  pub first_downstream_tx_byte_sent_ns: i64,
-  /// Time of last downstream TX byte sent in nanoseconds, or -1 if not available.
-  pub last_downstream_tx_byte_sent_ns: i64,
 }
 
 /// Byte count information from the stream info.
@@ -1312,25 +1292,15 @@ impl LogContext {
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     let count = self.get_headers_count(header_type);
-    if count == 0 {
-      return Vec::new();
-    }
-
-    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(count);
-    let success = unsafe {
+    crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
       abi::envoy_dynamic_module_callback_access_logger_get_headers(
         self.envoy_ptr,
         header_type,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
+        ptr,
+        capacity,
+        size_out,
       )
-    };
-    if !success {
-      return Vec::new();
-    }
-    unsafe {
-      headers.set_len(count);
-    }
-    headers
+    })
   }
 
   /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.

@@ -49,8 +49,10 @@ size_t envoy_dynamic_module_callback_early_header_mutation_get_headers_size(
 
 bool envoy_dynamic_module_callback_early_header_mutation_get_headers(
     envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers) {
-  return ContextAccessor::getHeaders(requestHeaders(mutationContext(envoy_ptr)), result_headers);
+    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
+    size_t* size_out) {
+  return ContextAccessor::getHeadersBounded(requestHeaders(mutationContext(envoy_ptr)),
+                                            result_headers, capacity, size_out);
 }
 
 bool envoy_dynamic_module_callback_early_header_mutation_get_header_value(
