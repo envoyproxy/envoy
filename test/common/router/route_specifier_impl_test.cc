@@ -219,8 +219,7 @@ public:
   absl::StatusOr<RouteSpecifierSharedPtr>
   createRouteSpecifier(const Protobuf::Message& config,
                        RouteSpecifierFactoryContext& context) override {
-    const std::string& key =
-        Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config).value();
+    const std::string& key = dynamic_cast<const Protobuf::StringValue&>(config).value();
     auto it = specifiers_.find(key);
     if (it == specifiers_.end()) {
       return absl::InvalidArgumentError(absl::StrCat("no test route specifier named ", key));
