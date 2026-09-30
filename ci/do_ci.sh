@@ -719,6 +719,15 @@ case $CI_TARGET in
             --define enable_logging=disabled \
             -c fastbuild \
             @envoy//source/exe:envoy-static
+
+        # Test execution_context build setting transition
+        echo "Building and testing execution_context_enabled tests..."
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            -c fastbuild \
+            --test_tag_filters=execution_context_enabled \
+            -- //test/...
+
         collect_build_profile build
         ;;
 
