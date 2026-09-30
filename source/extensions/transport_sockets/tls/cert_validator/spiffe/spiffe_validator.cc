@@ -191,6 +191,14 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   // User configured "trust_domains", not "trust_bundles"
   spiffe_data_ = std::make_shared<SpiffeData>();
   spiffe_data_->trust_bundle_stores_.reserve(message.trust_domains().size());
+  // Trust bundles are parsed through a process-wide cache so that identical PEM
+  // content - the common case when many trust domains or many clusters reference
+  // the same bundle - is parsed and materialized in memory only once. Each entry
+  // is shared with every other cert validator using the same content, including
+  // the default validator.
+  std::shared_ptr<CaCertCache> ca_cert_cache = getCaCertCache(context.singletonManager());
+  const bool reject_empty_trust_bundle = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.spiffe_validator_reject_empty_trust_bundle");
   for (auto& domain : message.trust_domains()) {
     if (auto it = spiffe_data_->trust_bundle_stores_.find(domain.name());
         it != spiffe_data_->trust_bundle_stores_.end()) {
@@ -205,44 +213,79 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 
     auto cert = Config::DataSource::read(domain.trust_bundle(), true, config->api());
     SET_AND_RETURN_IF_NOT_OK(cert.status(), creation_status);
-    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert->data()), cert->size()));
-    RELEASE_ASSERT(bio != nullptr, "");
-    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
-        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-    if (list == nullptr || sk_X509_INFO_num(list.get()) == 0) {
-      creation_status = absl::InvalidArgumentError(
-          absl::StrCat("Failed to load trusted CA certificate for ", domain.name()));
-      return;
+
+    absl::StatusOr<CaCertListSharedPtr> ca_cert_list =
+        ca_cert_cache->getOrCreate(*cert, domain.trust_bundle().filename());
+    if (!ca_cert_list.ok()) {
+      // The cache rejects a bundle that cannot be parsed as well as one that
+      // parses but carries no certificate, and reports both with a path-based
+      // message. Keep reporting the trust domain instead, which is what
+      // identifies the offending entry in a SPIFFE configuration.
+      if (reject_empty_trust_bundle) {
+        creation_status = absl::InvalidArgumentError(
+            absl::StrCat("Failed to load trusted CA certificate for ", domain.name()));
+        return;
+      }
+      // Legacy behavior, retained until the runtime guard above is removed: a
+      // bundle holding PEM objects but no certificate (for example only a CRL)
+      // was accepted and produced a trust bundle store with no trust anchors, so
+      // every handshake for this trust domain failed at verification time
+      // instead of the configuration being rejected here.
+      bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert->data()), cert->size()));
+      RELEASE_ASSERT(bio != nullptr, "");
+      bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+          PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+      if (list == nullptr || sk_X509_INFO_num(list.get()) == 0) {
+        creation_status = absl::InvalidArgumentError(
+            absl::StrCat("Failed to load trusted CA certificate for ", domain.name()));
+        return;
+      }
+      // The cache only fails with a non-empty list when no certificate parsed
+      // out of it, so there is nothing but CRLs to load here.
+      auto legacy_store = X509StorePtr(X509_STORE_new());
+      bool legacy_has_crl = false;
+      for (const X509_INFO* item : list.get()) {
+        if (item->crl) {
+          legacy_has_crl = true;
+          X509_STORE_add_crl(legacy_store.get(), item->crl);
+        }
+      }
+      if (legacy_has_crl) {
+        X509_STORE_set_flags(legacy_store.get(), X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+      }
+      spiffe_data_->trust_bundle_stores_[domain.name()][domain.workload_trust_domain()] =
+          std::move(legacy_store);
+      continue;
     }
 
     auto store = X509StorePtr(X509_STORE_new());
-    bool has_crl = false;
     bool ca_loaded = false;
-    for (const X509_INFO* item : list.get()) {
-      if (item->x509) {
-        X509_STORE_add_cert(store.get(), item->x509);
-        spiffe_data_->ca_certs_.push_back(bssl::UniquePtr<X509>(item->x509));
-        X509_up_ref(item->x509);
-        if (!ca_loaded) {
-          // TODO: With the current interface, we cannot return the multiple
-          // cert information on getCaCertInformation method.
-          // So temporarily we return the first CA's info here.
-          ca_loaded = true;
-          ca_file_name_ = absl::StrCat(domain.name(), ": ",
-                                       domain.trust_bundle().filename().empty()
-                                           ? "<inline>"
-                                           : domain.trust_bundle().filename());
-        }
-      }
-
-      if (item->crl) {
-        has_crl = true;
-        X509_STORE_add_crl(store.get(), item->crl);
+    for (const auto& ca_cert : (*ca_cert_list)->certs) {
+      // X509_STORE_add_cert takes its own reference, so the shared certificate
+      // stays valid for this store's lifetime independently of the cache.
+      X509_STORE_add_cert(store.get(), ca_cert.get());
+      spiffe_data_->ca_certs_.push_back(bssl::UpRef(ca_cert));
+      if (!ca_loaded) {
+        // TODO: With the current interface, we cannot return the multiple
+        // cert information on getCaCertInformation method.
+        // So temporarily we return the first CA's info here.
+        ca_loaded = true;
+        ca_file_name_ = absl::StrCat(domain.name(), ": ",
+                                     domain.trust_bundle().filename().empty()
+                                         ? "<inline>"
+                                         : domain.trust_bundle().filename());
       }
     }
-    if (has_crl) {
+
+    // A trust bundle is allowed to carry CRLs alongside the certificates.
+    for (const auto& crl : (*ca_cert_list)->crls) {
+      X509_STORE_add_crl(store.get(), crl.get());
+    }
+    if (!(*ca_cert_list)->crls.empty()) {
       X509_STORE_set_flags(store.get(), X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
+
+    spiffe_data_->ca_cert_lists_.push_back(*std::move(ca_cert_list));
     spiffe_data_->trust_bundle_stores_[domain.name()][domain.workload_trust_domain()] =
         std::move(store);
   }
