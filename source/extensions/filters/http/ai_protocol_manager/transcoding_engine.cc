@@ -892,6 +892,11 @@ TranscodeRuleSet anthropicResponseToIr() {
                                       TranscodingEngine::kIrProtocol),
           // 3. The message becomes the IR's only choice, its text blocks joined into
           //    `message.content`.
+          // TODO(ginama): preserve `tool_use` blocks. They are dropped here, with their `id`,
+          // `name` and `input`, while their `stop_reason` still maps to `tool_calls`. Map each
+          // one to an IR tool call instead: keep `id` and `name`, and JSON-encode `input` into
+          // `function.arguments` (`moveElements` into `choice.message.tool_calls`, then
+          // `serializeJson`).
           TranscodeRule::collectText("content", "text", "choice.message.content",
                                      TranscodePredicate::fieldEquals("type", "text")),
           TranscodeRule::move("role", "choice.message.role"),
