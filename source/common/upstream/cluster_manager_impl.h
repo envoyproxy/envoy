@@ -233,6 +233,8 @@ class ClusterManagerImpl : public ClusterManager,
                            public MissingClusterNotifier,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
+  static constexpr uint32_t DefaultMaxClusterUpdateBatchSize = 32;
+
   absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
   bool initialized() override { return initialized_; }
@@ -409,6 +411,29 @@ public:
   void
   createNetworkObserverRegistries(Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) override;
 
+  /**
+   * RAII implementation of ClusterUpdateBatch.
+   * Increments the active batch count in ClusterManagerImpl on construction and
+   * decrements it on destruction. When the active batch count reaches zero, all
+   * accumulated thread-local cluster updates and removals are drained and dispatched
+   * to worker threads in a single bulk TLS callback.
+   */
+  class ClusterUpdateBatchImpl : public ClusterUpdateBatch {
+  public:
+    ClusterUpdateBatchImpl(ClusterManagerImpl& parent) : parent_(parent) { parent_.startBatch(); }
+    ~ClusterUpdateBatchImpl() override { parent_.endBatch(); }
+
+  private:
+    ClusterManagerImpl& parent_;
+  };
+
+  /**
+   * Factory method to create an RAII cluster update batch.
+   * Returns a valid ClusterUpdateBatch if the
+   * runtime feature flag is enabled, or nullptr if disabled.
+   */
+  ClusterUpdateBatchPtr createSourceBatch() override;
+
 protected:
   // ClusterManagerImpl's constructor should not be invoked directly; create instances from the
   // clusterManagerFromProto() static method. The init() method must be called after construction.
@@ -476,6 +501,45 @@ protected:
       std::shared_ptr<const ClusterInitializationObject>;
   using ClusterInitializationMap =
       absl::flat_hash_map<std::string, ClusterInitializationObjectConstSharedPtr>;
+
+  /**
+   * Represents a queued thread-local cluster modification (either an add/update or removal)
+   * deferred during an active batch update. All pending actions are executed together on
+   * worker threads when the outermost batch ends.
+   */
+  struct PendingThreadLocalAction {
+    enum class Type { Update, Removal };
+
+    std::string drop_category_;
+    std::string removal_cluster_name_;
+    ThreadLocalClusterUpdateParams params_;
+    ClusterInfoConstSharedPtr info_;
+    LoadBalancerFactorySharedPtr load_balancer_factory_;
+    HostMapConstSharedPtr host_map_;
+    ClusterInitializationObjectConstSharedPtr cluster_initialization_object_;
+    Type type_{Type::Update};
+    UnitFloat drop_overload_{0};
+    bool add_or_update_cluster_{false};
+    bool enable_batch_aware_update_{false};
+  };
+
+  /**
+   * Increments the active batch nesting count, beginning or nesting a batch update.
+   */
+  void startBatch();
+
+  /**
+   * Decrements the active batch nesting count. When the count drops to 0 (outermost batch ends),
+   * flushes all accumulated pending thread-local actions via applyPendingThreadLocalUpdates().
+   */
+  void endBatch();
+
+  /**
+   * Drains all queued thread-local cluster updates and removals from
+   *  and broadcasts them across all worker threads via a single
+   *  dispatch.
+   */
+  void applyPendingThreadLocalUpdates();
 
   /**
    * An implementation of an on-demand CDS handle. It forwards the discovery request to the cluster
@@ -980,6 +1044,7 @@ private:
       UnitFloat drop_overload, absl::string_view drop_category);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
+  void queuePendingThreadLocalAction(PendingThreadLocalAction&& action);
 
   Server::Configuration::ServerFactoryContext& context_;
   ClusterManagerFactory& factory_;
@@ -991,6 +1056,7 @@ private:
   Config::XdsManager& xds_manager_;
   Random::RandomGenerator& random_;
   const bool deferred_cluster_creation_;
+  const uint32_t max_cluster_update_batch_size_;
   std::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
@@ -1029,6 +1095,12 @@ private:
 
   bool initialized_{};
   bool ads_mux_initialized_{};
+  bool pending_start_ads_mux_{false};
+  // Nesting counter of currently active RAII batch update scopes.
+  uint32_t active_batches_{0};
+  // Queue of deferred thread-local cluster additions, updates, and removals to be dispatched in
+  // bulk when active_batches_ reaches 0.
+  std::vector<PendingThreadLocalAction> pending_thread_local_actions_;
   std::atomic<bool> shutdown_;
 
   // Keep all the ClusterMaps at the end, so that they get destroyed first.
