@@ -587,9 +587,27 @@ config_setting(
     values = {"define": "perf_annotation=enabled"},
 )
 
+bool_flag(
+    name = "execution_context",
+    build_setting_default = False,
+)
+
 config_setting(
-    name = "enable_execution_context",
+    name = "enable_execution_context_flag",
+    flag_values = {":execution_context": "True"},
+)
+
+config_setting(
+    name = "enable_execution_context_define",
     values = {"define": "execution_context=enabled"},
+)
+
+selects.config_setting_group(
+    name = "enable_execution_context",
+    match_any = [
+        ":enable_execution_context_flag",
+        ":enable_execution_context_define",
+    ],
 )
 
 config_setting(
