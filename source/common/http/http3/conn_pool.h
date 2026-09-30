@@ -196,6 +196,9 @@ protected:
 private:
   friend class Http3ConnPoolImplPeer;
 
+  // Keeps the Quic helpers below alive for as long as this pool and its connections are, even if
+  // the cluster that created them is removed first.
+  const std::shared_ptr<Http::PersistentQuicInfo> quic_info_keep_alive_;
   // Latches Quic helpers shared across the cluster
   Quic::PersistentQuicInfoImpl& quic_info_;
   // server-id can change over the lifetime of Envoy but will be consistent for a

@@ -341,7 +341,7 @@ ConnectivityGrid::ConnectivityGrid(
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
       origin_("https", getTargetHostname(transport_socket_options, host_),
               host_->address()->ip()->port()),
-      quic_info_(quic_info), priority_(priority), overload_manager_(overload_manager),
+      quic_info_keep_alive_(quic_info.keepAlive()), quic_info_(quic_info), priority_(priority), overload_manager_(overload_manager),
       network_observer_registry_(network_observer_registry) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.

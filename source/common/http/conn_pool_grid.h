@@ -293,6 +293,9 @@ private:
   // may be from the cluster config, or the request headers for auto-sni.
   HttpServerPropertiesCache::Origin origin_;
 
+  // Keeps quic_info_ alive for the HTTP/3 pools this grid creates, even if the cluster that created
+  // it is removed first (each HTTP/3 pool holds its own as well).
+  const std::shared_ptr<Http::PersistentQuicInfo> quic_info_keep_alive_;
   Http::PersistentQuicInfo& quic_info_;
   Upstream::ResourcePriority priority_;
   Server::OverloadManager& overload_manager_;

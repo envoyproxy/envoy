@@ -123,6 +123,7 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
                             random_generator, state, client_fn, codec_fn, protocol,
                             overload_manager, {}, nullptr),
+      quic_info_keep_alive_(quic_info.keepAlive()),
       quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
       server_id_(sni(transport_socket_options, host),
                  static_cast<uint16_t>(host_->address()->ip()->port())),
