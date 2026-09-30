@@ -133,7 +133,7 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
 
     Gauge::ImportMode import_mode = Gauge::ImportMode::Uninitialized;
     if (gauge_opt) {
-      import_mode = gauge_opt->get().importMode();
+      import_mode = gauge_opt->importMode();
       if (import_mode == Gauge::ImportMode::NeverImport) {
         continue;
       }

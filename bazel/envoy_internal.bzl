@@ -26,6 +26,7 @@ _ENABLE_PERF_ANNOTATION = Label("//bazel:enable_perf_annotation")
 _ENABLE_PERF_TRACING = Label("//bazel:enable_perf_tracing")
 _EXPORTED_SYMBOLS = Label("//bazel:exported_symbols.txt")
 _EXPORTED_SYMBOLS_APPLE = Label("//bazel:exported_symbols_apple.txt")
+_EXPORTED_SYMBOLS_WINDOWS = Label("//bazel:exported_symbols_windows.def")
 _FASTBUILD_BUILD = Label("//bazel:fastbuild_build")
 _FORCE_LIBCPP = Label("//bazel:force_libcpp")
 _GCC_BUILD = Label("//bazel:gcc_build")
@@ -108,6 +109,7 @@ def envoy_copts(test = False):
                    "-fno-limit-debug-info",
                    "-Wgnu-conditional-omitted-operand",
                    "-Wc++2a-extensions",
+                   "-Wno-nullability-completeness",
                    "-Wrange-loop-analysis",
                ],
                _GCC_BUILD: [
@@ -285,7 +287,10 @@ def envoy_exported_symbols_input():
     return [
         _EXPORTED_SYMBOLS,
         _EXPORTED_SYMBOLS_APPLE,
-    ]
+    ] + select({
+        _WINDOWS_X86_64: [_EXPORTED_SYMBOLS_WINDOWS],
+        "//conditions:default": [],
+    })
 
 # Default symbols to be exported.
 def _envoy_default_exported_symbols():
@@ -295,6 +300,9 @@ def _envoy_default_exported_symbols():
         ],
         _APPLE: [
             "-Wl,-exported_symbols_list,$(location %s)" % str(_EXPORTED_SYMBOLS_APPLE),
+        ],
+        _WINDOWS_X86_64: [
+            "-DEF:$(location %s)" % str(_EXPORTED_SYMBOLS_WINDOWS),
         ],
         "//conditions:default": [],
     })

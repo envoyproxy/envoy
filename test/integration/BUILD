@@ -2892,6 +2892,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":integration_lib",
+        "//source/common/upstream:multi_health_checker_lib",
         "//test/common/http/http2:http2_frame",
         "//test/config:v2_link_hacks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -3161,7 +3162,6 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:resources_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],

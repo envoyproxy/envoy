@@ -36,6 +36,8 @@ constexpr absl::string_view RESULT_TYPE_FIELD = "resultType";
 constexpr absl::string_view RESULT_TYPE_COMPLETE = "complete";
 constexpr absl::string_view ERROR_FIELD = "error";
 
+constexpr int MCP_HEADER_MISMATCH_ERROR_CODE = -32020;
+
 // MCP Initialize constants
 constexpr absl::string_view MCP_VERSION_2024_11_05 = "2024-11-05";
 constexpr absl::string_view MCP_VERSION_2025_03_26 = "2025-03-26";
@@ -73,6 +75,10 @@ constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
 constexpr absl::string_view MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version";
 constexpr absl::string_view MCP_METHOD_HEADER = "mcp-method";
 constexpr absl::string_view MCP_NAME_HEADER = "mcp-name";
+
+// Delimiters for encoded header values.
+constexpr absl::string_view MCP_BASE64_PREFIX = "=?base64?";
+constexpr absl::string_view MCP_BASE64_SUFFIX = "?=";
 
 // Method names
 namespace Methods {
