@@ -7,6 +7,7 @@ use crate::{
   NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
@@ -1246,11 +1247,18 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
       let name_slice =
         unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
       let name_str = std::str::from_utf8(name_slice).unwrap_or("");
-      if (wrapper.callback)(name_str, value) {
-        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
-      } else {
-        wrapper.stopped = true;
-        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      // Catch panics so a panicking visitor never unwinds across the C boundary and aborts Envoy.
+      match catch_unwind(AssertUnwindSafe(|| (wrapper.callback)(name_str, value))) {
+        Ok(true) => abi::envoy_dynamic_module_type_stats_iteration_action::Continue,
+        Ok(false) => {
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
+        Err(panic) => {
+          crate::log_ffi_panic("bootstrap_extension_iterate_counters", panic);
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
       }
     }
 
@@ -1286,11 +1294,18 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
       let name_slice =
         unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
       let name_str = std::str::from_utf8(name_slice).unwrap_or("");
-      if (wrapper.callback)(name_str, value) {
-        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
-      } else {
-        wrapper.stopped = true;
-        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      // Catch panics so a panicking visitor never unwinds across the C boundary and aborts Envoy.
+      match catch_unwind(AssertUnwindSafe(|| (wrapper.callback)(name_str, value))) {
+        Ok(true) => abi::envoy_dynamic_module_type_stats_iteration_action::Continue,
+        Ok(false) => {
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
+        Err(panic) => {
+          crate::log_ffi_panic("bootstrap_extension_iterate_gauges", panic);
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
       }
     }
 

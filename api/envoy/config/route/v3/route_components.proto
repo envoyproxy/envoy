@@ -265,10 +265,10 @@ message VirtualHost {
   // the request attributes (e.g., headers, path) directly.
   //
   // Specifiers are executed in order, and the output of each is the input of the next. The
-  // specifiers here will run after the ``route_specifiers`` of
-  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`
-  // and before the ``route_specifiers`` of the resolved
-  // :ref:`route <envoy_v3_api_field_config.route.v3.Route.route_specifiers>`.
+  // specifiers here will run after the ``route_specifiers`` of the resolved
+  // :ref:`route <envoy_v3_api_field_config.route.v3.Route.route_specifiers>`
+  // and before the ``route_specifiers`` of
+  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`.
   //
   // .. note::
   //   If the route matching resolves no route, the route specifiers at the route configuration
@@ -448,10 +448,11 @@ message Route {
   // the request attributes (e.g., headers, path) directly.
   //
   // Specifiers are executed in order, and the output of each is the input of the next. The
-  // specifiers here will run last, after the ``route_specifiers`` of
-  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`
-  // and :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.route_specifiers>`, so
-  // the route that comes out of the last specifier here is the final route used by Envoy.
+  // specifiers here will run first, before the ``route_specifiers`` of
+  // :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.route_specifiers>` and
+  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`,
+  // so the route that comes out of the last specifier here is the input of the specifiers of
+  // these two levels.
   //
   // .. note::
   //   If the route matching resolves no route, the route specifiers at the route configuration
@@ -1841,7 +1842,9 @@ message RetryPolicy {
   // .. note::
   //   This currently works when the route cluster specifier support the dynamic refresh,
   //   e.g. :ref:`matcher cluster specifier
-  //   <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`
+  //   <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`,
+  //   :ref:`priority group cluster specifier
+  //   <envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier>`
   //   and :ref:`dynamic modules cluster specifier
   //   <envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier>`.
   bool refresh_cluster_on_retry = 14;

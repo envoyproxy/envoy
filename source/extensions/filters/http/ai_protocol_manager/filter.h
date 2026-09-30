@@ -49,6 +49,7 @@ public:
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   const AiFilterFactories& aiFilterFactories() const { return ai_filter_factories_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
+  bool alwaysSerializeRequest() const { return always_serialize_request_; }
   uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
@@ -66,6 +67,7 @@ private:
   mutable AiProtocolManagerStats stats_;
   const bool request_handling_enabled_ = false;
   const bool parse_unconfigured_routes_ = false;
+  const bool always_serialize_request_ = true;
   const uint32_t inline_string_threshold_bytes_ = 0;
   const bool token_usage_enabled_ = false;
   const bool include_unconfigured_routes_ = false;
@@ -81,8 +83,7 @@ private:
 // Per-route configuration. Its presence declares the route an AI endpoint.
 // The request and response wire APIs are declared separately (protocol
 // translation can make them differ); either may be Unspecified when the
-// route left it undeclared. A declared request API with a registered payload
-// schema (schema/schema_registry.h) is validated strictly.
+// route left it undeclared.
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
   explicit RouteConfig(const PerRouteProto& proto)
@@ -154,9 +155,9 @@ private:
 // rules out gRPC and Connect streaming, upgrades, and CONNECT. A declared
 // endpoint carries no such gate.
 //
-// A declared wire API with a registered payload schema is validated at end of
-// payload (schema/schema_registry.h), then the configured AI filters run over the
-// parsed document (filter_manager.h); normalization comes later.
+// At end of payload the configured AI filters run over the parsed document
+// (filter_manager.h); payload schema validation is one of them. Normalization
+// comes later.
 //
 // Encode (response) path: observe-only token-usage extraction. When
 // response_handling.token_usage is configured, 2xx SSE/JSON responses on
@@ -235,7 +236,7 @@ private:
   // can be re-resolved mid-stream, which would leave a cached pointer dangling,
   // and these are two scalars.
   bool route_has_request_{false};
-  LLMProtocol route_request_protocol_{LLMProtocol::Unspecified};
+  LLMProtocol request_protocol_{LLMProtocol::Unspecified};
 
   JsonWithExtBuf request_json_;
   // Cleared once parsing is done with, whether it completed, was abandoned, or

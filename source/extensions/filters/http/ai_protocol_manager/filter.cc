@@ -14,6 +14,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
@@ -151,6 +152,9 @@ FilterConfig::FilterConfig(
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
       parse_unconfigured_routes_(proto.request_handling().parse_unconfigured_routes()),
+      always_serialize_request_(
+          proto.request_handling().reserialize_body() ==
+          envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS),
       inline_string_threshold_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto.request_handling().limits(), inline_string_threshold_bytes,
           JsonWithExtBufParser::kDefaultInlineStringThresholdBytes)),
@@ -243,10 +247,15 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
           Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(decoder_callbacks_);
       route_config != nullptr) {
     route_has_request_ = route_config->hasRequest();
-    route_request_protocol_ = route_config->requestProtocol();
+    request_protocol_ = route_config->requestProtocol();
     if (route_has_request_) {
-      ENVOY_LOG(debug, "ai_protocol_manager: route declares request API {}",
-                llmProtocolName(route_request_protocol_));
+      if (const LLMProtocol declared =
+              RequestLlmProtocol::fromFilterState(*decoder_callbacks_->streamInfo().filterState());
+          declared != LLMProtocol::Unspecified) {
+        request_protocol_ = declared;
+      }
+      ENVOY_LOG(debug, "ai_protocol_manager: AI endpoint with request API {}",
+                llmProtocolName(request_protocol_));
     }
   }
 
@@ -289,8 +298,7 @@ uint32_t AiProtocolManagerFilter::inlineStringThresholdBytes() const {
   // schema may pin its own, because what has to stay inline for the payload to
   // validate is a property of the wire API, not of the deployment.
   if (isAiEndpoint()) {
-    if (const PayloadSchema* payload_schema =
-            AdapterRegistry::get(route_request_protocol_).schema();
+    if (const PayloadSchema* payload_schema = AdapterRegistry::get(request_protocol_).schema();
         payload_schema != nullptr) {
       if (const std::optional<uint32_t> pinned =
               payload_schema->requestInlineStringThresholdBytes();
@@ -338,21 +346,6 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   if (end_stream) {
     request_json_ = request_parser_->takeDocument();
     request_parser_.reset();
-
-    if (isAiEndpoint()) {
-      // TODO(penguingao): Support validating payload schema on the fly as the Wuffs parser
-      // streams and parses chunks, rejecting invalid fields early before end_stream.
-      if (const PayloadSchema* payload_schema =
-              AdapterRegistry::get(route_request_protocol_).schema();
-          payload_schema != nullptr) {
-        const absl::Status validation_status = payload_schema->validateRequest(request_json_);
-        if (!validation_status.ok()) {
-          config_->stats().request_schema_invalid_.inc();
-          rejectInvalidPayload(validation_status);
-          return false;
-        }
-      }
-    }
     config_->stats().request_parsed_.inc();
   }
   return true;
@@ -452,7 +445,7 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
     const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
-                                  route_request_protocol_, decode_manager_->length()};
+                                  request_protocol_, decode_manager_->length()};
     std::vector<AiFilterSharedPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());
     for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
@@ -473,7 +466,8 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
           payload_rejected_ = true;
           decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
                                              "ai_protocol_manager_filter_rejected");
-        });
+        },
+        config_->alwaysSerializeRequest(), request_protocol_);
   } else {
     decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
   }
