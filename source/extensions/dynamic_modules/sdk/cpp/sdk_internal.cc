@@ -97,9 +97,12 @@ public:
     }
 
     std::vector<HeaderView> result_headers(header_count);
-    envoy_dynamic_module_callback_http_get_headers(
-        host_plugin_ptr_, Type,
-        reinterpret_cast<envoy_dynamic_module_type_envoy_http_header*>(result_headers.data()));
+    if (!envoy_dynamic_module_callback_http_get_headers(
+            host_plugin_ptr_, Type,
+            reinterpret_cast<envoy_dynamic_module_type_envoy_http_header*>(
+                result_headers.data()))) {
+      return {};
+    }
     return result_headers;
   }
 
@@ -756,6 +759,47 @@ public:
     }
     return ClusterHostCounts{static_cast<uint64_t>(total), static_cast<uint64_t>(healthy),
                              static_cast<uint64_t>(degraded)};
+  }
+
+  std::optional<std::string_view> getUpstreamRemoteAddress() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_get_upstream_remote_address(
+        host_plugin_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  std::vector<std::string_view> getUpstreamHostsAttempted() override {
+    const size_t count =
+        envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(host_plugin_ptr_);
+    if (count == 0) {
+      return {};
+    }
+    std::vector<envoy_dynamic_module_type_envoy_buffer> buffers(count);
+    if (!envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(host_plugin_ptr_,
+                                                                         buffers.data())) {
+      return {};
+    }
+    std::vector<std::string_view> hosts;
+    hosts.reserve(count);
+    for (const auto& buffer : buffers) {
+      hosts.emplace_back(buffer.ptr, buffer.length);
+    }
+    return hosts;
+  }
+
+  std::vector<uint64_t> getUpstreamConnectionIdsAttempted() override {
+    const size_t count =
+        envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+            host_plugin_ptr_);
+    if (count == 0) {
+      return {};
+    }
+    std::vector<uint64_t> connection_ids(count);
+    if (!envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+            host_plugin_ptr_, connection_ids.data())) {
+      return {};
+    }
+    return connection_ids;
   }
 
   bool setUpstreamOverrideHost(std::string_view host, bool strict) override {

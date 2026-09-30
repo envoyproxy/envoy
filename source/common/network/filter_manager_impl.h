@@ -162,6 +162,9 @@ private:
       FixedReadBufferSource buffer_source{data, end_stream};
       parent_.onContinueReading(this, buffer_source);
     }
+    OptRef<Buffer::Instance> readBuffer() override {
+      return makeOptRef(parent_.connection_.getReadBuffer().buffer);
+    }
 
     void disableClose(bool disable) override;
 

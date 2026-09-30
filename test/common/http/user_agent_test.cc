@@ -25,12 +25,12 @@ void expectDeviceStat(Stats::TestUtil::TestStore& store, const std::string& name
                       uint64_t value) {
   Stats::CounterOptConstRef counter = store.findCounterByString(name);
   ASSERT_TRUE(counter.has_value()) << "no counter named '" << name << "'";
-  EXPECT_EQ(counter->get().value(), value) << " for stat '" << name << "'";
-  EXPECT_EQ(counter->get().tagExtractedName(), tag_extracted_name) << " for stat '" << name << "'";
+  EXPECT_EQ(counter->value(), value) << " for stat '" << name << "'";
+  EXPECT_EQ(counter->tagExtractedName(), tag_extracted_name) << " for stat '" << name << "'";
 
   using TagVector = std::vector<std::pair<std::string, std::string>>;
   TagVector tags;
-  for (const Stats::Tag& tag : counter->get().tags()) {
+  for (const Stats::Tag& tag : counter->tags()) {
     tags.emplace_back(tag.name_, tag.value_);
   }
   const TagVector expected_tags{{Config::TagNames::get().HTTP_USER_AGENT, device}};

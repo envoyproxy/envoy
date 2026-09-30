@@ -272,7 +272,6 @@ const envoy::config::core::v3::Metadata*
 getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
             envoy_dynamic_module_type_metadata_source metadata_source) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  filter->last_metadata_snapshot_.reset();
   auto* callbacks = filter->callbacks();
   if (!callbacks) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
@@ -304,9 +303,9 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     if (upstreamInfo) {
       Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
       if (hostInfo) {
-        filter->last_metadata_snapshot_ = hostInfo->metadata();
-        if (filter->last_metadata_snapshot_) {
-          return filter->last_metadata_snapshot_.get();
+        Upstream::MetadataConstSharedPtr metadata = hostInfo->metadata();
+        if (metadata) {
+          return filter->metadata_scratch_.emplace_back(std::move(metadata)).get();
         }
       }
     }
@@ -317,9 +316,9 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     if (upstreamInfo) {
       Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
       if (hostInfo) {
-        filter->last_metadata_snapshot_ = hostInfo->localityMetadata();
-        if (filter->last_metadata_snapshot_) {
-          return filter->last_metadata_snapshot_.get();
+        Upstream::MetadataConstSharedPtr metadata = hostInfo->localityMetadata();
+        if (metadata) {
+          return filter->metadata_scratch_.emplace_back(std::move(metadata)).get();
         }
       }
     }
@@ -1681,10 +1680,12 @@ bool envoy_dynamic_module_callback_http_get_filter_state_typed(
     return false;
   }
 
-  // Store the serialized string on the filter to ensure it outlives the current event hook.
-  filter->last_serialized_filter_state_ = std::move(serialized.value());
-  result->ptr = const_cast<char*>(filter->last_serialized_filter_state_->data());
-  result->length = filter->last_serialized_filter_state_->size();
+  // Append to the scratch so consecutive getter calls in the same hook stay valid until the hook
+  // returns.
+  filter->filter_state_scratch_.push_back(std::move(serialized.value()));
+  const std::string& stored = filter->filter_state_scratch_.back();
+  result->ptr = const_cast<char*>(stored.data());
+  result->length = stored.size();
   return true;
 }
 
@@ -2838,6 +2839,88 @@ uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
     return 0;
   }
   return upstream_info->upstreamConnectionId().value();
+}
+
+bool envoy_dynamic_module_callback_http_get_upstream_remote_address(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  const auto* upstream_info = filter->upstreamInfo();
+  if (upstream_info == nullptr) {
+    return false;
+  }
+  const auto& remote_address = upstream_info->upstreamRemoteAddress();
+  if (remote_address == nullptr) {
+    return false;
+  }
+  const auto address = remote_address->asStringView();
+  *result = {.ptr = const_cast<char*>(address.data()), .length = address.size()};
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  const auto* upstream_info = filter->upstreamInfo();
+  if (upstream_info == nullptr) {
+    return 0;
+  }
+  size_t size = 0;
+  for (const auto& host : upstream_info->upstreamHostsAttempted()) {
+    if (host != nullptr && host->address() != nullptr) {
+      ++size;
+    }
+  }
+  return size;
+}
+
+bool envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* hosts_out) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  const auto* upstream_info = filter->upstreamInfo();
+  if (upstream_info == nullptr) {
+    return false;
+  }
+  size_t index = 0;
+  for (const auto& host : upstream_info->upstreamHostsAttempted()) {
+    if (host == nullptr) {
+      continue;
+    }
+    const auto address = host->address();
+    if (address == nullptr) {
+      continue;
+    }
+    const auto address_string = address->asStringView();
+    hosts_out[index++] = {.ptr = const_cast<char*>(address_string.data()),
+                          .length = address_string.size()};
+  }
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  const auto* upstream_info = filter->upstreamInfo();
+  if (upstream_info == nullptr) {
+    return 0;
+  }
+  return upstream_info->upstreamConnectionIdsAttempted().size();
+}
+
+bool envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    uint64_t* connection_ids_out) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  const auto* upstream_info = filter->upstreamInfo();
+  if (upstream_info == nullptr) {
+    return false;
+  }
+  size_t index = 0;
+  for (const uint64_t id : upstream_info->upstreamConnectionIdsAttempted()) {
+    connection_ids_out[index++] = id;
+  }
+  return true;
 }
 
 // ------------------- Stream Control Callbacks -------------------------

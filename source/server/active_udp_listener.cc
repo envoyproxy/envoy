@@ -53,7 +53,7 @@ void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
                                     &parent = parent_, address]() mutable {
     Network::UdpListenerCallbacksOptRef listener = parent.getUdpListenerCallbacks(tag, *address);
     if (listener.has_value()) {
-      listener->get().onDataWorker(std::move(data));
+      listener->onDataWorker(std::move(data));
     }
   });
 }
@@ -125,7 +125,8 @@ void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
   if (non_dispatched_udp_packet_handler_.has_value() &&
       !active_sessions_.contains(data.addresses_)) {
     // Draining for hot restart: this session isn't ours, hand it to the child instance.
-    non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
+    non_dispatched_udp_packet_handler_->handle(
+        worker_index_, *listen_socket_.connectionInfoProvider().localAddress(), std::move(data));
     return;
   }
 

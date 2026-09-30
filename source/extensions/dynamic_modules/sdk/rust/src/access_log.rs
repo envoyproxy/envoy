@@ -10,6 +10,7 @@
 pub use crate::timing::TimingInfo;
 use crate::{abi, ffi_export, EnvoyBuffer};
 use std::ffi::c_void;
+use std::num::NonZero;
 use std::ptr;
 
 // -----------------------------------------------------------------------------
@@ -621,11 +622,11 @@ impl LogContext {
     self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_host)
   }
 
-  /// Get the connection ID, or 0 if not available.
-  pub fn connection_id(&self) -> u64 {
+  /// Get the connection ID, or `None` if not available.
+  pub fn connection_id(&self) -> Option<NonZero<u64>> {
     self
       .get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId)
-      .unwrap_or(0)
+      .and_then(NonZero::new)
   }
 
   /// Check if mTLS was used for the connection.
@@ -1106,11 +1107,11 @@ impl LogContext {
     )
   }
 
-  /// Get the upstream connection ID, or 0 if not available.
-  pub fn upstream_connection_id(&self) -> u64 {
-    unsafe {
+  /// Get the upstream connection ID, or `None` if not available.
+  pub fn upstream_connection_id(&self) -> Option<NonZero<u64>> {
+    NonZero::new(unsafe {
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_connection_id(self.envoy_ptr)
-    }
+    })
   }
 
   /// Get the upstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
@@ -1291,26 +1292,16 @@ impl LogContext {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_headers_count(header_type);
-    if count == 0 {
-      return Vec::new();
-    }
-
-    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(count);
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_headers(
-        self.envoy_ptr,
-        header_type,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-      )
-    };
-    if !success {
-      return Vec::new();
-    }
-    unsafe {
-      headers.set_len(count);
-    }
-    headers
+    crate::utility::collect_headers(
+      || self.get_headers_count(header_type),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_access_logger_get_headers(
+          self.envoy_ptr,
+          header_type,
+          headers,
+        )
+      },
+    )
   }
 
   /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.

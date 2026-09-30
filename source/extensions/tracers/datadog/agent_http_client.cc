@@ -77,7 +77,7 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
   }
 
   Http::AsyncClient::Request* request =
-      collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+      collector_cluster_.threadLocalCluster()->httpAsyncClient().send(
           std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
   if (!request) {
     stats_.reports_failed_.inc();

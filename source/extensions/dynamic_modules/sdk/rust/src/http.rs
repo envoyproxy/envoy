@@ -11,6 +11,7 @@ use crate::{
 use mockall::*;
 use std::any::Any;
 use std::ffi::c_void;
+use std::num::NonZero;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::rc::Rc;
 
@@ -2102,8 +2103,30 @@ pub trait EnvoyHttpFilter {
   /// Returns `true` if the override was set successfully, `false` if the host address is invalid.
   fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool;
 
-  /// Get the upstream connection ID, or 0 if not available.
-  fn get_upstream_connection_id(&self) -> u64;
+  /// Get the upstream connection ID, or `None` if not available.
+  fn get_upstream_connection_id(&self) -> Option<NonZero<u64>>;
+
+  /// Get the remote address of the connected upstream socket, including the port.
+  ///
+  /// This can differ from
+  /// [`abi::envoy_dynamic_module_type_attribute_id::UpstreamAddress`], which exposes the selected
+  /// upstream host address.
+  ///
+  /// Returns `None` if the address is unavailable. The buffer is valid until the current event
+  /// hook returns.
+  fn get_upstream_remote_address<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the upstream host addresses in attempt order.
+  ///
+  /// Returns an empty vector if upstream information is unavailable or no hosts were attempted.
+  /// The buffers are valid until the current event hook returns.
+  fn get_upstream_hosts_attempted<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get the upstream connection IDs in attempt order.
+  ///
+  /// Returns an empty vector if upstream information is unavailable or no connections were
+  /// attempted.
+  fn get_upstream_connection_ids_attempted(&self) -> Vec<u64>;
 
   // ------------------- Stream Control methods -------------------------
 
@@ -4222,8 +4245,76 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_upstream_connection_id(&self) -> u64 {
-    unsafe { abi::envoy_dynamic_module_callback_http_get_upstream_connection_id(self.raw_ptr) }
+  fn get_upstream_connection_id(&self) -> Option<NonZero<u64>> {
+    NonZero::new(unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_connection_id(self.raw_ptr)
+    })
+  }
+
+  fn get_upstream_remote_address(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_remote_address(
+        self.raw_ptr,
+        &mut result as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_upstream_hosts_attempted(&self) -> Vec<EnvoyBuffer<'_>> {
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(self.raw_ptr)
+    };
+    if size == 0 {
+      return Vec::new();
+    }
+    let mut hosts: Vec<EnvoyBuffer> = Vec::with_capacity(size);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(
+        self.raw_ptr,
+        hosts.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if !success {
+      return Vec::new();
+    }
+    unsafe {
+      hosts.set_len(size);
+    }
+    hosts
+  }
+
+  fn get_upstream_connection_ids_attempted(&self) -> Vec<u64> {
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+        self.raw_ptr,
+      )
+    };
+    if size == 0 {
+      return Vec::new();
+    }
+    let mut connection_ids = Vec::with_capacity(size);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+        self.raw_ptr,
+        connection_ids.as_mut_ptr(),
+      )
+    };
+    if !success {
+      return Vec::new();
+    }
+    unsafe {
+      connection_ids.set_len(size);
+    }
+    connection_ids
   }
 
   fn reset_stream(
@@ -4283,28 +4374,14 @@ impl EnvoyHttpFilterImpl {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_headers_size(self.raw_ptr, header_type)
-    };
-    if count == 0 {
-      return Vec::default();
-    }
-
-    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(count);
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_headers(
-        self.raw_ptr,
-        header_type,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-      )
-    };
-    if !success {
-      return Vec::default();
-    }
-    unsafe {
-      headers.set_len(count);
-    }
-    headers
+    crate::utility::collect_headers(
+      || unsafe {
+        abi::envoy_dynamic_module_callback_http_get_headers_size(self.raw_ptr, header_type)
+      },
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_http_get_headers(self.raw_ptr, header_type, headers)
+      },
+    )
   }
 
   /// This implements the common logic for getting the header/trailer values.
