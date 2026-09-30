@@ -56,7 +56,7 @@ RouteConstSharedPtr namedRoute(const std::string& name) {
 // Makes the specifier wrap whatever it is given in a route named `name`, recording the name of the
 // route it received in `trace`.
 auto wrapWith(const std::string& name, std::vector<std::string>& trace,
-              OnRouteResultStatus status = OnRouteResultStatus::Continue) {
+              OnRouteChainStatus status = OnRouteChainStatus::Continue) {
   return Invoke([&trace, name, status](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
                                        const StreamInfo::StreamInfo&, uint64_t) -> OnRouteResult {
     trace.push_back(route == nullptr ? "<none>" : route->routeName());
@@ -76,7 +76,7 @@ protected:
 
   RouteConstSharedPtr apply(RouteConstSharedPtr route) {
     return applyRouteSpecifiers(std::move(route), config_specifiers_, vhost_specifiers_,
-                                route_specifiers_, headers_, stream_info_, 0);
+                                route_specifiers_, headers_, stream_info_, 0, match_status_);
   }
 
   RouteSpecifierList config_specifiers_;
@@ -85,6 +85,7 @@ protected:
   Http::TestRequestHeaderMapImpl headers_{{":authority", "host"}, {":path", "/"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
   std::vector<std::string> trace_;
+  OnRouteMatchStatus match_status_{OnRouteMatchStatus::Unspecified};
 };
 
 // With nothing configured at any level the matched route is handed straight back.
@@ -96,7 +97,7 @@ TEST_F(ApplyRouteSpecifiersTest, EmptyChainsReturnTheInput) {
 // With nothing configured at any level, a nullptr route stays nullptr.
 TEST_F(ApplyRouteSpecifiersTest, EmptyChainsPreserveNoRoute) { EXPECT_EQ(nullptr, apply(nullptr)); }
 
-// Levels run route configuration first, then virtual host, then route, and each specifier is
+// Levels run route first, then virtual host, then route configuration, and each specifier is
 // handed what the previous one produced.
 TEST_F(ApplyRouteSpecifiersTest, LevelsRunInOrderAndFeedTheNext) {
   EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _))
@@ -109,8 +110,8 @@ TEST_F(ApplyRouteSpecifiersTest, LevelsRunInOrderAndFeedTheNext) {
   RouteConstSharedPtr result = apply(namedRoute("matched"));
 
   ASSERT_NE(nullptr, result);
-  EXPECT_EQ("route", result->routeName());
-  EXPECT_THAT(trace_, ElementsAre("matched", "config", "vhost"));
+  EXPECT_EQ("config", result->routeName());
+  EXPECT_THAT(trace_, ElementsAre("matched", "route", "vhost"));
 }
 
 // Specifiers of one level run in configuration order.
@@ -138,9 +139,9 @@ TEST_F(ApplyRouteSpecifiersTest, SpecifierCanGenerateRouteFromNoRoute) {
 
 // A specifier drops the matched route, and the next one still gets its turn.
 TEST_F(ApplyRouteSpecifiersTest, DroppedRouteIsPassedOnAsNoRoute) {
-  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _))
+  EXPECT_CALL(*addSpecifier(vhost_specifiers_), onRoute(_, _, _, _))
       .WillOnce(Return(OnRouteResult{nullptr}));
-  EXPECT_CALL(*addSpecifier(vhost_specifiers_), onRoute(IsNull(), _, _, _))
+  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(IsNull(), _, _, _))
       .WillOnce(wrapWith("rescued", trace_));
 
   RouteConstSharedPtr result = apply(namedRoute("matched"));
@@ -152,7 +153,7 @@ TEST_F(ApplyRouteSpecifiersTest, DroppedRouteIsPassedOnAsNoRoute) {
 
 // Nothing rescues the route, so the request ends up with none.
 TEST_F(ApplyRouteSpecifiersTest, RouteDroppedByTheLastSpecifierIsTheResult) {
-  EXPECT_CALL(*addSpecifier(route_specifiers_), onRoute(_, _, _, _))
+  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _))
       .WillOnce(Return(OnRouteResult{nullptr}));
 
   EXPECT_EQ(nullptr, apply(namedRoute("matched")));
@@ -161,7 +162,7 @@ TEST_F(ApplyRouteSpecifiersTest, RouteDroppedByTheLastSpecifierIsTheResult) {
 // StopIteration skips the rest of its own level.
 TEST_F(ApplyRouteSpecifiersTest, StopIterationSkipsTheRestOfTheLevel) {
   EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _))
-      .WillOnce(wrapWith("final", trace_, OnRouteResultStatus::StopIteration));
+      .WillOnce(wrapWith("final", trace_, OnRouteChainStatus::StopIteration));
   EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _)).Times(0);
 
   RouteConstSharedPtr result = apply(namedRoute("matched"));
@@ -172,10 +173,10 @@ TEST_F(ApplyRouteSpecifiersTest, StopIterationSkipsTheRestOfTheLevel) {
 
 // StopIteration ends the whole chain, not just the level that raised it.
 TEST_F(ApplyRouteSpecifiersTest, StopIterationSkipsTheLaterLevels) {
-  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _))
-      .WillOnce(wrapWith("final", trace_, OnRouteResultStatus::StopIteration));
+  EXPECT_CALL(*addSpecifier(route_specifiers_), onRoute(_, _, _, _))
+      .WillOnce(wrapWith("final", trace_, OnRouteChainStatus::StopIteration));
   EXPECT_CALL(*addSpecifier(vhost_specifiers_), onRoute(_, _, _, _)).Times(0);
-  EXPECT_CALL(*addSpecifier(route_specifiers_), onRoute(_, _, _, _)).Times(0);
+  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _)).Times(0);
 
   RouteConstSharedPtr result = apply(namedRoute("matched"));
 
@@ -186,9 +187,9 @@ TEST_F(ApplyRouteSpecifiersTest, StopIterationSkipsTheLaterLevels) {
 // A specifier can force "no route" and have that stand, even though a nullptr route on its own
 // would have been passed on to the next specifier.
 TEST_F(ApplyRouteSpecifiersTest, StopIterationWithNoRouteIsFinal) {
-  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _))
-      .WillOnce(Return(OnRouteResult{nullptr, OnRouteResultStatus::StopIteration}));
-  EXPECT_CALL(*addSpecifier(vhost_specifiers_), onRoute(_, _, _, _)).Times(0);
+  EXPECT_CALL(*addSpecifier(vhost_specifiers_), onRoute(_, _, _, _))
+      .WillOnce(Return(OnRouteResult{nullptr, OnRouteChainStatus::StopIteration}));
+  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _)).Times(0);
 
   EXPECT_EQ(nullptr, apply(namedRoute("matched")));
 }
@@ -205,8 +206,9 @@ TEST_F(ApplyRouteSpecifiersTest, RequestContextIsForwarded) {
           }));
 
   RouteConstSharedPtr route = namedRoute("matched");
-  EXPECT_EQ(route, applyRouteSpecifiers(route, config_specifiers_, vhost_specifiers_,
-                                        route_specifiers_, headers_, stream_info_, 1234));
+  EXPECT_EQ(route,
+            applyRouteSpecifiers(route, config_specifiers_, vhost_specifiers_, route_specifiers_,
+                                 headers_, stream_info_, 1234, match_status_));
 }
 
 // A single registered factory backs every test specifier; the string config names which one to
@@ -217,7 +219,8 @@ public:
   absl::StatusOr<RouteSpecifierSharedPtr>
   createRouteSpecifier(const Protobuf::Message& config,
                        RouteSpecifierFactoryContext& context) override {
-    const std::string& key = dynamic_cast<const Protobuf::StringValue&>(config).value();
+    const std::string& key =
+        Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config).value();
     auto it = specifiers_.find(key);
     if (it == specifiers_.end()) {
       return absl::InvalidArgumentError(absl::StrCat("no test route specifier named ", key));
@@ -380,8 +383,8 @@ virtual_hosts:
   VirtualHostRoute result = route(*config(yaml));
 
   ASSERT_NE(nullptr, result.route);
-  EXPECT_EQ("route", result.route->routeName());
-  EXPECT_THAT(trace_, ElementsAre("matched", "config", "vhost"));
+  EXPECT_EQ("config", result.route->routeName());
+  EXPECT_THAT(trace_, ElementsAre("matched", "route", "vhost"));
   // The specifiers wrapped the matched route, so the virtual host is still the one that matched,
   // and it agrees with the route that came out of the chains.
   ASSERT_NE(nullptr, result.vhost);
@@ -392,9 +395,10 @@ virtual_hosts:
 // The route configuration and virtual host levels run for a request that matched no route, so an
 // specifier can answer for it.
 TEST_F(RouteSpecifierConfigImplTest, LevelsAboveTheRouteRunWhenNothingMatched) {
-  EXPECT_CALL(*registerSpecifier("config"), onRoute(IsNull(), _, _, _))
+  EXPECT_CALL(*registerSpecifier("vhost"), onRoute(IsNull(), _, _, _))
+      .WillOnce(wrapWith("vhost", trace_));
+  EXPECT_CALL(*registerSpecifier("config"), onRoute(_, _, _, _))
       .WillOnce(wrapWith("config", trace_));
-  EXPECT_CALL(*registerSpecifier("vhost"), onRoute(_, _, _, _)).WillOnce(wrapWith("vhost", trace_));
   // Never reached: there is no matched route to read a route level chain from.
   EXPECT_CALL(*registerSpecifier("route"), onRoute(_, _, _, _)).Times(0);
 
@@ -427,8 +431,8 @@ virtual_hosts:
   VirtualHostRoute result = route(*config(yaml));
 
   ASSERT_NE(nullptr, result.route);
-  EXPECT_EQ("vhost", result.route->routeName());
-  EXPECT_THAT(trace_, ElementsAre("<none>", "config"));
+  EXPECT_EQ("config", result.route->routeName());
+  EXPECT_THAT(trace_, ElementsAre("<none>", "vhost"));
   // The specifiers supplied a route of their own, and the virtual host follows that route rather
   // than staying on the one that matched.
   ASSERT_NE(nullptr, result.vhost);
@@ -527,6 +531,268 @@ virtual_hosts:
   // Not the virtual host that matched the request: the one the returned route reports.
   ASSERT_NE(nullptr, result.vhost);
   EXPECT_EQ(replacement->virtualHostSharedPtr(), result.vhost);
+  EXPECT_EQ(result.vhost.get(), std::addressof(result.route->virtualHost()));
+}
+
+// Makes the specifier hand back the route it was given together with `match_status`, recording
+// the name of the route it received in `trace`.
+auto passWith(OnRouteMatchStatus match_status, std::vector<std::string>& trace,
+              OnRouteChainStatus status = OnRouteChainStatus::Continue) {
+  return Invoke(
+      [&trace, match_status, status](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
+                                     const StreamInfo::StreamInfo&, uint64_t) -> OnRouteResult {
+        trace.push_back(route == nullptr ? "<none>" : route->routeName());
+        return {std::move(route), status, match_status};
+      });
+}
+
+// No specifier has an opinion on the match status, so none comes out of the chains.
+TEST_F(ApplyRouteSpecifiersTest, MatchStatusIsUnspecifiedByDefault) {
+  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _))
+      .WillOnce(wrapWith("config", trace_));
+
+  RouteConstSharedPtr result = apply(namedRoute("matched"));
+
+  ASSERT_NE(nullptr, result);
+  EXPECT_EQ("config", result->routeName());
+  EXPECT_EQ(OnRouteMatchStatus::Unspecified, match_status_);
+}
+
+// The last specifier that returns a match status decides it, across the levels.
+TEST_F(ApplyRouteSpecifiersTest, LastSpecifiedMatchStatusWins) {
+  EXPECT_CALL(*addSpecifier(route_specifiers_), onRoute(_, _, _, _))
+      .WillOnce(passWith(OnRouteMatchStatus::Continue, trace_));
+  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _))
+      .WillOnce(passWith(OnRouteMatchStatus::Accept, trace_));
+
+  RouteConstSharedPtr result = apply(namedRoute("matched"));
+
+  ASSERT_NE(nullptr, result);
+  EXPECT_EQ(OnRouteMatchStatus::Accept, match_status_);
+  EXPECT_THAT(trace_, ElementsAre("matched", "matched"));
+}
+
+// A specifier that has no opinion leaves the match status of an earlier one alone.
+TEST_F(ApplyRouteSpecifiersTest, UnspecifiedKeepsTheEarlierMatchStatus) {
+  EXPECT_CALL(*addSpecifier(vhost_specifiers_), onRoute(_, _, _, _))
+      .WillOnce(passWith(OnRouteMatchStatus::Continue, trace_));
+  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _))
+      .WillOnce(passWith(OnRouteMatchStatus::Unspecified, trace_));
+
+  RouteConstSharedPtr result = apply(namedRoute("matched"));
+
+  ASSERT_NE(nullptr, result);
+  EXPECT_EQ(OnRouteMatchStatus::Continue, match_status_);
+}
+
+// StopIteration keeps the specifiers after it from changing the match status.
+TEST_F(ApplyRouteSpecifiersTest, StopIterationKeepsTheMatchStatus) {
+  EXPECT_CALL(*addSpecifier(route_specifiers_), onRoute(_, _, _, _))
+      .WillOnce(passWith(OnRouteMatchStatus::Continue, trace_));
+  EXPECT_CALL(*addSpecifier(vhost_specifiers_), onRoute(_, _, _, _))
+      .WillOnce(
+          passWith(OnRouteMatchStatus::Unspecified, trace_, OnRouteChainStatus::StopIteration));
+  EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, _)).Times(0);
+
+  RouteConstSharedPtr result = apply(namedRoute("matched"));
+
+  ASSERT_NE(nullptr, result);
+  EXPECT_EQ("matched", result->routeName());
+  EXPECT_EQ(OnRouteMatchStatus::Continue, match_status_);
+}
+
+// The specifiers turn the first route that matched down, and route matching moves on to the next
+// one, which runs the chains of its own.
+TEST_F(RouteSpecifierConfigImplTest, ContinueMatchStatusMovesOnToTheNextRoute) {
+  EXPECT_CALL(*registerSpecifier("vhost"), onRoute(_, _, _, _))
+      .Times(2)
+      .WillRepeatedly(passWith(OnRouteMatchStatus::Unspecified, trace_));
+  EXPECT_CALL(*registerSpecifier("route"), onRoute(_, _, _, _))
+      .WillOnce(passWith(OnRouteMatchStatus::Continue, trace_));
+
+  const std::string yaml = R"EOF(
+name: config
+virtual_hosts:
+- name: vhost
+  domains: ["*"]
+  route_specifiers:
+  - name: envoy.test.route_specifier
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: vhost
+  routes:
+  - match: {prefix: "/"}
+    name: first
+    route: {cluster: first_cluster}
+    route_specifiers:
+    - name: envoy.test.route_specifier
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: route
+  - match: {prefix: "/"}
+    name: second
+    route: {cluster: second_cluster}
+  )EOF";
+
+  VirtualHostRoute result = route(*config(yaml));
+
+  ASSERT_NE(nullptr, result.route);
+  EXPECT_EQ("second", result.route->routeName());
+  EXPECT_THAT(trace_, ElementsAre("first", "first", "second"));
+  ASSERT_NE(nullptr, result.vhost);
+  EXPECT_EQ("vhost", result.vhost->name());
+}
+
+// Dropping the route is not asking to continue: the match is accepted with no route, the next
+// route is not evaluated and the levels above the route do not run again.
+TEST_F(RouteSpecifierConfigImplTest, DroppedRouteIsFinal) {
+  EXPECT_CALL(*registerSpecifier("vhost"), onRoute(_, _, _, _))
+      .WillOnce(passWith(OnRouteMatchStatus::Unspecified, trace_));
+  EXPECT_CALL(*registerSpecifier("route"), onRoute(_, _, _, _))
+      .WillOnce(Return(OnRouteResult{nullptr}));
+
+  const std::string yaml = R"EOF(
+name: config
+virtual_hosts:
+- name: vhost
+  domains: ["*"]
+  route_specifiers:
+  - name: envoy.test.route_specifier
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: vhost
+  routes:
+  - match: {prefix: "/"}
+    name: first
+    route: {cluster: first_cluster}
+    route_specifiers:
+    - name: envoy.test.route_specifier
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: route
+  - match: {prefix: "/"}
+    name: second
+    route: {cluster: second_cluster}
+  )EOF";
+
+  bool callback_called = false;
+  VirtualHostRoute result = config(yaml)->route(
+      [&callback_called](RouteConstSharedPtr, RouteEvalStatus) {
+        callback_called = true;
+        return RouteMatchStatus::Accept;
+      },
+      headers_, stream_info_, 0);
+
+  EXPECT_EQ(nullptr, result.route);
+  // The route level runs first, so the virtual host level is handed the dropped route.
+  EXPECT_THAT(trace_, ElementsAre("<none>"));
+  // There is no route for the callback to look at.
+  EXPECT_FALSE(callback_called);
+  ASSERT_NE(nullptr, result.vhost);
+  EXPECT_EQ("vhost", result.vhost->name());
+}
+
+// Every route that matched was turned down, which leaves the request with no route, so the levels
+// above the route run once more to answer for it.
+TEST_F(RouteSpecifierConfigImplTest, LevelsAboveTheRouteRunAgainWhenEveryRouteWasTurnedDown) {
+  EXPECT_CALL(*registerSpecifier("vhost"), onRoute(_, _, _, _))
+      .Times(2)
+      .WillRepeatedly(passWith(OnRouteMatchStatus::Continue, trace_));
+
+  const std::string yaml = R"EOF(
+name: config
+virtual_hosts:
+- name: vhost
+  domains: ["*"]
+  route_specifiers:
+  - name: envoy.test.route_specifier
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: vhost
+  routes:
+  - match: {prefix: "/"}
+    name: only
+    route: {cluster: some_cluster}
+  )EOF";
+
+  VirtualHostRoute result = route(*config(yaml));
+
+  EXPECT_EQ(nullptr, result.route);
+  EXPECT_THAT(trace_, ElementsAre("only", "<none>"));
+  ASSERT_NE(nullptr, result.vhost);
+  EXPECT_EQ("vhost", result.vhost->name());
+}
+
+// The SSL redirect route has no route entry behind it to run the chains, so the levels above the
+// route run on it after the virtual host resolved it.
+TEST_F(RouteSpecifierConfigImplTest, LevelsAboveTheRouteRunOnTheSslRedirectRoute) {
+  EXPECT_CALL(*registerSpecifier("config"), onRoute(_, _, _, _))
+      .WillOnce(wrapWith("config", trace_));
+  EXPECT_CALL(*registerSpecifier("route"), onRoute(_, _, _, _)).Times(0);
+
+  const std::string yaml = R"EOF(
+name: config
+route_specifiers:
+- name: envoy.test.route_specifier
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: config
+virtual_hosts:
+- name: vhost
+  domains: ["*"]
+  require_tls: ALL
+  routes:
+  - match: {prefix: "/"}
+    name: matched
+    route: {cluster: some_cluster}
+    route_specifiers:
+    - name: envoy.test.route_specifier
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: route
+  )EOF";
+
+  VirtualHostRoute result = route(*config(yaml));
+
+  ASSERT_NE(nullptr, result.route);
+  EXPECT_EQ("config", result.route->routeName());
+  EXPECT_NE(nullptr, result.route->directResponseEntry());
+  EXPECT_EQ(1, trace_.size());
+}
+
+// A route callback is handed the route that came out of the chains.
+TEST_F(RouteSpecifierConfigImplTest, RouteCallbackSeesTheRouteOfTheSpecifiers) {
+  EXPECT_CALL(*registerSpecifier("route"), onRoute(_, _, _, _)).WillOnce(wrapWith("route", trace_));
+
+  const std::string yaml = R"EOF(
+name: config
+virtual_hosts:
+- name: vhost
+  domains: ["*"]
+  routes:
+  - match: {prefix: "/"}
+    name: matched
+    route: {cluster: some_cluster}
+    route_specifiers:
+    - name: envoy.test.route_specifier
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: route
+  )EOF";
+
+  std::string seen;
+  VirtualHostRoute result = config(yaml)->route(
+      [&seen](RouteConstSharedPtr route, RouteEvalStatus) {
+        seen = route->routeName();
+        return RouteMatchStatus::Accept;
+      },
+      headers_, stream_info_, 0);
+
+  ASSERT_NE(nullptr, result.route);
+  EXPECT_EQ("route", result.route->routeName());
+  EXPECT_EQ("route", seen);
+  EXPECT_THAT(trace_, ElementsAre("matched"));
+  ASSERT_NE(nullptr, result.vhost);
   EXPECT_EQ(result.vhost.get(), std::addressof(result.route->virtualHost()));
 }
 

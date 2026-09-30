@@ -31,6 +31,12 @@ pub enum RouteDecision {
   NoRoute,
   /// The module could not reach a decision, so Envoy applies the configured failure policy.
   Error,
+  /// Use the previous route of the stream unchanged, without building a new route. Valid only when
+  /// a previous route exists, otherwise Envoy applies the failure policy.
+  ReusePrevious,
+  /// Skip the route the specifier was given and let route matching carry on with the next route.
+  /// The recorded overrides and the returned route are ignored.
+  ContinueMatching,
 }
 
 impl RouteDecision {
@@ -43,6 +49,10 @@ impl RouteDecision {
       },
       Self::NoRoute => abi::envoy_dynamic_module_type_route_specifier_decision::NoRoute,
       Self::Error => abi::envoy_dynamic_module_type_route_specifier_decision::Error,
+      Self::ReusePrevious => abi::envoy_dynamic_module_type_route_specifier_decision::ReusePrevious,
+      Self::ContinueMatching => {
+        abi::envoy_dynamic_module_type_route_specifier_decision::ContinueMatching
+      },
     }
   }
 }
@@ -250,46 +260,26 @@ impl RouteSpecifierContext {
     }
   }
 
-  // Fills buf with the request headers, growing it once when it is too small. On success buf holds
-  // the header count and every entry is initialized. Returns Unavailable when the header map is
-  // absent, which never happens during on_route but is handled for safety.
+  // Fills buf with the request headers. On success buf holds the header count and every entry is
+  // initialized. The size and fill callbacks are paired by the shared helper, so the buffer always
+  // has room for what Envoy writes. Returns Unavailable when the header map is absent, which never
+  // happens during on_route but is handled for safety.
   fn fill_request_headers(
     &self,
     buf: &mut Vec<MaybeUninit<abi::envoy_dynamic_module_type_envoy_http_header>>,
   ) -> Result<(), FillError> {
-    let mut size_out: usize = 0;
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_route_specifier_get_request_headers(
-        self.envoy_ptr,
-        buf.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-        buf.capacity(),
-        &mut size_out,
-      )
-    };
-    if !ok {
-      if size_out == 0 {
-        return Err(FillError::Unavailable);
-      }
-      // The buffer was too small. Grow it to the required count and retry once. The length is zero
-      // here, so reserve leaves the capacity at least size_out.
-      buf.reserve(size_out);
-      let ok = unsafe {
+    crate::utility::fill_headers(
+      buf,
+      || self.get_request_headers_count(),
+      |headers| unsafe {
         abi::envoy_dynamic_module_callback_route_specifier_get_request_headers(
           self.envoy_ptr,
-          buf.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-          buf.capacity(),
-          &mut size_out,
+          headers,
         )
-      };
-      if !ok {
-        return Err(FillError::Unavailable);
-      }
-    }
-    // Safety: Envoy initialized size_out entries starting at index zero.
-    unsafe {
-      buf.set_len(size_out);
-    }
-    Ok(())
+      },
+    )
+    .map(|_| ())
+    .ok_or(FillError::Unavailable)
   }
 
   /// Fills the caller owned buffer with the request headers and returns a [`HeaderView`] over it.
@@ -548,6 +538,28 @@ impl RouteSpecifierContext {
   /// Prefer this over the individual getters when more than one of them is read. Returns `None`
   /// when no route was resolved for the request.
   pub fn input_route(&self) -> Option<InputRoute<'_>> {
+    self.read_route(abi::envoy_dynamic_module_callback_route_specifier_get_input_route)
+  }
+
+  /// Get the properties of the previous route of the stream, the route the connection manager last
+  /// installed before this resolution, in one call.
+  ///
+  /// It is `None` on the first resolution, after an internal redirect that recreated the stream,
+  /// and when a filter installed a null route. It can be a static route, a route of another
+  /// specifier, a filter supplied route or a route this specifier produced.
+  pub fn previous_route(&self) -> Option<InputRoute<'_>> {
+    self.read_route(abi::envoy_dynamic_module_callback_route_specifier_get_previous_route)
+  }
+
+  // Reads a route through the given getter and builds an InputRoute, shared by input_route and
+  // previous_route which differ only in which route Envoy reads.
+  fn read_route(
+    &self,
+    callback: unsafe extern "C" fn(
+      *mut c_void,
+      *mut abi::envoy_dynamic_module_type_route_specifier_input_route,
+    ) -> bool,
+  ) -> Option<InputRoute<'_>> {
     let null_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: ptr::null_mut(),
       length: 0,
@@ -572,12 +584,7 @@ impl RouteSpecifierContext {
       request_mirror_policies_count: 0,
       response_code: 0,
     };
-    if !unsafe {
-      abi::envoy_dynamic_module_callback_route_specifier_get_input_route(
-        self.envoy_ptr,
-        &mut result,
-      )
-    } {
+    if !unsafe { callback(self.envoy_ptr, &mut result) } {
       return None;
     }
     let kind = RouteKind::from_abi(result.kind);
@@ -713,6 +720,30 @@ impl RouteSpecifierContext {
     }
   }
 
+  /// Get the string value of a metadata entry of the previous route of the stream.
+  pub fn previous_route_metadata_string(
+    &self,
+    namespace: &str,
+    key: &str,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: ptr::null_mut(),
+      length: 0,
+    };
+    if unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_get_previous_route_metadata(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::str_to_module_buffer(key),
+        &mut result,
+      )
+    } {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+    } else {
+      None
+    }
+  }
+
   /// Get the number value of a route metadata entry of the resolved route.
   pub fn input_route_metadata_number(&self, namespace: &str, key: &str) -> Option<f64> {
     let mut result: f64 = 0.0;
@@ -738,6 +769,36 @@ impl RouteSpecifierContext {
       abi::envoy_dynamic_module_callback_route_specifier_set_route_template(
         self.envoy_ptr,
         crate::str_to_module_buffer(template_id),
+      )
+    }
+  }
+
+  /// Record a u64 on the route this decision produces.
+  ///
+  /// It forces the produced route to be wrapped even with no other override, so that
+  /// [`RouteSpecifierConfig::on_route_destroy`] fires for it with this value when the route is
+  /// destroyed. It is effective for the [`RouteDecision::Override`] and
+  /// [`RouteDecision::SelectTemplate`] decisions.
+  pub fn set_route_user_data(&mut self, user_data: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_route_user_data(
+        self.envoy_ptr,
+        user_data,
+      )
+    }
+  }
+
+  /// Record a prefix rewrite of the request path sent upstream.
+  ///
+  /// `matched` must be a case insensitive prefix of the current path without its query string,
+  /// which is replaced by `replacement` while the query string is preserved. Returns `false` when
+  /// `matched` is not such a prefix or the rewritten path exceeds the configured maximum.
+  pub fn set_prefix_rewrite(&mut self, matched: &str, replacement: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(matched),
+        crate::str_to_module_buffer(replacement),
       )
     }
   }
@@ -924,6 +985,20 @@ impl RouteSpecifierContext {
     }
   }
 
+  /// Record the name of the route the decision produces. The name is what the `%ROUTE_NAME%` access
+  /// log command operator reports, so a module built route carries an identity of its own in access
+  /// logs and other route name consumers.
+  ///
+  /// Returns `false` when the name is empty.
+  pub fn set_route_name(&mut self, route_name: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_route_name(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(route_name),
+      )
+    }
+  }
+
   /// Record a header added to the request sent upstream.
   ///
   /// Returns `false` when the key is not a valid header name, is a pseudo header, or the value is
@@ -1015,6 +1090,14 @@ pub trait RouteSpecifierConfig: Send + Sync {
   /// so it must be able to reach a decision from the request and the stream info alone. The call
   /// is synchronous and cannot be time boxed, so it must not block or perform I/O.
   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision;
+
+  /// Called when a route built with [`RouteSpecifierContext::set_route_user_data`] is destroyed,
+  /// with the value recorded on it. It may run on any thread, concurrently with other hooks, and
+  /// possibly after the stream that installed the route is gone. It must not block or call back
+  /// into Envoy. The default is a no op.
+  fn on_route_destroy(&self, user_data: u64) {
+    let _ = user_data;
+  }
 }
 
 /// Envoy-side interface for the route specifier dynamic module.
@@ -1048,6 +1131,9 @@ pub trait EnvoyRouteSpecifierConfig: Send + Sync {
   /// virtual host to build routes in, when the identifier is empty or already used, when the bytes do
   /// not parse, or when the route is invalid.
   fn register_route_template(&self, template_id: &str, serialized_route: &[u8]) -> bool;
+
+  /// The specifier_instance_id of this configuration, empty when it is unset.
+  fn specifier_instance_id(&self) -> String;
 
   /// Define a new counter with the given name and no labels.
   fn define_counter(
@@ -1233,6 +1319,21 @@ impl EnvoyRouteSpecifierConfig for EnvoyRouteSpecifierConfigImpl {
         crate::bytes_to_module_buffer(serialized_route),
       )
     }
+  }
+
+  fn specifier_instance_id(&self) -> String {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: ptr::null_mut(),
+      length: 0,
+    };
+    let buffer = unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id(
+        self.raw,
+        &mut result,
+      );
+      EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length)
+    };
+    String::from_utf8_lossy(buffer.as_slice()).into_owned()
   }
 
   fn define_counter(
@@ -1592,4 +1693,18 @@ ffi_export! {
   // A panic during resolution must not look like a decision, so fail closed and let Envoy apply
   // the configured failure policy.
   on_panic = abi::envoy_dynamic_module_type_route_specifier_decision::Error
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_route_specifier_route_destroy(
+    config_ptr: abi::envoy_dynamic_module_type_route_specifier_config_module_ptr,
+    user_data: u64,
+  ) {
+    let config = &*(config_ptr as *const Box<dyn RouteSpecifierConfig>);
+    config.on_route_destroy(user_data);
+  }
 }
