@@ -856,7 +856,7 @@ TEST_P(TlsInspectorTest, JA4WithSNIAndALPN) {
 
   std::string expected_value = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
                                 max_version == Config::TLS_MAX_SUPPORTED_VERSION)
-                                   ? SSL_SELECT("t13d1312h2_f57a46bbacb6_ef7df7f74e48",
+                                   ? SSL_SELECT("t13d1311h2_f57a46bbacb6_78e6aca7449b",
                                                 "t13d5511h2_54f589121d70_3cecfd2c111c")
                                    : alpn_sni_test_version_to_ja4_.at(min_version);
 
