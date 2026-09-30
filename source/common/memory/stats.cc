@@ -6,6 +6,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 
+#include "absl/synchronization/notification.h"
+
 #if defined(TCMALLOC)
 #include "tcmalloc/malloc_extension.h"
 #elif defined(GPERFTOOLS_TCMALLOC)
@@ -222,7 +224,14 @@ AllocatorManager::AllocatorManager(
 };
 
 AllocatorManager::~AllocatorManager() {
-#if defined(TCMALLOC)
+#if defined(GPERFTOOLS_TCMALLOC)
+  if (tcmalloc_thread_) {
+    // Stop the release loop and wait for the thread before the timer and dispatcher are destroyed.
+    tcmalloc_routine_dispatcher_->exit();
+    tcmalloc_thread_->join();
+    tcmalloc_thread_.reset();
+  }
+#elif defined(TCMALLOC)
   if (tcmalloc_thread_) {
     // Signal the ProcessBackgroundActions loop to exit and wait for the thread to finish.
     tcmalloc::MallocExtension::SetBackgroundProcessActionsEnabled(false);
@@ -268,42 +277,68 @@ void AllocatorManager::configureTcmallocOptions(
 }
 
 /**
- * Configures tcmalloc to use its native ProcessBackgroundActions for background memory
- * maintenance. This enables comprehensive memory management including per-CPU cache reclamation,
- * cache shuffling, size class resizing, transfer cache plundering, and memory release at the
- * configured rate. If `bytes_to_release_` is `0`, no background processing will be started.
+ * Configures background memory release. No thread is started when `bytes_to_release_` or
+ * `memory_release_interval_msec_` is `0`. Builds using neither Google's tcmalloc nor `gperftools`
+ * tcmalloc log a warning and ignore the configuration.
  */
 void AllocatorManager::configureBackgroundMemoryRelease() {
-#if defined(GPERFTOOLS_TCMALLOC)
-  if (bytes_to_release_ > 0) {
-    ENVOY_LOG_MISC(error,
-                   "Memory releasing is not supported for gperf tcmalloc, no memory releasing "
-                   "will be configured.");
-  }
-#elif defined(TCMALLOC)
+#if defined(GPERFTOOLS_TCMALLOC) || defined(TCMALLOC)
   ENVOY_BUG(!tcmalloc_thread_, "Invalid state, tcmalloc has already been initialised.");
-  if (bytes_to_release_ > 0) {
-    if (!tcmalloc::MallocExtension::NeedsProcessBackgroundActions()) {
-      ENVOY_LOG_MISC(warn, "This platform does not support tcmalloc background actions.");
-      return;
-    }
-
-    tcmalloc::MallocExtension::SetBackgroundReleaseRate(
-        tcmalloc::MallocExtension::BytesPerSecond{background_release_rate_bytes_per_second_});
-
-    tcmalloc_thread_ = api_.threadFactory().createThread(
-        []() -> void {
-          ENVOY_LOG_MISC(debug, "Started {}.", TCMALLOC_ROUTINE_THREAD_ID);
-          // ProcessBackgroundActions runs an infinite loop that handles all tcmalloc background
-          // maintenance including cache reclamation and memory release. It returns only when
-          // SetBackgroundProcessActionsEnabled(false) is called.
-          tcmalloc::MallocExtension::ProcessBackgroundActions();
-        },
-        Thread::Options{std::string(TCMALLOC_ROUTINE_THREAD_ID)});
-
-    ENVOY_LOG_MISC(info, "Configured tcmalloc with background release rate: {} bytes per second.",
-                   background_release_rate_bytes_per_second_);
+  if (bytes_to_release_ == 0) {
+    return;
   }
+  if (memory_release_interval_msec_.count() == 0) {
+    // A sub-millisecond interval truncates to zero and would make the `gperftools` timer re-arm
+    // with no delay and spin on the page-heap lock.
+    ENVOY_LOG_MISC(warn, "Memory release interval is less than one millisecond, no memory "
+                         "releasing will be configured.");
+    return;
+  }
+#else
+  if (bytes_to_release_ > 0) {
+    ENVOY_LOG_MISC(warn, "Background memory release is only supported with Google's tcmalloc or "
+                         "gperftools tcmalloc, ignoring.");
+  }
+#endif
+#if defined(GPERFTOOLS_TCMALLOC)
+  tcmalloc_routine_dispatcher_ = api_.allocateDispatcher(std::string(GPERFTOOLS_RELEASE_THREAD_ID));
+  memory_release_timer_ = tcmalloc_routine_dispatcher_->createTimer([this]() -> void {
+    MallocExtension::instance()->ReleaseToSystem(bytes_to_release_);
+    memory_release_timer_->enableTimer(memory_release_interval_msec_);
+  });
+  // Wait until the timer is armed so tests using simulated time are deterministic.
+  absl::Notification timer_armed;
+  tcmalloc_thread_ = api_.threadFactory().createThread(
+      [this, &timer_armed]() -> void {
+        memory_release_timer_->enableTimer(memory_release_interval_msec_);
+        tcmalloc_routine_dispatcher_->post([&timer_armed]() { timer_armed.Notify(); });
+        tcmalloc_routine_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+      },
+      Thread::Options{std::string(GPERFTOOLS_RELEASE_THREAD_ID)});
+  timer_armed.WaitForNotification();
+  ENVOY_LOG_MISC(info, "Configured gperftools tcmalloc background release: {} bytes every {} ms.",
+                 bytes_to_release_, memory_release_interval_msec_.count());
+#elif defined(TCMALLOC)
+  if (!tcmalloc::MallocExtension::NeedsProcessBackgroundActions()) {
+    ENVOY_LOG_MISC(warn, "This platform does not support tcmalloc background actions.");
+    return;
+  }
+
+  tcmalloc::MallocExtension::SetBackgroundReleaseRate(
+      tcmalloc::MallocExtension::BytesPerSecond{background_release_rate_bytes_per_second_});
+
+  tcmalloc_thread_ = api_.threadFactory().createThread(
+      []() -> void {
+        ENVOY_LOG_MISC(debug, "Started {}.", TCMALLOC_ROUTINE_THREAD_ID);
+        // ProcessBackgroundActions runs an infinite loop that handles all tcmalloc background
+        // maintenance including cache reclamation and memory release. It returns only when
+        // SetBackgroundProcessActionsEnabled(false) is called.
+        tcmalloc::MallocExtension::ProcessBackgroundActions();
+      },
+      Thread::Options{std::string(TCMALLOC_ROUTINE_THREAD_ID)});
+
+  ENVOY_LOG_MISC(info, "Configured tcmalloc with background release rate: {} bytes per second.",
+                 background_release_rate_bytes_per_second_);
 #endif
 }
 

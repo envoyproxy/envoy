@@ -99,8 +99,10 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaders) {
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   std::vector<envoy_dynamic_module_type_envoy_http_header> headers(2);
+  size_t size_out = 0;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers(
-      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers.data()));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers.data(),
+      headers.size(), &size_out));
 
   // Order isn't guaranteed by map iteration, but for small maps typically consistent.
   // We just verify the contents exist.
@@ -118,8 +120,9 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeadersNull) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
+  size_t size_out = 0;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers(
-      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr, 0, &size_out));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueFound) {

@@ -1,3 +1,6 @@
+#include "envoy/config/core/v3/extension.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
+
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/tls/client_context_impl.h"
@@ -13,6 +16,8 @@
 #include "quiche/quic/test_tools/test_certificates.h"
 
 using ::Envoy::StatusHelpers::IsOk;
+using testing::_;
+using testing::Invoke;
 using testing::NiceMock;
 using ::testing::Not;
 using testing::Return;
@@ -389,9 +394,8 @@ downstream_tls_context:
                    .clientCertificateValidationConfigured());
 }
 
-// `require_client_certificate: true` without `validation_context.trusted_ca`
-// is rejected because the `SSL_CTX` would remain `SSL_VERIFY_NONE` and accept
-// any client certificate chain.
+// `require_client_certificate: true` without any validation context is rejected because the
+// `SSL_CTX` would remain `SSL_VERIFY_NONE` and accept any client certificate chain.
 TEST_F(QuicServerTransportSocketFactoryConfigTest, RequireClientCertWithoutTrustedCa) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 downstream_tls_context:
@@ -407,7 +411,7 @@ downstream_tls_context:
   TestUtility::loadFromYaml(yaml, proto_config);
   EXPECT_THAT(
       config_factory_.createTransportSocketFactory(proto_config, context_, {}).status().message(),
-      testing::HasSubstr("no validation_context.trusted_ca is configured"));
+      testing::HasSubstr("configures no validation context"));
 }
 
 // `ACCEPT_UNTRUSTED` combined with `require_client_certificate: true` is accepted. The server
@@ -724,6 +728,175 @@ TEST_F(QuicClientTransportSocketFactoryTest, FailClosedWhenCertificateCannotBeIn
 
   EXPECT_ENVOY_BUG(EXPECT_EQ(nullptr, factory_->getCryptoConfig()),
                    "Failed to install client certificate chain for QUIC");
+}
+
+// A `trusted_ca` delivered over SDS is not resolved yet when the listener is configured, so a
+// filter chain that requires a client certificate is accepted and the trust anchor is checked when
+// the secret arrives and the SSL context is created. Handshakes are rejected in the meantime.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, RequireClientCertWithPendingSdsTrustedCa) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context_sds_secret_config:
+      name: validation_context
+      sds_config:
+        ads: {}
+)EOF");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  auto factory_or_error = config_factory_.createTransportSocketFactory(proto_config, context_, {});
+  ASSERT_THAT(factory_or_error.status(), IsOk());
+  auto& factory = static_cast<QuicServerTransportSocketFactory&>(**factory_or_error);
+  EXPECT_TRUE(factory.requiresClientCertificate());
+  // The configured validation context is observable before its secret resolves, so the filter
+  // chain asks for a client certificate rather than silently skipping validation.
+  EXPECT_TRUE(factory.clientCertificateValidationConfigured());
+}
+
+// The resumption default follows the resolved validation context, which is still pending when a
+// validation context is delivered over SDS. Such a filter chain therefore keeps the default
+// resumption and early data behavior, unlike one with an inline validation context.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, SdsValidationContextKeepsResumptionDefault) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context_sds_secret_config:
+      name: validation_context
+      sds_config:
+        ads: {}
+)EOF");
+  verifyQuicServerTransportSocketFactory(yaml, /*expect_early_data=*/true,
+                                         /*expect_resumption=*/true);
+}
+
+// A validation context which can neither verify nor deliberately skip verification is rejected
+// when the SSL context is built, which for an inline context happens while the listener config is
+// loaded. `RequireClientCertRejectsCaLessSecretUpdate` covers the same check on the SDS path.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, RequireClientCertWithEmptyValidationContext) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context: {}
+)EOF");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THAT(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}).status().message(),
+      testing::HasSubstr("has no trusted_ca and no custom_validator_config"));
+}
+
+// A custom validator such as SPIFFE brings its own trust anchors and raises the verify mode to
+// `SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT`, so it can require a client certificate
+// without configuring a `trusted_ca`.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, RequireClientCertWithCustomValidator) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+  - name: lyft.com
+    trust_bundle:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF"),
+                            *proto_config.mutable_downstream_tls_context()
+                                 ->mutable_common_tls_context()
+                                 ->mutable_validation_context()
+                                 ->mutable_custom_validator_config());
+  EXPECT_THAT(config_factory_.createTransportSocketFactory(proto_config, context_, {}).status(),
+              IsOk());
+}
+
+// `ACCEPT_UNTRUSTED` requests a client certificate without a trust anchor on purpose: the default
+// validator raises the verify mode to `SSL_VERIFY_PEER`, so the chain is still surfaced rather
+// than silently skipped. Omitting `trusted_ca` is therefore accepted.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, RequireClientCertAcceptUntrustedWithoutCa) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trust_chain_verification: ACCEPT_UNTRUSTED
+)EOF");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THAT(config_factory_.createTransportSocketFactory(proto_config, context_, {}).status(),
+              IsOk());
+}
+
+// The SDS path: the listener is accepted while the secret is pending, and the trust anchor is
+// checked on the update that resolves it. A validation context that arrives with neither a
+// `trusted_ca` nor a custom validator is rejected there, so the update is NACKed instead of
+// silently downgrading the filter chain to `SSL_VERIFY_NONE`.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, RequireClientCertRejectsCaLessSecretUpdate) {
+  auto config = std::make_unique<NiceMock<Ssl::MockServerContextConfig>>();
+  auto& config_ref = *config;
+  NiceMock<Ssl::MockContextManager> context_manager;
+
+  // The secret has not arrived: a validation context is configured but cannot be resolved yet.
+  std::function<absl::Status()> secret_update_callback;
+  ON_CALL(config_ref, requireClientCertificate()).WillByDefault(Return(true));
+  ON_CALL(config_ref, validationContextConfigured()).WillByDefault(Return(true));
+  ON_CALL(config_ref, certificateValidationContext()).WillByDefault(Return(nullptr));
+  ON_CALL(config_ref, setSecretUpdateCallback(_))
+      .WillByDefault(Invoke([&secret_update_callback](std::function<absl::Status()> callback) {
+        secret_update_callback = std::move(callback);
+      }));
+
+  auto factory_or_error = QuicServerTransportSocketFactory::create(
+      /*enable_early_data=*/false, /*enable_resumption=*/false, *server_stats_store_.rootScope(),
+      std::move(config), context_manager);
+  ASSERT_THAT(factory_or_error.status(), IsOk());
+  (*factory_or_error)->initialize();
+  ASSERT_TRUE(secret_update_callback != nullptr);
+
+  // The SDS server now delivers a validation context with no trust anchor, no custom validator and
+  // no `ACCEPT_UNTRUSTED`, which would leave the `SSL_CTX` at `SSL_VERIFY_NONE`.
+  NiceMock<Ssl::MockCertificateValidationContextConfig> validation_ctx;
+  const std::string empty_ca;
+  const std::optional<envoy::config::core::v3::TypedExtensionConfig> no_custom_validator;
+  ON_CALL(validation_ctx, caCert()).WillByDefault(ReturnRef(empty_ca));
+  ON_CALL(validation_ctx, customValidatorConfig()).WillByDefault(ReturnRef(no_custom_validator));
+  ON_CALL(validation_ctx, trustChainVerification())
+      .WillByDefault(Return(envoy::extensions::transport_sockets::tls::v3::
+                                CertificateValidationContext::VERIFY_TRUST_CHAIN));
+  ON_CALL(config_ref, certificateValidationContext()).WillByDefault(Return(&validation_ctx));
+
+  EXPECT_THAT(secret_update_callback().message(),
+              testing::HasSubstr("has no trusted_ca and no custom_validator_config"));
 }
 
 } // namespace Quic
