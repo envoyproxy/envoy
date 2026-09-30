@@ -14,6 +14,7 @@
 #include "source/extensions/http/ai_filters/common/sync_filter.h"
 
 #include "absl/status/status.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,8 +48,9 @@ private:
 };
 using RequestInfoFilterConfigSharedPtr = std::shared_ptr<const RequestInfoFilterConfig>;
 
-// Publishes envoy.data.ai.v3.RequestInfo before the manager releases the request headers, so
-// later decode filters see it from their first headers callback. First writer owns the namespace.
+// Publishes envoy.data.ai.v3.RequestInfo, and the model as the envoy.ai.model.request filter
+// state object, before the manager releases the request headers, so later decode filters see both
+// from their first headers callback. First writer owns the namespace and the object.
 class RequestInfoFilter : public Common::SyncAiFilter,
                           public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
@@ -61,6 +63,7 @@ public:
 
 private:
   void publish(const HttpFilters::AiProtocolManager::AiRequest& request);
+  void storeModel(absl::string_view model);
 
   RequestInfoFilterConfigSharedPtr config_;
   const HttpFilters::AiProtocolManager::AiFilterContext context_;

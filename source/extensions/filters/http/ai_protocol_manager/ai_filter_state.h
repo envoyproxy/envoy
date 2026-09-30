@@ -36,6 +36,9 @@ private:
   const LLMProtocol protocol_;
 };
 
+// The model the request names, as a Router::StringAccessor.
+inline constexpr absl::string_view RequestModelFilterStateKey = "envoy.ai.model.request";
+
 } // namespace AiProtocolManager
 } // namespace HttpFilters
 } // namespace Extensions

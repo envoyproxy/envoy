@@ -1,4 +1,5 @@
 #include "envoy/registry/registry.h"
+#include "envoy/router/string_accessor.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/stream_info/filter_state_impl.h"
@@ -67,6 +68,26 @@ TEST(RequestLlmProtocolTest, ReadsBackFromFilterState) {
                        std::make_shared<RequestLlmProtocol>(LLMProtocol::AnthropicMessages),
                        StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(RequestLlmProtocol::fromFilterState(filter_state), LLMProtocol::AnthropicMessages);
+}
+
+TEST(RequestModelFactoryTest, BuildsStringAccessorFromModelName) {
+  const auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
+          RequestModelFilterStateKey);
+  ASSERT_NE(factory, nullptr);
+  const auto object = factory->createFromBytes("gpt-4o-mini");
+  const auto* model = dynamic_cast<const Router::StringAccessor*>(object.get());
+  ASSERT_NE(model, nullptr);
+  EXPECT_EQ(model->asString(), "gpt-4o-mini");
+  EXPECT_EQ(object->serializeAsString(), "gpt-4o-mini");
+}
+
+TEST(RequestModelFactoryTest, RejectsEmptyModel) {
+  const auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
+          RequestModelFilterStateKey);
+  ASSERT_NE(factory, nullptr);
+  EXPECT_EQ(factory->createFromBytes(""), nullptr);
 }
 
 } // namespace

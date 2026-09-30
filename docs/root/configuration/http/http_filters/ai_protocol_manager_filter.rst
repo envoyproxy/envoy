@@ -335,6 +335,13 @@ receives it through typed namespace forwarding:
 Only typed metadata is published. If the namespace already holds a record for
 the stream, the new one is skipped and counted by ``request_info.duplicate``.
 
+The model is also stored as the ``envoy.ai.model.request`` :ref:`filter state
+object <well_known_filter_state>`, a string, so filters, the router and access
+logs can read it without unpacking the record, e.g. with
+``%FILTER_STATE(envoy.ai.model.request:PLAIN)%``. Nothing is stored when the
+request names no usable model, and an object a filter ahead already set is
+kept.
+
 Transcoder
 ~~~~~~~~~~
 

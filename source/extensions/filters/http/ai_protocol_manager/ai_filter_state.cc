@@ -5,6 +5,7 @@
 
 #include "envoy/registry/registry.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
 
 namespace Envoy {
@@ -47,6 +48,22 @@ public:
 };
 
 REGISTER_FACTORY(RequestLlmProtocolObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+class RequestModelObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return std::string(RequestModelFilterStateKey); }
+
+  // An empty name yields no object: absence is how an unknown model reads.
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    if (data.empty()) {
+      return nullptr;
+    }
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(RequestModelObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 } // namespace
 

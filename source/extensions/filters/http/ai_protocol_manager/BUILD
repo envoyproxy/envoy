@@ -133,6 +133,7 @@ envoy_cc_library(
         ":token_usage_lib",
         "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/router:string_accessor_lib",
         "@abseil-cpp//absl/strings",
     ],
 )
