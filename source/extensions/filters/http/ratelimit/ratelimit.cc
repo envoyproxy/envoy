@@ -219,7 +219,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
                       Http::RequestHeaderMapPtr&& request_headers_to_add,
                       const std::string& response_body,
-                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
+                      bool shadow_over_limit) {
   state_ = State::Complete;
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
@@ -228,6 +229,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
     callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), *dynamic_metadata);
+  }
+
+  if (shadow_over_limit) {
+    cluster_->statsScope().counterFromStatName(stat_names.shadow_over_limit_).inc();
   }
 
   switch (status) {
@@ -385,7 +390,7 @@ void OnStreamDoneCallBack::complete(Filters::Common::RateLimit::LimitStatus,
                                     Filters::Common::RateLimit::DescriptorStatusListPtr&&,
                                     Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&,
                                     const std::string&,
-                                    Filters::Common::RateLimit::DynamicMetadataPtr&&) {
+                                    Filters::Common::RateLimit::DynamicMetadataPtr&&, bool) {
   self_.reset();
 }
 

@@ -270,6 +270,26 @@ TEST_P(RatelimitIntegrationTest, Ok) {
   basicFlow();
 }
 
+TEST_P(RatelimitIntegrationTest, ShadowOverLimit) {
+  initialize();
+  initiateClientConnection();
+  waitForRatelimitRequest();
+
+  ratelimit_requests_[0]->startGrpcStream();
+  envoy::service::ratelimit::v3::RateLimitResponse response_msg;
+  response_msg.set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
+  response_msg.set_shadow_over_limit(true);
+  ratelimit_requests_[0]->sendGrpcMessage(response_msg);
+  ratelimit_requests_[0]->finishGrpcStream(Grpc::Status::Ok);
+
+  waitForSuccessfulUpstreamResponse(0);
+  cleanup();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.shadow_over_limit")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
+}
+
 TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
   initialize();
   initiateClientConnection();

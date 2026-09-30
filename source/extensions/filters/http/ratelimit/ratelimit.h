@@ -263,7 +263,8 @@ public:
                 Http::ResponseHeaderMapPtr&& response_headers_to_add,
                 Http::RequestHeaderMapPtr&& request_headers_to_add,
                 const std::string& response_body,
-                Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) override;
+                Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
+                bool shadow_over_limit) override;
 
 private:
   void initiateCall(const Http::RequestHeaderMap& headers);
@@ -312,7 +313,7 @@ public:
   void complete(Filters::Common::RateLimit::LimitStatus,
                 Filters::Common::RateLimit::DescriptorStatusListPtr&&, Http::ResponseHeaderMapPtr&&,
                 Http::RequestHeaderMapPtr&&, const std::string&,
-                Filters::Common::RateLimit::DynamicMetadataPtr&&) override;
+                Filters::Common::RateLimit::DynamicMetadataPtr&&, bool) override;
 
   Filters::Common::RateLimit::Client& client() { return *client_; }
 

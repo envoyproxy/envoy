@@ -109,7 +109,8 @@ void Filter::onEvent(Network::ConnectionEvent event) {
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&&,
                       Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&, const std::string&,
-                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
+                      bool shadow_over_limit) {
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
     filter_callbacks_->connection().streamInfo().setDynamicMetadata(
         NetworkFilterNames::get().RateLimit, *dynamic_metadata);
@@ -117,6 +118,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   status_ = Status::Complete;
   config_->stats().active_.dec();
+
+  if (shadow_over_limit) {
+    config_->stats().shadow_over_limit_.inc();
+  }
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
