@@ -190,6 +190,13 @@ void RpcStream::initRecvBufIfNewMessage() {
   }
 }
 
+// Resets all of our receive-buffering state back to empty, to await a new message.
+void RpcStream::resetReceiveState() {
+  recv_buf_.resize(0);
+  cur_msg_recvd_bytes_ = 0;
+  expected_proto_length_.reset();
+}
+
 // Must only be called when recv_buf_ contains a full proto. Returns that proto, and resets all of
 // our receive-buffering state back to empty, to await a new message.
 std::unique_ptr<HotRestartMessage> RpcStream::parseProtoAndResetState() {
@@ -197,9 +204,7 @@ std::unique_ptr<HotRestartMessage> RpcStream::parseProtoAndResetState() {
   RELEASE_ASSERT(
       ret->ParseFromArray(recv_buf_.data() + sizeof(uint64_t), expected_proto_length_.value()),
       "failed to parse a HotRestartMessage.");
-  recv_buf_.resize(0);
-  cur_msg_recvd_bytes_ = 0;
-  expected_proto_length_.reset();
+  resetReceiveState();
   return ret;
 }
 
@@ -257,8 +262,7 @@ std::unique_ptr<HotRestartMessage> RpcStream::receiveHotRestartMessage(Blocking 
           std::numeric_limits<uint64_t>::max() - sizeof(uint64_t)) {
         ENVOY_LOG_MISC(warn, "Hot restart IPC: dropping datagram with invalid length ({}).",
                        expected_proto_length_.value());
-        cur_msg_recvd_bytes_ = 0;
-        expected_proto_length_.reset();
+        resetReceiveState();
         initRecvBufIfNewMessage();
         continue;
       }
