@@ -46,10 +46,22 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.35",
-        sha256 = "5179bc3f912d9c2dd5a6e5215e98222abe088847f021eba9f0f2e9a006deacaa",
-        strip_prefix = "toolshed-bazel-v{version}",
-        urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
+        version = "0.4.13.post0",
+        sha256 = "9aa56955047082227a2a09ebe86eb482c0c694d3bfdb8ec63b21afbdc98c1204",
+        strip_prefix = "toolshed-bazel-v{version}/bazel",
+        urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
+    ),
+    sq_linux_arm64 = dict(
+        version = "1.4.0",
+        sha256 = "ccdbe4a6c79c589a12d6a2eff3fe8f635e7b170a45bf947971c47a018e923ebd",
+        strip_prefix = "sq-{version}-Linux-ARM64",
+        urls = ["https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.16/sq-{version}-Linux-ARM64.tar.zst"],
+    ),
+    sq_linux_x86_64 = dict(
+        version = "1.4.0",
+        sha256 = "dcef2a3f6ca8090684fdcbad777acbec83c9f6b182e2dca0288b06aa30b938a0",
+        strip_prefix = "sq-{version}-Linux-X64",
+        urls = ["https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.16/sq-{version}-Linux-X64.tar.zst"],
     ),
     rules_fuzzing = dict(
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
