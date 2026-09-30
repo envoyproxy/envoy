@@ -252,20 +252,13 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
 
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.on_demand_vhds_no_recreate_stream")) {
-    // New behavior: instead of recreating the stream (which re-runs the whole filter chain,
-    // double-triggering non-idempotent filters, and moves the buffered request body which can be
-    // a sub-iteration zombie if the downstream stream was reset while VHDS was in flight), re-snap
-    // the route config so the resumed router lookup observes the freshly-discovered virtual host,
-    // then continue decoding the existing stream.
+    // Continue the existing stream so the decoder filters before on_demand do not run again.
+    // Refreshing the route config snapshot lets the router see the newly discovered virtual host,
+    // and re-running decodeHeaders() starts on-demand CDS if the resolved cluster is unknown. In
+    // that case onClusterDiscoveryCompletion() resumes the stream.
     if (route_exists) {
       callbacks_->downstreamCallbacks()->refreshRouteConfigSnapshot();
       callbacks_->downstreamCallbacks()->clearRouteCache();
-      // Re-run the decode-headers behavior against the freshly-resolved route. When OnDemandCds is
-      // configured and the resolved virtual host targets a not-yet-known cluster, this re-triggers
-      // on-demand CDS (returning StopIteration) -- exactly what the legacy recreateStream() path
-      // achieved by re-entering decodeHeaders(), but without restarting the whole filter chain. If
-      // discovery is started, onClusterDiscoveryCompletion() resumes the stream, so we must not
-      // continue decoding here.
       getConfig()->decodeHeadersBehavior().decodeHeaders(*this);
       if (filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration) {
         return;
