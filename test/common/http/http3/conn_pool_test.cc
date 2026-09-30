@@ -102,7 +102,8 @@ public:
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
-  // When set, used by initialize() instead of quic_info_: owned the way the cluster manager owns it.
+  // When set, used by initialize() instead of quic_info_: owned the way the cluster manager owns
+  // it.
   Http::PersistentQuicInfoPtr shared_quic_info_;
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
