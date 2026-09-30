@@ -14,7 +14,6 @@
 #include "source/extensions/http/ai_filters/common/sync_filter.h"
 
 #include "absl/status/status.h"
-#include "nlohmann/json_fwd.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -61,7 +60,7 @@ public:
                           HttpFilters::AiProtocolManager::LocalReplier reply_locally) override;
 
 private:
-  void publish(const nlohmann::json& json);
+  void publish(const HttpFilters::AiProtocolManager::AiRequest& request);
 
   RequestInfoFilterConfigSharedPtr config_;
   const HttpFilters::AiProtocolManager::AiFilterContext context_;
