@@ -2508,7 +2508,7 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
   fn get_downstream_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     let size = self.get_downstream_headers_size();
     crate::utility::collect_headers(size, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
         self.raw_context,
         ptr,
         capacity,

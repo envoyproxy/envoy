@@ -621,7 +621,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
     let size = self.context_get_downstream_headers_size();
     crate::utility::collect_headers(size, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers_v2(
+      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers(
         self.context_ptr,
         ptr,
         capacity,
