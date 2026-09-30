@@ -4,6 +4,7 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 
+#include "absl/types/variant.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -36,6 +37,14 @@ TEST(RequestLlmProtocolTest, SerializesAsEnumValueName) {
             "GEMINI_GENERATE_CONTENT");
   EXPECT_EQ(RequestLlmProtocol(LLMProtocol::Unspecified).serializeAsString(),
             "LLM_PROTOCOL_UNSPECIFIED");
+}
+
+TEST(RequestLlmProtocolTest, ExposesLlmProtocolField) {
+  const RequestLlmProtocol object(LLMProtocol::OpenAiChatCompletions);
+  EXPECT_TRUE(object.hasFieldSupport());
+  EXPECT_EQ(absl::get<absl::string_view>(object.getField("llm_protocol")),
+            "OPENAI_CHAT_COMPLETIONS");
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(object.getField("model")));
 }
 
 TEST_F(RequestLlmProtocolFactoryTest, BuildsFromEnumValueName) {

@@ -29,6 +29,8 @@ public:
 
   // StreamInfo::FilterState::Object
   std::optional<std::string> serializeAsString() const override;
+  bool hasFieldSupport() const override { return true; }
+  FieldType getField(absl::string_view field_name) const override;
 
 private:
   const LLMProtocol protocol_;

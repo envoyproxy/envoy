@@ -130,7 +130,9 @@ filter state object. On a declared AI endpoint the object wins over the route's
 declaration standing. Its object factory builds it from an :ref:`LLMProtocol
 <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` enum-value name, so
 :ref:`set_filter_state <config_http_filters_set_filter_state>`, Lua and
-ext_proc can all set it. It is read when the request headers arrive.
+ext_proc can all set it. It is read when the request headers arrive. Access
+logs read it with
+``%FILTER_STATE(envoy.ai.llm_protocol.request:FIELD:llm_protocol)%``.
 
 .. code-block:: yaml
 

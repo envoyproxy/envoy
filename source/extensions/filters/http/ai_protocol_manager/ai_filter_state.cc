@@ -21,6 +21,14 @@ std::optional<std::string> RequestLlmProtocol::serializeAsString() const {
   return std::string(llmProtocolName(protocol_));
 }
 
+StreamInfo::FilterState::Object::FieldType
+RequestLlmProtocol::getField(absl::string_view field_name) const {
+  if (field_name == "llm_protocol") {
+    return llmProtocolName(protocol_);
+  }
+  return absl::monostate{};
+}
+
 namespace {
 
 class RequestLlmProtocolObjectFactory : public StreamInfo::FilterState::ObjectFactory {
