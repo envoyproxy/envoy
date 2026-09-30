@@ -38,6 +38,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:remote_data_fetcher_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/dynamic_modules/abi",

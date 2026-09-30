@@ -42,6 +42,7 @@ public:
           const std::string specifier_yaml = R"EOF(
 dynamic_module_config:
   name: route_specifier_integration_test
+  do_not_close: true
 specifier_name: test_route_specifier
 stat_prefix: test
 failure_policy: PASS_THROUGH
@@ -207,6 +208,7 @@ direct_response:
           const std::string specifier_yaml = absl::StrCat(R"EOF(
 dynamic_module_config:
   name: route_specifier_shadow
+  do_not_close: true
 specifier_name: shadow_example
 stat_prefix: test
 failure_policy: PASS_THROUGH
@@ -220,6 +222,48 @@ specifier_config:
           auto* specifier = virtual_host->add_route_specifiers();
           specifier->set_name("envoy.router.route_specifiers.dynamic_modules");
           std::ignore = specifier->mutable_typed_config()->PackFrom(specifier_config);
+        });
+    addCanaryCluster();
+    setUpstreamCount(2);
+    HttpIntegrationTest::initialize();
+  }
+
+  // Configures the catch all route with a route level specifier and adds a more specific route
+  // after it, so a test can see a ContinueMatching decision drop the catch all route and let
+  // matching carry on to the specific route.
+  void setupContinueMatchingTest(const std::string& failure_policy = "PASS_THROUGH") {
+    config_helper_.addConfigModifier(
+        [failure_policy](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          const std::string specifier_yaml = absl::StrCat(R"EOF(
+dynamic_module_config:
+  name: route_specifier_integration_test
+  do_not_close: true
+specifier_name: test_route_specifier
+stat_prefix: test
+failure_policy: )EOF",
+                                                          failure_policy, "\n");
+          DynamicModuleRouteSpecifierProto specifier_config;
+          TestUtility::loadFromYaml(specifier_yaml, specifier_config);
+
+          auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+          virtual_host->clear_domains();
+          virtual_host->add_domains("example.com");
+
+          auto* catch_all = virtual_host->mutable_routes(0);
+          catch_all->set_name("catch_all");
+          auto* specifier = catch_all->add_route_specifiers();
+          specifier->set_name("envoy.router.route_specifiers.dynamic_modules");
+          std::ignore = specifier->mutable_typed_config()->PackFrom(specifier_config);
+
+          auto* specific = virtual_host->add_routes();
+          TestUtility::loadFromYaml(R"EOF(
+name: specific
+match: {prefix: "/specific"}
+route: {cluster: canary}
+)EOF",
+                                    *specific);
         });
     addCanaryCluster();
     setUpstreamCount(2);
@@ -498,6 +542,60 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RewritesPathAndHost) {
   ASSERT_NE(nullptr, upstream_headers);
   EXPECT_EQ("/rewritten", upstream_headers->getPathValue());
   EXPECT_EQ("upstream.local", upstream_headers->getHostValue());
+}
+
+// A recorded route name is the one the %ROUTE_NAME% access log command operator reports, so a
+// module built route carries an identity of its own end to end.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, SetRouteNameSurfacesInAccessLog) {
+  useAccessLog("%ROUTE_NAME%");
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest(
+      {{"x-decision", "override"}, {"x-cluster", "canary"}, {"x-set-route-name", "module_route"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_NE(std::string::npos, log.find("module_route"));
+}
+
+// A recorded prefix rewrite replaces the matched prefix of the path sent upstream, keeping the
+// query string.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, PrefixRewriteRewritesUpstreamPath) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{":path", "/api/foo?q=1"},
+                               {"x-decision", "override"},
+                               {"x-prefix-rewrite", "/api=/internal"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/internal/foo?q=1", upstream_headers->getPathValue());
+}
+
+// A regex rewrite carried by a selected route override rewrites the path sent upstream when
+// set_route_override applies it, keeping the query string the same way a prefix rewrite does.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RouteOverrideRegexRewritesUpstreamPath) {
+  setupTest(R"EOF(
+route_overrides:
+- override_id: regex
+  regex_rewrite:
+    pattern: {regex: "^/api/(.*)$"}
+    substitution: '/internal/\1'
+)EOF");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      sendRequest({{":path", "/api/foo?q=1"}, {"x-decision", "override"}, {"x-override", "regex"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/internal/foo?q=1", upstream_headers->getPathValue());
 }
 
 // A module reads the request, the stream info and the route through the context, which is how it
@@ -790,6 +888,97 @@ typed_config:
   test_server_->waitForCounter("cluster.canary.upstream_rq_200", testing::Ge(1));
 }
 
+// When the route is recomputed the module reads the route the connection manager last installed.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsPreviousRouteOnRecompute) {
+  config_helper_.prependFilter(R"EOF(
+name: clear-route-cache
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.ClearRouteCacheFilterConfig
+)EOF");
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The first resolution overrides to canary and installs that route. The cache clear recomputes,
+  // and the echo of the second resolution reports the cluster of the previous route.
+  auto response = sendRequest(
+      {{"x-decision", "override"}, {"x-cluster", "canary"}, {"x-echo", "previous-route-cluster"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("canary", header(response->headers(), "x-echo-result"));
+}
+
+// When the route is recomputed the module reads the string metadata of the route the connection
+// manager last installed, which is how a module keeps a stream on a marker it wrote into a route it
+// built earlier.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsPreviousRouteMetadataOnRecompute) {
+  config_helper_.prependFilter(R"EOF(
+name: clear-route-cache
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.ClearRouteCacheFilterConfig
+)EOF");
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The first resolution selects the full template, whose route carries envoy.test.route metadata,
+  // and installs it. The cache clear recomputes, and the echo of the second resolution reports the
+  // string value read from the previous route.
+  auto response = sendRequest({{"x-decision", "select-template"},
+                               {"x-template", "full"},
+                               {"x-echo", "previous-route-metadata"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("value", header(response->headers(), "x-echo-result"));
+
+  // A previous route that carries no envoy.test.route metadata has no string value under the key,
+  // so the read reports the absent marker.
+  response = sendRequest(
+      {{"x-decision", "override"}, {"x-cluster", "canary"}, {"x-echo", "previous-route-metadata"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("absent", header(response->headers(), "x-echo-result"));
+}
+
+// ReusePrevious without a previous route is rejected and the failure policy passes it through.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReusePreviousWithoutPreviousRoute) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{"x-decision", "reuse-previous"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.reuse_previous_rejected",
+                               testing::Ge(1));
+}
+
+// After a route is installed, ReusePrevious keeps it on a recompute without building a new route.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReusePreviousKeepsInstalledRoute) {
+  config_helper_.prependFilter(R"EOF(
+name: clear-route-cache
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.ClearRouteCacheFilterConfig
+)EOF");
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The first resolution has no previous route and passes through to the static route, which is
+  // installed. The cache clear recomputes, and the second resolution reuses that route.
+  auto response = sendRequest({{"x-decision", "reuse-previous"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.decision_reuse_previous",
+                               testing::Ge(2));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.reuse_previous_rejected",
+                               testing::Ge(1));
+}
+
+// A route built with user data is wrapped even with no other override, and the route destroy hook
+// fires when it is destroyed at stream end.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RouteUserDataFiresDestroyHook) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest(
+      {{"x-decision", "select-template"}, {"x-template", "canary"}, {"x-user-data", "42"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.route_destroy",
+                               testing::Ge(1));
+}
+
 // A decision that stops the chain skips the specifiers configured after it, which the second
 // specifier of the chain reports through its own statistics.
 TEST_P(DynamicModuleRouteSpecifierIntegrationTest, StopsChain) {
@@ -944,6 +1133,50 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ShadowExampleWetRunApplies) {
   // A wet run applies the decision instead of counting, so the dry run counters are never created.
   EXPECT_EQ(0, counterValue("dynamicmodulescustom.shadow_match"));
   EXPECT_EQ(0, counterValue("dynamicmodulescustom.shadow_mismatch"));
+}
+
+// A ContinueMatching decision drops the catch all route and lets matching carry on to a more
+// specific route.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ContinueMatchingSkipsCatchAllRoute) {
+  setupContinueMatchingTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Without a decision the catch all route stays in effect, so the request reaches its cluster.
+  auto baseline = sendRequest({{":path", "/specific"}});
+  EXPECT_EQ("200", baseline->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", testing::Ge(1));
+
+  // The ContinueMatching decision skips the catch all route, so matching reaches the specific
+  // route.
+  auto response = sendRequest({{":path", "/specific"}, {"x-decision", "continue-matching"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.canary.upstream_rq_200", testing::Ge(1));
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.test.decision_continue_matching", testing::Ge(1));
+}
+
+// A ContinueMatching decision on a request that matches no other route yields no route, so the
+// request gets a 404.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ContinueMatchingOnTheLastRouteReturns404) {
+  setupContinueMatchingTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The specific route does not match "/", so the catch all route is the last one to try.
+  auto response = sendRequest({{"x-decision", "continue-matching"}});
+  EXPECT_EQ("404", response->headers().getStatusValue());
+}
+
+// With the CONTINUE_MATCHING failure policy a module error drops the catch all route and lets
+// matching carry on to a more specific route.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ContinueMatchingFailurePolicyContinuesOnError) {
+  setupContinueMatchingTest("CONTINUE_MATCHING");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{":path", "/specific"}, {"x-decision", "error"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.canary.upstream_rq_200", testing::Ge(1));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.failure_module_error",
+                               testing::Ge(1));
 }
 
 } // namespace

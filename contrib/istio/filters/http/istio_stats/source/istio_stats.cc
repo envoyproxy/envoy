@@ -1320,6 +1320,8 @@ IstioStatsFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const stats::PluginConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   context.api().customStatNamespaces().registerStatNamespace(CustomStatNamespace);
+  // The 'istio_build' gauge that the config records is named by this filter alone and owes nothing
+  // to its stat prefix, so it keeps the plain scope rather than the prefixed one.
   ConfigSharedPtr config =
       std::make_shared<Config>(proto_config, context, extra_context.scopeOr(context));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) {

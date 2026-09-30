@@ -47,6 +47,11 @@ RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_re
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
+// When enabled, which is the default, dynamic modules are loaded with RTLD_NOW so that every
+// referenced symbol is resolved at load time instead of lazily on first use. A module that
+// references a symbol the main program does not provide then fails to load rather than crashing
+// later when the symbol is first reached. Disable to restore the previous RTLD_LAZY behavior.
+RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_rtld_now);
 // When enabled, per-priority host updates that arrive during a main-thread batch host update are
 // posted to the worker threads as a single batched cross-thread update at the end of the batch,
 // instead of one post per priority. Combined with
@@ -178,6 +183,11 @@ RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness
 // polling the listener DrainDecision. Latched per connection when the network filter is created.
 RUNTIME_GUARD(envoy_reloadable_features_use_connection_event_drain);
 RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
+// Give the HTTP filters of the HTTP connection manager the 'http.<stat_prefix>.' scope of the
+// connection manager as the stats prefix scope of their factory context, so that the stats prefix
+// they read is empty, instead of passing that prefix as a string and relying on every filter to
+// prepend it to its stat names itself.
+RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);

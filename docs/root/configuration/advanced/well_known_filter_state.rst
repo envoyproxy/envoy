@@ -104,6 +104,12 @@ The following lists the filter state object keys used by the Envoy extensions to
   request attributes when ``request_storage_mode`` is set to ``FILTER_STATE`` or
   ``DYNAMIC_METADATA_AND_FILTER_STATE``. The object stores extracted fields from the parsed request.
 
+``envoy.ai.llm_protocol.request``
+  Names the request's wire API to the :ref:`AI Protocol Manager <config_http_filters_ai_protocol_manager>`,
+  ahead of the route's declaration. Accepts an :ref:`LLMProtocol <envoy_v3_api_enum_type.ai.v3.LLMProtocol>`
+  enum-value name as a constructor, e.g. "ANTHROPIC_MESSAGES". Supports field access with
+  ``llm_protocol``.
+
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
 

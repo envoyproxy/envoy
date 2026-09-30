@@ -125,6 +125,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ai_filter_state_lib",
+    srcs = ["ai_filter_state.cc"],
+    hdrs = ["ai_filter_state.h"],
+    deps = [
+        ":llm_protocol_conversion_lib",
+        ":token_usage_lib",
+        "//envoy/registry",
+        "//envoy/stream_info:filter_state_interface",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "llm_protocol_adapters_lib",
     srcs = ["llm_protocol_adapters.cc"],
     deps = [
@@ -205,6 +218,7 @@ envoy_cc_library(
     hdrs = ["ai_request.h"],
     deps = [
         ":json_with_ext_buf_lib",
+        ":token_usage_lib",
         "@nlohmann_json//:json",
     ],
 )
@@ -408,6 +422,7 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":ai_filter_lib",
+        ":ai_filter_state_lib",
         ":buffer_manager_lib",
         ":external_buffer_interface",
         ":filter_chain_bridge_lib",

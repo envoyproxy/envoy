@@ -142,12 +142,12 @@ jobs:
     needs:
     - release
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/appauth@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/dispatch@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/dispatch@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}

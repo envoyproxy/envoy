@@ -3403,17 +3403,17 @@ TEST(ABIImpl, Stats) {
   Stats::CounterOptConstRef counter_vec = stats_store.findCounterByString(
       "dynamicmodulescustom.some_counter_vec.some_label.some_value");
   EXPECT_TRUE(counter_vec.has_value());
-  EXPECT_EQ(counter_vec->get().value(), 10);
+  EXPECT_EQ(counter_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_vec_id, counter_vec_labels_values.data(), counter_vec_labels_values.size(),
       10);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_vec->get().value(), 20);
+  EXPECT_EQ(counter_vec->value(), 20);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_vec_id, counter_vec_labels_values.data(), counter_vec_labels_values.size(),
       42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_vec->get().value(), 62);
+  EXPECT_EQ(counter_vec->value(), 62);
 
   const std::string counter_no_labels_name{"some_counter_no_labels"};
   size_t counter_no_labels_id;
@@ -3424,15 +3424,15 @@ TEST(ABIImpl, Stats) {
   Stats::CounterOptConstRef counter_no_labels =
       stats_store.findCounterByString("dynamicmodulescustom.some_counter_no_labels");
   EXPECT_TRUE(counter_no_labels.has_value());
-  EXPECT_EQ(counter_no_labels->get().value(), 0);
+  EXPECT_EQ(counter_no_labels->value(), 0);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_no_labels_id, nullptr, 0, 15);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_no_labels->get().value(), 15);
+  EXPECT_EQ(counter_no_labels->value(), 15);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_no_labels_id, nullptr, 0, 25);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_no_labels->get().value(), 40);
+  EXPECT_EQ(counter_no_labels->value(), 40);
 
   const std::string gauge_vec_name{"some_gauge_vec"};
   const std::string gauge_vec_label_name{"some_label"};
@@ -3455,19 +3455,19 @@ TEST(ABIImpl, Stats) {
   Stats::GaugeOptConstRef gauge_vec =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_vec.some_label.some_value");
   EXPECT_TRUE(gauge_vec.has_value());
-  EXPECT_EQ(gauge_vec->get().value(), 10);
+  EXPECT_EQ(gauge_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_increment_gauge(
       &filter, gauge_vec_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 10);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 20);
+  EXPECT_EQ(gauge_vec->value(), 20);
   result = envoy_dynamic_module_callback_http_filter_decrement_gauge(
       &filter, gauge_vec_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 12);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 8);
+  EXPECT_EQ(gauge_vec->value(), 8);
   result = envoy_dynamic_module_callback_http_filter_set_gauge(
       &filter, gauge_vec_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 9001);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 9001);
+  EXPECT_EQ(gauge_vec->value(), 9001);
 
   const std::string gauge_no_labels_name{"some_gauge_no_labels"};
   size_t gauge_no_labels_id;
@@ -3478,19 +3478,19 @@ TEST(ABIImpl, Stats) {
   Stats::GaugeOptConstRef gauge_no_labels =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_no_labels");
   EXPECT_TRUE(gauge_no_labels.has_value());
-  EXPECT_EQ(gauge_no_labels->get().value(), 0);
+  EXPECT_EQ(gauge_no_labels->value(), 0);
   result = envoy_dynamic_module_callback_http_filter_increment_gauge(&filter, gauge_no_labels_id,
                                                                      nullptr, 0, 15);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_no_labels->get().value(), 15);
+  EXPECT_EQ(gauge_no_labels->value(), 15);
   result = envoy_dynamic_module_callback_http_filter_decrement_gauge(&filter, gauge_no_labels_id,
                                                                      nullptr, 0, 5);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_no_labels->get().value(), 10);
+  EXPECT_EQ(gauge_no_labels->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_set_gauge(&filter, gauge_no_labels_id, nullptr,
                                                                0, 42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_no_labels->get().value(), 42);
+  EXPECT_EQ(gauge_no_labels->value(), 42);
 
   const std::string histogram_vec_name{"some_histogram_vec"};
   const std::string histogram_vec_label_name{"some_label"};
@@ -3659,12 +3659,12 @@ TEST(ABIImpl, ConfigStats) {
   Stats::CounterOptConstRef counter_vec = stats_store.findCounterByString(
       "dynamicmodulescustom.some_counter_vec.some_label.some_value");
   EXPECT_TRUE(counter_vec.has_value());
-  EXPECT_EQ(counter_vec->get().value(), 10);
+  EXPECT_EQ(counter_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_config_increment_counter(
       filter_config.get(), counter_vec_id, counter_vec_labels_values.data(),
       counter_vec_labels_values.size(), 42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_vec->get().value(), 52);
+  EXPECT_EQ(counter_vec->value(), 52);
 
   // counter without labels
   const std::string counter_no_labels_name{"some_counter_no_labels"};
@@ -3679,7 +3679,7 @@ TEST(ABIImpl, ConfigStats) {
   Stats::CounterOptConstRef counter_no_labels =
       stats_store.findCounterByString("dynamicmodulescustom.some_counter_no_labels");
   EXPECT_TRUE(counter_no_labels.has_value());
-  EXPECT_EQ(counter_no_labels->get().value(), 15);
+  EXPECT_EQ(counter_no_labels->value(), 15);
 
   // gauge with labels
   const std::string gauge_vec_name{"some_gauge_vec"};
@@ -3704,17 +3704,17 @@ TEST(ABIImpl, ConfigStats) {
   Stats::GaugeOptConstRef gauge_vec =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_vec.some_label.some_value");
   EXPECT_TRUE(gauge_vec.has_value());
-  EXPECT_EQ(gauge_vec->get().value(), 10);
+  EXPECT_EQ(gauge_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
       filter_config.get(), gauge_vec_id, gauge_vec_labels_values.data(),
       gauge_vec_labels_values.size(), 2);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 8);
+  EXPECT_EQ(gauge_vec->value(), 8);
   result = envoy_dynamic_module_callback_http_filter_config_set_gauge(
       filter_config.get(), gauge_vec_id, gauge_vec_labels_values.data(),
       gauge_vec_labels_values.size(), 9001);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 9001);
+  EXPECT_EQ(gauge_vec->value(), 9001);
 
   // gauge without labels
   const std::string gauge_no_labels_name{"some_gauge_no_labels"};
@@ -3735,7 +3735,7 @@ TEST(ABIImpl, ConfigStats) {
   Stats::GaugeOptConstRef gauge_no_labels =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_no_labels");
   EXPECT_TRUE(gauge_no_labels.has_value());
-  EXPECT_EQ(gauge_no_labels->get().value(), 42);
+  EXPECT_EQ(gauge_no_labels->value(), 42);
 
   // histogram with labels
   const std::string histogram_vec_name{"some_histogram_vec"};
@@ -4276,6 +4276,94 @@ TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionIdNoUpstreamInfo) {
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
 
   EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_id(filter_.get()));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionAttemptsNoUpstreamInfo) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_upstream_remote_address(filter_.get(), &address));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(filter_.get()));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(filter_.get(), nullptr));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+                   filter_.get()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+      filter_.get(), nullptr));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionAttemptsEmpty) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  upstream_info->setUpstreamRemoteAddress(nullptr);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_upstream_remote_address(filter_.get(), &address));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(filter_.get()));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(filter_.get(), nullptr));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+                   filter_.get()));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+      filter_.get(), nullptr));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamRemoteAddressUsesConnectedSocket) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  auto selected_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  selected_host->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 443);
+  upstream_info->setUpstreamHost(selected_host);
+  upstream_info->setUpstreamRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2", 8443));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_upstream_remote_address(filter_.get(), &address));
+  EXPECT_EQ("10.0.0.2:8443", std::string(address.ptr, address.length));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionAttemptHistories) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  auto first_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto missing_address_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto second_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  first_host->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 443);
+  missing_address_host->address_ = nullptr;
+  second_host->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2", 8443);
+  ON_CALL(*first_host, address()).WillByDefault(testing::Return(first_host->address_));
+  ON_CALL(*missing_address_host, address()).WillByDefault(testing::Return(nullptr));
+  ON_CALL(*second_host, address()).WillByDefault(testing::Return(second_host->address_));
+  upstream_info->upstream_hosts_attempted_ = {first_host, nullptr, missing_address_host,
+                                              second_host};
+  upstream_info->upstream_connection_ids_attempted_ = {10, 20, 30};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  EXPECT_EQ(2, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(filter_.get()));
+  envoy_dynamic_module_type_envoy_buffer hosts[2];
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(filter_.get(), hosts));
+  EXPECT_EQ("10.0.0.1:443", std::string(hosts[0].ptr, hosts[0].length));
+  EXPECT_EQ("10.0.0.2:8443", std::string(hosts[1].ptr, hosts[1].length));
+
+  EXPECT_EQ(3, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+                   filter_.get()));
+  uint64_t connection_ids[3];
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+      filter_.get(), connection_ids));
+  EXPECT_EQ(10, connection_ids[0]);
+  EXPECT_EQ(20, connection_ids[1]);
+  EXPECT_EQ(30, connection_ids[2]);
 }
 
 // Test GetClusterHostCount with a properly configured filter and mocked cluster manager.

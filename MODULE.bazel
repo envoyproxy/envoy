@@ -15,9 +15,9 @@ bazel_dep(name = "aws-c-auth-testdata", version = "0.10.4.envoy")
 bazel_dep(name = "bazel-compdb", version = "0.0.0-20220906-4086479.envoy")
 bazel_dep(name = "bazel_features", version = "1.51.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
-bazel_dep(name = "boringssl", version = "0.20260813.0")
-bazel_dep(name = "boringssl-fips", version = "0.20260813.0.envoy")
-bazel_dep(name = "boringssl-source", version = "0.20260813.0.envoy")
+bazel_dep(name = "boringssl", version = "0.20260929.0")
+bazel_dep(name = "boringssl-fips", version = "0.20260929.0.envoy")
+bazel_dep(name = "boringssl-source", version = "0.20260929.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy")
 bazel_dep(name = "brotli", version = "1.2.0.bcr.3")
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", repo_name = "buildifier")
@@ -149,7 +149,7 @@ single_version_override(
 
 single_version_override(
     module_name = "boringssl",
-    version = "0.20260813.0",
+    version = "0.20260929.0",
 )
 
 single_version_override(
@@ -273,8 +273,8 @@ llvm_minimal_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llv
 llvm_minimal_ext.setup()
 use_repo(llvm_minimal_ext, "llvm_minimal_linux_arm64", "llvm_minimal_linux_x64", "llvm_minimal_macos_arm64")
 
-llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
-use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
+envoy_llvm_ext = use_extension("//bazel:extensions.bzl", "envoy_llvm_extension")
+use_repo(envoy_llvm_ext, "llvm_toolchain_llvm")
 
 cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
 use_repo(cc_configure, "local_config_cc", "local_config_cc_toolchains")
@@ -293,8 +293,48 @@ bazel_lib.yq(version = "4.24.4")
 use_repo(bazel_lib, "jq", "jq_toolchains", "yq", "yq_toolchains")
 
 # Java
+java_toolchains = use_extension("@rules_java//java:extensions.bzl", "toolchains")
+use_repo(
+    java_toolchains,
+    "remotejdk25_linux",
+    "remotejdk25_linux_aarch64",
+    "remotejdk25_linux_ppc64le",
+    "remotejdk25_linux_s390x",
+    "remotejdk25_macos",
+    "remotejdk25_macos_aarch64",
+    "remotejdk25_win",
+    "remotejdk25_win_arm64",
+)
+
 java_compat = use_extension("@rules_java//java:rules_java_deps.bzl", "compatibility_proxy")
 use_repo(java_compat, "compatibility_proxy")
+
+# Envoy has no first-class Java, but protobuf's Java tooling still needs a hermetic JDK and the
+# javabuilder workaround configured in //bazel:envoy_java_toolchain. Register both the default and
+# explicit Java 11 toolchain definitions because rules_java emits separate toolchains for
+# --java_language_version="" and --java_language_version=11. The runtime toolchains below must
+# point at concrete @remotejdk25_*//:jdk targets rather than the remotejdk_25 alias to avoid a
+# self-cycle through Java runtime toolchain resolution.
+register_toolchains(
+    "//bazel:envoy_java_toolchain_default_definition",
+    "//bazel:envoy_java_toolchain_definition",
+    "//bazel:envoy_java_runtime_toolchain_linux",
+    "//bazel:envoy_java_runtime_toolchain_linux_aarch64",
+    "//bazel:envoy_java_runtime_toolchain_linux_ppc64le",
+    "//bazel:envoy_java_runtime_toolchain_linux_s390x",
+    "//bazel:envoy_java_runtime_toolchain_macos",
+    "//bazel:envoy_java_runtime_toolchain_macos_aarch64",
+    "//bazel:envoy_java_runtime_toolchain_win",
+    "//bazel:envoy_java_runtime_toolchain_win_arm64",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux_aarch64",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux_ppc64le",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux_s390x",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_macos",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_macos_aarch64",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_win",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_win_arm64",
+)
 
 # Python/pip
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
@@ -325,13 +365,13 @@ use_repo(pip, "base_pip3", "fuzzing_pip3")
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk", dev_dependency = True)
 go_sdk.download(
     name = "go_sdk",
-    version = "1.27.1",
     sdks = {
         "linux_amd64": ("go1.27.1.linux-amd64.tar.gz", "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445"),
         "linux_arm64": ("go1.27.1.linux-arm64.tar.gz", "3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec"),
         "darwin_arm64": ("go1.27.1.darwin-arm64.tar.gz", "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12"),
         "darwin_amd64": ("go1.27.1.darwin-amd64.tar.gz", "8f8f52c6649542cf027bbc9b9c68d1ec042f9f34808a40413f0b8b3f66f3caa4"),
     },
+    version = "1.27.1",
 )
 use_repo(
     go_sdk,

@@ -56,22 +56,16 @@ per-stream memory. What counts as oversized is
 enough that conversation content does not. A declared API whose payload schema
 pins its own threshold uses that instead.
 
-Upon stream completion, the parsed document is validated against the payload
-schema of the route's declared :ref:`wire API
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`,
-for APIs with a defined schema (currently ``OPENAI_CHAT_COMPLETIONS``, ``ANTHROPIC_MESSAGES``
-and ``GEMINI_GENERATE_CONTENT``).
-Validation checks required fields, data types, enum values, and offload rules
--- ensuring metadata fields (like ``model`` and ``role``) remain inline in the
-DOM while permitting large message content to reside in external buffers. Any
-schema validation failure triggers an immediate HTTP 400 response.
+Upon stream completion, the parsed document is handed to the configured
+:ref:`AI filters <config_http_filters_ai_protocol_manager_ai_filters>`.
+Holding it to its API's payload schema is the job of the :ref:`schema
+validation <config_http_filters_ai_protocol_manager_schema_validation>` AI filter.
 
 .. note::
 
-  On the request path the body is offloaded to an in-memory store. Request
-  schema validation is supported for declared APIs with a defined schema
-  (currently OpenAI Chat Completions, Anthropic Messages and Gemini GenerateContent).
-  Payloads are converted between these APIs by the :ref:`transcoder AI filter
+  On the request path the body is offloaded to an in-memory store. Payloads are
+  converted between OpenAI Chat Completions, Anthropic Messages and Gemini
+  GenerateContent by the :ref:`transcoder AI filter
   <envoy_v3_api_msg_extensions.http.ai_filters.transcoder.v3.Transcoder>`.
 
 The filter is a dual filter: besides the downstream HTTP filter chain shown
@@ -107,11 +101,9 @@ A route carrying a :ref:`request
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.request>`
 declaration names the :ref:`wire API
 <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` its request payload follows, and
-(when ``request_handling`` is enabled) its payload is parsed and validated
-strictly: a malformed body — or one violating the declared API's payload
-schema, for APIs with a defined schema — is rejected with a 400. This is
-normally attached to a route matching the provider's REST path, such as
-``/chat/completions``:
+(when ``request_handling`` is enabled) its payload is parsed strictly: a
+malformed body is rejected with a 400. This is normally attached to a route
+matching the provider's REST path, such as ``/chat/completions``:
 
 .. code-block:: yaml
 
@@ -132,6 +124,33 @@ The request and response wire APIs are declared separately (an optional
 declaration covers gateways whose response API differs from the request API,
 e.g. under protocol translation); when the response API is undeclared it
 falls back to the request API.
+
+A filter ahead of this one that knows the caller better than the route does
+can name the request API itself, with the ``envoy.ai.llm_protocol.request``
+filter state object. On a declared AI endpoint the object wins over the route's
+``llm_protocol``; one naming ``LLM_PROTOCOL_UNSPECIFIED`` leaves the route's
+declaration standing. Its object factory builds it from an :ref:`LLMProtocol
+<envoy_v3_api_enum_type.ai.v3.LLMProtocol>` enum-value name, so
+:ref:`set_filter_state <config_http_filters_set_filter_state>`, Lua and
+ext_proc can all set it. It is read when the request headers arrive. Access
+logs read it with
+``%FILTER_STATE(envoy.ai.llm_protocol.request:FIELD:llm_protocol)%``.
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.set_filter_state
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+      on_request_headers:
+      - object_key: envoy.ai.llm_protocol.request
+        format_string:
+          text_format_source:
+            inline_string: "%REQ(x-llm-api)%"
+
+The example reads a request header, which is only safe for a header the edge
+strips from client requests: a caller that can set it picks the API its own
+payload is read and validated as.
 
 The filter-level configuration decides what happens on every other route. By
 default those requests are passed through untouched -- not parsed, and not
@@ -155,8 +174,8 @@ does not parse is forwarded unchanged.
 AI filters
 ----------
 
-After a declared AI endpoint's payload is parsed and validated, and before it
-is replayed, the filter runs the configured :ref:`AI filters
+After a declared AI endpoint's payload is parsed, and before it is replayed,
+the filter runs the configured :ref:`AI filters
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`
 in order over the parsed document; they require ``request_handling``. An AI
 filter (category ``envoy.http.ai_filters``)
@@ -170,6 +189,70 @@ request body by default. With :ref:`reserialize_body
 set to ``DISABLE``, the received body is forwarded byte for byte instead, and
 edits AI filters make to the document are not sent; use it only with AI filters
 that read the request.
+
+.. _config_http_filters_ai_protocol_manager_schema_validation:
+
+Schema validation
+~~~~~~~~~~~~~~~~~
+
+The :ref:`schema validation filter
+<envoy_v3_api_msg_extensions.http.ai_filters.schema_validation.v3.SchemaValidation>`
+validates the payload against the payload schema of its wire API, for APIs with
+a defined schema (currently ``OPENAI_CHAT_COMPLETIONS``, ``ANTHROPIC_MESSAGES``
+and ``GEMINI_GENERATE_CONTENT``). Validation checks required fields, data
+types, enum values, and offload rules -- metadata fields such as ``model`` and
+``role`` must stay inline, while large message content may reside in the
+external buffer. A payload that fails is rejected with a 400, or forwarded
+unchanged with :ref:`fail_open
+<envoy_v3_api_field_extensions.http.ai_filters.schema_validation.v3.SchemaValidation.fail_open>`.
+
+Configure it first. The API it resolves is the one the AI filters after it
+read, and they only see a payload that passed.
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.ai_protocol_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+      request_handling: {}
+      filters:
+      - name: envoy.http.ai_filters.schema_validation
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.schema_validation.v3.SchemaValidation
+      - name: envoy.http.ai_filters.request_info
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+
+The payload is validated against the API the request declares: the
+``envoy.ai.llm_protocol.request`` filter state object, else the route's
+:ref:`llm_protocol
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`.
+A request that declares none falls back to :ref:`default_llm_protocol
+<envoy_v3_api_field_extensions.http.ai_filters.schema_validation.v3.SchemaValidation.default_llm_protocol>`,
+and by default the API is detected from the request: its path, matched as a
+suffix against each provider's REST path (``/chat/completions``,
+``/responses``, ``/v1/messages``, ``:generateContent``,
+``:streamGenerateContent``); then the ``anthropic-version`` header; then the
+payload's shape.
+
+Chat Completions and Anthropic Messages share the ``messages[]`` request
+shape, so only keys exclusive to one of them tell the two apart. A payload
+carrying markers of both, or of neither -- including
+``{"model": ..., "messages": [{"role": "user", "content": ...}]}``, which is
+valid under either -- names no API, and is forwarded unvalidated.
+
+The filter outputs statistics in the ``ai_protocol_manager.schema_validation.``
+namespace:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  valid, Counter, The payload passed its API's schema.
+  invalid, Counter, "The payload violated its API's schema: rejected with a 400, or forwarded with ``fail_open``."
+  skipped, Counter, "No API was resolved, or the resolved one has no payload schema; the payload was forwarded unvalidated."
+  llm_protocol_detected, Counter, The API was detected from the request.
 
 Request info
 ~~~~~~~~~~~~
@@ -193,8 +276,10 @@ tool counts as :ref:`envoy.data.ai.v3.RequestInfo
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
 
-Attributes are read according to the route's declared :ref:`wire API
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`:
+Attributes are read according to the request's wire API: the one it declares,
+or the one the :ref:`schema validation
+<config_http_filters_ai_protocol_manager_schema_validation>` filter resolved
+when it runs first:
 
 .. csv-table::
   :header: Attribute, OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, Gemini
@@ -206,7 +291,7 @@ Attributes are read according to the route's declared :ref:`wire API
   ``message_count``, ``messages``, "``input`` (a string counts as one message)", ``messages``, ``contents``
   ``tool_count``, ``tools``, ``tools``, ``tools``, ``tools``
 
-Without a declared API, only ``model`` and ``stream`` are read. Every value is
+Without an API, only ``model`` and ``stream`` are read. Every value is
 client-declared and optional. A value Envoy cannot use (wrong type, out of
 range, or a string over 256 bytes) is ignored and counted by
 ``request_info.partial``.
@@ -595,9 +680,8 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  request_parsed, Counter, "A held request payload was parsed into a document, and passed its payload schema where the declared API has one."
+  request_parsed, Counter, A held request payload was parsed into a document.
   request_parse_error, Counter, A declared AI endpoint's payload was not well-formed JSON and was rejected with a 400.
-  request_schema_invalid, Counter, "A declared AI endpoint's payload parsed but violated its API's payload schema, and was rejected with a 400."
   request_passthrough, Counter, "A payload on an unconfigured route failed to parse under :ref:`parse_unconfigured_routes <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>` and was forwarded unchanged; never a request failure."
   request_external_buffer_error, Counter, The external buffer failed irrecoverably on the request path and the stream was answered with a 500.
   response_external_buffer_error, Counter, The external buffer failed irrecoverably on the response path and the stream was answered with a 500.

@@ -9,111 +9,29 @@ startup --host_jvm_args=-Xmx3g
 # global
 #############################################################################
 
-build --color=yes
-fetch --color=yes
-run --color=yes
-
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/86855d5d9ae43755ad6648e4af39983c1c748874
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/211cb075b962f6b9c097b08f40054cb382bfc2b8
+
 common --noincompatible_disallow_empty_glob
 
-build --workspace_status_command="bash get_workspace_status"
-build --incompatible_strict_action_env
-build --action_env=SPHINX_RUNNER_ARGS
-build --copt=-Wno-deprecated-declarations
-build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
-build --action_env=BUILD_DOCS_SHA
-build --jobs=HOST_CPUS*.8
-build --verbose_failures
-
+# hermetic python
 common --@rules_python//python/config_settings:bootstrap_impl=script
 build --incompatible_default_to_explicit_init_py
 
-common --@protobuf//bazel/flags:prefer_prebuilt_protoc=true
+# prebuilt protoc
 common --incompatible_enable_proto_toolchain_resolution
+common --@protobuf//bazel/toolchains:prefer_prebuilt_protoc
 
+# BCR modules with no registry override — deprecated absl Mutex shims / TSA false positives / fuzz semantics.
+build --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-deprecated-declarations
+build --per_file_copt=external/c-ares.*@-Wno-unused-function
+build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
+build --per_file_copt=external/libprotobuf-mutator.*@-Wno-unused-result
+build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
 
-#############################################################################
-# ci
-#############################################################################
+# TODO(phlax): Remove this once a proper fix for the deprecated enum lands
+build --copt=--system-header-prefix=envoy/config/route/v3/route_components.pb.h
+build --per_file_copt=external/envoy_api.*/route_components\.pb\.cc@-Wno-deprecated-declarations
 
-common:ci --noshow_progress
-common:ci --noshow_loading_progress
-common:ci --test_output=errors
-
-build:remote-ci --config=ci
-build:remote-ci --remote_download_minimal
-
-
-#############################################################################
-# compiler
-#############################################################################
-
-# Common flags for Clang (shared between all clang variants)
-common:clang-common --linkopt=-fuse-ld=lld
-
-# Clang with libc++ (default)
-common:clang --config=clang-common
-common:clang --config=libc++
-common:clang --host_platform=@clang_platform
-common:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-
-# Clang installed to non-standard location (ie not /opt/llvm/)
-common:clang-local --config=clang-common
-common:clang-local --config=libc++
-
-# libc++ - default for clang
-common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
-common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
-common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
-common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
-common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
-common:libc++ --define force_libcpp=enabled
-common:libc++ --@envoy//bazel:libc++=true
-
-
-#############################################################################
-# remote
-#############################################################################
-
-build:remote --spawn_strategy=remote,sandboxed,local
-build:remote --strategy=Javac=remote,sandboxed,local
-build:remote --strategy=Closure=remote,sandboxed,local
-build:remote --strategy=Genrule=remote,sandboxed,local
-build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-
-## RBE (Engflow Envoy)
-
-# this is not included in the `--config=rbe` target - set it to publish to engflow ui
-common:bes --bes_backend=grpcs://mordenite.cluster.engflow.com/
-common:bes --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
-common:bes --bes_timeout=3600s
-common:bes --bes_upload_mode=fully_async
-common:bes --nolegacy_important_outputs
-
-common:engflow-common --google_default_credentials=false
-common:engflow-common --credential_helper=*.engflow.com=%workspace%/engflow-bazel-credential-helper.sh
-common:engflow-common --grpc_keepalive_time=60s
-common:engflow-common --grpc_keepalive_timeout=30s
-common:engflow-common --remote_cache_compression
-# Recover from transient gRPC failures (e.g. UNAVAILABLE: io exception) talking to engflow.
-common:engflow-common --remote_retries=10
-common:engflow-common --remote_retry_max_delay=60s
-# Recover when blobs are evicted from the CAS mid-build (common during patch releases).
-common:engflow-common --experimental_remote_cache_eviction_retries=5
-
-# this provides access to RBE+cache
-common:rbe --config=remote-cache
-common:rbe --config=remote-exec
-
-# this provides access to just cache
-common:remote-cache --config=engflow-common
-common:remote-cache --remote_cache=grpcs://mordenite.cluster.engflow.com
-common:remote-cache --remote_timeout=3600s
-
-common:remote-exec --remote_executor=grpcs://mordenite.cluster.engflow.com
-common:remote-exec --jobs=200
-common:remote-exec --define=engflow_rbe=true
-
-try-import %workspace%/repo.bazelrc
-try-import %workspace%/user.bazelrc
+try-import %workspace%/../../../ci.bazelrc
+try-import %workspace%/../../../user.bazelrc

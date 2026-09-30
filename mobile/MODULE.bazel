@@ -31,16 +31,16 @@ bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
 bazel_dep(name = "pybind11_bazel", version = "3.0.0")
 bazel_dep(name = "quiche", version = "0.0.0-260922-7f07dc4.envoy")
 bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
-bazel_dep(name = "rules_android", version = "0.7.2")
+bazel_dep(name = "rules_android", version = "0.7.3")
 bazel_dep(name = "rules_android_ndk", version = "0.1.5")
 bazel_dep(name = "rules_apple", version = "5.1.0")
-bazel_dep(name = "rules_robolectric", version = "4.16")
+bazel_dep(name = "rules_robolectric", version = "4.17")
 bazel_dep(name = "rules_cc", version = "0.2.25")
-bazel_dep(name = "rules_detekt", version = "0.8.1.2")
+bazel_dep(name = "rules_detekt", version = "0.8.2.3")
 bazel_dep(name = "rules_go", version = "0.63.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_jvm_external", version = "7.1")
-bazel_dep(name = "rules_kotlin", version = "2.3.20")
+bazel_dep(name = "rules_kotlin", version = "2.4.20")
 bazel_dep(name = "rules_python", version = "2.3.3")
 bazel_dep(name = "rules_rust", version = "0.74.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
@@ -51,6 +51,42 @@ bazel_dep(name = "zlib-ng", version = "2.3.3.bcr.2")
 bazel_dep(name = "zstd", version = "1.5.7.bcr.2")
 
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = True, repo_name = "buildifier")
+
+java_toolchains = use_extension("@rules_java//java:extensions.bzl", "toolchains")
+use_repo(
+    java_toolchains,
+    "remotejdk17_linux",
+    "remotejdk17_linux_aarch64",
+    "remotejdk17_macos",
+    "remotejdk17_macos_aarch64",
+    "remotejdk21_linux",
+    "remotejdk21_linux_aarch64",
+    "remotejdk21_macos",
+    "remotejdk21_macos_aarch64",
+)
+
+register_toolchains(
+    "//bazel:envoy_mobile_java_toolchain_linux_definition",
+    "//bazel:envoy_mobile_java_toolchain_linux_aarch64_definition",
+    "//bazel:envoy_mobile_java_toolchain_macos_definition",
+    "//bazel:envoy_mobile_java_toolchain_macos_aarch64_definition",
+    "//bazel:envoy_mobile_java11_toolchain_linux_default_definition",
+    "//bazel:envoy_mobile_java11_toolchain_linux_aarch64_default_definition",
+    "//bazel:envoy_mobile_java11_toolchain_macos_default_definition",
+    "//bazel:envoy_mobile_java11_toolchain_macos_aarch64_default_definition",
+    "//bazel:envoy_mobile_java11_toolchain_linux_definition",
+    "//bazel:envoy_mobile_java11_toolchain_linux_aarch64_definition",
+    "//bazel:envoy_mobile_java11_toolchain_macos_definition",
+    "//bazel:envoy_mobile_java11_toolchain_macos_aarch64_definition",
+    "//bazel:envoy_mobile_java_runtime_toolchain_linux",
+    "//bazel:envoy_mobile_java_runtime_toolchain_linux_aarch64",
+    "//bazel:envoy_mobile_java_runtime_toolchain_macos",
+    "//bazel:envoy_mobile_java_runtime_toolchain_macos_aarch64",
+    "//bazel:envoy_mobile_java_bootstrap_runtime_toolchain_linux",
+    "//bazel:envoy_mobile_java_bootstrap_runtime_toolchain_linux_aarch64",
+    "//bazel:envoy_mobile_java_bootstrap_runtime_toolchain_macos",
+    "//bazel:envoy_mobile_java_bootstrap_runtime_toolchain_macos_aarch64",
+)
 
 local_path_override(
     module_name = "envoy",
@@ -66,7 +102,6 @@ local_path_override(
     module_name = "envoy_build_config",
     path = "envoy_build_config",
 )
-
 
 single_version_override(
     module_name = "openssl",
@@ -146,9 +181,9 @@ maven.install(
         "com.google.protobuf:protobuf-java:4.35.1",
         "com.google.protobuf:protobuf-javalite:4.35.1",
         "org.jetbrains:annotations:23.0.0",
-        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.23",
-        "org.jetbrains.kotlin:kotlin-stdlib-common:1.9.23",
-        "org.jetbrains.kotlin:kotlin-stdlib:1.9.23",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.20",
+        "org.jetbrains.kotlin:kotlin-stdlib-common:2.4.20",
+        "org.jetbrains.kotlin:kotlin-stdlib:2.4.20",
         "androidx.recyclerview:recyclerview:1.1.0",
         "androidx.core:core:1.3.2",
         "org.jetbrains.dokka:dokka-cli:1.5.31",
@@ -165,7 +200,7 @@ maven.install(
         "androidx.test:runner:1.5.0",
         "androidx.test:monitor:1.5.0",
         "androidx.test.ext:junit:1.1.5",
-        "org.robolectric:robolectric:4.16",
+        "org.robolectric:robolectric:4.17",
         "org.hamcrest:hamcrest:3.0",
     ],
     known_contributing_modules = ["protobuf"],
@@ -183,6 +218,16 @@ maven.artifact(
     force_version = True,
     group = "com.google.protobuf",
     version = "4.35.1",
+)
+
+# This pin is only for rules_android_maven's own tooling; it is intentionally independent from the
+# @android_gmaven_r8 D8 used in mobile/bazel/android_artifacts.bzl to desugar the published aar.
+maven.artifact(
+    name = "rules_android_maven",
+    artifact = "r8",
+    force_version = True,
+    group = "com.android.tools",
+    version = "9.1.43",
 )
 
 # This is to workaround upstream bug/noise
@@ -216,13 +261,13 @@ quiche_dev.deps(
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk", dev_dependency = True)
 go_sdk.download(
     name = "go_sdk",
-    version = "1.27.1",
     sdks = {
         "linux_amd64": ("go1.27.1.linux-amd64.tar.gz", "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445"),
         "linux_arm64": ("go1.27.1.linux-arm64.tar.gz", "3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec"),
         "darwin_arm64": ("go1.27.1.darwin-arm64.tar.gz", "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12"),
         "darwin_amd64": ("go1.27.1.darwin-amd64.tar.gz", "8f8f52c6649542cf027bbc9b9c68d1ec042f9f34808a40413f0b8b3f66f3caa4"),
     },
+    version = "1.27.1",
 )
 use_repo(
     go_sdk,
