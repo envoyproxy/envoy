@@ -149,7 +149,8 @@ absl::Status tryParseSerializedBinary(const absl::string_view header,
   if (header.empty()) {
     return absl::InvalidArgumentError("ORCA binary header value is empty");
   }
-  const std::string decoded_value = Envoy::Base64::decode(header);
+  // gRPC allows binary header values to be sent without base64 padding, e.g. grpc-go omits it.
+  const std::string decoded_value = Envoy::Base64::decodeWithoutPadding(header);
   if (decoded_value.empty()) {
     return absl::InvalidArgumentError(
         fmt::format("unable to decode ORCA binary header value: {}", header));

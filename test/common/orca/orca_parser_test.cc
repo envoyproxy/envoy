@@ -241,6 +241,49 @@ TEST(OrcaParserUtilTest, LegacyBinaryHeader) {
               StatusHelpers::IsOkAndHolds(ProtoEq(exampleOrcaLoadReport())));
 }
 
+TEST(OrcaParserUtilTest, LegacyBinaryHeaderWithoutPadding) {
+  // Verify that unpadded base64, as sent by grpc-go, is accepted.
+  const std::string proto_string =
+      TestUtility::getProtobufBinaryStringFromMessage(exampleOrcaLoadReport());
+  const std::string padded = Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  const std::string unpadded = padded.substr(0, padded.find('='));
+  ASSERT_NE(unpadded.length(), padded.length());
+  Http::TestRequestHeaderMapImpl headers{{std::string(kEndpointLoadMetricsHeaderBin), unpadded}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::IsOkAndHolds(ProtoEq(exampleOrcaLoadReport())));
+}
+
+TEST(OrcaParserUtilTest, LegacyBinaryHeaderFromGrpcGo) {
+  // Header value captured from a grpc-go backend, which omits base64 padding, and the same value
+  // with padding restored.
+  xds::data::orca::v3::OrcaLoadReport expected;
+  expected.set_cpu_utilization(0.5);
+  expected.set_rps_fractional(100);
+  expected.set_eps(2);
+  expected.mutable_named_metrics()->insert({"rif", 4});
+  for (const std::string header_value :
+       {"CQAAAAAAAOA/MQAAAAAAAFlAOQAAAAAAAABAQg4KA3JpZhEAAAAAAAAQQA",
+        "CQAAAAAAAOA/MQAAAAAAAFlAOQAAAAAAAABAQg4KA3JpZhEAAAAAAAAQQA=="}) {
+    SCOPED_TRACE(header_value);
+    Http::TestRequestHeaderMapImpl headers{
+        {std::string(kEndpointLoadMetricsHeaderBin), header_value}};
+    EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+                StatusHelpers::IsOkAndHolds(ProtoEq(expected)));
+  }
+}
+
+TEST(OrcaParserUtilTest, BinaryHeaderWithoutPadding) {
+  const std::string proto_string =
+      TestUtility::getProtobufBinaryStringFromMessage(exampleOrcaLoadReport());
+  const std::string padded = Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  const std::string unpadded = padded.substr(0, padded.find('='));
+  ASSERT_NE(unpadded.length(), padded.length());
+  Http::TestRequestHeaderMapImpl headers{
+      {std::string(kEndpointLoadMetricsHeader), absl::StrCat(kHeaderFormatPrefixBin, unpadded)}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::IsOkAndHolds(ProtoEq(exampleOrcaLoadReport())));
+}
+
 TEST(OrcaParserUtilTest, BinaryHeader) {
   // Verify serialized binary header processing when using default ORCA header
   // and appropriate format prefix in the header value.
