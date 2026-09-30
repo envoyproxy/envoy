@@ -47,7 +47,7 @@ Config::createAsyncClientFactory(const FilterConfig& config, Stats::Scope& scope
       context.serverFactoryContext().clusterManager().grpcAsyncClientManager();
   auto initial_metadata = THROW_OR_RETURN_VALUE(
       async_client_manager.parseGrpcServiceInitialMetadata(config.grpc_service(), context),
-      Grpc::GrpcServiceInitialMetadataPtr);
+      Grpc::GrpcServiceInitialMetadataSharedPtr);
   auto factory_or_error = async_client_manager.factoryForGrpcService(
       config.grpc_service(), scope, true, std::move(initial_metadata));
   THROW_IF_NOT_OK_REF(factory_or_error.status());

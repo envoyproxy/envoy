@@ -46,7 +46,7 @@ bool validateGrpcCompatibleAsciiHeaderValue(absl::string_view h_value) {
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(const envoy::config::core::v3::GrpcService& config,
                                                bool skip_cluster_check,
                                                Server::Configuration::ServerFactoryContext& context,
-                                               GrpcServiceInitialMetadataPtr initial_metadata,
+                                               GrpcServiceInitialMetadataSharedPtr initial_metadata,
                                                absl::Status& creation_status)
     : config_(config), context_(context), initial_metadata_(std::move(initial_metadata)) {
   if (skip_cluster_check) {
@@ -83,7 +83,7 @@ absl::StatusOr<RawAsyncClientPtr> AsyncClientFactoryImpl::createUncachedRawAsync
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     const envoy::config::core::v3::GrpcService& config, ThreadLocal::Slot* google_tls_slot,
     Stats::Scope& scope, Server::Configuration::ServerFactoryContext& context,
-    const StatNames& stat_names, GrpcServiceInitialMetadataPtr initial_metadata,
+    const StatNames& stat_names, GrpcServiceInitialMetadataSharedPtr initial_metadata,
     absl::Status& creation_status)
     : google_tls_slot_(google_tls_slot),
       // grpc.(<stat_prefix>).**
@@ -140,10 +140,9 @@ absl::StatusOr<RawAsyncClientPtr> GoogleAsyncClientFactoryImpl::createUncachedRa
 #endif
 }
 
-absl::StatusOr<AsyncClientFactoryPtr>
-AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
-                                              Stats::Scope& scope, bool skip_cluster_check,
-                                              GrpcServiceInitialMetadataPtr initial_metadata) {
+absl::StatusOr<AsyncClientFactoryPtr> AsyncClientManagerImpl::factoryForGrpcService(
+    const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
+    bool skip_cluster_check, GrpcServiceInitialMetadataSharedPtr initial_metadata) {
   // `initial_metadata` carries the service's initial metadata, parsed on the main thread by
   // parseGrpcServiceInitialMetadata(). The factory passes it to the clients it creates, which share
   // it.
@@ -178,14 +177,14 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::Grp
   return factory;
 }
 
-absl::StatusOr<GrpcServiceInitialMetadataPtr>
+absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
 AsyncClientManagerImpl::parseGrpcServiceInitialMetadata(
     const envoy::config::core::v3::GrpcService& config,
     Server::Configuration::GenericFactoryContext& context) {
   return Grpc::parseGrpcServiceInitialMetadata(config, context);
 }
 
-absl::StatusOr<GrpcServiceInitialMetadataPtr>
+absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
 AsyncClientManagerImpl::parseGrpcServiceInitialMetadataForServer(
     const envoy::config::core::v3::GrpcService& config) {
   return Grpc::parseGrpcServiceInitialMetadataForServer(config, context_);
@@ -193,7 +192,7 @@ AsyncClientManagerImpl::parseGrpcServiceInitialMetadataForServer(
 
 absl::StatusOr<RawAsyncClientSharedPtr> AsyncClientManagerImpl::getOrCreateRawAsyncClient(
     const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
-    bool skip_cluster_check, GrpcServiceInitialMetadataPtr initial_metadata) {
+    bool skip_cluster_check, GrpcServiceInitialMetadataSharedPtr initial_metadata) {
   const GrpcServiceConfigWithHashKey config_with_hash_key =
       GrpcServiceConfigWithHashKey(config, std::move(initial_metadata));
   RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(config_with_hash_key);

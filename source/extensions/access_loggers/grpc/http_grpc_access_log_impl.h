@@ -34,7 +34,7 @@ public:
                     ThreadLocal::SlotAllocator& tls,
                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
                     const Formatter::CommandParserPtrVector& command_parsers,
-                    Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata);
+                    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata);
 
 private:
   /**

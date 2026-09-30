@@ -28,7 +28,7 @@ class TestGrpcClient : public Grpc::AsyncStreamCallbacks<helloworld::HelloReply>
 public:
   TestGrpcClient(Server::Configuration::ServerFactoryContext& context,
                  const envoy::config::core::v3::GrpcService& grpc_service,
-                 Grpc::GrpcServiceInitialMetadataPtr initial_metadata)
+                 Grpc::GrpcServiceInitialMetadataSharedPtr initial_metadata)
       : client_(context.clusterManager()
                     .grpcAsyncClientManager()
                     .getOrCreateRawAsyncClient(grpc_service, context.scope(), true,
@@ -86,7 +86,7 @@ private:
 class ServerFactoryContextFilter : public Http::PassThroughFilter, public FilterCallbacks {
 public:
   ServerFactoryContextFilter(const envoy::config::core::v3::GrpcService& grpc_service,
-                             Grpc::GrpcServiceInitialMetadataPtr initial_metadata,
+                             Grpc::GrpcServiceInitialMetadataSharedPtr initial_metadata,
                              Server::Configuration::ServerFactoryContext& context)
       : grpc_service_(grpc_service), context_(context),
         test_client_(std::make_unique<TestGrpcClient>(context_, grpc_service_,

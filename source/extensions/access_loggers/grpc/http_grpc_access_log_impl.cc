@@ -29,7 +29,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
     AccessLog::FilterPtr&& filter, const HttpGrpcAccessLogConfig config,
     ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
     const Formatter::CommandParserPtrVector& command_parsers,
-    Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata)
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata)
     : Common::ImplBase(std::move(filter)),
       config_(std::make_shared<const HttpGrpcAccessLogConfig>(config)),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)),

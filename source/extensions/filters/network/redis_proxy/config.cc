@@ -143,7 +143,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto initial_metadata = THROW_OR_RETURN_VALUE(
       server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
           grpc_service, context),
-      Grpc::GrpcServiceInitialMetadataPtr);
+      Grpc::GrpcServiceInitialMetadataSharedPtr);
 
   return [has_external_auth_provider_, grpc_service, &context, splitter, filter_config, timeout_ms,
           initial_metadata](Network::FilterManager& filter_manager) -> void {

@@ -1093,10 +1093,11 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
         .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
     EXPECT_CALL(client_manager, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool,
-                             Grpc::GrpcServiceInitialMetadataPtr) -> Grpc::RawAsyncClientSharedPtr {
-          return std::move(async_client);
-        }));
+        .WillOnce(
+            Invoke([&](const GrpcService&, Stats::Scope&, bool,
+                       Grpc::GrpcServiceInitialMetadataSharedPtr) -> Grpc::RawAsyncClientSharedPtr {
+              return std::move(async_client);
+            }));
     // TODO(PiotrSikora): Switching back to the original context is inconsistent between SDKs.
     if (std::get<1>(GetParam()) == "rust") {
       EXPECT_CALL(filter(), log_(spdlog::level::debug, Eq("response")));
@@ -1158,10 +1159,11 @@ TEST_P(WasmHttpFilterTest, GrpcCallBadCall) {
     EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
         .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
     EXPECT_CALL(client_manager, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool,
-                             Grpc::GrpcServiceInitialMetadataPtr) -> Grpc::RawAsyncClientSharedPtr {
-          return std::move(async_client);
-        }));
+        .WillOnce(
+            Invoke([&](const GrpcService&, Stats::Scope&, bool,
+                       Grpc::GrpcServiceInitialMetadataSharedPtr) -> Grpc::RawAsyncClientSharedPtr {
+              return std::move(async_client);
+            }));
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
   }
@@ -1215,10 +1217,11 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
     EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
         .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
     EXPECT_CALL(client_manager, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool,
-                             Grpc::GrpcServiceInitialMetadataPtr) -> Grpc::RawAsyncClientSharedPtr {
-          return std::move(async_client);
-        }));
+        .WillOnce(
+            Invoke([&](const GrpcService&, Stats::Scope&, bool,
+                       Grpc::GrpcServiceInitialMetadataSharedPtr) -> Grpc::RawAsyncClientSharedPtr {
+              return std::move(async_client);
+            }));
     // TODO(PiotrSikora): Switching back to the original context is inconsistent between SDKs.
     if (std::get<1>(GetParam()) == "rust") {
       EXPECT_CALL(filter(), log_(spdlog::level::debug, Eq("failure bad")));
@@ -1306,10 +1309,11 @@ TEST_P(WasmHttpFilterTest, GrpcCallCancel) {
     EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
         .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
     EXPECT_CALL(client_manager, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool,
-                             Grpc::GrpcServiceInitialMetadataPtr) -> Grpc::RawAsyncClientSharedPtr {
-          return std::move(async_client);
-        }));
+        .WillOnce(
+            Invoke([&](const GrpcService&, Stats::Scope&, bool,
+                       Grpc::GrpcServiceInitialMetadataSharedPtr) -> Grpc::RawAsyncClientSharedPtr {
+              return std::move(async_client);
+            }));
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
@@ -1366,10 +1370,11 @@ TEST_P(WasmHttpFilterTest, GrpcCallClose) {
     EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
         .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
     EXPECT_CALL(client_manager, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool,
-                             Grpc::GrpcServiceInitialMetadataPtr) -> Grpc::RawAsyncClientSharedPtr {
-          return std::move(async_client);
-        }));
+        .WillOnce(
+            Invoke([&](const GrpcService&, Stats::Scope&, bool,
+                       Grpc::GrpcServiceInitialMetadataSharedPtr) -> Grpc::RawAsyncClientSharedPtr {
+              return std::move(async_client);
+            }));
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
@@ -1426,10 +1431,11 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
     EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
         .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
     EXPECT_CALL(client_manager, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool,
-                             Grpc::GrpcServiceInitialMetadataPtr) -> Grpc::RawAsyncClientSharedPtr {
-          return std::move(async_client);
-        }));
+        .WillOnce(
+            Invoke([&](const GrpcService&, Stats::Scope&, bool,
+                       Grpc::GrpcServiceInitialMetadataSharedPtr) -> Grpc::RawAsyncClientSharedPtr {
+              return std::move(async_client);
+            }));
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
 
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -1482,7 +1488,7 @@ void WasmHttpFilterTest::setupGrpcStreamTest(Grpc::RawAsyncStreamCallbacks*& cal
   EXPECT_CALL(async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
       .WillRepeatedly(
           Invoke([&](const GrpcService&, Stats::Scope&, bool,
-                     Grpc::GrpcServiceInitialMetadataPtr) -> Grpc::RawAsyncClientSharedPtr {
+                     Grpc::GrpcServiceInitialMetadataSharedPtr) -> Grpc::RawAsyncClientSharedPtr {
             auto async_client = std::make_unique<Grpc::MockAsyncClient>();
             EXPECT_CALL(*async_client, startRaw(_, _, _, _))
                 .WillRepeatedly(Invoke(

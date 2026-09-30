@@ -269,7 +269,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                            const std::string& stats_prefix, bool is_upstream,
                            Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                            Server::Configuration::CommonFactoryContext& context,
-                           Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata,
+                           Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata,
                            absl::Status& creation_status)
     : stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       untyped_forwarding_namespaces_(
@@ -650,7 +650,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     const ExtProcPerRoute& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     Server::Configuration::CommonFactoryContext& context,
-    Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata)
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
       grpc_service_(initGrpcService(config)),
       parsed_grpc_initial_metadata_(std::move(parsed_grpc_initial_metadata)),

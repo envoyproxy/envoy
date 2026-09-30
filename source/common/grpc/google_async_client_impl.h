@@ -180,7 +180,7 @@ public:
          GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
          const envoy::config::core::v3::GrpcService& config,
          Server::Configuration::ServerFactoryContext& context, const StatNames& stat_names,
-         GrpcServiceInitialMetadataPtr initial_metadata);
+         GrpcServiceInitialMetadataSharedPtr initial_metadata);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -201,7 +201,8 @@ private:
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
                         const envoy::config::core::v3::GrpcService& config,
                         Server::Configuration::ServerFactoryContext& context,
-                        const StatNames& stat_names, GrpcServiceInitialMetadataPtr metadata_parser);
+                        const StatNames& stat_names,
+                        GrpcServiceInitialMetadataSharedPtr metadata_parser);
 
   Event::Dispatcher& dispatcher_;
   GoogleAsyncClientThreadLocal& tls_;
@@ -218,7 +219,7 @@ private:
   // The service's parsed initial metadata. Shared with the other clients for the service when it
   // was parsed on the main thread with formatter extensions (see
   // parseGrpcServiceInitialMetadata()).
-  const GrpcServiceInitialMetadataPtr metadata_parser_;
+  const GrpcServiceInitialMetadataSharedPtr metadata_parser_;
 
   friend class GoogleAsyncClientThreadLocal;
   friend class GoogleAsyncRequestImpl;

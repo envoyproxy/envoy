@@ -56,7 +56,7 @@ Network::FilterFactoryCb NetworkExtProcConfigFactory::createFilterFactoryFromPro
           .clusterManager()
           .grpcAsyncClientManager()
           .parseGrpcServiceInitialMetadata(proto_config.grpc_service(), context),
-      Grpc::GrpcServiceInitialMetadataPtr);
+      Grpc::GrpcServiceInitialMetadataSharedPtr);
 
   return [ext_proc_config, parsed_grpc_initial_metadata,
           &context](Network::FilterManager& filter_manager) -> void {

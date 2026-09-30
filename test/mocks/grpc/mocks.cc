@@ -47,9 +47,9 @@ MockAsyncClientManager::MockAsyncClientManager() {
     return std::make_shared<testing::NiceMock<Grpc::MockAsyncClient>>();
   }));
   ON_CALL(*this, parseGrpcServiceInitialMetadata(_, _))
-      .WillByDefault(Return(GrpcServiceInitialMetadataPtr(nullptr)));
+      .WillByDefault(Return(GrpcServiceInitialMetadataSharedPtr(nullptr)));
   ON_CALL(*this, parseGrpcServiceInitialMetadataForServer(_))
-      .WillByDefault(Return(GrpcServiceInitialMetadataPtr(nullptr)));
+      .WillByDefault(Return(GrpcServiceInitialMetadataSharedPtr(nullptr)));
 }
 
 MockAsyncClientManager::~MockAsyncClientManager() = default;

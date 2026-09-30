@@ -261,9 +261,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
   }
 }
 
-Filters::Common::ExtAuthz::ClientPtr
-Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service,
-                                 const Grpc::GrpcServiceInitialMetadataPtr& initial_metadata) {
+Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteGrpcClient(
+    const envoy::config::core::v3::GrpcService& grpc_service,
+    const Grpc::GrpcServiceInitialMetadataSharedPtr& initial_metadata) {
   if (server_context_ == nullptr) {
     ENVOY_STREAM_LOG(
         debug, "ext_authz filter: server context not available for per-route gRPC client creation.",

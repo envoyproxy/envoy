@@ -42,7 +42,7 @@ void expectCorrectProto() {
   EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
               factoryForGrpcService(_, _, _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                          Grpc::GrpcServiceInitialMetadataPtr) {
+                          Grpc::GrpcServiceInitialMetadataSharedPtr) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   Network::FilterFactoryCb cb =
@@ -111,7 +111,7 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzWithMetadataContextNamespaces) {
   EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
               factoryForGrpcService(_, _, _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                          Grpc::GrpcServiceInitialMetadataPtr) {
+                          Grpc::GrpcServiceInitialMetadataSharedPtr) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   Network::FilterFactoryCb cb =

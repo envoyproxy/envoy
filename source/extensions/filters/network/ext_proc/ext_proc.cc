@@ -121,7 +121,7 @@ Config::Config(
 
 NetworkExtProcFilter::NetworkExtProcFilter(
     ConfigConstSharedPtr config, ExternalProcessorClientPtr&& client,
-    Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata)
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata)
     : config_(config), stats_(config->stats()), client_(std::move(client)),
       config_with_hash_key_(config_->grpcService(), std::move(parsed_grpc_initial_metadata)),
       downstream_callbacks_(*this) {}

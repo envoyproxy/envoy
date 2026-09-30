@@ -33,7 +33,7 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
           .clusterManager()
           .grpcAsyncClientManager()
           .parseGrpcServiceInitialMetadata(proto_config.common_config().grpc_service(), context),
-      Grpc::GrpcServiceInitialMetadataPtr);
+      Grpc::GrpcServiceInitialMetadataSharedPtr);
 
   return std::make_shared<HttpGrpcAccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),

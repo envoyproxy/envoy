@@ -719,7 +719,7 @@ createRouteConfig(const std::string& yaml,
 // Creates the filter from `filter_yaml`, sends a request with `route_configs` as its per-route
 // configs, and returns the parsed initial metadata sent with the gRPC service to create the gRPC
 // client.
-Grpc::GrpcServiceInitialMetadataPtr
+Grpc::GrpcServiceInitialMetadataSharedPtr
 formattersForRequest(const std::string& filter_yaml,
                      testing::NiceMock<Server::Configuration::MockServerFactoryContext>& context,
                      Router::RouteSpecificFilterConfigs route_configs = {}) {
@@ -737,7 +737,7 @@ formattersForRequest(const std::string& filter_yaml,
   cb(filter_callback);
 
   // Fail the client creation, to keep the test to the handle check.
-  Grpc::GrpcServiceInitialMetadataPtr formatters;
+  Grpc::GrpcServiceInitialMetadataSharedPtr formatters;
   EXPECT_CALL(context.cluster_manager_.async_client_manager_,
               getOrCreateRawAsyncClientWithHashKey(_, _, _))
       .WillOnce(testing::Invoke(

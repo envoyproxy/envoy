@@ -62,7 +62,7 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     Event::Dispatcher& dispatcher,
-    Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata) {
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata) {
   // We pass skip_cluster_check=true to factoryForGrpcService in order to avoid throwing
   // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
   // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in

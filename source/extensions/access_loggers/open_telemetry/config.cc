@@ -90,7 +90,7 @@ getHttpAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& c
           .clusterManager()
           .grpcAsyncClientManager()
           .parseGrpcServiceInitialMetadata(getGrpcService(proto_config), context),
-      Grpc::GrpcServiceInitialMetadataPtr);
+      Grpc::GrpcServiceInitialMetadataSharedPtr);
 
   return std::make_shared<AccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),

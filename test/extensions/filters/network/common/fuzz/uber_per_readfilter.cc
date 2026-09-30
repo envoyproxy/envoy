@@ -56,8 +56,9 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
 
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClient(_, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                                  Grpc::GrpcServiceInitialMetadataPtr) { return async_client_; }));
+        .WillByDefault(
+            Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                       Grpc::GrpcServiceInitialMetadataSharedPtr) { return async_client_; }));
 
     read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(pipe_addr_);
@@ -86,8 +87,9 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
 
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClient(_, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                                  Grpc::GrpcServiceInitialMetadataPtr) { return async_client_; }));
+        .WillByDefault(
+            Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                       Grpc::GrpcServiceInitialMetadataSharedPtr) { return async_client_; }));
     read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_

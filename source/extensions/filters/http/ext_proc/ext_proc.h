@@ -273,7 +273,7 @@ public:
                const std::string& stats_prefix, bool is_upstream,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                Server::Configuration::CommonFactoryContext& context,
-               Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata,
+               Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata,
                absl::Status& creation_status);
 
   bool failureModeAllow() const { return failure_mode_allow_; }
@@ -361,7 +361,7 @@ public:
     return grpc_service_;
   }
 
-  const Grpc::GrpcServiceInitialMetadataPtr& parsedGrpcInitialMetadata() const {
+  const Grpc::GrpcServiceInitialMetadataSharedPtr& parsedGrpcInitialMetadata() const {
     return parsed_grpc_initial_metadata_;
   }
 
@@ -418,7 +418,7 @@ private:
   const AllowedOverrideModesSet allowed_override_modes_;
 
   const std::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
-  const Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata_;
+  const Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
   const Protobuf::Struct filter_metadata_;
   const ExpressionManager expression_manager_;
@@ -462,7 +462,7 @@ public:
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
       Server::Configuration::CommonFactoryContext& context,
-      Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata);
+      Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata);
 
   // This constructor is used as a way to merge more-specific config into less-specific config in a
   // clearly defined way (e.g. route config into vh config). All fields on this class must be const
@@ -479,7 +479,7 @@ public:
     return grpc_service_;
   }
 
-  const Grpc::GrpcServiceInitialMetadataPtr& parsedGrpcInitialMetadata() const {
+  const Grpc::GrpcServiceInitialMetadataSharedPtr& parsedGrpcInitialMetadata() const {
     return parsed_grpc_initial_metadata_;
   }
   const std::vector<envoy::config::core::v3::HeaderValue>& grpcInitialMetadata() const {
@@ -526,7 +526,7 @@ private:
   const std::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
   const std::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
-  const Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata_;
+  const Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata_;
   std::vector<envoy::config::core::v3::HeaderValue> grpc_initial_metadata_;
 
   const std::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;

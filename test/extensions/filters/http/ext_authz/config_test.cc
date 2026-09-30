@@ -61,7 +61,7 @@ public:
       : Grpc::AsyncClientManagerImpl(config, context, stat_names) {}
   absl::StatusOr<Grpc::AsyncClientFactoryPtr>
   factoryForGrpcService(const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                        Grpc::GrpcServiceInitialMetadataPtr) override {
+                        Grpc::GrpcServiceInitialMetadataSharedPtr) override {
     return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
   }
 };

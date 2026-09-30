@@ -107,7 +107,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
         factory_context.clusterManager()
             .grpcAsyncClientManager()
             .parseGrpcServiceInitialMetadataForServer(opentelemetry_config.grpc_service()),
-        Grpc::GrpcServiceInitialMetadataPtr);
+        Grpc::GrpcServiceInitialMetadataSharedPtr);
     auto factory_or_error =
         factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
             opentelemetry_config.grpc_service(), factory_context.scope(), true,

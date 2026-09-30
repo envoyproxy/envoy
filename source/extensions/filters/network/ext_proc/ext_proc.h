@@ -204,7 +204,7 @@ public:
   // `parsed_grpc_initial_metadata` is the gRPC service's initial metadata, parsed on the main
   // thread by AsyncClientManager::parseGrpcServiceInitialMetadata().
   NetworkExtProcFilter(ConfigConstSharedPtr config, ExternalProcessorClientPtr&& client,
-                       Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata);
+                       Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata);
   ~NetworkExtProcFilter() override;
 
   // Network::ReadFilter

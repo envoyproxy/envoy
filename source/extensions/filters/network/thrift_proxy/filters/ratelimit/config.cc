@@ -36,7 +36,7 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   auto initial_metadata = THROW_OR_RETURN_VALUE(
       server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
           proto_config.rate_limit_service().grpc_service(), context),
-      Grpc::GrpcServiceInitialMetadataPtr);
+      Grpc::GrpcServiceInitialMetadataSharedPtr);
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(
       proto_config.rate_limit_service().grpc_service(), std::move(initial_metadata));
   return [config_with_hash_key, &context, timeout,

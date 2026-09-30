@@ -38,7 +38,7 @@ AccessLog::AccessLog(
     envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
     ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
     const std::vector<Formatter::CommandParserPtr>& commands,
-    Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata)
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata)
     : Common::ImplBase(std::move(filter)), tls_slot_(tls.allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)),
       filter_state_objects_to_log_(getFilterStateObjectsToLog(config)),

@@ -79,7 +79,7 @@ ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata;
+  Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata;
   if (proto_config.has_overrides() && proto_config.overrides().has_grpc_service()) {
     const auto& overrides = proto_config.overrides();
     // `grpc_initial_metadata` is merged into the service's initial metadata at request time, on a
@@ -117,7 +117,7 @@ ExternalProcessingFilterConfig::createHttpFilterFactoryFromProtoTyped(
   const uint32_t max_message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
   Stats::Scope& scope = extra_context.scopeOr(context);
-  Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata;
+  Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata;
   if (proto_config.has_grpc_service()) {
     Server::GenericFactoryContextImpl generic_context(
         context, extra_context.scope, extra_context.visitor, extra_context.init_manager);

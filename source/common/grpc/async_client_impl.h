@@ -25,14 +25,14 @@ namespace Grpc {
 // loaded with the validation visitor and stats scope of `context`, which belongs to the config that
 // owns `config`, and register init targets with its init manager, or start them immediately if it
 // has already initialized. Must be called on the main thread.
-absl::StatusOr<GrpcServiceInitialMetadataPtr>
+absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
 parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& config,
                                 Server::Configuration::GenericFactoryContext& context);
 
 // Like parseGrpcServiceInitialMetadata(), for a gRPC service that isn't owned by a config with its
 // own factory context, e.g. an xDS client. Formatters are loaded with the server's validation
 // visitor and stats scope, and their init targets start immediately.
-absl::StatusOr<GrpcServiceInitialMetadataPtr>
+absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
 parseGrpcServiceInitialMetadataForServer(const envoy::config::core::v3::GrpcService& config,
                                          Server::Configuration::ServerFactoryContext& context);
 
@@ -46,7 +46,7 @@ public:
   static absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
   create(const envoy::config::core::v3::GrpcService& config,
          Server::Configuration::ServerFactoryContext& context,
-         GrpcServiceInitialMetadataPtr initial_metadata);
+         GrpcServiceInitialMetadataSharedPtr initial_metadata);
   ~AsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -64,7 +64,8 @@ public:
 protected:
   AsyncClientImpl(const envoy::config::core::v3::GrpcService& config,
                   Server::Configuration::ServerFactoryContext& context,
-                  GrpcServiceInitialMetadataPtr initial_metadata, absl::Status& creation_status);
+                  GrpcServiceInitialMetadataSharedPtr initial_metadata,
+                  absl::Status& creation_status);
 
 private:
   const uint32_t max_recv_message_length_;
@@ -78,7 +79,7 @@ private:
   // The service's parsed initial metadata. Shared with the other clients for the service when it
   // was parsed on the main thread with formatter extensions (see
   // parseGrpcServiceInitialMetadata()).
-  GrpcServiceInitialMetadataPtr metadata_parser_;
+  GrpcServiceInitialMetadataSharedPtr metadata_parser_;
   // Default per service retry policy.
   Router::RetryPolicyConstSharedPtr retry_policy_;
 

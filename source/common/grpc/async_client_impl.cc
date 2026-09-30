@@ -49,7 +49,7 @@ void base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
 
 // Parses `config.initial_metadata()`. Formatters register their init targets with `init_manager`,
 // or, if it is nullopt, with a local init manager that starts them once parsing is done.
-absl::StatusOr<GrpcServiceInitialMetadataPtr>
+absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
 parseInitialMetadata(const envoy::config::core::v3::GrpcService& config,
                      Server::Configuration::ServerFactoryContext& server_context,
                      Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -69,11 +69,11 @@ parseInitialMetadata(const envoy::config::core::v3::GrpcService& config,
       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, *commands);
   RETURN_IF_NOT_OK_REF(parser_or_error.status());
   local_init_manager.initialize(Init::WatcherImpl("gRPC service initial metadata", [] {}));
-  return GrpcServiceInitialMetadataPtr(std::move(*parser_or_error));
+  return GrpcServiceInitialMetadataSharedPtr(std::move(*parser_or_error));
 }
 } // namespace
 
-absl::StatusOr<GrpcServiceInitialMetadataPtr>
+absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
 parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& config,
                                 Server::Configuration::GenericFactoryContext& context) {
   Init::Manager& init_manager = context.initManager();
@@ -85,7 +85,7 @@ parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& conf
                                                                 : makeOptRef(init_manager));
 }
 
-absl::StatusOr<GrpcServiceInitialMetadataPtr>
+absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
 parseGrpcServiceInitialMetadataForServer(const envoy::config::core::v3::GrpcService& config,
                                          Server::Configuration::ServerFactoryContext& context) {
   return parseInitialMetadata(config, context, context.scope(), context.messageValidationVisitor(),
@@ -95,7 +95,7 @@ parseGrpcServiceInitialMetadataForServer(const envoy::config::core::v3::GrpcServ
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
 AsyncClientImpl::create(const envoy::config::core::v3::GrpcService& config,
                         Server::Configuration::ServerFactoryContext& context,
-                        GrpcServiceInitialMetadataPtr initial_metadata) {
+                        GrpcServiceInitialMetadataSharedPtr initial_metadata) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<AsyncClientImpl>(
       new AsyncClientImpl(config, context, std::move(initial_metadata), creation_status));
@@ -105,7 +105,7 @@ AsyncClientImpl::create(const envoy::config::core::v3::GrpcService& config,
 
 AsyncClientImpl::AsyncClientImpl(const envoy::config::core::v3::GrpcService& config,
                                  Server::Configuration::ServerFactoryContext& context,
-                                 GrpcServiceInitialMetadataPtr initial_metadata,
+                                 GrpcServiceInitialMetadataSharedPtr initial_metadata,
                                  absl::Status& creation_status)
     : max_recv_message_length_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),

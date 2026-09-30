@@ -38,7 +38,7 @@ public:
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
                 factoryForGrpcService(_, _, _, _))
         .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                            Grpc::GrpcServiceInitialMetadataPtr) {
+                            Grpc::GrpcServiceInitialMetadataSharedPtr) {
           return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
         }));
 
@@ -85,7 +85,7 @@ TEST_F(OpenTelemetryAccessLogConfigTest, TopLevelGrpcServiceConfigOk) {
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
               factoryForGrpcService(_, _, _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                          Grpc::GrpcServiceInitialMetadataPtr) {
+                          Grpc::GrpcServiceInitialMetadataSharedPtr) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
 

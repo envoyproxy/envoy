@@ -18,12 +18,11 @@ namespace TcpGrpc {
 TcpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcCommon::GrpcAccessLoggerSharedPtr logger)
     : logger_(std::move(logger)) {}
 
-TcpGrpcAccessLog::TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
-                                   const TcpGrpcAccessLogConfig config,
-                                   ThreadLocal::SlotAllocator& tls,
-                                   GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-                                   const Formatter::CommandParserPtrVector& command_parsers,
-                                   Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata)
+TcpGrpcAccessLog::TcpGrpcAccessLog(
+    AccessLog::FilterPtr&& filter, const TcpGrpcAccessLogConfig config,
+    ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+    const Formatter::CommandParserPtrVector& command_parsers,
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata)
     : Common::ImplBase(std::move(filter)),
       config_(std::make_shared<const TcpGrpcAccessLogConfig>(config)),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)),

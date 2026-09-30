@@ -46,7 +46,7 @@ public:
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
                Common::GrpcAccessLoggerType logger_type,
-               Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata));
+               Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata));
 };
 
 // Test for the issue described in https://github.com/envoyproxy/envoy/pull/18081
@@ -63,7 +63,7 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
     EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _, _))
         .WillOnce([](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                          common_config,
-                     Common::GrpcAccessLoggerType type, Grpc::GrpcServiceInitialMetadataPtr) {
+                     Common::GrpcAccessLoggerType type, Grpc::GrpcServiceInitialMetadataSharedPtr) {
           // This is a part of the actual getOrCreateLogger code path and shouldn't crash.
           std::ignore = std::make_pair(MessageUtil::hash(common_config), type);
           return nullptr;
@@ -94,7 +94,8 @@ public:
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   Common::GrpcAccessLoggerType logger_type, Grpc::GrpcServiceInitialMetadataPtr) {
+                   Common::GrpcAccessLoggerType logger_type,
+                   Grpc::GrpcServiceInitialMetadataSharedPtr) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
@@ -116,7 +117,8 @@ public:
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   Common::GrpcAccessLoggerType logger_type, Grpc::GrpcServiceInitialMetadataPtr) {
+                   Common::GrpcAccessLoggerType logger_type,
+                   Grpc::GrpcServiceInitialMetadataSharedPtr) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;

@@ -87,7 +87,7 @@ ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validator) {
-  Grpc::GrpcServiceInitialMetadataPtr initial_metadata;
+  Grpc::GrpcServiceInitialMetadataSharedPtr initial_metadata;
   if (proto_config.has_check_settings() && proto_config.check_settings().has_grpc_service()) {
     Server::GenericFactoryContextImpl generic_context(context, validator);
     auto initial_metadata_or_error =

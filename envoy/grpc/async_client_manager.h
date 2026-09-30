@@ -50,7 +50,7 @@ using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 // that can only be created on the main thread, so the metadata is parsed there, and async clients
 // (which may be created on worker threads) share the parsed result. Hold it for as long as clients
 // for the service may be created.
-using GrpcServiceInitialMetadataPtr = std::shared_ptr<const Http::HeaderEvaluator>;
+using GrpcServiceInitialMetadataSharedPtr = std::shared_ptr<const Http::HeaderEvaluator>;
 
 class GrpcServiceConfigWithHashKey {
 public:
@@ -62,7 +62,7 @@ public:
   // extensions; pass null when they cannot be supported (e.g. a service selected at request time on
   // a worker thread).
   GrpcServiceConfigWithHashKey(const envoy::config::core::v3::GrpcService& config,
-                               GrpcServiceInitialMetadataPtr initial_metadata)
+                               GrpcServiceInitialMetadataSharedPtr initial_metadata)
       : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)),
         initial_metadata_(std::move(initial_metadata)) {}
 
@@ -84,10 +84,10 @@ public:
 
   // The parsed initial metadata for this service (may be null). Note this does not participate in
   // the hash/equality, which are derived from the config only.
-  const GrpcServiceInitialMetadataPtr& initialMetadata() const { return initial_metadata_; }
+  const GrpcServiceInitialMetadataSharedPtr& initialMetadata() const { return initial_metadata_; }
 
   void setConfig(const envoy::config::core::v3::GrpcService& g,
-                 GrpcServiceInitialMetadataPtr initial_metadata) {
+                 GrpcServiceInitialMetadataSharedPtr initial_metadata) {
     config_ = g;
     pre_computed_hash_ = Envoy::MessageUtil::hash(g);
     initial_metadata_ = std::move(initial_metadata);
@@ -96,7 +96,7 @@ public:
 private:
   envoy::config::core::v3::GrpcService config_;
   std::size_t pre_computed_hash_;
-  GrpcServiceInitialMetadataPtr initial_metadata_;
+  GrpcServiceInitialMetadataSharedPtr initial_metadata_;
 };
 
 // Singleton gRPC client manager. Grpc::AsyncClientManager can be used to create per-service
@@ -122,7 +122,7 @@ public:
   virtual absl::StatusOr<RawAsyncClientSharedPtr>
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& grpc_service,
                             Stats::Scope& scope, bool skip_cluster_check,
-                            GrpcServiceInitialMetadataPtr initial_metadata) PURE;
+                            GrpcServiceInitialMetadataSharedPtr initial_metadata) PURE;
 
   /**
    * Create a Grpc::RawAsyncClient. The async client is cached thread locally and shared across
@@ -154,7 +154,7 @@ public:
   virtual absl::StatusOr<AsyncClientFactoryPtr>
   factoryForGrpcService(const envoy::config::core::v3::GrpcService& grpc_service,
                         Stats::Scope& scope, bool skip_cluster_check,
-                        GrpcServiceInitialMetadataPtr initial_metadata) PURE;
+                        GrpcServiceInitialMetadataSharedPtr initial_metadata) PURE;
 
   /**
    * Parse `grpc_service.initial_metadata` using the substitution formatter extensions declared in
@@ -173,7 +173,7 @@ public:
    * @return a handle on success, or an error if the formatters or the initial metadata fail to
    * parse.
    */
-  virtual absl::StatusOr<GrpcServiceInitialMetadataPtr>
+  virtual absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
   parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& grpc_service,
                                   Server::Configuration::GenericFactoryContext& context) PURE;
 
@@ -182,7 +182,8 @@ public:
    * its own factory context, e.g. an xDS client. Formatters are loaded with the server's
    * validation visitor and stats scope, and their init targets start immediately.
    */
-  virtual absl::StatusOr<GrpcServiceInitialMetadataPtr> parseGrpcServiceInitialMetadataForServer(
+  virtual absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
+  parseGrpcServiceInitialMetadataForServer(
       const envoy::config::core::v3::GrpcService& grpc_service) PURE;
 };
 

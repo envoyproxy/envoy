@@ -24,9 +24,9 @@ namespace Grpc {
 namespace {
 static constexpr int DefaultBufferLimitBytes = 1024 * 1024;
 
-absl::StatusOr<GrpcServiceInitialMetadataPtr>
+absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
 buildMetadataParser(const envoy::config::core::v3::GrpcService& config,
-                    GrpcServiceInitialMetadataPtr initial_metadata) {
+                    GrpcServiceInitialMetadataSharedPtr initial_metadata) {
   if (initial_metadata != nullptr) {
     return initial_metadata;
   }
@@ -34,7 +34,7 @@ buildMetadataParser(const envoy::config::core::v3::GrpcService& config,
       config.initial_metadata(),
       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   RETURN_IF_NOT_OK_REF(parser_or_error.status());
-  return GrpcServiceInitialMetadataPtr(std::move(*parser_or_error));
+  return GrpcServiceInitialMetadataSharedPtr(std::move(*parser_or_error));
 }
 } // namespace
 
@@ -96,7 +96,7 @@ GoogleAsyncClientImpl::create(Event::Dispatcher& dispatcher, GoogleAsyncClientTh
                               const envoy::config::core::v3::GrpcService& config,
                               Server::Configuration::ServerFactoryContext& context,
                               const StatNames& stat_names,
-                              GrpcServiceInitialMetadataPtr initial_metadata) {
+                              GrpcServiceInitialMetadataSharedPtr initial_metadata) {
   // This can run on a worker thread, where an exception wouldn't be caught, so parsing errors are
   // returned instead.
   auto metadata_parser_or_error = buildMetadataParser(config, std::move(initial_metadata));
@@ -113,7 +113,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              const envoy::config::core::v3::GrpcService& config,
                                              Server::Configuration::ServerFactoryContext& context,
                                              const StatNames& stat_names,
-                                             GrpcServiceInitialMetadataPtr metadata_parser)
+                                             GrpcServiceInitialMetadataSharedPtr metadata_parser)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       target_uri_(config.google_grpc().target_uri()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
