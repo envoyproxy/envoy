@@ -780,10 +780,10 @@ public:
   // validates the payload against the IR's schema.
   //
   // A request `ToIr` leg deliberately does NOT validate its result against the IR schema. Two
-  // reasons: the source payload was already validated against its own schema by the AI Protocol
-  // Manager before the filter chain ran, so re-validating is duplicated work on the hot path; and
-  // the IR schema requires `model`, which a Gemini request need not carry in its body or its path,
-  // so validating here would reject valid Gemini traffic.
+  // reasons: holding the source payload to its own schema is the job of the schema validation AI
+  // filter, configured ahead of the transcoder, so validating again here would duplicate it on the
+  // hot path; and the IR schema requires `model`, which a Gemini request need not carry in its
+  // body or its path, so validating here would reject valid Gemini traffic.
   absl::Status transcode(const TranscodeLeg& leg, TranscodeContext& ctx,
                          nlohmann::json& json) const;
 
