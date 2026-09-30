@@ -87,7 +87,7 @@ public:
       ProtoT* new_proto = nullptr;
       if constexpr (std::is_abstract_v<OtherProtoT> || !std::is_constructible_v<OtherProtoT>) {
         new_proto = static_cast<ProtoT*>(heap_proto->New(arena_.get()));
-        new_proto->CopyFrom(*heap_proto);
+        new_proto->CheckTypeAndMergeFrom(*heap_proto);
       } else {
         OtherProtoT* typed_new_proto = google::protobuf::Arena::Create<OtherProtoT>(arena_.get());
         typed_new_proto->Swap(heap_proto.get());

@@ -355,8 +355,14 @@ run:
     - .bazelversion
     - .github/config.yml
     - .github/dependabot.yml
+    - .github/workflows/_precheck_deps.yml
+    - ci/do_ci.sh
+    - VERSION.txt
     - bazel/BUILD
     - tools/dependency/*
+    - "**/.bazelrc"
+    - "**/MODULE.bazel"
+    - "**/MODULE.bazel.lock"
     - "**/*.bzl"
     - "**/requirements.txt"
     - "**/go.mod"

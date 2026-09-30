@@ -1197,6 +1197,77 @@ TEST_F(ExtAuthzHttpClientTest, TestHttpClientResetOnComplete) {
   client_->onSuccess(async_request_, std::move(check_response));
 }
 
+TEST_F(ExtAuthzHttpClientTest, EmitClientSpanDefault) {
+  EXPECT_TRUE(config_->emitClientSpan());
+  EXPECT_TRUE(client_->emitClientSpan());
+
+  envoy::service::auth::v3::CheckRequest request;
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_EQ(std::nullopt, options.sampled_);
+        return &async_request_;
+      }));
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(async_request_, std::make_unique<Http::ResponseMessageImpl>(
+                                         Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+                                             {{Http::LowerCaseString(":status"), "200"}})));
+}
+
+TEST_F(ExtAuthzHttpClientTest, EmitClientSpanDisabled) {
+  const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+    emit_client_span: false
+  )EOF";
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
+  TestUtility::loadFromYaml(yaml, proto_config);
+  auto config = std::make_shared<ClientConfig>(proto_config, 250, "/bar", factory_context_);
+  EXPECT_FALSE(config->emitClientSpan());
+
+  auto client = std::make_unique<RawHttpClientImpl>(cm_, config);
+  EXPECT_FALSE(client->emitClientSpan());
+
+  envoy::service::auth::v3::CheckRequest request;
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_EQ(std::make_optional(false), options.sampled_);
+        return &async_request_;
+      }));
+
+  client->check(request_callbacks_, request, parent_span_, stream_info_);
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client->onSuccess(async_request_, std::make_unique<Http::ResponseMessageImpl>(
+                                        Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+                                            {{Http::LowerCaseString(":status"), "200"}})));
+}
+
+TEST_F(ExtAuthzHttpClientTest, SetEmitClientSpan) {
+  EXPECT_TRUE(client_->emitClientSpan());
+  client_->setEmitClientSpan(false);
+  EXPECT_FALSE(client_->emitClientSpan());
+
+  envoy::service::auth::v3::CheckRequest request;
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_EQ(std::make_optional(false), options.sampled_);
+        return &async_request_;
+      }));
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(async_request_, std::make_unique<Http::ResponseMessageImpl>(
+                                         Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+                                             {{Http::LowerCaseString(":status"), "200"}})));
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace Common

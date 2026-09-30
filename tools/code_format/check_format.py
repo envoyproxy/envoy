@@ -351,11 +351,20 @@ class FormatChecker:
             ]
         return []
 
+    def check_optional_reference_wrapper(self, file_path):
+        if self.allow_listed_for_optional_reference_wrapper(file_path):
+            return []
+        text = self.read_file(file_path)
+        return [
+            "%s:%d: Don't use std::optional<std::reference_wrapper<T>>; use OptRef<T> instead" %
+            (file_path, text.count("\n", 0, match.start()) + 1)
+            for match in self.config.re["optional_reference_wrapper"].finditer(text)
+        ]
+
     # To avoid breaking the Lyft import, we just check for path inclusion here.
     def allow_listed_for_protobuf_deps(self, file_path):
         return (
             file_path.endswith(self.config.suffixes["proto"])
-            or file_path.endswith(self.config.suffixes["repositories_bzl"])
             or any(file_path.startswith(path) for path in self.config.paths["protobuf"]["include"]))
 
     # Real-world time sources should not be instantiated in the source, except for a few
@@ -389,6 +398,9 @@ class FormatChecker:
     def allow_listed_for_std_regex(self, file_path):
         return file_path.startswith(
             "./test") or file_path in self.config.paths["std_regex"]["include"]
+
+    def allow_listed_for_optional_reference_wrapper(self, file_path):
+        return file_path in self.config.paths["optional_reference_wrapper"]["include"]
 
     def allow_listed_for_grpc_init(self, file_path):
         return file_path in self.config.paths["grpc_init"]["include"]
@@ -893,6 +905,7 @@ class FormatChecker:
             error_messages = self.check_file_contents(file_path, self.check_source_line)
         if file_path.endswith((".cc", ".h")):
             error_messages += self.check_namespace(file_path)
+            error_messages += self.check_optional_reference_wrapper(file_path)
         error_messages.extend(self.clang_format(file_path, check=True))
         return error_messages
 

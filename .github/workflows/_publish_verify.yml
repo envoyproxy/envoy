@@ -113,7 +113,7 @@ jobs:
             export NO_BUILD_SETUP=1
           steps-pre: |
             - id: version-support
-              uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+              uses: envoyproxy/toolshed/actions/jq@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
               with:
                 input: |
                   version_major: ${{ fromJSON(inputs.request).request.version.major }}

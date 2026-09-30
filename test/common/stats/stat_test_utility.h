@@ -147,9 +147,11 @@ public:
   TestStore& store() override { return store_; }
   const TestStore& constStore() const override { return store_; }
 
-private:
+protected:
   std::string statNameWithTags(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                StatName tagged_name);
+
+private:
   static std::string addDot(const std::string& prefix) {
     if (prefix.empty() || prefix[prefix.size() - 1] == '.') {
       return prefix;

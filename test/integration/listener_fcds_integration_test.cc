@@ -393,8 +393,11 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
   // Use HTTP2 to test GOAWAY behavior.
   downstream_protocol_ = Http::CodecType::HTTP2;
 
-  // Set a very short drain time so the test doesn't take long.
+  // Set a very short drain time so the test doesn't take long. The immediate strategy makes the
+  // draining connection drain-close on the first response after the update; the default gradual
+  // strategy would ramp that over the drain window instead.
   setDrainTime(std::chrono::seconds(5));
+  drain_strategy_ = Server::DrainStrategy::Immediate;
 
   on_server_init_function_ = [&]() {
     waitXdsStream();
@@ -529,8 +532,11 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsTcpFilterChainGracefulDrainClose) {
     GTEST_SKIP();
   }
 
-  // Set a very short drain time so the test doesn't take long.
+  // Set a very short drain time so the test doesn't take long. The immediate strategy makes the
+  // draining connection drain-close at the first opportunity; the default gradual strategy would
+  // ramp that over the drain window instead.
   setDrainTime(std::chrono::seconds(5));
+  drain_strategy_ = Server::DrainStrategy::Immediate;
 
   on_server_init_function_ = [&]() {
     waitXdsStream();

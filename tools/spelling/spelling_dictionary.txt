@@ -13,6 +13,7 @@ RANDOMKEY
 SLOWLOG
 addend
 addrlen
+connectionless
 defragmentation
 evictable
 flushdb
@@ -128,6 +129,7 @@ FIXME
 decrypted
 decrypts
 gperf
+gperftools
 HEXDIG
 HEXDIGIT
 HPE
@@ -389,6 +391,7 @@ NOCHECKRESP
 NODATA
 NODELAY
 NODELETE
+NOERROR
 NOLINT
 NOLINTBEGIN
 NOLINTEND
@@ -468,6 +471,7 @@ qatzip
 qatzstd
 RAII
 RANLUX
+RBE
 RBAC
 RDN
 RDS
@@ -601,6 +605,7 @@ WRR
 WS
 WSA
 WSABUF
+WSAEMSGSIZE
 WSS
 WUFFS
 Welford's
@@ -1404,6 +1409,7 @@ retransmitting
 retriable
 retriggers
 retryable
+revalidate
 revalidated
 revalidation
 reverify
@@ -1824,3 +1830,6 @@ MLKEM
 PQC
 quantum
 X25519MLKEM768
+cpaths
+SynchronousFeedbackResourceMonitor
+bernoulli

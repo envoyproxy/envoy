@@ -83,6 +83,7 @@ envoy_cc_test(
     deps = [
         "//source/common/secret:secret_provider_impl_lib",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],

@@ -73,6 +73,26 @@ struct WaitForSuccessfulUpstreamResponseOpts {
   bool failure_mode_allowed_header = false;
 };
 
+namespace {
+
+void cleanupExtAuthzConnection(FakeHttpConnectionPtr& connection) {
+  if (connection == nullptr) {
+    return;
+  }
+
+  AssertionResult result = connection->close();
+  RELEASE_ASSERT(result, result.message());
+  result = connection->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  // The disconnect notification can run inside another fake-upstream event callback. Wait for
+  // that callback to unwind before destroying the connection wrapper it may still reference.
+  result = connection->waitForDispatcherBarrier();
+  RELEASE_ASSERT(result, result.message());
+  connection.reset();
+}
+
+} // namespace
+
 class ExtAuthzGrpcIntegrationTest
     : public Grpc::BaseGrpcClientIntegrationParamTest,
       public HttpIntegrationTest,
@@ -82,6 +102,18 @@ class ExtAuthzGrpcIntegrationTest
 public:
   ExtAuthzGrpcIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, ExtAuthzGrpcIntegrationTest::ipVersion()) {}
+
+  // The stat names asserted below must be the same whether or not the HTTP filters are created
+  // with the connection manager's prefixed scope. Exercise both modes of the runtime guard without
+  // doubling the test matrix: the two IP versions run the server with the guard on and off.
+  bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
+        prefixedScope() ? "true" : "false");
+    HttpIntegrationTest::initialize();
+  }
 
   static std::string testParamsToString(
       const ::testing::TestParamInfo<
@@ -615,10 +647,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -682,6 +711,11 @@ attributes:
     };
     waitForSuccessfulUpstreamResponse("200", opts);
 
+    // The filter creates its stats in the connection manager's scope, so they carry its stat
+    // prefix. The per-cluster stats asserted elsewhere in this file live in the cluster's scope
+    // instead and are not prefixed by it.
+    test_server_->waitForCounter("http.config_test.ext_authz.ok", Eq(1));
+
     cleanup();
   }
 
@@ -699,6 +733,7 @@ attributes:
     if (!deny_at_disable) {
       waitForSuccessfulUpstreamResponse(expected_status);
     }
+    test_server_->waitForCounter("http.config_test.ext_authz.disabled", Eq(1));
     cleanup();
   }
 
@@ -740,6 +775,18 @@ class ExtAuthzHttpIntegrationTest
 public:
   ExtAuthzHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+
+  // The stat names asserted below must be the same whether or not the HTTP filters are created
+  // with the connection manager's prefixed scope. Exercise both modes of the runtime guard without
+  // doubling the test matrix: the two IP versions run the server with the guard on and off.
+  bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
+        prefixedScope() ? "true" : "false");
+    HttpIntegrationTest::initialize();
+  }
 
   static std::string testParamsToString(
       const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& p) {
@@ -851,12 +898,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -1474,6 +1516,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
   upstream_opts.failure_mode_allowed_header = true;
   waitForSuccessfulUpstreamResponse("200", upstream_opts);
 
+  test_server_->waitForCounter("http.config_test.ext_authz.error", Eq(1));
+  test_server_->waitForCounter("http.config_test.ext_authz.failure_mode_allowed", Eq(1));
+
   cleanup();
 }
 
@@ -1871,6 +1916,8 @@ TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseHeadersForwarding) {
 
   // Verify the body is forwarded.
   EXPECT_EQ("Found", response_->body());
+
+  test_server_->waitForCounter("http.config_test.ext_authz.denied", Eq(1));
 
   cleanup();
 }
@@ -2606,12 +2653,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -3522,12 +3564,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 

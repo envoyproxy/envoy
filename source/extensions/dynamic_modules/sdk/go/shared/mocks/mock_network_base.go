@@ -973,6 +973,48 @@ func (mr *MockNetworkFilterConfigHandleMockRecorder) DefineHistogram(name any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefineHistogram", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).DefineHistogram), name)
 }
 
+// GetRuntimeBool mocks base method.
+func (m *MockNetworkFilterConfigHandle) GetRuntimeBool(key string, defaultValue bool) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRuntimeBool", key, defaultValue)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// GetRuntimeBool indicates an expected call of GetRuntimeBool.
+func (mr *MockNetworkFilterConfigHandleMockRecorder) GetRuntimeBool(key, defaultValue any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRuntimeBool", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).GetRuntimeBool), key, defaultValue)
+}
+
+// GetRuntimeInt mocks base method.
+func (m *MockNetworkFilterConfigHandle) GetRuntimeInt(key string, defaultValue uint64) uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRuntimeInt", key, defaultValue)
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetRuntimeInt indicates an expected call of GetRuntimeInt.
+func (mr *MockNetworkFilterConfigHandleMockRecorder) GetRuntimeInt(key, defaultValue any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRuntimeInt", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).GetRuntimeInt), key, defaultValue)
+}
+
+// GetRuntimeNumber mocks base method.
+func (m *MockNetworkFilterConfigHandle) GetRuntimeNumber(key string, defaultValue float64) float64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRuntimeNumber", key, defaultValue)
+	ret0, _ := ret[0].(float64)
+	return ret0
+}
+
+// GetRuntimeNumber indicates an expected call of GetRuntimeNumber.
+func (mr *MockNetworkFilterConfigHandleMockRecorder) GetRuntimeNumber(key, defaultValue any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRuntimeNumber", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).GetRuntimeNumber), key, defaultValue)
+}
+
 // GetScheduler mocks base method.
 func (m *MockNetworkFilterConfigHandle) GetScheduler() shared.Scheduler {
 	m.ctrl.T.Helper()

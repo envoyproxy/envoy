@@ -10,13 +10,15 @@
 namespace Envoy {
 namespace Quic {
 
-quic::QuicAsyncStatus
-verifyQuicClientCertChain(const std::vector<absl::string_view>& certs,
-                          Extensions::TransportSockets::Tls::ContextImpl& context,
-                          std::string* error_details,
-                          std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert) {
+quic::QuicAsyncStatus verifyQuicClientCertChain(
+    const std::vector<absl::string_view>& certs,
+    Extensions::TransportSockets::Tls::ContextImpl& context, std::string* error_details,
+    std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert, bool* cert_validated) {
   ASSERT(error_details != nullptr);
   ASSERT(details != nullptr);
+  if (cert_validated != nullptr) {
+    *cert_validated = false;
+  }
 
   auto fail = [error_details, details](absl::string_view msg) {
     ENVOY_LOG_MISC(debug, "QUIC client certificate validation rejected: {}", msg);
@@ -64,8 +66,17 @@ verifyQuicClientCertChain(const std::vector<absl::string_view>& certs,
     return fail(result.error_details.value_or("client certificate validation failed"));
   }
 
-  ENVOY_LOG_MISC(debug, "QUIC client certificate validated, chain size {}", certs.size());
-  *details = std::make_unique<CertVerifyResult>(true);
+  // Report the certificate as validated only when it chains to the configured trust anchor.
+  // `ACCEPT_UNTRUSTED` accepts the chain without validating it.
+  const bool validated = result.detailed_status == Envoy::Ssl::ClientValidationStatus::Validated;
+  if (cert_validated != nullptr) {
+    *cert_validated = validated;
+  }
+  ENVOY_LOG_MISC(debug, "QUIC client certificate accepted, validated {}, chain size {}", validated,
+                 certs.size());
+  // Hand the verifier-built chain (not the peer-sent list) to the details so the connection info
+  // can report the validated issuer. The chain is empty when the certificate was not validated.
+  *details = std::make_unique<CertVerifyResult>(true, std::move(result.validated_chain));
   return quic::QUIC_SUCCESS;
 }
 

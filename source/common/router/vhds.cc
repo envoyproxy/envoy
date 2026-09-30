@@ -16,6 +16,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/stats/prefix_utility.h"
 
 namespace Envoy {
 namespace Router {
@@ -23,7 +24,7 @@ namespace Router {
 absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
     const envoy::config::route::v3::RouteConfiguration& route_config,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    VhdsConfigUpdateReceiver& receiver, Init::Manager& init_manager) {
+    bool from_rds, VhdsConfigUpdateReceiver& receiver, Init::Manager& init_manager) {
   const auto& vhds_config_source = route_config.vhds().config_source();
   // VHDS only supports Delta xDS. This can be specified either explicitly via DELTA_GRPC
   // or implicitly by using ADS when the parent ADS stream is in Delta mode.
@@ -54,19 +55,38 @@ absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
 
   auto status = absl::OkStatus();
   auto ret = std::unique_ptr<VhdsSubscription>(new VhdsSubscription(
-      route_config, factory_context, stat_prefix, receiver, init_manager, status));
+      route_config, factory_context, stat_prefix, from_rds, receiver, init_manager, status));
   RETURN_IF_ERROR(status);
   return ret;
 }
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
+namespace {
+
+// Creates the '<stat_prefix>[rds.]vhds.<route config name>.' scope of a VHDS subscription. There is
+// no tag extractor for the VHDS route config name, so it stays part of the tag-extracted name and
+// mergeStatPrefix() only adds the tag of the parent prefix.
+//
+// `stat_prefix` is the parent prefix alone, for example 'http.<stat_prefix>.'. A VHDS subscription
+// of a route configuration delivered over RDS is nested under that route configuration's own 'rds.'
+// namespace, while one of a static route configuration is not.
+Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view stat_prefix,
+                                       bool from_rds, absl::string_view route_config_name) {
+  const Stats::TaggedStatName prefix = Stats::mergeStatPrefix(
+      scope.symbolTable(), stat_prefix,
+      absl::StrCat(from_rds ? "rds.vhds." : "vhds.", route_config_name, "."));
+  return scope.scopeFromTaggedName(prefix.baseName(), prefix.tags(), prefix.name());
+}
+
+} // namespace
+
 VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfiguration& route_config,
                                    Server::Configuration::ServerFactoryContext& factory_context,
-                                   const std::string& stat_prefix,
+                                   const std::string& stat_prefix, bool from_rds,
                                    VhdsConfigUpdateReceiver& receiver, Init::Manager& init_manager,
                                    absl::Status& status)
     : receiver_(receiver), route_config_name_(route_config.name()),
-      scope_(factory_context.scope().createScope(stat_prefix + "vhds." + route_config_name_ + ".")),
+      scope_(createStatsScope(factory_context.scope(), stat_prefix, from_rds, route_config_name_)),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
       init_target_(fmt::format("VhdsConfigSubscription {}", route_config_name_),
                    [this]() { subscription_->start({route_config_name_}); }),
