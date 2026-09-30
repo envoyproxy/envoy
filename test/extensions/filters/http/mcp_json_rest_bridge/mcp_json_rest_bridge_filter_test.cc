@@ -361,7 +361,8 @@ TEST_F(McpJsonRestBridgeFilterTest, StatelessServerDiscoverReturnsLocalDiscovery
   request_headers_ = {{":method", "POST"},
                       {":path", "/mcp"},
                       {":authority", "test-host"},
-                      {"mcp-method", "server/discover"}};
+                      {"mcp-method", "server/discover"},
+                      {"mcp-protocol-version", "2026-07-28"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
@@ -449,7 +450,8 @@ protected:
     request_headers_ = {{":method", "POST"},
                         {":path", "/mcp"},
                         {":authority", "test-host"},
-                        {"mcp-method", "server/discover"}};
+                        {"mcp-method", "server/discover"},
+                        {"mcp-protocol-version", "2026-07-28"}};
     EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
               Http::FilterHeadersStatus::StopIteration);
 
@@ -501,7 +503,8 @@ TEST_F(McpJsonRestBridgeFilterTest, StatelessInitializeIsRejectedAsUnsupportedMe
   request_headers_ = {{":method", "POST"},
                       {":path", "/mcp"},
                       {":authority", "test-host"},
-                      {"mcp-method", "initialize"}};
+                      {"mcp-method", "initialize"},
+                      {"mcp-protocol-version", "2026-07-28"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
@@ -545,7 +548,8 @@ TEST_F(McpJsonRestBridgeFilterTest,
   request_headers_ = {{":method", "POST"},
                       {":path", "/mcp"},
                       {":authority", "test-host"},
-                      {"mcp-method", "notifications/initialized"}};
+                      {"mcp-method", "notifications/initialized"},
+                      {"mcp-protocol-version", "2026-07-28"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
