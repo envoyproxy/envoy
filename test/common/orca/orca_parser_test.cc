@@ -4,6 +4,7 @@
 #include "source/common/orca/orca_parser.h"
 
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/status/status.h"
@@ -270,6 +271,21 @@ TEST(OrcaParserUtilTest, LegacyBinaryHeaderFromGrpcGo) {
     EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
                 StatusHelpers::IsOkAndHolds(ProtoEq(expected)));
   }
+}
+
+TEST(OrcaParserUtilTest, LegacyBinaryHeaderWithoutPaddingRejectedWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.orca_accept_unpadded_base64", "false"}});
+  Http::TestRequestHeaderMapImpl unpadded_headers{
+      {std::string(kEndpointLoadMetricsHeaderBin),
+       "CQAAAAAAAOA/MQAAAAAAAFlAOQAAAAAAAABAQg4KA3JpZhEAAAAAAAAQQA"}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(unpadded_headers),
+              StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                       testing::HasSubstr("unable to decode ORCA binary header")));
+  Http::TestRequestHeaderMapImpl padded_headers{
+      {std::string(kEndpointLoadMetricsHeaderBin),
+       "CQAAAAAAAOA/MQAAAAAAAFlAOQAAAAAAAABAQg4KA3JpZhEAAAAAAAAQQA=="}};
+  EXPECT_TRUE(parseOrcaLoadReportHeaders(padded_headers).ok());
 }
 
 TEST(OrcaParserUtilTest, BinaryHeaderWithoutPadding) {

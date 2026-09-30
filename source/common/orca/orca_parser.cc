@@ -13,6 +13,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
@@ -150,7 +151,10 @@ absl::Status tryParseSerializedBinary(const absl::string_view header,
     return absl::InvalidArgumentError("ORCA binary header value is empty");
   }
   // gRPC allows binary header values to be sent without base64 padding, e.g. grpc-go omits it.
-  const std::string decoded_value = Envoy::Base64::decodeWithoutPadding(header);
+  const std::string decoded_value =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.orca_accept_unpadded_base64")
+          ? Envoy::Base64::decodeWithoutPadding(header)
+          : Envoy::Base64::decode(header);
   if (decoded_value.empty()) {
     return absl::InvalidArgumentError(
         fmt::format("unable to decode ORCA binary header value: {}", header));
