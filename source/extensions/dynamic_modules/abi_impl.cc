@@ -1609,6 +1609,10 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_access_logger_get_timing_info,
                envoy_dynamic_module_type_access_logger_envoy_ptr,
                envoy_dynamic_module_type_timing_info*)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_access_logger_get_timing_info_v2,
+               envoy_dynamic_module_type_access_logger_envoy_ptr,
+               envoy_dynamic_module_type_timing_info_v2*)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_access_logger_get_trace_id, false,
           envoy_dynamic_module_type_access_logger_envoy_ptr,
           envoy_dynamic_module_type_envoy_buffer*)
@@ -3178,7 +3182,7 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_http_filter_get_attribute_bool, fa
 
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_get_timing_info,
                envoy_dynamic_module_type_http_filter_envoy_ptr,
-               envoy_dynamic_module_type_timing_info*)
+               envoy_dynamic_module_type_timing_info_v2*)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_get_attribute_string, false,
           envoy_dynamic_module_type_network_filter_envoy_ptr,

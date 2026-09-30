@@ -2198,18 +2198,48 @@ fn test_http_get_upstream_connection_id_unavailable() {
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_http_get_timing_info(
   _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  timing_out: *mut abi::envoy_dynamic_module_type_timing_info,
+  timing_out: *mut abi::envoy_dynamic_module_type_timing_info_v2,
 ) {
   unsafe {
-    *timing_out = abi::envoy_dynamic_module_type_timing_info {
-      start_time_unix_ns: 1,
-      request_complete_duration_ns: 2,
-      first_upstream_tx_byte_sent_ns: 3,
-      last_upstream_tx_byte_sent_ns: 4,
-      first_upstream_rx_byte_received_ns: 5,
-      last_upstream_rx_byte_received_ns: 6,
-      first_downstream_tx_byte_sent_ns: 7,
-      last_downstream_tx_byte_sent_ns: 8,
+    *timing_out = abi::envoy_dynamic_module_type_timing_info_v2 {
+      start_time_unix_ns: 1_000,
+      downstream_connection_begin_ns: -4,
+      downstream_handshake_start_ns: -3,
+      downstream_handshake_complete_ns: -2,
+      last_downstream_header_rx_byte_received_ns: 0,
+      last_downstream_rx_byte_received_ns: 1,
+      upstream_connect_start_ns: 2,
+      upstream_connect_complete_ns: 3,
+      upstream_handshake_complete_ns: 4,
+      first_upstream_tx_byte_sent_ns: 5,
+      last_upstream_tx_byte_sent_ns: 6,
+      first_upstream_rx_byte_received_ns: 7,
+      first_upstream_rx_body_byte_received_ns: 8,
+      last_upstream_rx_byte_received_ns: 9,
+      first_downstream_tx_byte_sent_ns: 10,
+      last_downstream_tx_byte_sent_ns: 11,
+      last_downstream_ack_received_ns: 12,
+      request_complete_duration_ns: 13,
+      downstream_connection_end_ns: 14,
+      has_start_time: true,
+      has_downstream_connection_begin: true,
+      has_downstream_handshake_start: true,
+      has_downstream_handshake_complete: true,
+      has_last_downstream_header_rx_byte_received: true,
+      has_last_downstream_rx_byte_received: true,
+      has_upstream_connect_start: true,
+      has_upstream_connect_complete: true,
+      has_upstream_handshake_complete: true,
+      has_first_upstream_tx_byte_sent: true,
+      has_last_upstream_tx_byte_sent: true,
+      has_first_upstream_rx_byte_received: true,
+      has_first_upstream_rx_body_byte_received: true,
+      has_last_upstream_rx_byte_received: true,
+      has_first_downstream_tx_byte_sent: true,
+      has_last_downstream_tx_byte_sent: true,
+      has_last_downstream_ack_received: true,
+      has_request_complete: true,
+      has_downstream_connection_end: true,
     };
   }
 }
@@ -2221,14 +2251,25 @@ fn test_http_get_timing_info() {
   };
 
   let timing: access_log::TimingInfo = filter.get_timing_info();
-  assert_eq!(timing.start_time_unix_ns, 1);
-  assert_eq!(timing.request_complete_duration_ns, 2);
-  assert_eq!(timing.first_upstream_tx_byte_sent_ns, 3);
-  assert_eq!(timing.last_upstream_tx_byte_sent_ns, 4);
-  assert_eq!(timing.first_upstream_rx_byte_received_ns, 5);
-  assert_eq!(timing.last_upstream_rx_byte_received_ns, 6);
-  assert_eq!(timing.first_downstream_tx_byte_sent_ns, 7);
-  assert_eq!(timing.last_downstream_tx_byte_sent_ns, 8);
+  assert_eq!(timing.start_time_unix_ns, Some(1_000));
+  assert_eq!(timing.downstream_connection_begin_ns, Some(-4));
+  assert_eq!(timing.downstream_handshake_start_ns, Some(-3));
+  assert_eq!(timing.downstream_handshake_complete_ns, Some(-2));
+  assert_eq!(timing.last_downstream_header_rx_byte_received_ns, Some(0));
+  assert_eq!(timing.last_downstream_rx_byte_received_ns, Some(1));
+  assert_eq!(timing.upstream_connect_start_ns, Some(2));
+  assert_eq!(timing.upstream_connect_complete_ns, Some(3));
+  assert_eq!(timing.upstream_handshake_complete_ns, Some(4));
+  assert_eq!(timing.first_upstream_tx_byte_sent_ns, Some(5));
+  assert_eq!(timing.last_upstream_tx_byte_sent_ns, Some(6));
+  assert_eq!(timing.first_upstream_rx_byte_received_ns, Some(7));
+  assert_eq!(timing.first_upstream_rx_body_byte_received_ns, Some(8));
+  assert_eq!(timing.last_upstream_rx_byte_received_ns, Some(9));
+  assert_eq!(timing.first_downstream_tx_byte_sent_ns, Some(10));
+  assert_eq!(timing.last_downstream_tx_byte_sent_ns, Some(11));
+  assert_eq!(timing.last_downstream_ack_received_ns, Some(12));
+  assert_eq!(timing.request_complete_duration_ns, Some(13));
+  assert_eq!(timing.downstream_connection_end_ns, Some(14));
 }
 
 const HTTP_UPSTREAM_ATTEMPTS_AVAILABLE: usize = 1;
