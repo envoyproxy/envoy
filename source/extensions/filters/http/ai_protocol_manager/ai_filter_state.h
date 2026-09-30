@@ -14,12 +14,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
+// Well-known AI filter state keys.
+namespace FilterStateKeys {
+// A RequestLlmProtocol.
+constexpr absl::string_view LlmProtocolRequest = "envoy.ai.llm_protocol.request";
+// The model the request names, as a Router::StringAccessor.
+constexpr absl::string_view ModelRequest = "envoy.ai.model.request";
+} // namespace FilterStateKeys
+
 // The request's wire API, set by a filter that knows the caller better than the route does. It is
 // created from and serializes as an LLMProtocol value name, such as ANTHROPIC_MESSAGES.
 class RequestLlmProtocol : public StreamInfo::FilterState::Object {
 public:
-  static constexpr absl::string_view FilterStateKey = "envoy.ai.llm_protocol.request";
-
   explicit RequestLlmProtocol(LLMProtocol protocol) : protocol_(protocol) {}
 
   // Unspecified when no object is set.
@@ -35,9 +41,6 @@ public:
 private:
   const LLMProtocol protocol_;
 };
-
-// The model the request names, as a Router::StringAccessor.
-inline constexpr absl::string_view RequestModelFilterStateKey = "envoy.ai.model.request";
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters

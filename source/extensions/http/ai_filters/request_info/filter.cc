@@ -26,7 +26,7 @@ namespace RequestInfo {
 using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::AiRequest;
 using HttpFilters::AiProtocolManager::LocalReplier;
-using HttpFilters::AiProtocolManager::RequestModelFilterStateKey;
+namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 
 namespace {
 
@@ -111,10 +111,10 @@ void RequestInfoFilter::publish(const AiRequest& request) {
 void RequestInfoFilter::storeModel(absl::string_view model) {
   const StreamInfo::FilterStateSharedPtr& filter_state = context_.stream_info.filterState();
   // A filter ahead may have set the object with another life span, which setData rejects.
-  if (model.empty() || filter_state->hasDataWithName(RequestModelFilterStateKey)) {
+  if (model.empty() || filter_state->hasDataWithName(FilterStateKeys::ModelRequest)) {
     return;
   }
-  filter_state->setData(RequestModelFilterStateKey,
+  filter_state->setData(FilterStateKeys::ModelRequest,
                         std::make_shared<Router::StringAccessorImpl>(model),
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 }

@@ -40,7 +40,7 @@ using HttpFilters::AiProtocolManager::FilterManager;
 using HttpFilters::AiProtocolManager::InMemoryExternalBufferFactory;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LLMProtocol;
-using HttpFilters::AiProtocolManager::RequestModelFilterStateKey;
+namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 
 constexpr absl::string_view DefaultNamespace = "envoy.ai.request_info";
 
@@ -110,7 +110,7 @@ public:
 
   std::optional<std::string> storedModel() {
     const auto* model = stream_info_.filterState()->getDataReadOnly<Router::StringAccessor>(
-        RequestModelFilterStateKey);
+        FilterStateKeys::ModelRequest);
     return model != nullptr ? std::make_optional(std::string(model->asString())) : std::nullopt;
   }
 
@@ -157,7 +157,7 @@ TEST_F(RequestInfoFilterTest, StoresModelInFilterState) {
   run(R"({"model":"gpt-4o","messages":[]})", LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(storedModel(), "gpt-4o");
   const auto* object =
-      stream_info_.filterState()->getDataReadOnlyGeneric(RequestModelFilterStateKey);
+      stream_info_.filterState()->getDataReadOnlyGeneric(FilterStateKeys::ModelRequest);
   ASSERT_NE(object, nullptr);
   EXPECT_EQ(object->serializeAsString(), "gpt-4o");
 }
@@ -165,7 +165,7 @@ TEST_F(RequestInfoFilterTest, StoresModelInFilterState) {
 // The object was set with a wider life span than the filter's, so writing over it would be an
 // access violation.
 TEST_F(RequestInfoFilterTest, KeepsModelSetAhead) {
-  stream_info_.filterState()->setData(RequestModelFilterStateKey,
+  stream_info_.filterState()->setData(FilterStateKeys::ModelRequest,
                                       std::make_shared<Router::StringAccessorImpl>("alias"),
                                       StreamInfo::FilterState::LifeSpan::Request);
   run(R"({"model":"gpt-4o"})", LLMProtocol::OpenAiChatCompletions);

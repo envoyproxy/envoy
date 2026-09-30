@@ -14,7 +14,8 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 
 LLMProtocol RequestLlmProtocol::fromFilterState(const StreamInfo::FilterState& filter_state) {
-  const auto* object = filter_state.getDataReadOnly<RequestLlmProtocol>(FilterStateKey);
+  const auto* object =
+      filter_state.getDataReadOnly<RequestLlmProtocol>(FilterStateKeys::LlmProtocolRequest);
   return object != nullptr ? object->protocol() : LLMProtocol::Unspecified;
 }
 
@@ -34,7 +35,7 @@ namespace {
 
 class RequestLlmProtocolObjectFactory : public StreamInfo::FilterState::ObjectFactory {
 public:
-  std::string name() const override { return std::string(RequestLlmProtocol::FilterStateKey); }
+  std::string name() const override { return std::string(FilterStateKeys::LlmProtocolRequest); }
 
   // An unknown name yields no object, so a typo cannot read as LLM_PROTOCOL_UNSPECIFIED.
   std::unique_ptr<StreamInfo::FilterState::Object>
@@ -51,7 +52,7 @@ REGISTER_FACTORY(RequestLlmProtocolObjectFactory, StreamInfo::FilterState::Objec
 
 class RequestModelObjectFactory : public StreamInfo::FilterState::ObjectFactory {
 public:
-  std::string name() const override { return std::string(RequestModelFilterStateKey); }
+  std::string name() const override { return std::string(FilterStateKeys::ModelRequest); }
 
   // An empty name yields no object: absence is how an unknown model reads.
   std::unique_ptr<StreamInfo::FilterState::Object>

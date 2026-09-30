@@ -18,7 +18,7 @@ class RequestLlmProtocolFactoryTest : public testing::Test {
 protected:
   void SetUp() override {
     factory_ = Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
-        RequestLlmProtocol::FilterStateKey);
+        FilterStateKeys::LlmProtocolRequest);
     ASSERT_NE(factory_, nullptr);
   }
 
@@ -64,7 +64,7 @@ TEST(RequestLlmProtocolTest, ReadsBackFromFilterState) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(RequestLlmProtocol::fromFilterState(filter_state), LLMProtocol::Unspecified);
 
-  filter_state.setData(RequestLlmProtocol::FilterStateKey,
+  filter_state.setData(FilterStateKeys::LlmProtocolRequest,
                        std::make_shared<RequestLlmProtocol>(LLMProtocol::AnthropicMessages),
                        StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(RequestLlmProtocol::fromFilterState(filter_state), LLMProtocol::AnthropicMessages);
@@ -73,7 +73,7 @@ TEST(RequestLlmProtocolTest, ReadsBackFromFilterState) {
 TEST(RequestModelFactoryTest, BuildsStringAccessorFromModelName) {
   const auto* factory =
       Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
-          RequestModelFilterStateKey);
+          FilterStateKeys::ModelRequest);
   ASSERT_NE(factory, nullptr);
   const auto object = factory->createFromBytes("gpt-4o-mini");
   const auto* model = dynamic_cast<const Router::StringAccessor*>(object.get());
@@ -85,7 +85,7 @@ TEST(RequestModelFactoryTest, BuildsStringAccessorFromModelName) {
 TEST(RequestModelFactoryTest, RejectsEmptyModel) {
   const auto* factory =
       Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
-          RequestModelFilterStateKey);
+          FilterStateKeys::ModelRequest);
   ASSERT_NE(factory, nullptr);
   EXPECT_EQ(factory->createFromBytes(""), nullptr);
 }
