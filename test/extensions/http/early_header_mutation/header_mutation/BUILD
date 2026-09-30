@@ -35,6 +35,7 @@ envoy_extension_cc_test(
         "envoy.formatter.cel",
     ],
     rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/formatter/cel:config",
