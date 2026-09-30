@@ -64,6 +64,10 @@ Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
     return Api::ioCallUint64ResultNoError();
   }
 
+  // Similar to the IoSocketHandleImpl::close().
+  // TODO(aakugan): Implement logic for pings from the downstream side too.
+  resetFileEvents();
+
   // Notify the parent that this downstream connection has been closed.
   // This can trigger re-initiation of the reverse connection if needed.
   if (parent_) {
@@ -93,6 +97,12 @@ Api::SysCallIntResult DownstreamReverseConnectionIOHandle::shutdown(int how) {
   }
 
   return Api::SysCallIntResult{0, 0};
+}
+
+void DownstreamReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement() {
+  if (parent_) {
+    parent_->markTunnelDrainingAndDialReplacement(connection_key_, connection_id_);
+  }
 }
 
 } // namespace ReverseConnection

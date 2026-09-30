@@ -194,7 +194,6 @@ public:
                Router::Context& router_context)
       : factory_context_(factory_context), router_context_(router_context), scope_(scope), cm_(cm),
         runtime_(runtime), default_stats_(router_context_.statNames(), scope_, stat_prefix),
-        async_stats_(router_context_.statNames(), scope, http_context.asyncClientStatPrefix()),
         random_(random), emit_dynamic_stats_(emit_dynamic_stats),
         start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
@@ -221,12 +220,12 @@ public:
   }
 
   static absl::StatusOr<std::unique_ptr<FilterConfig>>
-  create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+  create(Stats::StatName stat_prefix, Server::Configuration::GenericFactoryContext& context,
          ShadowWriterPtr&& shadow_writer,
          const envoy::extensions::filters::http::router::v3::Router& config);
 
 protected:
-  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::GenericFactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config,
                absl::Status& creation_status);
@@ -261,7 +260,6 @@ public:
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
   FilterStats default_stats_;
-  FilterStats async_stats_;
   Random::RandomGenerator& random_;
   const bool emit_dynamic_stats_ : 1;
   const bool start_child_span_ : 1;
@@ -280,6 +278,13 @@ public:
   Http::Context& http_context_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
+  // The upstream filter config provider manager is an *unpinned* singleton, so it is kept alive
+  // only by its holders. Each dynamic (ECDS) provider in upstream_http_filter_factories_ owns a
+  // FilterConfigSubscription that holds a raw reference back to this manager and writes through it
+  // from its destructor, so the manager must outlive the factories below. Declared first so that it
+  // is destroyed last.
+  std::shared_ptr<Http::UpstreamFilterConfigProviderManager>
+      upstream_filter_config_provider_manager_;
   std::unique_ptr<Server::Configuration::UpstreamFactoryContext> upstream_ctx_;
   Http::FilterChainUtility::FilterFactoriesList upstream_http_filter_factories_;
 
@@ -580,6 +585,9 @@ private:
                                                     const Http::HeaderMap& headers) const;
   void applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
                                 Http::RequestHeaderMap& headers) const;
+  // Collects the downstream request's dynamic ``envoy.lb`` metadata (request over connection) for
+  // forwarding to shadow streams, mirroring ``metadataMatchCriteria()``. Empty if none is present.
+  envoy::config::core::v3::Metadata shadowDynamicMetadata() const;
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();

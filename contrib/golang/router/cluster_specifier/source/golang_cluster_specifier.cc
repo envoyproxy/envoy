@@ -1,6 +1,7 @@
 #include "contrib/golang/router/cluster_specifier/source/golang_cluster_specifier.h"
 
 #include <chrono>
+#include <format>
 
 #include "source/common/router/delegating_route_impl.h"
 
@@ -23,14 +24,14 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
   // TODO: unload DSO when filter updated.
   dynamic_lib_ = Envoy::Dso::DsoManager<Dso::ClusterSpecifierDsoImpl>::load(so_id_, so_path_);
   if (dynamic_lib_ == nullptr) {
-    throw EnvoyException(fmt::format("golang_cluster_specifier_plugin: load library failed: {} {}",
+    throw EnvoyException(std::format("golang_cluster_specifier_plugin: load library failed: {} {}",
                                      so_id_, so_path_));
   }
 
   std::string str;
   if (!config_.SerializeToString(&str)) {
     throw EnvoyException(
-        fmt::format("golang_cluster_specifier_plugin: serialize config to string failed: {} {}",
+        std::format("golang_cluster_specifier_plugin: serialize config to string failed: {} {}",
                     so_id_, so_path_));
   }
 
@@ -39,7 +40,7 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
   plugin_id_ = dynamic_lib_->envoyGoClusterSpecifierNewPlugin(ptr, len);
   if (plugin_id_ == 0) {
     throw EnvoyException(
-        fmt::format("golang_cluster_specifier_plugin: generate plugin failed in golang side: {} {}",
+        std::format("golang_cluster_specifier_plugin: generate plugin failed in golang side: {} {}",
                     so_id_, so_path_));
   }
 }

@@ -24,7 +24,16 @@ public:
 
   void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                        const StreamInfo::StreamInfo& stream_info) const override {
-    const std::string value = formatter_->format(context, stream_info);
+    std::string value_buffer;
+    absl::string_view value;
+    if (formatter_ != nullptr) {
+      formatter_->formatTo(value_buffer, context, stream_info);
+      value = value_buffer;
+    } else {
+      // The configured value contains no substitution command, so no formatter was built for it
+      // and it evaluates to itself.
+      value = original_value_;
+    }
 
     if (!value.empty() || add_if_empty_) {
       switch (append_action_) {

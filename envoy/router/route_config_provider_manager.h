@@ -51,11 +51,15 @@ public:
    * getRdsRouteConfigProvider above. This method always create a new RouteConfigProvider.
    * @param route_config supplies the RouteConfiguration for this route
    * @param factory_context is the context to use for the route config provider.
+   * @param init_manager the Init::Manager that the resources owned by the route configuration
+   * should use to warm up. An inline route configuration inherits the init manager of its owner,
+   * e.g. of the HTTP connection manager that it is configured in.
    * @param validator is the message validator for route config.
    */
   virtual RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                  Init::Manager& init_manager,
                                   ProtobufMessage::ValidationVisitor& validator) PURE;
 };
 

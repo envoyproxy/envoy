@@ -17,6 +17,9 @@ public:
   convertRateLimitUnit(envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit);
 };
 
+void populateRetryAfterHeader(const Filters::Common::RateLimit::DescriptorStatusList& statuses,
+                              Http::ResponseHeaderMap& headers, bool enabled);
+
 } // namespace RateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions

@@ -116,9 +116,15 @@ protected:
   std::unique_ptr<FilterConfig>
   getFilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config) {
     if (std::get<2>(GetParam())) {
-      return std::make_unique<FilterConfig>(proto_config, context_);
+      auto extra_context =
+          Server::Configuration::ExtraFactoryContext::create(context_, stats_prefix_);
+      return std::make_unique<FilterConfig>(proto_config, context_.server_factory_context_,
+                                            extra_context);
     }
-    return std::make_unique<FilterConfig>(proto_config, upstream_factory_context_);
+    auto extra_context = Server::Configuration::ExtraFactoryContext::create(
+        upstream_factory_context_, stats_prefix_);
+    return std::make_unique<FilterConfig>(
+        proto_config, upstream_factory_context_.server_factory_context_, extra_context);
   }
 
   envoy::extensions::filters::http::wasm::v3::Wasm localWasmConfig(const std::string& name) {
@@ -144,6 +150,7 @@ protected:
     return proto_config;
   }
 
+  const std::string stats_prefix_{"stats"};
   NiceMock<Network::MockListenerInfo> listener_info_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::Scope& stats_scope_{*stats_store_.rootScope()};
@@ -187,14 +194,18 @@ TEST_P(WasmFilterConfigTest, CreateFilterFactoryFromProtoWithServerContext) {
   WasmFilterConfig factory;
   Http::FilterFactoryCb cb;
   if (std::get<2>(GetParam())) {
+    Server::Configuration::ExtraFactoryContext extra_context{
+        context_.server_factory_context_.messageValidationVisitor(), "stats"};
     cb = factory
-             .createHttpFilterFactoryFromProto(proto_config, "stats",
-                                               context_.server_factory_context_)
+             .createHttpFilterFactoryFromProto(proto_config, context_.server_factory_context_,
+                                               extra_context)
              .value();
   } else {
+    Server::Configuration::ExtraFactoryContext extra_context{
+        upstream_factory_context_.server_factory_context_.messageValidationVisitor(), "stats"};
     cb = factory
-             .createHttpFilterFactoryFromProto(proto_config, "stats",
-                                               upstream_factory_context_.server_factory_context_)
+             .createHttpFilterFactoryFromProto(
+                 proto_config, upstream_factory_context_.server_factory_context_, extra_context)
              .value();
   }
 
@@ -478,8 +489,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineBadCode) {
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
@@ -527,8 +538,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
@@ -593,8 +604,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
@@ -784,8 +795,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
@@ -826,8 +837,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
@@ -871,8 +882,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
@@ -917,8 +928,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
   initializeForRemote();
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
@@ -988,8 +999,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
   const std::string code = "foo";
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
@@ -1057,8 +1068,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
 
 TEST_P(WasmFilterConfigTest, DEPRECATED_FEATURE_TEST(YamlLoadFromRemoteSuccessBadcodeFailOpen)) {
   const std::string code = "foo";
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     fail_open: true
@@ -1104,8 +1115,8 @@ TEST_P(WasmFilterConfigTest, DEPRECATED_FEATURE_TEST(YamlLoadFromRemoteSuccessBa
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpenPolicy) {
   const std::string code = "foo";
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     failure_policy: FAIL_OPEN
@@ -1152,8 +1163,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpenPolicy) {
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmcreateContext) {
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:

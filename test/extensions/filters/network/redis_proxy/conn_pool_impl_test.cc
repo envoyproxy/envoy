@@ -42,6 +42,10 @@ using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
 
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -1104,9 +1108,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
   EXPECT_EQ(host_address_map[host2->address()->asString()], host2);
-  EXPECT_EQ(clientMap().size(), 2);
-  EXPECT_NE(clientMap().find(host1), clientMap().end());
-  EXPECT_NE(clientMap().find(host2), clientMap().end());
+  EXPECT_THAT(clientMap(), UnorderedElementsAre(Key(host1), Key(host2)));
   void* host1_active_client = clientMap(host1);
   EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
@@ -1203,9 +1205,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
   EXPECT_EQ(host_address_map[host2->address()->asString()], host2);
-  EXPECT_EQ(clientMap().size(), 2);
-  EXPECT_NE(clientMap().find(host1), clientMap().end());
-  EXPECT_NE(clientMap().find(host2), clientMap().end());
+  EXPECT_THAT(clientMap(), UnorderedElementsAre(Key(host1), Key(host2)));
   EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
   EXPECT_EQ(drainTimer()->enabled(), false);
@@ -1281,9 +1281,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
   EXPECT_EQ(host_address_map[host2->address()->asString()], host2);
-  EXPECT_EQ(clientMap().size(), 2);
-  EXPECT_NE(clientMap().find(host1), clientMap().end());
-  EXPECT_NE(clientMap().find(host2), clientMap().end());
+  EXPECT_THAT(clientMap(), UnorderedElementsAre(Key(host1), Key(host2)));
   EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
   EXPECT_EQ(drainTimer()->enabled(), false);
@@ -1507,8 +1505,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccessWithDNSEntryViaCallback) {
   // DNS entry is not cached.
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
-  std::optional<std::reference_wrapper<
-      Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks>>
+  OptRef<Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks>
       saved_callbacks;
 
   EXPECT_CALL(*dns_cache, loadDnsCacheEntry_(Eq("foo:6379"), 6379, false, _))
@@ -1533,7 +1530,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccessWithDNSEntryViaCallback) {
   EXPECT_CALL(*client2, makeRequest_(Ref(*request_value), _)).WillOnce(Return(&active_request2));
   EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
 
-  saved_callbacks.value().get().onLoadDnsCacheComplete(host_info);
+  saved_callbacks->onLoadDnsCacheComplete(host_info);
 
   EXPECT_EQ(host1->address()->asString(), "1.2.3.4:6379");
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
@@ -1568,8 +1565,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailedWithDNSEntryViaCallback) {
   // DNS entry is not cached.
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
-  std::optional<std::reference_wrapper<
-      Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks>>
+  OptRef<Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks>
       saved_callbacks;
 
   EXPECT_CALL(*dns_cache, loadDnsCacheEntry_(Eq("foo:6379"), 6379, false, _))
@@ -1588,7 +1584,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailedWithDNSEntryViaCallback) {
   EXPECT_CALL(callbacks, onResponse_(_));
   EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
 
-  saved_callbacks.value().get().onLoadDnsCacheComplete(nullptr);
+  saved_callbacks->onLoadDnsCacheComplete(nullptr);
 
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
                      .counter("upstream_internal_redirect_failed_total")

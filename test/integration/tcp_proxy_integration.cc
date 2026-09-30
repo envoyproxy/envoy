@@ -22,7 +22,8 @@ void BaseTcpProxySslIntegrationTest::initialize() {
 
   context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
       server_factory_context_);
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
 }
 
 BaseTcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(
@@ -146,6 +147,13 @@ BaseTcpProxySslIntegrationTest::ClientSslConnection::peerCertificateSha256Digest
       ssl_client_->connectionInfoProvider().sslConnection();
   return ssl_info ? std::make_optional<std::string>(ssl_info->sha256PeerCertificateDigest())
                   : std::nullopt;
+}
+
+std::optional<std::string>
+BaseTcpProxySslIntegrationTest::ClientSslConnection::ciphersuite() const {
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info =
+      ssl_client_->connectionInfoProvider().sslConnection();
+  return ssl_info ? std::make_optional<std::string>(ssl_info->ciphersuiteString()) : std::nullopt;
 }
 
 void BaseTcpProxySslIntegrationTest::setupConnections() {

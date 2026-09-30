@@ -9,6 +9,9 @@
 using testing::NiceMock;
 using testing::Return;
 
+using testing::Contains;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Http {
 namespace {
@@ -47,9 +50,7 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabled) {
 
     // 'filter_1' and 'filter_2' should be added.
     FilterChainUtility::createFilterChainForFactories(callbacks, filter_factories);
-    EXPECT_TRUE(added_filters.find("filter_1") != added_filters.end());
-    EXPECT_TRUE(added_filters.find("filter_2") != added_filters.end());
-    EXPECT_EQ(added_filters.size(), 2);
+    EXPECT_THAT(added_filters, UnorderedElementsAre("filter_1", "filter_2"));
   }
 }
 
@@ -84,8 +85,7 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabledAndDe
 
     // Only filter_1 should be added.
     FilterChainUtility::createFilterChainForFactories(callbacks, filter_factories);
-    EXPECT_TRUE(added_filters.find("filter_1") != added_filters.end());
-    EXPECT_EQ(added_filters.size(), 1);
+    EXPECT_THAT(added_filters, UnorderedElementsAre("filter_1"));
   }
 }
 

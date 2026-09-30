@@ -2,6 +2,7 @@
 
 #include "envoy/config/subscription.h"
 
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -14,8 +15,8 @@ public:
       : validation_visitor_(validation_visitor), name_field_(name_field) {}
 
   // Config::OpaqueResourceDecoder
-  ProtobufTypes::MessagePtr decodeResource(const Protobuf::Any& resource) override {
-    auto typed_message = std::make_unique<Current>();
+  ArenaWrappedProto<Protobuf::Message> decodeResource(const Protobuf::Any& resource) override {
+    ArenaWrappedProto<Current> typed_message;
     // If the Any is a synthetic empty message (e.g. because the resource field was not set in
     // Resource, this might be empty, so we shouldn't decode.
     if (!resource.type_url().empty()) {

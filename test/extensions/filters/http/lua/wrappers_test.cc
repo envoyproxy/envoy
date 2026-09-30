@@ -13,12 +13,17 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
+using testing::Contains;
+using testing::ElementsAre;
 using testing::Expectation;
 using testing::InSequence;
+using testing::IsSupersetOf;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -565,18 +570,16 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetComplexDynamicMetadata) {
                                          .at("foo")
                                          .struct_value();
 
-  EXPECT_EQ(1234.0, meta_foo.fields().at("x").number_value());
-  EXPECT_EQ("baz", meta_foo.fields().at("y").string_value());
-  EXPECT_EQ(true, meta_foo.fields().at("z").bool_value());
+  EXPECT_THAT(meta_foo.fields(),
+              UnorderedElementsAre(IsStructNumber("x", 1234.0), IsStructString("y", "baz"),
+                                   IsStructBool("z", true)));
 
   const Protobuf::ListValue& meta_so =
       stream_info.dynamicMetadata().filter_metadata().at("envoy.lb").fields().at("so").list_value();
 
-  EXPECT_EQ(4, meta_so.values_size());
-  EXPECT_EQ("cool", meta_so.values(0).string_value());
-  EXPECT_EQ("and", meta_so.values(1).string_value());
-  EXPECT_EQ("dynamic", meta_so.values(2).string_value());
-  EXPECT_EQ(true, meta_so.values(3).bool_value());
+  EXPECT_THAT(meta_so.values(),
+              ElementsAre(IsStructValueString("cool"), IsStructValueString("and"),
+                          IsStructValueString("dynamic"), IsStructValueBool(true)));
 
   wrapper.reset();
 }
@@ -2133,7 +2136,7 @@ TEST_F(LuaStatsScopeWrapperTest, HistogramOperations) {
   // Verify the histogram was created with the correct prefix and unit.
   auto histogram = store_.findHistogramByString("lua.test_histogram");
   ASSERT_TRUE(histogram.has_value());
-  EXPECT_EQ(Stats::Histogram::Unit::Unspecified, histogram->get().unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified, histogram->unit());
   wrapper.reset();
 }
 
@@ -2160,7 +2163,7 @@ TEST_F(LuaStatsScopeWrapperTest, HistogramSharedIdentity) {
   // Verify only one histogram was created, not two.
   ASSERT_TRUE(store_.findHistogramByString("lua.shared").has_value());
   EXPECT_EQ(Stats::Histogram::Unit::Milliseconds,
-            store_.findHistogramByString("lua.shared")->get().unit());
+            store_.findHistogramByString("lua.shared")->unit());
   wrapper.reset();
 }
 
@@ -2193,19 +2196,19 @@ TEST_F(LuaStatsScopeWrapperTest, HistogramUnits) {
   // Verify histograms were created with correct units.
   auto latency = store_.findHistogramByString("lua.latency");
   ASSERT_TRUE(latency.has_value());
-  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, latency->get().unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, latency->unit());
 
   auto size = store_.findHistogramByString("lua.size");
   ASSERT_TRUE(size.has_value());
-  EXPECT_EQ(Stats::Histogram::Unit::Bytes, size->get().unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, size->unit());
 
   auto latency_us = store_.findHistogramByString("lua.latency_us");
   ASSERT_TRUE(latency_us.has_value());
-  EXPECT_EQ(Stats::Histogram::Unit::Microseconds, latency_us->get().unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Microseconds, latency_us->unit());
 
   auto count = store_.findHistogramByString("lua.count");
   ASSERT_TRUE(count.has_value());
-  EXPECT_EQ(Stats::Histogram::Unit::Unspecified, count->get().unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified, count->unit());
 
   wrapper.reset();
 }

@@ -2,6 +2,8 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/hot_restart.h"
+#include "envoy/server/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
@@ -38,6 +40,8 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
   enable_detailed_stats_ = config.enable_detailed_stats();
   max_reconnect_backoff_ms_ =
       PROTOBUF_GET_MS_OR_DEFAULT(config, max_reconnect_backoff, kDefaultMaxReconnectBackoffMs);
+  maintain_interval_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(
+      config, maintain_interval, ReverseConnectionUtility::kDefaultMaintainIntervalMs);
   if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
     handshake_request_path_ = config.http_handshake().request_path();
   } else {
@@ -102,8 +106,12 @@ void ReverseTunnelInitiatorExtension::emitAccessLog(
 }
 
 // ReverseTunnelInitiatorExtension implementation
-void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance&) {
+void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance& server) {
   ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension::onServerInitialized");
+
+  // Retain the server so the initiator can reach hotRestart() to gate dialing on the parent
+  // being told to stop accepting new connections during a hot restart.
+  server_ = &server;
 
   // Provider-backed formatters (e.g. %FILE_CONTENT%, and secret/SDS-backed formatters) resolve
   // their value through a provider whose data lives in a ThreadLocal slot. That slot is populated
@@ -114,8 +122,11 @@ void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance&) {
   // request. Built any earlier, the slot would be populated only on the main thread and the
   // formatter would resolve to an empty value on the workers.
   if (config_.has_http_handshake() && !config_.http_handshake().formatters().empty()) {
-    Server::GenericFactoryContextImpl formatter_context(context_,
-                                                        context_.messageValidationVisitor());
+    // These formatters come from the bootstrap, so validate them as static configuration. The
+    // context's default visitor cannot be used here: onServerInitialized() runs after the
+    // bootstrap has been loaded, so that visitor has already switched to the dynamic one.
+    Server::GenericFactoryContextImpl formatter_context(
+        context_, context_.messageValidationContext().staticValidationVisitor());
     auto command_parsers = returnOrThrow(Formatter::SubstitutionFormatStringUtils::parseFormatters(
         config_.http_handshake().formatters(), formatter_context));
     auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
@@ -129,6 +140,14 @@ void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance&) {
     }
     handshake_headers_ = std::move(handshake_headers);
   }
+}
+
+bool ReverseTunnelInitiatorExtension::parentStopAcceptingRequested() {
+  if (server_ == nullptr) {
+    // Not yet initialized (or some unit tests): no parent to wait for, so don't defer dialing.
+    return true;
+  }
+  return server_->hotRestart().parentStopAcceptingRequested();
 }
 
 void ReverseTunnelInitiatorExtension::onWorkerThreadInitialized() {

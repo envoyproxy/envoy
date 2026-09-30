@@ -3090,6 +3090,22 @@ TEST_F(RandomShardRequestTest, ClusterNodes) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.cluster.success").value());
 }
 
+TEST_F(RandomShardRequestTest, ClusterShards) {
+  InSequence s;
+
+  setup({"cluster", "shards"});
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.cluster.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[0]->onResponse(response());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.cluster.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.cluster.success").value());
+}
+
 TEST_F(RandomShardRequestTest, UnsupportedSubcommand) {
   // Test unsupported subcommand for random shard commands (e.g., cluster reset)
   Common::Redis::RespValue expected_response;
@@ -4090,7 +4106,7 @@ TEST_F(ClusterScopeCommandRoutingTest, NoShardsAvailable) {
 
 TEST_F(ClusterScopeCommandRoutingTest, InvalidSubcommand) {
   // Test that CLUSTER command with invalid subcommand is rejected
-  // Only "cluster" has subcommand validation: {"info", "slots", "keyslot", "nodes"}
+  // Only "cluster" has subcommand validation: {"info", "slots", "keyslot", "nodes", "shards"}
   InSequence s;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};

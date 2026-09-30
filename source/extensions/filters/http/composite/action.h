@@ -30,11 +30,14 @@ public:
   using FilterConfigProvider = std::function<OptRef<Http::FilterFactoryCb>()>;
 
   // Constructor for single filter which is either typed_config or dynamic_config.
+  // config_provider_manager is a keep-alive for dynamic_config actions; see the member comment
+  // below. It is nullptr for typed_config actions.
   explicit ExecuteFilterAction(
       FilterConfigProvider config_provider, const std::string& name,
       const std::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
-      Runtime::Loader& runtime)
-      : config_provider_(std::move(config_provider)), name_(name), sample_(sample),
+      Runtime::Loader& runtime, std::shared_ptr<void> config_provider_manager = nullptr)
+      : config_provider_manager_(std::move(config_provider_manager)),
+        config_provider_(std::move(config_provider)), name_(name), sample_(sample),
         runtime_(runtime), is_filter_chain_(false) {}
 
   // Constructor for filter chain (inline filter_chain).
@@ -70,6 +73,11 @@ public:
   const std::string& filterChainName() const { return name_; }
 
 private:
+  // For dynamic_config actions, keeps the filter config provider manager alive. The manager is an
+  // unpinned singleton, and the dynamic provider held by config_provider_ owns a
+  // FilterConfigSubscription that dereferences a raw reference to the manager from its destructor.
+  // Declared before config_provider_ so that it is destroyed after it.
+  std::shared_ptr<void> config_provider_manager_;
   // Used for single filter mode which is either typed_config or dynamic_config.
   FilterConfigProvider config_provider_;
   // Used for filter chain mode.
@@ -124,7 +132,7 @@ private:
             ? std::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
                   composite_action.sample_percent())
             : std::nullopt,
-        runtime);
+        runtime, provider_manager);
   }
 
   Matcher::ActionConstSharedPtr createDynamicActionDownstream(

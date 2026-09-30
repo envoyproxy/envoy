@@ -1,4 +1,6 @@
 #pragma once
+// Changing the default behavior of ext_authz is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
 
 #include <memory>
 #include <optional>

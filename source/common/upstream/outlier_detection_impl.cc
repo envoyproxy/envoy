@@ -375,7 +375,7 @@ void DetectorImpl::initialize(Cluster& cluster) {
 }
 
 void DetectorImpl::addHostMonitor(HostSharedPtr host) {
-  ASSERT(host_monitors_.count(host) == 0);
+  ASSERT(!host_monitors_.contains(host));
   DetectorHostMonitorImpl* monitor = new DetectorHostMonitorImpl(shared_from_this(), host);
   host_monitors_[host] = monitor;
   host->setOutlierDetector(DetectorHostMonitorPtr{monitor});
@@ -663,7 +663,7 @@ void DetectorImpl::setHostDegradedMainThread(HostSharedPtr host) {
   // posting this degrade event and the main thread running it; if so, ignore it
   // (mirrors the guard in the eject path) so host_monitors_[host] does not
   // default-insert a null monitor that is then dereferenced.
-  if (host_monitors_.count(host) == 0) {
+  if (!host_monitors_.contains(host)) {
     return;
   }
   if (!host->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION)) {
@@ -704,7 +704,7 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
                                             envoy::data::cluster::v3::OutlierEjectionType type) {
   // Ejections come in cross thread. There is a chance that the host has already been removed from
   // the set. If so, just ignore it.
-  if (host_monitors_.count(host) == 0) {
+  if (!host_monitors_.contains(host)) {
     return;
   }
   if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {

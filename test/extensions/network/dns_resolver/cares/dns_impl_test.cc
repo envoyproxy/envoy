@@ -2296,6 +2296,9 @@ TEST_F(DnsImplConstructor, VerifyCustomQcacheMaxTtl) {
 }
 
 TEST_F(DnsImplConstructor, ReusesResolverForIdenticalConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.shared_cares_dns_resolver", "true"}});
+
   auto typed_dns_resolver_config = getCaresDnsResolverConfig(0);
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
@@ -2329,6 +2332,9 @@ TEST_F(DnsImplConstructor, DoesNotReuseResolverForIdenticalConfigWhenFeatureDisa
 }
 
 TEST_F(DnsImplConstructor, DoesNotReuseResolverForDifferentConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.shared_cares_dns_resolver", "true"}});
+
   auto typed_dns_resolver_config1 = getCaresDnsResolverConfig(67);
   auto typed_dns_resolver_config2 = getCaresDnsResolverConfig(123);
 
@@ -2346,6 +2352,9 @@ TEST_F(DnsImplConstructor, DoesNotReuseResolverForDifferentConfig) {
 }
 
 TEST_F(DnsImplConstructor, CleansExpiredResolverBeforeReinsertingIdenticalConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.shared_cares_dns_resolver", "true"}});
+
   auto typed_dns_resolver_config = getCaresDnsResolverConfig(1234);
 
   Network::DnsResolverFactory& dns_resolver_factory =

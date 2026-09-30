@@ -16,17 +16,18 @@ namespace RateLimitQuota {
 inline constexpr absl::string_view FilterName = "envoy.filters.http.rate_limit_quota";
 
 class RateLimitQuotaFilterFactory
-    : public Common::ExceptionFreeFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig,
           envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride>,
       public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
-  RateLimitQuotaFilterFactory() : ExceptionFreeFactoryBase(std::string(FilterName)) {}
+  RateLimitQuotaFilterFactory() : UnifiedFactoryBase(std::string(FilterName)) {}
 
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig&
           filter_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 } // namespace RateLimitQuota

@@ -1,4 +1,5 @@
 #include "source/common/http/message_impl.h"
+#include "source/common/thread_local/thread_local_impl.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 
@@ -6,12 +7,15 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::MockFunction;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -163,8 +167,10 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
+  // Subscribers are notified once from the thread that initiates the update and again once
+  // every thread has applied it. ThreadLocal::MockInstance runs both synchronously.
   auto chain = std::make_shared<MockCredentialsProviderChain>();
-  EXPECT_CALL(*chain, onCredentialUpdate());
+  EXPECT_CALL(*chain, onCredentialUpdate()).Times(2);
   EXPECT_CALL(*chain, chainGetCredentials()).WillRepeatedly(Return(Credentials("akid", "skid")));
 
   auto document = R"EOF(
@@ -351,8 +357,10 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
+  // Subscribers are notified once from the thread that initiates the update and again once
+  // every thread has applied it. ThreadLocal::MockInstance runs both synchronously.
   auto chain = std::make_shared<MockCredentialsProviderChain>();
-  EXPECT_CALL(*chain, onCredentialUpdate());
+  EXPECT_CALL(*chain, onCredentialUpdate()).Times(2);
   EXPECT_CALL(*chain, chainGetCredentials()).WillRepeatedly(Return(Credentials("akid", "skid")));
   auto chain2 = std::make_shared<MockCredentialsProviderChain>();
 
@@ -509,9 +517,10 @@ TEST_F(AsyncCredentialHandlingTest, WeakPtrProtectionInSubscriberCallback) {
 
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
 
-  // Test 1: When subscriber is alive, onCredentialUpdate should be called
+  // Test 1: When subscriber is alive, onCredentialUpdate should be called. It is called once from
+  // the updating thread and again once all threads have applied the update.
   auto chain = std::make_shared<MockCredentialsProviderChain>();
-  EXPECT_CALL(*chain, onCredentialUpdate());
+  EXPECT_CALL(*chain, onCredentialUpdate()).Times(2);
   auto handle = provider_->subscribeToCredentialUpdates(chain);
 
   // Trigger credential update
@@ -647,6 +656,311 @@ TEST(CredentialsProviderChainTest, CheckChainReturnsPendingInCorrectOrder) {
   auto creds = chain.chainGetCredentials();
   EXPECT_EQ(creds.accessKeyId(), "provider1");
   EXPECT_EQ(creds.secretAccessKey(), "1");
+}
+
+// Regression tests for a deadlock between credential resolution and worker thread startup.
+//
+// credentials_pending_ used to be cleared from the all-threads-complete callback of
+// ThreadLocal::Slot::runOnAllThreads(). That callback only fires once every registered worker
+// dispatcher has run the update, and worker dispatchers are registered when the ListenerManager is
+// constructed but do not start running until startWorkers(), which itself waits on the server init
+// manager. Any credential refresh that resolved before that point latched credentials_pending_ at
+// true forever and stalled every signer depending on it.
+//
+// These tests use a real ThreadLocal::InstanceImpl with a registered worker dispatcher that is
+// deliberately never run(), which is exactly the pre-startWorkers() state. Every other AWS test
+// uses ThreadLocal::MockInstance, whose runOnAllThreads() invokes both callbacks synchronously, so
+// the barrier is never real there.
+class CredentialsPendingBeforeWorkerStartupTest : public testing::Test {
+public:
+  CredentialsPendingBeforeWorkerStartupTest()
+      : api_(Api::createApiForTest()), main_dispatcher_(api_->allocateDispatcher("test_main")),
+        worker_dispatcher_(api_->allocateDispatcher("test_worker")),
+        mock_manager_(std::make_shared<MockAwsClusterManager>()) {
+    tls_.registerThread(*main_dispatcher_, /*main_thread=*/true);
+    // Registered but never run(), modelling a worker thread that has not been started yet.
+    tls_.registerThread(*worker_dispatcher_, /*main_thread=*/false);
+
+    // Must be in place before the provider is constructed: MetadataCredentialsProviderBase's
+    // constructor allocates its tls slot from context_.threadLocal().
+    ON_CALL(context_, threadLocal()).WillByDefault(ReturnRef(tls_));
+    ON_CALL(*mock_manager_, getUriFromClusterName(_)).WillByDefault(Return("uri_2"));
+  }
+
+  ~CredentialsPendingBeforeWorkerStartupTest() override {
+    // The provider owns a slot in tls_, so it has to go away while tls_ is still alive and not yet
+    // shut down.
+    provider_.reset();
+    tls_.shutdownGlobalThreading();
+    tls_.shutdownThread();
+  }
+
+  void createProvider() {
+    envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
+        {};
+    cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
+    cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
+    cred_provider.set_role_session_name("role-session-name");
+
+    // These tests drive setCredentialsToAllThreads() directly rather than through a fetch, so the
+    // metadata fetcher is never created.
+    provider_ = std::make_shared<WebIdentityCredentialsProvider>(
+        context_, mock_manager_, "cluster_2",
+        [](Upstream::ClusterManager&, absl::string_view) { return MetadataFetcherPtr{}; },
+        MetadataFetcher::MetadataReceiver::RefreshState::Ready, std::chrono::seconds(2),
+        cred_provider);
+  }
+
+  Api::ApiPtr api_;
+  Event::DispatcherPtr main_dispatcher_;
+  Event::DispatcherPtr worker_dispatcher_;
+  ThreadLocal::InstanceImpl tls_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  std::shared_ptr<MockAwsClusterManager> mock_manager_;
+  WebIdentityCredentialsProviderPtr provider_;
+};
+
+// A successful credential refresh must un-pend the provider and notify its subscribers even though
+// no worker dispatcher is running.
+TEST_F(CredentialsPendingBeforeWorkerStartupTest, UnpendsBeforeWorkerDispatchersRun) {
+  createProvider();
+  EXPECT_TRUE(provider_->credentialsPending());
+
+  auto chain = std::make_shared<MockCredentialsProviderChain>();
+  EXPECT_CALL(*chain, onCredentialUpdate());
+  auto handle = provider_->subscribeToCredentialUpdates(chain);
+
+  MetadataCredentialsProviderBaseFriend(provider_).setCredentialsToAllThreads(
+      std::make_unique<Credentials>("akid", "secret", "token"));
+
+  EXPECT_FALSE(provider_->credentialsPending());
+  // The main thread's slot is written synchronously by runOnAllThreads(), so the credentials are
+  // readable here as well.
+  const auto credentials = provider_->getCredentials();
+  EXPECT_EQ("akid", credentials.accessKeyId());
+  EXPECT_EQ("secret", credentials.secretAccessKey());
+  EXPECT_EQ("token", credentials.sessionToken());
+}
+
+// The failure path must un-pend too.
+TEST_F(CredentialsPendingBeforeWorkerStartupTest, UnpendsOnRetrievalErrorBeforeWorkersRun) {
+  createProvider();
+  EXPECT_TRUE(provider_->credentialsPending());
+
+  auto chain = std::make_shared<MockCredentialsProviderChain>();
+  EXPECT_CALL(*chain, onCredentialUpdate());
+  auto handle = provider_->subscribeToCredentialUpdates(chain);
+
+  MetadataCredentialsProviderBaseFriend(provider_).credentialsRetrievalError();
+
+  EXPECT_FALSE(provider_->credentialsPending());
+  EXPECT_FALSE(provider_->getCredentials().accessKeyId().has_value());
+}
+
+// A thread must never observe "credentials are no longer pending" before the credential update
+// itself has been applied to that thread. The pending flag and the credentials both live in the
+// thread local cache and move as one update, so the pair is always consistent per thread.
+//
+// This test parks a running worker dispatcher inside one of its own callbacks, performs a
+// credential update from the main thread while the worker is stuck there, and then lets the worker
+// observe both halves.
+class CredentialsPendingWorkerVisibilityTest : public testing::Test {
+public:
+  CredentialsPendingWorkerVisibilityTest()
+      : api_(Api::createApiForTest()), main_dispatcher_(api_->allocateDispatcher("test_main")),
+        worker_dispatcher_(api_->allocateDispatcher("test_worker")),
+        mock_manager_(std::make_shared<MockAwsClusterManager>()) {
+    tls_.registerThread(*main_dispatcher_, /*main_thread=*/true);
+    tls_.registerThread(*worker_dispatcher_, /*main_thread=*/false);
+
+    ON_CALL(context_, threadLocal()).WillByDefault(ReturnRef(tls_));
+    ON_CALL(*mock_manager_, getUriFromClusterName(_)).WillByDefault(Return("uri_2"));
+  }
+
+  ~CredentialsPendingWorkerVisibilityTest() override {
+    if (worker_thread_ != nullptr) {
+      worker_dispatcher_->exit();
+      worker_thread_->join();
+    }
+    provider_.reset();
+    tls_.shutdownGlobalThreading();
+    tls_.shutdownThread();
+  }
+
+  void createProvider() {
+    envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
+        {};
+    cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
+    cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
+    cred_provider.set_role_session_name("role-session-name");
+
+    provider_ = std::make_shared<WebIdentityCredentialsProvider>(
+        context_, mock_manager_, "cluster_2",
+        [](Upstream::ClusterManager&, absl::string_view) { return MetadataFetcherPtr{}; },
+        MetadataFetcher::MetadataReceiver::RefreshState::Ready, std::chrono::seconds(2),
+        cred_provider);
+  }
+
+  // Started after the provider exists, so the slot initializer that the provider's constructor
+  // posted is already queued ahead of anything this test posts. RunUntilExit is what production
+  // worker threads use: RunType::Block returns as soon as the event set drains, which for a
+  // dispatcher with no listeners on it means the thread would exit between posts.
+  void startWorker() {
+    worker_thread_ = api_->threadFactory().createThread(
+        [this]() { worker_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
+  }
+
+  // Runs cb on the worker thread and waits for it to finish.
+  void runOnWorker(std::function<void()> cb) {
+    absl::Notification done;
+    worker_dispatcher_->post([&]() {
+      cb();
+      done.Notify();
+    });
+    done.WaitForNotification();
+  }
+
+  Api::ApiPtr api_;
+  Event::DispatcherPtr main_dispatcher_;
+  Event::DispatcherPtr worker_dispatcher_;
+  Thread::ThreadPtr worker_thread_;
+  ThreadLocal::InstanceImpl tls_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  std::shared_ptr<MockAwsClusterManager> mock_manager_;
+  WebIdentityCredentialsProviderPtr provider_;
+};
+
+TEST_F(CredentialsPendingWorkerVisibilityTest, WorkerNeverSeesUnpendedStaleCredentials) {
+  createProvider();
+  startWorker();
+
+  absl::Notification worker_parked;
+  absl::Notification release_worker;
+  absl::Notification observation_done;
+  bool observed_pending = false;
+  bool observed_has_credentials = false;
+
+  // Occupies the worker's event loop, so the credential update posted below is queued behind this
+  // callback and cannot be applied until it returns.
+  worker_dispatcher_->post([&]() {
+    worker_parked.Notify();
+    release_worker.WaitForNotification();
+    observed_pending = provider_->credentialsPending();
+    observed_has_credentials = provider_->getCredentials().hasCredentials();
+    observation_done.Notify();
+  });
+  worker_parked.WaitForNotification();
+
+  MetadataCredentialsProviderBaseFriend(provider_).setCredentialsToAllThreads(
+      std::make_unique<Credentials>("akid", "secret", "token"));
+  // Visible on the main thread immediately, which is what lets a callout made before startWorkers()
+  // be signed.
+  EXPECT_FALSE(provider_->credentialsPending());
+  EXPECT_TRUE(provider_->getCredentials().hasCredentials());
+
+  release_worker.Notify();
+  observation_done.WaitForNotification();
+
+  // The worker had not applied the update yet, so it has to still report pending.
+  EXPECT_TRUE(observed_pending);
+  EXPECT_FALSE(observed_has_credentials);
+
+  // Once it drains its post queue, both halves are visible together.
+  bool drained_pending = true;
+  bool drained_has_credentials = false;
+  runOnWorker([&]() {
+    drained_pending = provider_->credentialsPending();
+    drained_has_credentials = provider_->getCredentials().hasCredentials();
+  });
+  EXPECT_FALSE(drained_pending);
+  EXPECT_TRUE(drained_has_credentials);
+}
+
+// A pending callback registered by a worker after the updating thread has already notified
+// subscribers must still be woken. The worker keeps reading credentials_pending_ == true from its
+// own slot until it applies the posted update, so it can queue a callback onto a queue that has
+// just been drained. The all-threads-complete notification is what rescues it; without it the
+// request stalls until the next successful refresh, ~1 hour later.
+TEST_F(CredentialsPendingWorkerVisibilityTest, PendingCallbackRegisteredDuringStaleWindowIsWoken) {
+  createProvider();
+  startWorker();
+
+  auto chain = std::make_shared<CredentialsProviderChain>();
+  chain->add(provider_);
+  auto handle = provider_->subscribeToCredentialUpdates(chain);
+
+  absl::Notification worker_parked;
+  absl::Notification release_worker;
+  absl::Notification registered;
+  bool was_pending = false;
+  std::atomic<bool> callback_fired{false};
+
+  // Parks the worker's event loop so that the credential update posted below cannot be applied to
+  // the worker's slot until we let it go.
+  worker_dispatcher_->post([&]() {
+    worker_parked.Notify();
+    release_worker.WaitForNotification();
+    // The worker's slot still says pending, so the chain queues this callback - after the main
+    // thread has already drained the queue.
+    was_pending =
+        chain->addCallbackIfChainCredentialsPending([&callback_fired]() { callback_fired = true; });
+    registered.Notify();
+  });
+  worker_parked.WaitForNotification();
+
+  MetadataCredentialsProviderBaseFriend(provider_).setCredentialsToAllThreads(
+      std::make_unique<Credentials>("akid", "secret", "token"));
+
+  release_worker.Notify();
+  registered.WaitForNotification();
+  EXPECT_TRUE(was_pending);
+  EXPECT_FALSE(callback_fired);
+
+  // Let the worker drain the credential update. Releasing the last reference to the update callback
+  // posts the all-threads-complete callback onto the main dispatcher.
+  runOnWorker([]() {});
+  main_dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_TRUE(callback_fired);
+}
+
+// Marking pending again while already pending must not broadcast.
+// InstanceProfileCredentialsProvider marks pending once per stage of its three stage fetch, and
+// only the first transition needs an update posted to every thread.
+TEST(MetadataCredentialsProviderPendingTest, MarkingPendingIsDeduplicated) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto mock_manager = std::make_shared<MockAwsClusterManager>();
+  ON_CALL(*mock_manager, getUriFromClusterName(_)).WillByDefault(Return("uri_2"));
+
+  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
+      {};
+  cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
+  cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
+  cred_provider.set_role_session_name("role-session-name");
+
+  auto provider = std::make_shared<WebIdentityCredentialsProvider>(
+      context, mock_manager, "cluster_2",
+      [](Upstream::ClusterManager&, absl::string_view) { return MetadataFetcherPtr{}; },
+      MetadataFetcher::MetadataReceiver::RefreshState::Ready, std::chrono::seconds(2),
+      cred_provider);
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider);
+
+  // A provider starts out pending, so there is nothing to broadcast.
+  EXPECT_CALL(context.thread_local_, runOnAllThreads(_)).Times(0);
+  provider_friend.setCredentialsPendingToAllThreads();
+  EXPECT_TRUE(provider->credentialsPending());
+  testing::Mock::VerifyAndClearExpectations(&context.thread_local_);
+
+  // Delivering the credentials and clearing the flag uses the two-argument overload, so that
+  // subscribers are notified again once every thread has applied the update. Setting the flag again
+  // is then the only single-argument broadcast: the second, redundant call posts nothing.
+  EXPECT_CALL(context.thread_local_, runOnAllThreads(_, _));
+  EXPECT_CALL(context.thread_local_, runOnAllThreads(_));
+  provider_friend.setCredentialsToAllThreads(std::make_unique<Credentials>("akid", "secret"));
+  EXPECT_FALSE(provider->credentialsPending());
+  provider_friend.setCredentialsPendingToAllThreads();
+  provider_friend.setCredentialsPendingToAllThreads();
+  EXPECT_TRUE(provider->credentialsPending());
 }
 
 } // namespace Aws

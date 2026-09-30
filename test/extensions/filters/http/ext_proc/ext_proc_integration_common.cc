@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "test/extensions/filters/http/ext_proc/ext_proc_integration_common.h"
 
 #include <chrono>
@@ -14,7 +17,15 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
+#include "test/test_common/struct_matchers.h"
+
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::Ge;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -493,7 +504,7 @@ void ExtProcIntegrationTest::processRequestBodyMessage(
     // Check the flow control counter in downstream, which is triggered on the request
     // path to ext_proc server (i.e., from side stream).
     test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
-                                 testing::Ge(1));
+                                 Ge(1));
   }
 
   // Send back the response from ext_proc server.
@@ -730,11 +741,17 @@ void ExtProcIntegrationTest::testGetAndCloseStream() {
   processor_stream_->startGrpcStream();
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
+  // finishGrpcStream() only posts the response on the fake upstream's dispatcher. In
+  // observability mode, the main stream does not wait for the ext_proc stream, so wait until Envoy
+  // has processed the close before allowing the main response to complete and consume its logging
+  // info.
+  test_server_->waitForCounter("http.config_test.ext_proc.server_half_closed", Ge(1));
+
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }
 
-void ExtProcIntegrationTest::testSendDyanmicMetadata() {
+void ExtProcIntegrationTest::testSendDynamicMetadata() {
   Protobuf::Struct test_md_struct;
   (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
 
@@ -744,15 +761,16 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
   processGenericMessage(
       *grpc_upstreams_[0], true, [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
         // Verify the processing request contains the untyped metadata we injected.
-        EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
+        EXPECT_THAT(req.metadata_context().filter_metadata(),
+                    Contains(Key("forwarding_ns_untyped")));
         const Protobuf::Struct& fwd_metadata =
             req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
-        EXPECT_EQ(1, fwd_metadata.fields_size());
-        EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
-        EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
+        EXPECT_THAT(fwd_metadata.fields(),
+                    UnorderedElementsAre(IsStructString("foo", "value from set_metadata")));
 
         // Verify the processing request contains the typed metadata we injected.
-        EXPECT_TRUE(req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
+        EXPECT_THAT(req.metadata_context().typed_filter_metadata(),
+                    Contains(Key("forwarding_ns_typed")));
         const Protobuf::Any& fwd_typed_metadata =
             req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
         EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
@@ -769,6 +787,25 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
 
         return true;
       });
+}
+
+void ExtProcIntegrationTest::testSendTypedDynamicMetadata() {
+  envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_to_stuff;
+  typed_md_to_stuff.set_metadata_namespace("typed_value from ext_proc");
+
+  Protobuf::Any typed_val;
+  EXPECT_TRUE(typed_val.PackFrom(typed_md_to_stuff));
+
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [typed_val](const ProcessingRequest&, ProcessingResponse& resp) {
+                          // Spoof the response to contain receiving typed metadata.
+                          HeadersResponse headers_resp;
+                          (*resp.mutable_request_headers()) = headers_resp;
+                          auto mut_typed_md = resp.mutable_typed_dynamic_metadata();
+                          (*mut_typed_md)["receiving_ns_typed"] = typed_val;
+
+                          return true;
+                        });
 }
 
 void ExtProcIntegrationTest::testSidestreamPushbackDownstream(uint32_t body_size,
@@ -1104,6 +1141,50 @@ void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
 
     std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
   });
+}
+
+void ExtProcIntegrationTest::performStandAloneModeOverrideNormal(
+    envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode initial_body_mode) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(initial_body_mode);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = "hello world";
+  auto response = sendDownstreamRequestWithBody(body_str, std::nullopt);
+
+  // Process request headers message and send back only mode_override (no response_case set).
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        EXPECT_TRUE(req.has_request_headers());
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        resp.mutable_mode_override()->set_request_trailer_mode(ProcessingMode::SEND);
+        return true;
+      });
+
+  ProcessingRequest request;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  EXPECT_TRUE(request.has_request_body());
+  EXPECT_TRUE(request.request_body().end_of_stream());
+
+  // The server sends back the header response first:
+  ProcessingResponse resp_headers;
+  resp_headers.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp_headers);
+
+  // Then, it streams back the body responses:
+  ProcessingResponse resp_body;
+  auto* streamed_response = resp_body.mutable_request_body()
+                                ->mutable_response()
+                                ->mutable_body_mutation()
+                                ->mutable_streamed_response();
+  streamed_response->set_body(body_str);
+  streamed_response->set_end_of_stream(true);
+  processor_stream_->sendGrpcMessage(resp_body);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
 }
 
 } // namespace ExternalProcessing

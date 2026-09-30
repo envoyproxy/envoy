@@ -993,6 +993,10 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                                     "envoy.reloadable_features.http2_max_cookies_size_in_kb", 0) *
                                     1024
                               : 0),
+      http2_include_cookies_in_limits_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_include_cookies_in_limits")),
+      reject_frames_after_end_stream_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_reject_frames_after_end_stream")),
       protocol_constraints_(stats, http2_options,
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.http2_flood_protection_active_streams")),
@@ -1259,6 +1263,10 @@ Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t fla
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
 
+  if (reject_frames_after_end_stream_ && stream->remote_end_stream_) {
+    return codecProtocolError("Received DATA frame on a half-closed (remote) stream");
+  }
+
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   stream->decodeData();
   return okStatus();
@@ -1284,6 +1292,17 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
   stream->bytes_meter_->addHeaderBytesReceived(length + H2_FRAME_HEADER_SIZE);
+
+  // RFC 9113 Section 5.1: a peer that receives any frame other than PRIORITY, WINDOW_UPDATE or
+  // RST_STREAM for a stream in the "half-closed (remote)" state must treat it as an error. This is
+  // enforced here rather than in the codec adapter because the decoder that the frame would
+  // otherwise be dispatched to may already have been destroyed: for a client connection the
+  // CodecClient deletes the ActiveRequest (which owns the ResponseDecoder) as soon as the response
+  // completes, while oghttp2 keeps the stream alive until it is also half-closed locally. nghttp2
+  // already rejects these frames, so this only changes behavior for oghttp2.
+  if (reject_frames_after_end_stream_ && stream->remote_end_stream_) {
+    return codecProtocolError("Received HEADERS frame on a half-closed (remote) stream");
+  }
 
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   recordHistogramsForStream(*stream);
@@ -1660,8 +1679,8 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
 // The `histograms_recorded_` guard ensures we only record once (only for headers, not trailers).
 void ConnectionImpl::recordHistogramsForStream(StreamImpl& stream) {
   if (record_http2_histograms_ && !stream.histograms_recorded_) {
-    uint64_t headers_size = stream.headers().byteSize();
-    uint64_t headers_count = stream.headers().size();
+    uint64_t headers_size = stream.headers().byteSize() + stream.discarded_host_header_size_;
+    uint64_t headers_count = stream.headers().size() + stream.discarded_host_header_count_;
     uint64_t headers_with_cookies_size = headers_size + stream.cookies_.size();
     uint64_t headers_with_cookies_count = headers_count + stream.cookie_count_;
     stats_.header_list_size_.recordValue(headers_with_cookies_size);
@@ -1703,21 +1722,25 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
     stats_.cookies_total_bytes_too_large_.inc();
     return ERR_TEMPORAL_CALLBACK_FAILURE;
   }
-  uint64_t headers_size = stream->headers().byteSize();
-  uint64_t headers_count = stream->headers().size();
+  return checkHeaderLimits(*stream);
+}
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_include_cookies_in_limits")) {
-    headers_size += stream->cookies_.size();
-    headers_count += stream->cookie_count_;
+int ConnectionImpl::checkHeaderLimits(StreamImpl& stream) {
+  uint64_t headers_size = stream.headers().byteSize() + stream.discarded_host_header_size_;
+  uint64_t headers_count = stream.headers().size() + stream.discarded_host_header_count_;
+
+  if (http2_include_cookies_in_limits_) {
+    headers_size += stream.cookies_.size();
+    headers_count += stream.cookie_count_;
   }
 
   if (headers_size > max_headers_kb_ * 1024) {
-    stream->setDetails(Http2ResponseCodeDetails::get().header_list_size_too_large);
+    stream.setDetails(Http2ResponseCodeDetails::get().header_list_size_too_large);
     stats_.header_list_size_too_large_.inc();
     return ERR_TEMPORAL_CALLBACK_FAILURE;
   }
   if (headers_count > max_headers_count_) {
-    stream->setDetails(Http2ResponseCodeDetails::get().too_many_headers);
+    stream.setDetails(Http2ResponseCodeDetails::get().too_many_headers);
     stats_.header_overflow_.inc();
     // This will cause the library to reset/close the stream.
     return ERR_TEMPORAL_CALLBACK_FAILURE;
@@ -1870,10 +1893,17 @@ void ConnectionImpl::onProtocolConstraintViolation() {
 }
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  // Notify the streams based on least recently encoding to the connection.
-  // NOLINTNEXTLINE(modernize-loop-convert)
+  // Snapshot the streams in least-recently-encoded order before invoking callbacks. A callback may
+  // encode on its stream and reorder active_streams_, invalidating the traversal. Stream deletion
+  // is deferred, so the pointers remain valid for the duration of this synchronous callback fanout.
+  std::vector<StreamImpl*> streams;
+  streams.reserve(active_streams_.size());
   for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
-    (*it)->runLowWatermarkCallbacks();
+    streams.push_back(it->get());
+  }
+
+  for (StreamImpl* stream : streams) {
+    stream->runLowWatermarkCallbacks();
   }
 }
 
@@ -2378,10 +2408,12 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (!use_oghttp2_library_) {
 #ifdef ENVOY_NGHTTP2
     adapter_ = http2_session_factory.create(base(), client_http2_options.options());
+    stats_.nghttp2_upstream_connections_.inc();
 #endif
   }
   if (!adapter_) {
     adapter_ = http2_session_factory.create(base(), client_http2_options.ogOptions());
+    stats_.oghttp2_upstream_connections_.inc();
   }
   http2_session_factory.init(base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
@@ -2443,6 +2475,8 @@ ServerConnectionImpl::ServerConnectionImpl(
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
                      max_request_headers_count, runtime),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
+      http2_discard_host_header_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
       should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
@@ -2463,6 +2497,7 @@ ServerConnectionImpl::ServerConnectionImpl(
 #endif
     visitor_ = std::move(direct_visitor);
     adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
+    stats_.oghttp2_downstream_connections_.inc();
 #ifdef ENVOY_NGHTTP2
   } else {
     auto adapter =
@@ -2473,6 +2508,7 @@ ServerConnectionImpl::ServerConnectionImpl(
     direct_visitor->setStreamCloseListener(std::move(stream_close_listener));
     visitor_ = std::move(direct_visitor);
     adapter_ = std::move(adapter);
+    stats_.nghttp2_downstream_connections_.inc();
   }
 #endif
   sendSettings(http2_options, false);
@@ -2501,14 +2537,23 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
 }
 
 int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")) {
+  if (http2_discard_host_header_) {
     StreamImpl* stream = getStreamUnchecked(stream_id);
     if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {
       // Check if there is already the :authority header
       const auto result = stream->headers().get(Http::Headers::get().Host);
       if (!result.empty()) {
-        // Discard the host header value
-        return 0;
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.http2_track_size_of_dropped_host_header")) {
+          // Discard the host header value but track its size for enforcing received header map
+          // limits.
+          stream->discarded_host_header_size_ += name.size() + value.size();
+          stream->discarded_host_header_count_++;
+          stream->bytes_meter_->addDecompressedHeaderBytesReceived(name.size() + value.size());
+          return checkHeaderLimits(*stream);
+        } else {
+          return 0;
+        }
       }
       // Otherwise use host value as :authority
     }

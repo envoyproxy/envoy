@@ -7,6 +7,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/jwt_authn/extractor.h"
 #include "source/extensions/filters/http/jwt_authn/matcher.h"
 #include "source/extensions/filters/http/jwt_authn/stats.h"
 #include "source/extensions/filters/http/jwt_authn/verifier.h"
@@ -48,6 +50,11 @@ public:
 
   virtual bool stripFailureResponse() const PURE;
 
+  // Strip every configured forward_payload_header and claim_to_headers header_name from the
+  // request. This is a filter-level invariant so bypass paths (no matching rule, empty requires,
+  // per-route disabled, CORS preflight) cannot forward client-supplied identity headers upstream.
+  virtual void sanitizePayloadHeaders(Http::RequestHeaderMap& headers) const PURE;
+
   // Finds the matcher that matched the header
   virtual const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                        const StreamInfo::FilterState& filter_state) const PURE;
@@ -66,8 +73,9 @@ class FilterConfigImpl : public Logger::Loggable<Logger::Id::jwt>,
                          public AuthFactory {
 public:
   FilterConfigImpl(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
-                   const std::string& stats_prefix, Server::Configuration::FactoryContext& context,
-                   absl::Status& creation_status);
+                   const std::string& stats_prefix,
+                   Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+                   OptRef<Init::Manager> init_manager, absl::Status& creation_status);
 
   ~FilterConfigImpl() override = default;
 
@@ -84,6 +92,17 @@ public:
   bool bypassCorsPreflightRequest() const override { return proto_config_.bypass_cors_preflight(); }
 
   bool stripFailureResponse() const override { return proto_config_.strip_failure_response(); }
+
+  void sanitizePayloadHeaders(Http::RequestHeaderMap& headers) const override {
+    // Behavior change vs pre-filter-wide sanitization: guard so operators can
+    // disable during rollout if a deployment relied on client-supplied payload
+    // / claim headers on bypass paths.
+    if (header_sanitizer_ != nullptr &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.jwt_authn_sanitize_payload_headers_filter_wide")) {
+      header_sanitizer_->sanitizeHeaders(headers);
+    }
+  }
 
   const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                const StreamInfo::FilterState& filter_state) const override {
@@ -138,6 +157,8 @@ private:
   JwksCachePtr jwks_cache_;
   // the cluster manager object.
   Upstream::ClusterManager& cm_;
+  // Extractor over every provider, used only for filter-level payload/claim header sanitization.
+  ExtractorConstPtr header_sanitizer_;
   // The list of rule matchers.
   std::vector<MatcherVerifierPair> rule_pairs_;
   // The filter state name to lookup filter_state_rules.

@@ -1,3 +1,4 @@
+#include <format>
 #include <string>
 #include <vector>
 
@@ -323,7 +324,7 @@ load_assignment:
 
       // "hbone" cluster → SERVER over HTTP/2.
       auto* hbone = sr->add_clusters();
-      TestUtility::loadFromYaml(fmt::format(R"EOF(
+      TestUtility::loadFromYaml(std::format(R"EOF(
 name: hbone
 connect_timeout: 5s
 load_assignment:
@@ -435,7 +436,7 @@ load_assignment:
 
           // "hbone" cluster -> SERVER over HTTP/2.
           auto* hbone = sr->add_clusters();
-          TestUtility::loadFromYaml(fmt::format(R"EOF(
+          TestUtility::loadFromYaml(std::format(R"EOF(
 name: hbone
 connect_timeout: 5s
 load_assignment:

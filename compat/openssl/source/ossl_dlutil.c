@@ -14,6 +14,25 @@ static void *libcrypto;
 static void *libssl;
 
 
+static void *ossl_malloc(size_t num, const char *file, int line) {
+  (void)file;
+  (void)line;
+  return malloc(num);
+}
+
+static void *ossl_realloc(void *addr, size_t num, const char *file, int line) {
+  (void)file;
+  (void)line;
+  return realloc(addr, num);
+}
+
+static void ossl_free(void *addr, const char *file, int line) {
+  (void)file;
+  (void)line;
+  free(addr);
+}
+
+
 void ossl_dlopen(int expected_major, int expected_minor) {
   // First, a sanity check to see if OpenSSL shared libs are already linked in.
   // They shouldn't be, but it can easily happen (and has) if there's a bazel
@@ -42,13 +61,29 @@ void ossl_dlopen(int expected_major, int expected_minor) {
     char ossl_path[PATH_MAX];
     char temp_path[PATH_MAX];
 
-    // Bazel 8 places external repo runfiles directly under the runfiles root
-    // (e.g. {RUNFILES_DIR}/openssl/...), while Bazel 7 nests them under the
-    // workspace (e.g. {RUNFILES_DIR}/{TEST_WORKSPACE}/external/openssl/...).
-    snprintf(ossl_path, sizeof(ossl_path), "%s/%s/external/openssl/openssl/lib",
-                                            runfiles_dir, test_workspace);
-    if (access(ossl_path, F_OK) != 0) {
-      snprintf(ossl_path, sizeof(ossl_path), "%s/openssl/openssl/lib", runfiles_dir);
+    // Locate the OpenSSL libraries in the runfiles tree. The repository
+    // directory name and layout depend on the build/runtime:
+    //  - WORKSPACE / Bazel 7 nests external repos under the workspace, using the
+    //    apparent name (e.g. {RUNFILES_DIR}/{TEST_WORKSPACE}/external/openssl/...).
+    //  - Bazel 8 places them directly under the runfiles root
+    //    (e.g. {RUNFILES_DIR}/openssl/...).
+    //  - bzlmod materialises them under their canonical name, which is the
+    //    apparent name with a trailing '+' (e.g. .../openssl+/...).
+    // Probe each candidate and use the first that exists, defaulting to the last
+    // so dlopen() reports a sensible path if none are found.
+    const char* repo_names[] = {"openssl", "openssl+"};
+    const size_t num_repo_names = sizeof(repo_names) / sizeof(repo_names[0]);
+    for (size_t i = 0; i < num_repo_names; i++) {
+      snprintf(ossl_path, sizeof(ossl_path), "%s/%s/external/%s/openssl/lib",
+                                              runfiles_dir, test_workspace, repo_names[i]);
+      if (access(ossl_path, F_OK) == 0) {
+        break;
+      }
+      snprintf(ossl_path, sizeof(ossl_path), "%s/%s/openssl/lib",
+                                              runfiles_dir, repo_names[i]);
+      if (access(ossl_path, F_OK) == 0) {
+        break;
+      }
     }
 
     strcpy(temp_path, libcrypto_path);
@@ -68,12 +103,6 @@ void ossl_dlopen(int expected_major, int expected_minor) {
   // Load libcrypto.so first, because libssl.so depends on it.
   if ((libcrypto = dlopen(libcrypto_path, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND)) == NULL) {
     bssl_compat_error("dlopen(%s) : %s\n", libcrypto_path, dlerror());
-    exit(ELIBACC);
-  }
-
-  // Load libssl.so second, so that its dependency on libcrypto.so is resolved.
-  if ((libssl = dlopen(libssl_path, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND)) == NULL) {
-    bssl_compat_error("dlopen(%s) : %s\n", libssl_path, dlerror());
     exit(ELIBACC);
   }
 
@@ -98,6 +127,35 @@ void ossl_dlopen(int expected_major, int expected_minor) {
   if ((loaded_major != expected_major) || (loaded_minor < expected_minor)) {
     bssl_compat_error("Expecting to load OpenSSL version at least %d.%d.x but got %d.%d.%d\n",
                       expected_major, expected_minor, loaded_major, loaded_minor, loaded_patch);
+    exit(ELIBACC);
+  }
+
+  // Tell OpenSSL to use the tcmalloc malloc/realloc/free functions from the
+  // main executable. Without this, RTLD_DEEPBIND causes OpenSSL's allocations
+  // to resolve to glibc's malloc/realloc/free instead, resulting in OpenSSL
+  // using a completely separate heap. This defeats tcmalloc's performance
+  // benefits on the TLS hot path, and also makes all OpenSSL allocations
+  // invisible to tcmalloc's heap dumps.
+  typedef int (*CRYPTO_set_mem_functions_fn)(
+      void *(*malloc_fn)(size_t, const char *, int),
+      void *(*realloc_fn)(void *, size_t, const char *, int),
+      void (*free_fn)(void *, const char *, int));
+
+  CRYPTO_set_mem_functions_fn set_mem_fn = dlsym(libcrypto, "CRYPTO_set_mem_functions");
+  if (set_mem_fn == NULL) {
+    bssl_compat_error("dlsym(libcrypto, \"CRYPTO_set_mem_functions\") : %s\n", dlerror());
+    exit(ELIBACC);
+  }
+
+  // In some circumstances, libcrypto will perform allocations during dlopen(),
+  // in which case this CRYPTO_set_mem_functions() call will always fail, so we
+  // have to let it fail silently rather than exiting.
+  set_mem_fn(ossl_malloc, ossl_realloc, ossl_free);
+
+  // Load libssl.so *after* calling CRYPTO_set_mem_functions() just in case
+  // libssl.so has any library constructors that call OPENSSL_malloc().
+  if ((libssl = dlopen(libssl_path, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND)) == NULL) {
+    bssl_compat_error("dlopen(%s) : %s\n", libssl_path, dlerror());
     exit(ELIBACC);
   }
 }

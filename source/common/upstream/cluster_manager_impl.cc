@@ -35,6 +35,7 @@
 #include "source/common/http/mixed_conn_pool.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/router.h"
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tcp/conn_pool.h"
@@ -332,6 +333,15 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
               const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>(
               dispatcher_)),
       shutdown_(false) {
+  // The router filter config used by async clients depends on server-wide state only, so build a
+  // single instance here and share it with the async client of every cluster on every worker
+  // thread. This must happen on the main thread, before any worker can call httpAsyncClient().
+  async_client_router_config_ = std::make_shared<Router::FilterConfig>(
+      context_, http_context_.asyncClientStatPrefix(), *stats_.rootScope(), *this, runtime_,
+      random_, std::make_unique<Router::ShadowWriterImpl>(*this), true, false, false, false, false,
+      false, false, Protobuf::RepeatedPtrField<std::string>{}, time_source_, http_context_,
+      router_context_);
+
   if (auto admin = context.admin(); admin.has_value()) {
     config_tracker_entry_ = admin->getConfigTracker().add(
         "clusters", [this](const Matchers::StringMatcher& name_matcher) {
@@ -1515,14 +1525,11 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
       // overwriting hosts_added.
       if (!update.hosts_removed_.empty()) {
         // Remove all hosts to be removed from the old host_added.
-        auto& host_added = priority_state.hosts_added_;
-        auto removed_section = std::remove_if(
-            host_added.begin(), host_added.end(),
-            [hosts_removed = std::cref(update.hosts_removed_)](const HostSharedPtr& ptr) {
-              return std::find(hosts_removed.get().begin(), hosts_removed.get().end(), ptr) !=
-                     hosts_removed.get().end();
-            });
-        priority_state.hosts_added_.erase(removed_section, priority_state.hosts_added_.end());
+        std::erase_if(priority_state.hosts_added_,
+                      [hosts_removed = std::cref(update.hosts_removed_)](const HostSharedPtr& ptr) {
+                        return std::find(hosts_removed.get().begin(), hosts_removed.get().end(),
+                                         ptr) != hosts_removed.get().end();
+                      });
       }
 
       // Add updated host_added.
@@ -1576,11 +1583,9 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
 Http::AsyncClient&
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient() {
   if (lazy_http_async_client_ == nullptr) {
-    lazy_http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cluster_info_, parent_.parent_.stats_, parent_.thread_local_dispatcher_, parent_.parent_,
-        parent_.parent_.context_,
-        Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent_.parent_)},
-        parent_.parent_.http_context_, parent_.parent_.router_context_);
+    lazy_http_async_client_ =
+        std::make_unique<Http::AsyncClientImpl>(cluster_info_, parent_.thread_local_dispatcher_,
+                                                parent_.parent_.async_client_router_config_);
   }
   return *lazy_http_async_client_;
 }
@@ -1939,7 +1944,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(
         parent_.deferred_cluster_creation_,
         fmt::format("Cannot find ThreadLocalCluster {}, but deferred cluster creation is disabled.",
                     name));
-    ASSERT(thread_local_deferred_clusters_.find(name) != thread_local_deferred_clusters_.end(),
+    ASSERT(thread_local_deferred_clusters_.contains(name),
            "Cluster with removed host is neither deferred or inflated!");
     return;
   }
@@ -1957,7 +1962,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, bool weighted_priority_health,
     uint64_t overprovisioning_factor, HostMapConstSharedPtr cross_priority_host_map) {
-  ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
+  ASSERT(thread_local_clusters_.contains(name));
   const auto& cluster_entry = thread_local_clusters_[name];
   cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),
                              std::move(locality_weights), hosts_added, hosts_removed,
@@ -2410,7 +2415,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       getOrigin(transport_socket_options, host);
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100) &&
-      !transport_socket_options->http11ProxyInfo()) {
+      (!transport_socket_options || !transport_socket_options->http11ProxyInfo())) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
     ASSERT(alternate_protocol_options.has_value());

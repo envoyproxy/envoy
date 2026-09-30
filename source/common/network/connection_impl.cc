@@ -373,14 +373,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   connection_stats_.reset();
 
   if (abort_reset) {
-#if ENVOY_PLATFORM_ENABLE_SEND_RST
-    const bool ok = Network::Socket::applyOptions(
-        Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
-        envoy::config::core::v3::SocketOption::STATE_LISTENING);
-    if (!ok) {
-      ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on connection {}", id());
-    }
-#endif
+    socket_->setAbortiveClose();
   }
 
   // It is safe to call close() since there is an IO handle check.

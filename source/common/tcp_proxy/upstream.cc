@@ -1,5 +1,6 @@
 #include "source/common/tcp_proxy/upstream.h"
 
+#include "envoy/common/platform.h"
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -65,8 +66,9 @@ void generateAndStoreRequestId(const TunnelingConfigHelper& config, Http::Reques
 }
 
 TcpUpstream::TcpUpstream(Tcp::ConnectionPool::ConnectionDataPtr&& data,
-                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
-    : upstream_conn_data_(std::move(data)) {
+                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+                         StreamInfo::StreamInfo& downstream_info)
+    : upstream_conn_data_(std::move(data)), downstream_info_(downstream_info) {
   Network::ClientConnection& connection = upstream_conn_data_->connection();
   connection.enableHalfClose(true);
   upstream_conn_data_->addUpstreamCallbacks(upstream_callbacks);
@@ -126,14 +128,23 @@ StreamInfo::DetectedCloseType TcpUpstream::detectedCloseType() const {
 
 Tcp::ConnectionPool::ConnectionData* TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event,
                                                                     absl::string_view details) {
-  // TODO(botengyao): propagate RST back to upstream connection if RST is received from downstream.
   if (event == Network::ConnectionEvent::RemoteClose) {
     // The close call may result in this object being deleted. Latch the
     // connection locally so it can be returned for potential draining.
     auto* conn_data = upstream_conn_data_.release();
-    conn_data->connection().close(
-        Network::ConnectionCloseType::FlushWrite,
-        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose);
+    Network::ConnectionCloseType close_type = Network::ConnectionCloseType::FlushWrite;
+    absl::string_view close_reason =
+        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose;
+    if (ENVOY_PLATFORM_ENABLE_SEND_RST &&
+        downstream_info_.downstreamDetectedCloseType() ==
+            StreamInfo::DetectedCloseType::RemoteReset &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.propagate_downstream_rst_to_upstream")) {
+      close_type = Network::ConnectionCloseType::AbortReset;
+      close_reason =
+          StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamResetClose;
+    }
+    conn_data->connection().close(close_type, close_reason);
     return conn_data;
   } else if (event == Network::ConnectionEvent::LocalClose) {
     upstream_conn_data_->connection().close(
@@ -365,7 +376,8 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
   Tcp::ConnectionPool::ConnectionData* latched_data = conn_data.get();
   Network::Connection& connection = conn_data->connection();
 
-  auto upstream = std::make_unique<TcpUpstream>(std::move(conn_data), upstream_callbacks_);
+  auto upstream =
+      std::make_unique<TcpUpstream>(std::move(conn_data), upstream_callbacks_, downstream_info_);
   callbacks_->onGenericPoolReady(
       &connection.streamInfo(), std::move(upstream), host,
       latched_data->connection().connectionInfoProvider(),

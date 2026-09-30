@@ -3,6 +3,7 @@
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
 
+#include "test/common/formatter/formatter_test_utility.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
@@ -48,27 +49,33 @@ TEST_F(XfccValueTest, Test) {
   {
     Envoy::Formatter::Context formatter_context;
     // No headers.
-    EXPECT_TRUE(formatter->formatValue(formatter_context, stream_info_).has_null_value());
+    EXPECT_TRUE(Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info_)
+                    .has_null_value());
   }
 
   {
     // No XFCC header.
     Http::TestRequestHeaderMapImpl headers{};
-    EXPECT_TRUE(formatter->formatValue({&headers}, stream_info_).has_null_value());
+    EXPECT_TRUE(Envoy::Formatter::formatValueForTest(*formatter, {&headers}, stream_info_)
+                    .has_null_value());
   }
 
   {
     // Normal value.
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert", "By=test;URI=abc;DNS=example.com"}};
-    EXPECT_EQ(formatter->formatValue({&headers}, stream_info_).string_value(), "abc");
+    EXPECT_EQ(
+        Envoy::Formatter::formatValueForTest(*formatter, {&headers}, stream_info_).string_value(),
+        "abc");
   }
 
   // Normal value with special characters.
   {
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert", R"(By=test;URI="a,b,c;\"e;f;g=x";DNS=example.com)"}};
-    EXPECT_EQ(formatter->formatValue({&headers}, stream_info_).string_value(), R"(a,b,c;"e;f;g=x)");
+    EXPECT_EQ(
+        Envoy::Formatter::formatValueForTest(*formatter, {&headers}, stream_info_).string_value(),
+        R"(a,b,c;"e;f;g=x)");
   }
 
   {
@@ -76,14 +83,18 @@ TEST_F(XfccValueTest, Test) {
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert",
          R"(By=test;DNS=example.com,By=test;URI="a,b,c;\"e;f;g=x";DNS=example.com)"}};
-    EXPECT_EQ(formatter->formatValue({&headers}, stream_info_).string_value(), R"(a,b,c;"e;f;g=x)");
+    EXPECT_EQ(
+        Envoy::Formatter::formatValueForTest(*formatter, {&headers}, stream_info_).string_value(),
+        R"(a,b,c;"e;f;g=x)");
   }
 
   {
     // With escaped backslash.
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert", R"(By=test;DNS=example.com,By=test;URI="\\";DNS=example.com)"}};
-    EXPECT_EQ(formatter->formatValue({&headers}, stream_info_).string_value(), R"(\)");
+    EXPECT_EQ(
+        Envoy::Formatter::formatValueForTest(*formatter, {&headers}, stream_info_).string_value(),
+        R"(\)");
   }
 
   {
@@ -91,20 +102,56 @@ TEST_F(XfccValueTest, Test) {
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert",
          R"(By=test;DNS=example.com,By=test;URI="\\\"";DNS=example.com)"}};
-    EXPECT_EQ(formatter->formatValue({&headers}, stream_info_).string_value(), R"(\")");
+    EXPECT_EQ(
+        Envoy::Formatter::formatValueForTest(*formatter, {&headers}, stream_info_).string_value(),
+        R"(\")");
   }
 
   {
     // Unclosed quotes in XFCC header.
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert", R"(By=test;URI="abc;DNS=example.com)"}};
-    EXPECT_TRUE(formatter->formatValue({&headers}, stream_info_).has_null_value());
+    EXPECT_TRUE(Envoy::Formatter::formatValueForTest(*formatter, {&headers}, stream_info_)
+                    .has_null_value());
   }
 
   {
     // No required key.
     Http::TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;DNS=example.com"}};
-    EXPECT_TRUE(formatter->formatValue({&headers}, stream_info_).has_null_value());
+    EXPECT_TRUE(Envoy::Formatter::formatValueForTest(*formatter, {&headers}, stream_info_)
+                    .has_null_value());
+  }
+}
+
+// The string form of the formatter yields the same values as the proto form.
+TEST_F(XfccValueTest, TestFormat) {
+  auto formatter =
+      std::move(Envoy::Formatter::SubstitutionFormatParser::parse("%XFCC_VALUE(uri)%").value()[0]);
+
+  {
+    // No headers.
+    Envoy::Formatter::Context formatter_context;
+    EXPECT_EQ(std::nullopt,
+              Envoy::Formatter::formatForTest(*formatter, formatter_context, stream_info_));
+  }
+
+  {
+    // No XFCC header.
+    Http::TestRequestHeaderMapImpl headers{};
+    EXPECT_EQ(std::nullopt, Envoy::Formatter::formatForTest(*formatter, {&headers}, stream_info_));
+  }
+
+  {
+    // Normal value.
+    Http::TestRequestHeaderMapImpl headers{
+        {"x-forwarded-client-cert", "By=test;URI=abc;DNS=example.com"}};
+    EXPECT_EQ("abc", Envoy::Formatter::formatForTest(*formatter, {&headers}, stream_info_));
+  }
+
+  {
+    // No required key.
+    Http::TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;DNS=example.com"}};
+    EXPECT_EQ(std::nullopt, Envoy::Formatter::formatForTest(*formatter, {&headers}, stream_info_));
   }
 }
 

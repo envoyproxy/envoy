@@ -73,7 +73,7 @@ public:
   virtual ~EngineBuilderBase() = default;
   EngineBuilderBase(EngineBuilderBase&&) = default;
 
-  T& setLogLevel(Logger::Logger::Levels log_level) {
+  T& setLogLevel(Logger::Levels log_level) {
     log_level_ = log_level;
     return static_cast<T&>(*this);
   }
@@ -420,7 +420,7 @@ private:
   std::vector<envoy::config::listener::v3::Listener> custom_listeners_;
 
   // Common fields for InternalEngine
-  Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
+  Logger::Levels log_level_ = Logger::Levels::info;
   std::unique_ptr<EnvoyLogger> logger_{nullptr};
   bool enable_logger_{true};
   std::unique_ptr<EngineCallbacks> callbacks_;

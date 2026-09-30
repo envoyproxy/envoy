@@ -1,4 +1,4 @@
-//go:generate mockgen -source=http.go -destination=mocks/mock_http.go -package=mocks
+//go:generate mockgen -source=http.go -destination=mocks/mock_http.go -package=mocks -aux_files=github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared=common.go
 package shared
 
 // HTTP filter SDK surface for dynamic modules — handle, buffer, header, span, and watermark
@@ -6,7 +6,7 @@ package shared
 //
 // Cross-surface primitives (UnsafeEnvoyBuffer, LogLevel, MetricID, AttributeID, Scheduler,
 // HttpCalloutInitResult/Result/Callback, HttpStreamCallback/ResetReason, SocketOption*,
-// ClusterHostCounts, HttpHeaderType) live in types.go.
+// ClusterHostCounts, TimingInfo, HttpHeaderType) live in types.go.
 
 // BodyBuffer is an interface that provides access to the request and response body.
 // This should be implemented by the SDK or runtime.
@@ -91,11 +91,16 @@ const (
 )
 
 // Span is a tracing span associated with the current HTTP stream. It is owned by Envoy and is
-// valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span -
-// it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module owns.
+// valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span
+// because it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module
+// owns. A span may be stored and used in a later event hook on the same worker thread. Do not use
+// a span after the stream has ended or move it to another goroutine.
 type Span interface {
 	// SetTag sets a key/value tag on the span.
 	SetTag(key, value string)
+
+	// SetTags sets multiple key/value tags on the span.
+	SetTags(tags [][2]string)
 
 	// SetOperation sets the operation name on the span.
 	SetOperation(operation string)
@@ -136,7 +141,8 @@ type Span interface {
 }
 
 // ChildSpan is a tracing span owned by the module. It must be finished by calling Finish when
-// the module is done with it.
+// the module is done with it. A child span may be stored and finished in a later event hook on the
+// same worker thread, for example to cover off-thread work that resumes in a scheduled callback.
 type ChildSpan interface {
 	Span
 
@@ -162,6 +168,17 @@ type HttpFilterHandle interface {
 
 	// SetMetadata sets the dynamic metadata value of the stream.
 	SetMetadata(metadataNamespace, key string, value any)
+
+	// SetMetadataStruct sets an entire dynamic metadata namespace from a serialized
+	// google.protobuf.Struct. The struct is merged into the namespace and existing entries with the
+	// same key are overwritten. A buffer that does not parse as a google.protobuf.Struct is a no-op.
+	SetMetadataStruct(metadataNamespace string, serializedStruct []byte)
+
+	// SetTypedMetadata sets an entire typed dynamic metadata namespace from a serialized
+	// google.protobuf.Any. The Any is merged into the namespace's typed_filter_metadata entry,
+	// preserving the exact message type via the Any type_url. A buffer that does not parse as a
+	// google.protobuf.Any is a no-op.
+	SetTypedMetadata(metadataNamespace string, serializedAny []byte)
 
 	// GetMetadataKeys retrieves all keys in the given metadata namespace.
 	// Returns list of keys in the namespace, or nil if the namespace does not exist.
@@ -245,6 +262,9 @@ type HttpFilterHandle interface {
 	// GetAttributeBool retrieves the bool attribute value of the stream.
 	// Returns attribute value and true if found, otherwise false.
 	GetAttributeBool(attributeID AttributeID) (bool, bool)
+
+	// GetTimingInfo returns a snapshot of the current stream timing information.
+	GetTimingInfo() TimingInfo
 
 	// GetFilterStateTyped retrieves the serialized bytes of a typed filter state object stored
 	// under the given key. Unlike GetFilterState, this calls serializeAsString on the registered
@@ -348,6 +368,19 @@ type HttpFilterHandle interface {
 	// Returns host counts and true if successful, otherwise a zero-valued struct and false.
 	GetClusterHostCounts(priority uint32) (ClusterHostCounts, bool)
 
+	// GetUpstreamRemoteAddress returns the remote address of the connected upstream socket,
+	// including the port. This can differ from AttributeIDUpstreamAddress, which exposes the
+	// selected upstream host address. The buffer is owned by Envoy and is valid until the current
+	// event hook returns.
+	GetUpstreamRemoteAddress() (UnsafeEnvoyBuffer, bool)
+
+	// GetUpstreamHostsAttempted returns the upstream host addresses in attempt order. The buffers
+	// are owned by Envoy and are valid until the current event hook returns.
+	GetUpstreamHostsAttempted() []UnsafeEnvoyBuffer
+
+	// GetUpstreamConnectionIDsAttempted returns the upstream connection IDs in attempt order.
+	GetUpstreamConnectionIDsAttempted() []uint64
+
 	// SetUpstreamOverrideHost sets a host that the upstream load balancer should select first
 	// if it exists in the routed cluster. Useful for sticky sessions or host affinity. When
 	// strict is false, normal load balancing is used as a fallback. Returns false if the host
@@ -365,8 +398,10 @@ type HttpFilterHandle interface {
 	// RecreateStream recreates the HTTP stream, optionally with new headers (or with the original
 	// headers if headers is nil). Useful for internal redirects or request retries. After a
 	// successful call, the current filter chain is destroyed and the filter SHOULD return Stop
-	// from the current callback. Returns false if recreation could not be initiated (e.g., the
-	// request body has not been fully received yet).
+	// from the current callback. The filter itself stays valid until the callback returns, and the
+	// methods it calls after the teardown are safe and do not affect the recreated stream.
+	// Returns false if recreation could not be initiated (e.g., the request body has not been fully
+	// received yet).
 	RecreateStream(headers [][2]string) bool
 
 	// RequestHeaders retrieves the request headers.
@@ -514,14 +549,36 @@ type HttpFilterHandle interface {
 	// IncrementCounterValue adds the given value to the counter metric. The order and
 	// size of tagsValues must match the tag keys defined when the metric was created.
 	IncrementCounterValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// GetGenericSecret returns the current value of a generic secret subscribed to by the filter
+	// config via HttpFilterConfigHandle.SubscribeGenericSecret. The second return value is false
+	// if the id does not correspond to a subscribed secret. The value is empty when the secret has
+	// been subscribed to but not yet delivered by the SDS server.
+	//
+	// The buffer aliases Envoy memory and must not be retained across events: a secret rotation
+	// replaces the value in between events on this worker thread. Copy it if it needs to outlive
+	// the current callback.
+	GetGenericSecret(id GenericSecretID) (UnsafeEnvoyBuffer, bool)
 }
 
 // HttpFilterConfigHandle is the per-filter-config handle exposed to HttpFilterConfig
-// implementations. It supports config-scoped logging, metric definition, and async I/O via
-// HttpCallout / StartHttpStream from the main thread.
+// implementations. It supports config-scoped logging, metric definition, generic secret
+// subscription, and async I/O via HttpCallout / StartHttpStream from the main thread.
 type HttpFilterConfigHandle interface {
+	CommonHandle
+
 	// Log will log the given message via the host environment's logging mechanism.
 	Log(level LogLevel, format string, args ...any)
+
+	// GetLogLevel returns the current effective log level of the host environment's logging
+	// mechanism. The returned level reflects runtime changes, for example those applied via the
+	// admin API.
+	GetLogLevel() LogLevel
+
+	// IsLogLevelEnabled reports whether the given log level is enabled by the host environment's
+	// logging mechanism. It can be used to skip expensive work that is only needed when a message
+	// at the given level would actually be logged.
+	IsLogLevelEnabled(level LogLevel) bool
 
 	// DefineHistogram creates a histogram metric with the given name, and tag keys.
 	// Returns histogram metric id. This metric can never be used after the plugin
@@ -598,4 +655,31 @@ type HttpFilterConfigHandle interface {
 	// Unlike HttpFilterHandle.IncrementCounterValue, this does not require a per-stream filter and
 	// can be called outside of the request lifecycle, for example from a scheduled background task.
 	IncrementCounterValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// SubscribeGenericSecret subscribes to a generic secret so that its value can later be read
+	// via GetGenericSecret, either here or on HttpFilterHandle.
+	//
+	// name is the name of the secret: for a static secret the name in the bootstrap configuration,
+	// and for a dynamic secret the resource name requested from the SDS server.
+	//
+	// sdsConfigSource is the JSON serialized envoy.config.core.v3.ConfigSource describing where to
+	// fetch the secret from, so that the value is updated whenever the SDS server pushes a new
+	// version. Pass an empty string to look the name up among the statically configured secrets
+	// instead.
+	//
+	// This can only be called while the filter config is being created, i.e. from
+	// HttpFilterConfigFactory.Create. Returns a zero ID if the secret cannot be subscribed to, for
+	// example when the static secret does not exist or sdsConfigSource is not a valid ConfigSource.
+	SubscribeGenericSecret(name string, sdsConfigSource string) GenericSecretID
+
+	// GetGenericSecret returns the current value of a previously subscribed generic secret. The
+	// second return value is false if the id does not correspond to a subscribed secret. The value
+	// is empty when the secret has been subscribed to but not yet delivered by the SDS server.
+	//
+	// Unlike HttpFilterHandle.GetGenericSecret, this does not require a per-stream filter and can
+	// be called outside of the request lifecycle, for example from a scheduled background task.
+	//
+	// The buffer aliases Envoy memory and must not be retained across events. Copy it if it needs
+	// to outlive the current callback.
+	GetGenericSecret(id GenericSecretID) (UnsafeEnvoyBuffer, bool)
 }

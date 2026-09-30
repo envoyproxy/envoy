@@ -53,7 +53,7 @@ envoy_extension_cc_test(
         "envoy.resolvers.reverse_connection",
         "envoy.transport_sockets.tls",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # TODO(agrawroh): Temporarily disabled due to flakiness. Re-enable after stabilizing.
     tags = ["manual"],
     deps = [

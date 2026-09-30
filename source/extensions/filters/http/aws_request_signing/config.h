@@ -20,10 +20,10 @@ using AwsRequestSigningProtoPerRouteConfig =
  * Config registration for the AWS request signing filter.
  */
 class AwsRequestSigningFilterFactory
-    : public Common::DualFactoryBase<AwsRequestSigningProtoConfig,
-                                     AwsRequestSigningProtoPerRouteConfig> {
+    : public Common::UnifiedFactoryBase<AwsRequestSigningProtoConfig,
+                                        AwsRequestSigningProtoPerRouteConfig> {
 public:
-  AwsRequestSigningFilterFactory() : DualFactoryBase("envoy.filters.http.aws_request_signing") {}
+  AwsRequestSigningFilterFactory() : UnifiedFactoryBase("envoy.filters.http.aws_request_signing") {}
 
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoHelper(
       const AwsRequestSigningProtoConfig& proto_config, const std::string& stats_prefix,
@@ -34,14 +34,10 @@ private:
   createSigner(const AwsRequestSigningProtoConfig& config,
                Server::Configuration::ServerFactoryContext& server_context) const;
 
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const AwsRequestSigningProtoConfig& proto_config,
-                                    const std::string& stats_prefix, DualInfo dual_info,
-                                    Server::Configuration::ServerFactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
-      const AwsRequestSigningProtoConfig& proto_config, const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      const AwsRequestSigningProtoConfig& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const AwsRequestSigningProtoPerRouteConfig& per_route_config,

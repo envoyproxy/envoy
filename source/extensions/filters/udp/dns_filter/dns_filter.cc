@@ -13,10 +13,19 @@
 #include "source/extensions/filters/udp/dns_filter/dns_filter_access_log.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
+#include "absl/strings/ascii.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace DnsFilter {
+namespace {
+
+std::string normalizeIfEnabled(const absl::string_view name, const bool enabled) {
+  return enabled ? absl::AsciiStrToLower(name) : std::string(name);
+}
+
+} // namespace
 
 static constexpr std::chrono::milliseconds DEFAULT_RESOLVER_TIMEOUT{500};
 static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
@@ -39,12 +48,14 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   ENVOY_LOG(debug, "Loading DNS table from external file: {}", result ? "Success" : "Failure");
 
   retry_count_ = dns_table.external_retry_count();
+  case_insensitive_ = config.case_insensitive();
 
   for (const auto& virtual_domain : dns_table.virtual_domains()) {
     AddressConstPtrVec addrs{};
 
-    const absl::string_view virtual_domain_name =
-        Utils::getVirtualDomainName(virtual_domain.name());
+    // Owning string so suffix can be a view into it.
+    const std::string virtual_domain_name =
+        normalizeIfEnabled(Utils::getVirtualDomainName(virtual_domain.name()), case_insensitive_);
     const absl::string_view suffix = Utils::getDomainSuffix(virtual_domain_name);
     ENVOY_LOG(trace, "Loading configuration for domain: {}. Suffix: {}", virtual_domain_name,
               suffix);
@@ -108,8 +119,9 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
 
         // Generate the full name for the DNS service. All input parameters are populated
         // strings enforced by the message definition
-        const std::string full_service_name =
-            Utils::buildServiceName(dns_service.service_name(), proto, virtual_domain.name());
+        const std::string full_service_name = normalizeIfEnabled(
+            Utils::buildServiceName(dns_service.service_name(), proto, virtual_domain.name()),
+            case_insensitive_);
 
         DnsSrvRecordPtr service_record_ptr =
             std::make_unique<DnsSrvRecord>(full_service_name, proto, ttl);
@@ -129,8 +141,13 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
             attributes.is_cluster = true;
           }
 
-          ENVOY_LOG(trace, "Storing service {} target {}", full_service_name, target_name);
-          service_record_ptr->addTarget(target_name, attributes);
+          // Cluster names are matched case-sensitively; only host-name targets are normalized.
+          const std::string stored_target =
+              attributes.is_cluster ? std::string(target_name)
+                                    : normalizeIfEnabled(target_name, case_insensitive_);
+
+          ENVOY_LOG(trace, "Storing service {} target {}", full_service_name, stored_target);
+          service_record_ptr->addTarget(stored_target, attributes);
         }
 
         DnsEndpointConfig endpoint_config{};
@@ -278,7 +295,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     incrementExternalQueryTypeCount(query->type_);
     for (const auto& ip : iplist) {
       incrementExternalQueryTypeAnswerCount(query->type_);
-      const std::chrono::seconds ttl = getDomainTTL(query->name_);
+      const std::chrono::seconds ttl = getDomainTTL(query->lookupName());
       message_parser_.storeDnsAnswerRecord(context, *query, ttl, ip);
     }
     sendDnsResponse(std::move(context));
@@ -350,10 +367,13 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
    * contains QDCOUNT (usually 1) entries.
    */
   for (const auto& query : context->queries_) {
+    // Normalize once; matching below and the resolver callback reuse lookupName().
+    maybeNormalizeQuery(*query);
+
     // Try to resolve the query locally. If forwarding the query externally is disabled we will
     // always attempt to resolve with the configured domains
     const bool forward_queries = config_->forwardQueries();
-    if (isKnownDomain(query->name_) || !forward_queries) {
+    if (isKnownDomain(query->lookupName()) || !forward_queries) {
       // Determine whether the name is a cluster. Move on to the next query if successful
       if (resolveViaClusters(context, *query)) {
         continue;
@@ -470,7 +490,7 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
   size_t cluster_endpoints = 0;
 
   // Get the service_list config for the domain
-  const auto* service_config = getServiceConfigForDomain(query.name_);
+  const auto* service_config = getServiceConfigForDomain(query.lookupName());
   if (service_config != nullptr) {
     // We can redirect to more than one cluster, but only one is supported
     const auto& cluster_target = service_config->targets_.begin();
@@ -502,8 +522,8 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
           new_attributes.port = host->address()->ip()->port();
         }
 
-        // Create the service record element and increment the SRV record answer count
-        auto config = std::make_unique<DnsSrvRecord>(service_config->name_, service_config->proto_,
+        // Name the record after the query so the response echoes the client's original case.
+        auto config = std::make_unique<DnsSrvRecord>(query.name_, service_config->proto_,
                                                      service_config->ttl_);
 
         config->addTarget(target_name, new_attributes);
@@ -530,7 +550,7 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
 
 bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
   // Determine if the domain name is being redirected to a cluster
-  const auto cluster_name = getClusterNameForDomain(query.name_);
+  const auto cluster_name = getClusterNameForDomain(query.lookupName());
   absl::string_view lookup_name;
   if (!cluster_name.empty()) {
     lookup_name = cluster_name;
@@ -575,7 +595,7 @@ bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRe
 }
 
 bool DnsFilter::resolveConfiguredDomain(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
-  const auto* configured_address_list = getAddressListForDomain(query.name_);
+  const auto* configured_address_list = getAddressListForDomain(query.lookupName());
   uint64_t hosts_found = 0;
   if (configured_address_list != nullptr) {
     // Build an answer record from each configured IP address
@@ -584,7 +604,7 @@ bool DnsFilter::resolveConfiguredDomain(DnsQueryContextPtr& context, const DnsQu
       ENVOY_LOG(trace, "using local address {} for domain [{}]",
                 configured_address->ip()->addressAsString(), query.name_);
       ++hosts_found;
-      const std::chrono::seconds ttl = getDomainTTL(query.name_);
+      const std::chrono::seconds ttl = getDomainTTL(query.lookupName());
       if (message_parser_.storeDnsAnswerRecord(context, query, ttl, configured_address)) {
         incrementLocalQueryTypeAnswerCount(query.type_);
       }
@@ -594,7 +614,7 @@ bool DnsFilter::resolveConfiguredDomain(DnsQueryContextPtr& context, const DnsQu
 }
 
 bool DnsFilter::resolveConfiguredService(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
-  const auto* service_config = getServiceConfigForDomain(query.name_);
+  const auto* service_config = getServiceConfigForDomain(query.lookupName());
 
   size_t targets_discovered = 0;
   if (service_config != nullptr) {
@@ -612,7 +632,8 @@ bool DnsFilter::resolveConfiguredService(DnsQueryContextPtr& context, const DnsQ
         ENVOY_LOG(trace, "Adding srv record for target [{}]", target_name);
 
         incrementLocalQueryTypeAnswerCount(query.type_);
-        auto config = std::make_unique<DnsSrvRecord>(service_config->name_, service_config->proto_,
+        // Name the record after the query so the response echoes the client's original case.
+        auto config = std::make_unique<DnsSrvRecord>(query.name_, service_config->proto_,
                                                      service_config->ttl_);
         config->addTarget(target_name, attributes);
         message_parser_.storeDnsSrvAnswerRecord(context, query, std::move(config));

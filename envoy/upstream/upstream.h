@@ -39,6 +39,16 @@ class FilterChainManager;
 class HashPolicy;
 } // namespace Http
 
+namespace ConnectionPool {
+class PendingStream;
+} // namespace ConnectionPool
+
+namespace Extensions {
+namespace QueuePolicy {
+template <class ItemType> class QueuePolicyFactory;
+} // namespace QueuePolicy
+} // namespace Extensions
+
 namespace Router {
 class ShadowPolicy;
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
@@ -767,6 +777,7 @@ public:
   COUNTER(upstream_cx_none_healthy)                                                                \
   COUNTER(upstream_cx_overflow)                                                                    \
   COUNTER(upstream_cx_pool_overflow)                                                               \
+  COUNTER(upstream_cx_preconnect_skipped)                                                          \
   COUNTER(upstream_cx_protocol_error)                                                              \
   COUNTER(upstream_cx_rx_bytes_total)                                                              \
   COUNTER(upstream_cx_total)                                                                       \
@@ -803,6 +814,7 @@ public:
   GAUGE(upstream_cx_active, Accumulate)                                                            \
   GAUGE(upstream_cx_rx_bytes_buffered, Accumulate)                                                 \
   GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
+  GAUGE(upstream_queue_overloaded, Accumulate)                                                     \
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
@@ -916,12 +928,10 @@ struct ClusterCircuitBreakersStats {
 };
 
 using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
-using ClusterRequestResponseSizeStatsOptRef =
-    std::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>;
+using ClusterRequestResponseSizeStatsOptRef = OptRef<ClusterRequestResponseSizeStats>;
 
 using ClusterTimeoutBudgetStatsPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
-using ClusterTimeoutBudgetStatsOptRef =
-    std::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>>;
+using ClusterTimeoutBudgetStatsOptRef = OptRef<ClusterTimeoutBudgetStats>;
 
 /**
  * All extension protocol specific options returned by the method at
@@ -1090,6 +1100,13 @@ public:
   virtual float peekaheadRatio() const PURE;
 
   /**
+   * @param host the upstream host being considered for a preconnect.
+   * @return whether anticipatory connections may be opened to the host, per the cluster's
+   * preconnect_enabled_metadata matcher. Does not affect on-demand connections for requests.
+   */
+  virtual bool shouldPreconnect(const Host& host) const PURE;
+
+  /**
    * @return soft limit on size of the cluster's connections read and write buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;
@@ -1256,14 +1273,13 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
-   * @return std::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>> stats to track
-   * headers/body sizes of request/response for this cluster.
+   * @return ClusterRequestResponseSizeStatsOptRef stats to track headers/body sizes of
+   * request/response for this cluster.
    */
   virtual ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const PURE;
 
   /**
-   * @return std::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout
-   * budgets for this cluster.
+   * @return ClusterTimeoutBudgetStatsOptRef stats on timeout budgets for this cluster.
    */
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
@@ -1286,6 +1302,27 @@ public:
    * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * Queue policy for cluster pending requests, resolved once at cluster configuration load time
+   * so that connection pool creation does not need to perform a factory lookup or proto
+   * translation.
+   */
+  struct PendingRqQueuePolicy {
+    // Queue policy factory. Points into the static factory registry.
+    Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>* factory_{};
+    // Translated queue policy configuration.
+    std::unique_ptr<const Protobuf::Message> config_;
+    // Cluster-specific prefix supplied to the queue policy factory.
+    std::string stat_prefix_;
+  };
+
+  /**
+   * @return OptRef<const PendingRqQueuePolicy> the resolved queue policy for cluster pending
+   * requests, or nullopt when not configured (in which case the default FIFO queue policy is
+   * used).
+   */
+  virtual OptRef<const PendingRqQueuePolicy> pendingRqQueuePolicy() const PURE;
 
   /**
    * @return whether to skip waiting for health checking before draining connections
@@ -1459,7 +1496,7 @@ public:
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
-using ClusterConstOptRef = std::optional<std::reference_wrapper<const Cluster>>;
+using ClusterConstOptRef = OptRef<const Cluster>;
 
 } // namespace Upstream
 } // namespace Envoy

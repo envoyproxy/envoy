@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["reverse_connection_address.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//envoy/common:base_includes",
         "//envoy/network:address_interface",
         "//source/common/network:address_lib",
         "//source/common/network:socket_interface_lib",
@@ -77,6 +78,7 @@ envoy_cc_library(
         ":reverse_tunnel_extension_lib",
         "//envoy/access_log:access_log_interface",
         "//envoy/api:io_error_interface",
+        "//envoy/common:base_includes",
         "//envoy/common:random_generator_interface",
         "//envoy/grpc:async_client_interface",
         "//envoy/network:address_interface",

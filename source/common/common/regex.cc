@@ -13,6 +13,18 @@
 namespace Envoy {
 namespace Regex {
 
+namespace {
+
+RE2::Options initRe2Options() {
+  RE2::Options options(RE2::CannedOptions::Quiet);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.re2_use_latin1_mode")) {
+    options.set_encoding(RE2::Options::EncodingLatin1);
+  }
+  return options;
+}
+
+} // namespace
+
 absl::StatusOr<std::unique_ptr<CompiledGoogleReMatcher>>
 CompiledGoogleReMatcher::createAndSizeCheck(const std::string& regex) {
   absl::Status creation_status = absl::OkStatus();
@@ -44,7 +56,7 @@ REGISTER_FACTORY(GoogleReEngineFactory, EngineFactory);
 CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
                                                  absl::Status& creation_status,
                                                  bool do_program_size_check)
-    : regex_(regex, re2::RE2::Quiet) {
+    : regex_(regex, initRe2Options()) {
   if (!regex_.ok()) {
     creation_status = absl::InvalidArgumentError(regex_.error());
     return;

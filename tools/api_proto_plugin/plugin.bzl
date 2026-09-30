@@ -1,5 +1,8 @@
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
+load("@envoy_toolshed//toolchains:utils.bzl", "get_proto_compiler", "use_proto_toolchain")
+load("@protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
+
+PROTO_TOOLCHAIN_TYPE = Label("@protobuf//bazel/private:proto_toolchain_type")
 
 # Borrowed from https://github.com/grpc/grpc-java/blob/v1.24.1/java_grpc_library.bzl#L61
 def _path_ignoring_repository(f):
@@ -35,9 +38,10 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes, 
     proto_sources = [
         f
         for f in target[ProtoInfo].direct_sources
-        if (f.path.startswith("external/envoy_api") or
+        if ((f.path.startswith("external/envoy_api") and not f.path.startswith("external/envoy_api++")) or
             f.path.startswith("tools/testdata/protoxform/envoy") or
-            f.path.startswith("external/xds/xds"))
+            f.path.startswith("external/xds/xds") or
+            f.path.startswith("external/xds+"))
     ]
 
     # If this proto_library doesn't actually name any sources, e.g. //api:api,
@@ -91,7 +95,7 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes, 
     args.add_all(target[ProtoInfo].direct_sources)
 
     ctx.actions.run(
-        executable = ctx.executable._protoc,
+        executable = get_proto_compiler(ctx, PROTO_TOOLCHAIN_TYPE),
         arguments = [args],
         inputs = depset(transitive = inputs),
         tools = [ctx.executable._api_proto_plugin],
@@ -109,11 +113,6 @@ def api_proto_plugin_aspect(
         use_type_db = False,
         extra_inputs = []):
     _attrs = {
-        "_protoc": attr.label(
-            default = Label("@com_google_protobuf//:protoc"),
-            executable = True,
-            cfg = "exec",
-        ),
         # Handle both string labels and pre-constructed Label objects.
         # Use type comparison instead of string check for robustness.
         "_api_proto_plugin": attr.label(
@@ -137,4 +136,5 @@ def api_proto_plugin_aspect(
         attr_aspects = ["deps"],
         attrs = _attrs,
         implementation = aspect_impl,
+        toolchains = use_proto_toolchain(PROTO_TOOLCHAIN_TYPE),
     )

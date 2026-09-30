@@ -15,20 +15,14 @@ namespace StatefulSession {
  * Config registration for the stateful session filter. @see NamedHttpFilterConfigFactory.
  */
 class StatefulSessionFactoryConfig
-    : public Common::ExceptionFreeFactoryBase<ProtoConfig, PerRouteProtoConfig> {
+    : public Common::UnifiedFactoryBase<ProtoConfig, PerRouteProtoConfig> {
 public:
-  StatefulSessionFactoryConfig()
-      : ExceptionFreeFactoryBase("envoy.filters.http.stateful_session") {}
+  StatefulSessionFactoryConfig() : UnifiedFactoryBase("envoy.filters.http.stateful_session") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const ProtoConfig& proto_config,
-                                    const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
-      const ProtoConfig& proto_config, const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      const ProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const PerRouteProtoConfig& proto_config,

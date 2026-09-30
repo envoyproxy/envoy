@@ -18,17 +18,11 @@ absl::StatusOr<::Envoy::Http::FilterFactoryCb> CustomResponseFilterFactory::crea
 }
 
 absl::StatusOr<::Envoy::Http::FilterFactoryCb>
-CustomResponseFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
-    const std::string& stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(config, stats_prefix, context.serverFactoryContext());
-}
-
-absl::StatusOr<::Envoy::Http::FilterFactoryCb>
 CustomResponseFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
-    const std::string& stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context) {
-  return createFilterFactory(config, stats_prefix, context);
+    Envoy::Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactory(config, extra_context.stats_prefix, context);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

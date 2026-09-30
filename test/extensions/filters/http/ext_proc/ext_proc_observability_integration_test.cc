@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <algorithm>
 #include <iostream>
 
@@ -89,7 +92,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadataObservabilityMode) {
 
   auto response = sendDownstreamRequest(std::nullopt);
 
-  testSendDyanmicMetadata();
+  testSendDynamicMetadata();
 
   handleUpstreamRequest();
 

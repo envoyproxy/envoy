@@ -6,7 +6,6 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
@@ -15,11 +14,11 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/bridge_status.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/sse_response_extractor.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/hash/hash.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp" // IWYU pragma: keep
@@ -44,78 +43,14 @@ struct EndpointKey {
   }
 };
 
-enum class BridgeStatus {
-  Ok,
-  RequestNotPost,
-  RequestTooLarge,
-  RequestFailedToParseJsonRpc,
-  RequestUnsupportedProtocolVersion,
-  RequestInitializeNotValid,
-  RequestMethodNotSupported,
-  RequestMethodNotFound,
-  RequestMethodNotString,
-  RequestIdNotFound,
-  RequestToolParamsNotFound,
-  RequestToolNameNotFound,
-  RequestUnknownTool,
-  RequestToolArgumentsInvalid,
-  RequestToolTranscodingFailure,
-  RequestPassthrough,
-  ResponseTooLarge,
-  ResponseInvalidUtf8,
-  ResponseBackendError,
-  ResponseFailedToParseJsonRpc,
-};
-
-absl::string_view bridgeStatusToString(BridgeStatus status);
-
-namespace BridgeStatusValues {
-inline constexpr absl::string_view STATUS = "status";
-inline constexpr absl::string_view OK = "mcp_json_rest_bridge_ok";
-inline constexpr absl::string_view REQUEST_NOT_POST = "mcp_json_rest_bridge_request_not_post";
-inline constexpr absl::string_view REQUEST_TOO_LARGE = "mcp_json_rest_bridge_request_too_large";
-inline constexpr absl::string_view REQUEST_FAILED_TO_PARSE_JSON_RPC =
-    "mcp_json_rest_bridge_request_failed_to_parse_json_rpc";
-inline constexpr absl::string_view REQUEST_UNSUPPORTED_PROTOCOL_VERSION =
-    "mcp_json_rest_bridge_request_unsupported_protocol_version";
-inline constexpr absl::string_view REQUEST_INITIALIZE_NOT_VALID =
-    "mcp_json_rest_bridge_request_initialize_not_valid";
-inline constexpr absl::string_view REQUEST_METHOD_NOT_SUPPORTED =
-    "mcp_json_rest_bridge_request_method_not_supported";
-inline constexpr absl::string_view REQUEST_METHOD_NOT_FOUND =
-    "mcp_json_rest_bridge_request_method_not_found";
-inline constexpr absl::string_view REQUEST_METHOD_NOT_STRING =
-    "mcp_json_rest_bridge_request_method_not_string";
-inline constexpr absl::string_view REQUEST_ID_NOT_FOUND =
-    "mcp_json_rest_bridge_request_id_not_found";
-inline constexpr absl::string_view REQUEST_TOOL_PARAMS_NOT_FOUND =
-    "mcp_json_rest_bridge_request_tool_params_not_found";
-inline constexpr absl::string_view REQUEST_TOOL_NAME_NOT_FOUND =
-    "mcp_json_rest_bridge_request_tool_name_not_found";
-inline constexpr absl::string_view REQUEST_UNKNOWN_TOOL =
-    "mcp_json_rest_bridge_request_unknown_tool";
-inline constexpr absl::string_view REQUEST_TOOL_ARGUMENTS_INVALID =
-    "mcp_json_rest_bridge_request_tool_arguments_invalid";
-inline constexpr absl::string_view REQUEST_TOOL_TRANSCODING_FAILURE =
-    "mcp_json_rest_bridge_request_tool_transcoding_failure";
-inline constexpr absl::string_view REQUEST_PASSTHROUGH = "mcp_json_rest_bridge_request_passthrough";
-inline constexpr absl::string_view RESPONSE_TOO_LARGE = "mcp_json_rest_bridge_response_too_large";
-inline constexpr absl::string_view RESPONSE_INVALID_UTF8 =
-    "mcp_json_rest_bridge_response_invalid_utf8";
-inline constexpr absl::string_view RESPONSE_BACKEND_ERROR =
-    "mcp_json_rest_bridge_response_backend_error";
-inline constexpr absl::string_view RESPONSE_FAILED_TO_PARSE_JSON_RPC =
-    "mcp_json_rest_bridge_response_failed_to_parse_json";
-} // namespace BridgeStatusValues
-
 /**
  * Configuration for the MCP JSON REST Bridge filter.
  */
 class McpJsonRestBridgeFilterConfig : public Logger::Loggable<Logger::Id::config> {
 public:
-  explicit McpJsonRestBridgeFilterConfig(
-      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-          proto_config);
+  static absl::StatusOr<std::shared_ptr<McpJsonRestBridgeFilterConfig>>
+  create(const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+             proto_config);
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getHttpRule(absl::string_view tool_name, absl::string_view host, absl::string_view path) const;
@@ -123,6 +58,7 @@ public:
   getToolsListHttpRule(absl::string_view host, absl::string_view path) const;
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
+  const std::string& maxSupportedProtocolVersion() const { return max_supported_protocol_version_; }
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
@@ -162,6 +98,12 @@ public:
   bool perRouteOnly() const { return proto_config_.per_route_only(); }
 
 private:
+  explicit McpJsonRestBridgeFilterConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+          proto_config);
+
+  absl::Status initialize();
+
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
@@ -178,6 +120,7 @@ private:
   absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   std::string fallback_protocol_version_;
+  std::string max_supported_protocol_version_;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
   bool clear_route_cache_;
@@ -186,7 +129,7 @@ private:
 class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig,
                                         public Logger::Loggable<Logger::Id::config> {
 public:
-  explicit McpJsonRestBridgePerRouteConfig(
+  static absl::StatusOr<std::shared_ptr<McpJsonRestBridgePerRouteConfig>> create(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
           proto_config);
 
@@ -209,6 +152,12 @@ public:
                                    absl::string_view path) const;
 
 private:
+  explicit McpJsonRestBridgePerRouteConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+          proto_config);
+
+  absl::Status initialize();
+
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
@@ -228,6 +177,7 @@ private:
 };
 
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
+using McpJsonRestBridgePerRouteConfigSharedPtr = std::shared_ptr<McpJsonRestBridgePerRouteConfig>;
 
 /**
  * MCP JSON REST Bridge proxy implementation.
@@ -236,7 +186,7 @@ class McpJsonRestBridgeFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
   explicit McpJsonRestBridgeFilter(McpJsonRestBridgeFilterConfigSharedPtr config)
-      : config_(config) {}
+      : sse_response_extractor_(config->maxResponseBodySize()), config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -251,6 +201,17 @@ private:
   // Handles "method" field in the MCP request.
   void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
                        const McpJsonRestBridgePerRouteConfig* per_route_config);
+
+  // Validates that the "Mcp-Method" request header is present and matches the JSON-RPC "method"
+  // field. Returns true when the header is valid. Otherwise sends a local error response and
+  // returns false.
+  bool validateMcpMethodHeader(const nlohmann::json& json_rpc, absl::string_view method,
+                               Http::RequestHeaderMapOptRef request_headers);
+
+  // Validates that the "Mcp-Name" request header is present and matches the JSON-RPC
+  // "params.name" field for a tools/call request.
+  bool validateMcpNameHeader(const nlohmann::json& json_rpc, absl::string_view method,
+                             Http::RequestHeaderMapOptRef request_headers);
 
   // Serves a local tools/list response using tools' ToolsListSpecificConfig.
   void serveToolsListLocal(
@@ -267,15 +228,17 @@ private:
 
   // Handles decoding errors: sets dynamic metadata and sends a local reply.
   // IMPORTANT PROTOCOL RULE:
-  // 1. For JSON-RPC application/protocol errors (-32600, -32601, -32602), MUST use Http::Code::OK
-  //    (200). Many MCP SDK clients inspect HTTP status before JSON-RPC decoding and will fail with
-  //    a transport exception on non-200 responses, discarding the structured JSON-RPC error
-  //    code/message.
+  // 1. For JSON-RPC application/protocol errors in the request payload (-32600, -32601, -32602),
+  //    MUST use Http::Code::OK (200). Many MCP SDK clients inspect HTTP status before JSON-RPC
+  //    decoding and will fail with a transport exception on non-200 responses, discarding the
+  //    structured JSON-RPC error code/message.
   // 2. Only use non-200 HTTP codes (400, 401, 403, 405, 413) in the following cases:
   //    - Transport-level or framing syntax failures (generated locally by this filter):
   //      * 405 Method Not Allowed (non-POST request)
   //      * 413 Payload Too Large (exceeding maxRequestBodySize)
   //      * 400 Bad Request for malformed JSON syntax (-32700 parse error)
+  //      * 400 Bad Request when an MCP standard request header fails validation (-32020 header
+  //        mismatch), which is an HTTP-level error rather than a JSON-RPC payload error
   //    - Authorization errors preserved from upstream (401 Unauthorized, 403 Forbidden):
   //      * 401 and 403 from upstream are preserved as non-200 HTTP responses as required by the MCP
   //        authorization spec:
@@ -306,6 +269,15 @@ private:
   // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
   void buildStreamingPrefixAndSuffix(bool is_error);
 
+  // Encodes incoming data chunks for streaming MCP tool calls.
+  Http::FilterDataStatus encodeStreamingData(Buffer::Instance& data, bool end_stream);
+
+  // Processes an SSE response chunk and returns the serialized JSON event payloads.
+  absl::StatusOr<std::string> processSseResponse(absl::string_view chunk, bool end_stream);
+
+  // Prepares the escaped/formatted payload string for streaming.
+  absl::StatusOr<std::string> prepareStreamingPayload(absl::string_view chunk, bool end_stream);
+
   enum class McpOperation {
     Unspecified = 0,
     // Received a configured MCP URL path but has not parsed the request body yet.
@@ -325,6 +297,7 @@ private:
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   std::optional<nlohmann::json> session_id_;
+  bool is_stateless_request_{false};
   std::string server_name_;
   std::string path_;
   Buffer::OwnedImpl request_body_;
@@ -347,6 +320,11 @@ private:
   Protobuf::Struct mcp_params_;
   bool has_params_ = false;
   std::optional<uint64_t> backend_response_code_;
+
+  // Whether the response is SSE.
+  bool is_sse_response_ = false;
+  bool is_first_sse_event_ = true;
+  SseResponseExtractor sse_response_extractor_;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
 };

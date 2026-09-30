@@ -1,5 +1,9 @@
 #pragma once
 
+// clang-format off
+#include <windows.h>
+// clang-format on
+
 #include <processenv.h>
 #include <shellapi.h>
 #include <winsvc.h>

@@ -74,7 +74,7 @@ private:
     // To avoid storing the RR index in the base class, we end up using a second map here with
     // host source as the key. This means that each LB decision will require two map lookups in
     // the unweighted case. We might consider trying to optimize this in the future.
-    ASSERT(rr_indexes_.find(source) != rr_indexes_.end());
+    ASSERT(rr_indexes_.contains(source));
     return hosts_to_use[rr_indexes_[source]++ % hosts_to_use.size()];
   }
 

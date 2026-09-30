@@ -25,6 +25,7 @@ envoy_cc_extension(
         "//envoy/server:filter_config_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tracing:trace_driver_interface",
+        "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/config:datasource_lib",
         "//source/common/formatter:formatter_extension_lib",

@@ -1,7 +1,7 @@
-load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_xcframework")
-load("@build_bazel_rules_apple//apple:ios.bzl", "ios_static_framework")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines", "envoy_mobile_package")
+load("@rules_apple//apple:apple.bzl", "apple_static_xcframework")
+load("@rules_apple//apple:ios.bzl", "ios_static_framework")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 load("//bazel:swift_header_collector.bzl", "swift_header_collector")
 
@@ -77,7 +77,7 @@ swift_library(
     ] + [
         "@envoy_mobile_extra_swift_sources//:extra_swift_srcs",
     ],
-    defines = envoy_mobile_defines("@envoy"),
+    defines = envoy_mobile_defines(),
     features = [
         "swift.emit_symbol_graph",
         "swift.enable_library_evolution",

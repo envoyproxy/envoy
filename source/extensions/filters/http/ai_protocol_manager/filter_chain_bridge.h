@@ -3,6 +3,7 @@
 #include "envoy/http/filter.h"
 
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,49 +12,46 @@ namespace AiProtocolManager {
 
 // FilterChainBridge for the decode (request) path. Maps the path-agnostic bridge
 // methods onto StreamDecoderFilterCallbacks, and forwards upstream-request
-// watermarks into the BufferManager's ReplayWatermarkHandler so replay is paced
-// against upstream back-pressure.
+// watermarks into the bridge's replay flow control.
 class DecoderFilterChainBridge : public FilterChainBridge, public Http::UpstreamWatermarkCallbacks {
 public:
-  explicit DecoderFilterChainBridge(Http::StreamDecoderFilterCallbacks& callbacks)
-      : callbacks_(callbacks) {}
+  // Subscribes for the bridge's whole life rather than per replay: the filter manager replays the
+  // current high-watermark depth to every new subscriber, so re-subscribing double-counts.
+  DecoderFilterChainBridge(Http::StreamDecoderFilterCallbacks& callbacks,
+                           AiProtocolManagerStats& stats)
+      : FilterChainBridge(callbacks.decoderBufferLimit()), callbacks_(callbacks), stats_(stats) {
+    callbacks_.addUpstreamWatermarkCallbacks(*this);
+  }
+
+  ~DecoderFilterChainBridge() override { detachFromFilterChain(); }
 
   // FilterChainBridge
   Event::Dispatcher& dispatcher() override { return callbacks_.dispatcher(); }
-  uint32_t bufferLimit() override { return callbacks_.decoderBufferLimit(); }
   void injectData(Buffer::Instance& data) override {
     callbacks_.injectDecodedDataToFilterChain(data, /*end_stream=*/false);
   }
-  void pauseSource() override { callbacks_.onDecoderFilterAboveWriteBufferHighWatermark(); }
-  void resumeSource() override { callbacks_.onDecoderFilterBelowWriteBufferLowWatermark(); }
-  void registerReplayWatermarks(ReplayWatermarkHandler& handler) override;
-  void unregisterReplayWatermarks() override;
   void onUnrecoverableError() override;
 
   // Http::UpstreamWatermarkCallbacks (replay side: upstream back-pressure).
-  void onAboveWriteBufferHighWatermark() override {
-    if (handler_ != nullptr) {
-      handler_->onReplayAboveHighWatermark();
-    }
-  }
-  void onBelowWriteBufferLowWatermark() override {
-    if (handler_ != nullptr) {
-      handler_->onReplayBelowLowWatermark();
-    }
-  }
+  void onAboveWriteBufferHighWatermark() override { onAboveReplayWatermark(); }
+  void onBelowWriteBufferLowWatermark() override { onBelowReplayWatermark(); }
 
 private:
+  // FilterChainBridge
+  void pauseSource() override { callbacks_.onDecoderFilterAboveWriteBufferHighWatermark(); }
+  void resumeSource() override { callbacks_.onDecoderFilterBelowWriteBufferLowWatermark(); }
+  void unsubscribeReplayWatermarks() override {
+    callbacks_.removeUpstreamWatermarkCallbacks(*this);
+  }
+
   Http::StreamDecoderFilterCallbacks& callbacks_;
-  ReplayWatermarkHandler* handler_{nullptr};
-  // Whether *this is currently registered as an UpstreamWatermarkCallbacks.
-  bool registered_{false};
+  AiProtocolManagerStats& stats_;
 };
 
 // FilterChainBridge for the encode (response) path. Maps the bridge methods onto
 // StreamEncoderFilterCallbacks, but uses the decoder callbacks to subscribe to
 // downstream watermarks (add/removeDownstreamWatermarkCallbacks live on
-// StreamDecoderFilterCallbacks), forwarding them into the BufferManager's
-// ReplayWatermarkHandler.
+// StreamDecoderFilterCallbacks).
 //
 // Provided so the encode path is trivial to wire later; not yet constructed by
 // the filter.
@@ -61,39 +59,38 @@ class EncoderFilterChainBridge : public FilterChainBridge,
                                  public Http::DownstreamWatermarkCallbacks {
 public:
   EncoderFilterChainBridge(Http::StreamEncoderFilterCallbacks& encoder_callbacks,
-                           Http::StreamDecoderFilterCallbacks& decoder_callbacks)
-      : encoder_callbacks_(encoder_callbacks), decoder_callbacks_(decoder_callbacks) {}
+                           Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+                           AiProtocolManagerStats& stats)
+      : FilterChainBridge(encoder_callbacks.encoderBufferLimit()),
+        encoder_callbacks_(encoder_callbacks), decoder_callbacks_(decoder_callbacks),
+        stats_(stats) {
+    decoder_callbacks_.addDownstreamWatermarkCallbacks(*this);
+  }
+
+  ~EncoderFilterChainBridge() override { detachFromFilterChain(); }
 
   // FilterChainBridge
   Event::Dispatcher& dispatcher() override { return encoder_callbacks_.dispatcher(); }
-  uint32_t bufferLimit() override { return encoder_callbacks_.encoderBufferLimit(); }
   void injectData(Buffer::Instance& data) override {
     encoder_callbacks_.injectEncodedDataToFilterChain(data, /*end_stream=*/false);
   }
-  void pauseSource() override { encoder_callbacks_.onEncoderFilterAboveWriteBufferHighWatermark(); }
-  void resumeSource() override { encoder_callbacks_.onEncoderFilterBelowWriteBufferLowWatermark(); }
-  void registerReplayWatermarks(ReplayWatermarkHandler& handler) override;
-  void unregisterReplayWatermarks() override;
   void onUnrecoverableError() override;
 
   // Http::DownstreamWatermarkCallbacks (replay side: downstream back-pressure).
-  void onAboveWriteBufferHighWatermark() override {
-    if (handler_ != nullptr) {
-      handler_->onReplayAboveHighWatermark();
-    }
-  }
-  void onBelowWriteBufferLowWatermark() override {
-    if (handler_ != nullptr) {
-      handler_->onReplayBelowLowWatermark();
-    }
-  }
+  void onAboveWriteBufferHighWatermark() override { onAboveReplayWatermark(); }
+  void onBelowWriteBufferLowWatermark() override { onBelowReplayWatermark(); }
 
 private:
+  // FilterChainBridge
+  void pauseSource() override { encoder_callbacks_.onEncoderFilterAboveWriteBufferHighWatermark(); }
+  void resumeSource() override { encoder_callbacks_.onEncoderFilterBelowWriteBufferLowWatermark(); }
+  void unsubscribeReplayWatermarks() override {
+    decoder_callbacks_.removeDownstreamWatermarkCallbacks(*this);
+  }
+
   Http::StreamEncoderFilterCallbacks& encoder_callbacks_;
   Http::StreamDecoderFilterCallbacks& decoder_callbacks_;
-  ReplayWatermarkHandler* handler_{nullptr};
-  // Whether *this is currently registered as a DownstreamWatermarkCallbacks.
-  bool registered_{false};
+  AiProtocolManagerStats& stats_;
 };
 
 } // namespace AiProtocolManager

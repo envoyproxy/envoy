@@ -197,6 +197,12 @@ const (
 	AttributeIDXdsFilterChainName
 	// health_check
 	AttributeIDHealthCheck
+	// upstream.server_name
+	AttributeIDUpstreamRequestedServerName
+	// xds.virtual_cluster_name
+	AttributeIDXdsVirtualClusterName
+	// upstream.protocol
+	AttributeIDUpstreamProtocol
 )
 
 // LogLevel is the log level for messages logged via the host environment's logging mechanism.
@@ -310,6 +316,20 @@ type ClusterHostCounts struct {
 	Degraded uint64
 }
 
+// TimingInfo is a snapshot of stream timing information. StartTimeUnixNs is a Unix timestamp in
+// nanoseconds. All other fields are durations from the monotonic request start time. Unavailable
+// values are -1.
+type TimingInfo struct {
+	StartTimeUnixNs               int64
+	RequestCompleteDurationNs     int64
+	FirstUpstreamTxByteSentNs     int64
+	LastUpstreamTxByteSentNs      int64
+	FirstUpstreamRxByteReceivedNs int64
+	LastUpstreamRxByteReceivedNs  int64
+	FirstDownstreamTxByteSentNs   int64
+	LastDownstreamTxByteSentNs    int64
+}
+
 // MetricID is an opaque identifier for a metric defined via Define{Counter,Gauge,Histogram}.
 type MetricID uint64
 
@@ -322,6 +342,11 @@ const (
 	MetricsInvalidTags
 	MetricsFrozen
 )
+
+// GenericSecretID is an opaque identifier for a generic secret subscribed to via
+// HttpFilterConfigHandle.SubscribeGenericSecret. The zero value is never valid and is what
+// SubscribeGenericSecret returns when the subscription could not be created.
+type GenericSecretID uint64
 
 // HttpHeaderType identifies which HTTP header map to access. It corresponds to
 // envoy_dynamic_module_type_http_header_type. The values match the ABI's enum order:
