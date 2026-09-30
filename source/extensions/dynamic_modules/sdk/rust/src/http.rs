@@ -4374,18 +4374,14 @@ impl EnvoyHttpFilterImpl {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_headers_size(self.raw_ptr, header_type)
-    };
-    crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_http_get_headers_v2(
-        self.raw_ptr,
-        header_type,
-        ptr,
-        capacity,
-        size_out,
-      )
-    })
+    crate::utility::collect_headers(
+      || unsafe {
+        abi::envoy_dynamic_module_callback_http_get_headers_size(self.raw_ptr, header_type)
+      },
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_http_get_headers(self.raw_ptr, header_type, headers)
+      },
+    )
   }
 
   /// This implements the common logic for getting the header/trailer values.

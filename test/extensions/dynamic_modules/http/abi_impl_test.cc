@@ -443,9 +443,8 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaders) {
 
   // Test with nullptr accessors.
   envoy_dynamic_module_type_envoy_http_header result_headers[3];
-  size_t size_out = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_headers_v2(filter_.get(), header_type,
-                                                                 result_headers, 3, &size_out));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type, result_headers));
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
@@ -461,9 +460,8 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaders) {
   EXPECT_CALL(encoder_callbacks_, responseTrailers())
       .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
 
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_headers_v2(filter_.get(), header_type,
-                                                                result_headers, 3, &size_out));
-  EXPECT_EQ(size_out, 3);
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type, result_headers));
 
   EXPECT_EQ(result_headers[0].key_length, 6);
   EXPECT_EQ(std::string(result_headers[0].key_ptr, result_headers[0].key_length), "single");
@@ -5220,39 +5218,6 @@ TEST_F(DynamicModuleHttpFilterSchedulerTest,
   captured_cb();
 
   envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
-}
-
-// The deprecated get_headers callback keeps its released signature and behavior.
-TEST_P(DynamicModuleHttpFilterHeaderTest, DeprecatedGetHeaders) {
-  envoy_dynamic_module_type_http_header_type header_type = GetParam();
-
-  // Test with nullptr accessors.
-  envoy_dynamic_module_type_envoy_http_header result_headers[2];
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type, result_headers));
-
-  std::initializer_list<std::pair<std::string, std::string>> headers = {{"single", "value"},
-                                                                        {"other", "value1"}};
-  Http::TestRequestHeaderMapImpl request_headers{headers};
-  EXPECT_CALL(decoder_callbacks_, requestHeaders())
-      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
-  Http::TestRequestTrailerMapImpl request_trailers{headers};
-  EXPECT_CALL(decoder_callbacks_, requestTrailers())
-      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
-  Http::TestResponseHeaderMapImpl response_headers{headers};
-  EXPECT_CALL(encoder_callbacks_, responseHeaders())
-      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
-  Http::TestResponseTrailerMapImpl response_trailers{headers};
-  EXPECT_CALL(encoder_callbacks_, responseTrailers())
-      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
-
-  EXPECT_TRUE(
-      envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type, result_headers));
-
-  EXPECT_EQ(std::string(result_headers[0].key_ptr, result_headers[0].key_length), "single");
-  EXPECT_EQ(std::string(result_headers[0].value_ptr, result_headers[0].value_length), "value");
-  EXPECT_EQ(std::string(result_headers[1].key_ptr, result_headers[1].key_length), "other");
-  EXPECT_EQ(std::string(result_headers[1].value_ptr, result_headers[1].value_length), "value1");
 }
 
 } // namespace HttpFilters

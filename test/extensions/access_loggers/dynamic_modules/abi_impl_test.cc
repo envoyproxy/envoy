@@ -99,10 +99,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaders) {
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   std::vector<envoy_dynamic_module_type_envoy_http_header> headers(2);
-  size_t size_out = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers_v2(
-      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers.data(),
-      headers.size(), &size_out));
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers(
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers.data()));
 
   // Order isn't guaranteed by map iteration, but for small maps typically consistent.
   // We just verify the contents exist.
@@ -120,9 +118,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeadersNull) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
-  size_t size_out = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers_v2(
-      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr, 0, &size_out));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers(
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueFound) {
@@ -3323,33 +3320,6 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeHttpIntsWithoutProtocol) {
     EXPECT_FALSE(
         envoy_dynamic_module_callback_access_logger_get_attribute_int(env_ptr, id, &result));
   }
-}
-
-// The deprecated get_headers callback keeps its released signature and behavior.
-TEST_F(DynamicModuleAccessLogAbiTest, DeprecatedGetHeaders) {
-  Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  std::vector<envoy_dynamic_module_type_envoy_http_header> headers(2);
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers(
-      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers.data()));
-
-  std::vector<std::pair<std::string, std::string>> result;
-  result.reserve(headers.size());
-  for (const auto& h : headers) {
-    result.push_back(
-        {std::string(h.key_ptr, h.key_length), std::string(h.value_ptr, h.value_length)});
-  }
-  EXPECT_THAT(result, testing::UnorderedElementsAre(testing::Pair("x-request-id", "req-123"),
-                                                    testing::Pair(":authority", "example.com")));
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, DeprecatedGetHeadersNull) {
-  Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers(
-      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr));
 }
 
 } // namespace
