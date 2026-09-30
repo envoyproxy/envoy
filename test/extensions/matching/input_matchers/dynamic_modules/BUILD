@@ -15,6 +15,7 @@ envoy_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:matcher_check_headers",
         "//test/extensions/dynamic_modules/test_data/c:matcher_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:matcher_error",
         "//test/extensions/dynamic_modules/test_data/c:matcher_lifecycle_counter",
         "//test/extensions/dynamic_modules/test_data/c:matcher_missing_config_destroy",
         "//test/extensions/dynamic_modules/test_data/c:matcher_missing_config_new",
@@ -36,6 +37,7 @@ envoy_cc_dyn_module_test(
     srcs = ["matcher_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:matcher_check_headers",
+        "//test/extensions/dynamic_modules/test_data/c:matcher_error",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op",
     ],
     deps = [

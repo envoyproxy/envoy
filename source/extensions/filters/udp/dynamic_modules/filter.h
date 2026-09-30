@@ -45,7 +45,7 @@ private:
   const DynamicModuleUdpListenerFilterConfigSharedPtr config_;
   envoy_dynamic_module_type_udp_listener_filter_module_ptr in_module_filter_{nullptr};
   Network::UdpRecvData* current_data_{nullptr};
-  uint32_t worker_index_;
+  uint32_t worker_index_ = 0;
 };
 
 using DynamicModuleUdpListenerFilterSharedPtr = std::shared_ptr<DynamicModuleUdpListenerFilter>;

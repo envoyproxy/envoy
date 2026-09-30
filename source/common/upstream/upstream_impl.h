@@ -994,7 +994,7 @@ public:
       return std::nullopt;
     }
 
-    return std::ref(*(optional_cluster_stats_->request_response_size_stats_));
+    return *optional_cluster_stats_->request_response_size_stats_;
   }
 
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
@@ -1005,7 +1005,7 @@ public:
       return std::nullopt;
     }
 
-    return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
+    return *optional_cluster_stats_->timeout_budget_stats_;
   }
 
   bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }

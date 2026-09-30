@@ -1797,7 +1797,11 @@ FilterConfig::FilterConfig(
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
-      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))),
+      // The metrics that the Go plugin defines itself are named by the plugin alone and are not
+      // related to the stat prefix of this filter, so they live in a scope of their own that is
+      // created from the server's scope rather than from the scope of this context.
+      metric_store_(
+          std::make_shared<MetricStore>(context.serverFactoryContext().scope().createScope(""))),
       secret_reader_(std::make_shared<SecretReader>(proto_config, context)) {};
 
 absl::Status FilterConfig::newGoPluginConfig() {
@@ -2061,7 +2065,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return server_context.secretManager().findOrCreateGenericSecretProvider(
-        config.sds_config(), config.name(), server_context, init_manager);
+        config.sds_config(), config.name(), server_context, init_manager, true);
   } else {
     return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
@@ -2076,6 +2080,7 @@ SecretReader::SecretReader(
     auto& init_manager = context.initManager();
     auto& tls = server_context.threadLocal();
     auto& api = server_context.api();
+    auto& main_dispatcher = server_context.mainThreadDispatcher();
     for (auto& secret : proto_config.generic_secrets()) {
       // Check here to avoid creating unecessary sds provider
       if (secrets_.contains(secret.name())) {
@@ -2085,9 +2090,9 @@ SecretReader::SecretReader(
       if (secret_provider == nullptr) {
         throw EnvoyException(absl::StrCat("no secret provider found for ", secret.name()));
       }
-      auto tlsp = THROW_OR_RETURN_VALUE(
-          Secret::ThreadLocalGenericSecretProvider::create(std::move(secret_provider), tls, api),
-          std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>);
+      auto tlsp = THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                            std::move(secret_provider), tls, api, main_dispatcher),
+                                        Secret::ThreadLocalGenericSecretProviderPtr);
       secrets_.emplace(secret.name(), std::move(tlsp));
     }
   }

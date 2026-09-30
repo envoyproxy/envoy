@@ -6,7 +6,6 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
@@ -15,12 +14,11 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/bridge_status.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/sse_response_extractor.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/hash/hash.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp" // IWYU pragma: keep
@@ -60,9 +58,13 @@ public:
   getToolsListHttpRule(absl::string_view host, absl::string_view path) const;
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
+  const std::string& maxSupportedProtocolVersion() const { return max_supported_protocol_version_; }
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
+
+  uint64_t serverDiscoveryCacheTtlMs() const { return server_discovery_cache_ttl_ms_; }
+  absl::string_view serverDiscoveryCacheScope() const { return server_discovery_cache_scope_; }
 
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::RequestStorageMode
   requestStorageMode() const {
@@ -121,8 +123,12 @@ private:
   absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   std::string fallback_protocol_version_;
+  std::string max_supported_protocol_version_;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
+  uint64_t server_discovery_cache_ttl_ms_;
+
+  absl::string_view server_discovery_cache_scope_;
   bool clear_route_cache_;
 };
 
@@ -186,7 +192,7 @@ class McpJsonRestBridgeFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
   explicit McpJsonRestBridgeFilter(McpJsonRestBridgeFilterConfigSharedPtr config)
-      : config_(config) {}
+      : sse_response_extractor_(config->maxResponseBodySize()), config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -201,6 +207,17 @@ private:
   // Handles "method" field in the MCP request.
   void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
                        const McpJsonRestBridgePerRouteConfig* per_route_config);
+
+  // Validates that the "Mcp-Method" request header is present and matches the JSON-RPC "method"
+  // field. Returns true when the header is valid. Otherwise sends a local error response and
+  // returns false.
+  bool validateMcpMethodHeader(const nlohmann::json& json_rpc, absl::string_view method,
+                               Http::RequestHeaderMapOptRef request_headers);
+
+  // Validates that the "Mcp-Name" request header is present and matches the JSON-RPC
+  // "params.name" field for a tools/call request.
+  bool validateMcpNameHeader(const nlohmann::json& json_rpc, absl::string_view method,
+                             Http::RequestHeaderMapOptRef request_headers);
 
   // Serves a local tools/list response using tools' ToolsListSpecificConfig.
   void serveToolsListLocal(
@@ -217,15 +234,17 @@ private:
 
   // Handles decoding errors: sets dynamic metadata and sends a local reply.
   // IMPORTANT PROTOCOL RULE:
-  // 1. For JSON-RPC application/protocol errors (-32600, -32601, -32602), MUST use Http::Code::OK
-  //    (200). Many MCP SDK clients inspect HTTP status before JSON-RPC decoding and will fail with
-  //    a transport exception on non-200 responses, discarding the structured JSON-RPC error
-  //    code/message.
+  // 1. For JSON-RPC application/protocol errors in the request payload (-32600, -32601, -32602),
+  //    MUST use Http::Code::OK (200). Many MCP SDK clients inspect HTTP status before JSON-RPC
+  //    decoding and will fail with a transport exception on non-200 responses, discarding the
+  //    structured JSON-RPC error code/message.
   // 2. Only use non-200 HTTP codes (400, 401, 403, 405, 413) in the following cases:
   //    - Transport-level or framing syntax failures (generated locally by this filter):
   //      * 405 Method Not Allowed (non-POST request)
   //      * 413 Payload Too Large (exceeding maxRequestBodySize)
   //      * 400 Bad Request for malformed JSON syntax (-32700 parse error)
+  //      * 400 Bad Request when an MCP standard request header fails validation (-32020 header
+  //        mismatch), which is an HTTP-level error rather than a JSON-RPC payload error
   //    - Authorization errors preserved from upstream (401 Unauthorized, 403 Forbidden):
   //      * 401 and 403 from upstream are preserved as non-200 HTTP responses as required by the MCP
   //        authorization spec:
@@ -256,6 +275,15 @@ private:
   // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
   void buildStreamingPrefixAndSuffix(bool is_error);
 
+  // Encodes incoming data chunks for streaming MCP tool calls.
+  Http::FilterDataStatus encodeStreamingData(Buffer::Instance& data, bool end_stream);
+
+  // Processes an SSE response chunk and returns the serialized JSON event payloads.
+  absl::StatusOr<std::string> processSseResponse(absl::string_view chunk, bool end_stream);
+
+  // Prepares the escaped/formatted payload string for streaming.
+  absl::StatusOr<std::string> prepareStreamingPayload(absl::string_view chunk, bool end_stream);
+
   enum class McpOperation {
     Unspecified = 0,
     // Received a configured MCP URL path but has not parsed the request body yet.
@@ -272,9 +300,12 @@ private:
     ToolsCall = 6,
     // MCP operation failed.
     OperationFailed = 7,
+    // Clients send a server/discover request that is handled locally.
+    ServerDiscover = 8,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   std::optional<nlohmann::json> session_id_;
+  bool is_stateless_request_{false};
   std::string server_name_;
   std::string path_;
   Buffer::OwnedImpl request_body_;
@@ -297,6 +328,11 @@ private:
   Protobuf::Struct mcp_params_;
   bool has_params_ = false;
   std::optional<uint64_t> backend_response_code_;
+
+  // Whether the response is SSE.
+  bool is_sse_response_ = false;
+  bool is_first_sse_event_ = true;
+  SseResponseExtractor sse_response_extractor_;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
 };

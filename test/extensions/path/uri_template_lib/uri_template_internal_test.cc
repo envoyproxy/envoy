@@ -54,15 +54,6 @@ TEST(InternalParsing, ParsedPathDebugString) {
   EXPECT_EQ(patt2.debugString(), "/{var}");
 }
 
-TEST(InternalParsing, IsValidLiteralAsteriskDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "false"}});
-
-  EXPECT_FALSE(isValidLiteral("ab*c"));
-  EXPECT_FALSE(isValidLiteral("a**c"));
-}
-
 TEST(InternalParsing, IsValidLiteralWorks) {
   EXPECT_TRUE(isValidLiteral("123abcABC"));
   EXPECT_TRUE(isValidLiteral("._~-"));
@@ -77,14 +68,6 @@ TEST(InternalParsing, IsValidLiteralWorks) {
   EXPECT_FALSE(isValidLiteral("{abc"));
   EXPECT_FALSE(isValidLiteral("abc}"));
   EXPECT_FALSE(isValidLiteral("{abc}"));
-}
-
-TEST(InternalParsing, IsValidRewriteAsteriskDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "false"}});
-
-  EXPECT_FALSE(isValidRewriteLiteral("a*c"));
 }
 
 TEST(InternalParsing, IsValidRewriteLiteralWorks) {
@@ -344,15 +327,6 @@ TEST(InternalRegexGen, RegexLikePatternIsMatchedLiterally) {
 TEST(InternalRegexGen, DollarSignMatchesItself) {
   EXPECT_TRUE(RE2::FullMatch("abc$", toRegexPattern("abc$")));
   EXPECT_FALSE(RE2::FullMatch("abc", toRegexPattern("abc$")));
-}
-
-TEST(InternalRegexGen, OperatorRegexPatternAsteriskDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "false"}});
-
-  EXPECT_EQ(toRegexPattern(Operator::PathGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@=]+");
-  EXPECT_EQ(toRegexPattern(Operator::TextGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@=/]*");
 }
 
 TEST(InternalRegexGen, OperatorRegexPattern) {
@@ -618,10 +592,6 @@ TEST(InternalMixedVariableLiteralParsing, MixedVariableDebugString) {
 }
 
 TEST(InternalMixedVariableLiteralParsing, MixedVariableRegexPattern) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "true"}});
-
   Variable var = Variable("version", {}, "api", ".json");
   std::string regex = toRegexPattern(var);
   EXPECT_EQ(regex, "api(?P<version>[a-zA-Z0-9-._~%!$&'()+,;:@=*]+)\\.json");
@@ -657,8 +627,7 @@ TEST(InternalMixedVariableLiteralParsing, PathPatternWithMixedVariables) {
 TEST(InternalMixedVariableLiteralParsing, PathPatternWithMixedVariablesDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "true"},
-       {"envoy.reloadable_features.uri_template_mixed_variable_literals", "false"}});
+      {{"envoy.reloadable_features.uri_template_mixed_variable_literals", "false"}});
 
   // When the feature flag is disabled, mixed variables should not be supported and parsing should
   // fail

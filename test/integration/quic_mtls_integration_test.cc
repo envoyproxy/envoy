@@ -1,3 +1,5 @@
+#include <functional>
+
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
@@ -7,6 +9,7 @@
 
 #include "test/integration/quic_http_integration_test.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -26,7 +29,9 @@ public:
   void setupServerWithClientCertValidation(const std::string& client_ca_cert = "cacert.pem",
                                            const std::string& server_cert = "servercert.pem",
                                            const std::string& server_key = "serverkey.pem",
-                                           bool require_client_cert = true) {
+                                           bool require_client_cert = true,
+                                           bool accept_untrusted = false,
+                                           bool enable_resumption = false) {
     config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket = bootstrap.mutable_static_resources()
                                    ->mutable_listeners(0)
@@ -38,6 +43,10 @@ public:
           MessageUtil::unpackTo(*transport_socket->mutable_typed_config(), quic_config);
       ASSERT_TRUE(unpack_result.ok());
 
+      // Early data requires resumption, so keep the two consistent.
+      quic_config.mutable_enable_early_data()->set_value(enable_resumption);
+      quic_config.mutable_enable_resumption()->set_value(enable_resumption);
+
       auto* tls_context = quic_config.mutable_downstream_tls_context();
       tls_context->mutable_require_client_certificate()->set_value(require_client_cert);
 
@@ -47,12 +56,18 @@ public:
       server_cert_config->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/" + server_key));
 
-      if (require_client_cert) {
-        tls_context->mutable_common_tls_context()
-            ->mutable_validation_context()
-            ->mutable_trusted_ca()
-            ->set_filename(
-                TestEnvironment::runfilesPath("test/config/integration/certs/" + client_ca_cert));
+      // Add a validation context whenever a CA is provided, independent of `require_client_cert`,
+      // so a listener without the requirement exercises optional mTLS.
+      if (!client_ca_cert.empty()) {
+        auto* validation_context =
+            tls_context->mutable_common_tls_context()->mutable_validation_context();
+        validation_context->mutable_trusted_ca()->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/" + client_ca_cert));
+        if (accept_untrusted) {
+          validation_context->set_trust_chain_verification(
+              envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+                  ACCEPT_UNTRUSTED);
+        }
       }
 
       ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(quic_config));
@@ -117,6 +132,60 @@ public:
     const std::string failure_reason(codec_client_->connection()->transportFailureReason());
     EXPECT_FALSE(failure_reason.empty());
     EXPECT_THAT(failure_reason, testing::HasSubstr(expected_error_contains));
+  }
+
+  // Opens a new connection and sends a request, asserting a 200 response.
+  void sendRequestAndExpectSuccess() {
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+
+  void expectResumption(bool expected) {
+    EXPECT_EQ(expected,
+              static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->IsResumption());
+  }
+
+  // Completes a full mTLS handshake, then verifies that a second connection resumes the cached
+  // session while the configuration is unchanged.
+  void establishAndResumeMtlsSession() {
+    sendRequestAndExpectSuccess();
+    expectResumption(false);
+    codec_client_->close();
+
+    sendRequestAndExpectSuccess();
+    expectResumption(true);
+    codec_client_->close();
+  }
+
+  // Applies an in-place LDS update that mutates the downstream client certificate validation
+  // context, then waits for the previous filter chain to drain.
+  void updateDownstreamValidationContext(
+      std::function<
+          void(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>
+          mutate) {
+    ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+    new_config_helper.addConfigModifier(
+        [mutate](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* transport_socket = bootstrap.mutable_static_resources()
+                                       ->mutable_listeners(0)
+                                       ->mutable_filter_chains(0)
+                                       ->mutable_transport_socket();
+          envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+          ASSERT_TRUE(
+              MessageUtil::unpackTo(*transport_socket->mutable_typed_config(), quic_config).ok());
+          mutate(*quic_config.mutable_downstream_tls_context()
+                      ->mutable_common_tls_context()
+                      ->mutable_validation_context());
+          ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(quic_config));
+        });
+    new_config_helper.setLds("1");
+    test_server_->waitForCounter("listener_manager.listener_in_place_updated", testing::Ge(1));
+    test_server_->waitForGauge("listener_manager.total_filter_chains_draining", testing::Ge(1));
+    test_server_->waitForGauge("listener_manager.total_filter_chains_draining", testing::Eq(0));
   }
 };
 
@@ -220,6 +289,85 @@ TEST_P(QuicMtlsIntegrationTest, ServerWithoutClientCertRequirement) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   verifyClientSideServerCertInfo();
+  codec_client_->close();
+}
+
+// Optional mTLS validates and forwards a client certificate that the client presents, and the
+// server marks the peer certificate validated.
+TEST_P(QuicMtlsIntegrationTest, OptionalClientCertPresentedIsValidated) {
+  useAccessLog("%CEL(connection.mtls)% %CEL(connection.peer_certificate_valid)%");
+  setupServerWithClientCertValidation("cacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/false);
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  verifyServerSideClientCertInfo("Test Frontend Team");
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("true true"));
+
+  codec_client_->close();
+}
+
+// Optional mTLS accepts a client that presents no certificate. No XFCC header is emitted and the
+// server does not mark the peer certificate validated.
+TEST_P(QuicMtlsIntegrationTest, OptionalClientCertAbsentAccepted) {
+  useAccessLog("%CEL(connection.mtls)% %CEL(connection.peer_certificate_valid)%");
+  setupServerWithClientCertValidation("cacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/false);
+  ssl_client_option_.no_cert_ = true;
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  auto xfcc_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("x-forwarded-client-cert"));
+  EXPECT_TRUE(xfcc_headers.empty());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("false false"));
+
+  codec_client_->close();
+}
+
+// Optional mTLS rejects a client that presents a certificate that does not chain to the trust
+// anchor. Only the absence of a certificate is tolerated.
+TEST_P(QuicMtlsIntegrationTest, OptionalClientCertUntrustedRejected) {
+  setupServerWithClientCertValidation("upstreamcacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/false);
+  initialize();
+  expectConnectionFailure("");
+}
+
+// A required client certificate that does not chain to the trust anchor is accepted when
+// `trust_chain_verification` is `ACCEPT_UNTRUSTED`. The access log shows the certificate was
+// presented but not marked valid.
+TEST_P(QuicMtlsIntegrationTest, RequiredClientCertAcceptUntrusted) {
+  useAccessLog("%CEL(connection.mtls)% %CEL(connection.peer_certificate_valid)%");
+  setupServerWithClientCertValidation("upstreamcacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/true, /*accept_untrusted=*/true);
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("true false"));
+
   codec_client_->close();
 }
 
@@ -448,6 +596,59 @@ TEST_P(QuicMtlsIntegrationTest, PeerCertificateSanMatcherCoverage) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
+  codec_client_->close();
+}
+
+// A session established under one certificate validation configuration cannot be resumed under a
+// different one. Resumption succeeds while the configuration is unchanged, but once the trust
+// anchor changes the cached session is refused and a full handshake re-validates the client
+// certificate. Without this scoping a resumed connection would silently reuse the previous
+// validation verdict.
+TEST_P(QuicMtlsIntegrationTest, MtlsResumptionScopedToValidationConfig) {
+  concurrency_ = 1;
+  setupServerWithClientCertValidation("cacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/true, /*accept_untrusted=*/false,
+                                      /*enable_resumption=*/true);
+  initialize();
+
+  establishAndResumeMtlsSession();
+
+  // Change the trust anchor to one that does not sign the client certificate.
+  updateDownstreamValidationContext(
+      [](envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& ctx) {
+        ctx.mutable_trusted_ca()->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      });
+
+  // The cached session was scoped to the previous trust anchor, so resumption is refused, and the
+  // full handshake re-validates the client certificate against the new trust anchor and rejects it.
+  EXPECT_LOG_CONTAINS("debug", "QUIC client certificate validation rejected",
+                      { expectConnectionFailure(""); });
+}
+
+// A configuration change that keeps the client certificate valid still refuses a cached session,
+// but the full handshake succeeds because the certificate validates against the unchanged trust
+// anchor.
+TEST_P(QuicMtlsIntegrationTest, MtlsResumptionRefusedButRequestSucceedsWhenCertRemainsValid) {
+  concurrency_ = 1;
+  setupServerWithClientCertValidation("cacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/true, /*accept_untrusted=*/false,
+                                      /*enable_resumption=*/true);
+  initialize();
+
+  establishAndResumeMtlsSession();
+
+  // Allow expired certificates. This keeps the client certificate valid but changes the session id
+  // context, so the cached session no longer matches.
+  updateDownstreamValidationContext(
+      [](envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& ctx) {
+        ctx.set_allow_expired_certificate(true);
+      });
+
+  // Resumption is refused because the session id context changed, but the full handshake validates
+  // the client certificate against the unchanged trust anchor, so the request succeeds.
+  sendRequestAndExpectSuccess();
+  expectResumption(false);
   codec_client_->close();
 }
 

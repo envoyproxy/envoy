@@ -146,7 +146,7 @@ public:
 
   MOCK_METHOD(bool, canUpdateTokenByRefreshToken, (), (const));
   MOCK_METHOD(bool, isValid, (), (const));
-  MOCK_METHOD(void, setParams, (const Http::RequestHeaderMap& headers, const std::string& secret));
+  MOCK_METHOD(void, setParams, (const Http::RequestHeaderMap& headers, absl::string_view secret));
 };
 
 class MockOAuth2Client : public OAuth2Client {
@@ -611,17 +611,17 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
       }));
 
   auto client_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, "client", secret_context.server_context_, init_manager);
+      config_source, "client", secret_context.server_context_, init_manager, true);
   auto client_callback =
       secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
   auto token_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, "token", secret_context.server_context_, init_manager);
+      config_source, "token", secret_context.server_context_, init_manager, true);
   auto token_callback =
       secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
 
   NiceMock<ThreadLocal::MockInstance> tls;
   SDSSecretReader secret_reader(std::move(client_secret_provider), std::move(token_secret_provider),
-                                tls, *api);
+                                tls, *api, dispatcher);
   EXPECT_TRUE(secret_reader.clientSecret().empty());
   EXPECT_TRUE(secret_reader.hmacSecret().empty());
 
@@ -878,20 +878,48 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
 }
 
 TEST_F(OAuth2Test, OnDestroyCancelsOAuthClient) {
+  // The OAuth client is created lazily, so drive a request that actually reaches the token
+  // endpoint before checking that onDestroy() cancels it.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(*oauth_client_, cancel());
+  filter_->onDestroy();
+}
+
+// The OAuth client is only created when the filter actually needs to talk to the token endpoint;
+// a request that is served straight from a valid cookie must not create one.
+TEST_F(OAuth2Test, OAuthClientNotCreatedWhenNotNeeded) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Cookie.get(), "OauthHMAC=some_oauth_hmac_value"},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=some_oauth_expires_value"},
-      {Http::Headers::get().Cookie.get(), "RefreshToken=some_refresh_token_value"},
-      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=some_oauth_nonce_value"},
-      {Http::Headers::get().Cookie.get(),
-       "CodeVerifier.00000000075bcd15=some_code_verifier_value"}};
+  };
+
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
-  EXPECT_CALL(*oauth_client_, cancel());
+  // No client was created, so there is nothing to cancel on teardown.
+  EXPECT_CALL(*oauth_client_, cancel()).Times(0);
   filter_->onDestroy();
 }
 
@@ -2300,7 +2328,8 @@ TEST_F(OAuth2Test, SdsSecretReaderMultiEntrySecretProvidesKeyAndKeyId) {
   SDSSecretReader reader(std::make_shared<Secret::GenericSecretConfigProviderImpl>(client_secret),
                          std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
                          factory_context_.server_factory_context_.threadLocal(),
-                         factory_context_.server_factory_context_.api());
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
 
   // The PEM is reachable only as the signing key — never as an OAuth client secret, which the
   // non-JWT auth types would send to the token endpoint.
@@ -2320,7 +2349,8 @@ TEST_F(OAuth2Test, SdsSecretReaderSingleValueSecretHasNoKeyId) {
   SDSSecretReader reader(std::make_shared<Secret::GenericSecretConfigProviderImpl>(client_secret),
                          std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
                          factory_context_.server_factory_context_.threadLocal(),
-                         factory_context_.server_factory_context_.api());
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
 
   EXPECT_EQ("pem-data", reader.clientSecret());
   EXPECT_EQ("pem-data", reader.privateKey());
@@ -2334,7 +2364,8 @@ TEST_F(OAuth2Test, SdsSecretReaderMissingClientSecretProviderYieldsEmptyValues) 
   SDSSecretReader reader(nullptr,
                          std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
                          factory_context_.server_factory_context_.threadLocal(),
-                         factory_context_.server_factory_context_.api());
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
 
   EXPECT_EQ("", reader.clientSecret());
   EXPECT_EQ("", reader.privateKey());

@@ -15,12 +15,14 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/resource_name.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/watcher_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_config_impl.h"
+#include "source/common/stats/prefix_utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -132,6 +134,25 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
       config_(std::make_shared<ScopedConfigImpl>(scopes_)),
       rds_config_source_(std::move(rds_config_source)) {}
 
+namespace {
+
+// Creates the '<stat_prefix>scoped_rds.<scoped route config name>.' scope of a subscription, with
+// the scoped route config name carried by an explicit 'envoy.scoped_rds_config' tag rather than
+// being recovered from the stat name by a tag extractor.
+//
+// `stat_prefix` is the parent prefix alone, for example 'http.<stat_prefix>.', so that
+// mergeStatPrefix() can extract its tag.
+Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view stat_prefix,
+                                       absl::string_view name) {
+  const Stats::TaggedStatName prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, "scoped_rds.",
+                             {{Envoy::Config::TagNames::get().SCOPED_RDS_CONFIG, name}},
+                             absl::StrCat("scoped_rds.", name, "."));
+  return scope.scopeFromTaggedName(prefix.baseName(), prefix.tags(), prefix.name());
+}
+
+} // namespace
+
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
     const uint64_t manager_identifier, const std::string& name,
@@ -142,7 +163,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
       factory_context_(factory_context), name_(name),
-      scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
+      scope_(createStatsScope(factory_context.scope(), stat_prefix, name)),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name"),

@@ -9,7 +9,7 @@
 .envoy-content-main .rst-content .wy-table-responsive table {
   border: 0;
   border-collapse: collapse;
-  font-size: 14.5px;
+  font-size: 0.9rem;
   width: 100%;
 }
 
@@ -35,7 +35,7 @@ html.writer-html4 .envoy-content-main .rst-content table.docutils th,
   border-bottom: 1px solid var(--envoy-rule-strong);
   color: var(--envoy-ink-muted);
   font-family: var(--envoy-font-mono);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 500;
   letter-spacing: 0.13em;
   text-align: left;

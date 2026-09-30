@@ -28,9 +28,10 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
 
   auto& factory = static_cast<const QuicServerTransportSocketFactory&>(*transport_socket_factory);
   // The Envoy handshaker validates the downstream client certificate against the matched filter
-  // chain's context, so it must also be used when the chain requires a client certificate.
-  const bool client_cert_required = factory.requiresClientCertificate();
-  if (!ticket_support && !keylog_support && !client_cert_required) {
+  // chain's context, so it is used whenever the chain requires or validates a client certificate.
+  const bool validates_client_cert =
+      factory.requiresClientCertificate() || factory.clientCertificateValidationConfigured();
+  if (!ticket_support && !keylog_support && !validates_client_cert) {
     return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
   }
 

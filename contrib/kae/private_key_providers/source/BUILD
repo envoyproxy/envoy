@@ -16,8 +16,7 @@ envoy_cc_library(
         "libuadk_impl.h",
     ],
     external_deps = ["ssl"],
-    repository = "@envoy",
-    deps = ["//bazel/deps:uadk"],
+    deps = ["@uadk"],
 )
 
 envoy_cc_library(

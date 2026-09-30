@@ -25,12 +25,14 @@ envoy_cc_library(
     deps = [
         ":bridge_status_lib",
         ":http_request_builder_lib",
+        ":sse_response_extractor_lib",
         ":trace_context_lib",
         "//envoy/common:optref_lib",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
@@ -61,6 +63,7 @@ envoy_cc_library(
         ":bridge_status_lib",
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
@@ -74,5 +77,17 @@ envoy_cc_library(
     deps = [
         "//source/common/tracing:tracing_validation_lib",
         "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
+    name = "sse_response_extractor_lib",
+    srcs = ["sse_response_extractor.cc"],
+    hdrs = ["sse_response_extractor.h"],
+    deps = [
+        "//source/common/http/sse:sse_parser_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
     ],
 )

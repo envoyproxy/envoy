@@ -1,4 +1,9 @@
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test_library", "envoy_package")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
+    "envoy_cc_test_library",
+    "envoy_package",
+)
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
@@ -8,6 +13,16 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_benchmark_binary(
+    name = "cache_headers_utils_benchmark",
+    srcs = ["cache_headers_utils_benchmark.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
+    ],
+)
 
 envoy_cc_test_library(
     name = "mocks",
@@ -87,6 +102,8 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         ":mocks",
+        "//envoy/http:codes_interface",
+        "//source/common/http:headers_lib",
         "//source/extensions/filters/http/cache_v2:upstream_request_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
@@ -162,7 +179,6 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.cache_v2"],
     rbe_pool = "linux_x64_small",
-    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/cache_v2:config",
         "//source/extensions/filters/http/cache_v2:http_cache_lib",

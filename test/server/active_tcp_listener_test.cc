@@ -14,6 +14,7 @@
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
 
@@ -153,6 +154,108 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithoutInspectData) {
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
   tcp_socket->continueFilterChain(true);
+}
+
+// A listener filter that calls continueFilterChain synchronously from inside its own onAccept hook
+// must not re-enter and destroy itself. The re-entrant continue is deferred and applied after the
+// hook returns, so the chain completes once and the filter is destroyed only afterwards.
+TEST_F(ActiveTcpListenerTest, ListenerFilterReentrantContinueSuccessFromOnAccept) {
+  initializeWithFilter();
+
+  EXPECT_CALL(*filter_, onAccept(_))
+      .WillOnce(Invoke([](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.continueFilterChain(true);
+        return Network::FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
+
+  EXPECT_LOG_CONTAINS("debug", "deferring re-entrant listener filter continueFilterChain call", {
+    generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true, {});
+  });
+}
+
+// A re-entrant continueFilterChain with success false from onAccept stops the chain without
+// creating a connection, and still tears down safely after the hook returns.
+TEST_F(ActiveTcpListenerTest, ListenerFilterReentrantContinueFailureFromOnAccept) {
+  initializeWithFilter();
+
+  EXPECT_CALL(*filter_, onAccept(_))
+      .WillOnce(Invoke([](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.continueFilterChain(false);
+        return Network::FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).Times(0);
+
+  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true, {});
+}
+
+// A listener filter that calls continueFilterChain synchronously from inside its own onData hook is
+// deferred the same way, so it is not re-entered while the data callback is on the stack.
+TEST_F(ActiveTcpListenerTest, ListenerFilterReentrantContinueFromOnData) {
+  initializeWithInspectFilter();
+
+  Network::ListenerFilterCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(*filter_, onAccept(_))
+      .WillOnce(
+          Invoke([&captured_cb](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+            captured_cb = &cb;
+            return Network::FilterStatus::StopIteration;
+          }));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  Event::FileReadyCb file_event_callback;
+  EXPECT_CALL(io_handle_,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .WillOnce(SaveArg<1>(&file_event_callback));
+  EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
+  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true, {});
+
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(inspect_size_, Api::IoError::none()))));
+  EXPECT_CALL(*filter_, onData(_))
+      .WillOnce(Invoke([&captured_cb](Network::ListenerFilterBuffer&) -> Network::FilterStatus {
+        captured_cb->continueFilterChain(true);
+        return Network::FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(io_handle_, resetFileEvents());
+  EXPECT_LOG_CONTAINS("debug", "deferring re-entrant listener filter continueFilterChain call",
+                      { EXPECT_OK(file_event_callback(Event::FileReadyType::Read)); });
+}
+
+// A re-entrant continue from onClose is deferred and then dropped, because the socket is already
+// closing when the close hook runs.
+TEST_F(ActiveTcpListenerTest, ListenerFilterReentrantContinueFromOnClose) {
+  initializeWithInspectFilter();
+
+  Network::ListenerFilterCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(*filter_, onAccept(_))
+      .WillOnce(
+          Invoke([&captured_cb](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+            captured_cb = &cb;
+            return Network::FilterStatus::StopIteration;
+          }));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  Event::FileReadyCb file_event_callback;
+  EXPECT_CALL(io_handle_,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .WillOnce(SaveArg<1>(&file_event_callback));
+  EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
+  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true, {});
+
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  EXPECT_CALL(io_handle_, close)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  EXPECT_CALL(*filter_, onClose()).WillOnce(Invoke([&captured_cb]() {
+    captured_cb->continueFilterChain(true);
+  }));
+  EXPECT_LOG_CONTAINS("debug", "deferring re-entrant listener filter continueFilterChain call",
+                      { EXPECT_OK(file_event_callback(Event::FileReadyType::Read)); });
+  EXPECT_EQ(generic_active_listener_->stats_.downstream_listener_filter_remote_close_.value(), 1);
 }
 
 /**

@@ -1,7 +1,7 @@
 #!/usr/bin/awk -f
 
 # usage:
-# bazel run -c opt --config=clang test/common/coroutine:perf_test  -- --benchmark_repetitions=5 --benchmark_report_aggregates_only=true | test/commom/coroutine/aggregate_perf_test_stats.awk
+# bazel run -c opt test/common/coroutine:perf_test  -- --benchmark_repetitions=5 --benchmark_report_aggregates_only=true | test/commom/coroutine/aggregate_perf_test_stats.awk
 
 function test_name(input) {
   split(input, parts, "/");

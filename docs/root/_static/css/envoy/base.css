@@ -8,6 +8,10 @@
 
 html {
   color-scheme: light;
+  /* The one knob for text size: every font-size on the site is in rem. A
+     percentage rather than a px value keeps the reader's browser font-size
+     setting in play. */
+  font-size: 112.5%;
   scroll-padding-top: calc(var(--envoy-topbar-height) + 24px);
 }
 
@@ -26,7 +30,7 @@ body.wy-body-for-nav {
   background: var(--envoy-ground);
   color: var(--envoy-ink-body);
   font-family: var(--envoy-font-sans);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.7;
 }
 
@@ -59,7 +63,7 @@ select {
 .envoy-skip-link {
   background: var(--envoy-ink);
   color: var(--envoy-ground);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   left: 0;
   padding: 10px 16px;

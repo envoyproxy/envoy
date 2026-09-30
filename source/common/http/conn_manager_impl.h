@@ -48,6 +48,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/stats/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
@@ -75,12 +76,17 @@ public:
                         Server::Configuration::ServerFactoryContext& server_context);
   ~ConnectionManagerImpl() override;
 
-  static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
-  static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
-                                                            Stats::Scope& scope);
+  // The scope is expected to be one created by createStatsScope() below, which already carries the
+  // 'http.<stat_prefix>.' prefix, so no prefix is prepended to the stat names.
+  static ConnectionManagerStats generateStats(Stats::Scope& scope);
+  static ConnectionManagerTracingStats generateTracingStats(Stats::Scope& scope);
   static void chargeTracingStats(const Tracing::Reason& tracing_reason,
                                  ConnectionManagerTracingStats& tracing_stats);
-  static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
+  // Creates the 'http.<stat_prefix>.' scope in which an HTTP connection manager creates the stats.
+  static Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view stat_prefix);
+  // Creates the listener stats of an HTTP connection manager, which live in the specified
+  // listener's scope.
+  static ConnectionManagerListenerStats generateListenerStats(absl::string_view stat_prefix,
                                                               Stats::Scope& scope);
   static const ResponseHeaderMap& continueHeader();
 
@@ -653,6 +659,10 @@ private:
   ConnectionManagerConfigSharedPtr config_;
   ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on
                                   // the config in the hot path.
+  // Route resolution histograms, created only when recordRouteResolutionStats is enabled so the
+  // default stat set is unchanged.
+  OptRef<Stats::Histogram> route_resolution_time_us_histogram_;
+  OptRef<Stats::Histogram> route_resolutions_histogram_;
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;

@@ -24,7 +24,6 @@ envoy_cc_extension(
         "c_types.h",
         "filter.h",
     ],
-    repository = "@envoy",
     deps = [
         ":filter_cc_proto",
         "//library/common/api:external_api_lib",
@@ -50,7 +49,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":platform_bridge_filter_lib",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",

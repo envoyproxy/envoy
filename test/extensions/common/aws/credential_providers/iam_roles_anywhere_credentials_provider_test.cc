@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/logger.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
@@ -1209,7 +1210,7 @@ public:
 };
 
 TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, SignEmptyPayload) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
   auto mock_credentials_provider = std::make_shared<MockX509CredentialsProvider>();
 
@@ -1234,7 +1235,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, SignEmptyPayload) {
 }
 
 TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, SignUnsignedPayload) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
   auto mock_credentials_provider = std::make_shared<MockX509CredentialsProvider>();
   X509Credentials creds =

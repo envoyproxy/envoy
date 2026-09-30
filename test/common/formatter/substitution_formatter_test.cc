@@ -321,6 +321,37 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
   }
 }
 
+TEST(SubstitutionFormatterTest, routeResolutionFormatters) {
+  Event::SimulatedTimeSystem time_system;
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+
+  // A stream that never resolved a route reports no time and a zero count.
+  {
+    StreamInfoFormatter time_format("ROUTE_RESOLUTION_TIME_US");
+    StreamInfoFormatter count_format("ROUTE_RESOLUTION_COUNT");
+    EXPECT_EQ(std::nullopt, formatForTest(time_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(time_format, {}, stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ("0", formatForTest(count_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(count_format, {}, stream_info),
+                ProtoEq(ValueUtil::numberValue(0.0)));
+  }
+
+  // Two resolutions accumulate the total time in microseconds and the count.
+  {
+    stream_info.addRouteResolutionTime(std::chrono::microseconds(30));
+    stream_info.addRouteResolutionTime(std::chrono::microseconds(70));
+    StreamInfoFormatter time_format("ROUTE_RESOLUTION_TIME_US");
+    StreamInfoFormatter count_format("ROUTE_RESOLUTION_COUNT");
+    EXPECT_EQ("100", formatForTest(time_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(time_format, {}, stream_info),
+                ProtoEq(ValueUtil::numberValue(100.0)));
+    EXPECT_EQ("2", formatForTest(count_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(count_format, {}, stream_info),
+                ProtoEq(ValueUtil::numberValue(2.0)));
+  }
+}
+
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   EXPECT_THAT(StreamInfoFormatter::create("unknown_field"),
               HasStatusCode(absl::StatusCode::kInvalidArgument));
@@ -4466,7 +4497,8 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
     EXPECT_THAT(formatValueForTest(formatter, stream_info), ProtoEq(expected_val));
   }
 
-  // A non-string scalar is rendered as JSON and, once truncated, becomes a string.
+  // A non-string scalar keeps its type regardless of the length limit; only its rendered form is
+  // truncated.
   {
     Protobuf::Struct& struct_obj = (*metadata.mutable_filter_metadata())["com.test"];
     (*struct_obj.mutable_fields())["test_num"] = ValueUtil::numberValue(1234);
@@ -4487,11 +4519,12 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
                   ProtoEq(ValueUtil::numberValue(1234)));
     }
     {
-      // A limit that bites turns the value into a truncated string.
+      // A limit that bites leaves the value typed too...
       DynamicMetadataFormatter formatter("com.test", {"test_num"}, std::optional<size_t>(2));
-      EXPECT_EQ("12", formatForTest(formatter, stream_info));
       EXPECT_THAT(formatValueForTest(formatter, stream_info),
-                  ProtoEq(ValueUtil::stringValue("12")));
+                  ProtoEq(ValueUtil::numberValue(1234)));
+      // ...but its rendered form is truncated.
+      EXPECT_EQ("12", formatForTest(formatter, stream_info));
     }
     {
       DynamicMetadataFormatter formatter("com.test", {"test_bool"}, std::optional<size_t>());
@@ -4500,8 +4533,22 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
     }
     {
       DynamicMetadataFormatter formatter("com.test", {"test_bool"}, std::optional<size_t>(2));
+      EXPECT_THAT(formatValueForTest(formatter, stream_info), ProtoEq(ValueUtil::boolValue(true)));
       EXPECT_EQ("tr", formatForTest(formatter, stream_info));
-      EXPECT_THAT(formatValueForTest(formatter, stream_info),
+    }
+
+    // With the runtime guard disabled, a non-string scalar whose rendered form is truncated
+    // becomes a string.
+    {
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues(
+          {{"envoy.reloadable_features.metadata_formatter_only_truncate_string", "false"}});
+
+      DynamicMetadataFormatter num_formatter("com.test", {"test_num"}, std::optional<size_t>(2));
+      EXPECT_THAT(formatValueForTest(num_formatter, stream_info),
+                  ProtoEq(ValueUtil::stringValue("12")));
+      DynamicMetadataFormatter bool_formatter("com.test", {"test_bool"}, std::optional<size_t>(2));
+      EXPECT_THAT(formatValueForTest(bool_formatter, stream_info),
                   ProtoEq(ValueUtil::stringValue("tr")));
     }
 
@@ -6695,6 +6742,54 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterGridTest) {
     } else {
       EXPECT_EQ(tc.expected, result.value_or("-"));
     }
+  }
+}
+
+TEST(SubstitutionFormatterTest, CoalesceFormatterEmptyValues) {
+  StreamInfo::MockStreamInfo stream_info;
+  // ":authority" is present but empty while "x-envoy-original-host" has a value.
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", ""},
+                                                 {"x-envoy-original-host", "original.example.com"}};
+
+  const std::string format =
+      R"(%COALESCE({"operators": [{"command": "REQ", "param": ":authority"}, {"command": "REQ", "param": "x-envoy-original-host"}]})%)";
+
+  // By default a value that is present but empty is accepted as the result.
+  {
+    auto providers = *SubstitutionFormatParser::parse(format);
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("", formatForTest(*providers[0], {&request_headers}, stream_info));
+    EXPECT_THAT(formatValueForTest(*providers[0], {&request_headers}, stream_info),
+                ProtoEq(ValueUtil::stringValue("")));
+  }
+
+  // With the runtime guard disabled, the empty value is skipped and the next operator is used.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.coalesce_formatter_accept_empty_values", "false"}});
+
+    auto providers = *SubstitutionFormatParser::parse(format);
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("original.example.com",
+              formatForTest(*providers[0], {&request_headers}, stream_info));
+    EXPECT_THAT(formatValueForTest(*providers[0], {&request_headers}, stream_info),
+                ProtoEq(ValueUtil::stringValue("original.example.com")));
+  }
+
+  // With the runtime guard disabled and no non-empty operator, no value is produced.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.coalesce_formatter_accept_empty_values", "false"}});
+
+    Http::TestRequestHeaderMapImpl empty_headers{{":authority", ""}};
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": [{"command": "REQ", "param": ":authority"}]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_FALSE(formatForTest(*providers[0], {&empty_headers}, stream_info).has_value());
+    EXPECT_THAT(formatValueForTest(*providers[0], {&empty_headers}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
   }
 }
 

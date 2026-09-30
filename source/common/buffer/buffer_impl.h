@@ -409,6 +409,9 @@ public:
     RELEASE_ASSERT(slice_.isMutable(), "Not allowed to call getMutableData if slice is immutable");
     return {slice_.data(), static_cast<absl::Span<uint8_t>::size_type>(slice_.dataSize())};
   }
+  absl::Span<const uint8_t> getImmutableData() const override {
+    return {slice_.data(), static_cast<absl::Span<uint8_t>::size_type>(slice_.dataSize())};
+  }
 
 private:
   friend OwnedImpl;
@@ -664,7 +667,9 @@ public:
   RawSliceVector getRawSlices(std::optional<uint64_t> max_slices = std::nullopt) const override;
   RawSlice frontSlice() const override;
   SliceDataPtr extractMutableFrontSlice() override;
+  SliceDataPtr extractImmutableFrontSlice() override;
   uint64_t length() const override;
+  uint64_t sliceCount() const override;
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
@@ -741,6 +746,13 @@ private:
 
   void addImpl(const void* data, uint64_t size);
   void drainImpl(uint64_t size);
+
+  /**
+   * Removes the front slice from the buffer with its drain trackers and account charges attached.
+   * Must only be called on a non-empty buffer.
+   * @return the front slice.
+   */
+  Slice extractFrontSlice();
 
   /**
    * Moves contents of the `other_slice` by either taking its ownership or coalescing it

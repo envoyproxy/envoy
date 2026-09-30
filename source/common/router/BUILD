@@ -42,9 +42,11 @@ envoy_cc_library(
         ":header_parser_lib",
         ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
+        ":path_rewrite_utility_lib",
         ":per_filter_config_lib",
         ":retry_policy_lib",
         ":retry_state_lib",
+        ":route_specifier_lib",
         ":router_ratelimit_lib",
         ":tls_context_match_criteria_lib",
         ":weighted_cluster_specifier_lib",
@@ -110,6 +112,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "route_specifier_lib",
+    srcs = ["route_specifier_impl.cc"],
+    hdrs = ["route_specifier_impl.h"],
+    deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/router:route_specifier_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:utility_lib",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:span",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "per_filter_config_lib",
     srcs = ["per_filter_config.cc"],
     hdrs = ["per_filter_config.h"],
@@ -138,6 +157,17 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/config:well_known_names",
         "//source/common/http:hash_policy_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "path_rewrite_utility_lib",
+    srcs = ["path_rewrite_utility.cc"],
+    hdrs = ["path_rewrite_utility.h"],
+    deps = [
+        "//source/common/common:regex_lib",
+        "//source/common/http:path_utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -195,6 +225,7 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/rds:rds_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -222,6 +253,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:prefix_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -320,10 +352,12 @@ envoy_cc_library(
         "//source/common/config:config_provider_lib",
         "//source/common/config:resource_name_lib",
         "//source/common/config:resource_type_helper_lib",
+        "//source/common/config:well_known_names",
         "//source/common/config:xds_resource_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:watcher_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:prefix_utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

@@ -1449,7 +1449,104 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadCallsReportDisconnection) {
                                        std::chrono::seconds(30), /*rebalanced=*/false);
 
   ASSERT_NE(reporter_ptr, nullptr);
-  EXPECT_CALL(*reporter_ptr, reportDisconnectionEvent(Eq(node_id), Eq(cluster_id)));
+  EXPECT_CALL(*reporter_ptr, reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                                      testing::Eq(fd)));
+  socket_manager_->markSocketDead(fd);
+}
+
+TEST_F(TestUpstreamSocketManager, OnGoAwayCallsReportGoAway) {
+  socket_manager_.reset();
+
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface config_with_reporter;
+  auto* reporter_cfg = config_with_reporter.mutable_reporter_config();
+  reporter_cfg->set_name(MOCK_REPORTER);
+  Protobuf::StringValue noop_config;
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
+
+  NiceMock<MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  NiceMock<MockReverseTunnelReporter>* reporter_ptr = nullptr;
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+    reporter_ptr = reporter.get();
+    return reporter;
+  }));
+
+  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_,
+                                                                config_with_reporter);
+  socket_manager_ = std::make_unique<UpstreamSocketManager>(dispatcher_, extension_.get());
+
+  const int fd = 201;
+  const std::string node_id = "node";
+  const std::string cluster_id = "cluster";
+
+  auto socket = createMockSocket(fd);
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket),
+                                       std::chrono::seconds(30), /*rebalanced=*/false);
+
+  ASSERT_NE(reporter_ptr, nullptr);
+  EXPECT_CALL(*reporter_ptr,
+              reportGoAwayEvent(testing::Eq(node_id), testing::Eq(cluster_id), testing::Eq(fd)));
+  socket_manager_->onGoAway(fd);
+}
+
+TEST_F(TestUpstreamSocketManager, OnGoAwayWithoutExtension) {
+  socket_manager_.reset();
+  socket_manager_ = std::make_unique<UpstreamSocketManager>(dispatcher_, nullptr);
+
+  const int fd = 204;
+  auto socket = createMockSocket(fd);
+  socket_manager_->addConnectionSocket("node", "cluster", std::move(socket),
+                                       std::chrono::seconds(30), /*rebalanced=*/false);
+  socket_manager_->onGoAway(fd);
+}
+
+TEST_F(TestUpstreamSocketManager, MarkSocketDeadAndOnGoAwayAreDistinct) {
+  socket_manager_.reset();
+
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface config_with_reporter;
+  auto* reporter_cfg = config_with_reporter.mutable_reporter_config();
+  reporter_cfg->set_name(MOCK_REPORTER);
+  Protobuf::StringValue noop_config;
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
+
+  NiceMock<MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  NiceMock<MockReverseTunnelReporter>* reporter_ptr = nullptr;
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+    reporter_ptr = reporter.get();
+    return reporter;
+  }));
+
+  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_,
+                                                                config_with_reporter);
+  socket_manager_ = std::make_unique<UpstreamSocketManager>(dispatcher_, extension_.get());
+
+  const int fd = 202;
+  const std::string node_id = "node";
+  const std::string cluster_id = "cluster";
+
+  auto socket = createMockSocket(fd);
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket),
+                                       std::chrono::seconds(30), /*rebalanced=*/false);
+
+  ASSERT_NE(reporter_ptr, nullptr);
+  EXPECT_CALL(*reporter_ptr,
+              reportGoAwayEvent(testing::Eq(node_id), testing::Eq(cluster_id), testing::Eq(fd)));
+  socket_manager_->onGoAway(fd);
+  EXPECT_CALL(*reporter_ptr, reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                                      testing::Eq(fd)));
   socket_manager_->markSocketDead(fd);
 }
 

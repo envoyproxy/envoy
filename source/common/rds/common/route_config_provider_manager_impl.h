@@ -55,8 +55,7 @@ public:
           auto subscription = THROW_OR_RETURN_VALUE(
               RdsRouteConfigSubscription::create(
                   std::move(config_update), std::move(resource_decoder), rds.config_source(),
-                  rds.route_config_name(), manager_identifier, factory_context,
-                  stat_prefix + absl::AsciiStrToLower(getRdsName()) + ".",
+                  rds.route_config_name(), manager_identifier, factory_context, stat_prefix,
                   absl::AsciiStrToUpper(getRdsName()), manager_),
               std::unique_ptr<RdsRouteConfigSubscription>);
           auto provider = std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription),

@@ -164,23 +164,15 @@ TEST_P(QuicNetworkConnectionTest, QuicheHandlesMigrationOfIdleSessions) {
   client_connection->connect();
   EXPECT_TRUE(client_connection->connecting());
   ASSERT(session != nullptr);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_migration_in_quiche")) {
-    // Session should have a handle to the writer if quiche handles migration.
-    EXPECT_NE(session->writer(), nullptr);
-    // Port migration should be configured.
-    EXPECT_TRUE(session->GetConnectionMigrationConfig().allow_port_migration);
-    EXPECT_TRUE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
-    EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(10),
-              session->GetConnectionMigrationConfig().idle_migration_period);
-    EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(90),
-              session->GetConnectionMigrationConfig().max_time_on_non_default_network);
-  } else {
-    EXPECT_EQ(session->writer(), nullptr);
-    // QUICHE migration config should have all kinds of migration disabled.
-    EXPECT_FALSE(session->GetConnectionMigrationConfig().allow_server_preferred_address);
-    EXPECT_FALSE(session->GetConnectionMigrationConfig().allow_port_migration);
-    EXPECT_FALSE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
-  }
+  // Session should have a handle to the writer as quiche handles migration.
+  EXPECT_NE(session->writer(), nullptr);
+  // Port migration should be configured.
+  EXPECT_TRUE(session->GetConnectionMigrationConfig().allow_port_migration);
+  EXPECT_TRUE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
+  EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(10),
+            session->GetConnectionMigrationConfig().idle_migration_period);
+  EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(90),
+            session->GetConnectionMigrationConfig().max_time_on_non_default_network);
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -200,22 +192,14 @@ TEST_P(QuicNetworkConnectionTest, QuicheHandlesMigration) {
   client_connection->connect();
   EXPECT_TRUE(client_connection->connecting());
   ASSERT(session != nullptr);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_migration_in_quiche")) {
-    // Session should have a handle to the writer if quiche handles migration.
-    EXPECT_NE(session->writer(), nullptr);
-    // Port migration should be configured.
-    EXPECT_TRUE(session->GetConnectionMigrationConfig().allow_port_migration);
-    EXPECT_TRUE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
-    EXPECT_FALSE(session->GetConnectionMigrationConfig().migrate_idle_session);
-    EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(90),
-              session->GetConnectionMigrationConfig().max_time_on_non_default_network);
-  } else {
-    EXPECT_EQ(session->writer(), nullptr);
-    // QUICHE migration config should have all kinds of migration disabled.
-    EXPECT_FALSE(session->GetConnectionMigrationConfig().allow_server_preferred_address);
-    EXPECT_FALSE(session->GetConnectionMigrationConfig().allow_port_migration);
-    EXPECT_FALSE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
-  }
+  // Session should have a handle to the writer as quiche handles migration.
+  EXPECT_NE(session->writer(), nullptr);
+  // Port migration should be configured.
+  EXPECT_TRUE(session->GetConnectionMigrationConfig().allow_port_migration);
+  EXPECT_TRUE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
+  EXPECT_FALSE(session->GetConnectionMigrationConfig().migrate_idle_session);
+  EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(90),
+            session->GetConnectionMigrationConfig().max_time_on_non_default_network);
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 

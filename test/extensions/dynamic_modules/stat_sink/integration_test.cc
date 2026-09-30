@@ -93,8 +93,8 @@ TEST_P(DynamicModulesStatsSinkIntegrationTest, BasicFlush) {
       {"info", "stat sink integration test: flush called"},
       {"info", "stat sink integration test: found gauge server.uptime"},
   };
-  if (language() == "rust") {
-    // Only the Rust SDK exposes the tag callbacks. The "reconstructed tagged gauge" marker proves
+  if (language() == "rust" || language() == "go") {
+    // The Rust and Go SDKs expose the tag callbacks. The "reconstructed tagged gauge" marker proves
     // the module read the tag-extracted name and the "envoy.cluster_name" tag of the always-present
     // cluster.membership_total gauge and rebuilt the dimensional name a Prometheus-style sink would
     // emit.
@@ -140,12 +140,12 @@ TEST_P(DynamicModulesStatsSinkIntegrationTest, OffThreadAggregationPublishesGaug
   test_server_->waitForGauge("integration_aggregated_counters", testing::Ge(1));
 }
 
-// The Rust module reads each histogram's cumulative buckets through the snapshot API and logs a
-// marker only when the last bucket count equals the sample count, proving the buckets decode in the
-// cumulative form Envoy produces. Only the Rust module exercises the bucket getters.
+// The Rust and Go modules read each histogram's cumulative buckets through the snapshot API and log
+// a marker only when the last bucket count equals the sample count, proving the buckets decode in
+// the cumulative form Envoy produces. The C module does not exercise the bucket getters.
 TEST_P(DynamicModulesStatsSinkIntegrationTest, HistogramBucketsDecodeCumulatively) {
-  if (language() != "rust") {
-    GTEST_SKIP() << "histogram bucket decoding is only exercised by the Rust test module";
+  if (language() == "c") {
+    GTEST_SKIP() << "histogram bucket decoding is only exercised by the Rust and Go test modules";
   }
   auto body = [this]() {
     addStatSinkAndInitialize();

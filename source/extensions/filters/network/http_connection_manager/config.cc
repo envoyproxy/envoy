@@ -41,6 +41,7 @@
 #include "source/common/quic/server_connection_factory.h"
 #endif
 #include "source/common/router/route_provider_manager.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
@@ -366,9 +367,19 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
-      stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
-      tracing_stats_(
-          Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
+      // http.(<stat_prefix>.)*
+      http_scope_(
+          Http::ConnectionManagerImpl::createStatsScope(context.scope(), config.stat_prefix())),
+      // The HTTP filters only get the prefixed scope when the runtime feature is enabled. Note the
+      // scope itself is always created because this connection manager's own stats live in it.
+      http_filter_factory_context_(
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter")
+              ? std::make_unique<Http::HttpFilterFactoryContext>(context, http_scope_,
+                                                                 stats_prefix_)
+              : nullptr),
+      stats_(Http::ConnectionManagerImpl::generateStats(*http_scope_)),
+      tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats(*http_scope_)),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
       internal_address_config_(createInternalAddressConfig(config, creation_status)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
@@ -379,9 +390,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
-          config.http_protocol_options(), context.serverFactoryContext(),
-          context.messageValidationVisitor(), config.stream_error_on_invalid_http_message(),
-          xff_num_trusted_hops_ == 0 && use_remote_address_)),
+          config.http_protocol_options(), context, config.stream_error_on_invalid_http_message(),
+          xff_num_trusted_hops_ == 0 && use_remote_address_, creation_status)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb,
           context.serverFactoryContext().runtime().snapshot().getInteger(
@@ -417,7 +427,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       preserve_external_request_id_(config.preserve_external_request_id()),
       always_set_request_id_in_response_(config.always_set_request_id_in_response()),
       date_provider_(date_provider),
-      listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
+      listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(config.stat_prefix(),
                                                                          context_.prefixedScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       stream_error_on_invalid_http_messaging_(
@@ -441,6 +451,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.common_http_protocol_options().headers_with_underscores_action()),
       path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
+      record_route_resolution_stats_(config.record_route_resolution_stats()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_requests_per_connection, 0)),
       proxy_status_config_(config.has_proxy_status_config()
@@ -736,10 +747,19 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     return;
   }
 
+  // The filters see the 'http.<stat_prefix>.' scope of this connection manager as the prefixed
+  // scope of their factory context. The stats prefix is propagated unchanged either way: the extra
+  // factory context of a filter reports it as empty when that scope is used, see
+  // Server::Configuration::ExtraFactoryContext::statsPrefixOr().
+  Server::Configuration::FactoryContext& filter_factory_context =
+      http_filter_factory_context_ != nullptr
+          ? static_cast<Server::Configuration::FactoryContext&>(*http_filter_factory_context_)
+          : context_;
   Http::FilterChainHelper<Server::Configuration::FactoryContext,
                           Server::Configuration::NamedHttpFilterConfigFactory>
       helper(filter_config_provider_manager_, context_.serverFactoryContext(),
-             context_.serverFactoryContext().clusterManager(), context_, stats_prefix_);
+             context_.serverFactoryContext().clusterManager(), filter_factory_context,
+             stats_prefix_);
 
   SET_AND_RETURN_IF_NOT_OK(
       helper.processFilters(config.http_filters(), "http", "http", filter_factories_),

@@ -587,26 +587,10 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   codec_client_->close();
 }
 
-// Test to ensure code coverage of the flag codepath.
-TEST_P(QuicHttpIntegrationTest, DoNotValidatePseudoHeaders) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.validate_http3_pseudo_headers",
-                                    "false");
-
-  initialize();
-
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-
-  EXPECT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  codec_client_->close();
-}
-
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+  // The test client uses Envoy's HTTP/3 codec, which validates the headers it encodes. Turn that
+  // off so the invalid header reaches the server codec under test.
+  disableCodecHeaderValidation();
 
   initialize();
 
@@ -956,8 +940,6 @@ TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -994,8 +976,6 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_"
                                     "quic_notify_stream_soon_to_destroy",
                                     "true");
@@ -1057,40 +1037,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   codec_client_->close();
 }
 
-TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "false");
-  useAccessLog(
-      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
-      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
-      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
-      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
-      "METADATA("
-      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
-  initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  sendRequestAndWaitForResponse(default_request_headers_, /*request_size=*/0,
-                                default_response_headers_,
-                                /*response_size=*/0,
-                                /*upstream_index=*/0, TestUtility::DefaultTimeout);
-  codec_client_->close();
-
-  // Do not flush client acks.
-  std::string log = waitForAccessLog(access_log_name_, 0, false, nullptr);
-  std::vector<std::string> metrics = absl::StrSplit(log, ',');
-  ASSERT_EQ(metrics.size(), 21);
-  EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
-  EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
-  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
-  EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
-  EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
-  EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
-  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
-}
-
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -1119,8 +1066,6 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -1191,8 +1136,6 @@ TEST_P(QuicHttpIntegrationTest, DISABLED_DeferredLoggingWithEnvoyReset) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -1271,8 +1214,6 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog("%BYTES_RETRANSMITTED%,%PACKETS_RETRANSMITTED%");
   initialize();
 

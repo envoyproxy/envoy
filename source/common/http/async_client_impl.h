@@ -61,11 +61,8 @@ class AsyncRequestSharedImpl;
 
 class AsyncClientImpl final : public AsyncClient {
 public:
-  AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Stats::Store& stats_store,
-                  Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
-                  Server::Configuration::CommonFactoryContext& factory_context,
-                  Router::ShadowWriterPtr&& shadow_writer, Http::Context& http_context,
-                  Router::Context& router_context);
+  AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Event::Dispatcher& dispatcher,
+                  Router::FilterConfigSharedPtr config);
   ~AsyncClientImpl() override;
 
   // Http::AsyncClient
@@ -134,14 +131,14 @@ public:
     ENVOY_BUG(!watermark_callbacks_, "Watermark callbacks should not already be registered!");
     watermark_callbacks_.emplace(callbacks);
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
-      watermark_callbacks_->get().onSidestreamAboveHighWatermark();
+      watermark_callbacks_->onSidestreamAboveHighWatermark();
     }
   }
 
   void removeWatermarkCallbacks() override {
     ENVOY_BUG(watermark_callbacks_, "Watermark callbacks should already be registered!");
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
-      watermark_callbacks_->get().onSidestreamBelowLowWatermark();
+      watermark_callbacks_->onSidestreamBelowLowWatermark();
     }
     watermark_callbacks_.reset();
   }
@@ -166,7 +163,7 @@ protected:
   // Callback to listen for stream destruction.
   std::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
   // Callback to listen for low/high/overflow watermark events.
-  std::optional<std::reference_wrapper<SidestreamWatermarkCallbacks>> watermark_callbacks_;
+  OptRef<SidestreamWatermarkCallbacks> watermark_callbacks_;
   bool complete_{};
   const bool discard_response_body_;
   std::optional<uint64_t> buffer_limit_{std::nullopt};
@@ -226,14 +223,14 @@ private:
   void onDecoderFilterAboveWriteBufferHighWatermark() override {
     ++high_watermark_calls_;
     if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().onSidestreamAboveHighWatermark();
+      watermark_callbacks_->onSidestreamAboveHighWatermark();
     }
   }
   void onDecoderFilterBelowWriteBufferLowWatermark() override {
     ASSERT(high_watermark_calls_ != 0);
     --high_watermark_calls_;
     if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().onSidestreamBelowLowWatermark();
+      watermark_callbacks_->onSidestreamBelowLowWatermark();
     }
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}

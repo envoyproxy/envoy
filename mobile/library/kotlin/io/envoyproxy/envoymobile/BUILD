@@ -11,7 +11,6 @@ android_artifacts(
     name = "envoy_aar",
     android_library = ":envoy_lib",
     archive_name = "envoy",
-    manifest = "EnvoyManifest.xml",
     native_deps = select({
         "@envoy//bazel:opt_build": ["//library/jni:libenvoy_jni.so.debug_info"],
         "//conditions:default": ["//library/jni:libenvoy_jni.so"],
