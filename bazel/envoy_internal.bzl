@@ -111,6 +111,7 @@ def envoy_copts(test = False):
                    "-Wc++2a-extensions",
                    "-Wno-nullability-completeness",
                    "-Wrange-loop-analysis",
+                   "-Wno-nullability-completeness",
                ],
                _GCC_BUILD: [
                    "-Wno-maybe-uninitialized",
@@ -213,9 +214,11 @@ def envoy_linkstatic():
     })
 
 def envoy_select_force_libcpp(if_libcpp, default = None):
+    # Apple builds are covered by `_FORCE_LIBCPP` (`//bazel:libc++_enabled` includes
+    # `//bazel:apple`) and so get `if_libcpp`, as Apple always uses libc++. A separate `_APPLE`
+    # branch would make this select ambiguous for Apple builds.
     return select({
         _FORCE_LIBCPP: if_libcpp,
-        _APPLE: [],
         _WINDOWS_X86_64: [],
         "//conditions:default": default or [],
     })

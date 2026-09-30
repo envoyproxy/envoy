@@ -1292,16 +1292,16 @@ impl LogContext {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_headers_count(header_type);
-    crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_headers(
-        self.envoy_ptr,
-        header_type,
-        ptr,
-        capacity,
-        size_out,
-      )
-    })
+    crate::utility::collect_headers(
+      || self.get_headers_count(header_type),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_access_logger_get_headers(
+          self.envoy_ptr,
+          header_type,
+          headers,
+        )
+      },
+    )
   }
 
   /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.

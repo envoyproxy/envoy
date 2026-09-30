@@ -122,37 +122,6 @@ bool ContextAccessor::getHeaders(HeadersMapOptConstRef map,
   return true;
 }
 
-bool ContextAccessor::getHeadersBounded(HeadersMapOptConstRef map,
-                                        envoy_dynamic_module_type_envoy_http_header* result_headers,
-                                        size_t capacity, size_t* size_out) {
-  if (!map) {
-    *size_out = 0;
-    return false;
-  }
-  const size_t count = map->size();
-  *size_out = count;
-  if (count > capacity) {
-    return false;
-  }
-  // A null array is only valid when there is nothing to write, so a non-empty map with a null array
-  // is rejected rather than dereferenced.
-  if (count > 0 && result_headers == nullptr) {
-    return false;
-  }
-  size_t i = 0;
-  map->iterate([&i, result_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    auto& key = header.key();
-    result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());
-    result_headers[i].key_length = key.size();
-    auto& value = header.value();
-    result_headers[i].value_ptr = const_cast<char*>(value.getStringView().data());
-    result_headers[i].value_length = value.size();
-    i++;
-    return Http::HeaderMap::Iterate::Continue;
-  });
-  return true;
-}
-
 bool ContextAccessor::getHeaderValue(HeadersMapOptConstRef map,
                                      envoy_dynamic_module_type_module_buffer key,
                                      envoy_dynamic_module_type_envoy_buffer* result, size_t index,

@@ -8,7 +8,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/stats/custom_stat_namespaces_impl.h"
-#include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/router/route_specifiers/dynamic_modules/config.h"
 
@@ -188,45 +187,6 @@ TEST_F(DynamicModuleRouteSpecifierTest, DoNotCloseRequired) {
               HasStatusMessage(HasSubstr(
                   "dynamic_module_config.do_not_close must be true for a dynamic module route "
                   "specifier")));
-}
-
-// Verifies the capacity aware request header fill callback contract.
-TEST(DynamicModuleRouteSpecifierHeaderFillTest, BoundedCapacity) {
-  using Envoy::Extensions::DynamicModules::ContextAccessor;
-  Http::TestRequestHeaderMapImpl headers{
-      {":authority", "host"}, {":path", "/"}, {"x-multi", "a"}, {"x-multi", "b"}};
-  const size_t count = headers.size();
-
-  // Zero capacity with a null array writes nothing, reports the required count and fails.
-  size_t size_out = 0;
-  EXPECT_FALSE(ContextAccessor::getHeadersBounded(headers, nullptr, 0, &size_out));
-  EXPECT_EQ(count, size_out);
-
-  // A null array with a capacity that would otherwise fit is rejected rather than dereferenced.
-  size_out = 0;
-  EXPECT_FALSE(ContextAccessor::getHeadersBounded(headers, nullptr, count, &size_out));
-
-  // A capacity below the count writes nothing and still reports the required count.
-  std::vector<envoy_dynamic_module_type_envoy_http_header> too_small(count - 1);
-  size_out = 0;
-  EXPECT_FALSE(
-      ContextAccessor::getHeadersBounded(headers, too_small.data(), too_small.size(), &size_out));
-  EXPECT_EQ(count, size_out);
-
-  // Exact and oversized capacities both fill every entry in order, keeping duplicate values.
-  for (const size_t capacity : {count, count + 4}) {
-    std::vector<envoy_dynamic_module_type_envoy_http_header> filled(capacity);
-    size_out = 0;
-    EXPECT_TRUE(ContextAccessor::getHeadersBounded(headers, filled.data(), capacity, &size_out));
-    EXPECT_EQ(count, size_out);
-    std::vector<std::string> pairs;
-    for (size_t i = 0; i < size_out; i++) {
-      pairs.emplace_back(std::string(filled[i].key_ptr, filled[i].key_length) + "=" +
-                         std::string(filled[i].value_ptr, filled[i].value_length));
-    }
-    EXPECT_THAT(pairs, testing::Contains("x-multi=a"));
-    EXPECT_THAT(pairs, testing::Contains("x-multi=b"));
-  }
 }
 
 TEST_F(DynamicModuleRouteSpecifierTest, DuplicateTemplateId) {
@@ -485,6 +445,19 @@ TEST_F(DynamicModuleRouteSpecifierTest, ConfigDestroyRunsOnTeardown) {
   EXPECT_EQ(before + 1, destroy_count.value()());
 }
 
+// A route override may carry a regex rewrite, which is compiled once when the specifier loads.
+TEST_F(DynamicModuleRouteSpecifierTest, RegexRewriteOverrideLoads) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      route_overrides:
+      - override_id: rewrite
+        regex_rewrite:
+          pattern: {regex: "^/api/(.*)$"}
+          substitution: '/internal/\1'
+)EOF"));
+  EXPECT_TRUE(config.ok());
+}
+
 // A shadow policy of a route override that names a cluster the cluster manager does not know
 // is rejected when clusters are validated, since a statically named cluster can be checked at load.
 TEST_F(DynamicModuleRouteSpecifierTest, ValidateClustersRejectsUnknownShadowCluster) {
@@ -573,7 +546,8 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteEntryWrapperAccessors) {
   const auto* entry = route.route->routeEntry();
   ASSERT_NE(nullptr, entry);
 
-  // The recorded cluster and path replace those of the route.
+  // The recorded route name, cluster, and path replace those of the route.
+  EXPECT_EQ("module_route_entry", route.route->routeName());
   EXPECT_EQ("canary", entry->clusterName());
   auto headers = requestHeaders();
   Formatter::Context formatter_context(&headers);
@@ -675,6 +649,21 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperMetadataAccessors) {
   static_cast<void>(route.route->typedMetadata());
 }
 
+// A decision that records only a route name produces a route wrapper whose name replaces that of
+// the route, without recording any route entry override.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperRouteName) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_override", R"EOF(      failure_policy: PASS_THROUGH
+      specifier_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: route-name
+)EOF"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("module_route", route.route->routeName());
+}
+
 // A route wrapper that records no metadata delegates both metadata accessors to the route.
 TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperMetadataFallback) {
   const auto config =
@@ -688,9 +677,10 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperMetadataFallback) {
   ASSERT_NE(nullptr, route.route);
   // The recorded filter override marks the wrapper, confirming it is a route wrapper.
   EXPECT_TRUE(route.route->filterDisabled("envoy.test.disabled").value_or(false));
-  // Only a filter override was recorded, so the metadata accessors fall back to the route, which
-  // carries no envoy.test.route metadata.
+  // Only a filter override was recorded, so the metadata accessors and the route name fall back to
+  // the route, which carries no envoy.test.route metadata and no name.
   EXPECT_FALSE(route.route->metadata().filter_metadata().contains("envoy.test.route"));
+  EXPECT_EQ("", route.route->routeName());
   static_cast<void>(route.route->typedMetadata());
 }
 
@@ -706,8 +696,10 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteEntryWrapperMetadataFallback) {
   const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
   ASSERT_NE(nullptr, route.route);
   EXPECT_EQ("canary", route.route->routeEntry()->clusterName());
-  // Only a cluster override was recorded, so the metadata accessors fall back to the route.
+  // Only a cluster override was recorded, so the metadata accessors and the route name fall back to
+  // the route.
   EXPECT_FALSE(route.route->metadata().filter_metadata().contains("envoy.test.route"));
+  EXPECT_EQ("", route.route->routeName());
   static_cast<void>(route.route->typedMetadata());
 }
 

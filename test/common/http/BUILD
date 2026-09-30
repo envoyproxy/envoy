@@ -311,6 +311,7 @@ envoy_cc_test_library(
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/request_id/uuid:config",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",

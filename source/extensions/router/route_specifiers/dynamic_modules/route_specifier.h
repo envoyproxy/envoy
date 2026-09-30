@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/router/route_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/http/codes.h"
@@ -86,6 +87,9 @@ struct RouteOverride {
   std::unique_ptr<Envoy::Router::HedgePolicy> hedge_policy;
   std::unique_ptr<const Envoy::Router::RateLimitPolicy> rate_limit_policy;
   std::unique_ptr<const Envoy::Router::CorsPolicy> cors_policy;
+  // Regex rewrite of the request path, compiled once at configuration load. Null when unset.
+  Regex::CompiledMatcherPtr regex_rewrite;
+  std::string regex_rewrite_substitution;
 };
 
 using RouteOverrideMap = absl::flat_hash_map<std::string, RouteOverride>;
@@ -115,6 +119,8 @@ struct RouteOverrides {
   // Metadata the module layered onto the route, keyed by namespace. Empty when the module set none.
   envoy::config::core::v3::Metadata route_metadata;
   absl::flat_hash_map<std::string, bool> filter_disabled;
+  // Name the module recorded for the route it produces. Unset when the module set none.
+  std::optional<std::string> route_name;
   std::optional<std::string> path;
   std::optional<std::string> host;
   std::vector<HeaderMutation> request_headers_to_add;
@@ -191,6 +197,7 @@ public:
   const std::optional<RuntimeFraction>& runtimeFraction() const { return runtime_fraction_; }
   const std::string& specifierInstanceId() const { return specifier_instance_id_; }
   OnRouteSpecifierRouteDestroyType onRouteDestroy() const { return on_route_destroy_; }
+  uint32_t maxRewrittenPathBytes() const { return max_rewritten_path_bytes_; }
   bool failClosed() const { return fail_closed_; }
   bool continueMatchingOnFailure() const { return continue_matching_on_failure_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
@@ -244,6 +251,7 @@ private:
   Envoy::Router::RouteBuilder* config_new_route_builder_{nullptr};
   bool config_new_validate_clusters_{false};
   const std::optional<RuntimeFraction> runtime_fraction_;
+  const uint32_t max_rewritten_path_bytes_;
   const bool fail_closed_;
   const bool continue_matching_on_failure_;
   Upstream::ClusterManager& cluster_manager_;
@@ -281,8 +289,8 @@ struct RouteSpecifierContext {
   const StreamInfo::StreamInfo& stream_info;
   const uint64_t random_value;
   const DynamicModuleRouteSpecifierConfig::Template* selected_template{nullptr};
-  // The selected template evaluated against the request, set when set_template succeeds so that the
-  // getters reflect the route being produced. Null keeps the getters on the route matching
+  // The selected template evaluated against the request, set when set_route_template succeeds so
+  // that the getters reflect the route being produced. Null keeps the getters on the route matching
   // resolved, whether no template was selected or its match did not hold.
   Envoy::Router::RouteConstSharedPtr selected_route;
   envoy_dynamic_module_type_route_specifier_chain_status chain_status{
@@ -318,6 +326,7 @@ public:
   ~DynamicModuleRoute() override;
 
   // Router::Route
+  const std::string& routeName() const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   std::optional<bool> filterDisabled(absl::string_view name) const override;
@@ -346,6 +355,7 @@ public:
   ~DynamicModuleRouteEntry() override;
 
   // Router::Route
+  const std::string& routeName() const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   std::optional<bool> filterDisabled(absl::string_view name) const override;
@@ -393,7 +403,7 @@ enum class Failure {
   None,
   // The module returned the Error decision.
   ModuleError,
-  // The decision was SelectTemplate without a successful set_template.
+  // The decision was SelectTemplate without a successful set_route_template.
   TemplateNotSelected,
   // The match of the selected template does not hold for the request.
   TemplateMatchFailed,

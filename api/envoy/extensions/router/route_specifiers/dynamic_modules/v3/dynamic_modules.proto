@@ -5,6 +5,7 @@ package envoy.extensions.router.route_specifiers.dynamic_modules.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+import "envoy/type/matcher/v3/regex.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
@@ -83,7 +84,7 @@ message RouteTemplate {
 // configuration load rather than constructed on the request path. An entry that replaces no
 // property is rejected. A property an entry leaves unset keeps the value of the route the decision
 // produced, so an entry can never remove a property that route configures.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message RouteOverride {
   // The identifier the module selects this override with. Must be unique within the specifier.
   string override_id = 1 [(validate.rules).string = {min_len: 1}];
@@ -117,6 +118,13 @@ message RouteOverride {
   // CORS policy replacing the CORS policy of the produced route. The CORS filter reads it only when
   // CORS is not configured through per filter configuration.
   config.route.v3.CorsPolicy cors = 8;
+
+  // Regex rewrite of the request path, replacing the path the produced route sends upstream. The
+  // pattern is compiled once when the specifier is configured. It applies to the path without the
+  // query string, which is preserved, and the result is capped at
+  // :ref:`max_rewritten_path_bytes
+  // <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.max_rewritten_path_bytes>`.
+  type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 9;
 }
 
 // Configuration for the dynamic modules route specifier.
@@ -182,6 +190,11 @@ message DynamicModuleRouteSpecifier {
   // that references them. An unknown cluster then fails the request with the
   // ``cluster_not_found_response_code`` of the route instead.
   google.protobuf.BoolValue validate_clusters = 9;
+
+  // The maximum length of a request path a module rewrite may produce, covering the full ``:path``
+  // value including the query string. A rewrite whose result would exceed it is rejected. If not
+  // specified, defaults to 65536.
+  google.protobuf.UInt32Value max_rewritten_path_bytes = 10 [(validate.rules).uint32 = {gt: 0}];
 
   // An opaque identifier the module reads with ``get_config_specifier_instance_id``, so that two
   // specifier instances sharing one module can tell the routes they build apart, for example by

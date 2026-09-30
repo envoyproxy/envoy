@@ -47,6 +47,11 @@ RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_re
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
+// When enabled, which is the default, dynamic modules are loaded with RTLD_NOW so that every
+// referenced symbol is resolved at load time instead of lazily on first use. A module that
+// references a symbol the main program does not provide then fails to load rather than crashing
+// later when the symbol is first reached. Disable to restore the previous RTLD_LAZY behavior.
+RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_rtld_now);
 // When enabled, per-priority host updates that arrive during a main-thread batch host update are
 // posted to the worker threads as a single batched cross-thread update at the end of the batch,
 // instead of one post per priority. Combined with
