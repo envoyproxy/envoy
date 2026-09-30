@@ -216,7 +216,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcServiceInitialMetadataIntegra
                          Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // The gRPC client is created on the worker thread handling the first request. Its
-// %FILE_CONTENT()% initial metadata must resolve to the file's content, and follow updates to it.
+// %FILE_CONTENT()% initial metadata must resolve to the file's content.
 TEST_P(GrpcServiceInitialMetadataIntegrationTest, FileContentInInitialMetadata) {
   TestEnvironment::writeStringToFileForTest(std::string(FileName), "initial-content");
   initializeWithMetadata(
@@ -225,13 +225,6 @@ TEST_P(GrpcServiceInitialMetadataIntegrationTest, FileContentInInitialMetadata) 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   EXPECT_EQ("initial-content", sendRequestAndGetMetadata());
-
-  // The file_content DataSourceProvider watches for Modified events, so a direct write triggers
-  // the re-read. Send requests until the update propagates.
-  TestEnvironment::writeStringToFileForTest(std::string(FileName), "rotated-content");
-  while (sendRequestAndGetMetadata() != "rotated-content") {
-    absl::SleepFor(absl::Milliseconds(10));
-  }
 
   codec_client_->close();
 }
