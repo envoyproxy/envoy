@@ -102,5 +102,35 @@ TEST(ArenaWrappedProtoTest, MoveAssignment) {
   // NOLINTEND(bugprone-use-after-move)
 }
 
+TEST(ArenaWrappedProtoTest, UniquePtrAdoptionConcrete) {
+  auto heap_proto = std::make_unique<test::TestMessage>();
+  heap_proto->set_name("concrete_heap");
+  ArenaWrappedProto<test::TestMessage> wrapped(std::move(heap_proto));
+  EXPECT_EQ(heap_proto, nullptr);
+  EXPECT_NE(wrapped.arena(), nullptr);
+  EXPECT_NE(wrapped.get(), nullptr);
+  EXPECT_EQ(wrapped->name(), "concrete_heap");
+  EXPECT_EQ(wrapped.get()->GetArena(), wrapped.arena());
+}
+
+TEST(ArenaWrappedProtoTest, UniquePtrAdoptionAbstract) {
+  std::unique_ptr<Protobuf::Message> heap_proto = std::make_unique<test::TestMessage>();
+  static_cast<test::TestMessage*>(heap_proto.get())->set_name("abstract_heap");
+  ArenaWrappedProto<Protobuf::Message> wrapped(std::move(heap_proto));
+  EXPECT_EQ(heap_proto, nullptr);
+  EXPECT_NE(wrapped.arena(), nullptr);
+  EXPECT_NE(wrapped.get(), nullptr);
+  EXPECT_EQ(static_cast<const test::TestMessage&>(*wrapped).name(), "abstract_heap");
+  EXPECT_EQ(wrapped.get()->GetArena(), wrapped.arena());
+}
+
+TEST(ArenaWrappedProtoTest, UniquePtrAdoptionNull) {
+  std::unique_ptr<test::TestMessage> heap_proto = nullptr;
+  ArenaWrappedProto<test::TestMessage> wrapped(std::move(heap_proto));
+  EXPECT_EQ(wrapped.arena(), nullptr);
+  EXPECT_EQ(wrapped.get(), nullptr);
+  EXPECT_FALSE(wrapped);
+}
+
 } // namespace
 } // namespace Envoy

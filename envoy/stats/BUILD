@@ -18,6 +18,7 @@ envoy_cc_library(
     name = "tag_interface",
     hdrs = ["tag.h"],
     deps = [
+        "//envoy/common:optref_lib",
         "@abseil-cpp//absl/container:inlined_vector",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",

@@ -165,7 +165,6 @@ RUNTIME_GUARD(envoy_reloadable_features_strip_dotdot_segments_with_parameters);
 RUNTIME_GUARD(envoy_reloadable_features_strip_path_parameters_per_segment);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_strip_upgrade_header_on_failed_websocket_upgrades);
 RUNTIME_GUARD(envoy_reloadable_features_tap_honor_tap_enabled);
-RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_tls_inspector_enforce_client_tls_version);
 RUNTIME_GUARD(envoy_reloadable_features_udp_hot_restart_session_handoff);
@@ -182,8 +181,14 @@ RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness
 // polling the listener DrainDecision. Latched per connection when the network filter is created.
 RUNTIME_GUARD(envoy_reloadable_features_use_connection_event_drain);
 RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
+// Give the HTTP filters of the HTTP connection manager the 'http.<stat_prefix>.' scope of the
+// connection manager as the stats prefix scope of their factory context, so that the stats prefix
+// they read is empty, instead of passing that prefix as a string and relying on every filter to
+// prepend it to its stat names itself.
+RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
+RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
 

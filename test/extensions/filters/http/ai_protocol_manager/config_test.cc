@@ -193,8 +193,8 @@ TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromUpstreamContext) {
 // declared request and response wire APIs.
 TEST(AiProtocolManagerConfigTest, CreatesRouteSpecificConfig) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto_config;
-  proto_config.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
-  proto_config.mutable_response()->set_api_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  proto_config.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  proto_config.mutable_response()->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   AiProtocolManagerFilterConfigFactory factory;
@@ -206,10 +206,10 @@ TEST(AiProtocolManagerConfigTest, CreatesRouteSpecificConfig) {
       route_config.get(),
       testing::WhenDynamicCastTo<const RouteConfig*>(testing::AllOf(
           testing::Property(&RouteConfig::hasRequest, true),
-          testing::Property(&RouteConfig::requestProtocol, ApiProtocol::OpenAiChatCompletions),
-          testing::Property(&RouteConfig::responseProtocol, ApiProtocol::AnthropicMessages),
+          testing::Property(&RouteConfig::requestProtocol, LLMProtocol::OpenAiChatCompletions),
+          testing::Property(&RouteConfig::responseProtocol, LLMProtocol::AnthropicMessages),
           testing::Property(&RouteConfig::effectiveResponseProtocol,
-                            ApiProtocol::AnthropicMessages))));
+                            LLMProtocol::AnthropicMessages))));
 }
 
 // Without a response declaration the response side inherits the request API;
@@ -220,7 +220,7 @@ TEST(AiProtocolManagerConfigTest, RouteConfigResponseFallsBackToRequestProtocol)
   {
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
         proto_config;
-    proto_config.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+    proto_config.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
     auto route_config = factory
                             .createRouteSpecificFilterConfig(
                                 proto_config, context, ProtobufMessage::getNullValidationVisitor())
@@ -228,14 +228,14 @@ TEST(AiProtocolManagerConfigTest, RouteConfigResponseFallsBackToRequestProtocol)
     EXPECT_THAT(route_config.get(),
                 testing::WhenDynamicCastTo<const RouteConfig*>(testing::AllOf(
                     testing::Property(&RouteConfig::hasRequest, true),
-                    testing::Property(&RouteConfig::responseProtocol, ApiProtocol::Unspecified),
+                    testing::Property(&RouteConfig::responseProtocol, LLMProtocol::Unspecified),
                     testing::Property(&RouteConfig::effectiveResponseProtocol,
-                                      ApiProtocol::OpenAiChatCompletions))));
+                                      LLMProtocol::OpenAiChatCompletions))));
   }
   {
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
         proto_config;
-    proto_config.mutable_response()->set_api_protocol(envoy::type::ai::v3::OPENAI_RESPONSES);
+    proto_config.mutable_response()->set_llm_protocol(envoy::type::ai::v3::OPENAI_RESPONSES);
     auto route_config = factory
                             .createRouteSpecificFilterConfig(
                                 proto_config, context, ProtobufMessage::getNullValidationVisitor())
@@ -243,7 +243,7 @@ TEST(AiProtocolManagerConfigTest, RouteConfigResponseFallsBackToRequestProtocol)
     EXPECT_THAT(route_config.get(), testing::WhenDynamicCastTo<const RouteConfig*>(testing::AllOf(
                                         testing::Property(&RouteConfig::hasRequest, false),
                                         testing::Property(&RouteConfig::effectiveResponseProtocol,
-                                                          ApiProtocol::OpenAiResponses))));
+                                                          LLMProtocol::OpenAiResponses))));
   }
 }
 

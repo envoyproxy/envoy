@@ -13,7 +13,6 @@ envoy_cc_test(
     srcs = [
         "alpn_test.cc",
     ],
-    repository = "@envoy",
     deps = [
         "//contrib/istio/filters/http/alpn/source:alpn_filter",
         "//contrib/istio/filters/http/alpn/source:config_lib",
@@ -30,7 +29,6 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    repository = "@envoy",
     deps = [
         "//contrib/istio/filters/http/alpn/source:config_lib",
         "//test/mocks/server:server_mocks",

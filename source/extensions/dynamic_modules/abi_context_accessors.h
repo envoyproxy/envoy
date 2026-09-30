@@ -73,6 +73,10 @@ public:
   static bool getAttributeBool(const StreamInfo::StreamInfo& stream_info,
                                envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
 
+  // fill timing_out with the stream's timing snapshot, using -1 for unavailable values
+  static void getTimingInfo(const StreamInfo::StreamInfo* stream_info,
+                            envoy_dynamic_module_type_timing_info* timing_out);
+
   // Get a string value from dynamic metadata by filter name and dotted key path. Returns false
   // when the path is absent or the value is not a string.
   static bool getDynamicMetadata(const StreamInfo::StreamInfo& stream_info,

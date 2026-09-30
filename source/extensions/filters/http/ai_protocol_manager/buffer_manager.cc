@@ -40,6 +40,15 @@ void FilterChainBridge::updateIngestBackpressure() {
     source_paused_ = true;
     ENVOY_LOG(debug, "ai_protocol_manager: ingest high watermark ({} bytes not durable)", unacked_);
     pauseSource();
+    // Snapshot registered_managers_ in case a synchronous write completion/error unregisters a
+    // manager while iterating.
+    const std::vector<BufferManager*> managers(registered_managers_.begin(),
+                                               registered_managers_.end());
+    for (BufferManager* manager : managers) {
+      if (registered_managers_.contains(manager)) {
+        manager->onIngestPaused();
+      }
+    }
     return;
   }
   if (source_paused_ && unacked_ <= low_watermark_) {
