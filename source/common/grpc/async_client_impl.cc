@@ -89,7 +89,7 @@ absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
 parseGrpcServiceInitialMetadataForServer(const envoy::config::core::v3::GrpcService& config,
                                          Server::Configuration::ServerFactoryContext& context) {
   return parseInitialMetadata(config, context, context.scope(), context.messageValidationVisitor(),
-                              absl::nullopt);
+                              std::nullopt);
 }
 
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
