@@ -2,6 +2,9 @@
 
 set -e
 
+read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
+read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
+
 DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_proto_format.diff}"
 ENVOY_SRCDIR="${ENVOY_SRCDIR:-${PWD}}"
 
@@ -15,8 +18,11 @@ function fix {
   set +e
   "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" fix
   echo "Format check failed, try apply following patch to fix:"
-  git add api
-  git diff HEAD | tee "${DIFF_OUTPUT}"
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
+      //tools/git:git -- add api
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
+      //tools/git:git -- diff HEAD \
+      | tee "${DIFF_OUTPUT}"
 
   exit 1
 }
