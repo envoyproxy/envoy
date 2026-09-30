@@ -11256,6 +11256,7 @@ struct StubRouteDecision {
   filter_disabled: Option<(String, bool)>,
   path: Option<String>,
   host: Option<String>,
+  route_name: Option<String>,
   request_headers: Vec<(
     String,
     String,
@@ -11289,6 +11290,7 @@ static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
     filter_disabled: None,
     path: None,
     host: None,
+    route_name: None,
     request_headers: Vec::new(),
     removed_request_headers: Vec::new(),
     response_headers: Vec::new(),
@@ -11992,6 +11994,19 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_host(
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_name(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  route_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let route_name = unsafe { stub_specifier_string(route_name) };
+  if route_name.is_empty() {
+    return false;
+  }
+  STUB_ROUTE_DECISION.lock().unwrap().route_name = Some(route_name);
+  true
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_route_specifier_add_request_header(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
   key: abi::envoy_dynamic_module_type_module_buffer,
@@ -12538,6 +12553,8 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_path("rewritten"));
   assert!(ctx.set_host("example.com"));
   assert!(!ctx.set_host(""));
+  assert!(ctx.set_route_name("module_route"));
+  assert!(!ctx.set_route_name(""));
   assert!(ctx.add_request_header(
     "x-add",
     "value",
@@ -12605,6 +12622,7 @@ fn test_route_specifier_context_records_decision() {
   assert_eq!(Some(("filter".to_string(), true)), decision.filter_disabled);
   assert_eq!(Some("/rewritten".to_string()), decision.path);
   assert_eq!(Some("example.com".to_string()), decision.host);
+  assert_eq!(Some("module_route".to_string()), decision.route_name);
   assert_eq!(
     vec![(
       "x-add".to_string(),
