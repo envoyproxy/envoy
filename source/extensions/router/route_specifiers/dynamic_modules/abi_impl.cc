@@ -784,6 +784,17 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
   return true;
 }
 
+bool envoy_dynamic_module_callback_route_specifier_set_route_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer route_name) {
+  const absl::string_view value = toStringView(route_name);
+  if (value.empty()) {
+    return false;
+  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.route_name = std::string(value);
+  return true;
+}
+
 void envoy_dynamic_module_callback_route_specifier_set_timeout(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     uint64_t timeout_ms) {

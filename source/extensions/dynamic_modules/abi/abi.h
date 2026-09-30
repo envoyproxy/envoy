@@ -16871,7 +16871,8 @@ bool envoy_dynamic_module_callback_route_specifier_get_cluster_host_count(
 
 // ------------------- Route Specifier Callbacks - Input Route -----------------
 // These read the route the module is resolving, which is the route that route matching and any
-// earlier specifier resolved, or the template selected with set_template once one is selected.
+// earlier specifier resolved, or the template selected with set_route_template once one is
+// selected.
 
 /**
  * envoy_dynamic_module_callback_route_specifier_get_input_route is called by the module to get the
@@ -17149,6 +17150,21 @@ void envoy_dynamic_module_callback_route_specifier_set_chain_status(
 bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_name records the name of the route the
+ * decision produces, replacing the name of the route the decision was given. The name is what the
+ * %ROUTE_NAME% access log command operator reports, so a module built route carries an identity of
+ * its own in access logs and other route name consumers. The name is not validated beyond being
+ * non-empty.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param route_name is the name to record. The buffer is owned by the module.
+ * @return true if the name is not empty, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer route_name);
 
 /**
  * envoy_dynamic_module_callback_route_specifier_set_timeout records the route timeout for the

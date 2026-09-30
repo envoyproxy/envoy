@@ -985,6 +985,20 @@ impl RouteSpecifierContext {
     }
   }
 
+  /// Record the name of the route the decision produces. The name is what the `%ROUTE_NAME%` access
+  /// log command operator reports, so a module built route carries an identity of its own in access
+  /// logs and other route name consumers.
+  ///
+  /// Returns `false` when the name is empty.
+  pub fn set_route_name(&mut self, route_name: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_route_name(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(route_name),
+      )
+    }
+  }
+
   /// Record a header added to the request sent upstream.
   ///
   /// Returns `false` when the key is not a valid header name, is a pseudo header, or the value is

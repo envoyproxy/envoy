@@ -546,7 +546,8 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteEntryWrapperAccessors) {
   const auto* entry = route.route->routeEntry();
   ASSERT_NE(nullptr, entry);
 
-  // The recorded cluster and path replace those of the route.
+  // The recorded route name, cluster, and path replace those of the route.
+  EXPECT_EQ("module_route_entry", route.route->routeName());
   EXPECT_EQ("canary", entry->clusterName());
   auto headers = requestHeaders();
   Formatter::Context formatter_context(&headers);
@@ -648,6 +649,21 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperMetadataAccessors) {
   static_cast<void>(route.route->typedMetadata());
 }
 
+// A decision that records only a route name produces a route wrapper whose name replaces that of
+// the route, without recording any route entry override.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperRouteName) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_override", R"EOF(      failure_policy: PASS_THROUGH
+      specifier_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: route-name
+)EOF"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("module_route", route.route->routeName());
+}
+
 // A route wrapper that records no metadata delegates both metadata accessors to the route.
 TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperMetadataFallback) {
   const auto config =
@@ -661,9 +677,10 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperMetadataFallback) {
   ASSERT_NE(nullptr, route.route);
   // The recorded filter override marks the wrapper, confirming it is a route wrapper.
   EXPECT_TRUE(route.route->filterDisabled("envoy.test.disabled").value_or(false));
-  // Only a filter override was recorded, so the metadata accessors fall back to the route, which
-  // carries no envoy.test.route metadata.
+  // Only a filter override was recorded, so the metadata accessors and the route name fall back to
+  // the route, which carries no envoy.test.route metadata and no name.
   EXPECT_FALSE(route.route->metadata().filter_metadata().contains("envoy.test.route"));
+  EXPECT_EQ("", route.route->routeName());
   static_cast<void>(route.route->typedMetadata());
 }
 
@@ -679,8 +696,10 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteEntryWrapperMetadataFallback) {
   const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
   ASSERT_NE(nullptr, route.route);
   EXPECT_EQ("canary", route.route->routeEntry()->clusterName());
-  // Only a cluster override was recorded, so the metadata accessors fall back to the route.
+  // Only a cluster override was recorded, so the metadata accessors and the route name fall back to
+  // the route.
   EXPECT_FALSE(route.route->metadata().filter_metadata().contains("envoy.test.route"));
+  EXPECT_EQ("", route.route->routeName());
   static_cast<void>(route.route->typedMetadata());
 }
 
