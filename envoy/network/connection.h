@@ -418,6 +418,13 @@ public:
   virtual absl::string_view localCloseReason() const PURE;
 
   /**
+   * @return absl::string_view the initial local close reason of the underlying socket.
+   * This logs the first local close reason set on the connection which is not overwritten by
+   * subsequent local close reasons.
+   */
+  virtual absl::string_view initialLocalCloseReason() const { return ""; }
+
+  /**
    * Instructs the connection to start using secure transport.
    * Note: Not all underlying transport sockets support such operation.
    * @return boolean telling if underlying transport socket was able to

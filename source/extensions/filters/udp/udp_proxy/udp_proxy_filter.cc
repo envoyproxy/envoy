@@ -349,7 +349,9 @@ UdpProxyFilter::UdpActiveSession::UdpActiveSession(
     UdpProxyFilter& filter, Network::UdpRecvData::LocalPeerAddresses&& addresses,
     const Upstream::HostConstSharedPtr& host)
     : ActiveSession(filter, std::move(addresses), std::move(host)),
-      use_original_src_ip_(filter_.config_->usingOriginalSrcIp()) {}
+      source_address_policy_(filter_.config_->usingOriginalSrcIp()
+                                 ? Upstream::UdpSourceAddressPolicy::transparent(addresses_.peer_)
+                                 : Upstream::UdpSourceAddressPolicy::kernelSelected()) {}
 
 UdpProxyFilter::ActiveSession::~ActiveSession() {
   ENVOY_BUG(on_session_complete_called_, "onSessionComplete() not called");
@@ -546,12 +548,11 @@ void UdpProxyFilter::UdpActiveSession::writeUpstream(Network::UdpRecvData& data)
   // NOTE: On the first write, a local ephemeral port is bound, and thus this write can fail due to
   //       port exhaustion. To avoid exhaustion, UDP sockets will be connected and associated with
   //       a 4-tuple including the local IP, and the UDP port may be reused for multiple
-  //       connections unless use_original_src_ip_ is set. When use_original_src_ip_ is set, the
-  //       socket should not be connected since the source IP will be changed.
-  // NOTE: We do not specify the local IP to use for the sendmsg call if use_original_src_ip_ is not
-  //       set. We allow the OS to select the right IP based on outbound routing rules if
-  //       use_original_src_ip_ is not set, else use downstream peer IP as local IP.
-  if (!connected_ && !use_original_src_ip_) {
+  //       connections unless transparent source binding is configured. A transparent socket is
+  //       not connected because each send supplies the downstream source IP.
+  // NOTE: We do not specify the local IP for kernel-selected and configured binding. For
+  //       transparent binding, the downstream peer IP is supplied on each sendmsg call.
+  if (!connected_ && source_address_policy_.shouldConnect()) {
     Api::SysCallIntResult rc = udp_socket_->ioHandle().connect(host_->address());
     if (SOCKET_FAILURE(rc.return_value_)) {
       ENVOY_LOG(debug, "cannot connect: ({}) {}", rc.errno_, errorDetails(rc.errno_));
@@ -562,16 +563,16 @@ void UdpProxyFilter::UdpActiveSession::writeUpstream(Network::UdpRecvData& data)
     connected_ = true;
   }
 
-  ASSERT((connected_ || use_original_src_ip_) && udp_socket_ && host_);
+  ASSERT((connected_ || !source_address_policy_.shouldConnect()) && udp_socket_ && host_);
 
   const uint64_t tx_buffer_length = data.buffer_->length();
   ENVOY_LOG(trace, "writing {} byte datagram upstream: downstream={} local={} upstream={}",
             tx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_->address()->asStringView());
 
-  const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
-  Api::IoCallUint64Result rc = Network::Utility::writeToSocket(
-      udp_socket_->ioHandle(), *data.buffer_, local_ip, *host_->address());
+  Api::IoCallUint64Result rc =
+      Network::Utility::writeToSocket(udp_socket_->ioHandle(), *data.buffer_,
+                                      source_address_policy_.packetSourceIp(), *host_->address());
 
   if (!rc.ok()) {
     cluster_->cluster_stats_.sess_tx_errors_.inc();
@@ -649,15 +650,28 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
   udp_session_info_.upstreamInfo()->addUpstreamHostAttempted(host_);
   udp_session_info_.upstreamInfo()->setUpstreamHost(host_);
   udp_session_info_.upstreamInfo()->setUpstreamRemoteAddress(host_->address());
+
+  // Transparent source binding takes precedence over the cluster or bootstrap bind config.
+  if (source_address_policy_.mode() != Upstream::UdpSourceAddressPolicy::Mode::Transparent) {
+    auto source_address_selector = host_->cluster().getUpstreamLocalAddressSelector();
+    source_address_policy_ = Upstream::UdpSourceAddressPolicy::fromUpstreamLocalAddress(
+        source_address_selector->getUpstreamLocalAddress(
+            host_->address(), /*socket_options=*/nullptr, /*transport_socket_options=*/{}));
+  }
+
+  if (!createUdpSocket(host_)) {
+    host_.reset();
+    return false;
+  }
   cluster_->addSession(host_.get(), this);
-  createUdpSocket(host_);
   return true;
 }
 
-void UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConstSharedPtr& host) {
+bool UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConstSharedPtr& host) {
   ASSERT(cluster_);
-  // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
-  //       is bound until the first packet is sent to the upstream host.
+  // NOTE: The socket call can only fail due to memory/fd exhaustion. A configured local address
+  //       is bound below; otherwise no local ephemeral port is bound until the first packet is
+  //       sent to the upstream host.
   udp_socket_ = filter_.createUdpSocket(host);
   udp_socket_->ioHandle().initializeFileEvent(
       filter_.read_callbacks_->udpListener().dispatcher(),
@@ -671,13 +685,23 @@ void UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConst
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host->address()->asStringView());
 
-  if (use_original_src_ip_) {
-    const Network::Socket::OptionsSharedPtr socket_options =
-        Network::SocketOptionFactory::buildIpTransparentOptions();
-    const bool ok = Network::Socket::applyOptions(
-        socket_options, *udp_socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
+  const auto setup_result = source_address_policy_.prepareSocket(*udp_socket_);
+  if (!setup_result.ok()) {
+    if (setup_result.failure_reason_ ==
+        Upstream::UdpSourceAddressPolicy::SocketSetupResult::FailureReason::SocketOption) {
+      ENVOY_LOG(debug, "cannot apply pre-bind socket options for UDP upstream");
+    } else {
+      ENVOY_LOG(debug, "cannot bind UDP upstream socket to {}: ({}) {}",
+                source_address_policy_.sourceAddress()->asStringView(), setup_result.sys_errno_,
+                errorDetails(setup_result.sys_errno_));
+    }
+    udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
+    cluster_->cluster_stats_.sess_tx_errors_.inc();
+    udp_socket_.reset();
+    return false;
+  }
 
-    RELEASE_ASSERT(ok, "Should never occur!");
+  if (source_address_policy_.mode() == Upstream::UdpSourceAddressPolicy::Mode::Transparent) {
     ENVOY_LOG(debug, "The original src is enabled for address {}.",
               addresses_.peer_->asStringView());
   }
@@ -687,6 +711,8 @@ void UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConst
   // sockets. We need to figure out how to either refactor Socket into something that works better
   // for this use case or allow the socket option abstractions to work directly against an IO
   // handle.
+
+  return true;
 }
 
 void UdpProxyFilter::ActiveSession::onInjectReadDatagramToFilterChain(ActiveReadFilter* filter,

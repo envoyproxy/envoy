@@ -256,14 +256,6 @@ config_setting(
 )
 
 config_setting(
-    name = "local_asan_build",
-    flag_values = {
-        "@envoy_repo//:use_local_llvm_flag": "True",
-    },
-    values = {"define": "ENVOY_CONFIG_ASAN=1"},
-)
-
-config_setting(
     name = "tsan_build",
     values = {"define": "ENVOY_CONFIG_TSAN=1"},
 )
@@ -603,11 +595,6 @@ config_setting(
 config_setting(
     name = "enable_perf_tracing",
     values = {"define": "perf_tracing=enabled"},
-)
-
-config_setting(
-    name = "force_libcpp",
-    values = {"define": "force_libcpp=enabled"},
 )
 
 # SSL library selection using label_flag and bool_flag
@@ -1158,28 +1145,26 @@ config_setting(
     },
 )
 
-bool_flag(
-    name = "libc++",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "libc++_enabled",
-    flag_values = {
-        ":libc++": "True",
-    },
-)
-
-bool_flag(
-    name = "libstdc++",
-    build_setting_default = False,
-)
-
-config_setting(
+# The C++ standard library is derived from the compiler: clang and Apple builds use libc++,
+# gcc uses libstdc++. Other combinations (e.g. clang + libstdc++) are not supported; if you
+# need one you must provide your own cc_toolchain.
+alias(
     name = "libstdc++_enabled",
-    flag_values = {
-        ":libstdc++": "True",
-    },
+    actual = ":gcc_build",
+)
+
+selects.config_setting_group(
+    name = "libc++_enabled",
+    match_any = [
+        ":apple",
+        ":clang_build",
+    ],
+)
+
+# Back-compat for existing //bazel:force_libcpp label references.
+alias(
+    name = "force_libcpp",
+    actual = ":libc++_enabled",
 )
 
 alias(

@@ -604,6 +604,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "path_rewrite_utility_test",
+    srcs = ["path_rewrite_utility_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/common:regex_lib",
+        "//source/common/router:path_rewrite_utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "route_specifier_impl_test",
     srcs = ["route_specifier_impl_test.cc"],
     rbe_pool = "linux_x64_small",

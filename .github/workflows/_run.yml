@@ -340,7 +340,7 @@ jobs:
       if: >-
         ${{ fromJSON(inputs.request).request.pr != '' }}
     - run: |
-        echo "${BAZELRC_CONTENT}" > repo.bazelrc
+        echo "${BAZELRC_CONTENT}" > user.bazelrc
       if: ${{ vars.ENVOY_CI_BAZELRC }}
       name: Configure repo Bazel settings
       env:
