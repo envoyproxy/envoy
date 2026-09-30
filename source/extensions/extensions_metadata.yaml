@@ -2410,6 +2410,13 @@ envoy.http.ai_filters.schema_validation:
   status: alpha
   type_urls:
   - envoy.extensions.http.ai_filters.schema_validation.v3.SchemaValidation
+envoy.http.ai_filters.transcoder:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
 envoy.config_subscription.rest:
   categories:
   - envoy.config_subscription
