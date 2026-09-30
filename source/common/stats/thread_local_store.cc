@@ -240,6 +240,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   }
   histogram_set_.clear();
   sinked_histograms_.clear();
+  histograms_to_cleanup_.clear();
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
@@ -334,8 +335,10 @@ void ThreadLocalStoreImpl::releaseHistogramCrossThread(uint64_t histogram_id) {
     bool need_post = false;
     {
       Thread::LockGuard lock(hist_mutex_);
-      need_post = histograms_to_cleanup_.empty();
-      histograms_to_cleanup_.push_back(histogram_id);
+      if (!shutting_down_) {
+        need_post = histograms_to_cleanup_.empty();
+        histograms_to_cleanup_.push_back(histogram_id);
+      }
     }
     if (need_post) {
       main_thread_dispatcher_->post([this]() { clearHistogramsFromCaches(); });
