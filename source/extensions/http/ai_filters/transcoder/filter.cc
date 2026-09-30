@@ -205,6 +205,12 @@ Coroutine::Task<absl::Status> TranscoderFilter::encodeSSE(SseStreamReceiver rece
         engine.transcodeStreamEvent(*leg, ctx, event);
     if (!transcoded.ok()) {
       // The engine leaves a refused event untouched, so it can still go out as it came in.
+      // TODO(ginama): forwarding the source payload breaks the contract of the filters after this
+      // one, which expect the target's schema; the unary fallback in encodeUnary() does the same.
+      // Failing the response instead needs error translation first: this fallback also carries
+      // provider errors inside a 2xx (e.g. Gemini's in-stream 429 frame, Anthropic's `error`
+      // event), which would otherwise become a generic 502. Fix both with one dialect-agnostic
+      // policy for payloads the rules do not recognize.
       config_->stats().failed_.inc();
       ENVOY_LOG(debug, "transcoder: forwarding SSE frame untranslated: {}",
                 transcoded.status().message());
