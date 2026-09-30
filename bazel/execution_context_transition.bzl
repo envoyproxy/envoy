@@ -1,15 +1,14 @@
 load("//bazel:envoy_test.bzl", "envoy_cc_test", "envoy_test_env")
 
 def _execution_context_transition_impl(settings, attr):
-    # Append the compile flag to standard compiler options (copt)
-    return {
-        "//command_line_option:copt": settings["//command_line_option:copt"] + ["-DENVOY_ENABLE_EXECUTION_CONTEXT"],
-    }
+    if settings["//bazel:execution_context"]:
+        return settings  # already enabled at top level; don't fork a redundant config
+    return {"//bazel:execution_context": True}
 
 execution_context_transition = transition(
     implementation = _execution_context_transition_impl,
-    inputs = ["//command_line_option:copt"],
-    outputs = ["//command_line_option:copt"],
+    inputs = ["//bazel:execution_context"],
+    outputs = ["//bazel:execution_context"],
 )
 
 def _execution_context_enabled_test_impl(ctx):
@@ -108,6 +107,8 @@ def execution_context_dual_test(name, **kwargs):
     enabled_tags = list(enabled_kwargs.get("tags", []))
     if "execution_context_enabled" not in enabled_tags:
         enabled_tags.append("execution_context_enabled")
+    if "manual" not in enabled_tags:
+        enabled_tags.append("manual")
     enabled_kwargs["tags"] = enabled_tags
 
     # Derive name for the enabled test target (e.g. "execution_context_test" -> "execution_context_enabled_test")
