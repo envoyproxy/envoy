@@ -71,11 +71,11 @@ RequestInfoFilter::RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
     : config_(std::move(config)), context_(context) {}
 
 absl::Status RequestInfoFilter::decodeSync(AiRequest& request, LocalReplier) {
-  publish(request.json());
+  publish(request);
   return absl::OkStatus();
 }
 
-void RequestInfoFilter::publish(const nlohmann::json& json) {
+void RequestInfoFilter::publish(const AiRequest& request) {
   StreamInfo::StreamInfo& stream_info = context_.stream_info;
   if (stream_info.dynamicMetadata().typed_filter_metadata().contains(
           config_->metadataNamespace())) {
@@ -85,7 +85,7 @@ void RequestInfoFilter::publish(const nlohmann::json& json) {
     return;
   }
 
-  const RequestAttributes attrs = extractRequestAttributes(context_.request_protocol, json,
+  const RequestAttributes attrs = extractRequestAttributes(request.protocol(), request.json(),
                                                            context_.request_headers.getPathValue());
   envoy::data::ai::v3::RequestInfo record = toProto(attrs);
   if (config_->tokensPerByte().has_value()) {
