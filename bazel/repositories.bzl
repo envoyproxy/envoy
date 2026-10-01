@@ -258,7 +258,11 @@ def envoy_dependencies(skip_targets = []):
     )
 
 def _boringssl():
-    external_http_archive(name = "boringssl")
+    external_http_archive(
+        name = "boringssl",
+        patches = ["@envoy//bazel:boringssl-CVE-2026-35189.patch"],
+        patch_args = ["-p1"],
+    )
 
 def _boringssl_fips():
     external_http_archive(
