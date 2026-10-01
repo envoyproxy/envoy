@@ -26,7 +26,7 @@ common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/b565623d89166dd153aee61ba421ec1638bf7a3e
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/211cb075b962f6b9c097b08f40054cb382bfc2b8
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -222,6 +222,9 @@ build:compile-time-options --copt=-Wno-error=deprecated-enum-enum-conversion
 build:compile-time-options --test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true
 build:compile-time-options --@envoy//bazel:http3=False
 build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
+# This is a Protobuf feature which breaks dynamic casting of messages. Turn it
+# on here to prevent raw dynamic_casts from being added to Envoy.
+build:compile-time-options --copt=-DPROTOBUF_ENABLE_CUSTOM_VTABLE=1
 
 
 #############################################################################
