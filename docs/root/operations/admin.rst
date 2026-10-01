@@ -401,7 +401,7 @@ modify different aspects of the server:
    Idle downstream HTTP connections with an initialized codec use the HTTP connection manager
    :ref:`drain timeout
    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
-   Connections that remain without an initialized codec close without a drain grace period.
+   Connections that remain without an initialized codec close after the drain timeout.
 
    .. http:post:: /drain_listeners?skip_exit
 

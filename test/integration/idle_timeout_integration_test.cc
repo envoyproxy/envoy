@@ -8,6 +8,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_time.h"
@@ -167,9 +168,9 @@ TEST_P(IdleTimeoutIntegrationTest, ClosesIdleConnectionWithinOneDrainTimeout) {
   }
 }
 
-TEST_P(IdleTimeoutIntegrationTest, DrainingClosesConnectionWithoutCodec) {
+TEST_P(IdleTimeoutIntegrationTest, DrainingClosesConnectionWithoutCodecAfterDrainTimeout) {
   if (downstream_protocol_ != Http::CodecType::HTTP1) {
-    return;
+    GTEST_SKIP() << "The no-codec timeout is covered with HTTP/1";
   }
 
   config_helper_.addConfigModifier(
@@ -177,7 +178,8 @@ TEST_P(IdleTimeoutIntegrationTest, DrainingClosesConnectionWithoutCodec) {
              hcm) {
         hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->CopyFrom(
             ProtobufUtil::TimeUtil::SecondsToDuration(30));
-        hcm.mutable_drain_timeout()->CopyFrom(ProtobufUtil::TimeUtil::SecondsToDuration(5));
+        hcm.mutable_drain_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainTimeoutMs * 2));
       });
   initialize();
 
@@ -185,7 +187,62 @@ TEST_P(IdleTimeoutIntegrationTest, DrainingClosesConnectionWithoutCodec) {
   ASSERT_TRUE(codec_client_->connected());
   startServerDrain();
 
-  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(1000 * TIMEOUT_FACTOR)));
+  EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs)));
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs * 2)));
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+}
+
+TEST_P(IdleTimeoutIntegrationTest, RequestRacingServerDrainCompletesAndCloses) {
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    GTEST_SKIP() << "The raw request requires HTTP/1 or HTTP/2";
+  }
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_drain_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainTimeoutMs * 2));
+      });
+  autonomous_upstream_ = true;
+  initialize();
+
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+  ASSERT_TRUE(tcp_client->connected());
+  startServerDrain();
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: sni.lyft.com\r\n\r\n"));
+    EXPECT_TCP_RESPONSE(tcp_client, HasSubstr("HTTP/1.1 200"));
+    tcp_client->waitForDisconnect(true);
+    EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+    return;
+  }
+
+  using Http::Http2::Http2Frame;
+  std::string request = Http2Frame::Preamble;
+  request += std::string(Http2Frame::makeEmptySettingsFrame());
+  request += std::string(Http2Frame::makeRequest(1, "sni.lyft.com", "/"));
+  ASSERT_TRUE(tcp_client->write(request, false, false));
+
+  bool saw_go_away = false;
+  bool saw_success = false;
+  for (size_t i = 0; i < 10 && (!saw_go_away || !saw_success); ++i) {
+    Http2Frame frame;
+    ASSERT_TRUE(tcp_client->waitForData(Http2Frame::HeaderSize));
+    frame.setHeader(tcp_client->data());
+    tcp_client->clearData(Http2Frame::HeaderSize);
+    if (frame.payloadSize() > 0) {
+      ASSERT_TRUE(tcp_client->waitForData(frame.payloadSize()));
+      frame.setPayload(tcp_client->data());
+      tcp_client->clearData(frame.payloadSize());
+    }
+    saw_go_away |= frame.type() == Http2Frame::Type::GoAway;
+    saw_success |=
+        frame.streamId() == 1 && frame.responseStatus() == Http2Frame::ResponseStatus::Ok;
+  }
+  EXPECT_TRUE(saw_go_away);
+  EXPECT_TRUE(saw_success);
+  tcp_client->waitForDisconnect(true);
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
 }
 

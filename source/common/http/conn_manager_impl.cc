@@ -586,6 +586,14 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
     stats_.named_.downstream_cx_http1_active_.inc();
     break;
   }
+
+  if (drain_no_codec_close_timer_) {
+    drain_no_codec_close_timer_->disableTimer();
+    drain_no_codec_close_timer_.reset();
+    if (streams_.empty() && drain_state_ == DrainState::NotDraining && !connection_close_started_) {
+      startDrainSequence();
+    }
+  }
 }
 
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
@@ -733,36 +741,28 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 }
 
 void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
-  if (!connection_drain_event_.has_value()) {
-    connection_drain_event_ = drain_event;
-    if (streams_.empty() && !connection_close_started_) {
-      if (codec_) {
-        if (connection_idle_timer_) {
-          connection_idle_timer_->disableTimer();
-        }
-        if (drain_state_ == DrainState::NotDraining) {
-          startDrainSequence();
-        }
-      } else {
-        if (connection_idle_timer_) {
-          connection_idle_timer_->disableTimer();
-        }
-        // Defer closing until connection setup has completed.
-        drain_no_codec_close_timer_ = dispatcher_->createTimer([this]() {
-          if (!codec_) {
-            doConnectionClose(Network::ConnectionCloseType::NoFlush, std::nullopt,
-                              "drained_connection_without_codec");
-            return;
-          }
-          if (streams_.empty() && drain_state_ == DrainState::NotDraining &&
-              !connection_close_started_) {
-            startDrainSequence();
-          }
-        });
-        drain_no_codec_close_timer_->enableTimer(std::chrono::milliseconds(0));
-      }
-    }
+  if (connection_drain_event_.has_value()) {
+    return;
   }
+  connection_drain_event_ = drain_event;
+  if (!streams_.empty() || connection_close_started_) {
+    return;
+  }
+  if (connection_idle_timer_) {
+    connection_idle_timer_->disableTimer();
+  }
+  if (codec_) {
+    if (drain_state_ == DrainState::NotDraining) {
+      // Drain idle HTTP connections immediately, even if the strategy is Gradual.
+      startDrainSequence();
+    }
+    return;
+  }
+  drain_no_codec_close_timer_ = dispatcher_->createTimer([this]() {
+    doConnectionClose(Network::ConnectionCloseType::NoFlush, std::nullopt,
+                      "drained_connection_without_codec");
+  });
+  drain_no_codec_close_timer_->enableTimer(config_->drainTimeout());
 }
 
 bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
