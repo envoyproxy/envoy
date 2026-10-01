@@ -429,7 +429,7 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
       ENVOY_LOG(warn,
                 "hot restart parent did not answer for address {}; starting the fresh UDP "
                 "listener paused until the parent is gone",
-                addr);
+                absl::StrCat(Network::Utility::UDP_SCHEME, address->asString()));
       registrar = server_.hotRestart().parentDrainedCallbackRegistrar();
     }
     return std::make_shared<Network::UdpListenSocket>(
