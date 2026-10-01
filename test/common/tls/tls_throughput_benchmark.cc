@@ -1,4 +1,9 @@
+#include <cerrno>
+#include <string>
+
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/tls/io_handle_bio.h"
 
 #include "test/test_common/environment.h"
 
@@ -192,6 +197,170 @@ static void testParams(benchmark::internal::Benchmark* b) {
 }
 
 BENCHMARK(testThroughput)->Unit(::benchmark::kMicrosecond)->Apply(testParams);
+
+class ReceiveCountingIoHandle : public Network::IoSocketHandleImpl {
+public:
+  explicit ReceiveCountingIoHandle(os_fd_t fd) : IoSocketHandleImpl(fd) {}
+
+  Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
+                                uint64_t num_slice) override {
+    ++num_reads_;
+    return IoSocketHandleImpl::readv(max_length, slices, num_slice);
+  }
+
+  uint64_t numReads() const { return num_reads_; }
+
+private:
+  uint64_t num_reads_{0};
+};
+
+// Measure decryption and Envoy BIO socket reads with a full batch already queued. Encryption,
+// sending, handshakes, and payload verification are excluded from the timed region.
+static void testReceiveThroughput(benchmark::State& state) {
+  std::string error;
+  std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles(
+      bazel::tools::cpp::runfiles::Runfiles::Create("tls_throughput_benchmark",
+                                                    BAZEL_CURRENT_REPOSITORY, &error));
+  TestEnvironment::setRunfiles(runfiles.get());
+
+  int sockets[2];
+  RELEASE_ASSERT(socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sockets) == 0, "socketpair");
+  ReceiveCountingIoHandle receiver(sockets[0]);
+  Network::IoSocketHandleImpl sender(sockets[1]);
+  const int send_buffer_size = 1024 * 1024;
+  if (setsockopt(sockets[1], SOL_SOCKET, SO_SNDBUF, &send_buffer_size, sizeof(send_buffer_size)) !=
+      0) {
+    state.SkipWithError("Cannot enlarge the socket send buffer for a full ciphertext batch");
+    return;
+  }
+
+  const int tls_version = state.range(0) == 12 ? TLS1_2_VERSION : TLS1_3_VERSION;
+  const size_t record_size = state.range(1);
+  const uint32_t read_ahead_size = state.range(2);
+  bssl::UniquePtr<SSL_CTX> server_ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> client_ctx(SSL_CTX_new(TLS_method()));
+  for (SSL_CTX* ctx : {server_ctx.get(), client_ctx.get()}) {
+    RELEASE_ASSERT(SSL_CTX_set_min_proto_version(ctx, tls_version) == 1, "minimum TLS version");
+    RELEASE_ASSERT(SSL_CTX_set_max_proto_version(ctx, tls_version) == 1, "maximum TLS version");
+  }
+  const std::string cert_path =
+      TestEnvironment::runfilesPath("test/common/tls/test_data/san_dns_cert.pem");
+  const std::string key_path =
+      TestEnvironment::runfilesPath("test/common/tls/test_data/san_dns_key.pem");
+  RELEASE_ASSERT(
+      SSL_CTX_use_certificate_file(server_ctx.get(), cert_path.c_str(), SSL_FILETYPE_PEM) == 1,
+      "SSL_CTX_use_certificate_file");
+  RELEASE_ASSERT(
+      SSL_CTX_use_PrivateKey_file(server_ctx.get(), key_path.c_str(), SSL_FILETYPE_PEM) == 1,
+      "SSL_CTX_use_PrivateKey_file");
+
+  bssl::UniquePtr<SSL> server_ssl(SSL_new(server_ctx.get()));
+  BIO* receiver_bio = BIO_new_io_handle(&receiver);
+  SSL_set_bio(server_ssl.get(), receiver_bio, receiver_bio);
+  SSL_set_accept_state(server_ssl.get());
+  bssl::UniquePtr<SSL> client_ssl(SSL_new(client_ctx.get()));
+  RELEASE_ASSERT(SSL_set_fd(client_ssl.get(), sockets[1]) == 1, "SSL_set_fd");
+  SSL_set_connect_state(client_ssl.get());
+
+  bool handshake_success = false;
+  for (int i = 0; i < 50; ++i) {
+    const int client_err = SSL_do_handshake(client_ssl.get());
+    const int server_err = SSL_do_handshake(server_ssl.get());
+    if (client_err == 1 && server_err == 1) {
+      handshake_success = true;
+      break;
+    }
+    handleSslError(client_ssl.get(), client_err, false);
+    handleSslError(server_ssl.get(), server_err, true);
+  }
+  RELEASE_ASSERT(handshake_success, "handshake completed successfully");
+  RELEASE_ASSERT(enableIoHandleBioReadAhead(receiver_bio, read_ahead_size), "enable read-ahead");
+  state.SetLabel(SSL_CIPHER_get_name(SSL_get_current_cipher(server_ssl.get())));
+
+  BIO* output = BIO_new(BIO_s_mem());
+  RELEASE_ASSERT(output != nullptr, "BIO_new");
+  SSL_set0_wbio(client_ssl.get(), output);
+  const std::string plaintext(256 * 1024, 'a');
+  std::string received(plaintext.size(), '\0');
+
+  const auto queue_batch = [&]() {
+    for (size_t offset = 0; offset < plaintext.size(); offset += record_size) {
+      RELEASE_ASSERT(SSL_write(client_ssl.get(), plaintext.data() + offset, record_size) ==
+                         static_cast<int>(record_size),
+                     "SSL_write");
+    }
+    const uint8_t* ciphertext = nullptr;
+    size_t ciphertext_length = 0;
+    RELEASE_ASSERT(BIO_mem_contents(output, &ciphertext, &ciphertext_length) == 1,
+                   "BIO_mem_contents");
+    size_t sent = 0;
+    while (sent < ciphertext_length) {
+      const ssize_t result = ::send(sockets[1], ciphertext + sent, ciphertext_length - sent, 0);
+      if (result < 0 && errno == EINTR) {
+        continue;
+      }
+      if (result <= 0) {
+        return false;
+      }
+      sent += result;
+    }
+    RELEASE_ASSERT(BIO_reset(output) == 1, "BIO_reset");
+    return true;
+  };
+  const auto receive_batch = [&]() {
+    size_t offset = 0;
+    while (offset < received.size()) {
+      const int result =
+          SSL_read(server_ssl.get(), received.data() + offset, received.size() - offset);
+      if (result <= 0) {
+        return false;
+      }
+      offset += result;
+    }
+    return true;
+  };
+
+  // Warm up the lazy read-ahead allocation before measuring steady-state receive cost.
+  if (!queue_batch()) {
+    state.SkipWithError("Cannot queue a full ciphertext batch; check socket send buffer capacity");
+    return;
+  }
+  RELEASE_ASSERT(receive_batch() && received == plaintext, "warmup payload");
+  const uint64_t initial_reads = receiver.numReads();
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    state.PauseTiming();
+    if (!queue_batch()) {
+      state.SkipWithError(
+          "Cannot queue a full ciphertext batch; check socket send buffer capacity");
+      break;
+    }
+    state.ResumeTiming();
+    if (!receive_batch()) {
+      state.SkipWithError("SSL_read did not consume the queued plaintext batch");
+      break;
+    }
+    state.PauseTiming();
+    RELEASE_ASSERT(received == plaintext, "received payload");
+    state.ResumeTiming();
+  }
+  state.SetBytesProcessed(state.iterations() * plaintext.size());
+  state.counters["socket_reads_per_batch"] =
+      benchmark::Counter(receiver.numReads() - initial_reads, benchmark::Counter::kAvgIterations);
+}
+
+static void receiveParams(benchmark::internal::Benchmark* b) {
+  b->ArgNames({"tls_version", "record_bytes", "read_ahead_bytes"});
+  for (const int tls_version : {12, 13}) {
+    for (const int record_size : {1024, 16 * 1024}) {
+      for (const int read_ahead_size : {0, 16 * 1024, 64 * 1024, 256 * 1024}) {
+        b->Args({tls_version, record_size, read_ahead_size});
+      }
+    }
+  }
+}
+
+BENCHMARK(testReceiveThroughput)->Unit(::benchmark::kMicrosecond)->Apply(receiveParams);
 
 } // namespace Extensions::TransportSockets::Tls
 } // namespace Envoy

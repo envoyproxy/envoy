@@ -434,6 +434,8 @@ envoy_cc_benchmark_binary(
     deps = [
         "//bazel:cpp_runfiles",
         "//source/common/buffer:buffer_lib",
+        "//source/common/network:default_socket_interface_lib",
+        "//source/common/tls:io_handle_bio_lib",
         "@benchmark",
     ],
 )
