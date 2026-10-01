@@ -1,5 +1,5 @@
 load("@proxy-wasm-cpp-sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
-load("@rules_rust//rust:defs.bzl", "rust_binary")
+load("@rules_rust//rust:defs.bzl", "rust_shared_library")
 
 def _wasm_rust_transition_impl(settings, attr):
     return {
@@ -79,11 +79,9 @@ def wasm_rust_binary(name, tags = [], wasi = False, precompile = False, **kwargs
     wasm_name = "_wasm_" + name.replace(".", "_")
     kwargs.setdefault("visibility", ["//visibility:public"])
 
-    rust_binary(
+    rust_shared_library(
         name = wasm_name,
         edition = "2018",
-        crate_type = "cdylib",
-        out_binary = True,
         tags = ["manual"],
         **kwargs
     )

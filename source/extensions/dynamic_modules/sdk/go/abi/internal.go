@@ -21,6 +21,7 @@ import (
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/buffer"
+	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/recovery"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
 
@@ -258,11 +259,13 @@ func (h *dymHeaderMap) GetAll() [][2]shared.UnsafeEnvoyBuffer {
 	}
 
 	resultHeaders := make([]C.envoy_dynamic_module_type_envoy_http_header, headerCount)
-	C.envoy_dynamic_module_callback_http_get_headers(
+	if !bool(C.envoy_dynamic_module_callback_http_get_headers(
 		(C.envoy_dynamic_module_type_http_filter_envoy_ptr)(h.hostPluginPtr),
 		(C.envoy_dynamic_module_type_http_header_type)(h.headerType),
 		unsafe.SliceData(resultHeaders),
-	)
+	)) {
+		return nil
+	}
 	finalResult := envoyHttpHeaderSliceToUnsafeHeaderSlice(resultHeaders)
 	runtime.KeepAlive(resultHeaders)
 	return finalResult
@@ -959,6 +962,51 @@ func (h *dymHttpFilterHandle) GetAttributeBool(
 	return bool(value), true
 }
 
+func (h *dymHttpFilterHandle) GetTimingInfo() shared.TimingInfo {
+	var info C.envoy_dynamic_module_type_timing_info_v2
+	C.envoy_dynamic_module_callback_http_get_timing_info(h.hostPluginPtr, &info)
+	return shared.TimingInfo{
+		StartTimeUnixNs:                       int64(info.start_time_unix_ns),
+		DownstreamConnectionBeginNs:           int64(info.downstream_connection_begin_ns),
+		DownstreamHandshakeStartNs:            int64(info.downstream_handshake_start_ns),
+		DownstreamHandshakeCompleteNs:         int64(info.downstream_handshake_complete_ns),
+		LastDownstreamHeaderRxByteReceivedNs:  int64(info.last_downstream_header_rx_byte_received_ns),
+		LastDownstreamRxByteReceivedNs:        int64(info.last_downstream_rx_byte_received_ns),
+		UpstreamConnectStartNs:                int64(info.upstream_connect_start_ns),
+		UpstreamConnectCompleteNs:             int64(info.upstream_connect_complete_ns),
+		UpstreamHandshakeCompleteNs:           int64(info.upstream_handshake_complete_ns),
+		FirstUpstreamTxByteSentNs:             int64(info.first_upstream_tx_byte_sent_ns),
+		LastUpstreamTxByteSentNs:              int64(info.last_upstream_tx_byte_sent_ns),
+		FirstUpstreamRxByteReceivedNs:         int64(info.first_upstream_rx_byte_received_ns),
+		FirstUpstreamRxBodyByteReceivedNs:     int64(info.first_upstream_rx_body_byte_received_ns),
+		LastUpstreamRxByteReceivedNs:          int64(info.last_upstream_rx_byte_received_ns),
+		FirstDownstreamTxByteSentNs:           int64(info.first_downstream_tx_byte_sent_ns),
+		LastDownstreamTxByteSentNs:            int64(info.last_downstream_tx_byte_sent_ns),
+		LastDownstreamAckReceivedNs:           int64(info.last_downstream_ack_received_ns),
+		RequestCompleteDurationNs:             int64(info.request_complete_duration_ns),
+		DownstreamConnectionEndNs:             int64(info.downstream_connection_end_ns),
+		HasStartTime:                          bool(info.has_start_time),
+		HasDownstreamConnectionBegin:          bool(info.has_downstream_connection_begin),
+		HasDownstreamHandshakeStart:           bool(info.has_downstream_handshake_start),
+		HasDownstreamHandshakeComplete:        bool(info.has_downstream_handshake_complete),
+		HasLastDownstreamHeaderRxByteReceived: bool(info.has_last_downstream_header_rx_byte_received),
+		HasLastDownstreamRxByteReceived:       bool(info.has_last_downstream_rx_byte_received),
+		HasUpstreamConnectStart:               bool(info.has_upstream_connect_start),
+		HasUpstreamConnectComplete:            bool(info.has_upstream_connect_complete),
+		HasUpstreamHandshakeComplete:          bool(info.has_upstream_handshake_complete),
+		HasFirstUpstreamTxByteSent:            bool(info.has_first_upstream_tx_byte_sent),
+		HasLastUpstreamTxByteSent:             bool(info.has_last_upstream_tx_byte_sent),
+		HasFirstUpstreamRxByteReceived:        bool(info.has_first_upstream_rx_byte_received),
+		HasFirstUpstreamRxBodyByteReceived:    bool(info.has_first_upstream_rx_body_byte_received),
+		HasLastUpstreamRxByteReceived:         bool(info.has_last_upstream_rx_byte_received),
+		HasFirstDownstreamTxByteSent:          bool(info.has_first_downstream_tx_byte_sent),
+		HasLastDownstreamTxByteSent:           bool(info.has_last_downstream_tx_byte_sent),
+		HasLastDownstreamAckReceived:          bool(info.has_last_downstream_ack_received),
+		HasRequestComplete:                    bool(info.has_request_complete),
+		HasDownstreamConnectionEnd:            bool(info.has_downstream_connection_end),
+	}
+}
+
 func (h *dymHttpFilterHandle) GetFilterStateTyped(key string) (shared.UnsafeEnvoyBuffer, bool) {
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
 
@@ -1274,6 +1322,58 @@ func (h *dymHttpFilterHandle) GetClusterHostCounts(priority uint32) (shared.Clus
 		Healthy:  uint64(healthy),
 		Degraded: uint64(degraded),
 	}, true
+}
+
+func (h *dymHttpFilterHandle) GetUpstreamRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_http_get_upstream_remote_address(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
+func (h *dymHttpFilterHandle) GetUpstreamHostsAttempted() []shared.UnsafeEnvoyBuffer {
+	size := C.envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(h.hostPluginPtr)
+	if size == 0 {
+		return nil
+	}
+	buffers := make([]C.envoy_dynamic_module_type_envoy_buffer, size)
+	ret := C.envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(
+		h.hostPluginPtr,
+		unsafe.SliceData(buffers),
+	)
+	if !bool(ret) {
+		return nil
+	}
+	hosts := envoyBufferSliceToUnsafeEnvoyBufferSlice(buffers)
+	runtime.KeepAlive(buffers)
+	return hosts
+}
+
+func (h *dymHttpFilterHandle) GetUpstreamConnectionIDsAttempted() []uint64 {
+	size := C.envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+		h.hostPluginPtr,
+	)
+	if size == 0 {
+		return nil
+	}
+	connectionIDs := make([]uint64, size)
+	ret := C.envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+		h.hostPluginPtr,
+		(*C.uint64_t)(unsafe.Pointer(unsafe.SliceData(connectionIDs))),
+	)
+	runtime.KeepAlive(connectionIDs)
+	if !bool(ret) {
+		return nil
+	}
+	return connectionIDs
 }
 
 func (h *dymHttpFilterHandle) SetUpstreamOverrideHost(host string, strict bool) bool {
@@ -2027,7 +2127,8 @@ func (h *dymRouteConfigHandle) DefineCounter(name string,
 }
 
 //export envoy_dynamic_module_on_program_init
-func envoy_dynamic_module_on_program_init() C.envoy_dynamic_module_type_abi_version_module_ptr {
+func envoy_dynamic_module_on_program_init() (version C.envoy_dynamic_module_type_abi_version_module_ptr) {
+	defer recovery.Export("envoy_dynamic_module_on_program_init", nil, &version)
 	return C.envoy_dynamic_module_type_abi_version_module_ptr(C.envoy_dynamic_modules_abi_version)
 }
 
@@ -2036,7 +2137,8 @@ func envoy_dynamic_module_on_http_filter_config_new(
 	hostConfigPtr C.envoy_dynamic_module_type_http_filter_config_envoy_ptr,
 	name C.envoy_dynamic_module_type_envoy_buffer,
 	config C.envoy_dynamic_module_type_envoy_buffer,
-) C.envoy_dynamic_module_type_http_filter_config_module_ptr {
+) (modulePtr C.envoy_dynamic_module_type_http_filter_config_module_ptr) {
+	defer recovery.Export("envoy_dynamic_module_on_http_filter_config_new", nil, &modulePtr)
 	nameString := envoyBufferToStringUnsafe(name)
 	configBytes := envoyBufferToBytesUnsafe(config)
 
@@ -2054,6 +2156,7 @@ func envoy_dynamic_module_on_http_filter_config_new(
 func envoy_dynamic_module_on_http_filter_config_destroy(
 	configPtr C.envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_config_destroy")
 	factoryWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
 	if factoryWrapper == nil {
 		return
@@ -2067,7 +2170,8 @@ func envoy_dynamic_module_on_http_filter_config_destroy(
 func envoy_dynamic_module_on_http_filter_per_route_config_new(
 	name C.envoy_dynamic_module_type_envoy_buffer,
 	config C.envoy_dynamic_module_type_envoy_buffer,
-) C.envoy_dynamic_module_type_http_filter_per_route_config_module_ptr {
+) (modulePtr C.envoy_dynamic_module_type_http_filter_per_route_config_module_ptr) {
+	defer recovery.Export("envoy_dynamic_module_on_http_filter_per_route_config_new", nil, &modulePtr)
 	nameStr := envoyBufferToStringUnsafe(name)
 	configBytes := envoyBufferToBytesUnsafe(config)
 
@@ -2095,6 +2199,7 @@ func envoy_dynamic_module_on_http_filter_per_route_config_new(
 func envoy_dynamic_module_on_http_filter_per_route_config_destroy(
 	configPtr C.envoy_dynamic_module_type_http_filter_per_route_config_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_per_route_config_destroy")
 	configPerRouteManager.remove(unsafe.Pointer(configPtr))
 }
 
@@ -2102,7 +2207,8 @@ func envoy_dynamic_module_on_http_filter_per_route_config_destroy(
 func envoy_dynamic_module_on_http_filter_new(
 	pluginConfigPtr C.envoy_dynamic_module_type_http_filter_config_module_ptr,
 	hostPluginPtr C.envoy_dynamic_module_type_http_filter_envoy_ptr,
-) C.envoy_dynamic_module_type_http_filter_module_ptr {
+) (modulePtr C.envoy_dynamic_module_type_http_filter_module_ptr) {
+	defer recovery.Export("envoy_dynamic_module_on_http_filter_new", nil, &modulePtr)
 	factoryWrapper := configManager.unwrap(unsafe.Pointer(pluginConfigPtr))
 	if factoryWrapper == nil {
 		return nil
@@ -2120,6 +2226,7 @@ func envoy_dynamic_module_on_http_filter_new(
 func envoy_dynamic_module_on_http_filter_destroy(
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_destroy")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.streamDestoried {
 		return
@@ -2136,7 +2243,9 @@ func envoy_dynamic_module_on_http_filter_request_headers(
 	_ C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 	endOfStream C.bool,
-) C.envoy_dynamic_module_type_on_http_filter_request_headers_status {
+) (status C.envoy_dynamic_module_type_on_http_filter_request_headers_status) {
+	defer recovery.Export("envoy_dynamic_module_on_http_filter_request_headers",
+		C.envoy_dynamic_module_type_on_http_filter_request_headers_status_StopIteration, &status)
 	// Get the plugin wrapper.
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.plugin == nil {
@@ -2152,7 +2261,9 @@ func envoy_dynamic_module_on_http_filter_request_body(
 	_ C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 	endOfStream C.bool,
-) C.envoy_dynamic_module_type_on_http_filter_request_body_status {
+) (status C.envoy_dynamic_module_type_on_http_filter_request_body_status) {
+	defer recovery.Export("envoy_dynamic_module_on_http_filter_request_body",
+		C.envoy_dynamic_module_type_on_http_filter_request_body_status_StopIterationNoBuffer, &status)
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.plugin == nil {
 		return 0
@@ -2165,7 +2276,9 @@ func envoy_dynamic_module_on_http_filter_request_body(
 func envoy_dynamic_module_on_http_filter_request_trailers(
 	_ C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
-) C.envoy_dynamic_module_type_on_http_filter_request_trailers_status {
+) (status C.envoy_dynamic_module_type_on_http_filter_request_trailers_status) {
+	defer recovery.Export("envoy_dynamic_module_on_http_filter_request_trailers",
+		C.envoy_dynamic_module_type_on_http_filter_request_trailers_status_StopIteration, &status)
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.plugin == nil {
 		return 0
@@ -2179,7 +2292,9 @@ func envoy_dynamic_module_on_http_filter_response_headers(
 	_ C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 	endOfStream C.bool,
-) C.envoy_dynamic_module_type_on_http_filter_response_headers_status {
+) (status C.envoy_dynamic_module_type_on_http_filter_response_headers_status) {
+	defer recovery.Export("envoy_dynamic_module_on_http_filter_response_headers",
+		C.envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration, &status)
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.plugin == nil || pluginWrapper.localResponseSent {
 		return 0
@@ -2193,7 +2308,9 @@ func envoy_dynamic_module_on_http_filter_response_body(
 	_ C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 	endOfStream C.bool,
-) C.envoy_dynamic_module_type_on_http_filter_response_body_status {
+) (status C.envoy_dynamic_module_type_on_http_filter_response_body_status) {
+	defer recovery.Export("envoy_dynamic_module_on_http_filter_response_body",
+		C.envoy_dynamic_module_type_on_http_filter_response_body_status_StopIterationNoBuffer, &status)
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.plugin == nil || pluginWrapper.localResponseSent {
 		return 0
@@ -2206,7 +2323,9 @@ func envoy_dynamic_module_on_http_filter_response_body(
 func envoy_dynamic_module_on_http_filter_response_trailers(
 	_ C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
-) C.envoy_dynamic_module_type_on_http_filter_response_trailers_status {
+) (status C.envoy_dynamic_module_type_on_http_filter_response_trailers_status) {
+	defer recovery.Export("envoy_dynamic_module_on_http_filter_response_trailers",
+		C.envoy_dynamic_module_type_on_http_filter_response_trailers_status_StopIteration, &status)
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.plugin == nil || pluginWrapper.localResponseSent {
 		return 0
@@ -2220,6 +2339,7 @@ func envoy_dynamic_module_on_http_filter_stream_complete(
 	_ C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_stream_complete")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.plugin == nil {
 		return
@@ -2236,6 +2356,7 @@ func envoy_dynamic_module_on_http_filter_scheduled(
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 	taskID C.uint64_t,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_scheduled")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.scheduler == nil || pluginWrapper.streamCompleted {
 		return
@@ -2254,6 +2375,7 @@ func envoy_dynamic_module_on_http_filter_http_callout_done(
 	chunks *C.envoy_dynamic_module_type_envoy_buffer,
 	chunksSize C.size_t,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_http_callout_done")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
@@ -2283,6 +2405,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_headers(
 	headersSize C.size_t,
 	endOfStream C.bool,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_http_stream_headers")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
@@ -2306,6 +2429,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_data(
 	chunksSize C.size_t,
 	endOfStream C.bool,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_http_stream_data")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
@@ -2328,6 +2452,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_trailers(
 	trailers *C.envoy_dynamic_module_type_envoy_http_header,
 	trailersSize C.size_t,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_http_stream_trailers")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
@@ -2348,6 +2473,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_complete(
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 	streamID C.uint64_t,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_http_stream_complete")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
@@ -2367,6 +2493,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_reset(
 	streamID C.uint64_t,
 	reason C.envoy_dynamic_module_type_http_stream_reset_reason,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_http_stream_reset")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
@@ -2384,6 +2511,7 @@ func envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_wate
 	_ C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
@@ -2399,6 +2527,7 @@ func envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_water
 	_ C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark")
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
@@ -2416,7 +2545,9 @@ func envoy_dynamic_module_on_http_filter_local_reply(
 	response_code C.uint32_t,
 	details C.envoy_dynamic_module_type_envoy_buffer,
 	reset_imminent C.bool,
-) C.envoy_dynamic_module_type_on_http_filter_local_reply_status {
+) (status C.envoy_dynamic_module_type_on_http_filter_local_reply_status) {
+	defer recovery.Export("envoy_dynamic_module_on_http_filter_local_reply",
+		C.envoy_dynamic_module_type_on_http_filter_local_reply_status_Continue, &status)
 	_ = filter_envoy_ptr
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(filter_module_ptr))
 	if pluginWrapper == nil || pluginWrapper.plugin == nil {
@@ -2445,6 +2576,7 @@ func envoy_dynamic_module_on_http_filter_config_http_callout_done(
 	chunks *C.envoy_dynamic_module_type_envoy_buffer,
 	chunksSize C.size_t,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_config_http_callout_done")
 	configWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
 	if configWrapper == nil || configWrapper.configHandle == nil {
 		return
@@ -2470,6 +2602,7 @@ func envoy_dynamic_module_on_http_filter_config_http_stream_headers(
 	headersSize C.size_t,
 	endOfStream C.bool,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_config_http_stream_headers")
 	configWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
 	if configWrapper == nil || configWrapper.configHandle == nil {
 		return
@@ -2493,6 +2626,7 @@ func envoy_dynamic_module_on_http_filter_config_http_stream_data(
 	chunksSize C.size_t,
 	endOfStream C.bool,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_config_http_stream_data")
 	configWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
 	if configWrapper == nil || configWrapper.configHandle == nil {
 		return
@@ -2515,6 +2649,7 @@ func envoy_dynamic_module_on_http_filter_config_http_stream_trailers(
 	trailers *C.envoy_dynamic_module_type_envoy_http_header,
 	trailersSize C.size_t,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_config_http_stream_trailers")
 	configWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
 	if configWrapper == nil || configWrapper.configHandle == nil {
 		return
@@ -2535,6 +2670,7 @@ func envoy_dynamic_module_on_http_filter_config_http_stream_complete(
 	configPtr C.envoy_dynamic_module_type_http_filter_config_module_ptr,
 	streamID C.uint64_t,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_config_http_stream_complete")
 	configWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
 	if configWrapper == nil || configWrapper.configHandle == nil {
 		return
@@ -2555,6 +2691,7 @@ func envoy_dynamic_module_on_http_filter_config_http_stream_reset(
 	streamID C.uint64_t,
 	reason C.envoy_dynamic_module_type_http_stream_reset_reason,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_config_http_stream_reset")
 	configWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
 	if configWrapper == nil || configWrapper.configHandle == nil {
 		return
@@ -2574,6 +2711,7 @@ func envoy_dynamic_module_on_http_filter_config_scheduled(
 	configPtr C.envoy_dynamic_module_type_http_filter_config_module_ptr,
 	taskID C.uint64_t,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_http_filter_config_scheduled")
 	configWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
 	if configWrapper == nil || configWrapper.configHandle == nil {
 		return
@@ -2909,7 +3047,8 @@ func envoy_dynamic_module_on_stat_sink_config_new(
 	configEnvoyPtr C.envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
 	name C.envoy_dynamic_module_type_envoy_buffer,
 	config C.envoy_dynamic_module_type_envoy_buffer,
-) C.envoy_dynamic_module_type_stat_sink_config_module_ptr {
+) (modulePtr C.envoy_dynamic_module_type_stat_sink_config_module_ptr) {
+	defer recovery.Export("envoy_dynamic_module_on_stat_sink_config_new", nil, &modulePtr)
 	nameString := envoyBufferToStringUnsafe(name)
 	configBytes := envoyBufferToBytesUnsafe(config)
 
@@ -2928,6 +3067,7 @@ func envoy_dynamic_module_on_stat_sink_config_new(
 func envoy_dynamic_module_on_stat_sink_config_destroy(
 	configPtr C.envoy_dynamic_module_type_stat_sink_config_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_stat_sink_config_destroy")
 	wrapper := statSinkConfigManager.unwrap(unsafe.Pointer(configPtr))
 	if wrapper == nil {
 		return
@@ -2945,6 +3085,7 @@ func envoy_dynamic_module_on_stat_sink_flush(
 	configPtr C.envoy_dynamic_module_type_stat_sink_config_module_ptr,
 	snapshotPtr C.envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_stat_sink_flush")
 	wrapper := statSinkConfigManager.unwrap(unsafe.Pointer(configPtr))
 	if wrapper == nil {
 		return
@@ -2959,6 +3100,7 @@ func envoy_dynamic_module_on_stat_sink_on_histogram_complete(
 	histogramName C.envoy_dynamic_module_type_envoy_buffer,
 	value C.uint64_t,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_stat_sink_on_histogram_complete")
 	wrapper := statSinkConfigManager.unwrap(unsafe.Pointer(configPtr))
 	if wrapper == nil {
 		return
@@ -2972,6 +3114,7 @@ func envoy_dynamic_module_on_stat_sink_config_scheduled(
 	configPtr C.envoy_dynamic_module_type_stat_sink_config_module_ptr,
 	taskID C.uint64_t,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_stat_sink_config_scheduled")
 	wrapper := statSinkConfigManager.unwrap(unsafe.Pointer(configPtr))
 	if wrapper == nil || wrapper.handle == nil || wrapper.handle.scheduler == nil {
 		return

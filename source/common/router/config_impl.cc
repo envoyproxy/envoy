@@ -46,6 +46,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/header_cluster_specifier.h"
 #include "source/common/router/matcher_visitor.h"
+#include "source/common/router/path_rewrite_utility.h"
 #include "source/common/router/route_specifier_impl.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
@@ -125,6 +126,56 @@ public:
     return route;
   }
 };
+
+namespace {
+
+// Evaluates a route a specifier built the same way route matching evaluates a configured route.
+class MatchableRouteImpl : public MatchableRoute {
+public:
+  MatchableRouteImpl(RouteEntryImplBaseConstSharedPtr route, bool ignore_path_parameters)
+      : route_(std::move(route)), ignore_path_parameters_(ignore_path_parameters) {}
+
+  // Router::MatchableRoute
+  RouteConstSharedPtr match(const Http::RequestHeaderMap& headers,
+                            const StreamInfo::StreamInfo& stream_info,
+                            uint64_t random) const override {
+    if (headers.Path() == nullptr && !route_->supportsPathlessHeaders()) {
+      return nullptr;
+    }
+    RouteMatchContext context(headers, ignore_path_parameters_);
+    if (!route_->matches(context, stream_info, random)) {
+      return nullptr;
+    }
+    return route_->clusterEntry(headers, stream_info, random);
+  }
+
+private:
+  const RouteEntryImplBaseConstSharedPtr route_;
+  const bool ignore_path_parameters_;
+};
+
+} // namespace
+
+absl::StatusOr<MatchableRouteConstSharedPtr>
+RouteBuilderImpl::build(const envoy::config::route::v3::Route& route, bool validate_clusters) {
+  if (!route.route_specifiers().empty()) {
+    return absl::InvalidArgumentError("route_specifiers are not supported on a built route");
+  }
+  // Building a route runs the extensions it configures, which throw on configuration they reject,
+  // so the caller only has to handle a status.
+  absl::StatusOr<RouteEntryImplBaseConstSharedPtr> route_or_error =
+      absl::InvalidArgumentError("unreachable");
+  TRY_ASSERT_MAIN_THREAD {
+    route_or_error = RouteCreator::createAndValidateRoute(
+        route, vhost_, factory_context_, validator_, init_manager_, validate_clusters);
+  }
+  END_TRY
+  CATCH(const EnvoyException& e, { route_or_error = absl::InvalidArgumentError(e.what()); });
+  RETURN_IF_NOT_OK_REF(route_or_error.status());
+  return std::make_shared<MatchableRouteImpl>(
+      std::move(route_or_error.value()),
+      vhost_->globalRouteConfig().ignorePathParametersInPathMatching());
+}
 
 namespace {
 
@@ -212,40 +263,6 @@ createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine
     redirect_config->path_rewrite_formatter_ = std::move(formatter_or.value());
   }
   return redirect_config;
-}
-
-std::string generateNewPath(absl::string_view origin_path, absl::string_view path_to_strip,
-                            absl::string_view new_path_to_replace) {
-  ASSERT(path_to_strip.size() <= origin_path.size());
-
-  std::string result;
-  result.reserve(new_path_to_replace.size() + origin_path.size() - path_to_strip.size());
-  result.append(new_path_to_replace);
-  result.append(origin_path.substr(path_to_strip.size()));
-  return result;
-}
-
-std::string rewritePathByPrefixOrRegex(absl::string_view path, absl::string_view matched,
-                                       absl::string_view prefix_rewrite,
-                                       const Regex::CompiledMatcher* regex_rewrite,
-                                       absl::string_view regex_rewrite_substitution) {
-  if (!prefix_rewrite.empty()) {
-    ASSERT(absl::StartsWithIgnoreCase(path, matched));
-    return generateNewPath(path, matched, prefix_rewrite);
-  }
-
-  if (regex_rewrite != nullptr) {
-    absl::string_view path_only = Http::PathUtil::removeQueryAndFragment(path);
-    ASSERT(path_only.size() <= path.size());
-    const std::string new_path_only =
-        regex_rewrite->replaceAll(path_only, regex_rewrite_substitution);
-    // If regex rewrite fails then return nothing.
-    if (new_path_only.empty()) {
-      return {};
-    }
-    return generateNewPath(path, path_only, new_path_only);
-  }
-  return {};
 }
 
 } // namespace
@@ -804,7 +821,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
 
-  auto route_specifiers_or_error = createRouteSpecifiers(route.route_specifiers(), factory_context);
+  RouteBuilderImpl route_builder(vhost, factory_context, validator, init_manager);
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, route_builder);
+  auto route_specifiers_or_error =
+      createRouteSpecifiers(route.route_specifiers(), specifier_context);
   SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
   route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
@@ -931,17 +951,17 @@ void RouteEntryImplBase::finalizePathHeaderForRedirect(Http::RequestHeaderMap& h
   if (redirect_config_ == nullptr) {
     return;
   }
-  const std::string new_path = rewritePathByPrefixOrRegex(
+  const std::optional<std::string> new_path = rewritePathByPrefixOrRegex(
       headers.getPathValue(), matched_path, redirect_config_->prefix_rewrite_redirect_,
       redirect_config_->regex_rewrite_redirect_.get(),
-      redirect_config_->regex_rewrite_redirect_substitution_);
+      redirect_config_->regex_rewrite_redirect_substitution_, std::numeric_limits<size_t>::max());
 
-  // Empty new_path means there is no rewrite or the rewrite fails. Then we do nothing.
-  if (!new_path.empty()) {
+  // A missing new_path means there is no rewrite or the rewrite fails. Then we do nothing.
+  if (new_path.has_value()) {
     if (keep_old_path) {
       headers.setEnvoyOriginalPath(headers.getPathValue());
     }
-    headers.setPath(new_path);
+    headers.setPath(*new_path);
   }
 }
 
@@ -1097,7 +1117,11 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
       return {};
     }
     absl::string_view path_only = Http::PathUtil::removeQueryAndFragment(path_with_query);
-    return generateNewPath(path_with_query, path_only, new_path_only);
+    // path_only is a prefix of path_with_query, so a native rewrite is never out of range.
+    std::optional<std::string> new_path = generateNewPath(path_with_query, path_only, new_path_only,
+                                                          std::numeric_limits<size_t>::max());
+    ENVOY_BUG(new_path.has_value(), "native path rewrite produced no result");
+    return new_path.value_or(std::string{});
   }
 
   // Handle the case where path_rewrite_policy is configured.
@@ -1110,12 +1134,17 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
     if (!new_path_only.ok() || new_path_only->empty()) {
       return {};
     }
-    return generateNewPath(path_with_query, path_only, new_path_only.value());
+    std::optional<std::string> new_path = generateNewPath(
+        path_with_query, path_only, new_path_only.value(), std::numeric_limits<size_t>::max());
+    ENVOY_BUG(new_path.has_value(), "native path rewrite produced no result");
+    return new_path.value_or(std::string{});
   }
 
   // Handle the case where prefix_rewrite or regex_rewrite is configured.
   return rewritePathByPrefixOrRegex(path_with_query, matched_path, prefix_rewrite_,
-                                    regex_rewrite_.get(), regex_rewrite_substitution_);
+                                    regex_rewrite_.get(), regex_rewrite_substitution_,
+                                    std::numeric_limits<size_t>::max())
+      .value_or(std::string{});
 }
 
 std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers,
@@ -1414,15 +1443,14 @@ std::string UriTemplateMatcherRouteEntryImpl::currentUrlPathAfterRewrite(
                                                    path_matcher_->uriTemplate());
 }
 
-RouteConstSharedPtr
-UriTemplateMatcherRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                          const StreamInfo::StreamInfo& stream_info,
-                                          uint64_t random_value) const {
+bool UriTemplateMatcherRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                               const StreamInfo::StreamInfo& stream_info,
+                                               uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
       path_matcher_->match(route_match_context.path())) {
-    return clusterEntry(route_match_context.headers(), stream_info, random_value);
+    return true;
   }
-  return nullptr;
+  return false;
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(
@@ -1449,14 +1477,14 @@ PrefixRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& h
   return currentUrlPathAfterRewriteWithMatchedPath(headers, context, stream_info, matcher());
 }
 
-RouteConstSharedPtr PrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                                  const StreamInfo::StreamInfo& stream_info,
-                                                  uint64_t random_value) const {
+bool PrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
-    return clusterEntry(route_match_context.headers(), stream_info, random_value);
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
+    return true;
   }
-  return nullptr;
+  return false;
 }
 
 PathRouteEntryImpl::PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
@@ -1483,15 +1511,15 @@ PathRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& hea
   return currentUrlPathAfterRewriteWithMatchedPath(headers, context, stream_info, matcher());
 }
 
-RouteConstSharedPtr PathRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                                const StreamInfo::StreamInfo& stream_info,
-                                                uint64_t random_value) const {
+bool PathRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                 const StreamInfo::StreamInfo& stream_info,
+                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
-    return clusterEntry(route_match_context.headers(), stream_info, random_value);
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
+    return true;
   }
 
-  return nullptr;
+  return false;
 }
 
 RegexRouteEntryImpl::RegexRouteEntryImpl(
@@ -1525,15 +1553,15 @@ RegexRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& he
   return currentUrlPathAfterRewriteWithMatchedPath(headers, context, stream_info, path);
 }
 
-RouteConstSharedPtr RegexRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                                 const StreamInfo::StreamInfo& stream_info,
-                                                 uint64_t random_value) const {
+bool RegexRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                  const StreamInfo::StreamInfo& stream_info,
+                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    if (path_matcher_->match(route_match_context.sanitizedPath())) {
-      return clusterEntry(route_match_context.headers(), stream_info, random_value);
+    if (path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
+      return true;
     }
   }
-  return nullptr;
+  return false;
 }
 
 ConnectRouteEntryImpl::ConnectRouteEntryImpl(
@@ -1557,16 +1585,16 @@ ConnectRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& 
   return currentUrlPathAfterRewriteWithMatchedPath(headers, context, stream_info, path);
 }
 
-RouteConstSharedPtr ConnectRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                                   const StreamInfo::StreamInfo& stream_info,
-                                                   uint64_t random_value) const {
+bool ConnectRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    uint64_t random_value) const {
   const Http::RequestHeaderMap& headers = route_match_context.headers();
   if ((Http::HeaderUtility::isConnect(headers) ||
        Http::HeaderUtility::isConnectUdpRequest(headers)) &&
       RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    return clusterEntry(headers, stream_info, random_value);
+    return true;
   }
-  return nullptr;
+  return false;
 }
 
 PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
@@ -1592,21 +1620,20 @@ std::string PathSeparatedPrefixRouteEntryImpl::currentUrlPathAfterRewrite(
   return currentUrlPathAfterRewriteWithMatchedPath(headers, context, stream_info, matcher());
 }
 
-RouteConstSharedPtr
-PathSeparatedPrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                           const StreamInfo::StreamInfo& stream_info,
-                                           uint64_t random_value) const {
+bool PathSeparatedPrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                                const StreamInfo::StreamInfo& stream_info,
+                                                uint64_t random_value) const {
   if (!RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    return nullptr;
+    return false;
   }
   const absl::string_view sanitized_path = route_match_context.sanitizedPathWithoutQuery();
   const size_t sanitized_size = sanitized_path.size();
   const size_t matcher_size = matcher().size();
-  if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
+  if (sanitized_size >= matcher_size && path_matcher_->matchPathWithoutQuery(sanitized_path) &&
       (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
-    return clusterEntry(route_match_context.headers(), stream_info, random_value);
+    return true;
   }
-  return nullptr;
+  return false;
 }
 
 CommonVirtualHostImpl::CommonVirtualHostImpl(
@@ -1706,11 +1733,6 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   if (virtual_host.has_metadata()) {
     metadata_ = std::make_unique<RouteMetadataPack>(virtual_host.metadata());
   }
-
-  auto route_specifiers_or_error =
-      createRouteSpecifiers(virtual_host.route_specifiers(), factory_context);
-  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
-  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
 CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
@@ -1832,25 +1854,59 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       routes_.emplace_back(route_or_error.value());
     }
   }
+
+  RouteBuilderImpl route_builder(shared_virtual_host_, factory_context, validator, init_manager);
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, route_builder);
+  auto route_specifiers_or_error =
+      createRouteSpecifiers(virtual_host.route_specifiers(), specifier_context);
+  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
+  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
 VirtualHostMatchResult VirtualHostImpl::getRouteFromRoutes(
     const RouteCallback& cb, const RouteMatchContext& route_match_context,
     const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
     absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const {
+  const Http::RequestHeaderMap& headers = route_match_context.headers();
+  const RouteSpecifierSpan config_specifiers =
+      shared_virtual_host_->globalRouteConfig().routeSpecifiers();
+
   for (auto route = routes.begin(); route != routes.end(); ++route) {
-    if (!route_match_context.headers().Path() && !(*route)->supportsPathlessHeaders()) {
+    if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
       continue;
     }
 
-    RouteConstSharedPtr route_entry =
-        (*route)->matches(route_match_context, stream_info, random_value);
+    if (!(*route)->matches(route_match_context, stream_info, random_value)) {
+      continue;
+    }
+
+    RouteConstSharedPtr route_entry = (*route)->clusterEntry(headers, stream_info, random_value);
     if (route_entry == nullptr) {
       continue;
     }
 
+    const RouteSpecifierSpan route_specifiers = (*route)->routeSpecifiers();
+    const bool has_route_specifiers =
+        !config_specifiers.empty() || !route_specifiers_.empty() || !route_specifiers.empty();
+    if (has_route_specifiers) {
+      OnRouteMatchStatus specifier_match_status = OnRouteMatchStatus::Unspecified;
+      route_entry = applyRouteSpecifiers(std::move(route_entry), config_specifiers,
+                                         route_specifiers_, route_specifiers, headers, stream_info,
+                                         random_value, specifier_match_status);
+      if (specifier_match_status == OnRouteMatchStatus::Continue) {
+        // The specifiers turned this route down, carry on with the next one.
+        continue;
+      }
+      if (route_entry == nullptr) {
+        // The specifiers accepted the match and dropped the route, which leaves the request with
+        // no route. There is nothing for the callback to look at, and the specifiers of the
+        // levels above the route have had their say, so they do not run again.
+        return {nullptr, true};
+      }
+    }
+
     if (cb == nullptr) {
-      return {std::move(route_entry), (*route)->routeSpecifiers()};
+      return {std::move(route_entry), true};
     }
 
     RouteEvalStatus eval_status = (std::next(route) == routes.end())
@@ -1858,7 +1914,7 @@ VirtualHostMatchResult VirtualHostImpl::getRouteFromRoutes(
                                       : RouteEvalStatus::HasMoreRoutes;
     RouteMatchStatus match_status = cb(route_entry, eval_status);
     if (match_status == RouteMatchStatus::Accept) {
-      return {std::move(route_entry), (*route)->routeSpecifiers()};
+      return {std::move(route_entry), true};
     }
     if (match_status == RouteMatchStatus::Continue &&
         eval_status == RouteEvalStatus::NoMoreRoutes) {
@@ -2097,20 +2153,15 @@ VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::Reques
     match_result = virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
   }
 
-  const bool has_route_specifiers = !config_specifiers.empty() || !vhost_specifiers.empty() ||
-                                    !match_result.route_specifiers.empty();
-  if (!has_route_specifiers) {
-    // Quick return if there are no route specifiers at any level.
-    route_result.route = std::move(match_result.route);
-    return route_result;
+  route_result.route = std::move(match_result.route);
+
+  if (!match_result.specifiers_applied) {
+    OnRouteMatchStatus match_status = OnRouteMatchStatus::Unspecified;
+    route_result.route =
+        applyRouteSpecifiers(std::move(route_result.route), config_specifiers, vhost_specifiers, {},
+                             headers, stream_info, random_value, match_status);
   }
 
-  // The route configuration and virtual host chains run whether or not a route matched, so that a
-  // specifier can supply a fallback route for a request that would otherwise get no route at all.
-  // The route level chain is empty unless a route matched.
-  route_result.route =
-      applyRouteSpecifiers(std::move(match_result.route), config_specifiers, vhost_specifiers,
-                           match_result.route_specifiers, headers, stream_info, random_value);
   if (route_result.route != nullptr) {
     if (std::addressof(route_result.route->virtualHost()) != route_result.vhost.get()) {
       route_result.vhost = route_result.route->virtualHostSharedPtr();
@@ -2206,8 +2257,9 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
     metadata_ = std::make_unique<RouteMetadataPack>(config.metadata());
   }
 
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, {});
   auto route_specifiers_or_error =
-      createRouteSpecifiers(config.route_specifiers(), factory_context);
+      createRouteSpecifiers(config.route_specifiers(), specifier_context);
   SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
   route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
