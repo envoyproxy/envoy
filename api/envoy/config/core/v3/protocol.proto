@@ -321,9 +321,10 @@ message HttpProtocolOptions {
   //   Request based timeouts mean that HTTP/2 PINGs will not keep the connection alive.
   //
   // If not specified, this defaults to ``1 hour``. To disable idle timeouts explicitly set this to ``0``.
-  // During general server draining, the HTTP connection manager's :ref:`drain_timeout
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`
-  // overrides this value for downstream connections.
+  // This idle timeout does not apply during general server draining. An idle downstream HTTP
+  // connection instead enters the drain sequence, which is controlled by the HTTP connection
+  // manager's :ref:`drain_timeout
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
   //
   // .. warning::
   //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP

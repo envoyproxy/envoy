@@ -270,8 +270,6 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   // Captured once here rather than plumbed through the filter factory: the drain type belongs to
   // the listener that accepted this connection, and is reachable from the connection itself.
   drain_type_ = Network::listenerDrainType(read_callbacks_->connection());
-  resetConnectionIdleTimer();
-  read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_->addProxyProtocolConnectionState() &&
       !read_callbacks_->connection()
@@ -284,6 +282,13 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
             read_callbacks_->connection().connectionInfoProvider().remoteAddress(),
             read_callbacks_->connection().connectionInfoProvider().localAddress()}),
         StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+  if (config_->idleTimeout()) {
+    connection_idle_timer_ =
+        dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout,
+                                       [this]() -> void { onIdleTimeout(); });
+    connection_idle_timer_->enableTimer(config_->idleTimeout().value());
   }
 
   if (auto max_connection_duration = config_->maxConnectionDuration(); max_connection_duration) {
@@ -299,6 +304,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
       {stats_.named_.downstream_cx_rx_bytes_total_, stats_.named_.downstream_cx_rx_bytes_buffered_,
        stats_.named_.downstream_cx_tx_bytes_total_, stats_.named_.downstream_cx_tx_bytes_buffered_,
        nullptr, &stats_.named_.downstream_cx_delayed_close_timeout_});
+  read_callbacks_->connection().addConnectionCallbacks(*this);
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
@@ -461,8 +467,12 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.response_encoder_->getStream().removeCallbacks(stream);
   }
 
-  if (streams_.empty()) {
-    resetConnectionIdleTimer();
+  if (streams_.empty() && !connection_close_started_) {
+    if (connection_drain_event_.has_value() && codec_ && drain_state_ == DrainState::NotDraining) {
+      startDrainSequence();
+    } else if (connection_idle_timer_ && !connection_drain_event_.has_value()) {
+      connection_idle_timer_->enableTimer(config_->idleTimeout().value());
+    }
   }
   maybeDrainDueToPrematureResets();
 }
@@ -725,9 +735,23 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
   if (!connection_drain_event_.has_value()) {
     connection_drain_event_ = drain_event;
-    if (streams_.empty()) {
-      // Use drain_timeout as the idle timeout once draining begins.
-      resetConnectionIdleTimer();
+    if (streams_.empty() && !connection_close_started_) {
+      if (codec_) {
+        if (connection_idle_timer_) {
+          connection_idle_timer_->disableTimer();
+        }
+        if (drain_state_ == DrainState::NotDraining) {
+          startDrainSequence();
+        }
+      } else {
+        // A connection without a codec cannot start the HTTP drain sequence.
+        if (!connection_idle_timer_) {
+          connection_idle_timer_ = dispatcher_->createScaledTimer(
+              Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout,
+              [this]() -> void { onIdleTimeout(); });
+        }
+        connection_idle_timer_->enableTimer(config_->drainTimeout());
+      }
     }
   }
 }
@@ -879,29 +903,6 @@ void ConnectionManagerImpl::onIdleTimeout() {
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
   }
-}
-
-void ConnectionManagerImpl::resetConnectionIdleTimer() {
-  if (connection_close_started_) {
-    return;
-  }
-
-  auto timeout = config_->idleTimeout();
-  if (connection_drain_event_.has_value()) {
-    timeout = config_->drainTimeout();
-  }
-  if (!timeout.has_value()) {
-    if (connection_idle_timer_) {
-      connection_idle_timer_->disableTimer();
-    }
-    return;
-  }
-  if (!connection_idle_timer_) {
-    connection_idle_timer_ =
-        dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout,
-                                       [this]() -> void { onIdleTimeout(); });
-  }
-  connection_idle_timer_->enableTimer(timeout.value());
 }
 
 void ConnectionManagerImpl::onConnectionDurationTimeout() {

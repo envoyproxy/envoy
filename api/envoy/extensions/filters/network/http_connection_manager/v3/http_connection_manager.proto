@@ -663,9 +663,10 @@ message HttpConnectionManager {
   // frame is sent and Envoy will start refusing new streams. Draining occurs
   // either when a connection hits the idle timeout, when :ref:`max_connection_duration
   // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`
-  // is reached, or during general server draining. During general server draining, this value also
-  // overrides the idle timeout for downstream connections. The default grace period is 5000
-  // milliseconds (5 seconds) if this option is not specified.
+  // is reached, or during general server draining. An idle downstream HTTP connection enters this
+  // drain sequence when general server draining begins; the connection idle timeout no longer
+  // applies. The default grace period is 5000 milliseconds (5 seconds) if this option is not
+  // specified.
   google.protobuf.Duration drain_timeout = 12;
 
   // Percentage-based jitter for ``drain_timeout``. If set, the actual drain grace period

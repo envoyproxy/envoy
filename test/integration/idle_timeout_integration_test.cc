@@ -127,7 +127,7 @@ public:
 
   static constexpr uint64_t IdleTimeoutMs = 300 * TIMEOUT_FACTOR;
   static constexpr uint64_t RequestTimeoutMs = 200 * TIMEOUT_FACTOR;
-  static constexpr uint64_t DrainTimeoutMs = 100 * TIMEOUT_FACTOR;
+  static constexpr uint64_t DrainTimeoutMs = 1000 * TIMEOUT_FACTOR;
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
@@ -140,7 +140,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, IdleTimeoutIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(IdleTimeoutIntegrationTest, DrainTimeoutClosesIdleConnection) {
+TEST_P(IdleTimeoutIntegrationTest, ClosesIdleConnectionWithinOneDrainTimeout) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
@@ -160,8 +160,8 @@ TEST_P(IdleTimeoutIntegrationTest, DrainTimeoutClosesIdleConnection) {
 
   startServerDrain();
 
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  test_server_->waitForCounter("http.config_test.downstream_cx_idle_timeout", Ge(1));
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs * 3 / 2)));
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
   if (downstream_protocol_ != Http::CodecType::HTTP1) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
