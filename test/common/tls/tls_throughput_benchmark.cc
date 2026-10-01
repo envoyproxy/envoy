@@ -1,13 +1,27 @@
 #include <cerrno>
 #include <string>
 
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/network/io_socket_handle_impl.h"
-#include "source/common/tls/io_handle_bio.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/event/libevent.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/connection_socket_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
+
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
+#include "gmock/gmock.h"
 #include "openssl/ssl.h"
 #include "tools/cpp/runfiles/runfiles.h"
 
@@ -214,8 +228,8 @@ private:
   uint64_t num_reads_{0};
 };
 
-// Measure decryption and Envoy BIO socket reads with a full batch already queued. Encryption,
-// sending, handshakes, and payload verification are excluded from the timed region.
+// Measure the production TLS transport socket's receive path with a full batch already queued.
+// Encryption, sending, handshakes, and payload verification are excluded from the timed region.
 static void testReceiveThroughput(benchmark::State& state) {
   std::string error;
   std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles(
@@ -225,7 +239,8 @@ static void testReceiveThroughput(benchmark::State& state) {
 
   int sockets[2];
   RELEASE_ASSERT(socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sockets) == 0, "socketpair");
-  ReceiveCountingIoHandle receiver(sockets[0]);
+  auto receiver = std::make_unique<ReceiveCountingIoHandle>(sockets[0]);
+  const auto& receiver_io_handle = *receiver;
   Network::IoSocketHandleImpl sender(sockets[1]);
   const int send_buffer_size = 1024 * 1024;
   if (setsockopt(sockets[1], SOL_SOCKET, SO_SNDBUF, &send_buffer_size, sizeof(send_buffer_size)) !=
@@ -237,27 +252,58 @@ static void testReceiveThroughput(benchmark::State& state) {
   const int tls_version = state.range(0) == 12 ? TLS1_2_VERSION : TLS1_3_VERSION;
   const size_t record_size = state.range(1);
   const uint32_t read_ahead_size = state.range(2);
-  bssl::UniquePtr<SSL_CTX> server_ctx(SSL_CTX_new(TLS_method()));
-  bssl::UniquePtr<SSL_CTX> client_ctx(SSL_CTX_new(TLS_method()));
-  for (SSL_CTX* ctx : {server_ctx.get(), client_ctx.get()}) {
-    RELEASE_ASSERT(SSL_CTX_set_min_proto_version(ctx, tls_version) == 1, "minimum TLS version");
-    RELEASE_ASSERT(SSL_CTX_set_max_proto_version(ctx, tls_version) == 1, "maximum TLS version");
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  if (!Event::Libevent::Global::initialized()) {
+    Event::Libevent::Global::initialize();
   }
-  const std::string cert_path =
-      TestEnvironment::runfilesPath("test/common/tls/test_data/san_dns_cert.pem");
-  const std::string key_path =
-      TestEnvironment::runfilesPath("test/common/tls/test_data/san_dns_key.pem");
-  RELEASE_ASSERT(
-      SSL_CTX_use_certificate_file(server_ctx.get(), cert_path.c_str(), SSL_FILETYPE_PEM) == 1,
-      "SSL_CTX_use_certificate_file");
-  RELEASE_ASSERT(
-      SSL_CTX_use_PrivateKey_file(server_ctx.get(), key_path.c_str(), SSL_FILETYPE_PEM) == 1,
-      "SSL_CTX_use_PrivateKey_file");
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("tls_receive_benchmark");
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  ON_CALL(factory_context.server_context_, api()).WillByDefault(testing::ReturnRef(*api));
+  ON_CALL(factory_context.server_context_, serverScope())
+      .WillByDefault(testing::ReturnRef(*stats_store.rootScope()));
+  ContextManagerImpl manager(factory_context.serverFactoryContext());
 
-  bssl::UniquePtr<SSL> server_ssl(SSL_new(server_ctx.get()));
-  BIO* receiver_bio = BIO_new_io_handle(&receiver);
-  SSL_set_bio(server_ssl.get(), receiver_bio, receiver_bio);
-  SSL_set_accept_state(server_ssl.get());
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  auto& common_context = *tls_context.mutable_common_tls_context();
+  common_context.mutable_read_ahead_buffer_size()->set_value(read_ahead_size);
+  using TlsParameters = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+  const auto protocol = state.range(0) == 12 ? TlsParameters::TLSv1_2 : TlsParameters::TLSv1_3;
+  common_context.mutable_tls_params()->set_tls_minimum_protocol_version(protocol);
+  common_context.mutable_tls_params()->set_tls_maximum_protocol_version(protocol);
+  auto* certificate = common_context.add_tls_certificates();
+  certificate->mutable_certificate_chain()->set_filename(
+      TestEnvironment::runfilesPath("test/common/tls/test_data/san_dns_cert.pem"));
+  certificate->mutable_private_key()->set_filename(
+      TestEnvironment::runfilesPath("test/common/tls/test_data/san_dns_key.pem"));
+  auto config = ServerContextConfigImpl::create(tls_context, factory_context, {}, false);
+  RELEASE_ASSERT(config.ok(), config.status().ToString());
+  auto factory =
+      ServerSslSocketFactory::create(std::move(*config), manager, *stats_store.rootScope());
+  RELEASE_ASSERT(factory.ok(), factory.status().ToString());
+
+  // The anonymous socketpair needs an address only for connection diagnostics.
+  auto address = Network::Address::PipeInstance::create("tls_receive_benchmark");
+  RELEASE_ASSERT(address.ok(), address.status().ToString());
+  Network::Address::InstanceConstSharedPtr socket_address = std::move(*address);
+  auto socket = std::make_unique<Network::ConnectionSocketImpl>(std::move(receiver), socket_address,
+                                                                socket_address);
+  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(),
+                                         socket->connectionInfoProviderSharedPtr(),
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+  Network::ConnectionImpl connection(*dispatcher, std::move(socket),
+                                     (*factory)->createDownstreamTransportSocket(), stream_info,
+                                     true);
+  Cleanup close_connection(
+      [&connection]() { connection.close(Network::ConnectionCloseType::NoFlush); });
+  auto& transport_socket = *connection.transportSocket();
+  auto& received = connection.getReadBuffer().buffer;
+
+  bssl::UniquePtr<SSL_CTX> client_ctx(SSL_CTX_new(TLS_method()));
+  RELEASE_ASSERT(SSL_CTX_set_min_proto_version(client_ctx.get(), tls_version) == 1,
+                 "minimum TLS version");
+  RELEASE_ASSERT(SSL_CTX_set_max_proto_version(client_ctx.get(), tls_version) == 1,
+                 "maximum TLS version");
   bssl::UniquePtr<SSL> client_ssl(SSL_new(client_ctx.get()));
   RELEASE_ASSERT(SSL_set_fd(client_ssl.get(), sockets[1]) == 1, "SSL_set_fd");
   SSL_set_connect_state(client_ssl.get());
@@ -265,23 +311,24 @@ static void testReceiveThroughput(benchmark::State& state) {
   bool handshake_success = false;
   for (int i = 0; i < 50; ++i) {
     const int client_err = SSL_do_handshake(client_ssl.get());
-    const int server_err = SSL_do_handshake(server_ssl.get());
-    if (client_err == 1 && server_err == 1) {
+    const auto result = transport_socket.doRead(received);
+    RELEASE_ASSERT(result.action_ == Network::PostIoAction::KeepOpen && !result.end_stream_read_,
+                   std::string(transport_socket.failureReason()));
+    if (client_err == 1 && transport_socket.canFlushClose()) {
       handshake_success = true;
       break;
     }
     handleSslError(client_ssl.get(), client_err, false);
-    handleSslError(server_ssl.get(), server_err, true);
   }
   RELEASE_ASSERT(handshake_success, "handshake completed successfully");
-  RELEASE_ASSERT(enableIoHandleBioReadAhead(receiver_bio, read_ahead_size), "enable read-ahead");
-  state.SetLabel(SSL_CIPHER_get_name(SSL_get_current_cipher(server_ssl.get())));
+  RELEASE_ASSERT(SSL_version(client_ssl.get()) == tls_version, "negotiated TLS version");
+  RELEASE_ASSERT(received.length() == 0, "handshake produced no application data");
+  state.SetLabel(SSL_CIPHER_get_name(SSL_get_current_cipher(client_ssl.get())));
 
   BIO* output = BIO_new(BIO_s_mem());
   RELEASE_ASSERT(output != nullptr, "BIO_new");
   SSL_set0_wbio(client_ssl.get(), output);
   const std::string plaintext(256 * 1024, 'a');
-  std::string received(plaintext.size(), '\0');
 
   const auto queue_batch = [&]() {
     for (size_t offset = 0; offset < plaintext.size(); offset += record_size) {
@@ -308,16 +355,9 @@ static void testReceiveThroughput(benchmark::State& state) {
     return true;
   };
   const auto receive_batch = [&]() {
-    size_t offset = 0;
-    while (offset < received.size()) {
-      const int result =
-          SSL_read(server_ssl.get(), received.data() + offset, received.size() - offset);
-      if (result <= 0) {
-        return false;
-      }
-      offset += result;
-    }
-    return true;
+    const auto result = transport_socket.doRead(received);
+    return result.action_ == Network::PostIoAction::KeepOpen && !result.end_stream_read_ &&
+           result.bytes_processed_ == plaintext.size();
   };
 
   // Warm up the lazy read-ahead allocation before measuring steady-state receive cost.
@@ -325,11 +365,12 @@ static void testReceiveThroughput(benchmark::State& state) {
     state.SkipWithError("Cannot queue a full ciphertext batch; check socket send buffer capacity");
     return;
   }
-  RELEASE_ASSERT(receive_batch() && received == plaintext, "warmup payload");
-  const uint64_t initial_reads = receiver.numReads();
+  RELEASE_ASSERT(receive_batch() && received.toString() == plaintext, "warmup payload");
+  const uint64_t initial_reads = receiver_io_handle.numReads();
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     state.PauseTiming();
+    received.drain(received.length());
     if (!queue_batch()) {
       state.SkipWithError(
           "Cannot queue a full ciphertext batch; check socket send buffer capacity");
@@ -337,16 +378,16 @@ static void testReceiveThroughput(benchmark::State& state) {
     }
     state.ResumeTiming();
     if (!receive_batch()) {
-      state.SkipWithError("SSL_read did not consume the queued plaintext batch");
+      state.SkipWithError("TLS transport socket did not consume the queued plaintext batch");
       break;
     }
     state.PauseTiming();
-    RELEASE_ASSERT(received == plaintext, "received payload");
+    RELEASE_ASSERT(received.toString() == plaintext, "received payload");
     state.ResumeTiming();
   }
   state.SetBytesProcessed(state.iterations() * plaintext.size());
-  state.counters["socket_reads_per_batch"] =
-      benchmark::Counter(receiver.numReads() - initial_reads, benchmark::Counter::kAvgIterations);
+  state.counters["socket_reads_per_batch"] = benchmark::Counter(
+      receiver_io_handle.numReads() - initial_reads, benchmark::Counter::kAvgIterations);
 }
 
 static void receiveParams(benchmark::internal::Benchmark* b) {

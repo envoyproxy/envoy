@@ -434,9 +434,21 @@ envoy_cc_benchmark_binary(
     deps = [
         "//bazel:cpp_runfiles",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:cleanup_lib",
+        "//source/common/event:libevent_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:connection_impl",
+        "//source/common/network:connection_socket_lib",
         "//source/common/network:default_socket_interface_lib",
-        "//source/common/tls:io_handle_bio_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/common/tls:context_lib",
+        "//source/common/tls:server_context_config_lib",
+        "//source/common/tls:server_ssl_socket_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
         "@benchmark",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
