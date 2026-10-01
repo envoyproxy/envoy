@@ -128,10 +128,7 @@ def envoy_cc_fuzz_test(
         deps = [],
         tags = [],
         **kwargs):
-    exec_properties = exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
         corpus_name = name + "_corpus_files"
         native.filegroup(
@@ -198,6 +195,12 @@ def envoy_test_env(env = {}):
         "//conditions:default": {},
     })
 
+def envoy_exec_properties(rbe_pool = None, exec_properties = {}):
+    return exec_properties | select({
+        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
+        "//conditions:default": {},
+    })
+
 # Envoy C++ test targets should be specified with this function.
 def envoy_cc_test(
         name,
@@ -221,10 +224,7 @@ def envoy_cc_test(
         rbe_pool = None,
         exec_properties = {}):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
-    exec_properties = exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     cc_test(
         name = name,
         srcs = srcs,
@@ -281,10 +281,7 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
-    exec_properties = exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     disable_pch = kargs.pop("disable_pch", True)
     _envoy_cc_test_infrastructure_library(
         name,
@@ -373,10 +370,7 @@ def envoy_benchmark_test(
         tags = [],
         repository = "",
         **kargs):
-    exec_properties = exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     sh_test(
         name = name,
         srcs = [Label("//bazel:test_for_benchmark_wrapper.sh")],
