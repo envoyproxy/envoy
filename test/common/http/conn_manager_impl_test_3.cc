@@ -1335,6 +1335,13 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
 TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDrainingViaConnectionDrain) {
   setup();
 
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(Http::okStatus()));
+  Buffer::OwnedImpl empty_input;
+  conn_manager_->onData(empty_input, false);
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*codec_, shutdownNotice());
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
   EXPECT_CALL(drain_close_, drainClose(_)).Times(0);
   filter_callbacks_.connection_.raiseConnectionDrain(
       Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
@@ -1390,6 +1397,13 @@ traffic_direction: INBOUND
   EXPECT_CALL(factory_context_, listenerInfo()).WillOnce(ReturnRef(listener_info));
   setup();
 
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(Http::okStatus()));
+  Buffer::OwnedImpl empty_input;
+  conn_manager_->onData(empty_input, false);
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*codec_, shutdownNotice());
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
   EXPECT_CALL(drain_close_, drainClose(_)).Times(0);
   filter_callbacks_.connection_.raiseConnectionDrain(
       Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});

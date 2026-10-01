@@ -744,13 +744,22 @@ void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
           startDrainSequence();
         }
       } else {
-        // A connection without a codec cannot start the HTTP drain sequence.
-        if (!connection_idle_timer_) {
-          connection_idle_timer_ = dispatcher_->createScaledTimer(
-              Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout,
-              [this]() -> void { onIdleTimeout(); });
+        if (connection_idle_timer_) {
+          connection_idle_timer_->disableTimer();
         }
-        connection_idle_timer_->enableTimer(config_->drainTimeout());
+        // Defer closing until connection setup has completed.
+        drain_no_codec_close_timer_ = dispatcher_->createTimer([this]() {
+          if (!codec_) {
+            doConnectionClose(Network::ConnectionCloseType::NoFlush, std::nullopt,
+                              "drained_connection_without_codec");
+            return;
+          }
+          if (streams_.empty() && drain_state_ == DrainState::NotDraining &&
+              !connection_close_started_) {
+            startDrainSequence();
+          }
+        });
+        drain_no_codec_close_timer_->enableTimer(std::chrono::milliseconds(0));
       }
     }
   }
@@ -782,6 +791,11 @@ void ConnectionManagerImpl::doConnectionClose(
   if (drain_timer_) {
     drain_timer_->disableTimer();
     drain_timer_.reset();
+  }
+
+  if (drain_no_codec_close_timer_) {
+    drain_no_codec_close_timer_->disableTimer();
+    drain_no_codec_close_timer_.reset();
   }
 
   if (!streams_.empty()) {

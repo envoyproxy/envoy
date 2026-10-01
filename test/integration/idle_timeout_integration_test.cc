@@ -167,6 +167,28 @@ TEST_P(IdleTimeoutIntegrationTest, ClosesIdleConnectionWithinOneDrainTimeout) {
   }
 }
 
+TEST_P(IdleTimeoutIntegrationTest, DrainingClosesConnectionWithoutCodec) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::SecondsToDuration(30));
+        hcm.mutable_drain_timeout()->CopyFrom(ProtobufUtil::TimeUtil::SecondsToDuration(5));
+      });
+  initialize();
+
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
+  ASSERT_TRUE(codec_client_->connected());
+  startServerDrain();
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(1000 * TIMEOUT_FACTOR)));
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+}
+
 // Tests idle timeout behaviour with single request and validates that idle timer kicks in
 // after given timeout.
 TEST_P(IdleTimeoutIntegrationTest, TimeoutBasic) {
