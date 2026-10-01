@@ -1068,6 +1068,8 @@ WEAK_STUB(AccessLoggerGetDownstreamWireBytes,
           envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(nullptr, nullptr))
 WEAK_STUB(AccessLoggerGetTimingInfo,
           envoy_dynamic_module_callback_access_logger_get_timing_info(nullptr, nullptr))
+WEAK_STUB(AccessLoggerGetTimingInfoV2,
+          envoy_dynamic_module_callback_access_logger_get_timing_info_v2(nullptr, nullptr))
 WEAK_STUB(ListenerFilterCloseSocket,
           envoy_dynamic_module_callback_listener_filter_close_socket(nullptr, {nullptr, 0}))
 WEAK_STUB(ListenerFilterSetDownstreamTransportFailureReason,

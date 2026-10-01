@@ -2211,7 +2211,7 @@ TEST_F(LuaStatsScopeWrapperTest, HistogramUnits) {
 
   auto latency_ns = store_.findHistogramByString("lua.latency_ns");
   ASSERT_TRUE(latency_ns.has_value());
-  EXPECT_EQ(Stats::Histogram::Unit::Nanoseconds, latency_ns->get().unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Nanoseconds, latency_ns->unit());
 
   auto count = store_.findHistogramByString("lua.count");
   ASSERT_TRUE(count.has_value());

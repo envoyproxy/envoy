@@ -1694,8 +1694,8 @@ pub trait EnvoyHttpFilter {
 
   /// Get a snapshot of the current stream timing information.
   ///
-  /// Unavailable values are -1. The request start time is a Unix timestamp in nanoseconds; all
-  /// other values are durations from the monotonic request start time.
+  /// Unavailable fields are `None` at the current event hook. See [`TimingInfo`] for units and
+  /// offset semantics.
   fn get_timing_info(&self) -> TimingInfo;
 
   /// Send an HTTP callout to the given cluster with the given headers and body.
