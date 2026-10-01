@@ -36,6 +36,7 @@ public:
   void hashKey(std::vector<uint8_t>& hash) const override;
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
+  absl::string_view initialLocalCloseReason() const override { return initial_local_close_reason_; }
 
   // ScopeTrackedObject
   OptRef<const StreamInfo::StreamInfo> trackedStream() const override;
@@ -56,6 +57,9 @@ protected:
 
   absl::string_view localCloseReason() const override { return local_close_reason_; }
   virtual void setLocalCloseReason(absl::string_view local_close_reason) {
+    if (initial_local_close_reason_.empty()) {
+      initial_local_close_reason_ = std::string(local_close_reason);
+    }
     local_close_reason_ = std::string(local_close_reason);
   }
 
@@ -78,6 +82,8 @@ protected:
   std::chrono::milliseconds delayed_close_timeout_{0};
   // Should be set with setLocalCloseReason.
   std::string local_close_reason_;
+  // The first local close reason set on the connection.
+  std::string initial_local_close_reason_;
   Event::Dispatcher& dispatcher_;
   const uint64_t id_;
   std::list<ConnectionCallbacks*> callbacks_;

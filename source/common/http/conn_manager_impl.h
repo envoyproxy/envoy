@@ -658,6 +658,10 @@ private:
   ConnectionManagerConfigSharedPtr config_;
   ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on
                                   // the config in the hot path.
+  // Route resolution histograms, created only when recordRouteResolutionStats is enabled so the
+  // default stat set is unchanged.
+  OptRef<Stats::Histogram> route_resolution_time_us_histogram_;
+  OptRef<Stats::Histogram> route_resolutions_histogram_;
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;

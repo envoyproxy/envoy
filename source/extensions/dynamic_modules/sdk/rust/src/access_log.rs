@@ -7,8 +7,10 @@
 //! `logger_name`. The legacy [`crate::declare_access_logger!`] macro is preserved as a
 //! single-config shim over the same factory.
 
+pub use crate::timing::TimingInfo;
 use crate::{abi, ffi_export, EnvoyBuffer};
 use std::ffi::c_void;
+use std::num::NonZero;
 use std::ptr;
 
 // -----------------------------------------------------------------------------
@@ -303,27 +305,6 @@ pub trait AccessLogger: Send {
   ///
   /// This is optional. The default implementation does nothing.
   fn flush(&mut self) {}
-}
-
-/// Timing information from the stream info.
-#[derive(Debug, Clone, Default)]
-pub struct TimingInfo {
-  /// Request start time as Unix timestamp in nanoseconds.
-  pub start_time_unix_ns: i64,
-  /// Duration from start to request complete in nanoseconds, or -1 if not available.
-  pub request_complete_duration_ns: i64,
-  /// Time of first upstream TX byte sent in nanoseconds, or -1 if not available.
-  pub first_upstream_tx_byte_sent_ns: i64,
-  /// Time of last upstream TX byte sent in nanoseconds, or -1 if not available.
-  pub last_upstream_tx_byte_sent_ns: i64,
-  /// Time of first upstream RX byte received in nanoseconds, or -1 if not available.
-  pub first_upstream_rx_byte_received_ns: i64,
-  /// Time of last upstream RX byte received in nanoseconds, or -1 if not available.
-  pub last_upstream_rx_byte_received_ns: i64,
-  /// Time of first downstream TX byte sent in nanoseconds, or -1 if not available.
-  pub first_downstream_tx_byte_sent_ns: i64,
-  /// Time of last downstream TX byte sent in nanoseconds, or -1 if not available.
-  pub last_downstream_tx_byte_sent_ns: i64,
 }
 
 /// Byte count information from the stream info.
@@ -641,11 +622,11 @@ impl LogContext {
     self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_host)
   }
 
-  /// Get the connection ID, or 0 if not available.
-  pub fn connection_id(&self) -> u64 {
+  /// Get the connection ID, or `None` if not available.
+  pub fn connection_id(&self) -> Option<NonZero<u64>> {
     self
       .get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId)
-      .unwrap_or(0)
+      .and_then(NonZero::new)
   }
 
   /// Check if mTLS was used for the connection.
@@ -1126,11 +1107,11 @@ impl LogContext {
     )
   }
 
-  /// Get the upstream connection ID, or 0 if not available.
-  pub fn upstream_connection_id(&self) -> u64 {
-    unsafe {
+  /// Get the upstream connection ID, or `None` if not available.
+  pub fn upstream_connection_id(&self) -> Option<NonZero<u64>> {
+    NonZero::new(unsafe {
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_connection_id(self.envoy_ptr)
-    }
+    })
   }
 
   /// Get the upstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
@@ -1311,26 +1292,16 @@ impl LogContext {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_headers_count(header_type);
-    if count == 0 {
-      return Vec::new();
-    }
-
-    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(count);
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_headers(
-        self.envoy_ptr,
-        header_type,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-      )
-    };
-    if !success {
-      return Vec::new();
-    }
-    unsafe {
-      headers.set_len(count);
-    }
-    headers
+    crate::utility::collect_headers(
+      || self.get_headers_count(header_type),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_access_logger_get_headers(
+          self.envoy_ptr,
+          header_type,
+          headers,
+        )
+      },
+    )
   }
 
   /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.

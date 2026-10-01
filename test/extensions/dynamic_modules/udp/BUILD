@@ -54,6 +54,7 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:udp_null_config",
     ],
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",

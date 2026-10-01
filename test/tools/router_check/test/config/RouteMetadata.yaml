@@ -1,0 +1,17 @@
+virtual_hosts:
+- name: local_service
+  domains:
+  - '*'
+  routes:
+  - match:
+      prefix: "/canary"
+    route:
+      cluster: canary_service
+    metadata:
+      filter_metadata:
+        databricks.der:
+          route_id: canary
+  - match:
+      prefix: "/"
+    route:
+      cluster: local_service
