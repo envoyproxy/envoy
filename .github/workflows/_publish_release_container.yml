@@ -55,6 +55,7 @@ jobs:
       contents: read
       packages: read
     steps:
+    - uses: envoyproxy/toolshed/actions/diskspace@622e23d2ac80e9474bb74e5ec2dfd15d71f5c903
     - name: Generate manifest configuration (dev)
       id: dev-config
       if: ${{ inputs.dev && inputs.target-branch == 'main' }}
