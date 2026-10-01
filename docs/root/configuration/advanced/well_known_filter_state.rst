@@ -110,6 +110,12 @@ The following lists the filter state object keys used by the Envoy extensions to
   enum-value name as a constructor, e.g. "ANTHROPIC_MESSAGES". Supports field access with
   ``llm_protocol``.
 
+``envoy.ai.model.request``
+  The model the request names, as the :ref:`request info AI filter
+  <envoy_v3_api_msg_extensions.http.ai_filters.request_info.v3.RequestInfo>` read it from the
+  payload or, for Gemini, the request path. Accepts a non-empty model name as a constructor, e.g.
+  "gpt-4o".
+
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
 
