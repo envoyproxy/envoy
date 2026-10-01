@@ -168,5 +168,77 @@ TEST_F(ThreadSafeCallbackManagerTest, RegisterAndRemoveOnExpiredThread) {
   manager->runCallbacks();
 }
 
+TEST_F(ThreadSafeCallbackManagerTest, CoalescesPendingCallbacks) {
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  std::vector<Event::PostCb> posted;
+  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([&](Event::PostCb cb) {
+    posted.push_back(std::move(cb));
+  }));
+  auto manager = ThreadSafeCallbackManager::create();
+  unsigned calls = 0;
+  auto handle = manager->add(dispatcher, [&]() { ++calls; });
+
+  std::thread notifier([&]() {
+    for (unsigned i = 0; i < 100; ++i) {
+      manager->runCallbacks(/*coalesce=*/true);
+    }
+  });
+  notifier.join();
+  EXPECT_EQ(0, calls);
+  ASSERT_EQ(1, posted.size());
+  posted.front()();
+  posted.clear();
+  EXPECT_EQ(1, calls);
+
+  manager->runCallbacks(/*coalesce=*/true);
+  ASSERT_EQ(1, posted.size());
+  handle.reset();
+  posted.front()();
+  EXPECT_EQ(1, calls);
+}
+
+TEST_F(ThreadSafeCallbackManagerTest, NotificationDuringCoalescedCallbackIsNotLost) {
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  std::vector<Event::PostCb> posted;
+  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([&](Event::PostCb cb) {
+    posted.push_back(std::move(cb));
+  }));
+  auto manager = ThreadSafeCallbackManager::create();
+  unsigned calls = 0;
+  auto handle = manager->add(dispatcher, [&]() {
+    if (++calls == 1) {
+      manager->runCallbacks(/*coalesce=*/true);
+    }
+  });
+
+  manager->runCallbacks(/*coalesce=*/true);
+  ASSERT_EQ(1, posted.size());
+  auto first = std::move(posted.front());
+  posted.clear();
+  first();
+  ASSERT_EQ(1, posted.size());
+  posted.front()();
+  EXPECT_EQ(2, calls);
+}
+
+TEST_F(ThreadSafeCallbackManagerTest, DoesNotCoalesceByDefault) {
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  std::vector<Event::PostCb> posted;
+  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([&](Event::PostCb cb) {
+    posted.push_back(std::move(cb));
+  }));
+  auto manager = ThreadSafeCallbackManager::create();
+  unsigned calls = 0;
+  auto handle = manager->add(dispatcher, [&]() { ++calls; });
+
+  manager->runCallbacks();
+  manager->runCallbacks();
+  ASSERT_EQ(2, posted.size());
+  for (auto& cb : posted) {
+    cb();
+  }
+  EXPECT_EQ(2, calls);
+}
+
 } // namespace Common
 } // namespace Envoy
