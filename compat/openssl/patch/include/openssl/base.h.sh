@@ -92,18 +92,18 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro BORINGSSL_NO_CXX \
   --uncomment-macro 'OPENSSL_\(THREADS\|IS_BORINGSSL\|VERSION_NUMBER\|\)' \
   --uncomment-regex 'enum\s*.*\s*BORINGSSL_ENUM_INT' \
-  --uncomment-regex 'namespace\s*internal\s*{' \
-  --uncomment-regex '}\s*//\s*namespace\s*internal' \
+  --uncomment-regex 'namespace[[:space:]]\+internal[[:space:]]*{' \
+  --uncomment-regex '}[[:space:]]*//[[:space:]]*namespace[[:space:]]\+internal' \
   --uncomment-macro BORINGSSL_MAKE_DELETER \
   --uncomment-macro BORINGSSL_MAKE_UP_REF \
   --uncomment-macro OPENSSL_PRINTF_FORMAT_FUNC \
   --uncomment-macro BSSL_CHECK \
   --uncomment-macro BSSL_NAMESPACE_BEGIN \
   --uncomment-macro BSSL_NAMESPACE_END \
-  --uncomment-regex-range 'template\s*<typename\s*T,\s*typename\s*Enable\s*=\s*void>' 'struct\s*DeleterImpl\s*{};' \
+  --uncomment-regex-range 'template[[:space:]]*<[[:space:]]*typename[[:space:]]\+T,[[:space:]]*typename[[:space:]]\+Enable[[:space:]]*=[[:space:]]*void[[:space:]]*>' 'struct[[:space:]]\+DeleterImpl[[:space:]]*{}[[:space:]]*;' \
   --uncomment-struct Deleter \
-  --uncomment-regex-range 'template\s*<typename\s*T,\s*typename\s*CleanupRet,\s*void\s*(\*init)(T\s*\*),' '};$' \
-  --uncomment-regex 'template\s*<typename' 'using\s*UniquePtr' \
+  --uncomment-regex-range 'template[[:space:]]*<[[:space:]]*typename[[:space:]]\+T,[[:space:]]*typename[[:space:]]\+CleanupRet,[[:space:]]*void[[:space:]]\+(\*init)(T[[:space:]]*\*),' '};$' \
+  --uncomment-regex 'template[[:space:]]*<[[:space:]]*typename' 'using[[:space:]]\+UniquePtr' \
   --uncomment-macro OPENSSL_DEPRECATED \
   --uncomment-typedef-redef X509_STORE_CTX \
   --uncomment-typedef-redef DIST_POINT \
