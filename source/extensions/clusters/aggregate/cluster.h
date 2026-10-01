@@ -146,16 +146,21 @@ private:
 // create the thread local load balancer.
 class AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
 public:
-  AggregateLoadBalancerFactory(const Cluster& cluster) : cluster_(cluster) {}
+  AggregateLoadBalancerFactory(const Cluster& cluster)
+      : info_(cluster.info()), cluster_manager_(cluster.cluster_manager_),
+        runtime_(cluster.runtime()), random_(cluster.random()), clusters_(cluster.clusters_) {}
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
-    return std::make_unique<AggregateClusterLoadBalancer>(
-        cluster_.info(), cluster_.cluster_manager_, cluster_.runtime(), cluster_.random(),
-        cluster_.clusters_);
+    return std::make_unique<AggregateClusterLoadBalancer>(info_, cluster_manager_, runtime_,
+                                                          random_, clusters_);
   }
   bool recreateOnHostChangeDeprecated() const override { return false; }
 
-  const Cluster& cluster_;
+  const Upstream::ClusterInfoConstSharedPtr info_;
+  Upstream::ClusterManager& cluster_manager_;
+  Runtime::Loader& runtime_;
+  Random::RandomGenerator& random_;
+  const ClusterSetConstSharedPtr clusters_;
 };
 
 // Thread aware load balancer created by the main thread.
