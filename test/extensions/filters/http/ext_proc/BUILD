@@ -164,6 +164,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":filter_test_common_lib",
@@ -475,7 +476,7 @@ envoy_extension_cc_test(
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
     ],
-    rbe_pool = "4core",
+    rbe_pool = "6gig",
     shard_count = 8,
     tags = [
         "cpu:3",
