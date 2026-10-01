@@ -725,7 +725,7 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
   if (!connection_drain_event_.has_value()) {
     connection_drain_event_ = drain_event;
-    if (streams_.empty() && config_->drainIdleTimeout().has_value()) {
+    if (streams_.empty()) {
       resetConnectionIdleTimer();
     }
   }
@@ -887,12 +887,9 @@ void ConnectionManagerImpl::resetConnectionIdleTimer() {
 
   auto timeout = config_->idleTimeout();
   if (connection_drain_event_.has_value()) {
-    if (const auto drain_idle_timeout = config_->drainIdleTimeout();
-        drain_idle_timeout.has_value()) {
-      timeout = drain_idle_timeout;
-    }
+    timeout = config_->drainTimeout();
   }
-  if (!timeout.has_value() || timeout->count() == 0) {
+  if (!timeout.has_value()) {
     if (connection_idle_timer_) {
       connection_idle_timer_->disableTimer();
     }

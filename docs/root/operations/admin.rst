@@ -398,9 +398,9 @@ modify different aspects of the server:
    When draining listeners, enter a graceful drain period prior to closing listeners.
    This behaviour and duration is configurable via server options or CLI
    (:option:`--drain-time-s` and :option:`--drain-strategy`).
-   The HTTP connection manager can use a separate
-   :ref:`idle timeout while draining
-   <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.drain_idle_timeout>`.
+   Idle downstream HTTP connections use the HTTP connection manager
+   :ref:`drain timeout
+   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
 
    .. http:post:: /drain_listeners?skip_exit
 

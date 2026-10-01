@@ -31,15 +31,6 @@ public:
             hcm.mutable_stream_idle_timeout()->set_seconds(0);
             hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
           }
-          if (enable_drain_idle_timeout_) {
-            auto* protocol_options = hcm.mutable_common_http_protocol_options();
-            protocol_options->mutable_idle_timeout()->CopyFrom(
-                ProtobufUtil::TimeUtil::SecondsToDuration(30));
-            protocol_options->mutable_drain_idle_timeout()->CopyFrom(
-                ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainIdleTimeoutMs));
-            hcm.mutable_drain_timeout()->CopyFrom(
-                ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainTimeoutMs));
-          }
           if (enable_per_stream_idle_timeout_) {
             auto* route_config = hcm.mutable_route_config();
             auto* virtual_host = route_config->mutable_virtual_hosts(0);
@@ -136,10 +127,8 @@ public:
 
   static constexpr uint64_t IdleTimeoutMs = 300 * TIMEOUT_FACTOR;
   static constexpr uint64_t RequestTimeoutMs = 200 * TIMEOUT_FACTOR;
-  static constexpr uint64_t DrainIdleTimeoutMs = 100 * TIMEOUT_FACTOR;
-  static constexpr uint64_t DrainTimeoutMs = 50 * TIMEOUT_FACTOR;
+  static constexpr uint64_t DrainTimeoutMs = 100 * TIMEOUT_FACTOR;
   bool enable_global_idle_timeout_{false};
-  bool enable_drain_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
   bool enable_route_timeout_{false};
@@ -151,8 +140,15 @@ INSTANTIATE_TEST_SUITE_P(Protocols, IdleTimeoutIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(IdleTimeoutIntegrationTest, DrainIdleTimeout) {
-  enable_drain_idle_timeout_ = true;
+TEST_P(IdleTimeoutIntegrationTest, DrainTimeoutClosesIdleConnection) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::SecondsToDuration(30));
+        hcm.mutable_drain_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainTimeoutMs));
+      });
   autonomous_upstream_ = true;
   initialize();
 
