@@ -277,7 +277,7 @@ TEST_P(BasicAuthIntegrationTest, BasicAuthPerRouteEnabledInvalidCredentials) {
 }
 
 // Verify that the proto-level realm field is wired through config.
-TEST_P(BasicAuthIntegrationTestAllProtocols, FixedRealmInWWWAuthenticate) {
+TEST_P(BasicAuthIntegrationTest, FixedRealmInWWWAuthenticate) {
   initializeFilterWithRealm();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
