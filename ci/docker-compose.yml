@@ -64,6 +64,9 @@ x-envoy-build-base: &envoy-build-base
   - ENVOY_DOCKER_SAVE_IMAGE
   - ENVOY_PUBLISH_DRY_RUN
   - ENVOY_TARBALL_DIR
+  - DOCS_BUILD_RELEASE
+  - BUILD_DOCS_TAG
+  - BUILD_DOCS_SHA
 
   # Release signing
   - ENVOY_SIGNING_KEY_PATH
