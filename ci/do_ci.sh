@@ -748,9 +748,17 @@ case $CI_TARGET in
             cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
             exit 0
         fi
+        DOCS_TARGET=//:html
+        if [[ -n "${DOCS_BUILD_RELEASE}" ]]; then
+            DOCS_TARGET=//:html_release
+            BAZEL_BUILD_OPTIONS+=(
+                "--action_env=BUILD_DOCS_TAG=${BUILD_DOCS_TAG}"
+                "--action_env=BUILD_DOCS_SHA=${BUILD_DOCS_SHA}")
+        fi
+        DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
               "${BAZEL_BUILD_OPTIONS[@]}" \
-              --@envoy//tools/tarball:target=//:html \
+              "--@envoy//tools/tarball:target=${DOCS_TARGET}" \
               @envoy//tools/tarball:unpack \
               "$DOCS_OUTPUT_DIR"
         popd
