@@ -355,19 +355,31 @@ struct ClusterHostCounts {
 };
 
 /**
- * A snapshot of stream timing information. The request start time is a Unix timestamp in
- * nanoseconds. All other fields are durations from the monotonic request start time. Unavailable
- * values are -1.
+ * Stream timing from Envoy. start_time_unix_ns is a Unix timestamp in nanoseconds; all other fields
+ * are nanosecond offsets from the monotonic request start. Unavailable values are std::nullopt;
+ * zero is valid. Connection and handshake offsets can be negative when the connection predates the
+ * request.
  */
 struct TimingInfo {
-  int64_t start_time_unix_ns;
-  int64_t request_complete_duration_ns;
-  int64_t first_upstream_tx_byte_sent_ns;
-  int64_t last_upstream_tx_byte_sent_ns;
-  int64_t first_upstream_rx_byte_received_ns;
-  int64_t last_upstream_rx_byte_received_ns;
-  int64_t first_downstream_tx_byte_sent_ns;
-  int64_t last_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> start_time_unix_ns;
+  std::optional<int64_t> downstream_connection_begin_ns;
+  std::optional<int64_t> downstream_handshake_start_ns;
+  std::optional<int64_t> downstream_handshake_complete_ns;
+  std::optional<int64_t> last_downstream_header_rx_byte_received_ns;
+  std::optional<int64_t> last_downstream_rx_byte_received_ns;
+  std::optional<int64_t> upstream_connect_start_ns;
+  std::optional<int64_t> upstream_connect_complete_ns;
+  std::optional<int64_t> upstream_handshake_complete_ns;
+  std::optional<int64_t> first_upstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_upstream_tx_byte_sent_ns;
+  std::optional<int64_t> first_upstream_rx_byte_received_ns;
+  std::optional<int64_t> first_upstream_rx_body_byte_received_ns;
+  std::optional<int64_t> last_upstream_rx_byte_received_ns;
+  std::optional<int64_t> first_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_downstream_ack_received_ns;
+  std::optional<int64_t> request_complete_duration_ns;
+  std::optional<int64_t> downstream_connection_end_ns;
 };
 
 class ChildSpan;
@@ -786,6 +798,22 @@ public:
    * Retrieves host counts for the selected upstream cluster at the given priority.
    */
   virtual std::optional<ClusterHostCounts> getClusterHostCounts(uint32_t priority) = 0;
+
+  /**
+   * Retrieves the remote address of the connected upstream socket, including the port. This can
+   * differ from AttributeId::UpstreamAddress, which exposes the selected upstream host address.
+   */
+  virtual std::optional<std::string_view> getUpstreamRemoteAddress() = 0;
+
+  /**
+   * Retrieves the upstream host addresses attempted for the current request in attempt order.
+   */
+  virtual std::vector<std::string_view> getUpstreamHostsAttempted() = 0;
+
+  /**
+   * Retrieves the upstream connection IDs attempted for the current request in attempt order.
+   */
+  virtual std::vector<uint64_t> getUpstreamConnectionIdsAttempted() = 0;
 
   /**
    * Sets an upstream override host for the selected cluster.

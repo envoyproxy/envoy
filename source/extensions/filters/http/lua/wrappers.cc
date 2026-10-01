@@ -625,12 +625,14 @@ int StatsScopeWrapper::luaHistogram(lua_State* state) {
       unit = Stats::Histogram::Unit::Bytes;
     } else if (unit_str == "microseconds") {
       unit = Stats::Histogram::Unit::Microseconds;
+    } else if (unit_str == "nanoseconds") {
+      unit = Stats::Histogram::Unit::Nanoseconds;
     } else if (unit_str == "unspecified") {
       unit = Stats::Histogram::Unit::Unspecified;
     } else {
       luaL_error(state,
                  "invalid histogram unit '%s', expected 'ms', 'milliseconds', 'microseconds', "
-                 "'bytes', or 'unspecified'",
+                 "'nanoseconds', 'bytes', or 'unspecified'",
                  std::string(unit_str).c_str());
     }
   }

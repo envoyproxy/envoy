@@ -89,6 +89,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         header_to_set: config_iter.next().unwrap().to_owned(),
       }))
     },
+    "upstream_connection_attempts" => Some(Box::new(UpstreamConnectionAttemptsFilterConfig {
+      observed_total: envoy_filter_config
+        .define_counter("upstream_connection_attempts_observed_total")
+        .unwrap(),
+    })),
     "generic_secret_callbacks" => {
       let secret_name = String::from_utf8(config.to_owned()).unwrap();
       // A secret that is not configured anywhere cannot be subscribed to.
@@ -595,7 +600,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    assert!(envoy_filter.get_upstream_connection_id() > 0);
+    assert_ne!(envoy_filter.get_upstream_connection_id(), None);
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
@@ -1729,6 +1734,40 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
   }
 }
 
+struct UpstreamConnectionAttemptsFilterConfig {
+  observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UpstreamConnectionAttemptsFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(UpstreamConnectionAttemptsFilter {
+      observed_total: self.observed_total,
+    })
+  }
+}
+
+struct UpstreamConnectionAttemptsFilter {
+  observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionAttemptsFilter {
+  fn on_stream_complete(&self, envoy_filter: &mut EHF) {
+    assert!(!envoy_filter
+      .get_upstream_remote_address()
+      .unwrap()
+      .as_slice()
+      .is_empty());
+    assert_eq!(envoy_filter.get_upstream_hosts_attempted().len(), 1);
+    assert_eq!(
+      envoy_filter.get_upstream_connection_ids_attempted().len(),
+      1
+    );
+    envoy_filter
+      .increment_counter(self.observed_total, 1)
+      .unwrap();
+  }
+}
+
 // Terminal filter that creates a response without an upstream.
 // This filter demonstrates a bidirectional stream with trailers - response processing
 // can happen in filter callbacks or scheduled events. We test scheduled events here
@@ -1976,8 +2015,42 @@ struct StreamTimingFilter {
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamTimingFilter {
   fn on_stream_complete(&self, envoy_filter: &mut EHF) {
     let timing = envoy_filter.get_timing_info();
-    assert!(timing.start_time_unix_ns > 0);
-    assert!(timing.request_complete_duration_ns >= 0);
+    assert!(timing.start_time_unix_ns.unwrap() > 0);
+    assert!(timing.downstream_connection_begin_ns.is_some());
+    assert_eq!(timing.downstream_handshake_start_ns, None);
+    assert_eq!(timing.downstream_handshake_complete_ns, None);
+    assert!(timing.last_downstream_header_rx_byte_received_ns.unwrap() >= 0);
+    assert!(
+      timing.last_downstream_rx_byte_received_ns.unwrap()
+        >= timing.last_downstream_header_rx_byte_received_ns.unwrap()
+    );
+    assert!(timing.upstream_connect_start_ns.unwrap() >= 0);
+    assert!(
+      timing.upstream_connect_complete_ns.unwrap() >= timing.upstream_connect_start_ns.unwrap()
+    );
+    assert_eq!(timing.upstream_handshake_complete_ns, None);
+    assert!(timing.first_upstream_tx_byte_sent_ns.unwrap() >= 0);
+    assert!(
+      timing.last_upstream_tx_byte_sent_ns.unwrap()
+        >= timing.first_upstream_tx_byte_sent_ns.unwrap()
+    );
+    assert!(timing.first_upstream_rx_byte_received_ns.unwrap() >= 0);
+    assert!(
+      timing.first_upstream_rx_body_byte_received_ns.unwrap()
+        >= timing.first_upstream_rx_byte_received_ns.unwrap()
+    );
+    assert!(
+      timing.last_upstream_rx_byte_received_ns.unwrap()
+        >= timing.first_upstream_rx_body_byte_received_ns.unwrap()
+    );
+    assert!(timing.first_downstream_tx_byte_sent_ns.unwrap() >= 0);
+    assert!(
+      timing.last_downstream_tx_byte_sent_ns.unwrap()
+        >= timing.first_downstream_tx_byte_sent_ns.unwrap()
+    );
+    assert_eq!(timing.last_downstream_ack_received_ns, None);
+    assert!(timing.request_complete_duration_ns.unwrap() >= 0);
+    assert_eq!(timing.downstream_connection_end_ns, None);
     envoy_filter
       .increment_counter(self.timing_observed_total, 1)
       .unwrap();

@@ -820,7 +820,7 @@ TEST(DefaultCertValidatorTest, DefaultValidatorCaExpirationStats) {
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
   // No real certificate, so should get sentinel max value
-  EXPECT_EQ(gauge_opt->get().value(), std::chrono::seconds::max().count());
+  EXPECT_EQ(gauge_opt->value(), std::chrono::seconds::max().count());
 }
 
 // Test that ValidationResults contains detailed error information when SAN validation fails.
@@ -1377,8 +1377,8 @@ TEST(DefaultCertValidatorTest, SharesCaCertsAcrossContexts) {
   // Both validators reference the same parsed CA certificates, cached exactly
   // once, and each still reports the CA it was configured with.
   EXPECT_EQ(getCaCertCache(context.singletonManager())->size(), 1);
-  EXPECT_NE(validator1.getCaCertInformation(), nullptr);
-  EXPECT_NE(validator2.getCaCertInformation(), nullptr);
+  EXPECT_FALSE(validator1.getCaCertInformation().empty());
+  EXPECT_FALSE(validator2.getCaCertInformation().empty());
 
   // A validator using different CA content adds a second cache entry.
   const std::string other_ca_cert = TestEnvironment::readFileToStringForTest(

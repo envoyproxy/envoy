@@ -10,7 +10,7 @@ The :ref:`DynamicModuleRouteSpecifier <envoy_v3_api_msg_extensions.router.route_
 configuration specifies a :ref:`route specifier <config_http_conn_man_route_specifiers>` backed by a
 :ref:`dynamic module <arch_overview_dynamic_modules>`. For each request the module keeps the route
 that route matching resolved, refines it, replaces it with one of the route templates it declares,
-or drops it.
+drops it, or lets route matching carry on with the next route.
 
 The module is invoked while the route is being resolved, and again whenever the route is recomputed,
 so it must be able to reach a decision from the request and the stream info alone. The call is
@@ -38,18 +38,46 @@ request the match accepts.
 Decisions
 ---------
 
-The module returns one of five decisions:
+The module returns one of seven decisions:
 
 * ``PassThrough`` uses the route the specifier was given, unchanged.
 * ``Override`` uses that route with the properties the module recorded applied on top.
 * ``SelectTemplate`` uses the selected template, with the recorded properties applied on top.
 * ``NoRoute`` uses no route, so the request is handled as if nothing had matched.
 * ``Error`` reports that the module could not decide.
+* ``ReusePrevious`` uses the previous route of the stream unchanged, without building a new route.
+* ``ContinueMatching`` drops the route the specifier was given and lets route matching carry on with
+  the next route.
 
 A decision Envoy cannot honor is handled by the configured
 :ref:`failure_policy <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.failure_policy>`,
-which either passes the request through to the route table or drops the route. The SDK reports an
-error when the module panics, so a panic is handled by the same policy rather than crashing Envoy.
+which passes the request through to the route table, drops the route, or lets route matching carry on
+with the next route. The SDK reports an error when the module panics, so a panic is handled by the
+same policy rather than crashing Envoy.
+
+Stream consistent decisions
+---------------------------
+
+Envoy resolves the route more than once per stream, for example after a filter clears the route
+cache. On a later resolution the module reads the route the connection manager last installed with
+``get_previous_route`` and ``get_previous_route_metadata``, which are null on the first resolution,
+after an internal redirect, and when a filter installed a null route. Reading a marker the module
+wrote into the metadata of a route it built earlier, through ``set_route_metadata_string``, is how a
+module keeps a stream on the version it first served without depending on route object identity.
+
+``ReusePrevious`` uses that previous route unchanged and builds nothing. When the stream has no
+previous route the decision is rejected and counted in ``reuse_previous_rejected``, and the failure
+policy applies.
+
+A module that builds routes from versioned state can lease that version for as long as any route it
+built is alive. ``set_route_user_data`` records a ``u64`` on the produced route, which forces the
+route to be wrapped even with no other override, and
+:ref:`on_route_specifier_route_destroy <arch_overview_dynamic_modules>` fires with that value when
+the route is destroyed. The hook may run on any thread and after the stream is gone, since another
+owner may retain the route, so a module must treat it as a lease release only. The
+:ref:`specifier_instance_id
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.specifier_instance_id>`
+lets two specifier instances sharing one module tell their routes apart.
 
 Shadowing a routing change
 --------------------------
@@ -61,6 +89,21 @@ returns ``PassThrough`` so that routing stays unchanged. Once the counts give co
 module returns ``Override`` or ``SelectTemplate`` to apply the decision. The
 ``route_specifier_shadow.rs`` test module under ``test/extensions/dynamic_modules/test_data/rust``
 shows both runs, comparing the cluster name.
+
+Migrating routing to a module
+-----------------------------
+
+A module can take over the routing of a virtual host one step at a time, while the route table it
+replaces stays in place as a fallback. The pattern is a catch all route placed first in the route
+table, carrying the specifier at the route level. The catch all route matches every request, so the
+specifier runs first for each one. For a request the module owns it returns ``Override`` or
+``SelectTemplate``, and for a request the module leaves to the route table it returns
+``ContinueMatching``, which drops the catch all route and lets route matching carry on with the
+routes below it. Setting :ref:`failure_policy
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.failure_policy>`
+to ``CONTINUE_MATCHING`` makes a module failure fall back to the route table as well, rather than to
+the catch all route's own action. When the module owns the whole virtual host, the routes below the
+catch all route can be removed and the ``failure_policy`` changed to ``NO_ROUTE``.
 
 Route overrides
 ---------------
@@ -101,6 +144,8 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   decision_select_template, Counter, Requests for which the module selected a route template.
   decision_no_route, Counter, Requests for which the module dropped the route.
   decision_error, Counter, Requests for which the module could not decide.
+  decision_reuse_previous, Counter, Requests for which the module reused the previous route.
+  decision_continue_matching, Counter, Requests for which the module let route matching carry on with the next route.
   runtime_skipped, Counter, Requests outside ``runtime_fraction``.
   failure_module_error, Counter, Decisions not honored because the module reported an error.
   failure_template_not_selected, Counter, Decisions not honored because no known template was selected.
@@ -108,6 +153,8 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   failure_override_without_route, Counter, Decisions not honored because there was no route to refine.
   failure_override_on_non_route_entry, Counter, Decisions not honored because route entry properties were recorded for a direct response.
   failure_route_metadata, Counter, Decisions not honored because a typed metadata factory rejected the recorded metadata.
+  reuse_previous_rejected, Counter, ReusePrevious decisions rejected because the stream had no previous route.
+  route_destroy, Counter, Routes built with user data that were destroyed and fired the route destroy hook.
   on_route_duration, Histogram, Time in microseconds the module spent deciding.
   specifier_duration, Histogram, Time in microseconds the specifier spent on a request.
 

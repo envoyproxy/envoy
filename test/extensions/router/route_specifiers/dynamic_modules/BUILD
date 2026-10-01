@@ -16,6 +16,7 @@ envoy_extension_cc_dyn_module_test(
     srcs = ["route_specifier_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:route_specifier_continue_matching",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_missing_config_destroy",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_missing_config_new",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_missing_on_route",

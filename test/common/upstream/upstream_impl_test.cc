@@ -5378,8 +5378,8 @@ TEST_P(ParametrizedClusterInfoImplTest, TestTrackRequestResponseSizes) {
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
 
-  Upstream::ClusterRequestResponseSizeStats req_resp_stats =
-      cluster->info()->requestResponseSizeStats()->get();
+  Upstream::ClusterRequestResponseSizeStats& req_resp_stats =
+      cluster->info()->requestResponseSizeStats().ref();
 
   EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_headers_size_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_body_size_.unit());
@@ -5643,7 +5643,7 @@ TEST_P(ParametrizedClusterInfoImplTest, TestTrackTimeoutBudgets) {
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
 
-  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
+  Upstream::ClusterTimeoutBudgetStats& tb_stats = cluster->info()->timeoutBudgetStats().ref();
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
             tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
@@ -5676,7 +5676,7 @@ TEST_P(ParametrizedClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeout
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
 
-  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
+  Upstream::ClusterTimeoutBudgetStats& tb_stats = cluster->info()->timeoutBudgetStats().ref();
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
             tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,

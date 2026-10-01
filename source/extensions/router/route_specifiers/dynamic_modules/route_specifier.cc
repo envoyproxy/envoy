@@ -6,6 +6,7 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/hash_policy.h"
@@ -62,6 +63,13 @@ buildRouteOverride(const RouteOverrideProto& proto_override,
     entry.hedge_policy =
         std::make_unique<Envoy::Router::HedgePolicyImpl>(proto_override.hedge_policy());
   }
+  if (proto_override.has_regex_rewrite()) {
+    auto regex_or_error =
+        Regex::Utility::parseRegex(proto_override.regex_rewrite().pattern(), context.regexEngine());
+    RETURN_IF_NOT_OK_REF(regex_or_error.status());
+    entry.regex_rewrite = std::move(regex_or_error.value());
+    entry.regex_rewrite_substitution = proto_override.regex_rewrite().substitution();
+  }
   if (!proto_override.rate_limits().empty() || proto_override.has_cors()) {
     // RateLimitPolicyImpl and CorsPolicyImpl build extension backed matchers that throw on a
     // rejected input, so a build failure is turned into a configuration error.
@@ -86,7 +94,7 @@ buildRouteOverride(const RouteOverrideProto& proto_override,
   if (entry.retry_policy == nullptr && entry.metadata_match_criteria == nullptr &&
       entry.shadow_policies.empty() && entry.hash_policy == nullptr &&
       entry.hedge_policy == nullptr && entry.rate_limit_policy == nullptr &&
-      entry.cors_policy == nullptr) {
+      entry.cors_policy == nullptr && entry.regex_rewrite == nullptr) {
     return absl::InvalidArgumentError("Route override must replace at least one property");
   }
   return entry;
@@ -101,14 +109,16 @@ buildRuntimeFraction(const DynamicModuleRouteSpecifierProto& config) {
                          config.runtime_fraction().default_value()};
 }
 
-// Layers the metadata a module recorded onto the metadata of the route. Returns nullptr when the
-// module recorded none, so that both metadata accessors fall back to the route.
-Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory>
+// Layers the metadata a module recorded onto the metadata of the route and validates it. Returns a
+// null pack when the module recorded none, so that both metadata accessors fall back to the route,
+// and an error when a typed metadata factory rejects the merged metadata.
+absl::StatusOr<Envoy::Router::RouteMetadataPackPtr>
 buildMetadataPack(const Envoy::Router::Route& route,
                   const envoy::config::core::v3::Metadata& overrides) {
   if (overrides.filter_metadata().empty() && overrides.typed_filter_metadata().empty()) {
-    return nullptr;
+    return Envoy::Router::RouteMetadataPackPtr{};
   }
+  // One copy of the route metadata, merged in place and then moved into the pack.
   envoy::config::core::v3::Metadata merged = route.metadata();
   // Merge per namespace so an entry replaces only its own key while the other keys of the route
   // stay in effect. A top-level merge would replace the whole namespace instead.
@@ -118,9 +128,9 @@ buildMetadataPack(const Envoy::Router::Route& route,
   for (const auto& [name, typed] : overrides.typed_filter_metadata()) {
     (*merged.mutable_typed_filter_metadata())[name] = typed;
   }
-  // Building the pack runs the registered typed metadata factories, which throw on input they
-  // reject. The caller turns that into a decision failure.
-  return std::make_unique<Envoy::Router::RouteMetadataPack>(merged);
+  // create() runs the registered typed metadata factories once and returns an error instead of
+  // throwing, so the wrapper it feeds cannot throw when it is constructed.
+  return Envoy::Router::RouteMetadataPack::create(std::move(merged));
 }
 
 void applyHeaderMutations(Http::HeaderMap& headers,
@@ -188,7 +198,8 @@ bool RouteOverrides::hasRouteEntryOverrides() const {
 
 bool RouteOverrides::hasRouteOverrides() const {
   return !route_metadata.filter_metadata().empty() ||
-         !route_metadata.typed_filter_metadata().empty() || !filter_disabled.empty();
+         !route_metadata.typed_filter_metadata().empty() || !filter_disabled.empty() ||
+         route_name.has_value();
 }
 
 DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
@@ -199,9 +210,15 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
           absl::StrCat(metrics_namespace, "."))),
       metrics_(*metrics_scope_), dynamic_module_(std::move(dynamic_module)),
       specifier_name_(proto_config.specifier_name()), specifier_config_(specifier_config),
+      specifier_instance_id_(proto_config.specifier_instance_id()),
       runtime_fraction_(buildRuntimeFraction(proto_config)),
+      max_rewritten_path_bytes_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_rewritten_path_bytes, 65536)),
       fail_closed_(proto_config.failure_policy() ==
                    envoy::extensions::router::route_specifiers::dynamic_modules::v3::NO_ROUTE),
+      continue_matching_on_failure_(
+          proto_config.failure_policy() ==
+          envoy::extensions::router::route_specifiers::dynamic_modules::v3::CONTINUE_MATCHING),
       cluster_manager_(context.serverFactoryContext().clusterManager()),
       runtime_(context.serverFactoryContext().runtime()),
       time_source_(context.serverFactoryContext().timeSource()),
@@ -282,6 +299,11 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
       "envoy_dynamic_module_on_route_specifier_on_route");
   RETURN_IF_NOT_OK_REF(on_route.status());
 
+  // The route destroy hook is optional, so a module built with an older SDK that does not export it
+  // is accepted and the hook is a no op.
+  auto on_route_destroy = dynamic_module->getFunctionPointer<OnRouteSpecifierRouteDestroyType>(
+      "envoy_dynamic_module_on_route_specifier_route_destroy");
+
   // Use knownAnyToBytes() to properly handle StringValue/BytesValue/Struct types.
   std::string specifier_config;
   if (proto_config.has_specifier_config()) {
@@ -304,6 +326,7 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
       proto_config, specifier_config, std::move(dynamic_module), context, metrics_namespace);
   config->on_config_destroy_ = on_config_destroy.value();
   config->on_route_ = on_route.value();
+  config->on_route_destroy_ = on_route_destroy.ok() ? on_route_destroy.value() : nullptr;
 
   const bool validate_clusters =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, validate_clusters, false);
@@ -375,12 +398,26 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
   return config;
 }
 
-DynamicModuleRoute::DynamicModuleRoute(Envoy::Router::RouteConstSharedPtr route,
-                                       DynamicModuleRouteSpecifierConfigSharedPtr config,
-                                       RouteOverrides&& overrides)
+DynamicModuleRoute::DynamicModuleRoute(
+    Envoy::Router::RouteConstSharedPtr route, DynamicModuleRouteSpecifierConfigSharedPtr config,
+    RouteOverrides&& overrides,
+    Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack,
+    std::optional<uint64_t> user_data)
     : Envoy::Router::DelegatingRoute(std::move(route)), config_(std::move(config)),
-      overrides_(std::move(overrides)),
-      metadata_pack_(buildMetadataPack(*base_route_, overrides_.route_metadata)) {}
+      overrides_(std::move(overrides)), metadata_pack_(std::move(metadata_pack)),
+      user_data_(user_data) {}
+
+DynamicModuleRoute::~DynamicModuleRoute() {
+  if (user_data_.has_value() && config_->onRouteDestroy() != nullptr) {
+    config_->stats().route_destroy_.inc();
+    config_->onRouteDestroy()(config_->in_module_config_, *user_data_);
+  }
+}
+
+const std::string& DynamicModuleRoute::routeName() const {
+  return overrides_.route_name.has_value() ? *overrides_.route_name
+                                           : Envoy::Router::DelegatingRoute::routeName();
+}
 
 const envoy::config::core::v3::Metadata& DynamicModuleRoute::metadata() const {
   return metadata_pack_ != nullptr ? metadata_pack_->proto_metadata_
@@ -399,12 +436,26 @@ std::optional<bool> DynamicModuleRoute::filterDisabled(absl::string_view name) c
              : Envoy::Router::DelegatingRoute::filterDisabled(name);
 }
 
-DynamicModuleRouteEntry::DynamicModuleRouteEntry(Envoy::Router::RouteConstSharedPtr route,
-                                                 DynamicModuleRouteSpecifierConfigSharedPtr config,
-                                                 RouteOverrides&& overrides)
+DynamicModuleRouteEntry::DynamicModuleRouteEntry(
+    Envoy::Router::RouteConstSharedPtr route, DynamicModuleRouteSpecifierConfigSharedPtr config,
+    RouteOverrides&& overrides,
+    Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack,
+    std::optional<uint64_t> user_data)
     : DelegatingRouteEntry(std::move(route)), config_(std::move(config)),
-      overrides_(std::move(overrides)),
-      metadata_pack_(buildMetadataPack(*base_route_, overrides_.route_metadata)) {}
+      overrides_(std::move(overrides)), metadata_pack_(std::move(metadata_pack)),
+      user_data_(user_data) {}
+
+DynamicModuleRouteEntry::~DynamicModuleRouteEntry() {
+  if (user_data_.has_value() && config_->onRouteDestroy() != nullptr) {
+    config_->stats().route_destroy_.inc();
+    config_->onRouteDestroy()(config_->in_module_config_, *user_data_);
+  }
+}
+
+const std::string& DynamicModuleRouteEntry::routeName() const {
+  return overrides_.route_name.has_value() ? *overrides_.route_name
+                                           : DelegatingRouteEntry::routeName();
+}
 
 const envoy::config::core::v3::Metadata& DynamicModuleRouteEntry::metadata() const {
   return metadata_pack_ != nullptr ? metadata_pack_->proto_metadata_
@@ -596,12 +647,12 @@ Envoy::Router::OnRouteResult DynamicModuleRouteSpecifier::onRoute(
   Decision result = resolve(context, decision);
 
   record_duration(config_->stats().specifier_duration_);
-  return {std::move(result.route), result.status};
+  return {std::move(result.route), result.status, result.match_status};
 }
 
 DynamicModuleRouteSpecifier::Decision
 DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t decision) const {
-  using Status = Envoy::Router::OnRouteResultStatus;
+  using Status = Envoy::Router::OnRouteChainStatus;
   const auto status = [&context](Status by_decision) {
     switch (context.chain_status) {
     case envoy_dynamic_module_type_route_specifier_chain_status_Continue:
@@ -633,12 +684,19 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     case Failure::RouteMetadata:
       config_->stats().failure_route_metadata_.inc();
       break;
+    case Failure::ReusePreviousRejected:
+      config_->stats().reuse_previous_rejected_.inc();
+      break;
     case Failure::None:
       IS_ENVOY_BUG("route specifier failure without a reason");
       break;
     }
     ENVOY_LOG(debug, "dynamic module route specifier could not honor the decision, reason {}",
               static_cast<int>(failure));
+    if (config_->continueMatchingOnFailure()) {
+      return Decision{context.input_route, Status::Continue, failure,
+                      Envoy::Router::OnRouteMatchStatus::Continue};
+    }
     if (config_->failClosed()) {
       return Decision{nullptr, Status::StopIteration, failure};
     }
@@ -655,6 +713,10 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
   case envoy_dynamic_module_type_route_specifier_decision_Error:
     config_->stats().decision_error_.inc();
     return fail(Failure::ModuleError);
+  case envoy_dynamic_module_type_route_specifier_decision_ContinueMatching:
+    config_->stats().decision_continue_matching_.inc();
+    return {context.input_route, status(Status::Continue), Failure::None,
+            Envoy::Router::OnRouteMatchStatus::Continue};
   case envoy_dynamic_module_type_route_specifier_decision_Override: {
     config_->stats().decision_override_.inc();
     if (context.input_route == nullptr) {
@@ -668,13 +730,24 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     if (context.selected_template == nullptr) {
       return fail(Failure::TemplateNotSelected);
     }
-    // set_template evaluated the template against the request, so reuse the result rather than
-    // matching a second time. A null result means the match did not hold for the request.
+    // set_route_template evaluated the template against the request, so reuse the result rather
+    // than matching a second time. A null result means the match did not hold for the request.
     if (context.selected_route == nullptr) {
       return fail(Failure::TemplateMatchFailed);
     }
     Decision wrapped = wrap(context.selected_route, context, status(Status::StopIteration));
     return wrapped.failure == Failure::None ? wrapped : fail(wrapped.failure);
+  }
+  case envoy_dynamic_module_type_route_specifier_decision_ReusePrevious: {
+    config_->stats().decision_reuse_previous_.inc();
+    // Reuse the route the connection manager last installed. No new wrapper is allocated, so the
+    // destroy hook does not fire again and the previous route keeps its user data until the stream
+    // releases it.
+    Envoy::Router::RouteConstSharedPtr previous = context.stream_info.routeSharedPtr();
+    if (previous == nullptr) {
+      return fail(Failure::ReusePreviousRejected);
+    }
+    return {std::move(previous), status(Status::StopIteration)};
   }
   }
   // A module built against a newer ABI could return a decision this build does not know.
@@ -685,31 +758,36 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
 DynamicModuleRouteSpecifier::Decision
 DynamicModuleRouteSpecifier::wrap(Envoy::Router::RouteConstSharedPtr route,
                                   RouteSpecifierContext& context,
-                                  Envoy::Router::OnRouteResultStatus status) const {
+                                  Envoy::Router::OnRouteChainStatus status) const {
   const bool route_entry_overrides = context.overrides.hasRouteEntryOverrides();
-  if (!route_entry_overrides && !context.overrides.hasRouteOverrides()) {
+  // User data forces a wrapper even with no override, so the route destroy hook fires for the
+  // produced route.
+  if (!route_entry_overrides && !context.overrides.hasRouteOverrides() &&
+      !context.user_data.has_value()) {
     return {std::move(route), status};
   }
   if (route_entry_overrides && route->routeEntry() == nullptr) {
     return {nullptr, status, Failure::OverrideOnNonRouteEntry};
   }
-  // Building the metadata pack runs the registered typed metadata factories, which throw on input
-  // they reject, so a module cannot reach the worker with metadata Envoy cannot parse.
-  Decision decision{nullptr, status};
-  TRY_NEEDS_AUDIT {
-    if (route_entry_overrides) {
-      decision.route = std::make_shared<DynamicModuleRouteEntry>(std::move(route), config_,
-                                                                 std::move(context.overrides));
-    } else {
-      decision.route = std::make_shared<DynamicModuleRoute>(std::move(route), config_,
-                                                            std::move(context.overrides));
-    }
+  // Build and validate the metadata pack once, before the wrapper is constructed, so a namespace a
+  // typed metadata factory rejects becomes a decision failure rather than an exception the wrapper
+  // constructor throws.
+  auto metadata_pack = buildMetadataPack(*route, context.overrides.route_metadata);
+  if (!metadata_pack.ok()) {
+    ENVOY_LOG_EVERY_POW_2(warn, "dynamic module route metadata was rejected: {}",
+                          metadata_pack.status().message());
+    return {nullptr, status, Failure::RouteMetadata};
   }
-  END_TRY
-  CATCH(const EnvoyException& e, {
-    ENVOY_LOG_EVERY_POW_2(warn, "dynamic module route metadata was rejected: {}", e.what());
-    decision.failure = Failure::RouteMetadata;
-  });
+  Decision decision{nullptr, status};
+  if (route_entry_overrides) {
+    decision.route = std::make_shared<DynamicModuleRouteEntry>(
+        std::move(route), config_, std::move(context.overrides), std::move(metadata_pack.value()),
+        context.user_data);
+  } else {
+    decision.route = std::make_shared<DynamicModuleRoute>(
+        std::move(route), config_, std::move(context.overrides), std::move(metadata_pack.value()),
+        context.user_data);
+  }
   return decision;
 }
 

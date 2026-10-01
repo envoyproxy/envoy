@@ -75,7 +75,16 @@ absl::StatusOr<DynamicModuleTracerConfigSharedPtr> newDynamicModuleTracerConfig(
   RESOLVE_OR_RETURN(on_start_span_, "envoy_dynamic_module_on_tracer_start_span");
   RESOLVE_OR_RETURN(on_span_set_operation_, "envoy_dynamic_module_on_tracer_span_set_operation");
   RESOLVE_OR_RETURN(on_span_set_tag_, "envoy_dynamic_module_on_tracer_span_set_tag");
-  RESOLVE_OR_RETURN(on_span_reserve_tags_, "envoy_dynamic_module_on_tracer_span_reserve_tags");
+  // reserve_tags was added after v1.39.0, so resolve it optionally to keep loading tracer modules
+  // built against an older SDK. The field keeps its null default when absent and the call site
+  // skips it.
+  {
+    auto reserve_tags = config->dynamic_module_->getFunctionPointer<OnTracerSpanReserveTagsType>(
+        "envoy_dynamic_module_on_tracer_span_reserve_tags");
+    if (reserve_tags.ok()) {
+      config->on_span_reserve_tags_ = reserve_tags.value();
+    }
+  }
   RESOLVE_OR_RETURN(on_span_log_, "envoy_dynamic_module_on_tracer_span_log");
   RESOLVE_OR_RETURN(on_span_finish_, "envoy_dynamic_module_on_tracer_span_finish");
   RESOLVE_OR_RETURN(on_span_inject_context_, "envoy_dynamic_module_on_tracer_span_inject_context");
@@ -137,7 +146,10 @@ void DynamicModuleSpan::setTag(absl::string_view name, absl::string_view value) 
 }
 
 void DynamicModuleSpan::reserveTags(size_t size) {
-  config_->on_span_reserve_tags_(in_module_span_, size);
+  // Skipped when the module was built against an SDK that predates this hook.
+  if (config_->on_span_reserve_tags_ != nullptr) {
+    config_->on_span_reserve_tags_(in_module_span_, size);
+  }
 }
 
 void DynamicModuleSpan::log(SystemTime timestamp, const std::string& event) {

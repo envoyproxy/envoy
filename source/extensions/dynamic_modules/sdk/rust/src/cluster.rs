@@ -2506,24 +2506,15 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
   }
 
   fn get_downstream_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let size = self.get_downstream_headers_size();
-    if size == 0 {
-      return Vec::default();
-    }
-    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(size);
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
-        self.raw_context,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-      )
-    };
-    if !ok {
-      return Vec::default();
-    }
-    unsafe {
-      headers.set_len(size);
-    }
-    headers
+    crate::utility::collect_headers(
+      || self.get_downstream_headers_size(),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+          self.raw_context,
+          headers,
+        )
+      },
+    )
   }
 
   fn get_downstream_header(&self, key: &str, index: usize) -> Option<(EnvoyBuffer<'_>, usize)> {

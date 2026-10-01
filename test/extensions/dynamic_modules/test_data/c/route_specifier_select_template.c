@@ -23,7 +23,7 @@ envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr) {
   const char* template_id = "only";
   envoy_dynamic_module_type_module_buffer id = {template_id, 4};
-  if (!envoy_dynamic_module_callback_route_specifier_set_template(context_envoy_ptr, id)) {
+  if (!envoy_dynamic_module_callback_route_specifier_set_route_template(context_envoy_ptr, id)) {
     return envoy_dynamic_module_type_route_specifier_decision_Error;
   }
   return envoy_dynamic_module_type_route_specifier_decision_SelectTemplate;
