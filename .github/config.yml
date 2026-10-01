@@ -160,6 +160,7 @@ checks:
     on-run:
     - release
     - verify
+    - docs
     required: true
 
 run:
@@ -179,6 +180,10 @@ run:
   check-build:
     paths:
     - "**/*"
+  docs:
+    paths:
+    - "**/*"
+    push: paths
   check-build-openssl:
     paths:
     - "**/*"
