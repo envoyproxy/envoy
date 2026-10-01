@@ -6,9 +6,6 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-)
-load(
-    "//bazel:execution_context_transition.bzl",
     "execution_context_dual_test",
 )
 

@@ -1,4 +1,4 @@
-load("//bazel:envoy_test.bzl", "envoy_cc_test", "envoy_test_env")
+load("//bazel:envoy_test.bzl", "envoy_cc_test", "envoy_exec_properties", "envoy_test_env")
 
 def _execution_context_transition_impl(settings, attr):
     if settings["//bazel:execution_context"]:
@@ -57,22 +57,15 @@ _execution_context_enabled_test = rule(
     },
 )
 
-_ENGFLOW_RBE_X86_64 = Label("//bazel:engflow_rbe_x86_64")
-
-def execution_context_enabled_test(name, test, rbe_pool = None, exec_properties = {}, args = [], env = {}, **kwargs):
-    actual_exec_properties = exec_properties
-    if rbe_pool:
-        actual_exec_properties = actual_exec_properties | select({
-            _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool},
-            "//conditions:default": {},
-        })
-
+def execution_context_enabled_test(name, test, rbe_pool = None, exec_properties = {}, args = [], env = {}, coverage = True, tags = [], **kwargs):
+    tags = tags + ([] if coverage else ["nocoverage"])
     _execution_context_enabled_test(
         name = name,
         test = test,
-        exec_properties = actual_exec_properties,
+        exec_properties = envoy_exec_properties(rbe_pool, exec_properties),
         args = args,
         env = envoy_test_env(env),
+        tags = tags,
         **kwargs
     )
 
@@ -99,6 +92,7 @@ def execution_context_dual_test(name, **kwargs):
         "rbe_pool",
         "args",
         "env",
+        "coverage",
     ]:
         if attr in kwargs:
             enabled_kwargs[attr] = kwargs[attr]
