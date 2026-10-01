@@ -3,6 +3,8 @@
 #include <iterator>
 #include <span>
 
+#include "fmt/format.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
@@ -27,6 +29,17 @@ constexpr const char* MMDB_ANON_VPN_LOOKUP_PATH[] = {"is_anonymous_vpn", nullptr
 constexpr const char* MMDB_ANON_HOSTING_LOOKUP_PATH[] = {"is_hosting_provider", nullptr};
 constexpr const char* MMDB_ANON_TOR_LOOKUP_PATH[] = {"is_tor_exit_node", nullptr};
 constexpr const char* MMDB_ANON_PROXY_LOOKUP_PATH[] = {"is_public_proxy", nullptr};
+constexpr const char* MMDB_CITY_GEONAME_ID_LOOKUP_PATH[] = {"city", "geoname_id", nullptr};
+constexpr const char* MMDB_LATITUDE_LOOKUP_PATH[] = {"location", "latitude", nullptr};
+constexpr const char* MMDB_LONGITUDE_LOOKUP_PATH[] = {"location", "longitude", nullptr};
+constexpr const char* MMDB_TIME_ZONE_LOOKUP_PATH[] = {"location", "time_zone", nullptr};
+constexpr const char* MMDB_POSTAL_CODE_LOOKUP_PATH[] = {"postal", "code", nullptr};
+constexpr const char* MMDB_REGION_NAME_LOOKUP_PATH[] = {"subdivisions", "0", "names", "en", nullptr};
+constexpr const char* MMDB_REGION_GEONAME_ID_LOOKUP_PATH[] = {"subdivisions", "0", "geoname_id", nullptr};
+constexpr const char* MMDB_SUBREGION_GEONAME_ID_LOOKUP_PATH[] = {"subdivisions", "1", "geoname_id", nullptr};
+constexpr const char* MMDB_COUNTRY_GEONAME_ID_LOOKUP_PATH[] = {"country", "geoname_id", nullptr};
+constexpr const char* MMDB_CONTINENT_GEONAME_ID_LOOKUP_PATH[] = {"continent", "geoname_id", nullptr};
+constexpr const char* MMDB_METRO_CODE_LOOKUP_PATH[] = {"location", "metro_code", nullptr};
 
 enum class LookupValueTransform { None, ApplePrivateRelay };
 
@@ -39,9 +52,20 @@ struct LookupFieldSpec {
 constexpr LookupFieldSpec CITY_LOOKUP_FIELDS[] = {
     {GeoField::City, MMDB_CITY_LOOKUP_PATH},
     {GeoField::Region, MMDB_REGION_LOOKUP_PATH},
+    {GeoField::CityGeonameId, MMDB_CITY_GEONAME_ID_LOOKUP_PATH},
+    {GeoField::Latitude, MMDB_LATITUDE_LOOKUP_PATH},
+    {GeoField::Longitude, MMDB_LONGITUDE_LOOKUP_PATH},
+    {GeoField::TimeZone, MMDB_TIME_ZONE_LOOKUP_PATH},
+    {GeoField::PostalCode, MMDB_POSTAL_CODE_LOOKUP_PATH},
+    {GeoField::RegionName, MMDB_REGION_NAME_LOOKUP_PATH},
+    {GeoField::RegionGeonameId, MMDB_REGION_GEONAME_ID_LOOKUP_PATH},
+    {GeoField::SubregionGeonameId, MMDB_SUBREGION_GEONAME_ID_LOOKUP_PATH},
+    {GeoField::MetroCode, MMDB_METRO_CODE_LOOKUP_PATH},
 };
 constexpr LookupFieldSpec COUNTRY_LOOKUP_FIELDS[] = {
     {GeoField::Country, MMDB_COUNTRY_LOOKUP_PATH},
+    {GeoField::CountryGeonameId, MMDB_COUNTRY_GEONAME_ID_LOOKUP_PATH},
+    {GeoField::ContinentGeonameId, MMDB_CONTINENT_GEONAME_ID_LOOKUP_PATH},
 };
 constexpr LookupFieldSpec ASN_LOOKUP_FIELDS[] = {
     {GeoField::Asn, MMDB_ASN_LOOKUP_PATH},
@@ -109,6 +133,12 @@ std::optional<std::string> lookupValue(MMDB_lookup_result_s& mmdb_lookup_result,
   if (entry_data.type == MMDB_DATA_TYPE_BOOLEAN) {
     return entry_data.boolean ? "true" : "false";
   }
+  if (entry_data.type == MMDB_DATA_TYPE_UINT16 && entry_data.uint16 > 0) {
+    return std::to_string(entry_data.uint16);
+  }
+  if (entry_data.type == MMDB_DATA_TYPE_DOUBLE) {
+    return fmt::format("{}", entry_data.double_value);
+  }
   return std::nullopt;
 }
 
@@ -156,6 +186,17 @@ GeoipProviderConfig::GeoipProviderConfig(
     setFieldKey(GeoField::AnonProxy, keys.anon_proxy());
     setFieldKey(GeoField::Isp, keys.isp());
     setFieldKey(GeoField::ApplePrivateRelay, keys.apple_private_relay());
+    setFieldKey(GeoField::CityGeonameId, keys.city_geoname_id());
+    setFieldKey(GeoField::Latitude, keys.latitude());
+    setFieldKey(GeoField::Longitude, keys.longitude());
+    setFieldKey(GeoField::TimeZone, keys.time_zone());
+    setFieldKey(GeoField::PostalCode, keys.postal_code());
+    setFieldKey(GeoField::RegionName, keys.region_name());
+    setFieldKey(GeoField::RegionGeonameId, keys.region_geoname_id());
+    setFieldKey(GeoField::SubregionGeonameId, keys.subregion_geoname_id());
+    setFieldKey(GeoField::CountryGeonameId, keys.country_geoname_id());
+    setFieldKey(GeoField::ContinentGeonameId, keys.continent_geoname_id());
+    setFieldKey(GeoField::MetroCode, keys.metro_code());
   };
 
   if (common_config.has_geo_field_keys()) {
