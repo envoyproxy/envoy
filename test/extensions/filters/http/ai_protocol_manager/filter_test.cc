@@ -9,6 +9,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/coroutine/status_macros.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
@@ -1319,7 +1320,6 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(counterValue("request_parsed"), 1);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
-  EXPECT_EQ(counterValue("request_schema_invalid"), 0);
 }
 
 // Rewrites `model` so a test can tell the chain ran ahead of replay.
@@ -1327,6 +1327,7 @@ class ContextRecordingAiFilter : public AiFilter {
 public:
   struct Seen {
     LLMProtocol protocol;
+    LLMProtocol request_protocol;
     std::string path;
     const StreamInfo::StreamInfo* stream_info;
     uint64_t payload_bytes;
@@ -1339,7 +1340,7 @@ public:
                                        AiRequestPropagator propagate_request,
                                        LocalReplier) override {
     ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
-    seen_.push_back({context_.request_protocol,
+    seen_.push_back({context_.request_protocol, request->protocol(),
                      std::string(context_.request_headers.getPathValue()), &context_.stream_info,
                      context_.request_payload_bytes});
     request->json()["model"] = "rewritten";
@@ -1400,6 +1401,7 @@ TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) 
   EXPECT_EQ(built, 1);
   ASSERT_EQ(seen.size(), 1);
   EXPECT_EQ(seen[0].protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen[0].request_protocol, LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(seen[0].path, "/chat/completions");
   EXPECT_EQ(seen[0].stream_info, &callbacks_.stream_info_);
   EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
@@ -1425,6 +1427,40 @@ TEST_F(AiProtocolManagerFilterTest, AiFilterContextCarriesTotalPayloadBytes) {
 
   ASSERT_EQ(seen.size(), 1);
   EXPECT_EQ(seen[0].payload_bytes, first.size() + second.size());
+}
+
+class AiProtocolManagerFilterStateTest : public AiProtocolManagerFilterTest {
+public:
+  // What the AI filters see on a Chat Completions route when filter state names `named`.
+  std::vector<ContextRecordingAiFilter::Seen> runWithFilterState(LLMProtocol named) {
+    std::vector<ContextRecordingAiFilter::Seen> seen;
+    createFilterWithAiFilters({[&seen](const AiFilterContext& context) -> AiFilterSharedPtr {
+      return std::make_unique<ContextRecordingAiFilter>(context, seen);
+    }});
+    setRouteConfig();
+    callbacks_.stream_info_.filterState()->setData(RequestLlmProtocol::FilterStateKey,
+                                                   std::make_shared<RequestLlmProtocol>(named),
+                                                   StreamInfo::FilterState::LifeSpan::FilterChain);
+    EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+    Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+    EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+    drain();
+    return seen;
+  }
+};
+
+TEST_F(AiProtocolManagerFilterStateTest, FilterStateOutranksTheRoute) {
+  const auto seen = runWithFilterState(LLMProtocol::AnthropicMessages);
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].protocol, LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(seen[0].request_protocol, LLMProtocol::AnthropicMessages);
+}
+
+TEST_F(AiProtocolManagerFilterStateTest, UnspecifiedFilterStateLeavesTheRoute) {
+  const auto seen = runWithFilterState(LLMProtocol::Unspecified);
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen[0].request_protocol, LLMProtocol::OpenAiChatCompletions);
 }
 
 TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
@@ -1502,10 +1538,9 @@ TEST_F(AiProtocolManagerFilterTest, DoesNotSetContentLengthOnReplayWhenAbsent) {
   EXPECT_EQ(request_headers_.ContentLength(), nullptr);
 }
 
-// A payload whose `model` is larger than the inline-string threshold: the
-// parser offloads the value, and the schema declares `model` non-offloadable,
-// so the default 1KiB threshold rejects it.
-TEST_F(AiProtocolManagerFilterTest, ModelOverInlineStringThresholdIsRejected) {
+// A payload whose `model` is larger than the default 1KiB inline-string
+// threshold: the parser leaves the value in the external buffer.
+TEST_F(AiProtocolManagerFilterTest, ModelOverInlineStringThresholdIsOffloaded) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
@@ -1513,10 +1548,12 @@ TEST_F(AiProtocolManagerFilterTest, ModelOverInlineStringThresholdIsRejected) {
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
 
-  EXPECT_EQ(local_reply_calls_, 1);
-  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
-  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
-  EXPECT_EQ(inject_calls_, 0);
+  EXPECT_EQ(local_reply_calls_, 0);
+  const auto* index =
+      callbacks_.stream_info_.filterState()->getDataReadOnly<APMRequestPayloadIndex>(
+          APMRequestPayloadIndex::kFilterStateKey);
+  ASSERT_NE(index, nullptr);
+  EXPECT_TRUE(JsonWithExtBuf::isExternalRef(index->index().json().at("model")));
 }
 
 // The same payload is accepted once the configured threshold is raised above
@@ -1536,6 +1573,11 @@ TEST_F(AiProtocolManagerFilterTest, RaisedInlineStringThresholdKeepsLargeValuesI
   // preserve key order; compare the parsed JSON rather than the raw bytes.
   EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
   EXPECT_TRUE(injected_end_stream_);
+  const auto* index =
+      callbacks_.stream_info_.filterState()->getDataReadOnly<APMRequestPayloadIndex>(
+          APMRequestPayloadIndex::kFilterStateKey);
+  ASSERT_NE(index, nullptr);
+  EXPECT_TRUE(index->index().json().at("model").is_string());
 }
 
 // Malformed JSON is answered with a 400 and never reaches the upstream.
@@ -1551,10 +1593,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
   EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
   EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
   EXPECT_EQ(inject_calls_, 0);
-  // A body that is not JSON at all is a parse error, not a schema failure: the
-  // two 400s are counted apart because they mean different things to operate on.
   EXPECT_EQ(counterValue("request_parse_error"), 1);
-  EXPECT_EQ(counterValue("request_schema_invalid"), 0);
   EXPECT_EQ(counterValue("request_parsed"), 0);
 }
 
@@ -1645,9 +1684,9 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJsonMidUpload) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// A payload that is valid JSON syntax but fails schema validation is answered
-// with a 400 and never reaches the upstream.
-TEST_F(AiProtocolManagerFilterTest, RejectsPayloadFailingSchemaValidation) {
+// Schema validation is an AI filter's job: without one, a well-formed payload
+// the declared API would reject is forwarded.
+TEST_F(AiProtocolManagerFilterTest, ForwardsSchemaInvalidPayloadWithoutValidationFilter) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
@@ -1656,14 +1695,10 @@ TEST_F(AiProtocolManagerFilterTest, RejectsPayloadFailingSchemaValidation) {
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
 
-  EXPECT_EQ(local_reply_calls_, 1);
-  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
-  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
-  EXPECT_EQ(inject_calls_, 0);
-  // Well-formed JSON that the declared API rejects: schema drift, not garbage.
-  EXPECT_EQ(counterValue("request_schema_invalid"), 1);
-  EXPECT_EQ(counterValue("request_parse_error"), 0);
-  EXPECT_EQ(counterValue("request_parsed"), 0);
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()),
+            nlohmann::json::parse(R"({"model":"gpt-4"})"));
+  EXPECT_EQ(counterValue("request_parsed"), 1);
 }
 
 // Unknown fields are permitted and pass through untouched.
@@ -1967,8 +2002,7 @@ TEST_F(AiProtocolManagerFilterTest, RouteConfigIsStrictEvenWithBestEffortConfigu
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// A declared endpoint's valid payload is parsed, validated against the
-// declared API's schema, and forwarded unchanged.
+// A declared endpoint's valid payload is parsed and forwarded unchanged.
 TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointIsParsedAndForwarded) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1996,21 +2030,6 @@ TEST_F(AiProtocolManagerFilterTest, SetsFilterStateObjectOnParsedPayload) {
       APMRequestPayloadIndex::kFilterStateKey);
   ASSERT_NE(fs, nullptr);
   EXPECT_EQ(fs->index().json()["model"], "gpt-4");
-}
-
-// A payload with valid JSON syntax but violating the route's schema is rejected with 400.
-TEST_F(AiProtocolManagerFilterTest, SchemaValidationRejectsInvalidPayload) {
-  setRouteConfig();
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
-
-  // Missing required "messages" array.
-  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-
-  EXPECT_EQ(local_reply_calls_, 1);
-  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
-  EXPECT_EQ(inject_calls_, 0);
 }
 
 // Trailers arriving after a stream was rejected are dropped with StopIteration.
