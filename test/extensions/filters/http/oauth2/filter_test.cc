@@ -706,6 +706,43 @@ TEST_F(OAuth2Test, SecretsNotReadyReturnsServiceUnavailable) {
   EXPECT_EQ(1, config_->stats().oauth_failure_.value());
 }
 
+TEST_F(OAuth2Test, ConnectRequestWithoutPathReturnsUnauthorized) {
+  auto secret_reader =
+      std::make_shared<MockSecretReader>("asdf_client_secret_fdsa", TEST_HMAC_SECRET);
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.set_forward_bearer_token(true);
+  p.set_stat_prefix("my_prefix");
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+  init(makeFilterConfig(p, secret_reader).value());
+
+  // Plain CONNECT requests carry :authority but no :path. The filter must fail closed
+  // instead of crashing on a null header entry dereference.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Connect},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, "OAuth flow failed.",
+                                                 _, _, "OAuth flow failed: missing :path header."));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
+}
+
 TEST_F(OAuth2Test, TlsClientAuthDoesNotRequireClientSecret) {
   auto secret_reader = std::make_shared<MockSecretReader>("", TEST_HMAC_SECRET);
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
