@@ -41,6 +41,10 @@ public:
   void requestOnDemandUpdate(const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
+  void requestOnDemandUpdate(const absl::flat_hash_set<std::string>&,
+                             const absl::flat_hash_set<std::string>&) override {
+    ENVOY_BUG(false, "unexpected request for on demand update");
+  }
 
   // Http::RestApiFetcher
   void createRequest(Http::RequestMessage& request) override;

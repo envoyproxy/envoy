@@ -97,6 +97,13 @@ TEST_F(HttpSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
   EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028, "0"));
 }
 
+TEST_F(HttpSubscriptionImplTest, RequestOnDemandNotImplemented) {
+  EXPECT_ENVOY_BUG(subscription_->requestOnDemandUpdate({"cluster0"}),
+                   "unexpected request for on demand update");
+  EXPECT_ENVOY_BUG(subscription_->requestOnDemandUpdate({"cluster0"}, {"cluster1"}),
+                   "unexpected request for on demand update");
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
