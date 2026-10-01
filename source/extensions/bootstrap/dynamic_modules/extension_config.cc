@@ -1,7 +1,12 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 
-#include "source/common/common/assert.h"
+#include <algorithm>
+#include <vector>
 
+#include "source/common/common/assert.h"
+#include "source/common/listener_manager/filter_chain_manager_impl.h"
+
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -69,17 +74,31 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
 
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
-  if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_add_or_update_ != nullptr) {
-    on_bootstrap_extension_cluster_add_or_update_(thisAsVoidPtr(), in_module_config_,
-                                                  {cluster_name.data(), cluster_name.size()});
-  }
+  // ThreadLocalClusterUpdateCallbacks are delivered on every worker thread (runOnAllThreads), but
+  // the module hooks may only run on the main thread. Marshal there via post(), copying the name
+  // since the view does not outlive the callback, and locking a weak_ptr so a post that outlives
+  // the config is dropped rather than dereferencing freed memory.
+  main_thread_dispatcher_.post([weak = weak_from_this(), name = std::string(cluster_name)]() {
+    auto self = weak.lock();
+    if (self && self->in_module_config_ != nullptr &&
+        self->on_bootstrap_extension_cluster_add_or_update_ != nullptr) {
+      self->on_bootstrap_extension_cluster_add_or_update_(
+          self->thisAsVoidPtr(), self->in_module_config_, {name.data(), name.size()});
+    }
+  });
 }
 
 void DynamicModuleBootstrapExtensionConfig::onClusterRemoval(absl::string_view cluster_name) {
-  if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_removal_ != nullptr) {
-    on_bootstrap_extension_cluster_removal_(thisAsVoidPtr(), in_module_config_,
-                                            {cluster_name.data(), cluster_name.size()});
-  }
+  // Marshal to the main thread as in onClusterAddOrUpdate. cluster_name is a view that does not
+  // outlive this call, so copy it into the posted task rather than capturing the view.
+  main_thread_dispatcher_.post([weak = weak_from_this(), name = std::string(cluster_name)]() {
+    auto self = weak.lock();
+    if (self && self->in_module_config_ != nullptr &&
+        self->on_bootstrap_extension_cluster_removal_ != nullptr) {
+      self->on_bootstrap_extension_cluster_removal_(self->thisAsVoidPtr(), self->in_module_config_,
+                                                    {name.data(), name.size()});
+    }
+  });
 }
 
 bool DynamicModuleBootstrapExtensionConfig::enableListenerLifecycle() {
@@ -112,6 +131,147 @@ void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string&
     on_bootstrap_extension_listener_removal_(thisAsVoidPtr(), in_module_config_,
                                              {listener_name.data(), listener_name.size()});
   }
+}
+
+bool DynamicModuleBootstrapExtensionConfig::enableSecretLifecycle() {
+  if (secret_lifecycle_enabled_) {
+    return false;
+  }
+  if (!server_initialized_) {
+    ENVOY_LOG(error, "cannot enable secret lifecycle before server is initialized");
+    return false;
+  }
+  secret_lifecycle_enabled_ = true;
+  // Subscribe to every dynamic TLS certificate secret provider. The SecretManager invokes this on
+  // the main thread once for each provider that already exists and again for each one created
+  // later; we then hook the provider's own update/remove callbacks (also main thread). Because
+  // pre-existing providers are replayed through the same path, they get update AND removal events,
+  // not just an initial add.
+  context_.secretManager().setDynamicTlsCertificateSecretProviderCreatedCallback(
+      [weak = weak_from_this()](const std::string& secret_name,
+                                const Secret::TlsCertificateConfigProviderSharedPtr& provider) {
+        if (auto self = weak.lock()) {
+          self->subscribeSecretProvider(secret_name, provider);
+        }
+      });
+  return true;
+}
+
+void DynamicModuleBootstrapExtensionConfig::subscribeSecretProvider(
+    const std::string& secret_name, const Secret::TlsCertificateConfigProviderSharedPtr& provider) {
+  // addUpdateCallback fires immediately if the secret is already present, and again on every
+  // rotation; addRemoveCallback fires when the resource is explicitly removed. Both run on the main
+  // thread. The handles are retained so the subscriptions stay live for the life of the config.
+  secret_callback_handles_.push_back(
+      provider->addUpdateCallback([weak = weak_from_this(), secret_name]() {
+        if (auto self = weak.lock()) {
+          self->onSecretAddOrUpdate(secret_name);
+        }
+        return absl::OkStatus();
+      }));
+  secret_callback_handles_.push_back(
+      provider->addRemoveCallback([weak = weak_from_this(), secret_name]() {
+        if (auto self = weak.lock()) {
+          self->onSecretRemoval(secret_name);
+        }
+        return absl::OkStatus();
+      }));
+}
+
+void DynamicModuleBootstrapExtensionConfig::onSecretAddOrUpdate(const std::string& secret_name) {
+  if (in_module_config_ != nullptr && on_bootstrap_extension_secret_add_or_update_ != nullptr) {
+    on_bootstrap_extension_secret_add_or_update_(thisAsVoidPtr(), in_module_config_,
+                                                 {secret_name.data(), secret_name.size()});
+  }
+}
+
+void DynamicModuleBootstrapExtensionConfig::onSecretRemoval(const std::string& secret_name) {
+  if (in_module_config_ != nullptr && on_bootstrap_extension_secret_removal_ != nullptr) {
+    on_bootstrap_extension_secret_removal_(thisAsVoidPtr(), in_module_config_,
+                                           {secret_name.data(), secret_name.size()});
+  }
+}
+
+void DynamicModuleBootstrapExtensionConfig::getActiveResourceNames(
+    envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
+    absl::FunctionRef<void(absl::string_view)> emit) {
+  // The cluster manager and listener manager are not available until the server is initialized.
+  if (!server_initialized_) {
+    return;
+  }
+  switch (kind) {
+  case envoy_dynamic_module_type_bootstrap_active_resource_kind_FilterChain: {
+    // Inline filter chains across all active listeners.
+    if (listener_manager_ != nullptr) {
+      for (Network::ListenerConfig& listener :
+           listener_manager_->listeners(Server::ListenerManager::ListenerState::ACTIVE)) {
+        for (absl::string_view name : listener.filterChainManager().filterChainNames()) {
+          emit(name);
+        }
+      }
+    }
+    // Active FCDS filter chains. When a listener uses fcds_config its filter chains live in the
+    // shared FCDS manager (not the listener's inline FilterChainManager). Emits nothing when FCDS
+    // is unused (the singleton is never created).
+    if (auto fcds_manager = Server::getFcdsSharedFilterChainManager(context_.singletonManager());
+        fcds_manager != nullptr) {
+      for (absl::string_view name : fcds_manager->activeFilterChainNames()) {
+        emit(name);
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster:
+    for (const auto& cluster_entry : context_.clusterManager().clusters().active_clusters_) {
+      emit(cluster_entry.first);
+    }
+    break;
+  case envoy_dynamic_module_type_bootstrap_active_resource_kind_TransportSocketMatch: {
+    // A transport socket match is emitted only when present in every cluster that has matches, so a
+    // match is observed only once it has landed in all the clusters that carry per-endpoint
+    // matches. Clusters with no matches do not constrain the intersection.
+    std::vector<std::vector<absl::string_view>> per_cluster_matches;
+    for (const auto& [cluster_name, cluster] :
+         context_.clusterManager().clusters().active_clusters_) {
+      per_cluster_matches.push_back(cluster.get().info()->transportSocketMatcher().matchNames());
+    }
+    for (absl::string_view match_name : transportSocketMatchIntersection(per_cluster_matches)) {
+      emit(match_name);
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret:
+    for (const std::string& secret_name :
+         context_.secretManager().dynamicActiveTlsCertificateSecretNames()) {
+      emit(secret_name);
+    }
+    break;
+  }
+}
+
+std::vector<absl::string_view>
+DynamicModuleBootstrapExtensionConfig::transportSocketMatchIntersection(
+    const std::vector<std::vector<absl::string_view>>& per_cluster_matches) {
+  std::vector<absl::string_view> result;
+  bool initialized = false;
+  for (const auto& cluster_matches : per_cluster_matches) {
+    // A cluster with no matches carries no per-endpoint matches, so it does not constrain the
+    // intersection.
+    if (cluster_matches.empty()) {
+      continue;
+    }
+    if (!initialized) {
+      result.assign(cluster_matches.begin(), cluster_matches.end());
+      initialized = true;
+      continue;
+    }
+    const absl::flat_hash_set<absl::string_view> names(cluster_matches.begin(),
+                                                       cluster_matches.end());
+    result.erase(std::remove_if(result.begin(), result.end(),
+                                [&names](absl::string_view n) { return !names.contains(n); }),
+                 result.end());
+  }
+  return result;
 }
 
 void DynamicModuleBootstrapExtensionConfig::onScheduled(uint64_t event_id) {
@@ -352,6 +512,16 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_listener_removal.status();
   }
 
+  // Secret lifecycle hooks are optional per the ABI compatibility policy (abi/abi.h): an absent
+  // symbol means the module does not implement the hook, not a load failure. A module that never
+  // enables secret lifecycle need not export them.
+  auto on_secret_add_or_update =
+      dynamic_module->getFunctionPointer<OnBootstrapExtensionSecretAddOrUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update");
+  auto on_secret_removal =
+      dynamic_module->getFunctionPointer<OnBootstrapExtensionSecretRemovalType>(
+          "envoy_dynamic_module_on_bootstrap_extension_secret_removal");
+
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
       main_thread_dispatcher, context, stats_store);
@@ -386,6 +556,10 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_cluster_removal_ = on_cluster_removal.value();
   config->on_bootstrap_extension_listener_add_or_update_ = on_listener_add_or_update.value();
   config->on_bootstrap_extension_listener_removal_ = on_listener_removal.value();
+  config->on_bootstrap_extension_secret_add_or_update_ =
+      on_secret_add_or_update.ok() ? on_secret_add_or_update.value() : nullptr;
+  config->on_bootstrap_extension_secret_removal_ =
+      on_secret_removal.ok() ? on_secret_removal.value() : nullptr;
 
   config->stat_creation_frozen_ = true;
 

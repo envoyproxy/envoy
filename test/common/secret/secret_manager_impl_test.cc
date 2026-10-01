@@ -403,6 +403,166 @@ tls_certificate:
             tls_config.privateKey());
 }
 
+TEST_F(SecretManagerImplTest, DynamicActiveTlsCertificateSecretNames) {
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  envoy::config::core::v3::ConfigSource config_source;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
+  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+      .WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
+
+  auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+  // Before delivery the secret is warming, not active.
+  EXPECT_TRUE(secret_manager->dynamicActiveTlsCertificateSecretNames().empty());
+
+  const std::string yaml =
+      R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+  init_target_handle->initialize(init_watcher);
+  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "")
+                  .ok());
+  // Delivered: the secret is now active.
+  EXPECT_THAT(secret_manager->dynamicActiveTlsCertificateSecretNames(),
+              testing::UnorderedElementsAre("abc.com"));
+}
+
+// Registering the provider-created callback replays it for providers that already exist, so an
+// observer that subscribes after a provider was created still learns of it (and can hook the
+// provider's update/removal callbacks). Without the replay a pre-existing provider's removal would
+// never reach the observer.
+TEST_F(SecretManagerImplTest, SecretProviderCreatedCallbackReplaysExistingProviders) {
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  envoy::config::core::v3::ConfigSource config_source;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Init::MockManager> init_manager;
+  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+      .WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
+
+  // Create the provider before the callback is registered.
+  auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+
+  // Registering the callback replays it for the already-existing provider, carrying its name and
+  // the same provider handle.
+  std::vector<std::string> observed;
+  Secret::TlsCertificateConfigProviderSharedPtr observed_provider;
+  secret_manager->setDynamicTlsCertificateSecretProviderCreatedCallback(
+      [&observed, &observed_provider](
+          const std::string& name, const Secret::TlsCertificateConfigProviderSharedPtr& provider) {
+        observed.push_back(name);
+        observed_provider = provider;
+      });
+  EXPECT_THAT(observed, testing::ElementsAre("abc.com"));
+  EXPECT_EQ(observed_provider.get(), secret_provider.get());
+}
+
+// A callback registered before any provider exists is delivered exactly once, when the provider is
+// created; re-fetching an existing provider does not deliver it again.
+TEST_F(SecretManagerImplTest, SecretProviderCreatedCallbackFiresOnceForLaterProvider) {
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  envoy::config::core::v3::ConfigSource config_source;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Init::MockManager> init_manager;
+  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+      .WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
+
+  // Register the callback before any provider exists, so there is nothing to replay.
+  std::vector<std::string> observed;
+  secret_manager->setDynamicTlsCertificateSecretProviderCreatedCallback(
+      [&observed](const std::string& name, const Secret::TlsCertificateConfigProviderSharedPtr&) {
+        observed.push_back(name);
+      });
+  EXPECT_THAT(observed, testing::IsEmpty());
+
+  // Creating a provider delivers exactly once.
+  auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+  EXPECT_THAT(observed, testing::ElementsAre("abc.com"));
+
+  // Re-fetching the same provider returns the existing instance and does not deliver again.
+  auto same_provider = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+  EXPECT_EQ(same_provider.get(), secret_provider.get());
+  EXPECT_THAT(observed, testing::ElementsAre("abc.com"));
+}
+
+// The name the provider-created callback delivers is the same name the active-secret accessor
+// reports once the secret is delivered, so a module observing secret events and one enumerating
+// active secret names agree on the identifier.
+TEST_F(SecretManagerImplTest, CreatedCallbackNameMatchesActiveSecretName) {
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  envoy::config::core::v3::ConfigSource config_source;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
+  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+      .WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
+
+  std::vector<std::string> observed;
+  secret_manager->setDynamicTlsCertificateSecretProviderCreatedCallback(
+      [&observed](const std::string& name, const Secret::TlsCertificateConfigProviderSharedPtr&) {
+        observed.push_back(name);
+      });
+  auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+  ASSERT_THAT(observed, testing::ElementsAre("abc.com"));
+
+  const std::string yaml =
+      R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+  init_target_handle->initialize(init_watcher);
+  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "")
+                  .ok());
+
+  // The delivered name the observer saw equals the active-secret name the accessor reports.
+  EXPECT_THAT(secret_manager->dynamicActiveTlsCertificateSecretNames(),
+              testing::ElementsAre(observed.front()));
+}
+
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   Server::MockInstance server;
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
