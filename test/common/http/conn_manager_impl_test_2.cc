@@ -620,6 +620,8 @@ TEST_F(HttpConnectionManagerImplTest, ZeroDrainTimeoutClosesConnectionWithoutCod
 TEST_F(HttpConnectionManagerImplTest, DrainTimeoutStartsAfterActiveStreamCompletes) {
   drain_timeout_ = std::chrono::milliseconds(20);
   setup();
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(30)));
 
   MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -644,6 +646,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutStartsAfterActiveStreamComplet
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_drain_close_.value());
 
   response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());

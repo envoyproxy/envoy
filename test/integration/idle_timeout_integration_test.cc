@@ -164,6 +164,7 @@ TEST_P(IdleTimeoutIntegrationTest, ClosesIdleConnectionWithinOneDrainTimeout) {
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs * 3 / 2)));
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
   test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
   if (downstream_protocol_ != Http::CodecType::HTTP1) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
@@ -192,6 +193,7 @@ TEST_P(IdleTimeoutIntegrationTest, DrainingClosesConnectionWithoutCodecAfterDrai
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs * 2)));
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
   test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestRacingServerDrainCompletesAndCloses) {
@@ -218,6 +220,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestRacingServerDrainCompletesAndCloses) {
     tcp_client->waitForDisconnect(true);
     EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
     test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
+    EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
     return;
   }
 
@@ -248,6 +251,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestRacingServerDrainCompletesAndCloses) {
   tcp_client->waitForDisconnect(true);
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
   test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
 }
 
 // Tests idle timeout behaviour with single request and validates that idle timer kicks in

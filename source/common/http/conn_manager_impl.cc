@@ -570,6 +570,7 @@ void ConnectionManagerImpl::handleCodecOverloadError(absl::string_view error) {
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
   ASSERT(!codec_);
+  ASSERT(streams_.empty());
   codec_ = config_->createCodec(read_callbacks_->connection(), data, *this, overload_manager_);
 
   switch (codec_->protocol()) {
@@ -591,7 +592,7 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
   if (drain_no_codec_close_timer_) {
     drain_no_codec_close_timer_->disableTimer();
     drain_no_codec_close_timer_.reset();
-    if (streams_.empty() && drain_state_ == DrainState::NotDraining && !connection_close_started_) {
+    if (drain_state_ == DrainState::NotDraining && !connection_close_started_) {
       stats_.named_.downstream_cx_drain_close_.inc();
       startDrainSequence();
     }
