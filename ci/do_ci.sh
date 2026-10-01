@@ -665,10 +665,17 @@ case $CI_TARGET in
             bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
             cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
         fi
+        DOCS_TARGET=//docs:html
+        if [[ -n "${DOCS_BUILD_RELEASE}" ]]; then
+            DOCS_TARGET=//docs:html_release
+            BAZEL_BUILD_OPTIONS+=(
+                "--action_env=BUILD_DOCS_TAG=${BUILD_DOCS_TAG}"
+                "--action_env=BUILD_DOCS_SHA=${BUILD_DOCS_SHA}")
+        fi
         DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
               "${BAZEL_BUILD_OPTIONS[@]}" \
-              --//tools/tarball:target=//docs:html \
+              "--//tools/tarball:target=${DOCS_TARGET}" \
               //tools/tarball:unpack \
               "$DOCS_OUTPUT_DIR"
         ;;
