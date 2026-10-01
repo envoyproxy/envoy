@@ -469,6 +469,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   if (streams_.empty() && !connection_close_started_) {
     if (connection_drain_event_.has_value() && codec_ && drain_state_ == DrainState::NotDraining) {
+      stats_.named_.downstream_cx_drain_close_.inc();
       startDrainSequence();
     } else if (connection_idle_timer_ && !connection_drain_event_.has_value()) {
       connection_idle_timer_->enableTimer(config_->idleTimeout().value());
@@ -591,6 +592,7 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
     drain_no_codec_close_timer_->disableTimer();
     drain_no_codec_close_timer_.reset();
     if (streams_.empty() && drain_state_ == DrainState::NotDraining && !connection_close_started_) {
+      stats_.named_.downstream_cx_drain_close_.inc();
       startDrainSequence();
     }
   }
@@ -754,13 +756,15 @@ void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
   if (codec_) {
     if (drain_state_ == DrainState::NotDraining) {
       // Drain idle HTTP connections immediately, even if the strategy is Gradual.
+      stats_.named_.downstream_cx_drain_close_.inc();
       startDrainSequence();
     }
     return;
   }
   drain_no_codec_close_timer_ = dispatcher_->createTimer([this]() {
-    doConnectionClose(Network::ConnectionCloseType::NoFlush, std::nullopt,
-                      "drained_connection_without_codec");
+    stats_.named_.downstream_cx_drain_close_.inc();
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, std::nullopt,
+                      StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec);
   });
   drain_no_codec_close_timer_->enableTimer(config_->drainTimeout());
 }

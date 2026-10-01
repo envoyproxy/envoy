@@ -327,6 +327,8 @@ message HttpProtocolOptions {
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
   // A connection without an initialized HTTP codec closes after the drain timeout. If a codec is
   // initialized before then, the connection enters the HTTP drain sequence.
+  // If the codec is initialized near the end of this wait, the two drain timers can span nearly
+  // twice the configured drain timeout, before accounting for jitter or active streams.
   //
   // .. warning::
   //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP

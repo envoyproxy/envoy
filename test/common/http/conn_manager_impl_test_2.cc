@@ -431,9 +431,11 @@ TEST_F(HttpConnectionManagerImplTest, DrainClosesConnectionWithoutCodec) {
 
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::NoFlush, "drained_connection_without_codec"));
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec));
   drain_timer->invokeCallback();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_idle_timeout_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, ReplayedDrainClosesConnectionWithoutCodec) {
@@ -454,10 +456,12 @@ TEST_F(HttpConnectionManagerImplTest, ReplayedDrainClosesConnectionWithoutCodec)
   EXPECT_CALL(*idle_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::NoFlush, "drained_connection_without_codec"));
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec));
   setup();
   drain_timer->invokeCallback();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_idle_timeout_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, DrainClosesConnectionWithoutCodecOrIdleTimeout) {
@@ -472,9 +476,11 @@ TEST_F(HttpConnectionManagerImplTest, DrainClosesConnectionWithoutCodecOrIdleTim
 
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::NoFlush, "drained_connection_without_codec"));
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec));
   drain_timer->invokeCallback();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_idle_timeout_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, DrainStartsWhenCodecAppearsDuringNoCodecWait) {
@@ -496,12 +502,14 @@ TEST_F(HttpConnectionManagerImplTest, DrainStartsWhenCodecAppearsDuringNoCodecWa
   Buffer::OwnedImpl input;
   conn_manager_->onData(input, false);
   EXPECT_TRUE(no_codec_timer_destroyed);
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, DrainAllowsStreamWhenCodecAppearsDuringNoCodecWait) {
@@ -536,6 +544,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainAllowsStreamWhenCodecAppearsDuringNoC
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
   response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, DrainStartsImmediatelyForIdleConnection) {
@@ -557,6 +566,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainStartsImmediatelyForIdleConnection) {
       Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
 
   EXPECT_EQ(0U, stats_.named_.downstream_cx_idle_timeout_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
@@ -601,8 +611,10 @@ TEST_F(HttpConnectionManagerImplTest, ZeroDrainTimeoutClosesConnectionWithoutCod
 
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::NoFlush, "drained_connection_without_codec"));
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec));
   drain_timer->invokeCallback();
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, DrainTimeoutStartsAfterActiveStreamCompletes) {
@@ -625,6 +637,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutStartsAfterActiveStreamComplet
 
   filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
       test_time_.timeSystem().monotonicTime(), Server::DrainStrategy::Gradual});
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_drain_close_.value());
 
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(20), _));
@@ -633,6 +646,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutStartsAfterActiveStreamComplet
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
   response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {

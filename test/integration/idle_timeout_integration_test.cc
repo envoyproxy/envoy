@@ -163,6 +163,7 @@ TEST_P(IdleTimeoutIntegrationTest, ClosesIdleConnectionWithinOneDrainTimeout) {
 
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs * 3 / 2)));
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+  test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
   if (downstream_protocol_ != Http::CodecType::HTTP1) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
@@ -190,6 +191,7 @@ TEST_P(IdleTimeoutIntegrationTest, DrainingClosesConnectionWithoutCodecAfterDrai
   EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs)));
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs * 2)));
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+  test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestRacingServerDrainCompletesAndCloses) {
@@ -215,6 +217,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestRacingServerDrainCompletesAndCloses) {
     EXPECT_TCP_RESPONSE(tcp_client, HasSubstr("HTTP/1.1 200"));
     tcp_client->waitForDisconnect(true);
     EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+    test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
     return;
   }
 
@@ -244,6 +247,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestRacingServerDrainCompletesAndCloses) {
   EXPECT_TRUE(saw_success);
   tcp_client->waitForDisconnect(true);
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+  test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
 }
 
 // Tests idle timeout behaviour with single request and validates that idle timer kicks in
