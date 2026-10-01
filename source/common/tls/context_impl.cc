@@ -635,7 +635,7 @@ std::optional<uint64_t> ContextImpl::secondsUntilFirstOcspResponseExpires() cons
   return secs_until_expiration;
 }
 
-Envoy::Ssl::CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
+std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCaCertInformation() const {
   return cert_validator_->getCaCertInformation();
 }
 

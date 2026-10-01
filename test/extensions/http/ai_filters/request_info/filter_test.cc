@@ -76,11 +76,14 @@ public:
 
     absl::Status status;
     bool completed = false;
-    manager.startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
-                         [&status, &completed](absl::Status s) {
-                           status = std::move(s);
-                           completed = true;
-                         });
+    manager.startRequest(
+        std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+        [&status, &completed](absl::Status s) {
+          status = std::move(s);
+          completed = true;
+        },
+        /*request_headers=*/nullptr, /*local_reply_fn=*/nullptr, /*always_serialize=*/true,
+        protocol);
     for (int i = 0; i < 20; ++i) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }

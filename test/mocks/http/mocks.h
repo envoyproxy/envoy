@@ -49,6 +49,7 @@ public:
   // Http::ConnectionCallbacks
   MOCK_METHOD(void, onGoAway, (GoAwayErrorCode error_code));
   MOCK_METHOD(void, onSettings, (ReceivedSettings & settings));
+  MOCK_METHOD(void, onMetadata, (MetadataMapPtr && metadata_map));
 };
 
 class MockFilterManagerCallbacks : public FilterManagerCallbacks {

@@ -12,18 +12,27 @@ namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
+std::string HotRestartingChild::UdpForwardingContext::key(absl::string_view network_namespace,
+                                                          absl::string_view address) {
+  return absl::StrCat(network_namespace, "|", address);
+}
+
 void HotRestartingChild::UdpForwardingContext::registerListener(
     Network::Address::InstanceConstSharedPtr address,
     std::shared_ptr<Network::UdpListenerConfig> listener_config) {
   const bool inserted =
-      listener_map_.try_emplace(address->asString(), ForwardEntry{address, listener_config}).second;
+      listener_map_
+          .try_emplace(key(address->networkNamespace().value_or(""), address->asString()),
+                       ForwardEntry{address, listener_config})
+          .second;
   ASSERT(inserted, "Two udp listeners on the same address shouldn't be possible");
 }
 
 std::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
 HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     const Network::Address::Instance& address) {
-  auto it = listener_map_.find(address.asString());
+  const std::string ns = address.networkNamespace().value_or("");
+  auto it = listener_map_.find(key(ns, address.asString()));
   if (it == listener_map_.end()) {
     // If no listener on the specific address was found, check for a default route.
     // If the address is IPv6, check default route IPv6 only, otherwise check default
@@ -31,11 +40,11 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     // packet.
     uint32_t port = address.ip()->port();
     if (address.ip()->version() == Network::Address::IpVersion::v6) {
-      it = listener_map_.find(absl::StrCat("[::]:", port));
+      it = listener_map_.find(key(ns, absl::StrCat("[::]:", port)));
     } else {
-      it = listener_map_.find(absl::StrCat("0.0.0.0:", port));
+      it = listener_map_.find(key(ns, absl::StrCat("0.0.0.0:", port)));
       if (it == listener_map_.end()) {
-        it = listener_map_.find(absl::StrCat("[::]:", port));
+        it = listener_map_.find(key(ns, absl::StrCat("[::]:", port)));
         if (it != listener_map_.end() && it->second.first->ip()->ipv6()->v6only()) {
           // If there is a default IPv6 route but it's set v6only, don't use it.
           it = listener_map_.end();
@@ -102,9 +111,10 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
 
 void HotRestartingChild::shutdown() { socket_event_udp_forwarding_.reset(); }
 
-void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data) {
-  auto addr_and_listener =
-      udp_forwarding_context_.getListenerForDestination(*data.addresses_.local_);
+void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index,
+                                              const Network::Address::Instance& listener_address,
+                                              Network::UdpRecvData&& data) {
+  auto addr_and_listener = udp_forwarding_context_.getListenerForDestination(listener_address);
   if (addr_and_listener.has_value()) {
     auto [addr, listener_config] = *addr_and_listener;
     // We send to the worker index from the parent instance.
@@ -415,7 +425,17 @@ absl::Status HotRestartingChild::onSocketEventUdpForwarding() {
       packet.receive_time_ =
           MonotonicTime(std::chrono::microseconds{req.receive_time_epoch_microseconds()});
       packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(req.payload());
-      onForwardedUdpPacket(req.worker_index(), std::move(packet));
+      // Parents that predate the listener address fields only send the packet's destination.
+      Network::Address::InstanceConstSharedPtr listener_address = packet.addresses_.local_;
+      if (!req.listener_addr().empty()) {
+        auto listener_or_error = Network::Utility::resolveUrl(req.listener_addr());
+        RETURN_IF_NOT_OK(listener_or_error.status());
+        listener_address = *listener_or_error;
+        if (!req.network_namespace().empty() && listener_address->ip() != nullptr) {
+          listener_address = listener_address->withNetworkNamespace(req.network_namespace());
+        }
+      }
+      onForwardedUdpPacket(req.worker_index(), *listener_address, std::move(packet));
       break;
     }
     default: {
