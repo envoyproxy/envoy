@@ -726,6 +726,7 @@ void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
   if (!connection_drain_event_.has_value()) {
     connection_drain_event_ = drain_event;
     if (streams_.empty()) {
+      // Use drain_timeout as the idle timeout once draining begins.
       resetConnectionIdleTimer();
     }
   }
