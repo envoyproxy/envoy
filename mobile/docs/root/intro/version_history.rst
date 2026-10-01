@@ -343,7 +343,7 @@ Additional changes:
 0.2.2 (Feb 3, 2020)
 ===================
 
-Envoy Mobile v0.2.2 changes how network requests are performed to no longer use Envoy's `AsyncClient` and to instead consume the `ApiListener` directly (:issue:`#616 <616>`).
+Envoy Mobile v0.2.3 changes how network requests are performed to no longer use Envoy's `AsyncClient` and to instead consume the `ApiListener` directly (:issue:`#616 <616>`).
 
 Additional changes:
 

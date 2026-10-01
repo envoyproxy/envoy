@@ -43,6 +43,7 @@ public:
   void move(Instance& rhs, uint64_t length) override;
   void move(Instance& rhs, uint64_t length, bool reset_drain_trackers_and_accounting) override;
   SliceDataPtr extractMutableFrontSlice() override;
+  SliceDataPtr extractImmutableFrontSlice() override;
   Reservation reserveForRead() override;
   void postProcess() override { checkLowWatermark(); }
   void appendSliceForTest(const void* data, uint64_t size) override;

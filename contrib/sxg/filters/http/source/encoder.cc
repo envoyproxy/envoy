@@ -6,6 +6,7 @@
 #include <openssl/x509.h>
 
 #include <chrono>
+#include <format>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/headers.h"
@@ -154,7 +155,7 @@ const std::string EncoderImpl::toAbsolute(const std::string& url_or_relative_pat
 const std::string EncoderImpl::getValidityUrl() const { return toAbsolute(config_->validityUrl()); }
 
 const std::string EncoderImpl::getCborUrl(const std::string& cert_digest) const {
-  return fmt::format("{}?d={}", toAbsolute(config_->cborUrl()), cert_digest);
+  return std::format("{}?d={}", toAbsolute(config_->cborUrl()), cert_digest);
 }
 
 X509* EncoderImpl::loadX09Cert() {

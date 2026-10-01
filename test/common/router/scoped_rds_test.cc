@@ -639,9 +639,11 @@ key:
       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
   auto scoped_config = getScopedRdsProvider()->config<ScopedConfigImpl>();
   ASSERT_THAT(scoped_config, Not(IsNull()));
+  // The route configuration configures VHDS, so it isn't published to the scope until the initial
+  // VHDS fetch has landed.
   const auto config_after_rds = scoped_config->getRouteConfig(scope_key);
   ASSERT_THAT(config_after_rds, Not(IsNull()));
-  EXPECT_EQ("foo_routes", config_after_rds->name());
+  EXPECT_EQ("", config_after_rds->name());
 
   // VHDS adds a virtual host to foo_routes.
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
@@ -660,10 +662,11 @@ routes:
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "222"));
 
-  // The scope now serves the route configuration that VHDS rebuilt, not the one RDS left behind.
+  // The scope now serves the route configuration that the initial VHDS fetch completed.
   const auto config_after_vhds =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(scope_key);
   ASSERT_THAT(config_after_vhds, Not(IsNull()));
+  EXPECT_EQ("foo_routes", config_after_vhds->name());
   EXPECT_NE(config_after_rds.get(), config_after_vhds.get());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;

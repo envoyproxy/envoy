@@ -8,12 +8,14 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/worker_index.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/ascii.h"
@@ -136,6 +138,23 @@ TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
   EXPECT_EQ(getSomeVariable.value()(), 42);
 }
 
+// By default the loader binds now (RTLD_NOW), resolving every referenced symbol at load. The
+// runtime guard reverts it to lazy binding (RTLD_LAZY). A self-contained module loads under both
+// bindings, so loading it in each mode exercises both branches of the binding-mode selection.
+TEST(DynamicModuleTestLanguages, RtldNowIsDefaultAndRuntimeGuardReverts) {
+  // Default: RTLD_NOW. A self-contained module resolves every symbol at load.
+  absl::StatusOr<DynamicModulePtr> now_module =
+      newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_OK(now_module);
+
+  // The runtime guard reverts the loader to RTLD_LAZY. The module still loads with lazy binding.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.dynamic_modules_rtld_now", "false"}});
+  absl::StatusOr<DynamicModulePtr> lazy_module =
+      newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_OK(lazy_module);
+}
+
 TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
   std::string language = GetParam();
   EXPECT_LOG_CONTAINS("error", "Failed to resolve symbol envoy_dynamic_module_on_program_init", {
@@ -157,11 +176,15 @@ TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
 }
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
-  // We expect a warning log for ABI version mismatch but still load the module successfully.
+  // We expect a warning log for ABI version mismatch but still load the module successfully. The
+  // log carries the module version string, which confirms it was copied out of module memory. This
+  // module has a dedicated version so it is loaded fresh and on_program_init runs the check.
   std::string language = GetParam();
-  absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
-  EXPECT_OK(result);
+  EXPECT_LOG_CONTAINS("warn", "invalid-version-hash is deprecated", {
+    absl::StatusOr<DynamicModulePtr> result =
+        newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
+    EXPECT_OK(result);
+  });
 }
 
 TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {
@@ -662,6 +685,31 @@ TEST(DynamicModuleStats, IncrementConfigLoadFailure) {
   // An absent context is a no-op (the context-less caller path).
   incrementLoadFailure(std::nullopt, "my-filter", ModuleLoadErrorStat);
   EXPECT_EQ(2U, failureCounter(scope, ModuleLoadErrorStat, "my-filter"));
+}
+
+// A well-formed `worker_{index}` dispatcher name yields its index.
+TEST(ParseWorkerIndexFromDispatcherName, WellFormedName) {
+  EXPECT_EQ(0U, parseWorkerIndexFromDispatcherName("worker_0"));
+  EXPECT_EQ(7U, parseWorkerIndexFromDispatcherName("worker_7"));
+  EXPECT_EQ(42U, parseWorkerIndexFromDispatcherName("worker_42"));
+}
+
+// A name whose index cannot be parsed falls back to zero.
+TEST(ParseWorkerIndexFromDispatcherName, UnparsableIndexFallsBackToZero) {
+  EXPECT_ENVOY_BUG(EXPECT_EQ(0U, parseWorkerIndexFromDispatcherName("worker_notanumber")),
+                   "failed to parse worker index from name");
+}
+
+// An index that overflows `uint32_t` falls back to zero.
+TEST(ParseWorkerIndexFromDispatcherName, OverflowingIndexFallsBackToZero) {
+  EXPECT_ENVOY_BUG(EXPECT_EQ(0U, parseWorkerIndexFromDispatcherName("worker_4294967296")),
+                   "failed to parse worker index from name");
+}
+
+// A name with no separator trips the format check and falls back to zero.
+TEST(ParseWorkerIndexFromDispatcherName, NameWithoutSeparatorFallsBackToZero) {
+  EXPECT_ENVOY_BUG(EXPECT_EQ(0U, parseWorkerIndexFromDispatcherName("noseparator")),
+                   "worker name is not in expected format");
 }
 
 } // namespace DynamicModules

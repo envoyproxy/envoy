@@ -28,6 +28,7 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
@@ -292,9 +293,24 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
 #if defined(__linux__)
   auto netns = address->networkNamespace();
   if (netns.has_value()) {
+    // A listen socket inherited from the hot restart parent is already bound inside the target
+    // network namespace, so ask the parent for it before entering the namespace. The namespace
+    // path may no longer open (e.g. it was removed after the parent bound the socket)
+    // while the parent's socket is still valid; entering the namespace first would fail the
+    // listener even though it could have been inherited.
+    if (bind_type != BindType::NoBind && address->type() == Network::Address::Type::Ip &&
+        &address->socketInterface() == &Network::SocketInterfaceSingleton::get()) {
+      Network::SocketSharedPtr parent_socket =
+          duplicateParentListenSocket(address, socket_type, options, worker_index);
+      if (parent_socket != nullptr) {
+        return parent_socket;
+      }
+    }
+
     auto fn = [&]() -> absl::StatusOr<Network::SocketSharedPtr> {
+      // The parent has already been asked for the socket above.
       return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
-                                        worker_index);
+                                        worker_index, /*try_parent_socket=*/false);
     };
 
     // Here we're running `fn` in a different network namespace. It will return a `absl::StatusOr`
@@ -317,13 +333,36 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
 #endif
 
   return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
-                                    worker_index);
+                                    worker_index, /*try_parent_socket=*/true);
+}
+
+Network::SocketSharedPtr ProdListenerComponentFactory::duplicateParentListenSocket(
+    const Network::Address::InstanceConstSharedPtr& address, Network::Socket::Type socket_type,
+    const Network::Socket::OptionsSharedPtr& options, uint32_t worker_index) {
+  const std::string scheme = (socket_type == Network::Socket::Type::Stream)
+                                 ? std::string(Network::Utility::TCP_SCHEME)
+                                 : std::string(Network::Utility::UDP_SCHEME);
+  const std::string addr = absl::StrCat(scheme, address->asString());
+  const int fd = server_.hotRestart().duplicateParentListenSocket(
+      addr, worker_index, address->networkNamespace().value_or(""));
+  if (fd == -1) {
+    return nullptr;
+  }
+  ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
+  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
+  if (socket_type == Network::Socket::Type::Stream) {
+    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
+  }
+  return std::make_shared<Network::UdpListenSocket>(
+      std::move(io_handle), address, options,
+      server_.hotRestart().parentDrainedCallbackRegistrar());
 }
 
 absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocketInternal(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
-    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index,
+    bool try_parent_socket) {
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
@@ -368,25 +407,11 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     return std::make_shared<Network::InternalListenSocket>(address);
   }
 
-  const std::string scheme = (socket_type == Network::Socket::Type::Stream)
-                                 ? std::string(Network::Utility::TCP_SCHEME)
-                                 : std::string(Network::Utility::UDP_SCHEME);
-  const std::string addr = absl::StrCat(scheme, address->asString());
-
-  if (bind_type != BindType::NoBind) {
-    const int fd = server_.hotRestart().duplicateParentListenSocket(
-        addr, worker_index, address->networkNamespace().value_or(""));
-    if (fd != -1) {
-      ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-      Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
-      if (socket_type == Network::Socket::Type::Stream) {
-        return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
-      } else {
-        auto socket = std::make_shared<Network::UdpListenSocket>(
-            std::move(io_handle), address, options,
-            server_.hotRestart().parentDrainedCallbackRegistrar());
-        return socket;
-      }
+  if (bind_type != BindType::NoBind && try_parent_socket) {
+    Network::SocketSharedPtr parent_socket =
+        duplicateParentListenSocket(address, socket_type, options, worker_index);
+    if (parent_socket != nullptr) {
+      return parent_socket;
     }
   }
 
@@ -974,16 +999,22 @@ void ListenerManagerImpl::drainGroup(
   // connections are forcibly closed. The drain start time is captured once here so that every
   // connection shares a single, consistent drain timeline.
   //
-  // The strategy is forced to Immediate rather than using the configured
-  // Server::Options::drainStrategy(). This preserves the pre-existing behavior of
-  // PerFilterChainFactoryContextImpl::drainClose(), which returns true unconditionally once the
-  // filter chain is draining, and it is the correct behavior here: unlike a server drain, the
-  // configuration backing these connections is already gone, and at the end of the drain window
-  // removeFilterChains() hard-closes whatever is left. Ramping up gradually would mean a large
-  // share of connections are still running on deleted configuration when that deadline arrives,
-  // and are then closed abruptly instead of being given the whole window to finish gracefully.
+  // The configured Server::Options::drainStrategy() is applied, so a gradual server drain ramps
+  // these connections up over the drain window in the same way it ramps a server drain. Note that
+  // unlike a server drain the configuration backing these connections is already gone, and at the
+  // end of the drain window removeFilterChains() hard-closes whatever is left, so connections that
+  // survive the ramp are closed abruptly rather than being given the whole window to finish.
+  //
+  // When the guard is disabled the strategy is forced to Immediate, which preserves the legacy
+  // behavior of PerFilterChainFactoryContextImpl::drainClose(): it returned true unconditionally
+  // once the filter chain was draining.
+  const Server::DrainStrategy drain_strategy =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.filter_chain_drain_uses_configured_strategy")
+          ? server_.options().drainStrategy()
+          : Server::DrainStrategy::Immediate;
   const Network::ConnectionDrainEvent filter_chain_drain_event{
-      server_.api().timeSource().monotonicTime(), Server::DrainStrategy::Immediate};
+      server_.api().timeSource().monotonicTime(), drain_strategy};
   for (const auto& worker : workers_) {
     worker->onFilterChainDrain(draining_group->getDrainingListenerTag(),
                                draining_group->getDrainingFilterChains(), filter_chain_drain_event);
@@ -1378,12 +1409,11 @@ absl::Status ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listen
 }
 
 void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
-  if (!listener.udpListenerConfig().has_value() ||
-      listener.udpListenerConfig()->listenerFactory().isTransportConnectionless()) {
+  if (!listener.udpListenerConfig().has_value()) {
     // Close the listen sockets right away to avoid leaving TCP connections in accept queue
-    // already waiting for long timeout. However, connection-oriented UDP listeners shouldn't
-    // close the socket because they need to receive packets for existing connections via the
-    // listen sockets.
+    // already waiting for long timeout. UDP listeners keep their sockets: QUIC listeners
+    // need them to receive packets for existing connections, raw UDP listeners need them
+    // so a hot restart parent can keep serving established sessions during drain.
     listener.closeAllSockets();
 
     // In case of this listener was in-place updated previously and in the filter chains draining

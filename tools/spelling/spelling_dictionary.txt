@@ -13,6 +13,7 @@ RANDOMKEY
 SLOWLOG
 addend
 addrlen
+connectionless
 defragmentation
 evictable
 flushdb
@@ -128,6 +129,7 @@ FIXME
 decrypted
 decrypts
 gperf
+gperftools
 HEXDIG
 HEXDIGIT
 HPE
@@ -202,6 +204,7 @@ ECDH
 ECDHE
 ECDS
 ECDSA
+sigalgs
 ECONNREFUSED
 ECONNRESET
 EDESTRUCTION
@@ -223,6 +226,7 @@ EVP
 EWOULDBLOCK
 EXPECTs
 EXPR
+FAPI
 FAQ
 FASTOPEN
 FB
@@ -387,6 +391,7 @@ NOCHECKRESP
 NODATA
 NODELAY
 NODELETE
+NOERROR
 NOLINT
 NOLINTBEGIN
 NOLINTEND
@@ -466,6 +471,7 @@ qatzip
 qatzstd
 RAII
 RANLUX
+RBE
 RBAC
 RDN
 RDS
@@ -599,6 +605,7 @@ WRR
 WS
 WSA
 WSABUF
+WSAEMSGSIZE
 WSS
 WUFFS
 Welford's
@@ -611,6 +618,7 @@ XN
 XNOR
 XSS
 YAML
+YYYY
 ZXID
 absl
 accesslog
@@ -905,6 +913,7 @@ extrahelp
 faceplant
 facto
 failover
+faketime
 fallbacks
 fanout
 fastbuild
@@ -1246,6 +1255,7 @@ pfctl
 pipelined
 pipelining
 pkey
+pkix
 plaintext
 pluggable
 pointee
@@ -1399,6 +1409,7 @@ retransmitting
 retriable
 retriggers
 retryable
+revalidate
 revalidated
 revalidation
 reverify
@@ -1812,3 +1823,13 @@ acq
 interleavings
 millis
 msgs
+CRYSTALS
+encapsulation
+Kyber
+MLKEM
+PQC
+quantum
+X25519MLKEM768
+cpaths
+SynchronousFeedbackResourceMonitor
+bernoulli

@@ -12,7 +12,6 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "postgres_inspector_test",
     srcs = ["postgres_inspector_test.cc"],
-    repository = "@envoy",
     deps = [
         ":postgres_test_utils_lib",
         "//contrib/postgres_inspector/filters/listener/source:postgres_inspector_lib",
@@ -28,7 +27,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "postgres_inspector_integration_test",
     srcs = ["postgres_inspector_integration_test.cc"],
-    repository = "@envoy",
     deps = [
         ":postgres_test_utils_lib",
         "//contrib/postgres_inspector/filters/listener/source:config",
@@ -48,7 +46,6 @@ envoy_cc_test(
     srcs = [
         "postgres_message_parser_test.cc",
     ],
-    repository = "@envoy",
     deps = [
         ":postgres_test_utils_lib",
         "//contrib/postgres_inspector/filters/listener/source:postgres_message_parser_lib",
@@ -69,7 +66,6 @@ cc_library(
 envoy_cc_test(
     name = "postgres_inspector_sni_integration_test",
     srcs = ["postgres_inspector_sni_integration_test.cc"],
-    repository = "@envoy",
     deps = [
         ":postgres_test_utils_lib",
         "//contrib/postgres_inspector/filters/listener/source:config",

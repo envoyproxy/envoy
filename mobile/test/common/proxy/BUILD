@@ -22,7 +22,6 @@ envoy_cc_test_library(
         ],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
             "//library/common/api:external_api_lib",

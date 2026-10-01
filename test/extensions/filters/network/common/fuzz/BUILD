@@ -94,11 +94,11 @@ envoy_cc_fuzz_test(
     deps = [
         ":uber_readfilter_lib",
         ":vig_anymap_ext_lib",
+        "//bazel/deps:libprotobuf-mutator",
         "//source/common/config:utility_lib",
         "//source/common/http:rds_lib",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
-        "@libprotobuf-mutator//:libprotobuf_mutator",
     ] + envoy_filters_from_selected(READFILTER_FUZZ_FILTERS),
 )
 

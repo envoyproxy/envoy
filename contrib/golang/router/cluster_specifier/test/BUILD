@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
+    "envoy_cc_dyn_module_test",
     "envoy_contrib_package",
 )
 
@@ -8,7 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "golang_integration_test",
     srcs = ["golang_integration_test.cc"],
     data = [

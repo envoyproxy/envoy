@@ -15,12 +15,15 @@
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/struct_matchers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -91,7 +94,7 @@ public:
   void initializeFilter(bool emit_dynamic_metadata = false) {
     filter_ = std::make_unique<TestProxyFilter>(
         "test.", *store_.rootScope(), runtime_, access_log_, fault_config_, drain_decision_,
-        dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_, 100);
+        server_context_, dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_, 100);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -133,6 +136,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<MockTimeSystem> time_source_;
   TestStreamInfo stream_info_;
 };
@@ -542,6 +546,9 @@ TEST_F(MongoProxyFilterTest, DecodeError) {
 }
 
 TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   initializeFilter();
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -575,6 +582,50 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.drain_close_enabled", 100))
         .WillByDefault(Return(true));
     EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
+    drain_timer = new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
+    EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(0), _));
+    filter_->callbacks_->decodeReply(std::move(message));
+  }));
+  filter_->onWrite(fake_data_, false);
+
+  EXPECT_CALL(read_filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->invokeCallback();
+
+  EXPECT_EQ(0U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(1U, store_.counter("test.cx_drain_close").value());
+}
+
+// Equivalent of ConcurrentQueryWithDrainClose exercising the connection-level drain path: instead
+// of polling the DrainDecision, the connection is notified via onDrain() and the filter decides to
+// drain-close from that event. Uses an Immediate strategy so the decision is deterministic.
+TEST_F(MongoProxyFilterTest, ConcurrentQueryWithConnectionLevelDrainClose) {
+  initializeFilter();
+
+  // Notify the connection that it is being drained. The connection-level path is consulted instead
+  // of drain_decision_.drainClose(), which must therefore never be called.
+  EXPECT_CALL(drain_decision_, drainClose(_)).Times(0);
+  read_filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(1, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeQuery(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+  EXPECT_EQ(1U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
+
+  Event::MockTimer* drain_timer = nullptr;
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    ReplyMessagePtr message(new ReplyMessageImpl(0, 1));
+    message->flags(0b11);
+    message->cursorId(1);
+    message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
+    ON_CALL(runtime_.snapshot_, featureEnabled("mongo.drain_close_enabled", 100))
+        .WillByDefault(Return(true));
     drain_timer = new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
     EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(0), _));
     filter_->callbacks_->decodeReply(std::move(message));

@@ -97,16 +97,13 @@ public:
   }
 };
 
-// BasicAuth integration tests that should run with all protocols
-class BasicAuthIntegrationTestAllProtocols : public BasicAuthIntegrationTest {};
-
 INSTANTIATE_TEST_SUITE_P(
-    Protocols, BasicAuthIntegrationTestAllProtocols,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    Protocols, BasicAuthIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Request with valid credential
-TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
+TEST_P(BasicAuthIntegrationTest, ValidCredential) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -131,7 +128,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
 }
 
 // Request without credential
-TEST_P(BasicAuthIntegrationTestAllProtocols, NoCredential) {
+TEST_P(BasicAuthIntegrationTest, NoCredential) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -152,7 +149,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoCredential) {
 }
 
 // Request without wrong password
-TEST_P(BasicAuthIntegrationTestAllProtocols, WrongPasswrod) {
+TEST_P(BasicAuthIntegrationTest, WrongPasswrod) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -174,7 +171,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, WrongPasswrod) {
 }
 
 // Request with none-existed user
-TEST_P(BasicAuthIntegrationTestAllProtocols, NoneExistedUser) {
+TEST_P(BasicAuthIntegrationTest, NoneExistedUser) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -196,7 +193,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoneExistedUser) {
 }
 
 // Request with existing username header
-TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
+TEST_P(BasicAuthIntegrationTest, ExistingUsernameHeader) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -221,7 +218,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteDisabled) {
+TEST_P(BasicAuthIntegrationTest, BasicAuthPerRouteDisabled) {
   disablePerRouteFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -239,7 +236,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteDisabled) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabled) {
+TEST_P(BasicAuthIntegrationTest, BasicAuthPerRouteEnabled) {
   initializePerRouteFilter(AdminUsers);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -258,7 +255,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabled) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabledInvalidCredentials) {
+TEST_P(BasicAuthIntegrationTest, BasicAuthPerRouteEnabledInvalidCredentials) {
   initializePerRouteFilter(AdminUsers);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

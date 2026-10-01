@@ -169,7 +169,16 @@ public:
   bool wantsToWrite() override { return adapter_->want_write(); }
   // Propagate network connection watermark events to each stream on the connection.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
+    // Snapshot the streams before invoking callbacks. A callback may encode on its stream and
+    // reorder active_streams_, invalidating the traversal. Stream deletion is deferred, so the
+    // pointers remain valid for the duration of this synchronous callback fanout.
+    std::vector<StreamImpl*> streams;
+    streams.reserve(active_streams_.size());
     for (auto& stream : active_streams_) {
+      streams.push_back(stream.get());
+    }
+
+    for (StreamImpl* stream : streams) {
       stream->runHighWatermarkCallbacks();
     }
   }
@@ -182,6 +191,10 @@ public:
   // ScopeTrackedObject
   OptRef<const StreamInfo::StreamInfo> trackedStream() const override;
   void dumpState(std::ostream& os, int indent_level) const override;
+
+  void encodeMetadata(const MetadataMapVector& metadata_map_vector) override {
+    encodeMetadata(metadata_map_vector, 0); // 0 is the stream for connection metadata.
+  }
 
 protected:
   friend class ProdNghttp2SessionFactory;
@@ -388,8 +401,6 @@ protected:
     // Consumes any decoded data, buffering if backed up.
     void decodeData();
 
-    // Get MetadataEncoder for this stream.
-    NewMetadataEncoder& getMetadataEncoder();
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
     // Callback function for MetadataDecoder.
@@ -437,7 +448,6 @@ protected:
     Buffer::InstancePtr pending_send_data_;
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
-    std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
     std::optional<StreamResetReason> deferred_reset_;
     // Holds the reset reason for this stream. Useful if we have buffered data
     // to determine whether we should continue processing that data.
@@ -748,11 +758,9 @@ protected:
   // Latched value of the `http2_include_cookies_in_limits` runtime feature, read once per
   // connection instead of on every header field in saveHeader().
   const bool http2_include_cookies_in_limits_ = false;
-#ifndef ENVOY_ENABLE_UHV
-  // Latched value of the `validate_upstream_headers` runtime feature, consulted per encoded
-  // request instead of performing a runtime lookup there.
-  const bool validate_upstream_headers_ = false;
-#endif
+  // Latched value of the `http2_reject_frames_after_end_stream` runtime feature, consulted for
+  // every received HEADERS and DATA frame instead of performing a runtime lookup on the data path.
+  const bool reject_frames_after_end_stream_ = false;
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and
@@ -785,6 +793,8 @@ protected:
   void sendKeepalive();
 
   const MonotonicTime& lastReceivedDataTime() { return last_received_data_time_; }
+
+  void encodeMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id);
 
 private:
   friend class Http2CodecImplTestFixture;
@@ -821,6 +831,12 @@ private:
   bool slowContainsStreamId(int32_t stream_id) const;
   virtual StreamResetReason getMessagingErrorResetReason() const PURE;
 
+  // Callback function for MetadataDecoder.
+  void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
+
+  NewMetadataEncoder& getMetadataEncoder();
+  MetadataDecoder& getMetadataDecoder();
+
   // Tracks the current slice we're processing in the dispatch loop.
   const Buffer::RawSlice* current_slice_ = nullptr;
   // Streams that are pending deferred reset. Using an ordered map provides determinism in the rare
@@ -838,6 +854,8 @@ private:
   std::chrono::milliseconds keepalive_interval_;
   std::chrono::milliseconds keepalive_timeout_;
   uint32_t keepalive_interval_jitter_percent_;
+  std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
+  std::unique_ptr<MetadataDecoder> metadata_decoder_;
 };
 
 /**

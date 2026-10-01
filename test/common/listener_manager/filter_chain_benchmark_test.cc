@@ -96,6 +96,7 @@ public:
   const Network::IoHandle& ioHandle() const override { return *io_handle_; }
 
   // Dummy method
+  void setAbortiveClose() override {}
   void close() override {}
   bool isOpen() const override { return false; }
   Network::Socket::Type socketType() const override { return Network::Socket::Type::Stream; }

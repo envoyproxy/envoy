@@ -59,6 +59,7 @@ namespace {
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using testing::ByMove;
+using testing::HasSubstr;
 using testing::InSequence;
 using ::testing::Not;
 using testing::Return;
@@ -150,6 +151,11 @@ public:
     EXPECT_EQ(1UL, manager_->listeners().size());
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
   }
+
+  // Performs an in-place filter chain update against a gradual, 600s server drain and returns
+  // the drain event the workers were notified with, so that the strategy the filter chain drain
+  // picked is observable.
+  Network::ConnectionDrainEvent inPlaceUpdateAndCaptureDrainEvent();
 
   Network::MockListenSocket*
   expectUpdateToThenDrain(const envoy::config::listener::v3::Listener& new_listener_proto,
@@ -695,6 +701,16 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   addOrUpdateListener(listener_proto);
   EXPECT_EQ(1u, manager_->listeners().size());
+
+  // Stopping listeners must not close connectionless UDP listen sockets, so a hot restart
+  // parent can keep reading from them during drain.
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
+                          std::function<void()> completion) { completion(); }));
+  EXPECT_CALL(server_.dispatcher_, post(_)).WillOnce([](Event::PostCb callback) { callback(); });
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
+  manager_->stopListeners(ListenerManager::StopListenersType::All, {});
+  EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AllowOnlyDefaultFilterChain) {
@@ -968,6 +984,100 @@ filter_chains:
   EXPECT_THAT(status, Not(IsOk()));
 #endif
 }
+
+#if defined(__linux__)
+// A listener in a network namespace whose path can no longer be opened still inherits its socket
+// from the hot restart parent: the parent's socket is already bound inside that namespace, so the
+// namespace is not entered when the parent has a socket to hand over.
+TEST_P(ListenerManagerImplTest, InheritParentListenSocketWithoutEnteringNetworkNamespace) {
+  ProdListenerComponentFactory real_listener_factory(server_);
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+    network_namespace_filepath: /var/run/netns/removed
+filter_chains:
+- filters: []
+  )EOF";
+
+  const int parent_fd = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0).return_value_;
+  ASSERT_GE(parent_fd, 0);
+  EXPECT_CALL(server_.hot_restart_,
+              duplicateParentListenSocket("tcp://127.0.0.1:1234", 0, "/var/run/netns/removed"))
+      .WillOnce(Return(parent_fd));
+  // The namespace file is never opened.
+  EXPECT_CALL(os_sys_calls_, open(_, _)).Times(0);
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, 0))
+      .WillOnce(Invoke(
+          [&real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+}
+
+// Without a parent socket to inherit, a network namespace path that cannot be opened still fails
+// the listener.
+TEST_P(ListenerManagerImplTest, MissingNetworkNamespaceWithoutParentListenSocketFails) {
+  ProdListenerComponentFactory real_listener_factory(server_);
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+    network_namespace_filepath: /var/run/netns/removed
+filter_chains:
+- filters: []
+  )EOF";
+
+  EXPECT_CALL(server_.hot_restart_,
+              duplicateParentListenSocket("tcp://127.0.0.1:1234", 0, "/var/run/netns/removed"))
+      .WillOnce(Return(-1));
+  // Opening the current namespace succeeds; opening the target namespace fails.
+  EXPECT_CALL(os_sys_calls_, open(_, _))
+      .WillRepeatedly(Invoke([](const char* pathname, int) -> Api::SysCallIntResult {
+        if (absl::EndsWith(pathname, "/ns/net")) {
+          return {3, 0};
+        }
+        return {-1, ENOENT};
+      }));
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, 0))
+      .WillOnce(Invoke(
+          [&real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_THAT(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true)
+                  .status()
+                  .message(),
+              HasSubstr("failed to open netns file /var/run/netns/removed"));
+  EXPECT_EQ(
+      1UL,
+      server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
+}
+#endif
 
 TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
   const std::string yaml = R"EOF(
@@ -7719,14 +7829,14 @@ api_listener:
   ASSERT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   ASSERT_TRUE(manager_->apiListener().has_value());
-  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
+  EXPECT_EQ("test_api_listener", manager_->apiListener()->name());
 
   // Only one ApiListener is added.
   ASSERT_FALSE(addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   // The original ApiListener is there.
   ASSERT_TRUE(manager_->apiListener().has_value());
-  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
+  EXPECT_EQ("test_api_listener", manager_->apiListener()->name());
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
@@ -8209,13 +8319,12 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
 }
 
-// A draining filter chain is notified with DrainStrategy::Immediate regardless of the configured
-// strategy to keep backwards compatibility with existing filter chain drain behavior.
-TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, FilterChainDrainUsesImmediateStrategy) {
-  // Deliberately no InSequence: this test asserts the content of the drain notification, not the
+Network::ConnectionDrainEvent
+ListenerManagerImplForInPlaceFilterChainUpdateTest::inPlaceUpdateAndCaptureDrainEvent() {
+  // Deliberately no InSequence: the caller asserts the content of the drain notification, not the
   // ordering of the surrounding calls.
   EXPECT_CALL(*worker_, start(_, _, _));
-  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  EXPECT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -8257,7 +8366,7 @@ filter_chains:
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(listener_foo_update1_proto));
 
-  // Configure a gradual server drain strategy; the filter chain drain must override it.
+  // Configure a gradual server drain so that the strategy the filter chain drain picks is visible.
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));
 
@@ -8272,8 +8381,6 @@ filter_chains:
   listener_foo_update1->target_.ready();
   worker_->callAddCompletion();
 
-  EXPECT_EQ(Server::DrainStrategy::Immediate, captured.strategy);
-
   // Timer expires, the worker removes the draining filter chains, and once that completes the
   // main thread can destroy the original listener.
   EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
@@ -8282,6 +8389,22 @@ filter_chains:
   worker_->callDrainFilterChainsComplete();
 
   EXPECT_CALL(*listener_foo_update1, onDestroy());
+  return captured;
+}
+
+// A draining filter chain is notified with the configured server drain strategy.
+TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, FilterChainDrainUsesConfiguredStrategy) {
+  EXPECT_EQ(Server::DrainStrategy::Gradual, inPlaceUpdateAndCaptureDrainEvent().strategy);
+}
+
+// With the guard disabled the configured strategy is ignored and the legacy
+// DrainStrategy::Immediate is used instead.
+TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest,
+       FilterChainDrainUsesImmediateStrategyWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.filter_chain_drain_uses_configured_strategy", "false"}});
+  EXPECT_EQ(Server::DrainStrategy::Immediate, inPlaceUpdateAndCaptureDrainEvent().strategy);
 }
 
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, RemoveTheInplaceUpdatingListener) {

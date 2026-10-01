@@ -4106,6 +4106,65 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   }
 }
 
+#if defined(__linux__)
+// With validate_network_namespaces set, a cluster whose upstream bind config references a
+// non-existent network namespace is rejected at config load time.
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespace) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  config.mutable_upstream_bind_config()->set_validate_network_namespaces(true);
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_THROW_WITH_REGEX(std::shared_ptr<StaticClusterImpl> cluster =
+                              createCluster(config, factory_context),
+                          EnvoyException, "failed to open network namespace file");
+}
+
+// Without validate_network_namespaces, the invalid network namespace is not validated at config
+// load time, so cluster creation succeeds (preserving the pre-existing behavior).
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespaceNotValidated) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_NO_THROW(createCluster(config, factory_context));
+}
+
+// With validate_network_namespaces set, extra source addresses are validated as well.
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespaceExtraSourceAddress) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  config.mutable_upstream_bind_config()->set_validate_network_namespaces(true);
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  auto* extra_source_address =
+      config.mutable_upstream_bind_config()->add_extra_source_addresses()->mutable_address();
+  extra_source_address->set_address("2001::1");
+  extra_source_address->set_port_value(0);
+  extra_source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_THROW_WITH_REGEX(std::shared_ptr<StaticClusterImpl> cluster =
+                              createCluster(config, factory_context),
+                          EnvoyException, "failed to open network namespace file");
+}
+#endif
+
 TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourceAddress) {
   envoy::config::cluster::v3::Cluster config;
   config.set_name("staticcluster");
@@ -5319,8 +5378,8 @@ TEST_P(ParametrizedClusterInfoImplTest, TestTrackRequestResponseSizes) {
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
 
-  Upstream::ClusterRequestResponseSizeStats req_resp_stats =
-      cluster->info()->requestResponseSizeStats()->get();
+  Upstream::ClusterRequestResponseSizeStats& req_resp_stats =
+      cluster->info()->requestResponseSizeStats().ref();
 
   EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_headers_size_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_body_size_.unit());
@@ -5584,7 +5643,7 @@ TEST_P(ParametrizedClusterInfoImplTest, TestTrackTimeoutBudgets) {
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
 
-  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
+  Upstream::ClusterTimeoutBudgetStats& tb_stats = cluster->info()->timeoutBudgetStats().ref();
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
             tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
@@ -5617,7 +5676,7 @@ TEST_P(ParametrizedClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeout
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
 
-  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
+  Upstream::ClusterTimeoutBudgetStats& tb_stats = cluster->info()->timeoutBudgetStats().ref();
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
             tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,

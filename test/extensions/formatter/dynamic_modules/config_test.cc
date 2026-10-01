@@ -8,6 +8,7 @@
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/extensions/formatter/dynamic_modules/config.h"
 
+#include "test/common/formatter/formatter_test_utility.h"
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
@@ -439,6 +440,56 @@ formatters:
 })EOF";
   EXPECT_TRUE(TestUtility::jsonStringEqual((*formatter)->format(formatter_context_, stream_info_),
                                            expected));
+}
+
+// Drives the provider directly so that format()/formatValue() and their sink-based counterparts
+// are checked against each other. The tests above go through a line formatter, which only ever
+// calls the sink-based paths.
+TEST_F(DynamicModuleFormatterTest, ProviderFormatMatchesFormatTo) {
+  DynamicModuleFormatterFactory factory;
+  auto parser = factory.createCommandParserFromProto(
+      protoConfig("formatter_integration_test", "test_formatter"), context_);
+  ASSERT_NE(nullptr, parser);
+
+  // A header that is present.
+  {
+    auto provider = *parser->parse("DYNAMIC_MODULE_REQ", "x-custom", std::nullopt);
+    ASSERT_NE(nullptr, provider);
+    EXPECT_EQ("custom-value",
+              Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+    EXPECT_EQ("custom-value",
+              Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                  .string_value());
+  }
+
+  // A header that is absent: the module reports no value.
+  {
+    auto provider = *parser->parse("DYNAMIC_MODULE_REQ", "x-absent", std::nullopt);
+    ASSERT_NE(nullptr, provider);
+    EXPECT_EQ(std::nullopt,
+              Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+    EXPECT_TRUE(Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                    .has_null_value());
+  }
+
+  // A zero-length value is a value, not a missing one.
+  {
+    auto provider = *parser->parse("DYNAMIC_MODULE_EMPTY", "", std::nullopt);
+    ASSERT_NE(nullptr, provider);
+    EXPECT_EQ("", Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+    EXPECT_EQ("", Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                      .string_value());
+  }
+
+  // Truncation is applied by the module via the max length handed to parse().
+  {
+    auto provider = *parser->parse("DYNAMIC_MODULE_REQ", "x-custom", 3);
+    ASSERT_NE(nullptr, provider);
+    EXPECT_EQ("cus", Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+    EXPECT_EQ("cus",
+              Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                  .string_value());
+  }
 }
 
 TEST_F(DynamicModuleFormatterTest, UnknownCommandRejected) {

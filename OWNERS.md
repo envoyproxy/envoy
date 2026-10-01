@@ -33,8 +33,6 @@ routing PRs, questions, etc. to the right place.
 # Maintainers
 <!--- If you modify maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml -->
 
-* Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
-  * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
   * Data plane, overload management, flow control.
 * Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
@@ -131,6 +129,7 @@ without further review.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
+* Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
 
 # Friends of Envoy
 

@@ -12,8 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-JsonWithExtBufParser::JsonWithExtBufParser(Config config)
-    : config_(config), cursor_(*this, /*track_paths=*/false) {}
+JsonWithExtBufParser::JsonWithExtBufParser(Config config) : config_(config), cursor_(*this) {}
 
 absl::Status JsonWithExtBufParser::feed(absl::string_view chunk, bool end_stream) {
   // Order matters: a parser that already failed reports that failure again, so a
@@ -149,8 +148,10 @@ void JsonWithExtBufParser::closeStringCapture(absl::string_view, int, size_t tok
     setError(absl::InternalError("ai json: string token range is shorter than its quotes"));
     return;
   }
-  setError(addValue(JsonWithExtBuf::makeExternalRef(
-      {string_token_start_ + 1, token_end - string_token_start_ - 2})));
+  has_external_refs_ = true;
+  const std::uint64_t ref_len = token_end - string_token_start_ - 2;
+  external_ref_bytes_ += ref_len;
+  setError(addValue(JsonWithExtBuf::makeExternalRef({string_token_start_ + 1, ref_len})));
 }
 
 absl::Status JsonWithExtBufParser::onKey(absl::string_view key, int, size_t) {

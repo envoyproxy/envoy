@@ -182,6 +182,23 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, MaxReconnectBackoffOverride) {
   EXPECT_EQ(custom_extension->maxReconnectBackoffMs(), 5000);
 }
 
+TEST_F(ReverseTunnelInitiatorExtensionTest, MaintainIntervalDefaults) {
+  // Unset maintain_interval falls back to the historical 10s re-check.
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface empty_config;
+  auto extension_with_default =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, empty_config);
+  EXPECT_EQ(extension_with_default->maintainIntervalMs(), 10000);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, MaintainIntervalOverride) {
+  auto custom_config = config_;
+  custom_config.mutable_maintain_interval()->set_seconds(5);
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_EQ(custom_extension->maintainIntervalMs(), 5000);
+}
+
 TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersDefaults) {
   EXPECT_TRUE(extension_->handshakeAdditionalHeaders().empty());
 }

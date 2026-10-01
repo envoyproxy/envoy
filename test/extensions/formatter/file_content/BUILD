@@ -20,6 +20,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/formatter:substitution_format_string_lib",
         "//source/extensions/formatter/file_content:config",
+        "//test/common/formatter:formatter_test_utility_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:environment_lib",

@@ -76,7 +76,7 @@ envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
     rbe_pool = "linux_x64_small",
-    shard_count = 5,
+    shard_count = 10,
     deps = [
         ":listener_manager_impl_test_lib",
         "//envoy/network:socket_interface",
@@ -125,6 +125,7 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":listener_manager_impl_test_lib",
         "//source/common/formatter:formatter_extension_lib",
+        "//source/common/quic:quic_packet_writer_interface",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/matching/network/common:inputs_lib",
@@ -135,6 +136,7 @@ envoy_cc_test(
         "//test/integration/filters:test_listener_filter_lib",
         "//test/integration/filters:test_network_filter_lib",
         "//test/server:utility_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

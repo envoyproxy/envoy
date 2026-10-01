@@ -88,6 +88,8 @@ public:
   bool used() const override { return flags_ & Metric::Flags::Used; }
   void markUnused() override { flags_ &= ~Metric::Flags::Used; }
   bool hidden() const override { return flags_ & Metric::Flags::Hidden; }
+  bool noTagExtraction() const override { return flags_ & Metric::Flags::NoTagExtraction; }
+  void markAsNoTagExtraction() override { flags_ |= Metric::Flags::NoTagExtraction; }
 
   // RefcountInterface
   void incRefCount() override { ref_count_.fetch_add(1, std::memory_order_relaxed); }

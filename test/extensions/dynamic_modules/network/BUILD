@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -8,7 +9,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
@@ -17,16 +18,21 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
         "//test/extensions/dynamic_modules/test_data/c:network_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/rust:network_integration_test",
     ],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/http:message_lib",
         "//source/common/stats:isolated_store_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/network/dynamic_modules:config",
         "//source/extensions/filters/network/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:status_utility_lib",
     ],
 )
@@ -74,7 +80,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [

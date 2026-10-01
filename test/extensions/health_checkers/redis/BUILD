@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.health_checkers.redis"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//source/common/api:api_lib",
         "//source/extensions/health_checkers/redis",
         "//source/extensions/health_checkers/redis:utility",
