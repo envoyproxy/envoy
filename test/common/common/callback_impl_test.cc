@@ -83,6 +83,7 @@ TEST_F(ThreadSafeCallbackManagerTest, All) {
   ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](Event::PostCb cb) { cb(); }));
 
   auto manager = ThreadSafeCallbackManager::create();
+  EXPECT_EQ(0, manager->size());
 
   auto handle1 = manager->add(cb_dispatcher, [this]() {
     called(5);
@@ -92,12 +93,14 @@ TEST_F(ThreadSafeCallbackManagerTest, All) {
     called(10);
     return absl::OkStatus();
   });
+  EXPECT_EQ(2, manager->size());
 
   EXPECT_CALL(*this, called(5));
   EXPECT_CALL(*this, called(10));
   manager->runCallbacks();
 
   handle1.reset();
+  EXPECT_EQ(1, manager->size());
   EXPECT_CALL(*this, called(10));
   manager->runCallbacks();
 
@@ -109,9 +112,12 @@ TEST_F(ThreadSafeCallbackManagerTest, All) {
   });
   manager->runCallbacks();
   handle3.reset();
+  EXPECT_EQ(1, manager->size());
 
   EXPECT_CALL(*this, called(10));
   manager->runCallbacks();
+  handle2.reset();
+  EXPECT_EQ(0, manager->size());
 }
 
 // Validate that the handles returned from callback-registration can outlive the manager

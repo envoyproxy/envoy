@@ -11,6 +11,7 @@ CallbackHandlePtr ThreadSafeCallbackManager::add(Event::Dispatcher& dispatcher, 
   // Get the list iterator of added callback handle, which will be used to remove itself from
   // callbacks_ list.
   new_callback->it_ = (--callbacks_.end());
+  size_ = callbacks_.size();
   return new_callback;
 }
 
@@ -36,14 +37,12 @@ void ThreadSafeCallbackManager::runCallbacks(bool coalesce) {
   }
 }
 
-size_t ThreadSafeCallbackManager::size() const noexcept {
-  Thread::LockGuard lock(lock_);
-  return callbacks_.size();
-}
+size_t ThreadSafeCallbackManager::size() const noexcept { return size_; }
 
 void ThreadSafeCallbackManager::remove(typename std::list<CallbackListEntry>::iterator& it) {
   Thread::LockGuard lock(lock_);
   callbacks_.erase(it);
+  size_ = callbacks_.size();
 }
 
 ThreadSafeCallbackManager::CallbackHolder::CallbackHolder(

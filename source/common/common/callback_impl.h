@@ -193,6 +193,8 @@ private:
   mutable Thread::MutexBasicLockable lock_{};
 
   std::list<CallbackListEntry> callbacks_ ABSL_GUARDED_BY(lock_);
+  // Allow callers to skip the registry lock when there are no callbacks.
+  std::atomic<size_t> size_{0};
 };
 
 } // namespace Common
