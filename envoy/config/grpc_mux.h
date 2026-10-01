@@ -122,7 +122,7 @@ public:
    * @param for_update set of resource names to request on-demand.
    */
   virtual void requestOnDemandUpdate(const std::string& type_url,
-                                     const absl::flat_hash_set<std::string>& for_update) PURE;
+                                     const absl::flat_hash_set<std::string>& for_update) = 0;
 
   /**
    * Request an on-demand update to subscribe to and/or unsubscribe from a set of resources.
