@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <deque>
 
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
@@ -69,6 +70,29 @@ public:
 
   bool isDestroyed() const { return destroyed_; }
 
+  // RAII guard placed at each event hook that can invoke a module filter-state or metadata getter.
+  // Nested hooks share the outermost scope, so the returned views stay valid until the outermost
+  // hook returns and are then cleared.
+  class HookScope {
+  public:
+    explicit HookScope(DynamicModuleHttpFilter& filter) : filter_(filter) { ++filter_.hook_depth_; }
+    ~HookScope() {
+      if (--filter_.hook_depth_ == 0) {
+        filter_.filter_state_scratch_.clear();
+        filter_.metadata_scratch_.clear();
+      }
+    }
+
+  private:
+    DynamicModuleHttpFilter& filter_;
+  };
+
+  // Test-only accessor for the number of buffered filter-state getter results.
+  size_t filterStateScratchSizeForTest() const { return filter_state_scratch_.size(); }
+
+  // Test-only accessor for the number of buffered host metadata snapshots.
+  size_t metadataScratchSizeForTest() const { return metadata_scratch_.size(); }
+
   /**
    * Returns the worker dispatcher this filter is running on; safe to call from any thread.
    * Returns nullptr until callbacks are wired and after `onDestroy()`.
@@ -103,13 +127,16 @@ public:
   Buffer::Instance* current_request_body_ = nullptr;
   Buffer::Instance* current_response_body_ = nullptr;
 
-  // Temporary storage for the serialized typed filter state value returned by
-  // get_filter_state_typed. Valid until the end of the current event hook.
-  std::optional<std::string> last_serialized_filter_state_;
+  // Scratch buffers for values returned by filter-state and host metadata getters. They must
+  // outlive the getter call so the module can read them until the current event hook returns. The
+  // deque keeps stable element addresses, so appending a serialized value never invalidates an
+  // earlier view. Metadata is held by shared pointer, so its pointee stays valid regardless of
+  // vector growth.
+  std::deque<std::string> filter_state_scratch_;
+  std::vector<Upstream::MetadataConstSharedPtr> metadata_scratch_;
 
-  // Temporary holder for host metadata snapshots returned by host metadata getters.
-  // Valid until the next metadata getter call on this filter.
-  Upstream::MetadataConstSharedPtr last_metadata_snapshot_;
+  // Depth of nested event hooks. The scratch buffers are cleared when the outermost hook returns.
+  uint32_t hook_depth_ = 0;
 
   /**
    * Helper to get the correct callbacks.
@@ -388,7 +415,9 @@ private:
     std::string byte_value;
   };
 
-  std::vector<StoredSocketOption> socket_options_;
+  // A deque keeps element addresses stable as options are appended, so a byte value view handed to
+  // a module stays valid until the filter is destroyed as the ABI promises.
+  std::deque<StoredSocketOption> socket_options_;
 
 public:
   /**

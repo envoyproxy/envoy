@@ -161,6 +161,7 @@ categories:
 - envoy.http.ext_proc.response_processors
 - envoy.http.ai_filters
 - envoy.router.cluster_specifier_plugin
+- envoy.router.route_specifiers
 - envoy.tap_sinks.udp_sink
 - envoy.tracers.opentelemetry.resource_detectors
 - envoy.tracers.opentelemetry.samplers

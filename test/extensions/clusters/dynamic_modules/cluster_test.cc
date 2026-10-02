@@ -79,6 +79,11 @@ public:
   // constructed: clears in_module_lb_ so chooseHost exercises the early-return path.
   static void clearInModuleLb(DynamicModuleLoadBalancer& lb) { lb.in_module_lb_ = nullptr; }
 
+  // Returns whether the load balancer registered the host membership update callback.
+  static bool hasMemberUpdateCb(const DynamicModuleLoadBalancer& lb) {
+    return lb.member_update_cb_ != nullptr;
+  }
+
   // Sets the borrowed host vectors that back the member update host accessors. These are only
   // populated by Envoy during an on_host_membership_update callback, so this lets the accessors
   // be exercised deterministically from a unit test.
@@ -232,6 +237,33 @@ cluster_type:
   EXPECT_NE(nullptr, result->first);
   // CLUSTER_PROVIDED should return a non-null thread-aware LB (module LB).
   EXPECT_NE(nullptr, result->second);
+}
+
+// A module that provides a load balancer and the membership hook registers the callback.
+TEST_F(DynamicModuleClusterTest, ValidLoadBalancerRegistersMembershipCallback) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  EXPECT_TRUE(DynamicModuleClusterTestPeer::hasMemberUpdateCb(*lb_instance));
+}
+
+// A module returning a null load balancer must not register the host membership update callback,
+// so a later membership change cannot invoke the module hook against a null load balancer.
+TEST_F(DynamicModuleClusterTest, NullLoadBalancerSkipsMembershipCallback) {
+  auto result = createCluster(makeYamlConfig("cluster_null_lb"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  EXPECT_FALSE(DynamicModuleClusterTestPeer::hasMemberUpdateCb(*lb_instance));
 }
 
 // Test that LEAST_REQUEST lb_policy is accepted and returns nullptr thread-aware LB.
@@ -465,6 +497,51 @@ TEST_F(DynamicModuleClusterTest, BatchRemoveMultipleHosts) {
   // Remove all three at once.
   EXPECT_EQ(3, cluster->removeHosts(hosts));
   EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+}
+
+// Removing a host that was added at a higher priority must republish that priority so the worker
+// load balancers drop the stale endpoint. Republishing only priority 0 would leave it in place.
+TEST_F(DynamicModuleClusterTest, RemoveHostsRepublishesHigherPriority) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  std::vector<Upstream::HostSharedPtr> p0_hosts;
+  ASSERT_TRUE(
+      addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 1}, p0_hosts, 0));
+  std::vector<Upstream::HostSharedPtr> p1_hosts;
+  ASSERT_TRUE(
+      addSimpleHosts(*cluster, {"127.0.0.1:10003", "127.0.0.1:10004"}, {1, 1}, p1_hosts, 1));
+
+  EXPECT_EQ(2, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(2, cluster->prioritySet().hostSetsPerPriority()[1]->hosts().size());
+
+  // Capture priority 0's partition identity. An unaffected priority must not be rebuilt, and a
+  // rebuild would allocate new partition vectors and change this pointer.
+  const auto* p0_hosts_ptr_before =
+      cluster->prioritySet().hostSetsPerPriority()[0]->hostsPtr().get();
+
+  // Remove one host from priority 1.
+  EXPECT_EQ(1, cluster->removeHosts({p1_hosts[0]}));
+
+  // Priority 1 is republished without the removed host and priority 0 is untouched.
+  EXPECT_EQ(2, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority()[1]->hosts().size());
+  EXPECT_EQ(p1_hosts[1].get(), cluster->prioritySet().hostSetsPerPriority()[1]->hosts()[0].get());
+  EXPECT_EQ(3, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(p0_hosts_ptr_before, cluster->prioritySet().hostSetsPerPriority()[0]->hostsPtr().get());
+
+  // The removed host is gone from the cross-priority map and the remaining one still resolves.
+  EXPECT_EQ(nullptr, cluster->findHostByAddress("127.0.0.1:10003"));
+  EXPECT_NE(nullptr, cluster->findHostByAddress("127.0.0.1:10004"));
+
+  // A single removal spanning priorities updates both host sets, including draining priority 1.
+  EXPECT_EQ(2, cluster->removeHosts({p0_hosts[0], p1_hosts[1]}));
+  EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0, cluster->prioritySet().hostSetsPerPriority()[1]->hosts().size());
+  EXPECT_EQ(1, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
 }
 
 // Test that addresses already present in the host set are skipped on a subsequent batch.
@@ -1938,7 +2015,7 @@ TEST_F(DynamicModuleClusterTest, MetricsResolveAndRecordByHandle) {
   auto counter_stat = server_context_.store_.findCounterByString(
       "dynamicmodulescustom.handle_counter.outcome.resolved");
   ASSERT_TRUE(counter_stat.has_value());
-  EXPECT_EQ(8, counter_stat->get().value());
+  EXPECT_EQ(8, counter_stat->value());
 
   // Resolving the same tuple again yields the same child, which is what makes a cached handle
   // equivalent to the id path rather than a second stat.
@@ -1966,7 +2043,7 @@ TEST_F(DynamicModuleClusterTest, MetricsResolveAndRecordByHandle) {
   auto gauge_stat = server_context_.store_.findGaugeByString(
       "dynamicmodulescustom.handle_gauge.outcome.resolved");
   ASSERT_TRUE(gauge_stat.has_value());
-  EXPECT_EQ(12, gauge_stat->get().value());
+  EXPECT_EQ(12, gauge_stat->value());
 
   // Histogram vec. The record forwards the value to the resolved child, which the isolated store
   // delivers to sinks, so intercept that to assert the tagged child receives the value.
@@ -2941,6 +3018,72 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedFound) {
   EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
       context_ptr, key_buf, &result));
   EXPECT_EQ("typed-v", absl::string_view(result.ptr, result.length));
+}
+
+// The typed getter keeps every serialized value alive for the whole host selection callback so a
+// module can hold several views at once, and the scope guard clears them when the outermost
+// callback returns.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedConsecutiveGettersStayValid) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k1",
+                                     std::make_unique<Router::StringAccessorImpl>("value-one"));
+  stream_info.filter_state_->setData("k2",
+                                     std::make_unique<Router::StringAccessorImpl>("value-two"));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  std::string key1 = "k1";
+  std::string key2 = "k2";
+  envoy_dynamic_module_type_module_buffer key1_buf = {key1.data(), key1.size()};
+  envoy_dynamic_module_type_module_buffer key2_buf = {key2.data(), key2.size()};
+  envoy_dynamic_module_type_envoy_buffer result1;
+  envoy_dynamic_module_type_envoy_buffer result2;
+  {
+    ClusterLbFilterStateScratchGuard guard;
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key1_buf, &result1));
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key2_buf, &result2));
+    // The first view is not clobbered by the second call.
+    EXPECT_EQ("value-one", absl::string_view(result1.ptr, result1.length));
+    EXPECT_EQ("value-two", absl::string_view(result2.ptr, result2.length));
+    EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+  }
+  EXPECT_EQ(0U, clusterLbFilterStateScratchSizeForTest());
+}
+
+// A nested guard keeps the outer scratch, and only the outermost guard clears it.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNestedGuardClearsAtOutermost) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k1",
+                                     std::make_unique<Router::StringAccessorImpl>("value-one"));
+  stream_info.filter_state_->setData("k2",
+                                     std::make_unique<Router::StringAccessorImpl>("value-two"));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  std::string key1 = "k1";
+  std::string key2 = "k2";
+  envoy_dynamic_module_type_module_buffer key1_buf = {key1.data(), key1.size()};
+  envoy_dynamic_module_type_module_buffer key2_buf = {key2.data(), key2.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  {
+    ClusterLbFilterStateScratchGuard outer;
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key1_buf, &result));
+    {
+      ClusterLbFilterStateScratchGuard inner;
+      EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+          context_ptr, key2_buf, &result));
+      EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+    }
+    // A nested guard does not clear the scratch.
+    EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+  }
+  // The outermost guard clears the scratch.
+  EXPECT_EQ(0U, clusterLbFilterStateScratchSizeForTest());
 }
 
 // Test set_filter_state_bytes with nullptr context.

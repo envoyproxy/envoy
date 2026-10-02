@@ -12,19 +12,23 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Geoip {
 
-ProtobufTypes::MessagePtr GeoipInfo::serializeAsProto() const {
-  auto proto_struct = std::make_unique<Protobuf::Struct>();
-  auto& proto_fields = *proto_struct->mutable_fields();
-  for (const auto& [key, value] : fields_) {
+namespace {
+Protobuf::Struct toStruct(const absl::flat_hash_map<std::string, std::string>& fields) {
+  Protobuf::Struct proto_struct;
+  auto& proto_fields = *proto_struct.mutable_fields();
+  for (const auto& [key, value] : fields) {
     proto_fields[key] = ValueUtil::stringValue(value);
   }
   return proto_struct;
 }
+} // namespace
+
+ProtobufTypes::MessagePtr GeoipInfo::serializeAsProto() const {
+  return std::make_unique<Protobuf::Struct>(toStruct(fields_));
+}
 
 std::optional<std::string> GeoipInfo::serializeAsString() const {
-  auto proto_struct = serializeAsProto();
-  return Json::Factory::loadFromProtobufStruct(dynamic_cast<const Protobuf::Struct&>(*proto_struct))
-      ->asJsonString();
+  return Json::Factory::loadFromProtobufStruct(toStruct(fields_))->asJsonString();
 }
 
 StreamInfo::FilterState::Object::FieldType GeoipInfo::getField(absl::string_view field_name) const {

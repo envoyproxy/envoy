@@ -16,11 +16,13 @@ package(default_visibility = [
     "//test/extensions/formatter/dynamic_modules:__pkg__",
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
+    "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/http/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
+    "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
@@ -90,6 +92,8 @@ test_program(name = "listener_filter_new_fail")
 test_program(name = "listener_stop_iteration")
 
 test_program(name = "udp_no_op")
+
+test_program(name = "udp_null_config")
 
 test_program(name = "udp_stop_iteration")
 
@@ -183,6 +187,26 @@ test_program(name = "early_header_mutation_rewrite")
 
 test_program(name = "early_header_mutation_stop_chain")
 
+test_program(name = "header_formatter_no_op")
+
+test_program(name = "header_formatter_missing_config_new")
+
+test_program(name = "header_formatter_missing_config_destroy")
+
+test_program(name = "header_formatter_missing_new")
+
+test_program(name = "header_formatter_missing_destroy")
+
+test_program(name = "header_formatter_missing_process_key")
+
+test_program(name = "header_formatter_missing_format")
+
+test_program(name = "header_formatter_config_new_fail")
+
+test_program(name = "header_formatter_new_fail")
+
+test_program(name = "header_formatter_preserve_case")
+
 test_program(name = "cluster_specifier_no_op")
 
 test_program(name = "cluster_specifier_missing_config_new")
@@ -193,9 +217,29 @@ test_program(name = "cluster_specifier_missing_select")
 
 test_program(name = "cluster_specifier_config_new_fail")
 
+test_program(name = "route_specifier_no_op")
+
+test_program(name = "route_specifier_missing_config_new")
+
+test_program(name = "route_specifier_missing_config_destroy")
+
+test_program(name = "route_specifier_missing_on_route")
+
+test_program(name = "route_specifier_config_new_fail")
+
+test_program(name = "route_specifier_unknown_decision")
+
+test_program(name = "route_specifier_continue_matching")
+
+test_program(name = "route_specifier_select_template")
+
+test_program(name = "route_specifier_override")
+
 test_program(name = "cluster_async_host_selection")
 
 test_program(name = "cluster_no_op")
+
+test_program(name = "cluster_null_lb")
 
 test_program(name = "cluster_run_on_all_workers")
 
@@ -228,6 +272,8 @@ test_program(name = "matcher_missing_match")
 test_program(name = "matcher_missing_config_destroy")
 
 test_program(name = "matcher_check_headers")
+
+test_program(name = "matcher_error")
 
 test_program(name = "matcher_string_input_echo")
 
@@ -271,7 +317,11 @@ test_program(name = "upstream_bridge_headers_end_stream")
 
 test_program(name = "upstream_bridge_headers_end_stream_no_body")
 
+test_program(name = "upstream_bridge_terminal_response")
+
 test_program(name = "tracer_no_op")
+
+test_program(name = "tracer_no_op_no_reserve_tags")
 
 test_program(name = "tracer_config_fail")
 
@@ -292,6 +342,8 @@ test_program(name = "stat_sink_missing_histogram_complete")
 test_program(name = "stat_sink_integration_test")
 
 test_program(name = "dns_resolver_config_new_fail")
+
+test_program(name = "dns_resolver_new_fail")
 
 test_program(name = "health_checker_no_op")
 

@@ -1998,6 +1998,47 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotFalse) {
   EXPECT_EQ(false, config.shouldStripTrailingHostDot());
 }
 
+// Validated that route resolution stats are off by default.
+TEST_F(HttpConnectionManagerConfigTest, RouteResolutionStatsDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
+  EXPECT_FALSE(config.recordRouteResolutionStats());
+}
+
+// Validated that route resolution stats are enabled when configured.
+TEST_F(HttpConnectionManagerConfigTest, RouteResolutionStatsEnabled) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  record_route_resolution_stats: true
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
+  EXPECT_TRUE(config.recordRouteResolutionStats());
+}
+
 // Validated that by default we allow requests with header names containing underscores.
 TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) {
   const std::string yaml_string = R"EOF(
