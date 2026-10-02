@@ -458,6 +458,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+PSK
 Postgre
 Postgres
 Prereq
@@ -976,6 +977,7 @@ hackery
 hacky
 handoff
 handshaker
+handshakers
 hardcode
 hardcoded
 hardcodes
