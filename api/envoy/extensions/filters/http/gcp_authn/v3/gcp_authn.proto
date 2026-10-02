@@ -75,7 +75,8 @@ message GcpAuthnFilterConfig {
 message Audience {
   message AccessToken {
     // Optional custom OAuth scopes for the access token request.
-    // If empty, the metadata server's default scopes will be used.
+    // If empty, the filter will not request scopes explicitly, so the metadata server's default
+    // scopes will be used.
     // When populated, the filter appends "?scopes=<comma-separated-scopes>" to the
     // metadata server token request. Note that the metadata server replaces default
     // scopes with the provided list rather than appending; to preserve general GCP API
@@ -94,7 +95,8 @@ message Audience {
 
   message BoundAccessToken {
     // Optional custom OAuth scopes for the bound access token request.
-    // If empty, the metadata server's default scopes will be used.
+    // If empty, the filter will not request scopes explicitly, so the metadata server's default
+    // scopes will be used.
     // When populated, the filter appends "&scopes=<comma-separated-scopes>" to the
     // metadata server token request. Note that the metadata server replaces default
     // scopes with the provided list rather than appending; to preserve general GCP API
