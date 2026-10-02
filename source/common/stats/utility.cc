@@ -66,6 +66,81 @@ TaggedStatName::TaggedStatName(SymbolTable& symbol_table, absl::string_view base
   }
 }
 
+TaggedStatName::TaggedStatName(SymbolTable& symbol_table, StatName base_name, StatNameTagSpan tags,
+                               StatName name)
+    : tag_pool_(symbol_table) {
+  tag_pool_.reserve(tags.size() * 2 + 2);
+
+  base_name_ = tag_pool_.add(base_name);
+  if (tags.empty()) {
+    name_ = base_name_;
+  } else {
+    ASSERT(!name.empty(), "When tags are supplied, the caller must supply the tagged name with the "
+                          "tag values interleaved.");
+    name_ = tag_pool_.add(name);
+  }
+
+  tags_.reserve(tags.size());
+  for (const StatNameTag& tag : tags) {
+    tags_.push_back({tag_pool_.add(tag.first), tag_pool_.add(tag.second)});
+  }
+}
+
+ScopeHelper::FullNameJoiner::FullNameJoiner(const ScopeHelper& helper, StatName name) {
+  const SymbolTable& symbol_table = helper.scope_.constSymbolTable();
+  base_name_.join({helper.basePrefix(), name}, symbol_table);
+  // Without tags the tagged name is left empty and the tags unset, which is the same as creating
+  // the stat from the scope by its plain name.
+  if (!helper.tags().empty()) {
+    tagged_name_.join({helper.prefix(), name}, symbol_table);
+    tags_ = helper.tags();
+  }
+}
+
+Counter& ScopeHelper::counterFromStatName(StatName name) {
+  const FullNameJoiner full_name(*this, name);
+  return scope_.counterFromTaggedName(full_name.baseName(), full_name.tags(),
+                                      full_name.taggedName());
+}
+
+Gauge& ScopeHelper::gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) {
+  const FullNameJoiner full_name(*this, name);
+  return scope_.gaugeFromTaggedName(full_name.baseName(), full_name.tags(), full_name.taggedName(),
+                                    import_mode);
+}
+
+Histogram& ScopeHelper::histogramFromStatName(StatName name, Histogram::Unit unit) {
+  const FullNameJoiner full_name(*this, name);
+  return scope_.histogramFromTaggedName(full_name.baseName(), full_name.tags(),
+                                        full_name.taggedName(), unit);
+}
+
+TextReadout& ScopeHelper::textReadoutFromStatName(StatName name) {
+  const FullNameJoiner full_name(*this, name);
+  return scope_.textReadoutFromTaggedName(full_name.baseName(), full_name.tags(),
+                                          full_name.taggedName());
+}
+
+Counter& ScopeHelper::counterFromString(absl::string_view name) {
+  StatNameManagedStorage name_storage(name, scope_.symbolTable());
+  return counterFromStatName(name_storage.statName());
+}
+
+Gauge& ScopeHelper::gaugeFromString(absl::string_view name, Gauge::ImportMode import_mode) {
+  StatNameManagedStorage name_storage(name, scope_.symbolTable());
+  return gaugeFromStatName(name_storage.statName(), import_mode);
+}
+
+Histogram& ScopeHelper::histogramFromString(absl::string_view name, Histogram::Unit unit) {
+  StatNameManagedStorage name_storage(name, scope_.symbolTable());
+  return histogramFromStatName(name_storage.statName(), unit);
+}
+
+TextReadout& ScopeHelper::textReadoutFromString(absl::string_view name) {
+  StatNameManagedStorage name_storage(name, scope_.symbolTable());
+  return textReadoutFromStatName(name_storage.statName());
+}
+
 std::optional<StatName> Utility::findTag(const Metric& metric, StatName find_tag_name) {
   std::optional<StatName> value;
   metric.iterateTagStatNames(
@@ -168,106 +243,6 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
   return scope.textReadoutFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags),
                                          StatName());
-}
-
-Counter& counterFromTaggedPrefix(Scope& scope, StatName base_prefix, StatNameTagSpan prefix_tags,
-                                 StatName prefix, absl::string_view name) {
-  StatNameManagedStorage name_storage(name, scope.symbolTable());
-  return counterFromTaggedPrefix(scope, base_prefix, prefix_tags, prefix, name_storage.statName());
-}
-
-Gauge& gaugeFromTaggedPrefix(Scope& scope, StatName base_prefix, StatNameTagSpan prefix_tags,
-                             StatName prefix, absl::string_view name,
-                             Gauge::ImportMode import_mode) {
-  StatNameManagedStorage name_storage(name, scope.symbolTable());
-  return gaugeFromTaggedPrefix(scope, base_prefix, prefix_tags, prefix, name_storage.statName(),
-                               import_mode);
-}
-
-Histogram& histogramFromTaggedPrefix(Scope& scope, StatName base_prefix,
-                                     StatNameTagSpan prefix_tags, StatName prefix,
-                                     absl::string_view name, Histogram::Unit unit) {
-  StatNameManagedStorage name_storage(name, scope.symbolTable());
-  return histogramFromTaggedPrefix(scope, base_prefix, prefix_tags, prefix, name_storage.statName(),
-                                   unit);
-}
-
-TextReadout& textReadoutFromTaggedPrefix(Scope& scope, StatName base_prefix,
-                                         StatNameTagSpan prefix_tags, StatName prefix,
-                                         absl::string_view name) {
-  StatNameManagedStorage name_storage(name, scope.symbolTable());
-  return textReadoutFromTaggedPrefix(scope, base_prefix, prefix_tags, prefix,
-                                     name_storage.statName());
-}
-
-Counter& counterFromTaggedPrefix(Scope& scope, StatName base_prefix, StatNameTagSpan prefix_tags,
-                                 StatName prefix, StatName name) {
-  SymbolTable& symbol_table = scope.symbolTable();
-  if (prefix_tags.empty()) {
-    prefix = base_prefix;
-  } else {
-    ASSERT(!prefix.empty(),
-           "When tags are supplied, the caller must supply the tagged prefix with the "
-           "tag values interleaved.");
-  }
-
-  SymbolTable::StoragePtr full_name = symbol_table.join({prefix, name});
-  SymbolTable::StoragePtr full_name_base = symbol_table.join({base_prefix, name});
-  return scope.counterFromTaggedName(StatName(full_name_base.get()), prefix_tags,
-                                     StatName(full_name.get()));
-}
-
-Gauge& gaugeFromTaggedPrefix(Scope& scope, StatName base_prefix, StatNameTagSpan prefix_tags,
-                             StatName prefix, StatName name, Gauge::ImportMode import_mode) {
-  SymbolTable& symbol_table = scope.symbolTable();
-  if (prefix_tags.empty()) {
-    prefix = base_prefix;
-  } else {
-    ASSERT(!prefix.empty(),
-           "When tags are supplied, the caller must supply the tagged prefix with the "
-           "tag values interleaved.");
-  }
-
-  SymbolTable::StoragePtr full_name = symbol_table.join({prefix, name});
-  SymbolTable::StoragePtr full_name_base = symbol_table.join({base_prefix, name});
-  return scope.gaugeFromTaggedName(StatName(full_name_base.get()), prefix_tags,
-                                   StatName(full_name.get()), import_mode);
-}
-
-Histogram& histogramFromTaggedPrefix(Scope& scope, StatName base_prefix,
-                                     StatNameTagSpan prefix_tags, StatName prefix, StatName name,
-                                     Histogram::Unit unit) {
-  SymbolTable& symbol_table = scope.symbolTable();
-  if (prefix_tags.empty()) {
-    prefix = base_prefix;
-  } else {
-    ASSERT(!prefix.empty(),
-           "When tags are supplied, the caller must supply the tagged prefix with the "
-           "tag values interleaved.");
-  }
-
-  SymbolTable::StoragePtr full_name = symbol_table.join({prefix, name});
-  SymbolTable::StoragePtr full_name_base = symbol_table.join({base_prefix, name});
-  return scope.histogramFromTaggedName(StatName(full_name_base.get()), prefix_tags,
-                                       StatName(full_name.get()), unit);
-}
-
-TextReadout& textReadoutFromTaggedPrefix(Scope& scope, StatName base_prefix,
-                                         StatNameTagSpan prefix_tags, StatName prefix,
-                                         StatName name) {
-  SymbolTable& symbol_table = scope.symbolTable();
-  if (prefix_tags.empty()) {
-    prefix = base_prefix;
-  } else {
-    ASSERT(!prefix.empty(),
-           "When tags are supplied, the caller must supply the tagged prefix with the "
-           "tag values interleaved.");
-  }
-
-  SymbolTable::StoragePtr full_name = symbol_table.join({prefix, name});
-  SymbolTable::StoragePtr full_name_base = symbol_table.join({base_prefix, name});
-  return scope.textReadoutFromTaggedName(StatName(full_name_base.get()), prefix_tags,
-                                         StatName(full_name.get()));
 }
 
 } // namespace Utility

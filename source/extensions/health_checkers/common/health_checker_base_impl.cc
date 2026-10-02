@@ -90,14 +90,13 @@ void HealthCheckerImplBase::decDegraded() { stats_.degraded_.sub(1); }
 
 HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope,
                                                         absl::string_view name) {
-  const Stats::TaggedStatName prefix(
-      scope.symbolTable(), "health_check.",
+  Stats::ScopeHelper helper(
+      scope, "health_check.",
       name.empty() ? Stats::TagStringViewSpan{}
                    : Stats::TagStringViewSpan{{Config::TagNames::get().HEALTH_CHECK_NAME, name}},
       name.empty() ? "health_check." : absl::StrCat("health_check.name.", name, "."));
 
-  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_TAGGED(scope, prefix),
-                                   POOL_GAUGE_TAGGED(scope, prefix))};
+  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
 }
 
 void HealthCheckerImplBase::incHealthy() { stats_.healthy_.add(1); }

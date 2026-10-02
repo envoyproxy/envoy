@@ -16,6 +16,15 @@ namespace Envoy {
 namespace Http {
 
 /**
+ * All stats of a user agent. @see stats_macros.h
+ */
+#define ALL_USER_AGENT_STATS(COUNTER, HISTOGRAM)                                                   \
+  COUNTER(downstream_cx_destroy_remote_active_rq)                                                  \
+  COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_rq_total)                                                                     \
+  HISTOGRAM(downstream_cx_length_ms, Milliseconds)
+
+/**
  * Captures the stat tokens used for recording user-agent stats. These are
  * independent of scope.
  */
@@ -24,7 +33,6 @@ struct UserAgentContext {
 
   Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_;
-  Stats::StatName downstream_cx_length_ms_;
   // The device is carried by an explicit 'envoy.http_user_agent' tag rather than being recovered
   // from the stat name by a tag extractor: 'user_agent' is the tag-extracted prefix of the
   // per-device stats, ios_ and android_ are the matching flat prefixes, and ios_tags_ and
@@ -35,9 +43,8 @@ struct UserAgentContext {
   Stats::StatName android_;
   Stats::StatNameTagVector ios_tags_;
   Stats::StatNameTagVector android_tags_;
-  Stats::StatName downstream_cx_total_;
-  Stats::StatName downstream_cx_destroy_remote_active_rq_;
-  Stats::StatName downstream_rq_total_;
+  // The leaf names of the stats.
+  ALL_USER_AGENT_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)
 };
 
 /**
@@ -47,19 +54,7 @@ struct UserAgentContext {
  * request-path.
  */
 struct UserAgentStats {
-  /**
-   * @param device the flat 'user_agent.<device>' prefix of the stats.
-   * @param device_tags the tags describing that same device.
-   * @param scope the scope the stats are created in, which already carries any enclosing prefix.
-   * @param context the pre-resolved stat name tokens.
-   */
-  UserAgentStats(Stats::StatName device, Stats::StatNameTagSpan device_tags, Stats::Scope& scope,
-                 const UserAgentContext& context);
-
-  Stats::Counter& downstream_cx_total_;
-  Stats::Counter& downstream_cx_destroy_remote_active_rq_;
-  Stats::Counter& downstream_rq_total_;
-  Stats::Histogram& downstream_cx_length_ms_;
+  ALL_USER_AGENT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
