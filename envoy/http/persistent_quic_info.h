@@ -13,15 +13,10 @@ namespace Http {
 //
 // Every upstream QUIC connection keeps raw pointers into this object (its clock, alarm factory and
 // config), and a connection pool can outlive the cluster that created it: a removed cluster only
-// drains its pools, and pools with active streams live on until those streams end. Pools therefore
-// share ownership (see keepAlive()), so the object outlives every connection that uses it.
-struct PersistentQuicInfo : public std::enable_shared_from_this<PersistentQuicInfo> {
+// drains its pools, and pools with active streams live on until those streams end. The cluster and
+// its pools therefore share ownership, so the object outlives every connection that uses it.
+struct PersistentQuicInfo {
   virtual ~PersistentQuicInfo() = default;
-
-  // Returns shared ownership of this object when it is owned by a PersistentQuicInfoPtr, or
-  // nullptr when it is owned some other way (e.g. by a test), in which case the owner is
-  // responsible for outliving its users.
-  std::shared_ptr<PersistentQuicInfo> keepAlive() { return weak_from_this().lock(); }
 };
 
 using PersistentQuicInfoPtr = std::shared_ptr<PersistentQuicInfo>;
