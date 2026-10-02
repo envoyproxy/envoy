@@ -704,9 +704,7 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV1ReaderWhenOnlyV1FilesExis
   EXPECT_NE(reader_or_error.value(), nullptr);
 }
 
-// With no cgroup v1/v2 available, create() still returns a reader so startup
-// continues, but every sample fails as unavailable.
-TEST(LinuxContainerCpuStatsReaderFactoryTest, ReturnsFallbackReaderWhenNoCgroupFilesExist) {
+TEST(LinuxContainerCpuStatsReaderFactoryTest, ReturnsErrorWhenNoCgroupFilesExist) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::MockDispatcher dispatcher;
   Server::MockOptions options;
@@ -727,12 +725,8 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, ReturnsFallbackReaderWhenNoCgroupF
       .WillRepeatedly(Return(false));
 
   auto result = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
-  ASSERT_TRUE(result.ok());
-  ASSERT_NE(result.value(), nullptr);
-
-  auto util = result.value()->getUtilization();
-  EXPECT_EQ(util.status().code(), absl::StatusCode::kUnavailable);
-  EXPECT_THAT(util, HasStatusMessage(testing::HasSubstr(std::string(NoSupportedCGroupMessage))));
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(std::string(result.status().message()), ::testing::Eq(NoSupportedCGroupMessage));
 }
 
 // =============================================================================

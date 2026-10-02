@@ -83,10 +83,16 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
   auto monitor_or_error = factory->createResourceMonitor(config, context);
-  // Container mode always produces a monitor: on hosts without a supported cgroup
-  // CPU implementation its updates fail instead of config initialization.
-  ASSERT_TRUE(monitor_or_error.ok());
+#if defined(__linux__)
+  if (!monitor_or_error.ok()) {
+    ASSERT_THAT(std::string(monitor_or_error.status().message()),
+                ::testing::Eq(NoSupportedCGroupMessage));
+    GTEST_SKIP() << "Skipping test because the current machine does not support cgroup";
+  }
   EXPECT_NE(monitor_or_error.value(), nullptr);
+#else
+  EXPECT_FALSE(monitor_or_error.ok());
+#endif
 }
 
 TEST(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
@@ -130,7 +136,11 @@ TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
   auto monitor_or_error = factory->createResourceMonitor(config, context);
-  ASSERT_TRUE(monitor_or_error.ok());
+  if (!monitor_or_error.ok()) {
+    ASSERT_THAT(std::string(monitor_or_error.status().message()),
+                ::testing::Eq(NoSupportedCGroupMessage));
+    GTEST_SKIP() << "Skipping test because the current machine does not support cgroup";
+  }
   auto monitor = std::move(monitor_or_error.value());
   ASSERT_NE(monitor, nullptr);
 

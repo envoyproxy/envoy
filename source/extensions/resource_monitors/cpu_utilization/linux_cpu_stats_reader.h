@@ -117,16 +117,6 @@ private:
   CpuTimesV2 previous_cpu_times_{false, 0, 0, 0};
 };
 
-// Reader used when no supported cgroup CPU implementation is found. Startup still
-// succeeds, but every sample fails so the monitor's failed_updates reflects it.
-class UnsupportedCgroupCpuStatsReader : public LinuxContainerCpuStatsReader,
-                                        private Logger::Loggable<Logger::Id::main> {
-public:
-  UnsupportedCgroupCpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source);
-
-  absl::StatusOr<double> getUtilization() override;
-};
-
 } // namespace CpuUtilizationMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

@@ -230,9 +230,7 @@ LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_
     return std::make_unique<CgroupV1CpuStatsReader>(fs, time_source);
   }
 
-  // No supported cgroup found: keep startup going with a reader whose samples all
-  // fail, so this optional overload monitor never blocks server startup.
-  return std::make_unique<UnsupportedCgroupCpuStatsReader>(fs, time_source);
+  return absl::InvalidArgumentError(std::string(NoSupportedCGroupMessage));
 }
 
 CgroupV1CpuStatsReader::CgroupV1CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)
@@ -467,17 +465,6 @@ absl::StatusOr<double> CgroupV2CpuStatsReader::getUtilization() {
   previous_cpu_times_ = current_cpu_times;
 
   return clamped_utilization;
-}
-
-UnsupportedCgroupCpuStatsReader::UnsupportedCgroupCpuStatsReader(Filesystem::Instance& fs,
-                                                                 TimeSource& time_source)
-    : LinuxContainerCpuStatsReader(fs, time_source) {
-  ENVOY_LOG(warn, "{}; CPU utilization resource monitor updates will fail in CONTAINER mode",
-            NoSupportedCGroupMessage);
-}
-
-absl::StatusOr<double> UnsupportedCgroupCpuStatsReader::getUtilization() {
-  return absl::UnavailableError(NoSupportedCGroupMessage);
 }
 
 } // namespace CpuUtilizationMonitor
