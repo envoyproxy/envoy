@@ -224,7 +224,7 @@ build:compile-time-options --@envoy//bazel:http3=False
 build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
 # This is a Protobuf feature which breaks dynamic casting of messages. Turn it
 # on here to prevent raw dynamic_casts from being added to Envoy.
-build:compile-time-options --copt=-DPROTOBUF_ENABLE_CUSTOM_VTABLE=1
+build:compile-time-options --copt=-DPROTOBUF_ENABLE_CUSTOM_VTABLES=1
 
 
 #############################################################################
