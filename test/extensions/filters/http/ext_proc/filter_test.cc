@@ -133,7 +133,7 @@ protected:
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.ext_proc_return_stop_iteration", "true"}});
     scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.ext_proc_not_send_empty_body_with_false_eos", "true"}});
+        {{"envoy.reloadable_features.ext_proc_not_send_empty_data_with_false_eos", "true"}});
     if (!client_) {
       client_ = std::make_unique<MockClient>();
     }
