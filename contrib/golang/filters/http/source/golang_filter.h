@@ -67,8 +67,7 @@ public:
   std::optional<const std::string> secret(const std::string& name) const;
 
 private:
-  absl::flat_hash_map<std::string, std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>>
-      secrets_;
+  absl::flat_hash_map<std::string, Secret::ThreadLocalGenericSecretProviderPtr> secrets_;
 };
 /**
  * Configuration for the HTTP golang extension filter.
