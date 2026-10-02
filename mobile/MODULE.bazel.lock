@@ -4374,16 +4374,16 @@
             "https://files.pythonhosted.org/packages/39/a4/5180d9afc57e8fca05601dd652bdff19604c218814037fe90ffc7625a50a/docutils-0.23.tar.gz": "sha256:746f5060322511280a1e50eb76846ed6bf2342984b2ac04dc42caa1a8d78799e"
           },
           "envoy-base-utils": {
-            "https://files.pythonhosted.org/packages/94/8b/aed2ee446b06c254de6d0b2a53959dd06916f7f059bc17e1e94b47cad45c/envoy_base_utils-0.6.9.tar.gz": "sha256:b088b7621b5075005c48cdbef5db5675827b7b63550be7d880d395261fdcdb20",
-            "https://files.pythonhosted.org/packages/c4/71/86288c14c8e557bbc3489d6bd2963caed7e54f478976b0c359f9b3597bf2/envoy_base_utils-0.6.9-py3-none-any.whl": "sha256:664dcc19ee12125398222a7628bdcbb40e265b3846e197e4014434fcd273fd61"
+            "https://files.pythonhosted.org/packages/bd/98/e3c1a16a299fe399092c45cb91e148c2f99a4a7a551d6729dd411ffc4c3d/envoy_base_utils-0.6.12.tar.gz": "sha256:d2ab511a1f6f59f7319c6dc6b70088bad139be2165466ed9ce6932b0c96faa02",
+            "https://files.pythonhosted.org/packages/d9/4d/275e6c7033b8b5d4f59216034d98c303feb2d99185da479963e458083699/envoy_base_utils-0.6.12-py3-none-any.whl": "sha256:8b860c9d88493f1eb1044cc48fa9ae953cd31d9da77102d05e9c6af65ff14eae"
           },
           "envoy-ci-report": {
             "https://files.pythonhosted.org/packages/43/c9/24aceda89afab59b701ea7f9f004c422a9e4adfb63003e086692a3c9a0dc/envoy_ci_report-0.1.1.tar.gz": "sha256:481115be4d05941b83ffbbd8fdac241f10e9823c076f850d8bef7f0308aa382d",
             "https://files.pythonhosted.org/packages/85/a8/d694c1b8d931b985f75146f8ac0168f7fe2ece7679a0cf66653efe1c0f22/envoy_ci_report-0.1.1-py3-none-any.whl": "sha256:a38da2e996b266b32ff80f2f404018d1887f156ad086e3fa8fd4233bb4cd6fe7"
           },
           "envoy-code-check": {
-            "https://files.pythonhosted.org/packages/c9/8b/340c8898dec2341b36d6fbc1cc93ee03d23061dd94d2af89834a8324f520/envoy_code_check-0.6.7-py3-none-any.whl": "sha256:7b7fbc99c114f663126be738095945d479e0b4c6f71d3d784bc234d9d9098a8d",
-            "https://files.pythonhosted.org/packages/de/0a/0850dc942e491cd40d3ab96bfc7c7e4a063307c4f2b93563dfa9ea333033/envoy_code_check-0.6.7.tar.gz": "sha256:76b0edf0b95d8a31b5d78481b3a7f5ae4a2925c04d2158e77cc3549653a4213e"
+            "https://files.pythonhosted.org/packages/0c/12/b36eed1f6c7402bba14d1567122919aea69beeed312d71b229465eb1826d/envoy_code_check-0.6.9.tar.gz": "sha256:9a212107476b4a36b3743fb550eacad3ede72b3cdbf825dc944c25e48e4e1eb6",
+            "https://files.pythonhosted.org/packages/7d/4f/c97a5be443f8a3f40cf56864f94d578cfb1b6d500c20e04946713251d347/envoy_code_check-0.6.9-py3-none-any.whl": "sha256:9ded56211e8e81ffc27c97b923e17dd7a6dd60e72454755f07bb1555ca019279"
           },
           "envoy-dependency-check": {
             "https://files.pythonhosted.org/packages/06/7c/afcea506f6d304321ce8deca1ff7e21e6fc4c34e6431e66409219afb49b3/envoy_dependency_check-0.2.1-py3-none-any.whl": "sha256:a037ab34b7db9893ecf07247c8e9149481148de26f340f1c27e4adfa7a48e227",
