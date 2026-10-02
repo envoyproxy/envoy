@@ -105,4 +105,4 @@ jobs:
         trap-caching: false
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1
+      uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2  # codeql-bundle-v4.38.2
