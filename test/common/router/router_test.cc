@@ -8214,6 +8214,23 @@ TEST_F(RouterTest, SetDynamicMaxStreamDuration) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
+TEST_F(RouterTest, NotSetDynamicMaxStreamDurationIfHeaderOverflows) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder_,
+                                      Http::Protocol::Http10);
+
+  // The timer will not be created.
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_).Times(0);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-upstream-stream-duration-ms", "18446744073709551615"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  router_->onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
 TEST_F(RouterTest, NotSetDynamicMaxStreamDurationIfZero) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder_, Http::Protocol::Http10);
