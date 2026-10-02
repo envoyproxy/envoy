@@ -446,7 +446,7 @@ min_rtt_calc_params:
 
 TEST_F(GradientControllerTest, MinLatencyDeltaUsesMaximumNotSum) {
   for (const bool sampled : {false, true}) {
-    for (const std::string& delta : {"0s", "0.001s", "0.005s", "0.010s", "315576000000s"}) {
+    for (const std::string& delta : {"0s", "0.001s", "0.005s", "0.010s", "9223372035.999999999s"}) {
       SCOPED_TRACE(sampled);
       SCOPED_TRACE(delta);
       const std::string yaml =
@@ -470,10 +470,29 @@ min_rtt_calc_params:
           stats_.gauge("test_prefix.gradient", Stats::Gauge::ImportMode::NeverImport).value();
       // The relative buffer is 5ms. A 10ms absolute buffer raises the threshold from 10 to 15ms,
       // not 20ms. Very large legal durations must saturate the gradient without integer overflow.
-      const uint64_t expected = delta == "315576000000s" ? 2000 : delta == "0.010s" ? 750 : 500;
+      const uint64_t expected = delta == "9223372035.999999999s" ? 2000
+                                : delta == "0.010s"              ? 750
+                                                                 : 500;
       EXPECT_NEAR(gradient, expected, 30);
     }
   }
+}
+
+TEST_F(GradientControllerTest, MinLatencyDeltaMaximumDurationDoesNotOverflow) {
+  auto controller = makeController(R"EOF(
+concurrency_limit_params:
+  concurrency_update_interval: 0.1s
+  min_concurrency_limit: 20
+min_rtt_calc_params:
+  fixed_value: 2s
+  buffer: {value: 100}
+  min_latency_delta: 9223372035.999999999s
+)EOF");
+  driveSampleRTTWindows(controller, std::chrono::seconds(10), 1);
+  // This is Envoy's maximum validated duration. Adding the baseline in integer nanoseconds
+  // would overflow; the absolute buffer must still win over the 2s relative buffer.
+  EXPECT_EQ(2000,
+            stats_.gauge("test_prefix.gradient", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 TEST_F(GradientControllerTest, EwmaUsesMeanAndTenWindowWarmupWithoutProbes) {
