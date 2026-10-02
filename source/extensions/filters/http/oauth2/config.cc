@@ -72,7 +72,8 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
       std::move(secret_provider_client_secret), std::move(secret_provider_hmac_secret),
-      context.serverFactoryContext().threadLocal(), context.serverFactoryContext().api());
+      context.serverFactoryContext().threadLocal(), context.serverFactoryContext().api(),
+      context.serverFactoryContext().mainThreadDispatcher());
   auto config = std::make_shared<FilterConfig>(proto_config, context.serverFactoryContext(),
                                                secret_reader, context.scope(), stats_prefix);
 

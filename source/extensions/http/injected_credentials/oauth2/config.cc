@@ -54,7 +54,8 @@ OAuth2CredentialInjectorFactory::createOauth2ClientCredentialInjector(
   }
 
   auto secret_reader = std::make_shared<const Common::SDSSecretReader>(
-      std::move(client_secret_provider), context.threadLocal(), context.api());
+      std::move(client_secret_provider), context.threadLocal(), context.api(),
+      context.mainThreadDispatcher());
   auto token_reader = std::make_shared<const TokenProvider>(
       secret_reader, context.threadLocal(), cluster_manager, proto_config,
       context.mainThreadDispatcher(), stats_prefix, context.scope());
