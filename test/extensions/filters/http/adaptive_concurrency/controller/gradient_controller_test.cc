@@ -283,6 +283,356 @@ min_rtt_calc_params:
   EXPECT_EQ(config.minRTTCalcConcurrency(), 3);
   EXPECT_EQ(config.minConcurrencyLimit(), 3);
   EXPECT_EQ(config.minRTTBufferPercent(), 0.25);
+  EXPECT_EQ(config.minLatencyDelta(), std::chrono::microseconds::zero());
+  EXPECT_FALSE(config.ewmaEnabled());
+  EXPECT_TRUE(config.isMinRTTSamplingEnabled());
+}
+
+const std::string EwmaConfig = R"EOF(
+baseline_mode: EWMA
+ewma_baseline:
+  half_life: 10s
+  initial_concurrency: 512
+concurrency_limit_params:
+  max_concurrency_limit: 512
+  min_concurrency_limit: 4
+  concurrency_update_interval: 1s
+min_rtt_calc_params:
+  buffer:
+    value: 0
+)EOF";
+
+TEST_F(GradientControllerConfigTest, EwmaParametersAreAllOptional) {
+  const std::string yaml = R"EOF(
+baseline_mode: EWMA
+concurrency_limit_params:
+  concurrency_update_interval: 1s
+min_rtt_calc_params: {}
+)EOF";
+  const auto config = makeConfig(yaml, runtime_);
+  EXPECT_TRUE(config.ewmaEnabled());
+  EXPECT_FALSE(config.isMinRTTSamplingEnabled());
+  EXPECT_EQ(config.ewmaHalfLife(), std::chrono::seconds(300));
+  EXPECT_EQ(config.ewmaWarmupWindows(), 10);
+  EXPECT_EQ(config.ewmaInitialConcurrency(), 3);
+  EXPECT_EQ(config.minConcurrencyLimit(), 3);
+  EXPECT_EQ(config.minLatencyDelta(), std::chrono::microseconds::zero());
+
+  const auto empty_params = makeConfig(yaml + "ewma_baseline: {}\n", runtime_);
+  EXPECT_EQ(empty_params.ewmaHalfLife(), config.ewmaHalfLife());
+  EXPECT_EQ(empty_params.ewmaWarmupWindows(), config.ewmaWarmupWindows());
+  EXPECT_EQ(empty_params.ewmaInitialConcurrency(), config.ewmaInitialConcurrency());
+}
+
+TEST_F(GradientControllerConfigTest, EwmaUsesExistingMinimumLimit) {
+  const auto config = makeConfig(EwmaConfig, runtime_);
+  EXPECT_EQ(config.ewmaHalfLife(), std::chrono::seconds(10));
+  EXPECT_EQ(config.ewmaInitialConcurrency(), 512);
+  EXPECT_EQ(config.minConcurrencyLimit(), 4);
+  EXPECT_CALL(runtime_.snapshot_, getInteger(_, 4)).WillOnce(Return(8));
+  EXPECT_EQ(config.minConcurrencyLimit(), 8);
+
+  const auto defaults = makeConfig(R"EOF(
+baseline_mode: EWMA
+concurrency_limit_params:
+  concurrency_update_interval: 1s
+  min_concurrency_limit: 7
+min_rtt_calc_params: {}
+)EOF",
+                                   runtime_);
+  EXPECT_EQ(defaults.ewmaInitialConcurrency(), 7);
+}
+
+TEST_F(GradientControllerConfigTest, EwmaRejectsIncompatibleConfiguration) {
+  auto status = [&](const std::string& yaml) {
+    envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig proto;
+    TestUtility::loadFromYamlAndValidate(yaml, proto);
+    absl::Status creation_status;
+    GradientControllerConfig config{proto, runtime_, creation_status};
+    return creation_status;
+  };
+  for (const std::string& field :
+       {"interval: 1s", "fixed_value: 0.01s", "request_count: 10", "jitter: {value: 10}"}) {
+    SCOPED_TRACE(field);
+    EXPECT_THAT(status(EwmaConfig + "  " + field + "\n"),
+                HasStatusMessage("adaptive_concurrency: EWMA does not accept probe controls or "
+                                 "`sample_aggregate_percentile`"));
+  }
+  EXPECT_FALSE(status(EwmaConfig + "sample_aggregate_percentile: {value: 75}\n").ok());
+
+  auto yaml = EwmaConfig;
+  yaml.replace(yaml.find("EWMA"), 4, "LEGACY");
+  EXPECT_THAT(
+      status(yaml),
+      HasStatusMessage("adaptive_concurrency: `ewma_baseline` requires explicit EWMA mode"));
+
+  yaml.erase(yaml.find("baseline_mode: LEGACY"), std::string("baseline_mode: LEGACY\n").size());
+  EXPECT_THAT(
+      status(yaml),
+      HasStatusMessage("adaptive_concurrency: `ewma_baseline` requires explicit EWMA mode"));
+
+  for (const std::string& value : {"1", "513"}) {
+    yaml = EwmaConfig;
+    const std::string initial = "initial_concurrency: 512";
+    yaml.replace(yaml.find(initial), initial.size(), "initial_concurrency: " + value);
+    EXPECT_FALSE(status(yaml).ok());
+  }
+  yaml = EwmaConfig;
+  const std::string minimum = "min_concurrency_limit: 4";
+  yaml.replace(yaml.find(minimum), minimum.size(), "min_concurrency_limit: 513");
+  EXPECT_FALSE(status(yaml).ok());
+
+  yaml = EwmaConfig;
+  const std::string interval = "concurrency_update_interval: 1s";
+  yaml.replace(yaml.find(interval), interval.size(), "concurrency_update_interval: 0.0001s");
+  EXPECT_THAT(
+      status(yaml),
+      HasStatusMessage("adaptive_concurrency: EWMA requires `concurrency_update_interval` >= 1ms"));
+}
+
+TEST_F(GradientControllerConfigTest, NewParametersHaveValidation) {
+  for (const std::string& value : {"0s", "-1s", "0.0001s"}) {
+    SCOPED_TRACE(value);
+    auto yaml = EwmaConfig;
+    yaml.replace(yaml.find("half_life: 10s"), std::string("half_life: 10s").size(),
+                 "half_life: " + value);
+    EXPECT_THROW(makeConfig(yaml, runtime_), ProtoValidationException);
+  }
+  for (const std::string& field : {"warmup_windows: 0", "initial_concurrency: 0"}) {
+    SCOPED_TRACE(field);
+    const std::string yaml = "baseline_mode: EWMA\newma_baseline:\n  " + field + R"EOF(
+concurrency_limit_params:
+  concurrency_update_interval: 1s
+min_rtt_calc_params: {}
+)EOF";
+    EXPECT_THROW(makeConfig(yaml, runtime_), ProtoValidationException);
+  }
+  EXPECT_THROW(makeConfig(EwmaConfig + "  min_latency_delta: -0.001s\n", runtime_),
+               ProtoValidationException);
+  const auto config = makeConfig(EwmaConfig + "  min_latency_delta: 0.001250s\n", runtime_);
+  EXPECT_EQ(config.minLatencyDelta(), std::chrono::microseconds(1250));
+}
+
+TEST_F(GradientControllerTest, NewFeaturesAreDisabledByDefault) {
+  for (const bool fixed : {false, true}) {
+    SCOPED_TRACE(fixed);
+    const std::string yaml = std::string(R"EOF(
+concurrency_limit_params:
+  concurrency_update_interval: 0.1s
+  min_concurrency_limit: 4
+min_rtt_calc_params:
+  min_concurrency: 8
+)EOF") + (fixed ? "  fixed_value: 0.005s\n"
+                : "  interval: 30s\n  jitter: {value: 0}\n  request_count: 5\n");
+    auto run = [&](const std::string& config) {
+      auto controller = makeController(config);
+      EXPECT_EQ(controller->isMinRTTSamplingEnabled(), !fixed);
+      EXPECT_EQ(controller->concurrencyLimit(), fixed ? 4 : 8);
+      if (!fixed) {
+        advancePastMinRTTStage(controller, config);
+      }
+      std::vector<uint32_t> limits;
+      for (const auto latency : {4, 6, 20, 5, 30, 3}) {
+        driveSampleRTTWindows(controller, std::chrono::milliseconds(latency), 1);
+        limits.push_back(controller->concurrencyLimit());
+      }
+      return limits;
+    };
+    const auto original = run(yaml);
+    // An explicit default enum and zero duration must be identical to the old configuration.
+    EXPECT_EQ(original, run(yaml + "  min_latency_delta: 0s\nbaseline_mode: LEGACY\n"));
+  }
+}
+
+TEST_F(GradientControllerTest, MinLatencyDeltaUsesMaximumNotSum) {
+  for (const bool sampled : {false, true}) {
+    for (const std::string& delta : {"0s", "0.001s", "0.005s", "0.010s", "315576000000s"}) {
+      SCOPED_TRACE(sampled);
+      SCOPED_TRACE(delta);
+      const std::string yaml =
+          std::string(R"EOF(
+concurrency_limit_params:
+  concurrency_update_interval: 0.1s
+  min_concurrency_limit: 20
+min_rtt_calc_params:
+  min_concurrency: 20
+  buffer: {value: 100}
+)EOF") +
+          (sampled ? "  interval: 30s\n  request_count: 5\n  jitter: {value: 0}\n"
+                   : "  fixed_value: 0.005s\n") +
+          "  min_latency_delta: " + delta + "\n";
+      auto controller = makeController(yaml);
+      if (sampled) {
+        advancePastMinRTTStage(controller, yaml);
+      }
+      driveSampleRTTWindows(controller, std::chrono::milliseconds(20), 1);
+      const auto gradient =
+          stats_.gauge("test_prefix.gradient", Stats::Gauge::ImportMode::NeverImport).value();
+      // The relative buffer is 5ms. A 10ms absolute buffer raises the threshold from 10 to 15ms,
+      // not 20ms. Very large legal durations must saturate the gradient without integer overflow.
+      const uint64_t expected = delta == "315576000000s" ? 2000 : delta == "0.010s" ? 750 : 500;
+      EXPECT_NEAR(gradient, expected, 30);
+    }
+  }
+}
+
+TEST_F(GradientControllerTest, EwmaUsesMeanAndTenWindowWarmupWithoutProbes) {
+  auto controller = makeController(EwmaConfig);
+  EXPECT_EQ(controller->concurrencyLimit(), 512);
+  EXPECT_FALSE(controller->isMinRTTSamplingEnabled());
+  for (uint32_t window = 1; window <= 10; ++window) {
+    for (uint32_t request = 0; request < window; ++request) {
+      tryForward(controller, true);
+      sampleLatency(controller, std::chrono::milliseconds(window * 5));
+      tryForward(controller, true);
+      sampleLatency(controller, std::chrono::milliseconds(window * 15));
+    }
+    time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                   Event::Dispatcher::RunType::Block);
+    verifyMinRTTValue(std::chrono::milliseconds(5 * (window + 1)));
+    verifyMinRTTInactive();
+  }
+}
+
+TEST_F(GradientControllerTest, EwmaHalfLifeAndRecovery) {
+  auto controller = makeController(EwmaConfig);
+  auto window = [&](uint32_t latency_ms) {
+    tryForward(controller, true);
+    sampleLatency(controller, std::chrono::milliseconds(latency_ms));
+    time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                   Event::Dispatcher::RunType::Block);
+    verifyMinRTTInactive();
+  };
+  for (uint32_t i = 0; i < 10; ++i) {
+    window(20);
+  }
+  for (uint32_t i = 0; i < 10; ++i) {
+    window(60);
+  }
+  EXPECT_NEAR(
+      40, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value(),
+      1);
+  EXPECT_LT(controller->concurrencyLimit(), 512);
+  for (uint32_t i = 0; i < 300; ++i) {
+    window(60);
+    EXPECT_GE(controller->concurrencyLimit(), 4);
+  }
+  EXPECT_EQ(controller->concurrencyLimit(), 512);
+  for (uint32_t i = 0; i < 10; ++i) {
+    window(20);
+  }
+  EXPECT_NEAR(
+      40, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value(),
+      1);
+}
+
+TEST_F(GradientControllerTest, EwmaCustomWarmupAndRuntimeStartupBounds) {
+  auto yaml = EwmaConfig;
+  yaml.replace(yaml.find("half_life: 10s"), std::string("half_life: 10s").size(),
+               "half_life: 1s\n  warmup_windows: 1");
+  ON_CALL(runtime_.snapshot_,
+          getInteger("adaptive_concurrency.gradient_controller.max_concurrency_limit", 512))
+      .WillByDefault(Return(100));
+  auto controller = makeController(yaml);
+  EXPECT_EQ(controller->concurrencyLimit(), 100);
+  tryForward(controller, true);
+  sampleLatency(controller, std::chrono::milliseconds(20));
+  time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
+  verifyMinRTTValue(std::chrono::milliseconds(20));
+  tryForward(controller, true);
+  sampleLatency(controller, std::chrono::milliseconds(60));
+  time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
+  verifyMinRTTValue(std::chrono::milliseconds(40));
+  verifyMinRTTInactive();
+  controller.reset();
+
+  yaml.replace(yaml.find("initial_concurrency: 512"),
+               std::string("initial_concurrency: 512").size(), "initial_concurrency: 4");
+  ON_CALL(runtime_.snapshot_,
+          getInteger("adaptive_concurrency.gradient_controller.min_concurrency_limit", 4))
+      .WillByDefault(Return(8));
+  controller = makeController(yaml);
+  EXPECT_EQ(controller->concurrencyLimit(), 8);
+}
+
+TEST_F(GradientControllerTest, EwmaIdleWindowsAndCancelledRequestsDoNotAgeBaseline) {
+  auto controller = makeController(EwmaConfig);
+  auto window = [&](uint32_t latency_ms) {
+    tryForward(controller, true);
+    sampleLatency(controller, std::chrono::milliseconds(latency_ms));
+    time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                   Event::Dispatcher::RunType::Block);
+  };
+  window(20);
+  // Idle time must not consume any of the remaining nine warmup windows.
+  for (uint32_t i = 0; i < 60; ++i) {
+    tryForward(controller, true);
+    controller->cancelLatencySample();
+    time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                   Event::Dispatcher::RunType::Block);
+  }
+  window(60);
+  verifyMinRTTValue(std::chrono::milliseconds(40));
+  for (uint32_t i = 0; i < 8; ++i) {
+    window(40);
+  }
+  for (uint32_t i = 0; i < 60; ++i) {
+    time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                   Event::Dispatcher::RunType::Block);
+  }
+  window(80);
+  // Only one active second, rather than the preceding idle minute, contributes to the weight.
+  verifyMinRTTValue(std::chrono::milliseconds(42));
+  verifyMinRTTInactive();
+}
+
+TEST_F(GradientControllerTest, EwmaFloorIsNotAProbeAndZeroLatencyIsFinite) {
+  auto yaml = EwmaConfig;
+  yaml.replace(yaml.find("half_life: 10s"), std::string("half_life: 10s").size(),
+               "half_life: 100000s");
+  auto controller = makeController(yaml);
+  for (uint32_t i = 0; i < 50; ++i) {
+    tryForward(controller, true);
+    sampleLatency(controller,
+                  i < 10 ? std::chrono::microseconds(0) : std::chrono::milliseconds(100));
+    time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                   Event::Dispatcher::RunType::Block);
+    verifyMinRTTInactive();
+  }
+  EXPECT_EQ(controller->concurrencyLimit(), 4);
+  for (uint32_t i = 0; i < 4; ++i) {
+    tryForward(controller, true);
+  }
+  tryForward(controller, false);
+  for (uint32_t i = 0; i < 4; ++i) {
+    controller->cancelLatencySample();
+  }
+}
+
+TEST_F(GradientControllerTest, EwmaAbsoluteBufferIsOptional) {
+  for (const bool absolute : {false, true}) {
+    auto yaml = EwmaConfig;
+    yaml.replace(yaml.find("half_life: 10s"), std::string("half_life: 10s").size(),
+                 "half_life: 100000s");
+    if (absolute) {
+      yaml += "  min_latency_delta: 0.020s\n";
+    }
+    auto controller = makeController(yaml);
+    for (uint32_t i = 0; i < 10; ++i) {
+      tryForward(controller, true);
+      sampleLatency(controller, std::chrono::milliseconds(4));
+      time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                     Event::Dispatcher::RunType::Block);
+    }
+    tryForward(controller, true);
+    sampleLatency(controller, std::chrono::milliseconds(20));
+    time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                   Event::Dispatcher::RunType::Block);
+    EXPECT_EQ(controller->concurrencyLimit() == 512, absolute);
+    verifyMinRTTInactive();
+  }
 }
 
 TEST_F(GradientControllerConfigTest, MinConcurrencyLimitFallsBackToMinRTTCalcConcurrency) {

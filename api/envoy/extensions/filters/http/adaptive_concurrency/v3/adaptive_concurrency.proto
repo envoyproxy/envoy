@@ -29,6 +29,29 @@ message GradientControllerConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig";
 
+  enum BaselineMode {
+    // Preserve the existing periodic minRTT measurements or configured fixed baseline.
+    LEGACY = 0;
+
+    // Continuously estimate the baseline without low-concurrency minRTT measurements.
+    EWMA = 1;
+  }
+
+  // Optional tuning parameters used only when baseline_mode is EWMA.
+  message EwmaBaselineParams {
+    // Half-life of the baseline in time spent in nonempty sample windows. Defaults to 300s.
+    // After warmup, each window has weight 1 - 2^(-window_duration / half_life).
+    google.protobuf.Duration half_life = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // Number of nonempty window means initially averaged arithmetically. Defaults to 10.
+    // Empty windows neither advance warmup nor age the baseline.
+    google.protobuf.UInt32Value warmup_windows = 2 [(validate.rules).uint32 = {gt: 0}];
+
+    // Initial concurrency limit. Defaults to the minimum calculated concurrency limit and must
+    // be between that minimum and max_concurrency_limit. Limit updates continue during warmup.
+    google.protobuf.UInt32Value initial_concurrency = 3 [(validate.rules).uint32 = {gt: 0}];
+  }
+
   // Parameters controlling the periodic recalculation of the concurrency limit from sampled request
   // latencies.
   message ConcurrencyLimitCalculationParams {
@@ -53,8 +76,8 @@ message GradientControllerConfig {
     google.protobuf.UInt32Value min_concurrency_limit = 4 [(validate.rules).uint32 = {gt: 0}];
   }
 
-  // Parameters controlling the periodic minRTT recalculation.
-  // [#next-free-field: 7]
+  // Parameters controlling the baseline buffer and, in LEGACY mode, minRTT recalculation.
+  // [#next-free-field: 8]
   message MinimumRTTCalculationParams {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig."
@@ -65,7 +88,7 @@ message GradientControllerConfig {
     google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
     // The fixed value for the minRTT. This value is used when minRTT is not sampled dynamically.
-    // If dynamic sampling of the minRTT is disabled, this field must be set.
+    // In LEGACY mode, if dynamic sampling of the minRTT is disabled, this field must be set.
     google.protobuf.Duration fixed_value = 6 [(validate.rules).duration = {gt {}}];
 
     // The number of requests to aggregate/sample during the minRTT recalculation window before
@@ -79,7 +102,8 @@ message GradientControllerConfig {
     // somewhere in the range (10s - 11.5s).
     type.v3.Percent jitter = 3;
 
-    // The concurrency limit set while measuring the minRTT. Defaults to 3.
+    // The concurrency limit set while measuring the minRTT in LEGACY mode. Defaults to 3.
+    // Also supplies the minimum calculated limit when min_concurrency_limit is unset in either mode.
     google.protobuf.UInt32Value min_concurrency = 4 [(validate.rules).uint32 = {gt: 0}];
 
     // Amount added to the measured minRTT to add stability to the concurrency limit during natural
@@ -88,15 +112,29 @@ message GradientControllerConfig {
     //
     // Defaults to 25%.
     type.v3.Percent buffer = 5;
+
+    // Minimum absolute latency buffer. The effective buffer is the larger of this duration and
+    // the percentage-based buffer, not their sum. Applies to the legacy and EWMA baselines.
+    // Unset or zero preserves the existing percentage-only behavior.
+    google.protobuf.Duration min_latency_delta = 7 [(validate.rules).duration = {gte {}}];
   }
 
-  // The percentile to use when summarizing aggregated samples. Defaults to p50.
+  // The percentile to use when summarizing aggregated samples in LEGACY mode. Defaults to p50.
+  // Must be unset in EWMA mode, which uses the arithmetic mean RTT of each sample window.
   type.v3.Percent sample_aggregate_percentile = 1;
 
   ConcurrencyLimitCalculationParams concurrency_limit_params = 2
       [(validate.rules).message = {required: true}];
 
   MinimumRTTCalculationParams min_rtt_calc_params = 3 [(validate.rules).message = {required: true}];
+
+  // Defaults to LEGACY. EWMA is enabled only by explicitly selecting this mode.
+  BaselineMode baseline_mode = 4 [(validate.rules).enum = {defined_only: true}];
+
+  // Optional parameters for EWMA mode. All nested fields are optional. This message must be
+  // unset in LEGACY mode; its presence alone does not enable EWMA. In EWMA mode, interval,
+  // fixed_value, request_count, jitter, and sample_aggregate_percentile must be unset.
+  EwmaBaselineParams ewma_baseline = 5;
 }
 
 message AdaptiveConcurrency {
