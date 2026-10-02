@@ -41,15 +41,15 @@ message GradientControllerConfig {
   // Optional tuning parameters used only when baseline_mode is EWMA.
   message EwmaBaselineParams {
     // Half-life of the baseline in time spent in nonempty sample windows. Defaults to 300s.
-    // After warmup, each window has weight 1 - 2^(-window_duration / half_life).
+    // After warm-up, each window has weight 1 - 2^(-window_duration / half_life).
     google.protobuf.Duration half_life = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
     // Number of nonempty window means initially averaged arithmetically. Defaults to 10.
-    // Empty windows neither advance warmup nor age the baseline.
+    // Empty windows neither advance warm-up nor age the baseline.
     google.protobuf.UInt32Value warmup_windows = 2 [(validate.rules).uint32 = {gt: 0}];
 
     // Initial concurrency limit. Defaults to the minimum calculated concurrency limit and must
-    // be between that minimum and max_concurrency_limit. Limit updates continue during warmup.
+    // be between that minimum and max_concurrency_limit. Limit updates continue during warm-up.
     google.protobuf.UInt32Value initial_concurrency = 3 [(validate.rules).uint32 = {gt: 0}];
   }
 

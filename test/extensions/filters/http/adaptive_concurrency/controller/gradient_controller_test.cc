@@ -351,7 +351,7 @@ TEST_F(GradientControllerConfigTest, EwmaRejectsIncompatibleConfiguration) {
     GradientControllerConfig config{proto, runtime_, creation_status};
     return creation_status;
   };
-  for (const std::string& field :
+  for (const std::string field :
        {"interval: 1s", "fixed_value: 0.01s", "request_count: 10", "jitter: {value: 10}"}) {
     SCOPED_TRACE(field);
     EXPECT_THAT(status(EwmaConfig + "  " + field + "\n"),
@@ -371,7 +371,7 @@ TEST_F(GradientControllerConfigTest, EwmaRejectsIncompatibleConfiguration) {
       status(yaml),
       HasStatusMessage("adaptive_concurrency: `ewma_baseline` requires explicit EWMA mode"));
 
-  for (const std::string& value : {"1", "513"}) {
+  for (const std::string value : {"1", "513"}) {
     yaml = EwmaConfig;
     const std::string initial = "initial_concurrency: 512";
     yaml.replace(yaml.find(initial), initial.size(), "initial_concurrency: " + value);
@@ -391,14 +391,14 @@ TEST_F(GradientControllerConfigTest, EwmaRejectsIncompatibleConfiguration) {
 }
 
 TEST_F(GradientControllerConfigTest, NewParametersHaveValidation) {
-  for (const std::string& value : {"0s", "-1s", "0.0001s"}) {
+  for (const std::string value : {"0s", "-1s", "0.0001s"}) {
     SCOPED_TRACE(value);
     auto yaml = EwmaConfig;
     yaml.replace(yaml.find("half_life: 10s"), std::string("half_life: 10s").size(),
                  "half_life: " + value);
     EXPECT_THROW(makeConfig(yaml, runtime_), ProtoValidationException);
   }
-  for (const std::string& field : {"warmup_windows: 0", "initial_concurrency: 0"}) {
+  for (const std::string field : {"warmup_windows: 0", "initial_concurrency: 0"}) {
     SCOPED_TRACE(field);
     const std::string yaml = "baseline_mode: EWMA\newma_baseline:\n  " + field + R"EOF(
 concurrency_limit_params:
@@ -446,7 +446,7 @@ min_rtt_calc_params:
 
 TEST_F(GradientControllerTest, MinLatencyDeltaUsesMaximumNotSum) {
   for (const bool sampled : {false, true}) {
-    for (const std::string& delta : {"0s", "0.001s", "0.005s", "0.010s", "9223372035.999999999s"}) {
+    for (const std::string delta : {"0s", "0.001s", "0.005s", "0.010s", "9223372035.999999999s"}) {
       SCOPED_TRACE(sampled);
       SCOPED_TRACE(delta);
       const std::string yaml =
@@ -585,7 +585,7 @@ TEST_F(GradientControllerTest, EwmaIdleWindowsAndCancelledRequestsDoNotAgeBaseli
                                    Event::Dispatcher::RunType::Block);
   };
   window(20);
-  // Idle time must not consume any of the remaining nine warmup windows.
+  // Idle time must not consume any of the remaining nine warm-up windows.
   for (uint32_t i = 0; i < 60; ++i) {
     tryForward(controller, true);
     controller->cancelLatencySample();
