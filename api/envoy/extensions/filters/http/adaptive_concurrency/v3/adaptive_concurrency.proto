@@ -25,6 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.adaptive_concurrency]
 
 // Configuration parameters for the gradient controller.
+// [#next-free-field: 6]
 message GradientControllerConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig";
