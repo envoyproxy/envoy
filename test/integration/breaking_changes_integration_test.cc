@@ -26,7 +26,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http1BreakingChangesTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(Http1BreakingChangesTest, TestEnabledBreakingChange) {
-  absl::SetFlag(&FLAGS_breaking_change_observability_enabled, true);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.set_enable_breaking_changes_observability(true);
+  });
   useAccessLog("%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%");
   config_helper_.prependFilter(R"EOF(
 name: breaking-change-filter
@@ -53,7 +55,9 @@ typed_config:
 }
 
 TEST_P(Http1BreakingChangesTest, TestDisabledBreakingChange) {
-  absl::SetFlag(&FLAGS_breaking_change_observability_enabled, true);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.set_enable_breaking_changes_observability(true);
+  });
   useAccessLog("%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%");
   config_helper_.prependFilter(R"EOF(
 name: breaking-change-filter
@@ -81,7 +85,6 @@ typed_config:
 
 TEST_P(Http1BreakingChangesTest,
        TestDisabledBreakingChangeEnabledManuallyAndObservabilityDisabled) {
-  absl::SetFlag(&FLAGS_breaking_change_observability_enabled, false);
   config_helper_.addRuntimeOverride("envoy.reloadable_features.test_disabled_breaking_change",
                                     "true");
   useAccessLog("%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%");
@@ -112,7 +115,6 @@ typed_config:
 }
 
 TEST_P(Http1BreakingChangesTest, ObservabilityDisabled) {
-  absl::SetFlag(&FLAGS_breaking_change_observability_enabled, false);
   useAccessLog("%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%");
   config_helper_.prependFilter(R"EOF(
 name: breaking-change-filter
@@ -135,7 +137,6 @@ typed_config:
 }
 
 TEST_P(Http1BreakingChangesTest, ObservabilityEnabledInBootstrap) {
-  absl::SetFlag(&FLAGS_breaking_change_observability_enabled, false);
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.set_enable_breaking_changes_observability(true);
   });

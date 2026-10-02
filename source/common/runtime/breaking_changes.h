@@ -15,8 +15,8 @@
 ABSL_DECLARE_FLAG(bool, breaking_change_observability_enabled);
 
 #define OBSERVED_BREAKING_CHANGE(name, filter_state)                                               \
-  if (BreakingChangesTracker::IsEnabled()) {                                                       \
-    BreakingChangesTracker::fromFilterState(filter_state).name = 1;                                \
+  if (::Envoy::Runtime::BreakingChangesTracker::IsEnabled()) {                                     \
+    ::Envoy::Runtime::BreakingChangesTracker::fromFilterState(filter_state).name = 1;              \
   }
 
 #define FEATURE_TRACKER(name) uint64_t name : 1 {0};

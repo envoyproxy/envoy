@@ -407,9 +407,8 @@ absl::Status InstanceUtil::loadBootstrapConfig(
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
-  if (bootstrap.enable_breaking_changes_observability()) {
-    absl::SetFlag(&FLAGS_breaking_change_observability_enabled, true);
-  }
+  absl::SetFlag(&FLAGS_breaking_change_observability_enabled,
+                bootstrap.enable_breaking_changes_observability());
   return absl::OkStatus();
 }
 
