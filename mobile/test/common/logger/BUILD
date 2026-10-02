@@ -7,7 +7,6 @@ envoy_mobile_package()
 envoy_cc_test(
     name = "logger_delegate_test",
     srcs = ["logger_delegate_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common/api:external_api_lib",
         "//library/common/bridge:utility_lib",

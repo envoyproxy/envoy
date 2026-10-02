@@ -40,7 +40,6 @@ def envoy_cc_binary(
         tags = [],
         features = [],
         linkstatic = True):
-    deprecate_repository("envoy_cc_binary", repository)
     exec_properties = exec_properties | select({
         _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
@@ -53,7 +52,7 @@ def envoy_cc_binary(
         linkopts = linkopts + _envoy_stamped_linkopts()
         deps = deps + _envoy_stamped_deps()
     linkopts += envoy_dbg_linkopts()
-    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + envoy_stdlib_deps()
+    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + envoy_stdlib_deps() + deprecate_repository("envoy_cc_binary", repository)
     cc_binary(
         name = name,
         srcs = srcs,

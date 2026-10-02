@@ -48,6 +48,19 @@ public:
 
 REGISTER_FACTORY(TestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
+// A second typed object factory under a distinct name, so a test can store two filter-state values
+// and verify that consecutive getter calls do not invalidate each other.
+class SecondTestTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.typed_object_second"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(SecondTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 // A filter state object that does not support serialization. Used to test the
 // get_filter_state_typed fallback when serializeAsString() returns nullopt.
 class NonSerializableObject : public StreamInfo::FilterState::Object {};
@@ -1015,6 +1028,55 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetFilterStateTyped) {
   EXPECT_EQ(value, std::string(result.ptr, result.length));
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ConsecutiveFilterStateGettersStayValid) {
+  const std::string key1 = "envoy.test.typed_object";
+  const std::string value1 = "first_value";
+  const std::string key2 = "envoy.test.typed_object_second";
+  const std::string value2 = "second_value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_set_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key1.data()), key1.size()},
+      {const_cast<char*>(value1.data()), value1.size()}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_set_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key2.data()), key2.size()},
+      {const_cast<char*>(value2.data()), value2.size()}));
+
+  // The first view must stay valid after the second getter call.
+  envoy_dynamic_module_type_envoy_buffer result1;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key1.data()), key1.size()}, &result1));
+  envoy_dynamic_module_type_envoy_buffer result2;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key2.data()), key2.size()}, &result2));
+
+  EXPECT_EQ(value1, std::string(result1.ptr, result1.length));
+  EXPECT_EQ(value2, std::string(result2.ptr, result2.length));
+}
+
+// A nested hook keeps the outer scratch, and only the outermost hook clears it.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, FilterStateScratchClearedAtOutermostHook) {
+  const std::string key = "envoy.test.typed_object";
+  const std::string value = "value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_set_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(value.data()), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  {
+    DynamicModuleNetworkFilter::HookScope outer(*filter_);
+    EXPECT_TRUE(envoy_dynamic_module_callback_network_get_filter_state_typed(
+        filterPtr(), {const_cast<char*>(key.data()), key.size()}, &result));
+    {
+      DynamicModuleNetworkFilter::HookScope inner(*filter_);
+      EXPECT_TRUE(envoy_dynamic_module_callback_network_get_filter_state_typed(
+          filterPtr(), {const_cast<char*>(key.data()), key.size()}, &result));
+    }
+    // A nested hook does not clear the scratch.
+    EXPECT_EQ(filter_->filterStateScratchSizeForTest(), 2);
+  }
+  // The outermost hook clears the scratch.
+  EXPECT_EQ(filter_->filterStateScratchSizeForTest(), 0);
+}
+
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetFilterStateTypedNoFactory) {
   const std::string key = "nonexistent.factory.key";
   const std::string value = "some_value";
@@ -1642,6 +1704,71 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetSocketOptionBytes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_bytes(
       filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound, &result));
   EXPECT_EQ(value, std::string(result.ptr, result.length));
+}
+
+// A module that sets the same option twice reads back the latest value, not the first one stored.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SocketOptionLatestValueWins) {
+  const int64_t level = 7;
+  const int64_t name = 8;
+  const std::string first = "first";
+  const std::string second = "second";
+  envoy_dynamic_module_callback_network_set_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      {first.data(), first.size()});
+  envoy_dynamic_module_callback_network_set_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      {second.data(), second.size()});
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound, &result));
+  EXPECT_EQ(second, std::string(result.ptr, result.length));
+}
+
+// A module that sets the same int option twice reads back the latest value, not the first stored.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SocketOptionIntLatestValueWins) {
+  const int64_t level = 11;
+  const int64_t name = 12;
+  envoy_dynamic_module_callback_network_set_socket_option_int(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, 100);
+  envoy_dynamic_module_callback_network_set_socket_option_int(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, 200);
+
+  int64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_int(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, &result));
+  EXPECT_EQ(200, result);
+}
+
+// A bytes option view keeps a stable address as more options are appended, so a module holding the
+// view never reads freed memory where the old vector backed store would have reallocated.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SocketOptionBytesViewSurvivesAppends) {
+  const int64_t level = 9;
+  const int64_t name = 10;
+  const std::string value = "stable-bytes";
+  envoy_dynamic_module_callback_network_set_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      {value.data(), value.size()});
+
+  envoy_dynamic_module_type_envoy_buffer first_view;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound, &first_view));
+  const char* first_ptr = first_view.ptr;
+
+  // Append enough options to force a reallocation of the old vector backed store.
+  for (int64_t i = 0; i < 256; ++i) {
+    const std::string filler = "filler";
+    envoy_dynamic_module_callback_network_set_socket_option_bytes(
+        filterPtr(), 1000 + i, 1000 + i, envoy_dynamic_module_type_socket_option_state_Bound,
+        {filler.data(), filler.size()});
+  }
+
+  envoy_dynamic_module_type_envoy_buffer second_view;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_bytes(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound, &second_view));
+  // The stored element never moved, so the address is unchanged and the bytes are intact.
+  EXPECT_EQ(first_ptr, second_view.ptr);
+  EXPECT_EQ(value, std::string(second_view.ptr, second_view.length));
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSocketOptionIntMissing) {

@@ -6,6 +6,7 @@ use crate::{
   NewNetworkFilterConfigFunction, NEW_NETWORK_FILTER_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::num::NonZero;
 
 /// The trait that represents the Envoy network filter configuration.
 /// This is used in [`NewNetworkFilterConfigFunction`] to pass the Envoy filter configuration
@@ -502,8 +503,8 @@ pub trait EnvoyNetworkFilter {
   /// Check if an upstream host has been selected for this connection.
   fn has_upstream_host(&self) -> bool;
 
-  /// Get the upstream connection ID, or 0 if not available.
-  fn get_upstream_connection_id(&self) -> u64;
+  /// Get the upstream connection ID, or `None` if not available.
+  fn get_upstream_connection_id(&self) -> Option<NonZero<u64>>;
 
   /// Signal the downstream connection to enable secure transport mode.
   /// This is done when the downstream connection's transport socket is of startTLS type.
@@ -1766,10 +1767,10 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     unsafe { abi::envoy_dynamic_module_callback_network_filter_has_upstream_host(self.raw) }
   }
 
-  fn get_upstream_connection_id(&self) -> u64 {
-    unsafe {
+  fn get_upstream_connection_id(&self) -> Option<NonZero<u64>> {
+    NonZero::new(unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(self.raw)
-    }
+    })
   }
 
   fn start_downstream_secure_transport(&mut self) -> bool {

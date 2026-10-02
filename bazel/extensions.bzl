@@ -1,9 +1,11 @@
+# TODO(phlax): Move this to toolsheds toolchain alias
 """Module extensions for Envoy's non-module dependencies.
 
 This file defines module extensions to support Envoy's bzlmod migration while
 respecting existing WORKSPACE patches and custom BUILD files.
 """
 
+load("@envoy_toolshed//compile:llvm_minimal.bzl", "render_llvm_repo_build")
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("//bazel/external/cargo/remote:crates.bzl", "crate_repositories")
 load(":envoy_build_config.bzl", "default_envoy_build_config")
@@ -12,6 +14,190 @@ load(":repo.bzl", "envoy_repo")
 _LOCKFILE_LABEL = Label("//:MODULE.bazel.lock")
 _MODULES_SEGMENT = "/modules/"
 _SOURCE_JSON_SUFFIX = "/source.json"
+_LLVM_VERSION = "22.1.8"
+
+_LLVM_LIBRARY_TARGETS = """
+
+filegroup(
+    name = "libclang_cpp",
+    srcs = glob(["lib/**/libclang-cpp.so*", "lib64/**/libclang-cpp.so*"], allow_empty = True),
+)
+
+filegroup(
+    name = "libllvm",
+    srcs = glob(["lib/**/libLLVM.so*", "lib64/**/libLLVM.so*"], allow_empty = True),
+)
+
+cc_library(
+    name = "clang_tooling_headers",
+    hdrs = glob(["include/clang/**", "include/clang-c/**", "include/llvm/**", "include/llvm-c/**"], allow_empty = True),
+    includes = ["include"],
+)
+"""
+
+def _llvm_repo_build(llvm_version):
+    build = render_llvm_repo_build(llvm_version.split(".")[0])
+    libclang_glob = 'glob(["lib/libclang.so*", "lib/libclang*.dylib"], allow_empty = True)'
+    if libclang_glob not in build:
+        fail("The envoy_toolshed LLVM repository BUILD template changed")
+    return (
+        build.replace(
+            libclang_glob,
+            'glob(["lib/**/libclang.so*", "lib/**/libclang*.dylib", "lib64/**/libclang.so*", "lib64/**/libclang*.dylib"], allow_empty = True)',
+        ) + _LLVM_LIBRARY_TARGETS + '\nexports_files(["llvm.bzl"])\n'
+    )
+
+def _write_llvm_bzl(repository_ctx, llvm_version, llvm_lib_dir, is_host):
+    major = llvm_version.split(".")[0]
+    major_minor = ".".join(llvm_version.split(".")[:2])
+    repository_ctx.file("llvm.bzl", """
+LLVM_VERSION = %r
+LLVM_MAJOR = %r
+LLVM_MAJOR_MINOR = %r
+LLVM_LIB_DIR = %r
+LLVM_IS_HOST = %s
+""" % (llvm_version, major, major_minor, llvm_lib_dir, is_host))
+
+def _detect_llvm_version(repository_ctx, llvm_root, declared_version):
+    clang = llvm_root.get_child("bin/clang")
+    result = repository_ctx.execute([str(clang), "--version"])
+    if result.return_code != 0:
+        fail("Could not run %s --version (exit code %s): %s" % (clang, result.return_code, result.stderr))
+
+    version = ""
+    marker = "clang version "
+    for line in result.stdout.split("\n"):
+        if marker in line:
+            version_parts = line[line.find(marker) + len(marker):].strip().split(" ")
+            if version_parts:
+                version = version_parts[0].split("-")[0]
+                components = version.split(".")
+                if len(components) != 3:
+                    version = ""
+                else:
+                    for component in components:
+                        if not component.isdigit():
+                            version = ""
+                            break
+            break
+    if not version:
+        fail("Could not parse a full clang version from %s --version output: %s" % (clang, result.stdout))
+    if declared_version and declared_version.split(".")[0] != version.split(".")[0]:
+        fail(
+            "envoy_llvm.host(llvm_version = %r) does not match the installed clang version %s" %
+            (declared_version, version),
+        )
+    return version
+
+def _detect_llvm_lib_dir(llvm_root, major):
+    library_name = "libclang-cpp.so.%s" % major
+    for candidate in ["lib", "lib64", "lib/x86_64-linux-gnu", "lib/aarch64-linux-gnu"]:
+        directory = llvm_root.get_child(candidate)
+        if not directory.exists:
+            continue
+        for library in directory.readdir():
+            if library.basename == library_name or library.basename.startswith(library_name + "."):
+                return candidate
+    fail("Could not find %s under %s in lib, lib64, lib/x86_64-linux-gnu, or lib/aarch64-linux-gnu" % (library_name, llvm_root))
+
+def _host_llvm_repo_impl(repository_ctx):
+    llvm_root = repository_ctx.path(repository_ctx.attr.path)
+    version = _detect_llvm_version(repository_ctx, llvm_root, repository_ctx.attr.llvm_version)
+    lib_dir = _detect_llvm_lib_dir(llvm_root, version.split(".")[0])
+    for directory in ["bin", "include", "lib", "lib64"]:
+        path = llvm_root.get_child(directory)
+        if not path.exists and directory in ["bin", "include"]:
+            fail("Host LLVM directory does not exist: %s" % path)
+        if path.exists:
+            _symlink_directory_contents(repository_ctx, path, directory)
+    repository_ctx.file(
+        "BUILD.bazel",
+        _llvm_repo_build(version),
+    )
+    _write_llvm_bzl(repository_ctx, version, lib_dir, True)
+
+_host_llvm_repo = repository_rule(
+    implementation = _host_llvm_repo_impl,
+    local = True,
+    attrs = {
+        "llvm_version": attr.string(default = ""),
+        "path": attr.string(mandatory = True),
+    },
+)
+
+def _symlink_directory_contents(repository_ctx, source, destination):
+    for child in source.readdir():
+        repository_ctx.symlink(child, destination + "/" + child.basename)
+
+def _llvm_alias_repo_impl(repository_ctx):
+    os_name = repository_ctx.os.name.lower()
+    arch = repository_ctx.os.arch.lower()
+    if os_name.startswith("linux") and (arch.startswith("x86_64") or arch.startswith("amd64")):
+        llvm_root = repository_ctx.path(repository_ctx.attr.minimal_linux_x64).dirname
+    elif os_name.startswith("linux") and (arch.startswith("aarch64") or arch.startswith("arm64")):
+        llvm_root = repository_ctx.path(repository_ctx.attr.minimal_linux_arm64).dirname
+    elif (os_name.startswith("mac os x") or os_name.startswith("darwin")) and (
+        arch.startswith("aarch64") or arch.startswith("arm64")
+    ):
+        llvm_root = repository_ctx.path(repository_ctx.attr.minimal_macos_arm64).dirname
+    else:
+        fail(
+            "Unsupported host platform for llvm_toolchain_llvm: %s %s" %
+            (repository_ctx.os.name, repository_ctx.os.arch),
+        )
+
+    for directory in ["bin", "include", "lib"]:
+        _symlink_directory_contents(repository_ctx, llvm_root.get_child(directory), directory)
+    repository_ctx.file(
+        "BUILD.bazel",
+        _llvm_repo_build(_LLVM_VERSION),
+    )
+    _write_llvm_bzl(repository_ctx, _LLVM_VERSION, "lib", False)
+
+_llvm_alias_repo = repository_rule(
+    implementation = _llvm_alias_repo_impl,
+    attrs = {
+        "minimal_linux_arm64": attr.label(mandatory = True),
+        "minimal_linux_x64": attr.label(mandatory = True),
+        "minimal_macos_arm64": attr.label(mandatory = True),
+    },
+)
+
+def _envoy_llvm_impl(module_ctx):
+    host = None
+    for module in module_ctx.modules:
+        for tag in module.tags.host:
+            if not module.is_root:
+                fail("envoy_llvm_extension.host may only be specified by the root module")
+            if host != None:
+                fail("envoy_llvm_extension.host may only be specified once")
+            host = tag
+
+    if host:
+        _host_llvm_repo(
+            name = "llvm_toolchain_llvm",
+            llvm_version = host.llvm_version,
+            path = host.path,
+        )
+    else:
+        _llvm_alias_repo(
+            name = "llvm_toolchain_llvm",
+            minimal_linux_x64 = Label("@llvm_minimal_linux_x64//:BUILD.bazel"),
+            minimal_linux_arm64 = Label("@llvm_minimal_linux_arm64//:BUILD.bazel"),
+            minimal_macos_arm64 = Label("@llvm_minimal_macos_arm64//:BUILD.bazel"),
+        )
+
+_host_llvm = tag_class(
+    attrs = {
+        "llvm_version": attr.string(default = ""),
+        "path": attr.string(mandatory = True),
+    },
+)
+
+envoy_llvm_extension = module_extension(
+    implementation = _envoy_llvm_impl,
+    tag_classes = {"host": _host_llvm},
+)
 
 def _module_dep_from_lock_entry(url):
     if not url.endswith(_SOURCE_JSON_SUFFIX):

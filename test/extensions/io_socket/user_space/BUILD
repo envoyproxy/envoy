@@ -45,8 +45,8 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "connection_compatbility_test",
-    srcs = ["connection_compatbility_test.cc"],
+    name = "connection_compatibility_test",
+    srcs = ["connection_compatibility_test.cc"],
     extension_names = ["envoy.io_socket.user_space"],
     rbe_pool = "linux_x64_small",
     deps = [

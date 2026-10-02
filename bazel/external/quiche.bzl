@@ -33,7 +33,6 @@ def envoy_quiche_platform_impl_cc_library(
         srcs = srcs,
         hdrs = hdrs,
         deps = deps,
-        repository = "@envoy",
         strip_include_prefix = "quiche/common/platform/default/",
         visibility = ["//visibility:public"],
     )
@@ -48,7 +47,6 @@ def envoy_quiche_platform_impl_cc_test_library(
         srcs = srcs,
         hdrs = hdrs,
         deps = deps,
-        repository = "@envoy",
         strip_include_prefix = "quiche/common/platform/default/",
     )
 
@@ -63,15 +61,14 @@ def envoy_quic_cc_library(
         tags = []):
     envoy_cc_library(
         name = name,
-        srcs = envoy_select_enable_http3(srcs, "@envoy"),
-        hdrs = envoy_select_enable_http3(hdrs, "@envoy"),
-        repository = "@envoy",
+        srcs = envoy_select_enable_http3(srcs),
+        hdrs = envoy_select_enable_http3(hdrs),
         copts = quiche_copts,
         tags = tags,
         visibility = ["//visibility:public"],
         defines = defines,
         external_deps = external_deps,
-        deps = envoy_select_enable_http3(deps, "@envoy"),
+        deps = envoy_select_enable_http3(deps),
     )
 
 def envoy_quic_cc_test_library(
@@ -83,11 +80,10 @@ def envoy_quic_cc_test_library(
         deps = []):
     envoy_cc_test_library(
         name = name,
-        srcs = envoy_select_enable_http3(srcs, "@envoy"),
-        hdrs = envoy_select_enable_http3(hdrs, "@envoy"),
+        srcs = envoy_select_enable_http3(srcs),
+        hdrs = envoy_select_enable_http3(hdrs),
         copts = quiche_copts,
-        repository = "@envoy",
         tags = tags,
         external_deps = external_deps,
-        deps = envoy_select_enable_http3(deps, "@envoy"),
+        deps = envoy_select_enable_http3(deps),
     )

@@ -35,12 +35,11 @@ def envoy_pch_library(
         external_deps = [],
         testonly = False,
         repository = ""):
-    deprecate_repository("envoy_pch_library", repository)
     cc_library(
         name = name + "_libs",
         visibility = ["//visibility:private"],
         copts = envoy_copts(),
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + deprecate_repository("envoy_pch_library", repository),
         alwayslink = 1,
         testonly = testonly,
         linkstatic = envoy_linkstatic(),

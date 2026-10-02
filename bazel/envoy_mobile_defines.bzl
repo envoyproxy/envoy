@@ -15,7 +15,6 @@ load(
 
 # Compute the defines needed for Envoy Mobile libraries that don't use Envoy's main library wrappers.
 def envoy_mobile_defines(repository = ""):
-    deprecate_repository("envoy_mobile_defines", repository)
     return envoy_select_admin_functionality(["ENVOY_ADMIN_FUNCTIONALITY"]) + \
            envoy_select_enable_http3(["ENVOY_ENABLE_QUIC"]) + \
            envoy_select_enable_full_protos(["ENVOY_ENABLE_FULL_PROTOS"]) + \
@@ -24,4 +23,5 @@ def envoy_mobile_defines(repository = ""):
            envoy_select_enable_http_datagrams(["ENVOY_ENABLE_HTTP_DATAGRAMS"]) + \
            envoy_select_envoy_mobile_listener(["ENVOY_MOBILE_ENABLE_LISTENER"]) + \
            envoy_select_envoy_mobile_xds(["ENVOY_MOBILE_XDS"]) + \
-           envoy_select_google_grpc(["ENVOY_GOOGLE_GRPC"])
+           envoy_select_google_grpc(["ENVOY_GOOGLE_GRPC"]) + \
+           deprecate_repository("envoy_mobile_defines", repository)

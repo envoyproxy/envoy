@@ -29,7 +29,6 @@ envoy_cc_library(
         "postgres_message.h",
         "postgres_session.h",
     ],
-    repository = "@envoy",
     deps = [
         "//contrib/common/sqlutils/source:sqlutils_lib",
         "//contrib/postgres/protocol:postgres_protocol_lib",
@@ -48,7 +47,6 @@ envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":filter",
         "//source/extensions/filters/network:well_known_names",

@@ -621,7 +621,7 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
 
   NiceMock<ThreadLocal::MockInstance> tls;
   SDSSecretReader secret_reader(std::move(client_secret_provider), std::move(token_secret_provider),
-                                tls, *api);
+                                tls, *api, dispatcher);
   EXPECT_TRUE(secret_reader.clientSecret().empty());
   EXPECT_TRUE(secret_reader.hmacSecret().empty());
 
@@ -2328,7 +2328,8 @@ TEST_F(OAuth2Test, SdsSecretReaderMultiEntrySecretProvidesKeyAndKeyId) {
   SDSSecretReader reader(std::make_shared<Secret::GenericSecretConfigProviderImpl>(client_secret),
                          std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
                          factory_context_.server_factory_context_.threadLocal(),
-                         factory_context_.server_factory_context_.api());
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
 
   // The PEM is reachable only as the signing key — never as an OAuth client secret, which the
   // non-JWT auth types would send to the token endpoint.
@@ -2348,7 +2349,8 @@ TEST_F(OAuth2Test, SdsSecretReaderSingleValueSecretHasNoKeyId) {
   SDSSecretReader reader(std::make_shared<Secret::GenericSecretConfigProviderImpl>(client_secret),
                          std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
                          factory_context_.server_factory_context_.threadLocal(),
-                         factory_context_.server_factory_context_.api());
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
 
   EXPECT_EQ("pem-data", reader.clientSecret());
   EXPECT_EQ("pem-data", reader.privateKey());
@@ -2362,7 +2364,8 @@ TEST_F(OAuth2Test, SdsSecretReaderMissingClientSecretProviderYieldsEmptyValues) 
   SDSSecretReader reader(nullptr,
                          std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
                          factory_context_.server_factory_context_.threadLocal(),
-                         factory_context_.server_factory_context_.api());
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
 
   EXPECT_EQ("", reader.clientSecret());
   EXPECT_EQ("", reader.privateKey());

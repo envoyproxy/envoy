@@ -462,17 +462,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
   parent_.updateActiveStreamsOnEncode(*this);
-  ASSERT(parent_.allow_metadata_);
-  NewMetadataEncoder& metadata_encoder = getMetadataEncoder();
-  auto sources_vec = metadata_encoder.createSources(metadata_map_vector);
-  for (auto& source : sources_vec) {
-    parent_.adapter_->SubmitMetadata(stream_id_, 16 * 1024, std::move(source));
-  }
-
-  if (parent_.sendPendingFramesAndHandleError()) {
-    // Intended to check through coverage that this error case is tested
-    return;
-  }
+  parent_.encodeMetadata(metadata_map_vector, stream_id_);
 }
 
 void ConnectionImpl::StreamImpl::processBufferedData() {
@@ -940,13 +930,6 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
                                               reasonToReset(reason, response_end_stream_sent)));
 }
 
-NewMetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
-  if (metadata_encoder_ == nullptr) {
-    metadata_encoder_ = std::make_unique<NewMetadataEncoder>();
-  }
-  return *metadata_encoder_;
-}
-
 MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
   if (metadata_decoder_ == nullptr) {
     auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
@@ -995,6 +978,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                               : 0),
       http2_include_cookies_in_limits_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_include_cookies_in_limits")),
+      reject_frames_after_end_stream_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_reject_frames_after_end_stream")),
       protocol_constraints_(stats, http2_options,
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.http2_flood_protection_active_streams")),
@@ -1051,6 +1036,24 @@ void ConnectionImpl::sendKeepalive() {
     return;
   }
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
+}
+
+void ConnectionImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector,
+                                    int32_t stream_id) {
+  if (!allow_metadata_) {
+    ENVOY_BUG(false, "metadata not allowed on this connection");
+    return;
+  }
+  NewMetadataEncoder& metadata_encoder = getMetadataEncoder();
+  auto sources_vec = metadata_encoder.createSources(metadata_map_vector);
+  for (auto& source : sources_vec) {
+    adapter_->SubmitMetadata(stream_id, 16 * 1024, std::move(source));
+  }
+
+  if (sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
 }
 
 void ConnectionImpl::onKeepaliveResponse() {
@@ -1261,6 +1264,10 @@ Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t fla
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
 
+  if (reject_frames_after_end_stream_ && stream->remote_end_stream_) {
+    return codecProtocolError("Received DATA frame on a half-closed (remote) stream");
+  }
+
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   stream->decodeData();
   return okStatus();
@@ -1286,6 +1293,17 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
   stream->bytes_meter_->addHeaderBytesReceived(length + H2_FRAME_HEADER_SIZE);
+
+  // RFC 9113 Section 5.1: a peer that receives any frame other than PRIORITY, WINDOW_UPDATE or
+  // RST_STREAM for a stream in the "half-closed (remote)" state must treat it as an error. This is
+  // enforced here rather than in the codec adapter because the decoder that the frame would
+  // otherwise be dispatched to may already have been destroyed: for a client connection the
+  // CodecClient deletes the ActiveRequest (which owns the ResponseDecoder) as soon as the response
+  // completes, while oghttp2 keeps the stream alive until it is also half-closed locally. nghttp2
+  // already rejects these frames, so this only changes behavior for oghttp2.
+  if (reject_frames_after_end_stream_ && stream->remote_end_stream_) {
+    return codecProtocolError("Received HEADERS frame on a half-closed (remote) stream");
+  }
 
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   recordHistogramsForStream(*stream);
@@ -1624,6 +1642,11 @@ Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
 int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len) {
   ENVOY_CONN_LOG(trace, "recv {} bytes METADATA", connection_, len);
 
+  if (!stream_id) {
+    bool success = getMetadataDecoder().receiveMetadata(data, len);
+    return success ? 0 : ERR_CALLBACK_FAILURE;
+  }
+
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
     if (!stream) {
@@ -1640,6 +1663,11 @@ int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, s
 int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata) {
   ENVOY_CONN_LOG(trace, "recv METADATA frame on stream {}, end_metadata: {}", connection_,
                  stream_id, end_metadata);
+
+  if (!stream_id) {
+    bool success = getMetadataDecoder().onMetadataFrameComplete(end_metadata);
+    return success ? 0 : ERR_CALLBACK_FAILURE;
+  }
 
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
@@ -2391,10 +2419,12 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (!use_oghttp2_library_) {
 #ifdef ENVOY_NGHTTP2
     adapter_ = http2_session_factory.create(base(), client_http2_options.options());
+    stats_.nghttp2_upstream_connections_.inc();
 #endif
   }
   if (!adapter_) {
     adapter_ = http2_session_factory.create(base(), client_http2_options.ogOptions());
+    stats_.oghttp2_upstream_connections_.inc();
   }
   http2_session_factory.init(base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
@@ -2445,6 +2475,31 @@ StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
   return StreamResetReason::ProtocolError;
 }
 
+void ConnectionImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
+  if (metadata_map_ptr->empty()) {
+    ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", connection_);
+    return stats_.metadata_empty_frames_.inc();
+  }
+  callbacks().onMetadata(std::move(metadata_map_ptr));
+}
+
+NewMetadataEncoder& ConnectionImpl::getMetadataEncoder() {
+  if (metadata_encoder_ == nullptr) {
+    metadata_encoder_ = std::make_unique<NewMetadataEncoder>();
+  }
+  return *metadata_encoder_;
+}
+
+MetadataDecoder& ConnectionImpl::getMetadataDecoder() {
+  if (metadata_decoder_ == nullptr) {
+    auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
+      this->onMetadataDecoded(std::move(metadata_map_ptr));
+    };
+    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb, max_metadata_size_);
+  }
+  return *metadata_decoder_;
+}
+
 ServerConnectionImpl::ServerConnectionImpl(
     Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks, CodecStats& stats,
     Random::RandomGenerator& random_generator,
@@ -2478,6 +2533,7 @@ ServerConnectionImpl::ServerConnectionImpl(
 #endif
     visitor_ = std::move(direct_visitor);
     adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
+    stats_.oghttp2_downstream_connections_.inc();
 #ifdef ENVOY_NGHTTP2
   } else {
     auto adapter =
@@ -2488,6 +2544,7 @@ ServerConnectionImpl::ServerConnectionImpl(
     direct_visitor->setStreamCloseListener(std::move(stream_close_listener));
     visitor_ = std::move(direct_visitor);
     adapter_ = std::move(adapter);
+    stats_.nghttp2_downstream_connections_.inc();
   }
 #endif
   sendSettings(http2_options, false);
