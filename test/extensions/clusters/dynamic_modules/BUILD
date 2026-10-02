@@ -1,14 +1,17 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     data = [
@@ -20,6 +23,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:cluster_run_on_all_workers",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
+    extension_names = ["envoy.clusters.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:metadata_lib",
@@ -54,7 +58,7 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -63,6 +67,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:cluster_filter_state_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
     ],
+    extension_names = ["envoy.clusters.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:cleanup_lib",

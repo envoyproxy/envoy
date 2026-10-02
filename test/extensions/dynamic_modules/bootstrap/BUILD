@@ -1,14 +1,17 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "extension_config_test",
     srcs = ["extension_config_test.cc"],
     data = [
@@ -33,6 +36,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_timer_fired",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_worker_initialized",
     ],
+    extension_names = ["envoy.bootstrap.dynamic_modules"],
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
@@ -46,12 +50,13 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
     ],
+    extension_names = ["envoy.bootstrap.dynamic_modules"],
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
@@ -77,13 +82,14 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "extension_test",
     srcs = ["extension_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_extension_new_null",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
     ],
+    extension_names = ["envoy.bootstrap.dynamic_modules"],
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
@@ -97,7 +103,7 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
@@ -105,6 +111,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_config_new",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
     ],
+    extension_names = ["envoy.bootstrap.dynamic_modules"],
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
@@ -116,7 +123,7 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -135,6 +142,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_timer_test",
     ],
+    extension_names = ["envoy.bootstrap.dynamic_modules"],
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
