@@ -1,7 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -9,9 +12,10 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 # For legacy reasons, the various network input tests are in one place.
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "inputs_test",
     srcs = ["inputs_test.cc"],
+    extension_names = ["envoy.matching.inputs.destination_ip"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http/matching:data_impl_lib",
@@ -24,10 +28,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "inputs_integration_test",
     size = "large",
     srcs = ["inputs_integration_test.cc"],
+    extension_names = ["envoy.matching.inputs.destination_ip"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:address_lib",
