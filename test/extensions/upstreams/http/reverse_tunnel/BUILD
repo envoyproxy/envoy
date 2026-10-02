@@ -1,16 +1,20 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_names = ["envoy.upstreams.http.reverse_tunnel"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
