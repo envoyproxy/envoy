@@ -182,8 +182,8 @@ ConnectionManagerListenerStats
 ConnectionManagerImpl::generateListenerStats(absl::string_view stat_prefix, Stats::Scope& scope) {
   // These live in the listener's scope, so the 'http.<stat_prefix>.' prefix is part of the stat
   // name rather than of the scope and has to be supplied to every stat.
-  Stats::ScopeHelper helper(scope, HttpBaseStatPrefix, {httpStatPrefixTag(stat_prefix)},
-                            httpFlatStatPrefix(stat_prefix));
+  Stats::LiteScopeHelper helper(scope, HttpBaseStatPrefix, {httpStatPrefixTag(stat_prefix)},
+                                httpFlatStatPrefix(stat_prefix));
   return {CONN_MAN_LISTENER_STATS(
       POOL_COUNTER(helper), POOL_COUNTER_RESPONSE_CODE_CLASS(scope, helper.basePrefix(),
                                                              helper.tags(), helper.prefix()))};

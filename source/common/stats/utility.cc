@@ -86,7 +86,7 @@ TaggedStatName::TaggedStatName(SymbolTable& symbol_table, StatName base_name, St
   }
 }
 
-ScopeHelper::FullNameJoiner::FullNameJoiner(const ScopeHelper& helper, StatName name) {
+LiteScopeHelper::FullNameJoiner::FullNameJoiner(const LiteScopeHelper& helper, StatName name) {
   const SymbolTable& symbol_table = helper.scope_.constSymbolTable();
   base_name_.join({helper.basePrefix(), name}, symbol_table);
   // Without tags the tagged name is left empty and the tags unset, which is the same as creating
@@ -97,46 +97,46 @@ ScopeHelper::FullNameJoiner::FullNameJoiner(const ScopeHelper& helper, StatName 
   }
 }
 
-Counter& ScopeHelper::counterFromStatName(StatName name) {
+Counter& LiteScopeHelper::counterFromStatName(StatName name) {
   const FullNameJoiner full_name(*this, name);
   return scope_.counterFromTaggedName(full_name.baseName(), full_name.tags(),
                                       full_name.taggedName());
 }
 
-Gauge& ScopeHelper::gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) {
+Gauge& LiteScopeHelper::gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) {
   const FullNameJoiner full_name(*this, name);
   return scope_.gaugeFromTaggedName(full_name.baseName(), full_name.tags(), full_name.taggedName(),
                                     import_mode);
 }
 
-Histogram& ScopeHelper::histogramFromStatName(StatName name, Histogram::Unit unit) {
+Histogram& LiteScopeHelper::histogramFromStatName(StatName name, Histogram::Unit unit) {
   const FullNameJoiner full_name(*this, name);
   return scope_.histogramFromTaggedName(full_name.baseName(), full_name.tags(),
                                         full_name.taggedName(), unit);
 }
 
-TextReadout& ScopeHelper::textReadoutFromStatName(StatName name) {
+TextReadout& LiteScopeHelper::textReadoutFromStatName(StatName name) {
   const FullNameJoiner full_name(*this, name);
   return scope_.textReadoutFromTaggedName(full_name.baseName(), full_name.tags(),
                                           full_name.taggedName());
 }
 
-Counter& ScopeHelper::counterFromString(absl::string_view name) {
+Counter& LiteScopeHelper::counterFromString(absl::string_view name) {
   StatNameManagedStorage name_storage(name, scope_.symbolTable());
   return counterFromStatName(name_storage.statName());
 }
 
-Gauge& ScopeHelper::gaugeFromString(absl::string_view name, Gauge::ImportMode import_mode) {
+Gauge& LiteScopeHelper::gaugeFromString(absl::string_view name, Gauge::ImportMode import_mode) {
   StatNameManagedStorage name_storage(name, scope_.symbolTable());
   return gaugeFromStatName(name_storage.statName(), import_mode);
 }
 
-Histogram& ScopeHelper::histogramFromString(absl::string_view name, Histogram::Unit unit) {
+Histogram& LiteScopeHelper::histogramFromString(absl::string_view name, Histogram::Unit unit) {
   StatNameManagedStorage name_storage(name, scope_.symbolTable());
   return histogramFromStatName(name_storage.statName(), unit);
 }
 
-TextReadout& ScopeHelper::textReadoutFromString(absl::string_view name) {
+TextReadout& LiteScopeHelper::textReadoutFromString(absl::string_view name) {
   StatNameManagedStorage name_storage(name, scope_.symbolTable());
   return textReadoutFromStatName(name_storage.statName());
 }

@@ -204,8 +204,8 @@ DbFileStats generateDbFileStats(Stats::Scope& scope, GeoDbType db_type,
                                 const std::string& db_path) {
   const std::string db_name = Stats::Utility::sanitizeStatsName(db_path);
   const absl::string_view base_prefix = dbTypeName(db_type);
-  Stats::ScopeHelper helper(scope, base_prefix, {{DB_NAME_TAG, db_name}},
-                            absl::StrCat(base_prefix, ".", db_name));
+  Stats::LiteScopeHelper helper(scope, base_prefix, {{DB_NAME_TAG, db_name}},
+                                absl::StrCat(base_prefix, ".", db_name));
   return {ALL_MAXMIND_DB_FILE_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
 }
 

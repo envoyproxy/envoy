@@ -63,7 +63,7 @@ using ElementVec = absl::InlinedVector<Element, 8>;
 /**
  * Bundles a pre-encoded tag-extracted name, tagged name and tags, e.g. to create a tagged
  * sub-scope with Scope::scopeFromTaggedName(). To create many tagged stats directly on a shared
- * scope, see ScopeHelper below.
+ * scope, see LiteScopeHelper below.
  *
  * Neither name should have a trailing dot.
  */
@@ -111,7 +111,7 @@ private:
  * whole name for every stat. The helper provides the stat creation methods of Scope that the
  * POOL_* macros in stats_macros.h rely on, so it can be passed to them in place of a scope:
  *
- *   Stats::ScopeHelper helper(scope, "http", {{"envoy.http_conn_manager_prefix", "ingress"}},
+ *   Stats::LiteScopeHelper helper(scope, "http", {{"envoy.http_conn_manager_prefix", "ingress"}},
  *                             "http.ingress");
  *   MyStats stats{MY_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
  *
@@ -123,12 +123,12 @@ private:
  * stats. It references the scope, which must outlive it. The names and tags are copied, so they
  * do not need to outlive the constructor.
  */
-class ScopeHelper {
+class LiteScopeHelper {
 public:
   /**
    * Creates a helper that adds nothing; it behaves like the scope itself.
    */
-  explicit ScopeHelper(Scope& scope) : ScopeHelper(scope, StatName()) {}
+  explicit LiteScopeHelper(Scope& scope) : LiteScopeHelper(scope, StatName()) {}
 
   /**
    * @param scope The scope in which the stats are created.
@@ -136,11 +136,11 @@ public:
    * @param tags The tags to add to the stats.
    * @param prefix The flat prefix with the tag values interleaved. Ignored if tags is empty.
    */
-  ScopeHelper(Scope& scope, absl::string_view base_prefix, TagStringViewSpan tags = {},
-              absl::string_view prefix = {})
+  LiteScopeHelper(Scope& scope, absl::string_view base_prefix, TagStringViewSpan tags = {},
+                  absl::string_view prefix = {})
       : scope_(scope), prefix_(scope.symbolTable(), base_prefix, tags, prefix) {}
-  ScopeHelper(Scope& scope, StatName base_prefix, StatNameTagSpan tags = {},
-              StatName prefix = StatName())
+  LiteScopeHelper(Scope& scope, StatName base_prefix, StatNameTagSpan tags = {},
+                  StatName prefix = StatName())
       : scope_(scope), prefix_(scope.symbolTable(), base_prefix, tags, prefix) {}
 
   // The subset of the Scope stat creation methods used by the stats macros. The name is the
@@ -175,7 +175,7 @@ private:
   // The names of a single stat: the helper's prefixes joined with the stat's leaf name.
   class FullNameJoiner {
   public:
-    FullNameJoiner(const ScopeHelper& helper, StatName name);
+    FullNameJoiner(const LiteScopeHelper& helper, StatName name);
 
     StatName baseName() const { return base_name_.statName(); }
     std::optional<StatNameTagSpan> tags() const { return tags_; }

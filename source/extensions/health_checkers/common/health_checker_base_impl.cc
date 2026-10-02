@@ -90,7 +90,7 @@ void HealthCheckerImplBase::decDegraded() { stats_.degraded_.sub(1); }
 
 HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope,
                                                         absl::string_view name) {
-  Stats::ScopeHelper helper(
+  Stats::LiteScopeHelper helper(
       scope, "health_check.",
       name.empty() ? Stats::TagStringViewSpan{}
                    : Stats::TagStringViewSpan{{Config::TagNames::get().HEALTH_CHECK_NAME, name}},

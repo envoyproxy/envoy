@@ -311,20 +311,20 @@ TEST_P(StatsUtilityTest, SanitizeStatsName) {
   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a:/b"));
 }
 
-#define SCOPE_HELPER_TEST_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT)                           \
+#define LITE_SCOPE_HELPER_TEST_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT)                      \
   COUNTER(requests)                                                                                \
   GAUGE(active, Accumulate)                                                                        \
   HISTOGRAM(latency, Milliseconds)                                                                 \
   TEXT_READOUT(info)
 
-struct ScopeHelperTestStats {
-  SCOPE_HELPER_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,
-                          GENERATE_TEXT_READOUT_STRUCT)
+struct LiteScopeHelperTestStats {
+  LITE_SCOPE_HELPER_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                               GENERATE_HISTOGRAM_STRUCT, GENERATE_TEXT_READOUT_STRUCT)
 };
 
 // A helper without a prefix or tags creates the same stats as the scope itself.
-TEST_P(StatsUtilityTest, ScopeHelperNoPrefix) {
-  ScopeHelper helper(*scope_);
+TEST_P(StatsUtilityTest, LiteScopeHelperNoPrefix) {
+  LiteScopeHelper helper(*scope_);
   EXPECT_TRUE(helper.basePrefix().empty());
   EXPECT_TRUE(helper.prefix().empty());
   EXPECT_TRUE(helper.tags().empty());
@@ -339,8 +339,8 @@ TEST_P(StatsUtilityTest, ScopeHelperNoPrefix) {
 
 // A helper with a prefix but no tags: the flat prefix is ignored, and the stats are the ones the
 // scope creates for the joined name.
-TEST_P(StatsUtilityTest, ScopeHelperPrefixOnly) {
-  ScopeHelper helper(*scope_, "prefix.", {}, "ignored");
+TEST_P(StatsUtilityTest, LiteScopeHelperPrefixOnly) {
+  LiteScopeHelper helper(*scope_, "prefix.", {}, "ignored");
   EXPECT_EQ("prefix", symbol_table_->toString(helper.basePrefix()));
   EXPECT_EQ("prefix", symbol_table_->toString(helper.prefix()));
   EXPECT_TRUE(helper.tags().empty());
@@ -364,15 +364,15 @@ TEST_P(StatsUtilityTest, ScopeHelperPrefixOnly) {
 
 // A helper with string tags can be used with the POOL_* macros in place of a scope. The stats are
 // created in the scope, with the tag value at its position in the flat name.
-TEST_P(StatsUtilityTest, ScopeHelperWithMacros) {
-  ScopeHelper helper(*scope_, "prefix", {{"tag", "value"}}, "prefix.value");
+TEST_P(StatsUtilityTest, LiteScopeHelperWithMacros) {
+  LiteScopeHelper helper(*scope_, "prefix", {{"tag", "value"}}, "prefix.value");
   EXPECT_EQ("prefix", symbol_table_->toString(helper.basePrefix()));
   EXPECT_EQ("prefix.value", symbol_table_->toString(helper.prefix()));
   ASSERT_EQ(1, helper.tags().size());
   EXPECT_EQ("tag", symbol_table_->toString(helper.tags()[0].first));
   EXPECT_EQ("value", symbol_table_->toString(helper.tags()[0].second));
 
-  ScopeHelperTestStats stats{SCOPE_HELPER_TEST_STATS(
+  LiteScopeHelperTestStats stats{LITE_SCOPE_HELPER_TEST_STATS(
       POOL_COUNTER(helper), POOL_GAUGE(helper), POOL_HISTOGRAM(helper), POOL_TEXT_READOUT(helper))};
   EXPECT_EQ("scope.prefix.value.requests", stats.requests_.name());
   EXPECT_EQ("scope.prefix.value.active", stats.active_.name());
@@ -396,15 +396,15 @@ TEST_P(StatsUtilityTest, ScopeHelperWithMacros) {
   }
 
   // The macros with an additional string prefix work too.
-  ScopeHelperTestStats prefixed_stats{SCOPE_HELPER_TEST_STATS(
+  LiteScopeHelperTestStats prefixed_stats{LITE_SCOPE_HELPER_TEST_STATS(
       POOL_COUNTER_PREFIX(helper, "extra."), POOL_GAUGE_PREFIX(helper, "extra."),
       POOL_HISTOGRAM_PREFIX(helper, "extra."), POOL_TEXT_READOUT_PREFIX(helper, "extra."))};
   EXPECT_EQ("scope.prefix.value.extra.requests", prefixed_stats.requests_.name());
 }
 
 // A helper created from pre-encoded StatNames and used with StatName leaves.
-TEST_P(StatsUtilityTest, ScopeHelperWithStatNames) {
-  ScopeHelper helper(*scope_, pool_.add("prefix"), tags_, pool_.add("prefix.value1.value2"));
+TEST_P(StatsUtilityTest, LiteScopeHelperWithStatNames) {
+  LiteScopeHelper helper(*scope_, pool_.add("prefix"), tags_, pool_.add("prefix.value1.value2"));
 
   Counter& c = helper.counterFromStatName(pool_.add("requests"));
   EXPECT_EQ("scope.prefix.value1.value2.requests", c.name());

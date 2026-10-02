@@ -22,7 +22,9 @@ protected:
 
   // The flat name the tagged prefix produces for a "name" leaf (must match legacyName()).
   std::string taggedName(const TaggedStatName& p) {
-    return ScopeHelper(scope_, p.baseName(), p.tags(), p.name()).counterFromString("name").name();
+    return LiteScopeHelper(scope_, p.baseName(), p.tags(), p.name())
+        .counterFromString("name")
+        .name();
   }
 
   std::string base(const TaggedStatName& p) { return symbol_table_.toString(p.baseName()); }

@@ -11,18 +11,10 @@
 #include "envoy/stats/timespan.h"
 
 #include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Http {
-
-/**
- * All stats of a user agent. @see stats_macros.h
- */
-#define ALL_USER_AGENT_STATS(COUNTER, HISTOGRAM)                                                   \
-  COUNTER(downstream_cx_destroy_remote_active_rq)                                                  \
-  COUNTER(downstream_cx_total)                                                                     \
-  COUNTER(downstream_rq_total)                                                                     \
-  HISTOGRAM(downstream_cx_length_ms, Milliseconds)
 
 /**
  * Captures the stat tokens used for recording user-agent stats. These are
@@ -33,6 +25,7 @@ struct UserAgentContext {
 
   Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_;
+  Stats::StatName downstream_cx_length_ms_;
   // The device is carried by an explicit 'envoy.http_user_agent' tag rather than being recovered
   // from the stat name by a tag extractor: 'user_agent' is the tag-extracted prefix of the
   // per-device stats, ios_ and android_ are the matching flat prefixes, and ios_tags_ and
@@ -43,8 +36,9 @@ struct UserAgentContext {
   Stats::StatName android_;
   Stats::StatNameTagVector ios_tags_;
   Stats::StatNameTagVector android_tags_;
-  // The leaf names of the stats.
-  ALL_USER_AGENT_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)
+  Stats::StatName downstream_cx_total_;
+  Stats::StatName downstream_cx_destroy_remote_active_rq_;
+  Stats::StatName downstream_rq_total_;
 };
 
 /**
@@ -54,7 +48,17 @@ struct UserAgentContext {
  * request-path.
  */
 struct UserAgentStats {
-  ALL_USER_AGENT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+  /**
+   * @param helper the helper the stats are created with, which carries the 'user_agent.<device>'
+   * prefix and the tags describing that device.
+   * @param context the pre-resolved stat name tokens.
+   */
+  UserAgentStats(Stats::LiteScopeHelper& helper, const UserAgentContext& context);
+
+  Stats::Counter& downstream_cx_total_;
+  Stats::Counter& downstream_cx_destroy_remote_active_rq_;
+  Stats::Counter& downstream_rq_total_;
+  Stats::Histogram& downstream_cx_length_ms_;
 };
 
 /**
