@@ -9,6 +9,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/path_rewrite_utility.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
@@ -424,10 +425,9 @@ size_t envoy_dynamic_module_callback_route_specifier_get_request_headers_size(
 
 bool envoy_dynamic_module_callback_route_specifier_get_request_headers(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
-    size_t* size_out) {
-  return ContextAccessor::getHeadersBounded(routeSpecifierContext(context_envoy_ptr)->headers,
-                                            result_headers, capacity, size_out);
+    envoy_dynamic_module_type_envoy_http_header* result_headers) {
+  return ContextAccessor::getHeaders(routeSpecifierContext(context_envoy_ptr)->headers,
+                                     result_headers);
 }
 
 bool envoy_dynamic_module_callback_route_specifier_get_request_header_value(
@@ -784,6 +784,17 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
   return true;
 }
 
+bool envoy_dynamic_module_callback_route_specifier_set_route_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer route_name) {
+  const absl::string_view value = toStringView(route_name);
+  if (value.empty()) {
+    return false;
+  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.route_name = std::string(value);
+  return true;
+}
+
 void envoy_dynamic_module_callback_route_specifier_set_timeout(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     uint64_t timeout_ms) {
@@ -841,6 +852,33 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_override(
     return false;
   }
   context->overrides.route_override = entry;
+  // A regex rewrite carried by the override rewrites the request path, computed once here the same
+  // way set_prefix_rewrite does. A result over the bound or an empty rewrite leaves the path alone.
+  if (entry->regex_rewrite != nullptr) {
+    std::optional<std::string> rewritten = Envoy::Router::rewritePathByPrefixOrRegex(
+        context->headers.getPathValue(), "", "", entry->regex_rewrite.get(),
+        entry->regex_rewrite_substitution, context->config.maxRewrittenPathBytes());
+    if (rewritten.has_value()) {
+      context->overrides.path = std::move(*rewritten);
+    }
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer matched,
+    envoy_dynamic_module_type_module_buffer replacement) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  // Compute the rewritten path once, so it takes precedence over the rewrites of the route the same
+  // way set_path does. A matched that is not a prefix, or a result over the bound, is rejected.
+  std::optional<std::string> rewritten = Envoy::Router::rewritePathByPrefixOrRegex(
+      context->headers.getPathValue(), toStringView(matched), toStringView(replacement), nullptr,
+      "", context->config.maxRewrittenPathBytes());
+  if (!rewritten.has_value()) {
+    return false;
+  }
+  context->overrides.path = std::move(*rewritten);
   return true;
 }
 

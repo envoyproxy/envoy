@@ -46,6 +46,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/header_cluster_specifier.h"
 #include "source/common/router/matcher_visitor.h"
+#include "source/common/router/path_rewrite_utility.h"
 #include "source/common/router/route_specifier_impl.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
@@ -262,40 +263,6 @@ createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine
     redirect_config->path_rewrite_formatter_ = std::move(formatter_or.value());
   }
   return redirect_config;
-}
-
-std::string generateNewPath(absl::string_view origin_path, absl::string_view path_to_strip,
-                            absl::string_view new_path_to_replace) {
-  ASSERT(path_to_strip.size() <= origin_path.size());
-
-  std::string result;
-  result.reserve(new_path_to_replace.size() + origin_path.size() - path_to_strip.size());
-  result.append(new_path_to_replace);
-  result.append(origin_path.substr(path_to_strip.size()));
-  return result;
-}
-
-std::string rewritePathByPrefixOrRegex(absl::string_view path, absl::string_view matched,
-                                       absl::string_view prefix_rewrite,
-                                       const Regex::CompiledMatcher* regex_rewrite,
-                                       absl::string_view regex_rewrite_substitution) {
-  if (!prefix_rewrite.empty()) {
-    ASSERT(absl::StartsWithIgnoreCase(path, matched));
-    return generateNewPath(path, matched, prefix_rewrite);
-  }
-
-  if (regex_rewrite != nullptr) {
-    absl::string_view path_only = Http::PathUtil::removeQueryAndFragment(path);
-    ASSERT(path_only.size() <= path.size());
-    const std::string new_path_only =
-        regex_rewrite->replaceAll(path_only, regex_rewrite_substitution);
-    // If regex rewrite fails then return nothing.
-    if (new_path_only.empty()) {
-      return {};
-    }
-    return generateNewPath(path, path_only, new_path_only);
-  }
-  return {};
 }
 
 } // namespace
@@ -984,17 +951,17 @@ void RouteEntryImplBase::finalizePathHeaderForRedirect(Http::RequestHeaderMap& h
   if (redirect_config_ == nullptr) {
     return;
   }
-  const std::string new_path = rewritePathByPrefixOrRegex(
+  const std::optional<std::string> new_path = rewritePathByPrefixOrRegex(
       headers.getPathValue(), matched_path, redirect_config_->prefix_rewrite_redirect_,
       redirect_config_->regex_rewrite_redirect_.get(),
-      redirect_config_->regex_rewrite_redirect_substitution_);
+      redirect_config_->regex_rewrite_redirect_substitution_, std::numeric_limits<size_t>::max());
 
-  // Empty new_path means there is no rewrite or the rewrite fails. Then we do nothing.
-  if (!new_path.empty()) {
+  // A missing new_path means there is no rewrite or the rewrite fails. Then we do nothing.
+  if (new_path.has_value()) {
     if (keep_old_path) {
       headers.setEnvoyOriginalPath(headers.getPathValue());
     }
-    headers.setPath(new_path);
+    headers.setPath(*new_path);
   }
 }
 
@@ -1150,7 +1117,11 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
       return {};
     }
     absl::string_view path_only = Http::PathUtil::removeQueryAndFragment(path_with_query);
-    return generateNewPath(path_with_query, path_only, new_path_only);
+    // path_only is a prefix of path_with_query, so a native rewrite is never out of range.
+    std::optional<std::string> new_path = generateNewPath(path_with_query, path_only, new_path_only,
+                                                          std::numeric_limits<size_t>::max());
+    ENVOY_BUG(new_path.has_value(), "native path rewrite produced no result");
+    return new_path.value_or(std::string{});
   }
 
   // Handle the case where path_rewrite_policy is configured.
@@ -1163,12 +1134,17 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
     if (!new_path_only.ok() || new_path_only->empty()) {
       return {};
     }
-    return generateNewPath(path_with_query, path_only, new_path_only.value());
+    std::optional<std::string> new_path = generateNewPath(
+        path_with_query, path_only, new_path_only.value(), std::numeric_limits<size_t>::max());
+    ENVOY_BUG(new_path.has_value(), "native path rewrite produced no result");
+    return new_path.value_or(std::string{});
   }
 
   // Handle the case where prefix_rewrite or regex_rewrite is configured.
   return rewritePathByPrefixOrRegex(path_with_query, matched_path, prefix_rewrite_,
-                                    regex_rewrite_.get(), regex_rewrite_substitution_);
+                                    regex_rewrite_.get(), regex_rewrite_substitution_,
+                                    std::numeric_limits<size_t>::max())
+      .value_or(std::string{});
 }
 
 std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers,
@@ -1505,7 +1481,7 @@ bool PrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
                                    const StreamInfo::StreamInfo& stream_info,
                                    uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
     return true;
   }
   return false;
@@ -1539,7 +1515,7 @@ bool PathRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
                                  const StreamInfo::StreamInfo& stream_info,
                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
     return true;
   }
 
@@ -1581,7 +1557,7 @@ bool RegexRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
                                   const StreamInfo::StreamInfo& stream_info,
                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    if (path_matcher_->match(route_match_context.sanitizedPath())) {
+    if (path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
       return true;
     }
   }
@@ -1653,7 +1629,7 @@ bool PathSeparatedPrefixRouteEntryImpl::matches(const RouteMatchContext& route_m
   const absl::string_view sanitized_path = route_match_context.sanitizedPathWithoutQuery();
   const size_t sanitized_size = sanitized_path.size();
   const size_t matcher_size = matcher().size();
-  if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
+  if (sanitized_size >= matcher_size && path_matcher_->matchPathWithoutQuery(sanitized_path) &&
       (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
     return true;
   }

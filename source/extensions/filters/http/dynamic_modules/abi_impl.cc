@@ -163,6 +163,25 @@ bool setHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_module_b
   return true;
 }
 
+bool getHeadersImpl(HeadersMapOptConstRef map,
+                    envoy_dynamic_module_type_envoy_http_header* result_headers) {
+  if (!map) {
+    return false;
+  }
+  size_t i = 0;
+  map->iterate([&i, &result_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    auto& key = header.key();
+    result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());
+    result_headers[i].key_length = key.size();
+    auto& value = header.value();
+    result_headers[i].value_ptr = const_cast<char*>(value.getStringView().data());
+    result_headers[i].value_length = value.size();
+    i++;
+    return Http::HeaderMap::Iterate::Continue;
+  });
+  return true;
+}
+
 bool headerAsAttribute(HeadersMapOptConstRef map, const Envoy::Http::LowerCaseString& header,
                        envoy_dynamic_module_type_envoy_buffer* result) {
   if (!map.has_value()) {
@@ -981,11 +1000,9 @@ size_t envoy_dynamic_module_callback_http_get_headers_size(
 bool envoy_dynamic_module_callback_http_get_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
-    size_t* size_out) {
+    envoy_dynamic_module_type_envoy_http_header* result_headers) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return ContextAccessor::getHeadersBounded(getHeaderMapByType(filter, header_type), result_headers,
-                                            capacity, size_out);
+  return getHeadersImpl(getHeaderMapByType(filter, header_type), result_headers);
 }
 
 void envoy_dynamic_module_callback_http_send_response(
@@ -2090,9 +2107,9 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
 
 void envoy_dynamic_module_callback_http_get_timing_info(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_timing_info* timing_out) {
+    envoy_dynamic_module_type_timing_info_v2* timing_out) {
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  ContextAccessor::getTimingInfo(filter->streamInfo(), timing_out);
+  ContextAccessor::getTimingInfoV2(filter->streamInfo(), timing_out);
 }
 
 void envoy_dynamic_module_callback_http_add_custom_flag(

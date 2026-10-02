@@ -86,6 +86,10 @@ using DynamicModulePtr = std::unique_ptr<DynamicModule>;
  * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
+ *
+ * The binding mode is not a parameter: the loader binds now (RTLD_NOW) by default and falls back to
+ * lazy binding (RTLD_LAZY) when the ``envoy.reloadable_features.dynamic_modules_rtld_now`` runtime
+ * guard is disabled.
  */
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,

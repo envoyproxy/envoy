@@ -68,15 +68,15 @@ impl ClusterSpecifierContext {
   ///
   /// Returns an empty vector when there are no headers.
   pub fn get_all_request_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_request_headers_count();
-    crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
-        self.envoy_ptr,
-        ptr,
-        capacity,
-        size_out,
-      )
-    })
+    crate::utility::collect_headers(
+      || self.get_request_headers_count(),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
+          self.envoy_ptr,
+          headers,
+        )
+      },
+    )
   }
 
   /// Get the first value of the request header with the given key.

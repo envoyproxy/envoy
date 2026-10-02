@@ -7,8 +7,9 @@
 //! the decision setters, and the configuration metrics recorded on each decision.
 //!
 //! The headers the module reads are:
-//!   `x-decision`       `override`, `select-template`, `no-route` or `error`. Without it the
-//!                      module leaves the resolved route in place.
+//!   `x-decision`       `override`, `select-template`, `no-route`, `error`, `reuse-previous` or
+//!                      `continue-matching`. Without it the module leaves the resolved route in
+//!                      place.
 //!   `x-template`       the identifier of the route template to select.
 //!   `x-cluster`        the upstream cluster to route to.
 //!   `x-timeout-ms`     the route timeout to set, in milliseconds.
@@ -20,6 +21,9 @@
 //!   `x-override`       the override_id of the route override to select.
 //!   `x-set-path`       the path of the request sent upstream.
 //!   `x-set-host`       the authority of the request sent upstream.
+//!   `x-set-route-name` the name recorded for the route the decision produces.
+//!   `x-prefix-rewrite` a `matched=replacement` pair recorded as a prefix rewrite of the path.
+//!   `x-user-data`      a u64 recorded on the produced route, so the route destroy hook fires.
 //!   `x-append-action`  `append`, `add-if-absent`, `overwrite` or `overwrite-if-exists`, how an
 //!                      added header combines with one of the same name. Defaults to `overwrite`.
 //!   `x-add-request-header`  a `key=value` pair added to the request sent upstream.
@@ -395,6 +399,7 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
         b"no-route" => RouteDecision::NoRoute,
         b"error" => RouteDecision::Error,
         b"reuse-previous" => RouteDecision::ReusePrevious,
+        b"continue-matching" => RouteDecision::ContinueMatching,
         _ => RouteDecision::PassThrough,
       },
       None => RouteDecision::PassThrough,
@@ -459,6 +464,16 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
     }
     if let Some(host) = ctx.get_request_header("x-set-host") {
       let _ = ctx.set_host(&buffer_to_string(host));
+    }
+    if let Some(name) = ctx.get_request_header("x-set-route-name") {
+      let _ = ctx.set_route_name(&buffer_to_string(name));
+    }
+    if let Some(pair) = ctx.get_request_header("x-prefix-rewrite") {
+      let pair = buffer_to_string(pair);
+      if let Some((matched, replacement)) = split_pair(&pair) {
+        // Tests also pass a matched that is not a prefix, so a rejection is expected here.
+        let _ = ctx.set_prefix_rewrite(matched, replacement);
+      }
     }
     let append_action = read_append_action(ctx);
     if let Some(pair) = ctx.get_request_header("x-add-request-header") {
