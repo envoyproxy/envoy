@@ -132,6 +132,8 @@ envoy_cc_library(
         ":fcds_api_lib",
         ":filter_chain_factory_context_callback",
         "//envoy/config:typed_metadata_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:schedulable_cb_interface",
         "//envoy/init:manager_interface",
         "//envoy/matcher:matcher_interface",
         "//envoy/network:filter_interface",

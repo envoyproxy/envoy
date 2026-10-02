@@ -2103,6 +2103,30 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, HistogramDestructionShutdownRace) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  {
+    ScopeSharedPtr scope1 = store_->createScope("scope1.");
+    scope1->histogramFromString("h1", Histogram::Unit::Unspecified);
+  }
+
+  // Execute posted tasks to run clearScopesFromCaches on the main thread.
+  // This will destroy scope1 and in turn destroy the histogram h1 (since there are no other
+  // references). Destroying the histogram will call releaseHistogramCrossThread and post
+  // clearHistogramsFromCaches to the dispatcher.
+  main_thread_dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+
+  // Now, without executing the newly posted clearHistogramsFromCaches task, we initiate shutdown.
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+
+  // ThreadLocalStore should destruct cleanly without any histograms_to_cleanup_.empty() assert
+  // failure.
+  tls_.shutdownThread();
+}
+
 TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   SymbolTableImpl symbol_table;
   Api::ApiPtr api = Api::createApiForTest();

@@ -15,9 +15,9 @@ bazel_dep(name = "aws-c-auth-testdata", version = "0.10.4.envoy")
 bazel_dep(name = "bazel-compdb", version = "0.0.0-20220906-4086479.envoy")
 bazel_dep(name = "bazel_features", version = "1.51.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
-bazel_dep(name = "boringssl", version = "0.20260813.0")
-bazel_dep(name = "boringssl-fips", version = "0.20260813.0.envoy")
-bazel_dep(name = "boringssl-source", version = "0.20260813.0.envoy")
+bazel_dep(name = "boringssl", version = "0.20260929.0")
+bazel_dep(name = "boringssl-fips", version = "0.20260929.0.envoy")
+bazel_dep(name = "boringssl-source", version = "0.20260929.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy")
 bazel_dep(name = "brotli", version = "1.2.0.bcr.3")
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", repo_name = "buildifier")
@@ -29,8 +29,8 @@ bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.1.envoy")
-bazel_dep(name = "envoy_toolshed_jq", version = "0.5.1.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.2.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.2.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "fmt", version = "12.2.0")
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -149,7 +149,7 @@ single_version_override(
 
 single_version_override(
     module_name = "boringssl",
-    version = "0.20260813.0",
+    version = "0.20260929.0",
 )
 
 single_version_override(
