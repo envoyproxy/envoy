@@ -191,6 +191,12 @@ filter_config:
     EXPECT_EQ(
         "cat",
         upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
+    // Headers set or added with an empty value must reach upstream, present and empty.
+    for (const auto* name : {"x-empty-set", "x-empty-add"}) {
+      const auto empty_values = upstream_request_->headers().get(Http::LowerCaseString(name));
+      ASSERT_EQ(1, empty_values.size()) << name;
+      EXPECT_EQ("", empty_values[0]->value().getStringView()) << name;
+    }
     EXPECT_EQ("cat", upstream_request_->trailers()
                          .get()
                          ->get(Http::LowerCaseString("dog"))[0]

@@ -2066,15 +2066,15 @@ bool envoy_dynamic_module_callback_http_get_headers(
 /**
  * envoy_dynamic_module_callback_http_add_header is called by the module to add
  * the value of the header with the given key. If the header does not exist, it will be
- * created. If the header already exists, all existing values will be removed and the new value will
- * be set. When the given value is null, the header will be removed if the key exists.
+ * created. If the header already exists, the new value will be appended to the existing values.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param header_type is the type of the header map to add the header to (request/response
  * headers/trailers).
  * @param key is the key of the header.
- * @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ * @param value is the buffer of the value. A non-null pointer with zero length adds the header
+ * with an empty value. A null pointer is rejected.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only adds the header to the underlying Envoy object. Whether or not the header is
@@ -2091,14 +2091,16 @@ bool envoy_dynamic_module_callback_http_add_header(
  * envoy_dynamic_module_callback_http_set_header is called by the module to set
  * the value of the header with the given key. If the header does not exist, it will be
  * created. If the header already exists, all existing values will be removed and the new value will
- * be set. When the given value is null, the header will be removed if the key exists.
+ * be set. When the pointer of the given value is null, the header will be removed if the key
+ * exists.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param header_type is the type of the header map to set the header to (request/response
  * headers/trailers).
  * @param key is the key of the header.
- * @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ * @param value is the buffer of the value. A non-null pointer with zero length sets the header to
+ * an empty value. A null pointer removes the header.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only sets the header to the underlying Envoy object. Whether or not the header is

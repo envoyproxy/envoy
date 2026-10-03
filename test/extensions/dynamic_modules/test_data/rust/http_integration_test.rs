@@ -734,6 +734,12 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
     let new_values = envoy_filter.get_request_header_values("new");
     assert_eq!(new_values.len(), 0);
 
+    // Test empty values: they must be kept, not treated as a removal.
+    assert!(envoy_filter.set_request_header("x-empty-set", b""));
+    assert_eq!(envoy_filter.get_request_header_values("x-empty-set").len(), 1);
+    assert!(envoy_filter.add_request_header("x-empty-add", b""));
+    assert_eq!(envoy_filter.get_request_header_values("x-empty-add").len(), 1);
+
     // Test worker id.
     let worker_id = envoy_filter.get_worker_index();
     assert_eq!(worker_id, 0);
