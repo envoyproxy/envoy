@@ -679,6 +679,21 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "union_string_speed_test",
+    srcs = ["union_string_speed_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//envoy/common:union_string",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "union_string_benchmark_test",
+    benchmark_binary = "union_string_speed_test",
+)
+
 envoy_cc_test(
     name = "bit_array_test",
     srcs = ["bit_array_test.cc"],
