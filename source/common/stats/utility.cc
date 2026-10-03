@@ -79,6 +79,24 @@ std::optional<StatName> Utility::findTag(const Metric& metric, StatName find_tag
   return value;
 }
 
+std::optional<std::string> Utility::findTag(const Metric& metric, StatName find_tag_name,
+                                            StatNameStringCache& cache) {
+  return findTag(metric, find_tag_name, metric.constSymbolTable(), cache);
+}
+
+std::optional<std::string> Utility::findTag(const Metric& metric, StatName find_tag_name,
+                                            const SymbolTable& symbol_table,
+                                            StatNameStringCache& cache) {
+  auto tag_value = findTag(metric, find_tag_name);
+  if (!tag_value.has_value()) {
+    return std::nullopt;
+  }
+  if (!cache.enabled()) {
+    return symbol_table.toString(*tag_value);
+  }
+  return cache.decode(*tag_value, symbol_table);
+}
+
 namespace {
 
 // Helper class for the three Utility::*FromElements implementations to build up

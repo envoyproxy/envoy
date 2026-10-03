@@ -50,7 +50,9 @@ public:
     }
 
     std::string name() const { return name_; }
-    StatName statName() const { return stat_name_storage_->statName(); }
+    StatName statName() const {
+      return stat_name_storage_ != nullptr ? stat_name_storage_->statName() : StatName();
+    }
 
   private:
     MockMetric& mock_metric_;
@@ -66,6 +68,7 @@ public:
   std::string name() const override { return name_.name(); }
   StatName statName() const override { return name_.statName(); }
   TagVector tags() const override { return tags_; }
+  TagVector tags(StatNameStringCache&) const override { return tags_; }
   void setTagExtractedName(absl::string_view name) {
     tag_extracted_name_ = std::string(name);
     tag_extracted_stat_name_ =
@@ -74,7 +77,9 @@ public:
   std::string tagExtractedName() const override {
     return tag_extracted_name_.empty() ? name() : tag_extracted_name_;
   }
-  StatName tagExtractedStatName() const override { return tag_extracted_stat_name_->statName(); }
+  StatName tagExtractedStatName() const override {
+    return tag_extracted_stat_name_ != nullptr ? tag_extracted_stat_name_->statName() : statName();
+  }
   void iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const override {
     ASSERT((tag_names_and_values_.size() % 2) == 0);
     for (size_t i = 0; i < tag_names_and_values_.size(); i += 2) {
