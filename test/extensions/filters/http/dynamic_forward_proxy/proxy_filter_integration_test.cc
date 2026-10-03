@@ -737,7 +737,20 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   // Wait for both requests to be received downstream before unblocking DNS.
   test_server_->waitForCounter("http.config_test.downstream_rq_total", Eq(2));
+
+  // Unblock any blocked resolutions.
   Network::TestResolver::unblockResolve();
+  // Unblock the second resolution if it remained pending.
+  bool has_second = false;
+  {
+    absl::MutexLock guard(&Network::TestResolver::resolution_mutex_);
+    if (!Network::TestResolver::blocked_resolutions_.empty()) {
+      has_second = true;
+    }
+  }
+  if (has_second) {
+    Network::TestResolver::unblockResolve();
+  }
 
   ASSERT_TRUE(response1->waitForEndStream());
   ASSERT_TRUE(response2->waitForEndStream());
