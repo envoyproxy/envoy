@@ -168,7 +168,12 @@ void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
     UnregisterHttp3DatagramVisitor();
   }
 #endif
-  Reset(envoyResetReasonToQuicRstError(reason));
+  const quic::QuicRstStreamErrorCode rst = envoyResetReasonToQuicRstError(reason);
+  maybeReliableReset(rst);
+  // Hard Reset() raises callbacks via ResetWithError(); the reliable path does not, so run them
+  // here. No-op if ResetWithError() already ran them.
+  runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(rst),
+                    absl::StrCat(quic::QuicRstStreamErrorCodeToString(rst), "|FROM_SELF"));
 }
 
 void EnvoyQuicClientStream::switchStreamBlockState() {

@@ -505,6 +505,12 @@ public:
     }
   }
 
+  // With |enable|, both peers advertise reliable stream reset. Client writes are blocked so that
+  // request body stays buffered in the QUIC stream send buffer when the stream is locally aborted.
+  // RESET_STREAM_AT still flushes that buffered body, while a hard RST_STREAM abandons it
+  // (packets already serialized before the block may still deliver a small prefix).
+  void testReliableStreamResetBodyDelivery(bool enable);
+
 protected:
   quic::ParsedQuicVersionVector supported_versions_;
   EnvoyQuicConnectionHelper conn_helper_;
