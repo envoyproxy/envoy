@@ -9,6 +9,7 @@
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/extensions/common/dynamic_forward_proxy/dynamic_host_candidates.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -152,9 +153,34 @@ public:
   void onClusterInitTimeout();
 
 private:
+  struct HostCandidateLookup
+      : public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks {
+    explicit HostCandidateLookup(ProxyFilter& parent) : parent_(parent) {}
+
+    // Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks
+    void onLoadDnsCacheComplete(
+        const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) override {
+      parent_.onHostCandidateLoaded(*this, host_info);
+    }
+
+    ProxyFilter& parent_;
+    Upstream::ResourceAutoIncDecPtr circuit_breaker_;
+    Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr handle_;
+  };
+
   void addHostAddressToFilterState(const Network::Address::InstanceConstSharedPtr& address);
   void onDnsResolutionFail(absl::string_view details);
   virtual bool isProxying();
+  Http::FilterHeadersStatus loadHostCandidates(
+      const Extensions::Common::DynamicForwardProxy::DynamicHostCandidates& candidates,
+      uint16_t default_port);
+  void recordHostCandidate(
+      const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
+      bool is_proxying);
+  void onHostCandidateLoaded(
+      HostCandidateLookup& lookup,
+      const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info);
+  bool onHostCandidatesLoaded();
 
   const ProxyFilterConfigSharedPtr config_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
@@ -162,6 +188,10 @@ private:
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
   LoadClusterEntryHandlePtr cluster_load_handle_;
   Event::TimerPtr cluster_init_timer_;
+  std::vector<std::unique_ptr<HostCandidateLookup>> host_candidate_lookups_;
+  uint32_t pending_host_candidates_{};
+  bool host_candidate_usable_{};
+  std::string host_candidate_failure_;
 };
 
 } // namespace DynamicForwardProxy
