@@ -1046,41 +1046,26 @@ case $CI_TARGET in
 
     release|release.server_only|release.test_only)
         if [[ "$CI_TARGET" == "release.test_only" && "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
-            # CI experiment for #47485 only: reproduce, sanitize and symbolize the filter_persistence_test crash.
+            # CI experiment for #47485 only: compare filter_persistence_test crash rates with and
+            # without the new runtime guard under load.
             fp=//test/extensions/filters/http/rate_limit_quota:filter_persistence_test
-            fp_path=test/extensions/filters/http/rate_limit_quota/filter_persistence_test
+            guard='RUNTIME_GUARD(envoy_reloadable_features_cpu_utilization_resolve_container_cgroup);'
             replica=(--test_env=ENVOY_MEMORY_TEST_EXACT=true --remote_download_minimal --stripopt=--strip-all -c opt)
-            dbg=(--test_env=ENVOY_MEMORY_TEST_EXACT=true --remote_download_toplevel -c opt --copt=-g --strip=never)
-            echo "=== CI_EXPERIMENT A2: exact replica of the release job ==="
-            bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${replica[@]}" --nocache_test_results --test_output=errors "$fp" || true
-            echo "=== CI_EXPERIMENT M: msan ==="
-            bazel test --config=msan "${BAZEL_BUILD_OPTIONS[@]}" --nocache_test_results --test_output=errors "$fp" || true
-            echo "=== CI_EXPERIMENT B2: replica with -g under the maps wrapper ==="
-            bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${dbg[@]}" --nocache_test_results --test_output=errors \
-                --run_under=//tools/ci_experiment:wrap "$fp" 2>&1 | tee /tmp/fp_b.log || true
-            echo "=== CI_EXPERIMENT D2: replica with sharding disabled ==="
-            bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${replica[@]}" --nocache_test_results --test_output=errors \
-                --test_sharding_strategy=disabled "$fp" || true
-            echo "=== CI_EXPERIMENT B2 symbolization ==="
-            bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt @llvm_toolchain_llvm//:symbolizer || true
-            sym_rel="$(bazel cquery "${BAZEL_BUILD_OPTIONS[@]}" -c opt --output=files @llvm_toolchain_llvm//:symbolizer 2>/dev/null | head -1)"
-            sym="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" -c opt execution_root || true)/${sym_rel}"
-            bin="$(readlink -f "$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" "${dbg[@]}" bazel-bin || true)/${fp_path}")"
-            base="$(awk '/=== CI_EXPERIMENT_MAPS ===/{f=1;next} /CI_EXPERIMENT_MAPS_END/{f=0} f && /filter_persistence_test/ {print; exit}' /tmp/fp_b.log | sed -E 's/^[^0-9a-f]*//' | cut -d- -f1)"
-            echo "binary: ${bin} ($(stat -c %s "$bin" 2>/dev/null || echo missing) bytes)"
-            echo "load base: 0x${base}"
-            if [[ -z "$base" ]] || ! grep -q 'Caught Segmentation' /tmp/fp_b.log; then
-                echo "B2 did not crash or no load base captured"
-                exit 1
-            fi
-            grep -oE '#[0-9]+: .*\[0x[0-9a-f]+\]$' /tmp/fp_b.log | head -14 | while read -r frame; do
-                addr="$(grep -oE '0x[0-9a-f]+\]$' <<<"$frame" | tr -d ']')"
-                rel=$(( addr - 0x${base} ))
-                echo "== ${frame}"
-                for a in "$rel" "$(( rel - 1 ))"; do
-                    "$sym" --obj="$bin" --inlining --functions=linkage --demangle --pretty-print "$(printf '0x%x' "$a")" || true
-                done
+            stress=(--runs_per_test=30 --nocache_test_results --test_output=errors)
+            echo "=== CI_EXPERIMENT S1: stress WITH the runtime guard ($(grep -cxF "$guard" source/common/runtime/runtime_features.cc) guard line) ==="
+            bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${replica[@]}" "${stress[@]}" "$fp" 2>&1 | tee /tmp/s1.log || true
+            grep -vxF "$guard" source/common/runtime/runtime_features.cc > /tmp/rf.cc && cp /tmp/rf.cc source/common/runtime/runtime_features.cc
+            echo "=== CI_EXPERIMENT S2: stress WITHOUT the runtime guard ($(grep -cxF "$guard" source/common/runtime/runtime_features.cc) guard line) ==="
+            bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${replica[@]}" "${stress[@]}" "$fp" 2>&1 | tee /tmp/s2.log || true
+            git checkout -- source/common/runtime/runtime_features.cc
+            echo "=== CI_EXPERIMENT SUMMARY ==="
+            for run in s1 s2; do
+                echo "${run}: segfaults=$(grep -c 'Caught Segmentation' "/tmp/${run}.log") $(grep -oE 'filter_persistence_test +(PASSED|FAILED|FLAKY)[^\r]{0,40}' "/tmp/${run}.log" | tail -1)"
             done
+            echo "=== CI_EXPERIMENT S1 first crash ==="
+            grep -m1 -A22 'Caught Segmentation' /tmp/s1.log || true
+            echo "=== CI_EXPERIMENT S2 first crash ==="
+            grep -m1 -A22 'Caught Segmentation' /tmp/s2.log || true
             exit 1
         fi
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
