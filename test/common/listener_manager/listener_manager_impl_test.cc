@@ -12,6 +12,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/network/parent_drained_callback_registrar.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stream_info/filter_state.h"
@@ -3109,6 +3110,58 @@ filter_chains:
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+}
+
+// A fresh UDP socket bound because the hot restart parent had no socket for the address reads
+// from the start; one bound because the parent never answered starts paused (it gets the
+// parent-drained registrar), since the parent may still be serving that address. TCP sockets are
+// never paused.
+TEST_P(ListenerManagerImplTest, FreshUdpSocketIsPausedWhenHotRestartParentIsUnresponsive) {
+  ProdListenerComponentFactory real_listener_factory(server_);
+  ON_CALL(os_sys_calls_, socket(AF_INET, _, 0))
+      .WillByDefault(Invoke([this](int domain, int type, int protocol) {
+        return os_sys_calls_actual_.socket(domain, type, protocol);
+      }));
+  ON_CALL(os_sys_calls_, bind(_, _, _))
+      .WillByDefault(Invoke(
+          [&](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) -> Api::SysCallIntResult {
+            return os_sys_calls_actual_.bind(sockfd, addr, addrlen);
+          }));
+  class NoopParentDrainedCallbackRegistrar : public Network::ParentDrainedCallbackRegistrar {
+  public:
+    void registerParentDrainedCallback(const Network::Address::InstanceConstSharedPtr&,
+                                       absl::AnyInvocable<void()>) override {}
+  };
+  NoopParentDrainedCallbackRegistrar registrar;
+  ON_CALL(server_.hot_restart_, parentDrainedCallbackRegistrar())
+      .WillByDefault(Return(OptRef<Network::ParentDrainedCallbackRegistrar>(registrar)));
+  ON_CALL(server_.hot_restart_, duplicateParentListenSocket(_, _, _)).WillByDefault(Return(-1));
+  const auto address = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:0");
+
+  // The parent answered: it has no such socket.
+  ON_CALL(server_.hot_restart_, parentUnresponsive()).WillByDefault(Return(false));
+  auto socket = real_listener_factory.createListenSocket(
+      address, Network::Socket::Type::Datagram, nullptr,
+      ListenerComponentFactory::BindType::ReusePort, {}, 0);
+  ASSERT_TRUE(socket.ok());
+  EXPECT_FALSE((*socket)->parentDrainedCallbackRegistrar().has_value());
+
+  // The parent never answered: the parent may own the address, so the listener starts paused.
+  ON_CALL(server_.hot_restart_, parentUnresponsive()).WillByDefault(Return(true));
+  EXPECT_LOG_CONTAINS("warning", "starting the fresh UDP listener paused until the parent is gone",
+                      socket = real_listener_factory.createListenSocket(
+                          address, Network::Socket::Type::Datagram, nullptr,
+                          ListenerComponentFactory::BindType::ReusePort, {}, 0));
+  ASSERT_TRUE(socket.ok());
+  ASSERT_TRUE((*socket)->parentDrainedCallbackRegistrar().has_value());
+  EXPECT_EQ(&(*socket)->parentDrainedCallbackRegistrar().ref(), &registrar);
+
+  // The kernel routes TCP traffic per connection, so a TCP socket is never paused.
+  socket = real_listener_factory.createListenSocket(address, Network::Socket::Type::Stream, nullptr,
+                                                    ListenerComponentFactory::BindType::ReusePort,
+                                                    {}, 0);
+  ASSERT_TRUE(socket.ok());
+  EXPECT_FALSE((*socket)->parentDrainedCallbackRegistrar().has_value());
 }
 
 TEST_P(ListenerManagerImplTest, NotSupportedDatagramUds) {
