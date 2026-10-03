@@ -50,6 +50,37 @@ public:
   MockRetryState* retry_state_{};
 };
 
+// Tracks whether decode ran after onDestroy (regression for #47544).
+class LifecycleTrackingFilter : public Http::StreamDecoderFilter {
+public:
+  // Http::StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    ++decode_headers_;
+    EXPECT_FALSE(destroyed_);
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    ++decode_data_;
+    EXPECT_FALSE(destroyed_);
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    ++decode_trailers_;
+    EXPECT_FALSE(destroyed_);
+    return Http::FilterTrailersStatus::Continue;
+  }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+  }
+  void onDestroy() override { destroyed_ = true; }
+
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
+  bool destroyed_{false};
+  int decode_headers_{0};
+  int decode_data_{0};
+  int decode_trailers_{0};
+};
+
 class RouterUpstreamFilterTest : public testing::Test {
 public:
   void init(std::vector<HttpFilter> upstream_filters) {
@@ -164,6 +195,51 @@ TEST_F(RouterUpstreamFilterTest, UpstreamFilter) {
   init({add_header_filter, codec_filter});
   auto headers = run();
   EXPECT_FALSE(headers.get(Http::LowerCaseString("x-header-to-add")).empty());
+}
+
+// Regression for #47544: synchronous pool failure must not decode after onDestroy.
+TEST_F(RouterUpstreamFilterTest, SyncPoolFailureDoesNotDecodeAfterDestroy) {
+  auto filter = std::make_shared<LifecycleTrackingFilter>();
+
+  HttpFilter codec_filter;
+  codec_filter.set_name("envoy.filters.http.upstream_codec");
+  envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+  std::ignore = codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
+  init({codec_filter});
+
+  ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, info())
+      .WillByDefault(Return(cluster_info_));
+
+  EXPECT_CALL(*cluster_info_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamDecoderFilter(filter);
+        return false; // fall through so the router chain still adds the codec filter
+      }));
+
+  // Fail the pool synchronously inside newStream() (overflow path).
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+              newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::ResponseDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
+        callbacks.onPoolFailure(Http::ConnectionPool::PoolFailureReason::Overflow,
+                                "max pending streams overflow",
+                                context_.server_factory_context_.cluster_manager_
+                                    .thread_local_cluster_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  EXPECT_TRUE(filter->destroyed_);
+  EXPECT_EQ(0, filter->decode_headers_);
+  EXPECT_EQ(0, filter->decode_data_);
+  EXPECT_EQ(0, filter->decode_trailers_);
 }
 
 // Regression test for a use-after-free at teardown. A dynamic (ECDS) upstream HTTP filter causes

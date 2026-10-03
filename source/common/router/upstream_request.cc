@@ -457,6 +457,13 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
 
   conn_pool_->newStream(this);
 
+  // Synchronous pool failure (e.g. circuit breaker overflow) may have already cleaned up
+  // this request inside newStream(); do not decode into a destroyed filter chain (#47544).
+  if (cleaned_up_) {
+    ENVOY_LOG(debug, "upstream request aborted during connection pool newStream");
+    return;
+  }
+
   if (parent_.config().upstream_log_flush_interval_.has_value()) {
     upstream_log_flush_timer_ = parent_.callbacks()->dispatcher().createTimer([this]() -> void {
       // If the request is complete, we've already done the stream-end upstream log, and shouldn't
