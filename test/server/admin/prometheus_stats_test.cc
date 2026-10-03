@@ -1069,8 +1069,8 @@ struct DecodedNativeHistogram {
         if (current_count > 0) {
           DecodedBucket bucket;
           bucket.index = current_index;
-          bucket.lower_bound = std::pow(base, current_index);
-          bucket.upper_bound = std::pow(base, current_index + 1);
+          bucket.lower_bound = std::pow(base, current_index - 1);
+          bucket.upper_bound = std::pow(base, current_index);
           bucket.count = static_cast<uint64_t>(current_count);
           positive_buckets.push_back(bucket);
         }
@@ -1100,13 +1100,13 @@ struct DecodedNativeHistogram {
   }
 
   // Compute the expected bucket index for a value given a schema.
-  // Bucket i covers (base^i, base^(i+1)] where base = 2^(2^(-schema)).
+  // Bucket i covers (base^(i-1), base^i] where base = 2^(2^(-schema)).
   static int32_t expectedBucketIndex(int8_t schema, double value) {
     EXPECT_GT(value, 0) << "Only positive values have bucket indices";
     const double base = std::pow(2.0, std::pow(2.0, -schema));
-    // For value v in (base^i, base^(i+1)], the bucket index is i.
-    // Formula: i = ceil(log(v) / log(base)) - 1
-    return static_cast<int32_t>(std::ceil(std::log(value) / std::log(base))) - 1;
+    // For value v in (base^(i-1), base^i], the bucket index is i.
+    // Formula: i = ceil(log(v) / log(base))
+    return static_cast<int32_t>(std::ceil(std::log(value) / std::log(base)));
   }
 };
 
@@ -1763,6 +1763,51 @@ public:
   std::unique_ptr<Upstream::PerEndpointMetricsTestHelper> endpoints_helper_;
 };
 
+TEST_F(RealHistogramNativePrometheusTest, NativeHistogramUsesPrometheusBucketIndices) {
+  Stats::Histogram& histogram = makeHistogram("request_body_size", Stats::Histogram::Unit::Bytes);
+  recordValue(histogram, 4000);
+  mergeHistograms();
+
+  auto parent_histogram = getParentHistogram("request_body_size");
+  ASSERT_NE(nullptr, parent_histogram);
+
+  struct TestCase {
+    uint32_t max_buckets;
+    int32_t schema;
+    int32_t bucket_index;
+  };
+  // Prometheus bucket i has upper bound 2^(i * 2^(-schema)). A 4000-byte sample
+  // belongs to bucket 192 at schema 4 (upper bound 4096), or bucket 2 at schema -3
+  // (upper bound 65536). Assert the wire indices independently of the test decoders.
+  const std::vector<TestCase> test_cases = {{20, 4, 192}, {1, -3, 2}};
+  for (const auto& test_case : test_cases) {
+    SCOPED_TRACE(test_case.schema);
+    StatsParams params;
+    params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
+    params.native_histogram_max_buckets_ = test_case.max_buckets;
+
+    Http::TestResponseHeaderMapImpl response_headers;
+    Buffer::OwnedImpl response;
+    EXPECT_EQ(1, PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+                     {}, {}, {parent_histogram}, {}, endpoints_helper_->cm_, response_headers,
+                     response, params, custom_namespaces_));
+
+    const auto families = parsePrometheusProtobuf(response.toString());
+    ASSERT_EQ(1, families.size());
+    ASSERT_EQ(1, families[0].metric_size());
+    const auto& hist = families[0].metric(0).histogram();
+    EXPECT_EQ(test_case.schema, hist.schema());
+    EXPECT_EQ(1, hist.sample_count());
+    EXPECT_DOUBLE_EQ(parent_histogram->cumulativeStatistics().sampleSum(), hist.sample_sum());
+    EXPECT_EQ(0, hist.zero_count());
+    ASSERT_EQ(1, hist.positive_span_size());
+    EXPECT_EQ(test_case.bucket_index, hist.positive_span(0).offset());
+    EXPECT_EQ(1, hist.positive_span(0).length());
+    ASSERT_EQ(1, hist.positive_delta_size());
+    EXPECT_EQ(1, hist.positive_delta(0));
+  }
+}
+
 // Test native histogram with only zero values using real histogram implementation.
 // All samples should go to the zero bucket, with no positive buckets.
 TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithOnlyZeros) {
@@ -1918,23 +1963,23 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithBoundaryValues) {
 
   // At schema 4, values 1 and 2 are in different buckets:
   // - base = 2^(2^(-4)) = 2^(1/16) ≈ 1.044
-  // - value 1.0: index = ceil(log(1) / log(base)) - 1 = -1
-  // - value 2.0: Mathematically would be index 15, but base^16 = 2.0 exactly,
+  // - value 1.0: index = ceil(log(1) / log(base)) = 0
+  // - value 2.0: Mathematically would be index 16, but base^16 = 2.0 exactly,
   //   so this is an exact bucket boundary. Due to how circllhist handles
-  //   boundaries during interpolation, the samples end up in bucket 16.
+  //   boundaries during interpolation, the samples end up in bucket 17.
   ASSERT_EQ(2, decoded.positive_buckets.size());
 
   // First bucket should contain value 1
-  EXPECT_EQ(-1, decoded.positive_buckets[0].index);
+  EXPECT_EQ(0, decoded.positive_buckets[0].index);
   EXPECT_EQ(3, decoded.positive_buckets[0].count); // 3 ones
   EXPECT_LT(decoded.positive_buckets[0].lower_bound, 1.0);
   EXPECT_GE(decoded.positive_buckets[0].upper_bound, 1.0);
 
   // Second bucket should contain value 2
-  // Note: index is 16 rather than 15 due to boundary handling at base^16 = 2.0.
-  // Bucket 16 covers (base^16, base^17] = (2.0, ~2.088], but circllhist
+  // Note: index is 17 rather than 16 due to boundary handling at base^16 = 2.0.
+  // Bucket 17 covers (base^16, base^17] = (2.0, ~2.088], but circllhist
   // interpolation places the samples here anyway.
-  EXPECT_EQ(16, decoded.positive_buckets[1].index);
+  EXPECT_EQ(17, decoded.positive_buckets[1].index);
   EXPECT_EQ(2, decoded.positive_buckets[1].count); // 2 twos
   // Use EXPECT_NEAR due to floating-point precision in std::pow(base, 16)
   EXPECT_NEAR(2.0, decoded.positive_buckets[1].lower_bound, 1e-10);
@@ -2102,14 +2147,14 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithPercent) {
 
   // With PercentScale applied, the output bucket bounds should be in 0-3 range.
   // The 8 sparse non-zero values (0.00001 to 3.0) span about 18 doublings.
-  // With default max_buckets=20, schema 2 should be selected (4 buckets per doubling).
-  EXPECT_EQ(2, hist.schema());
+  // With default max_buckets=20, schema 3 should be selected (8 buckets per doubling).
+  EXPECT_EQ(3, hist.schema());
 
   // Verify positive bucket total matches non-zero samples
   EXPECT_EQ(8, decodeTotalCountFromBuckets(hist));
 
   // With 8 sparse values spanning a wide range (0.00001 to 3.0), each value should
-  // fall into a distinct native histogram bucket at schema 2.
+  // fall into a distinct native histogram bucket at schema 3.
   EXPECT_EQ(8, hist.positive_delta_size());
 
   const DecodedNativeHistogram decoded(hist);
@@ -2119,7 +2164,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithPercent) {
 
   // Verify each recorded non-zero value has a corresponding bucket with count 1.
   // Since values are sparse and sorted, they map 1:1 to consecutive decoded buckets.
-  // At schema 2, bucket i covers (base^i, base^(i+1)].
+  // At schema 3, bucket i covers (base^(i-1), base^i].
   const std::vector<double> recorded_values = {0.00001, 0.01, 0.10, 0.50, 0.75, 1.00, 1.50, 3.00};
   for (size_t i = 0; i < recorded_values.size(); ++i) {
     const double value = recorded_values[i];
@@ -2139,9 +2184,9 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithPercent) {
         << "Bucket " << i << " index mismatch for value " << value;
 
     if (value > 1.0) {
-      EXPECT_GE(bucket.index, 0);
+      EXPECT_GT(bucket.index, 0);
     } else {
-      EXPECT_LT(bucket.index, 0);
+      EXPECT_LE(bucket.index, 0);
     }
   }
 }
@@ -2179,27 +2224,27 @@ public:
   }
 
   // Given a schema and value, compute the expected bucket index.
-  // Bucket i covers (base^i, base^(i+1)] where base = 2^(2^(-schema)).
+  // Bucket i covers (base^(i-1), base^i] where base = 2^(2^(-schema)).
   static int32_t expectedBucketIndex(int8_t schema, double value) {
     EXPECT_GT(value, 0) << "Only positive values have bucket indices";
     double base = std::pow(2.0, std::pow(2.0, -schema));
-    // For value v in (base^i, base^(i+1)], the bucket index is i.
-    // At exact boundaries, v = base^(i+1) is in bucket i.
-    // Formula: i = ceil(log(v) / log(base)) - 1
+    // For value v in (base^(i-1), base^i], the bucket index is i.
+    // At exact boundaries, v = base^i is in bucket i.
+    // Formula: i = ceil(log(v) / log(base))
     double log_base = std::log(base);
-    return static_cast<int32_t>(std::ceil(std::log(value) / log_base)) - 1;
+    return static_cast<int32_t>(std::ceil(std::log(value) / log_base));
   }
 
   // Compute the upper bound of a bucket given its index and schema.
   static double bucketUpperBound(int8_t schema, int32_t index) {
     double base = std::pow(2.0, std::pow(2.0, -schema));
-    return std::pow(base, index + 1);
+    return std::pow(base, index);
   }
 
   // Compute the lower bound of a bucket given its index and schema.
   static double bucketLowerBound(int8_t schema, int32_t index) {
     double base = std::pow(2.0, std::pow(2.0, -schema));
-    return std::pow(base, index);
+    return std::pow(base, index - 1);
   }
 };
 
@@ -2366,8 +2411,8 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramBucketIndexAccuracy) {
   Stats::Histogram& h1 = makeHistogram("histogram_exact", Stats::Histogram::Unit::Unspecified);
 
   // At schema 4, base = 2^(2^(-4)) = 2^(1/16) ≈ 1.044274
-  // Bucket i covers (base^i, base^(i+1)]
-  // For value v, bucket index = ceil(log(v)/log(base)) - 1
+  // Bucket i covers (base^(i-1), base^i]
+  // For value v, bucket index = ceil(log(v)/log(base))
   constexpr int8_t expected_schema = 4;
   const double base = std::pow(2.0, std::pow(2.0, -expected_schema)); // 2^(1/16)
 
@@ -2380,9 +2425,9 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramBucketIndexAccuracy) {
 
   std::vector<ValueExpectation> test_values;
   for (uint64_t v : {2, 4, 8, 16, 32}) {
-    // Bucket index formula: ceil(log(v)/log(base)) - 1
+    // Bucket index formula: ceil(log(v)/log(base))
     const int32_t idx =
-        static_cast<int32_t>(std::ceil(std::log(static_cast<double>(v)) / std::log(base))) - 1;
+        static_cast<int32_t>(std::ceil(std::log(static_cast<double>(v)) / std::log(base)));
     test_values.push_back({v, idx});
     recordValue(h1, v);
   }
@@ -2433,9 +2478,9 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramBucketIndexAccuracy) {
         << "Value " << expected.value << " should be in bucket " << expected.expected_index;
     EXPECT_EQ(1, bucket.count) << "Bucket for value " << expected.value << " should have count 1";
 
-    // Verify bounds: bucket covers (base^idx, base^(idx+1)]
-    const double expected_lower = std::pow(base, expected.expected_index);
-    const double expected_upper = std::pow(base, expected.expected_index + 1);
+    // Verify bounds: bucket covers (base^(idx-1), base^idx]
+    const double expected_lower = std::pow(base, expected.expected_index - 1);
+    const double expected_upper = std::pow(base, expected.expected_index);
     EXPECT_NEAR(expected_lower, bucket.lower_bound, expected_lower * 1e-10);
     EXPECT_NEAR(expected_upper, bucket.upper_bound, expected_upper * 1e-10);
 
@@ -2641,7 +2686,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramCumulativeAccuracy) {
     double lower = NativeHistogramDecoder::bucketLowerBound(schema, idx);
     double upper = NativeHistogramDecoder::bucketUpperBound(schema, idx);
 
-    // Bucket i covers (base^i, base^(i+1)], i.e., exclusive lower, inclusive upper.
+    // Bucket i covers (base^(i-1), base^i], i.e., exclusive lower, inclusive upper.
     if (lower < 5.0 && upper >= 5.0) {
       count_around_5 += count;
     }
@@ -2846,12 +2891,12 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSchemaFallback) {
   EXPECT_EQ(2, decoded.totalPositiveBucketCount());
 
   // At schema -4, base = 2^16 = 65536
-  // Value 1: bucket index = ceil(log(1)/log(65536)) - 1 = ceil(0) - 1 = -1
-  // Value 1000000000: bucket index = ceil(log(1e9)/log(65536)) - 1 = ceil(1.87) - 1 = 1
-  // So indices should be -1 and 1.
-  EXPECT_EQ(-1, decoded.positive_buckets[0].index) << "Value 1 should be in bucket -1 at schema -4";
-  EXPECT_EQ(1, decoded.positive_buckets[1].index)
-      << "Value 1000000000 should be in bucket 1 at schema -4";
+  // Value 1: bucket index = ceil(log(1)/log(65536)) = 0
+  // Value 1000000000: bucket index = ceil(log(1e9)/log(65536)) = 2
+  // So indices should be 0 and 2.
+  EXPECT_EQ(0, decoded.positive_buckets[0].index) << "Value 1 should be in bucket 0 at schema -4";
+  EXPECT_EQ(2, decoded.positive_buckets[1].index)
+      << "Value 1000000000 should be in bucket 2 at schema -4";
 }
 
 } // namespace Server

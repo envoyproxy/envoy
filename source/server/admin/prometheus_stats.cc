@@ -559,7 +559,7 @@ private:
 
       proto_histogram->mutable_positive_delta()->Reserve(needed_indices.size());
       for (int32_t idx : needed_indices) {
-        const double upper_bound = std::pow(base, idx + 1);
+        const double upper_bound = std::pow(base, idx);
         uint64_t cumulative = histogram->cumulativeCountLessThanOrEqualToValue(upper_bound);
         uint64_t bucket_count = cumulative - prev_cumulative;
         prev_cumulative = cumulative;
@@ -659,12 +659,10 @@ private:
 
       // Clamp lower bound to zero_threshold to prevent log(0).
       const double effective_lower = std::max(bucket.lower_bound_, zero_threshold);
-      // Use ceil(...) - 1 to find the bucket containing effective_lower.
-      // Prometheus bucket i covers (base^i, base^(i+1)], so value v is in bucket
-      // ceil(log(v)/log(base)) - 1. This correctly handles boundary cases where
-      // v = base^k exactly (it goes in bucket k-1, not k).
+      // Prometheus bucket i covers (base^(i-1), base^i].
+      // Use ceil(...) so an exact boundary value base^k maps to index k.
       const int32_t lower_index =
-          static_cast<int32_t>(std::ceil(std::log(effective_lower) / log_base)) - 1;
+          static_cast<int32_t>(std::ceil(std::log(effective_lower) / log_base));
       const int32_t upper_index = static_cast<int32_t>(std::ceil(std::log(upper_bound) / log_base));
 
       for (int32_t idx = lower_index; idx <= upper_index; ++idx) {
