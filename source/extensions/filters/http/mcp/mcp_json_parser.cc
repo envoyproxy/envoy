@@ -445,13 +445,9 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
     }
 
     if (!path_stack_.empty()) {
-      // Update cached path before removing from stack
-      size_t last_dot = current_path_cache_.rfind('.');
-      if (last_dot != std::string::npos) {
-        current_path_cache_.resize(last_dot);
-      } else {
-        current_path_cache_.clear();
-      }
+      const size_t trim_size = path_stack_.back().size() + (path_stack_.size() > 1 ? 1 : 0);
+      ASSERT(current_path_cache_.size() >= trim_size);
+      current_path_cache_.resize(current_path_cache_.size() - trim_size);
       path_stack_.pop_back();
     }
     if (context_stack_.size() > 1) {

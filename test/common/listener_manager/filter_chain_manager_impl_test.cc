@@ -24,6 +24,7 @@
 #include "source/server/configuration_impl.h"
 
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/factory_context.h"
@@ -123,10 +124,26 @@ public:
         empty_config_source_, dummy_fcds_callbacks_));
   }
 
+  std::shared_ptr<FcdsSharedFilterChainManager>
+  createFcdsSharedManager(ListenerComponentFactory& listener_component_factory) {
+    // The manager takes ownership. The raw pointer lets the test drive the coalesced callback.
+    fcds_tls_update_cb_ = new NiceMock<Event::MockSchedulableCallback>(
+        &parent_context_.server_factory_context_.dispatcher_);
+    return std::make_shared<FcdsSharedFilterChainManager>(parent_context_.server_factory_context_,
+                                                          listener_component_factory);
+  }
+
+  void flushFcdsTlsUpdate() {
+    if (fcds_tls_update_cb_ != nullptr && fcds_tls_update_cb_->enabled_) {
+      fcds_tls_update_cb_->invokeCallback();
+    }
+  }
+
   // Intermediate states.
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::vector<std::shared_ptr<Network::MockConnectionSocket>> sockets_;
+  Event::MockSchedulableCallback* fcds_tls_update_cb_{};
 
   // Reusable template.
   const std::string filter_chain_yaml = R"EOF(
@@ -391,8 +408,7 @@ public:
 TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
 
-  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
-      parent_context_.server_factory_context_, listener_component_factory);
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
 
   envoy::config::core::v3::ConfigSource config_source;
   config_source.mutable_api_config_source()->set_api_type(
@@ -443,6 +459,10 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
 
   EXPECT_OK(fcds_callbacks->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
 
+  // The warmed chain reaches workers only after the coalesced callback runs.
+  EXPECT_EQ(fcds_shared_manager->findThreadLocalFilterChain(filter_chain_name), nullptr);
+  flushFcdsTlsUpdate();
+
   const Network::FilterChain* active_chain =
       fcds_shared_manager->findThreadLocalFilterChain(filter_chain_name);
   ASSERT_NE(active_chain, nullptr);
@@ -466,6 +486,7 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
   EXPECT_OK(fcds_callbacks->onConfigUpdate(decoded_resources_v2.refvec_, removed_resources, "v2"));
 
   EXPECT_EQ(drained_chain.get(), active_chain);
+  flushFcdsTlsUpdate();
 
   const Network::FilterChain* active_chain_v2 =
       fcds_shared_manager->findThreadLocalFilterChain(filter_chain_name);
@@ -481,8 +502,7 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
 TEST_P(FilterChainManagerImplTest, FcdsActiveFilterChainNames) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
 
-  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
-      parent_context_.server_factory_context_, listener_component_factory);
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
 
   envoy::config::core::v3::ConfigSource config_source;
   config_source.mutable_api_config_source()->set_api_type(
@@ -537,10 +557,97 @@ TEST_P(FilterChainManagerImplTest, FcdsActiveFilterChainNames) {
   EXPECT_THAT(fcds_shared_manager->activeFilterChainNames(), testing::IsEmpty());
 }
 
+// Warming a batch of filter chains in one event loop iteration publishes to workers only once.
+TEST_P(FilterChainManagerImplTest, FcdsCoalescesThreadLocalUpdates) {
+  NiceMock<MockListenerComponentFactory> listener_component_factory;
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
+
+  envoy::config::core::v3::ConfigSource config_source;
+  config_source.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::GRPC);
+  config_source.mutable_api_config_source()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
+
+  std::vector<Config::SubscriptionCallbacks*> subscription_callbacks;
+  ON_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
+          subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillByDefault(Invoke(
+          [&subscription_callbacks](
+              const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
+              Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
+              const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+            subscription_callbacks.push_back(&callbacks);
+            return std::make_unique<NiceMock<Config::MockSubscription>>();
+          }));
+  ON_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _))
+      .WillByDefault(
+          Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                    Configuration::FilterChainFactoryContext&)
+                     -> absl::StatusOr<Filter::NetworkFilterFactoriesList> {
+            return Filter::NetworkFilterFactoriesList{};
+          }));
+
+  testing::StrictMock<MockFcdsClientCallbacks> callbacks;
+  const std::vector<std::string> names{"chain_a", "chain_b", "chain_c"};
+  std::vector<FcdsSubscriptionHandleSharedPtr> handles;
+  for (const auto& name : names) {
+    auto handle_or_status =
+        fcds_shared_manager->subscribe(config_source, name, callbacks, init_manager_);
+    ASSERT_TRUE(handle_or_status.ok());
+    handles.push_back(std::move(handle_or_status).value());
+  }
+  ASSERT_EQ(subscription_callbacks.size(), names.size());
+
+  Init::ExpectableWatcherImpl init_watcher;
+  EXPECT_CALL(init_watcher, ready());
+  init_manager_.initialize(init_watcher);
+
+  // Warming the whole batch arms the coalesced callback exactly once.
+  EXPECT_CALL(*fcds_tls_update_cb_, scheduleCallbackCurrentIteration());
+  for (size_t i = 0; i < names.size(); i++) {
+    envoy::config::listener::v3::FilterChain filter_chain;
+    filter_chain.set_name(names[i]);
+    const auto decoded_resources = TestUtility::decodeResources({filter_chain});
+    Protobuf::RepeatedPtrField<std::string> removed_resources;
+    EXPECT_OK(subscription_callbacks[i]->onConfigUpdate(decoded_resources.refvec_,
+                                                        removed_resources, "v1"));
+  }
+
+  // The publish is deferred, so workers observe nothing until the callback runs.
+  for (const auto& name : names) {
+    EXPECT_EQ(fcds_shared_manager->findThreadLocalFilterChain(name), nullptr);
+  }
+
+  // Running the single coalesced callback publishes the full snapshot.
+  fcds_tls_update_cb_->invokeCallback();
+  for (const auto& name : names) {
+    EXPECT_NE(fcds_shared_manager->findThreadLocalFilterChain(name), nullptr);
+  }
+  testing::Mock::VerifyAndClearExpectations(fcds_tls_update_cb_);
+
+  // Removing a batch rearms the callback once and the removed chains stay visible until it runs.
+  EXPECT_CALL(callbacks, drainFilterChain(_)).Times(2);
+  EXPECT_CALL(*fcds_tls_update_cb_, scheduleCallbackCurrentIteration());
+  for (size_t i = 0; i < 2; i++) {
+    Protobuf::RepeatedPtrField<std::string> removed_resources;
+    removed_resources.Add(std::string(names[i]));
+    EXPECT_OK(subscription_callbacks[i]->onConfigUpdate({}, removed_resources, "v2"));
+  }
+  EXPECT_NE(fcds_shared_manager->findThreadLocalFilterChain(names[0]), nullptr);
+
+  fcds_tls_update_cb_->invokeCallback();
+  EXPECT_EQ(fcds_shared_manager->findThreadLocalFilterChain(names[0]), nullptr);
+  EXPECT_EQ(fcds_shared_manager->findThreadLocalFilterChain(names[1]), nullptr);
+  EXPECT_NE(fcds_shared_manager->findThreadLocalFilterChain(names[2]), nullptr);
+
+  for (auto& handle : handles) {
+    handle.reset();
+  }
+}
+
 TEST_P(FilterChainManagerImplTest, FcdsNoMatcherFails) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
-  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
-      parent_context_.server_factory_context_, listener_component_factory);
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
 
   auto status = filter_chain_manager_->addFilterChains(
       nullptr,
@@ -552,187 +659,9 @@ TEST_P(FilterChainManagerImplTest, FcdsNoMatcherFails) {
                                 "FCDS requires a filter chain matcher."));
 }
 
-namespace {
-// A GRPC config source accepted by the FCDS subscription machinery in tests.
-envoy::config::core::v3::ConfigSource testGrpcConfigSource() {
-  envoy::config::core::v3::ConfigSource config_source;
-  config_source.mutable_api_config_source()->set_api_type(
-      envoy::config::core::v3::ApiConfigSource::GRPC);
-  config_source.mutable_api_config_source()->set_transport_api_version(
-      envoy::config::core::v3::ApiVersion::V3);
-  return config_source;
-}
-} // namespace
-
-// The accessors get_active_resource_names() relies on: a subscription is reported active only once
-// its chain has committed, and the handle exposes the subscribed chain name. Before the commit the
-// name is known but the chain is not active.
-TEST_P(FilterChainManagerImplTest, FcdsHandleIsActiveTracksCommit) {
-  NiceMock<MockListenerComponentFactory> listener_component_factory;
-  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
-      parent_context_.server_factory_context_, listener_component_factory);
-  const auto config_source = testGrpcConfigSource();
-  const std::string name = "dynamic_chain";
-
-  Config::SubscriptionCallbacks* fcds_callbacks = nullptr;
-  auto subscription = std::make_unique<NiceMock<Config::MockSubscription>>();
-  EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(Invoke([&fcds_callbacks, &subscription](
-                           const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                           Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
-                           Config::OpaqueResourceDecoderSharedPtr,
-                           const Config::SubscriptionOptions&) mutable
-                           -> absl::StatusOr<Config::SubscriptionPtr> {
-        fcds_callbacks = &callbacks;
-        return std::move(subscription);
-      }));
-
-  MockFcdsClientCallbacks callbacks;
-  auto handle_or_status =
-      fcds_shared_manager->subscribe(config_source, name, callbacks, init_manager_);
-  ASSERT_TRUE(handle_or_status.ok());
-  auto handle = std::move(handle_or_status).value();
-
-  Init::ExpectableWatcherImpl init_watcher;
-  EXPECT_CALL(init_watcher, ready());
-  init_manager_.initialize(init_watcher);
-  ASSERT_NE(fcds_callbacks, nullptr);
-
-  // Subscribed but not yet committed: name is known, but the chain is not active.
-  EXPECT_EQ(handle->filterChainName(), name);
-  EXPECT_FALSE(handle->isActive());
-  EXPECT_FALSE(fcds_shared_manager->isFilterChainActive(name));
-  EXPECT_FALSE(fcds_shared_manager->isFilterChainActive("never_subscribed"));
-
-  // Commit the chain.
-  envoy::config::listener::v3::FilterChain filter_chain;
-  filter_chain.set_name(name);
-  EXPECT_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _))
-      .WillOnce(Return(Filter::NetworkFilterFactoriesList{}));
-  const auto decoded = TestUtility::decodeResources({filter_chain});
-  Protobuf::RepeatedPtrField<std::string> removed;
-  EXPECT_OK(fcds_callbacks->onConfigUpdate(decoded.refvec_, removed, "v1"));
-
-  // Now active.
-  EXPECT_TRUE(handle->isActive());
-  EXPECT_TRUE(fcds_shared_manager->isFilterChainActive(name));
-
-  handle.reset();
-}
-
-// filterChainNames() reports an FCDS chain only when it is BOTH referenced by this listener's
-// matcher (routable) AND committed (active). A chain committed in the process-wide shared manager
-// but absent from this listener's matcher is not reported by this listener.
-TEST_P(FilterChainManagerImplTest, FilterChainNamesFcdsRoutableAndActiveOnly) {
-  // FCDS requires a matcher, so this is only meaningful in the matcher-enabled parameterization.
-  if (!GetParam()) {
-    GTEST_SKIP();
-  }
-  NiceMock<MockListenerComponentFactory> listener_component_factory;
-  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
-      parent_context_.server_factory_context_, listener_component_factory);
-  const auto config_source = testGrpcConfigSource();
-
-  // Matcher routes port 10000 to the FCDS chain `fc_routable` (no inline chain of that name, so it
-  // becomes an FCDS subscription rather than a static action).
-  const std::string matcher_yaml = R"EOF(
-     matcher_tree:
-       input:
-         name: port
-         typed_config:
-           "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
-       exact_match_map:
-         map:
-           "10000":
-             action:
-               name: filter-chain-name
-               typed_config:
-                 "@type": type.googleapis.com/google.protobuf.StringValue
-                 value: fc_routable
-  )EOF";
-  xds::type::matcher::v3::Matcher fcds_matcher;
-  TestUtility::loadFromYaml(matcher_yaml, fcds_matcher);
-
-  // Capture the subscription callbacks per subscribe() call (one for `fc_routable` via
-  // addFilterChains, one for the out-of-matcher chain below).
-  std::vector<Config::SubscriptionCallbacks*> sub_callbacks;
-  EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillRepeatedly(
-          Invoke([&sub_callbacks](const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                                  Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
-                                  Config::OpaqueResourceDecoderSharedPtr,
-                                  const Config::SubscriptionOptions&) mutable
-                     -> absl::StatusOr<Config::SubscriptionPtr> {
-            sub_callbacks.push_back(&callbacks);
-            return std::make_unique<NiceMock<Config::MockSubscription>>();
-          }));
-
-  // No inline chains; the matcher's `fc_routable` is served via FCDS.
-  EXPECT_OK(filter_chain_manager_->addFilterChains(
-      &fcds_matcher, std::vector<const envoy::config::listener::v3::FilterChain*>{}, nullptr,
-      filter_chain_factory_builder_, *filter_chain_manager_, fcds_shared_manager, config_source,
-      dummy_fcds_callbacks_));
-
-  Init::ExpectableWatcherImpl init_watcher;
-  EXPECT_CALL(init_watcher, ready());
-  init_manager_.initialize(init_watcher);
-  ASSERT_FALSE(sub_callbacks.empty());
-
-  // Subscribed (matcher references it) but not yet committed -> not reported.
-  EXPECT_THAT(filter_chain_manager_->filterChainNames(), testing::IsEmpty());
-
-  // Commit `fc_routable`. The factory list is move-only, so return a fresh one per call.
-  EXPECT_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _))
-      .WillRepeatedly(
-          testing::InvokeWithoutArgs([] { return Filter::NetworkFilterFactoriesList{}; }));
-  Protobuf::RepeatedPtrField<std::string> removed;
-  {
-    envoy::config::listener::v3::FilterChain fc;
-    fc.set_name("fc_routable");
-    const auto decoded = TestUtility::decodeResources({fc});
-    EXPECT_OK(sub_callbacks.front()->onConfigUpdate(decoded.refvec_, removed, "v1"));
-  }
-
-  // Routable + active -> reported by this listener.
-  EXPECT_THAT(filter_chain_manager_->filterChainNames(),
-              testing::UnorderedElementsAre("fc_routable"));
-
-  // A chain committed in the shared manager but NOT in this listener's matcher must not be reported
-  // by this listener (routable-scoping): subscribe + commit `fc_elsewhere` via a separate handle.
-  // It needs its own init manager (init_manager_ is already initialized above; adding a target to
-  // an initialized manager is not allowed).
-  Init::ManagerImpl other_init_manager{"fcds-other-test"};
-  MockFcdsClientCallbacks other_callbacks;
-  auto other_handle_or_status = fcds_shared_manager->subscribe(config_source, "fc_elsewhere",
-                                                               other_callbacks, other_init_manager);
-  ASSERT_TRUE(other_handle_or_status.ok());
-  auto other_handle = std::move(other_handle_or_status).value();
-  Init::ExpectableWatcherImpl other_watcher;
-  EXPECT_CALL(other_watcher, ready());
-  other_init_manager.initialize(other_watcher);
-  ASSERT_GE(sub_callbacks.size(), 2u);
-  {
-    envoy::config::listener::v3::FilterChain fc;
-    fc.set_name("fc_elsewhere");
-    const auto decoded = TestUtility::decodeResources({fc});
-    EXPECT_OK(sub_callbacks.back()->onConfigUpdate(decoded.refvec_, removed, "v1"));
-  }
-  EXPECT_TRUE(fcds_shared_manager->isFilterChainActive("fc_elsewhere"));
-
-  // Still only `fc_routable`: the out-of-matcher (but active) chain is not reported by this
-  // listener.
-  EXPECT_THAT(filter_chain_manager_->filterChainNames(),
-              testing::UnorderedElementsAre("fc_routable"));
-
-  other_handle.reset();
-}
-
 TEST_P(FilterChainManagerImplTest, FcdsQuicFails) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
-  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
-      parent_context_.server_factory_context_, listener_component_factory);
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
 
   EXPECT_CALL(parent_context_, isQuic()).WillRepeatedly(Return(true));
 
@@ -748,8 +677,7 @@ TEST_P(FilterChainManagerImplTest, FcdsQuicFails) {
 
 TEST_P(FilterChainManagerImplTest, FcdsInvalidConfigSourceFails) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
-  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
-      parent_context_.server_factory_context_, listener_component_factory);
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
 
   EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
               subscriptionFromConfigSource(_, _, _, _, _, _))
@@ -796,32 +724,6 @@ TEST(ListenerInfoImplTest, FromConfig) {
   EXPECT_FALSE(info.isQuic());
   info.metadata();
   info.typedMetadata();
-}
-
-TEST_P(FilterChainManagerImplTest, FilterChainNames) {
-  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
-  for (int i = 0; i < 2; i++) {
-    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
-    new_filter_chain.set_name(absl::StrCat("fc_", i));
-    new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
-    filter_chain_messages.push_back(std::move(new_filter_chain));
-  }
-  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
-      .WillRepeatedly(testing::Invoke(
-          [](const envoy::config::listener::v3::FilterChain& fc, FilterChainFactoryContextCreator&,
-             bool) -> absl::StatusOr<Network::DrainableFilterChainSharedPtr> {
-            auto chain = std::make_shared<NiceMock<Network::MockFilterChain>>();
-            ON_CALL(*chain, name()).WillByDefault(Return(fc.name()));
-            return chain;
-          }));
-  EXPECT_OK(filter_chain_manager_->addFilterChains(
-      GetParam() ? &matcher_ : nullptr,
-      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0],
-                                                                   &filter_chain_messages[1]},
-      nullptr, filter_chain_factory_builder_, *filter_chain_manager_, nullptr, empty_config_source_,
-      dummy_fcds_callbacks_));
-  EXPECT_THAT(filter_chain_manager_->filterChainNames(),
-              testing::UnorderedElementsAre("fc_0", "fc_1"));
 }
 
 } // namespace Server

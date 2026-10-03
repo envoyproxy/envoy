@@ -6,6 +6,7 @@
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -531,6 +532,8 @@ public:
   void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
 
 private:
+  friend class FcdsSharedFilterChainManagerPeer;
+
   struct ThreadLocalState : public ThreadLocal::ThreadLocalObject {
     absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_;
   };
@@ -548,6 +551,10 @@ private:
 
   void onFilterChainWarmed(Network::DrainableFilterChainSharedPtr filter_chain);
   void updateTlsState();
+  void scheduleTlsUpdate();
+
+  // Coalesces thread local filter chain updates within a single event loop iteration.
+  Event::SchedulableCallbackPtr tls_update_cb_;
 };
 
 // Helper function to look up the process-wide FCDS shared filter chain manager, returning it if it
