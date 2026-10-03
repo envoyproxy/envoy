@@ -36,9 +36,11 @@ public:
     return *items_.front();
   }
 
-  void pop() override {
+  ItemType& pop() override {
     ASSERT(!items_.empty());
-    remove(*items_.front());
+    ItemType& item = *items_.front();
+    remove(item);
+    return item;
   }
 
   void remove(ItemType& item) override {

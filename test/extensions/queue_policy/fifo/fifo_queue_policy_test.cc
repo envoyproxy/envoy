@@ -71,7 +71,8 @@ TEST(FifoQueueTest, TestQueueFunctions) {
   EXPECT_EQ(queue.peek().value(), 11);
   EXPECT_EQ(second.value(), 42);
 
-  queue.pop();
+  static_assert(std::is_same_v<decltype(queue.pop()), FifoQueueItemType&>);
+  EXPECT_EQ(queue.pop().value(), 11);
   EXPECT_EQ(queue.peek().value(), 7);
   queue.remove(third);
   EXPECT_TRUE(queue.empty());

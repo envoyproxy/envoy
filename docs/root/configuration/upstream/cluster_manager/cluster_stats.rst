@@ -77,6 +77,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_protocol_error, Counter, Total connection protocol errors
   upstream_cx_max_requests, Counter, Total connections closed due to maximum requests
   upstream_cx_none_healthy, Counter, Total times connection not established due to no healthy hosts
+  upstream_queue_overloaded, Gauge, Number of connection pool pending request queues currently reporting an overloaded state
   upstream_rq_total, Counter, Total requests
   upstream_rq_active, Gauge, Total active requests
   upstream_rq_pending_total, Counter, Total requests pending a connection pool connection
