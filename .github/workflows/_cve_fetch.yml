@@ -31,7 +31,7 @@ jobs:
         DAY=$(date +%u)
         if [[ "$DAY" == 7 && "${{ inputs.scheduled }}" == "true" ]]; then
             echo "weekly_run=true" >> $GITHUB_OUTPUT
-            export OVERWRITE_ALL_CVE_DATA=1
+            echo "OVERWRITE_ALL_CVE_DATA=1" >> "$GITHUB_ENV"
         else
             echo "weekly_run=false" >> $GITHUB_OUTPUT
         fi
