@@ -330,7 +330,7 @@ ConnectivityGrid::ConnectivityGrid(
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
     HttpServerPropertiesCacheSharedPtr alternate_protocols,
     ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
+    Stats::Scope& scope, Http::PersistentQuicInfoPtr quic_info,
     OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
     Server::OverloadManager& overload_manager)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host), options_(options),
@@ -341,7 +341,7 @@ ConnectivityGrid::ConnectivityGrid(
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
       origin_("https", getTargetHostname(transport_socket_options, host_),
               host_->address()->ip()->port()),
-      quic_info_(quic_info), priority_(priority), overload_manager_(overload_manager),
+      quic_info_(std::move(quic_info)), priority_(priority), overload_manager_(overload_manager),
       network_observer_registry_(network_observer_registry) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.

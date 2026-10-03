@@ -160,7 +160,7 @@ public:
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
                     CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
                     OptRef<PoolConnectResultCallback> connect_callback,
-                    Http::PersistentQuicInfo& quic_info,
+                    Http::PersistentQuicInfoPtr quic_info,
                     OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
                     Server::OverloadManager& overload_manager, bool attempt_happy_eyeballs = false);
 
@@ -172,7 +172,7 @@ public:
   void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
     if (drain_behavior ==
             Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections &&
-        quic_info_.migration_config_.migrate_session_on_network_change) {
+        quic_info_->migration_config_.migrate_session_on_network_change) {
       // If connection migration is enabled, don't drain existing connections.
       // Each connection will observe network change signals and decide whether
       // to migrate or drain.
@@ -196,8 +196,9 @@ protected:
 private:
   friend class Http3ConnPoolImplPeer;
 
-  // Latches Quic helpers shared across the cluster
-  Quic::PersistentQuicInfoImpl& quic_info_;
+  // Quic helpers shared across the cluster. Shared ownership keeps them alive for as long as this
+  // pool and its connections are, even if the cluster that created them is removed first.
+  const std::shared_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
   // server-id can change over the lifetime of Envoy but will be consistent for a
   // given connection pool.
   quic::QuicServerId server_id_;
@@ -222,7 +223,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
                  OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback,
-                 Http::PersistentQuicInfo& quic_info,
+                 Http::PersistentQuicInfoPtr quic_info,
                  OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
                  Server::OverloadManager& overload_manager, bool attempt_happy_eyeballs = false);
 
