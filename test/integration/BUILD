@@ -1370,6 +1370,7 @@ envoy_cc_test(
         "//envoy/server:filter_config_interface",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//test/common/http/http2:http2_frame",
         "//test/integration/filters:backpressure_filter_config_lib",
         "//test/integration/filters:reset_idle_timer_filter_lib",
         "//test/integration/filters:set_route_filter_lib",

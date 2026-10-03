@@ -281,7 +281,6 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   // Captured once here rather than plumbed through the filter factory: the drain type belongs to
   // the listener that accepted this connection, and is reachable from the connection itself.
   drain_type_ = Network::listenerDrainType(read_callbacks_->connection());
-  read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_->addProxyProtocolConnectionState() &&
       !read_callbacks_->connection()
@@ -316,6 +315,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
       {stats_.named_.downstream_cx_rx_bytes_total_, stats_.named_.downstream_cx_rx_bytes_buffered_,
        stats_.named_.downstream_cx_tx_bytes_total_, stats_.named_.downstream_cx_tx_bytes_buffered_,
        nullptr, &stats_.named_.downstream_cx_delayed_close_timeout_});
+  read_callbacks_->connection().addConnectionCallbacks(*this);
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
@@ -478,8 +478,13 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.response_encoder_->getStream().removeCallbacks(stream);
   }
 
-  if (connection_idle_timer_ && streams_.empty()) {
-    connection_idle_timer_->enableTimer(config_->idleTimeout().value());
+  if (streams_.empty() && !connection_close_started_) {
+    if (connection_drain_event_.has_value() && codec_ && drain_state_ == DrainState::NotDraining) {
+      stats_.named_.downstream_cx_drain_close_.inc();
+      startDrainSequence();
+    } else if (connection_idle_timer_ && !connection_drain_event_.has_value()) {
+      connection_idle_timer_->enableTimer(config_->idleTimeout().value());
+    }
   }
   maybeDrainDueToPrematureResets();
 }
@@ -576,6 +581,7 @@ void ConnectionManagerImpl::handleCodecOverloadError(absl::string_view error) {
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
   ASSERT(!codec_);
+  ASSERT(streams_.empty());
   codec_ = config_->createCodec(read_callbacks_->connection(), data, *this, overload_manager_);
 
   switch (codec_->protocol()) {
@@ -592,6 +598,15 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
     stats_.named_.downstream_cx_http1_total_.inc();
     stats_.named_.downstream_cx_http1_active_.inc();
     break;
+  }
+
+  if (drain_no_codec_close_timer_) {
+    drain_no_codec_close_timer_->disableTimer();
+    drain_no_codec_close_timer_.reset();
+    if (drain_state_ == DrainState::NotDraining && !connection_close_started_) {
+      stats_.named_.downstream_cx_drain_close_.inc();
+      startDrainSequence();
+    }
   }
 }
 
@@ -740,9 +755,30 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 }
 
 void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
-  if (!connection_drain_event_.has_value()) {
-    connection_drain_event_ = drain_event;
+  if (connection_drain_event_.has_value()) {
+    return;
   }
+  connection_drain_event_ = drain_event;
+  if (!streams_.empty() || connection_close_started_) {
+    return;
+  }
+  if (connection_idle_timer_) {
+    connection_idle_timer_->disableTimer();
+  }
+  if (codec_) {
+    if (drain_state_ == DrainState::NotDraining) {
+      // Drain idle HTTP connections immediately, even if the strategy is Gradual.
+      stats_.named_.downstream_cx_drain_close_.inc();
+      startDrainSequence();
+    }
+    return;
+  }
+  drain_no_codec_close_timer_ = dispatcher_->createTimer([this]() {
+    stats_.named_.downstream_cx_drain_close_.inc();
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, std::nullopt,
+                      StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec);
+  });
+  drain_no_codec_close_timer_->enableTimer(config_->drainTimeout());
 }
 
 bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
@@ -756,6 +792,8 @@ bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
 void ConnectionManagerImpl::doConnectionClose(
     std::optional<Network::ConnectionCloseType> close_type,
     std::optional<StreamInfo::CoreResponseFlag> response_flag, absl::string_view details) {
+  connection_close_started_ = true;
+
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
     connection_idle_timer_.reset();
@@ -769,6 +807,11 @@ void ConnectionManagerImpl::doConnectionClose(
   if (drain_timer_) {
     drain_timer_->disableTimer();
     drain_timer_.reset();
+  }
+
+  if (drain_no_codec_close_timer_) {
+    drain_no_codec_close_timer_->disableTimer();
+    drain_no_codec_close_timer_.reset();
   }
 
   if (!streams_.empty()) {

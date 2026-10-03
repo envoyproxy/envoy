@@ -8,6 +8,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_time.h"
@@ -127,6 +128,7 @@ public:
 
   static constexpr uint64_t IdleTimeoutMs = 300 * TIMEOUT_FACTOR;
   static constexpr uint64_t RequestTimeoutMs = 200 * TIMEOUT_FACTOR;
+  static constexpr uint64_t DrainTimeoutMs = 1000 * TIMEOUT_FACTOR;
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
@@ -138,6 +140,119 @@ public:
 INSTANTIATE_TEST_SUITE_P(Protocols, IdleTimeoutIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(IdleTimeoutIntegrationTest, ClosesIdleConnectionWithinOneDrainTimeout) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::SecondsToDuration(30));
+        hcm.mutable_drain_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainTimeoutMs));
+      });
+  autonomous_upstream_ = true;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_TRUE(codec_client_->connected());
+
+  startServerDrain();
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs * 3 / 2)));
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+  test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  }
+}
+
+TEST_P(IdleTimeoutIntegrationTest, DrainingClosesConnectionWithoutCodecAfterDrainTimeout) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "The no-codec timeout is covered with HTTP/1";
+  }
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::SecondsToDuration(30));
+        hcm.mutable_drain_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainTimeoutMs * 2));
+      });
+  initialize();
+
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
+  ASSERT_TRUE(codec_client_->connected());
+  startServerDrain();
+
+  EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs)));
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(DrainTimeoutMs * 2)));
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+  test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
+}
+
+TEST_P(IdleTimeoutIntegrationTest, RequestRacingServerDrainCompletesAndCloses) {
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    GTEST_SKIP() << "The raw request requires HTTP/1 or HTTP/2";
+  }
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_drain_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainTimeoutMs * 2));
+      });
+  autonomous_upstream_ = true;
+  initialize();
+
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+  ASSERT_TRUE(tcp_client->connected());
+  startServerDrain();
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: sni.lyft.com\r\n\r\n"));
+    EXPECT_TCP_RESPONSE(tcp_client, HasSubstr("HTTP/1.1 200"));
+    tcp_client->waitForDisconnect(true);
+    EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+    test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
+    EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
+    return;
+  }
+
+  using Http::Http2::Http2Frame;
+  std::string request = Http2Frame::Preamble;
+  request += std::string(Http2Frame::makeEmptySettingsFrame());
+  request += std::string(Http2Frame::makeRequest(1, "sni.lyft.com", "/"));
+  ASSERT_TRUE(tcp_client->write(request, false, false));
+
+  bool saw_go_away = false;
+  bool saw_success = false;
+  for (size_t i = 0; i < 10 && (!saw_go_away || !saw_success); ++i) {
+    Http2Frame frame;
+    ASSERT_TRUE(tcp_client->waitForData(Http2Frame::HeaderSize));
+    frame.setHeader(tcp_client->data());
+    tcp_client->clearData(Http2Frame::HeaderSize);
+    if (frame.payloadSize() > 0) {
+      ASSERT_TRUE(tcp_client->waitForData(frame.payloadSize()));
+      frame.setPayload(tcp_client->data());
+      tcp_client->clearData(frame.payloadSize());
+    }
+    saw_go_away |= frame.type() == Http2Frame::Type::GoAway;
+    saw_success |=
+        frame.streamId() == 1 && frame.responseStatus() == Http2Frame::ResponseStatus::Ok;
+  }
+  EXPECT_TRUE(saw_go_away);
+  EXPECT_TRUE(saw_success);
+  tcp_client->waitForDisconnect(true);
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+  test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
+}
 
 // Tests idle timeout behaviour with single request and validates that idle timer kicks in
 // after given timeout.
