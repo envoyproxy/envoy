@@ -528,29 +528,14 @@ impl LogContext {
 
   /// Get timing information.
   pub fn timing_info(&self) -> TimingInfo {
-    let mut info = abi::envoy_dynamic_module_type_timing_info {
-      start_time_unix_ns: 0,
-      request_complete_duration_ns: -1,
-      first_upstream_tx_byte_sent_ns: -1,
-      last_upstream_tx_byte_sent_ns: -1,
-      first_upstream_rx_byte_received_ns: -1,
-      last_upstream_rx_byte_received_ns: -1,
-      first_downstream_tx_byte_sent_ns: -1,
-      last_downstream_tx_byte_sent_ns: -1,
-    };
+    let mut info = crate::timing::unavailable_timing_info();
     unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_timing_info(self.envoy_ptr, &mut info);
+      abi::envoy_dynamic_module_callback_access_logger_get_timing_info_v2(
+        self.envoy_ptr,
+        &mut info,
+      );
     }
-    TimingInfo {
-      start_time_unix_ns: info.start_time_unix_ns,
-      request_complete_duration_ns: info.request_complete_duration_ns,
-      first_upstream_tx_byte_sent_ns: info.first_upstream_tx_byte_sent_ns,
-      last_upstream_tx_byte_sent_ns: info.last_upstream_tx_byte_sent_ns,
-      first_upstream_rx_byte_received_ns: info.first_upstream_rx_byte_received_ns,
-      last_upstream_rx_byte_received_ns: info.last_upstream_rx_byte_received_ns,
-      first_downstream_tx_byte_sent_ns: info.first_downstream_tx_byte_sent_ns,
-      last_downstream_tx_byte_sent_ns: info.last_downstream_tx_byte_sent_ns,
-    }
+    info.into()
   }
 
   /// Get byte count information.
@@ -1292,16 +1277,16 @@ impl LogContext {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_headers_count(header_type);
-    crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_headers_v2(
-        self.envoy_ptr,
-        header_type,
-        ptr,
-        capacity,
-        size_out,
-      )
-    })
+    crate::utility::collect_headers(
+      || self.get_headers_count(header_type),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_access_logger_get_headers(
+          self.envoy_ptr,
+          header_type,
+          headers,
+        )
+      },
+    )
   }
 
   /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.

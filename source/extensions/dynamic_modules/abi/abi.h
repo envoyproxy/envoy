@@ -229,6 +229,56 @@ typedef struct envoy_dynamic_module_type_timing_info {
   int64_t last_downstream_tx_byte_sent_ns;
 } envoy_dynamic_module_type_timing_info;
 
+/**
+ * Stream timing for HTTP filters and access loggers. start_time_unix_ns is a Unix timestamp in
+ * nanoseconds; the other numeric fields are nanosecond offsets from the monotonic request start.
+ * Check each numeric value's has_* field for availability. When the flag is false, the numeric
+ * value is -1. Zero and negative offsets are valid.
+ * downstream_connection_begin_ns records accept time, and downstream_handshake_start_ns records
+ * ClientHello. downstream_connection_end_ns is set only if the request is active when the
+ * connection closes. Envoy tracks the final ACK for QUIC.
+ */
+typedef struct envoy_dynamic_module_type_timing_info_v2 {
+  int64_t start_time_unix_ns;
+  int64_t downstream_connection_begin_ns;
+  int64_t downstream_handshake_start_ns;
+  int64_t downstream_handshake_complete_ns;
+  int64_t last_downstream_header_rx_byte_received_ns;
+  int64_t last_downstream_rx_byte_received_ns;
+  int64_t upstream_connect_start_ns;
+  int64_t upstream_connect_complete_ns;
+  int64_t upstream_handshake_complete_ns;
+  int64_t first_upstream_tx_byte_sent_ns;
+  int64_t last_upstream_tx_byte_sent_ns;
+  int64_t first_upstream_rx_byte_received_ns;
+  int64_t first_upstream_rx_body_byte_received_ns;
+  int64_t last_upstream_rx_byte_received_ns;
+  int64_t first_downstream_tx_byte_sent_ns;
+  int64_t last_downstream_tx_byte_sent_ns;
+  int64_t last_downstream_ack_received_ns;
+  int64_t request_complete_duration_ns;
+  int64_t downstream_connection_end_ns;
+  bool has_start_time;
+  bool has_downstream_connection_begin;
+  bool has_downstream_handshake_start;
+  bool has_downstream_handshake_complete;
+  bool has_last_downstream_header_rx_byte_received;
+  bool has_last_downstream_rx_byte_received;
+  bool has_upstream_connect_start;
+  bool has_upstream_connect_complete;
+  bool has_upstream_handshake_complete;
+  bool has_first_upstream_tx_byte_sent;
+  bool has_last_upstream_tx_byte_sent;
+  bool has_first_upstream_rx_byte_received;
+  bool has_first_upstream_rx_body_byte_received;
+  bool has_last_upstream_rx_byte_received;
+  bool has_first_downstream_tx_byte_sent;
+  bool has_last_downstream_tx_byte_sent;
+  bool has_last_downstream_ack_received;
+  bool has_request_complete;
+  bool has_downstream_connection_end;
+} envoy_dynamic_module_type_timing_info_v2;
+
 typedef enum envoy_dynamic_module_type_http_header_type {
   envoy_dynamic_module_type_http_header_type_RequestHeader,
   envoy_dynamic_module_type_http_header_type_RequestTrailer,
@@ -1990,10 +2040,6 @@ size_t envoy_dynamic_module_callback_http_get_headers_size(
     envoy_dynamic_module_type_http_header_type header_type);
 
 /**
- * @deprecated Use envoy_dynamic_module_callback_http_get_headers_v2 instead, which takes the
- * capacity of the output array and reports the header count, so that Envoy never writes past the
- * end of the array.
- *
  * envoy_dynamic_module_callback_http_get_headers is called by the module to get all the
  * headers. The headers are returned as an array of
  * envoy_dynamic_module_type_envoy_http_header.
@@ -2016,31 +2062,6 @@ bool envoy_dynamic_module_callback_http_get_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers);
-
-/**
- * envoy_dynamic_module_callback_http_get_headers_v2 is called by the module to write the headers of
- * the given type into a module owned array. On success it writes the headers and sets size_out to
- * the header count. When capacity is smaller than the header count it writes nothing, sets size_out
- * to the required count and returns false, so the module can grow the array and retry. When the
- * header map is unavailable it sets size_out to zero and returns false.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the corresponding
- * HTTP filter.
- * @param header_type is the type of the header map to get the headers from (request/response
- * headers/trailers).
- * @param result_headers is the output array, which may be null when capacity is zero. The buffers
- * in the entries are owned by Envoy and are valid until the end of the current event hook unless
- * the setter callback are called.
- * @param capacity is the number of entries result_headers can hold.
- * @param size_out receives the header count on success and the required count when capacity is too
- * small.
- * @return true when the headers were written, false when capacity is too small or the header map is
- * unavailable.
- */
-bool envoy_dynamic_module_callback_http_get_headers_v2(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * envoy_dynamic_module_callback_http_add_header is called by the module to add
@@ -3016,16 +3037,15 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
 /**
  * Get a snapshot of the current stream timing information.
  *
- * This always populates the module-owned output struct. The request start time is a Unix timestamp;
- * all other fields are durations from the monotonic request start time. Fields are set to -1 when
- * the stream or an individual timing marker is unavailable at the current event hook.
+ * This always populates the module-owned output struct. Each has_* field reports whether its
+ * numeric value is available at the current event hook.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
  * @param timing_out is the module-owned output parameter for timing information.
  */
 void envoy_dynamic_module_callback_http_get_timing_info(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_timing_info* timing_out);
+    envoy_dynamic_module_type_timing_info_v2* timing_out);
 
 /**
  * envoy_dynamic_module_callback_http_filter_http_callout is called by the module to initiate
@@ -7344,10 +7364,6 @@ size_t envoy_dynamic_module_callback_access_logger_get_headers_size(
     envoy_dynamic_module_type_http_header_type header_type);
 
 /**
- * @deprecated Use envoy_dynamic_module_callback_access_logger_get_headers_v2 instead, which takes
- * the capacity of the output array and reports the header count, so that Envoy never writes past
- * the end of the array.
- *
  * Get all headers from the specified header map.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
@@ -7360,29 +7376,6 @@ bool envoy_dynamic_module_callback_access_logger_get_headers(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers);
-
-/**
- * envoy_dynamic_module_callback_access_logger_get_headers_v2 is called by the module to write the
- * headers of the given type into a module owned array. On success it writes the headers and sets
- * size_out to the header count. When capacity is smaller than the header count it writes nothing,
- * sets size_out to the required count and returns false, so the module can grow the array and
- * retry. When the header map is unavailable it sets size_out to zero and returns false.
- *
- * @param logger_envoy_ptr is the pointer to the log context.
- * @param header_type is the type of header map to access. Supported types are RequestHeader,
- * ResponseHeader, and ResponseTrailer.
- * @param result_headers is the output array, which may be null when capacity is zero. The buffers
- * in the entries are owned by Envoy.
- * @param capacity is the number of entries result_headers can hold.
- * @param size_out receives the header count on success and the required count when capacity is too
- * small.
- * @return true when the headers were written, false when capacity is too small or the header map is
- * unavailable.
- */
-bool envoy_dynamic_module_callback_access_logger_get_headers_v2(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
-    envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * Get a specific header value by key.
@@ -7465,6 +7458,9 @@ bool envoy_dynamic_module_callback_access_logger_get_protocol(
     envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_timing_info_v2 for the extended
+ * timing snapshot.
+ *
  * Get timing information from StreamInfo.
  *
  * This always populates the output struct. Individual fields are set to -1 if unavailable.
@@ -7475,6 +7471,19 @@ bool envoy_dynamic_module_callback_access_logger_get_protocol(
 void envoy_dynamic_module_callback_access_logger_get_timing_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_timing_info* timing_out);
+
+/**
+ * Get the extended timing snapshot from StreamInfo.
+ *
+ * This always populates the output struct. Each has_* field reports whether its numeric value is
+ * available.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param timing_out is the output parameter for timing info.
+ */
+void envoy_dynamic_module_callback_access_logger_get_timing_info_v2(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_timing_info_v2* timing_out);
 
 /**
  * Get byte count information from StreamInfo.
@@ -8687,10 +8696,6 @@ size_t envoy_dynamic_module_callback_formatter_get_headers_size(
     envoy_dynamic_module_type_http_header_type header_type);
 
 /**
- * @deprecated Use envoy_dynamic_module_callback_formatter_get_headers_v2 instead, which takes the
- * capacity of the output array and reports the header count, so that Envoy never writes past the
- * end of the array.
- *
  * Get all headers from the specified header map.
  *
  * @param formatter_context_envoy_ptr is the pointer to the formatting context.
@@ -8703,29 +8708,6 @@ bool envoy_dynamic_module_callback_formatter_get_headers(
     envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers);
-
-/**
- * envoy_dynamic_module_callback_formatter_get_headers_v2 is called by the module to write the
- * headers of the given type into a module owned array. On success it writes the headers and sets
- * size_out to the header count. When capacity is smaller than the header count it writes nothing,
- * sets size_out to the required count and returns false, so the module can grow the array and
- * retry. When the header map is unavailable it sets size_out to zero and returns false.
- *
- * @param formatter_context_envoy_ptr is the pointer to the formatting context.
- * @param header_type is the type of header map to access. Supported types are RequestHeader,
- * ResponseHeader, and ResponseTrailer.
- * @param result_headers is the output array, which may be null when capacity is zero. The buffers
- * in the entries are owned by Envoy.
- * @param capacity is the number of entries result_headers can hold.
- * @param size_out receives the header count on success and the required count when capacity is too
- * small.
- * @return true when the headers were written, false when capacity is too small or the header map is
- * unavailable.
- */
-bool envoy_dynamic_module_callback_formatter_get_headers_v2(
-    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
-    envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * Get a specific header value by key.
@@ -11305,10 +11287,6 @@ size_t envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_s
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
 
 /**
- * @deprecated Use envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2
- * instead, which takes the capacity of the output array and reports the header count, so that Envoy
- * never writes past the end of the array.
- *
  * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers retrieves all downstream
  * request headers into a pre-allocated array.
  *
@@ -11322,27 +11300,6 @@ size_t envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_s
 bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_envoy_http_header* result_headers);
-
-/**
- * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2 is called by the
- * module to write the downstream request headers into a module owned array. On success it writes
- * the headers and sets size_out to the header count. When capacity is smaller than the header count
- * it writes nothing, sets size_out to the required count and returns false, so the module can grow
- * the array and retry. When the header map is unavailable it sets size_out to zero and returns
- * false.
- *
- * @param context_envoy_ptr is the per-request load balancer context.
- * @param result_headers is the output array, which may be null when capacity is zero. The buffers
- * in the entries are owned by Envoy.
- * @param capacity is the number of entries result_headers can hold.
- * @param size_out receives the header count on success and the required count when capacity is too
- * small.
- * @return true when the headers were written, false when capacity is too small or the header map is
- * unavailable.
- */
-bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_v2(
-    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header retrieves a single
@@ -12184,10 +12141,6 @@ size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
 
 /**
- * @deprecated Use envoy_dynamic_module_callback_lb_context_get_downstream_headers_v2 instead, which
- * takes the capacity of the output array and reports the header count, so that Envoy never writes
- * past the end of the array.
- *
  * envoy_dynamic_module_callback_lb_context_get_downstream_headers is called by the module to get
  * all the downstream request headers. The headers are returned as an array of
  * envoy_dynamic_module_type_envoy_http_header.
@@ -12206,27 +12159,6 @@ size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(
 bool envoy_dynamic_module_callback_lb_context_get_downstream_headers(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_envoy_http_header* result_headers);
-
-/**
- * envoy_dynamic_module_callback_lb_context_get_downstream_headers_v2 is called by the module to
- * write the downstream request headers into a module owned array. On success it writes the headers
- * and sets size_out to the header count. When capacity is smaller than the header count it writes
- * nothing, sets size_out to the required count and returns false, so the module can grow the array
- * and retry. When the header map is unavailable it sets size_out to zero and returns false.
- *
- * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
- * @param result_headers is the output array, which may be null when capacity is zero. The buffers
- * in the entries are owned by Envoy and are valid until the end of the current choose_host
- * callback.
- * @param capacity is the number of entries result_headers can hold.
- * @param size_out receives the header count on success and the required count when capacity is too
- * small.
- * @return true when the headers were written, false when capacity is too small or the header map is
- * unavailable.
- */
-bool envoy_dynamic_module_callback_lb_context_get_downstream_headers_v2(
-    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * envoy_dynamic_module_callback_lb_context_get_downstream_header is called by the module to get
@@ -12589,10 +12521,6 @@ size_t envoy_dynamic_module_callback_matcher_get_headers_size(
     envoy_dynamic_module_type_http_header_type header_type);
 
 /**
- * @deprecated Use envoy_dynamic_module_callback_matcher_get_headers_v2 instead, which takes the
- * capacity of the output array and reports the header count, so that Envoy never writes past the
- * end of the array.
- *
  * Get all headers from the specified header map.
  *
  * PRECONDITION: The module must ensure that result_headers is valid and has enough length to
@@ -12608,28 +12536,6 @@ bool envoy_dynamic_module_callback_matcher_get_headers(
     envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers);
-
-/**
- * envoy_dynamic_module_callback_matcher_get_headers_v2 is called by the module to write the headers
- * of the given type into a module owned array. On success it writes the headers and sets size_out
- * to the header count. When capacity is smaller than the header count it writes nothing, sets
- * size_out to the required count and returns false, so the module can grow the array and retry.
- * When the header map is unavailable it sets size_out to zero and returns false.
- *
- * @param matcher_input_envoy_ptr is the pointer to the matcher input.
- * @param header_type is the type of header map to access.
- * @param result_headers is the output array, which may be null when capacity is zero. The buffers
- * in the entries are owned by Envoy.
- * @param capacity is the number of entries result_headers can hold.
- * @param size_out receives the header count on success and the required count when capacity is too
- * small.
- * @return true when the headers were written, false when capacity is too small or the header map is
- * unavailable.
- */
-bool envoy_dynamic_module_callback_matcher_get_headers_v2(
-    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
-    envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 /**
  * Get a specific header value by key.
@@ -13381,10 +13287,6 @@ size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr);
 
 /**
- * @deprecated Use envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2
- * instead, which takes the capacity of the output array and reports the header count, so that Envoy
- * never writes past the end of the array.
- *
  * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers is called by the
  * module to get all request headers.
  *
@@ -13398,26 +13300,6 @@ size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header
 bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_envoy_http_header* result_headers);
-
-/**
- * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2 is called by the
- * module to write the request headers into a module owned array. On success it writes the headers
- * and sets size_out to the header count. When capacity is smaller than the header count it writes
- * nothing, sets size_out to the required count and returns false, so the module can grow the array
- * and retry. When the header map is unavailable it sets size_out to zero and returns false.
- *
- * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
- * @param result_headers is the output array, which may be null when capacity is zero. The buffers
- * in the entries are owned by Envoy.
- * @param capacity is the number of entries result_headers can hold.
- * @param size_out receives the header count on success and the required count when capacity is too
- * small.
- * @return true when the headers were written, false when capacity is too small or the header map is
- * unavailable.
- */
-bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_v2(
-    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
 
 // ----------------------- Request Buffer Operations ---------------------------
 
@@ -15823,7 +15705,7 @@ size_t envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size(
  */
 bool envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
 
 /**
  * envoy_dynamic_module_callback_cluster_specifier_get_request_header_value is called by the module
@@ -16881,24 +16763,19 @@ size_t envoy_dynamic_module_callback_route_specifier_get_request_headers_size(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_route_specifier_get_request_headers writes the request headers into
- * a module owned array. On success it writes up to capacity entries and sets size_out to the header
- * count. When capacity is smaller than the header count it writes nothing, sets size_out to the
- * required count and returns false, so the module can grow the array and retry. When the header map
- * is unavailable it sets size_out to zero and returns false.
+ * envoy_dynamic_module_callback_route_specifier_get_request_headers is called by the module to get
+ * all request headers.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
- * @param result_headers is the output array, which may be null when capacity is zero. The buffers
- * in the entries are owned by Envoy and are valid until the end of the current event hook.
- * @param capacity is the number of entries result_headers can hold.
- * @param size_out receives the header count on success and the required count when capacity is too
- * small.
- * @return true when the headers were written, false when capacity is too small or the header map is
- * unavailable.
+ * @param result_headers is the output array. The module must pre-allocate at least
+ * envoy_dynamic_module_callback_route_specifier_get_request_headers_size entries. Envoy does not
+ * bounds check the array, so passing a shorter one is undefined behavior. The buffers in the
+ * entries are owned by Envoy and are valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_route_specifier_get_request_headers(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
 
 /**
  * envoy_dynamic_module_callback_route_specifier_get_request_header_value is called by the module to
@@ -17059,7 +16936,8 @@ bool envoy_dynamic_module_callback_route_specifier_get_cluster_host_count(
 
 // ------------------- Route Specifier Callbacks - Input Route -----------------
 // These read the route the module is resolving, which is the route that route matching and any
-// earlier specifier resolved, or the template selected with set_template once one is selected.
+// earlier specifier resolved, or the template selected with set_route_template once one is
+// selected.
 
 /**
  * envoy_dynamic_module_callback_route_specifier_get_input_route is called by the module to get the
@@ -17337,6 +17215,21 @@ void envoy_dynamic_module_callback_route_specifier_set_chain_status(
 bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_name records the name of the route the
+ * decision produces, replacing the name of the route the decision was given. The name is what the
+ * %ROUTE_NAME% access log command operator reports, so a module built route carries an identity of
+ * its own in access logs and other route name consumers. The name is not validated beyond being
+ * non-empty.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param route_name is the name to record. The buffer is owned by the module.
+ * @return true if the name is not empty, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer route_name);
 
 /**
  * envoy_dynamic_module_callback_route_specifier_set_timeout records the route timeout for the
@@ -17710,7 +17603,7 @@ size_t envoy_dynamic_module_callback_early_header_mutation_get_headers_size(
  */
 bool envoy_dynamic_module_callback_early_header_mutation_get_headers(
     envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity, size_t* size_out);
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
 
 /**
  * envoy_dynamic_module_callback_early_header_mutation_get_header_value is called by the module to

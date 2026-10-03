@@ -260,46 +260,26 @@ impl RouteSpecifierContext {
     }
   }
 
-  // Fills buf with the request headers, growing it once when it is too small. On success buf holds
-  // the header count and every entry is initialized. Returns Unavailable when the header map is
-  // absent, which never happens during on_route but is handled for safety.
+  // Fills buf with the request headers. On success buf holds the header count and every entry is
+  // initialized. The size and fill callbacks are paired by the shared helper, so the buffer always
+  // has room for what Envoy writes. Returns Unavailable when the header map is absent, which never
+  // happens during on_route but is handled for safety.
   fn fill_request_headers(
     &self,
     buf: &mut Vec<MaybeUninit<abi::envoy_dynamic_module_type_envoy_http_header>>,
   ) -> Result<(), FillError> {
-    let mut size_out: usize = 0;
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_route_specifier_get_request_headers(
-        self.envoy_ptr,
-        buf.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-        buf.capacity(),
-        &mut size_out,
-      )
-    };
-    if !ok {
-      if size_out == 0 {
-        return Err(FillError::Unavailable);
-      }
-      // The buffer was too small. Grow it to the required count and retry once. The length is zero
-      // here, so reserve leaves the capacity at least size_out.
-      buf.reserve(size_out);
-      let ok = unsafe {
+    crate::utility::fill_headers(
+      buf,
+      || self.get_request_headers_count(),
+      |headers| unsafe {
         abi::envoy_dynamic_module_callback_route_specifier_get_request_headers(
           self.envoy_ptr,
-          buf.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-          buf.capacity(),
-          &mut size_out,
+          headers,
         )
-      };
-      if !ok {
-        return Err(FillError::Unavailable);
-      }
-    }
-    // Safety: Envoy initialized size_out entries starting at index zero.
-    unsafe {
-      buf.set_len(size_out);
-    }
-    Ok(())
+      },
+    )
+    .map(|_| ())
+    .ok_or(FillError::Unavailable)
   }
 
   /// Fills the caller owned buffer with the request headers and returns a [`HeaderView`] over it.
@@ -1001,6 +981,20 @@ impl RouteSpecifierContext {
       abi::envoy_dynamic_module_callback_route_specifier_set_host(
         self.envoy_ptr,
         crate::str_to_module_buffer(host),
+      )
+    }
+  }
+
+  /// Record the name of the route the decision produces. The name is what the `%ROUTE_NAME%` access
+  /// log command operator reports, so a module built route carries an identity of its own in access
+  /// logs and other route name consumers.
+  ///
+  /// Returns `false` when the name is empty.
+  pub fn set_route_name(&mut self, route_name: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_route_name(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(route_name),
       )
     }
   }

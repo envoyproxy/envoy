@@ -1694,8 +1694,8 @@ pub trait EnvoyHttpFilter {
 
   /// Get a snapshot of the current stream timing information.
   ///
-  /// Unavailable values are -1. The request start time is a Unix timestamp in nanoseconds; all
-  /// other values are durations from the monotonic request start time.
+  /// Unavailable fields are `None` at the current event hook. See [`TimingInfo`] for units and
+  /// offset semantics.
   fn get_timing_info(&self) -> TimingInfo;
 
   /// Send an HTTP callout to the given cluster with the given headers and body.
@@ -4374,18 +4374,14 @@ impl EnvoyHttpFilterImpl {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_headers_size(self.raw_ptr, header_type)
-    };
-    crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_http_get_headers_v2(
-        self.raw_ptr,
-        header_type,
-        ptr,
-        capacity,
-        size_out,
-      )
-    })
+    crate::utility::collect_headers(
+      || unsafe {
+        abi::envoy_dynamic_module_callback_http_get_headers_size(self.raw_ptr, header_type)
+      },
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_http_get_headers(self.raw_ptr, header_type, headers)
+      },
+    )
   }
 
   /// This implements the common logic for getting the header/trailer values.

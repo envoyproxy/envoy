@@ -209,7 +209,8 @@ bool RouteOverrides::hasRouteEntryOverrides() const {
 bool RouteOverrides::hasRouteOverrides() const {
   return !route_metadata.filter_metadata().empty() ||
          !route_metadata.typed_filter_metadata().empty() || !filter_disabled.empty() ||
-         (route_override != nullptr && route_override->tracing != nullptr);
+         (route_override != nullptr && route_override->tracing != nullptr) ||
+         route_name.has_value();
 }
 
 DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
@@ -424,6 +425,11 @@ DynamicModuleRoute::~DynamicModuleRoute() {
   }
 }
 
+const std::string& DynamicModuleRoute::routeName() const {
+  return overrides_.route_name.has_value() ? *overrides_.route_name
+                                           : Envoy::Router::DelegatingRoute::routeName();
+}
+
 const envoy::config::core::v3::Metadata& DynamicModuleRoute::metadata() const {
   return metadata_pack_ != nullptr ? metadata_pack_->proto_metadata_
                                    : Envoy::Router::DelegatingRoute::metadata();
@@ -462,6 +468,11 @@ DynamicModuleRouteEntry::~DynamicModuleRouteEntry() {
     config_->stats().route_destroy_.inc();
     config_->onRouteDestroy()(config_->in_module_config_, *user_data_);
   }
+}
+
+const std::string& DynamicModuleRouteEntry::routeName() const {
+  return overrides_.route_name.has_value() ? *overrides_.route_name
+                                           : DelegatingRouteEntry::routeName();
 }
 
 const envoy::config::core::v3::Metadata& DynamicModuleRouteEntry::metadata() const {
@@ -743,8 +754,8 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     if (context.selected_template == nullptr) {
       return fail(Failure::TemplateNotSelected);
     }
-    // set_template evaluated the template against the request, so reuse the result rather than
-    // matching a second time. A null result means the match did not hold for the request.
+    // set_route_template evaluated the template against the request, so reuse the result rather
+    // than matching a second time. A null result means the match did not hold for the request.
     if (context.selected_route == nullptr) {
       return fail(Failure::TemplateMatchFailed);
     }

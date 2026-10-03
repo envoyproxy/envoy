@@ -1490,7 +1490,7 @@ bool PrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
                                    const StreamInfo::StreamInfo& stream_info,
                                    uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
     return true;
   }
   return false;
@@ -1524,7 +1524,7 @@ bool PathRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
                                  const StreamInfo::StreamInfo& stream_info,
                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
     return true;
   }
 
@@ -1566,7 +1566,7 @@ bool RegexRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
                                   const StreamInfo::StreamInfo& stream_info,
                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    if (path_matcher_->match(route_match_context.sanitizedPath())) {
+    if (path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
       return true;
     }
   }
@@ -1638,7 +1638,7 @@ bool PathSeparatedPrefixRouteEntryImpl::matches(const RouteMatchContext& route_m
   const absl::string_view sanitized_path = route_match_context.sanitizedPathWithoutQuery();
   const size_t sanitized_size = sanitized_path.size();
   const size_t matcher_size = matcher().size();
-  if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
+  if (sanitized_size >= matcher_size && path_matcher_->matchPathWithoutQuery(sanitized_path) &&
       (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
     return true;
   }

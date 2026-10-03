@@ -129,6 +129,8 @@ struct RouteOverrides {
   // Metadata the module layered onto the route, keyed by namespace. Empty when the module set none.
   envoy::config::core::v3::Metadata route_metadata;
   absl::flat_hash_map<std::string, bool> filter_disabled;
+  // Name the module recorded for the route it produces. Unset when the module set none.
+  std::optional<std::string> route_name;
   std::optional<std::string> path;
   std::optional<std::string> host;
   std::vector<HeaderMutation> request_headers_to_add;
@@ -297,8 +299,8 @@ struct RouteSpecifierContext {
   const StreamInfo::StreamInfo& stream_info;
   const uint64_t random_value;
   const DynamicModuleRouteSpecifierConfig::Template* selected_template{nullptr};
-  // The selected template evaluated against the request, set when set_template succeeds so that the
-  // getters reflect the route being produced. Null keeps the getters on the route matching
+  // The selected template evaluated against the request, set when set_route_template succeeds so
+  // that the getters reflect the route being produced. Null keeps the getters on the route matching
   // resolved, whether no template was selected or its match did not hold.
   Envoy::Router::RouteConstSharedPtr selected_route;
   envoy_dynamic_module_type_route_specifier_chain_status chain_status{
@@ -334,6 +336,7 @@ public:
   ~DynamicModuleRoute() override;
 
   // Router::Route
+  const std::string& routeName() const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   std::optional<bool> filterDisabled(absl::string_view name) const override;
@@ -363,6 +366,7 @@ public:
   ~DynamicModuleRouteEntry() override;
 
   // Router::Route
+  const std::string& routeName() const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   std::optional<bool> filterDisabled(absl::string_view name) const override;
@@ -411,7 +415,7 @@ enum class Failure {
   None,
   // The module returned the Error decision.
   ModuleError,
-  // The decision was SelectTemplate without a successful set_template.
+  // The decision was SelectTemplate without a successful set_route_template.
   TemplateNotSelected,
   // The match of the selected template does not hold for the request.
   TemplateMatchFailed,

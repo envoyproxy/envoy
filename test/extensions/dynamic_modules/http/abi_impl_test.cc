@@ -443,9 +443,8 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaders) {
 
   // Test with nullptr accessors.
   envoy_dynamic_module_type_envoy_http_header result_headers[3];
-  size_t size_out = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_headers_v2(filter_.get(), header_type,
-                                                                 result_headers, 3, &size_out));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type, result_headers));
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
@@ -461,9 +460,8 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaders) {
   EXPECT_CALL(encoder_callbacks_, responseTrailers())
       .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
 
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_headers_v2(filter_.get(), header_type,
-                                                                result_headers, 3, &size_out));
-  EXPECT_EQ(size_out, 3);
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type, result_headers));
 
   EXPECT_EQ(result_headers[0].key_length, 6);
   EXPECT_EQ(std::string(result_headers[0].key_ptr, result_headers[0].key_length), "single");
@@ -3075,10 +3073,24 @@ TEST_F(DynamicModuleHttpFilterTest, GetTimingInfo) {
   stream_info.start_time_monotonic_ = MonotonicTime(std::chrono::seconds(1));
   stream_info.start_time_ = SystemTime(std::chrono::seconds(10));
   stream_info.end_time_ = std::chrono::nanoseconds(5'000'000);
+  stream_info.downstream_timing_.downstream_connection_begin_ =
+      stream_info.start_time_monotonic_ - std::chrono::milliseconds(4);
+  stream_info.downstream_timing_.downstream_handshake_start_ =
+      stream_info.start_time_monotonic_ - std::chrono::milliseconds(3);
+  stream_info.downstream_timing_.downstream_handshake_complete_ =
+      stream_info.start_time_monotonic_ - std::chrono::milliseconds(2);
+  stream_info.downstream_timing_.last_downstream_header_rx_byte_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::microseconds(500);
+  stream_info.downstream_timing_.last_downstream_rx_byte_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(1);
   stream_info.downstream_timing_.first_downstream_tx_byte_sent_ =
       stream_info.start_time_monotonic_ + std::chrono::milliseconds(2);
   stream_info.downstream_timing_.last_downstream_tx_byte_sent_ =
       stream_info.start_time_monotonic_ + std::chrono::milliseconds(3);
+  stream_info.downstream_timing_.last_downstream_ack_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(4);
+  stream_info.downstream_timing_.downstream_connection_end_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(5);
 
   auto* upstream_info =
       dynamic_cast<NiceMock<StreamInfo::MockUpstreamInfo>*>(stream_info.upstream_info_.get());
@@ -3091,9 +3103,17 @@ TEST_F(DynamicModuleHttpFilterTest, GetTimingInfo) {
       stream_info.start_time_monotonic_ + std::chrono::milliseconds(6);
   upstream_info->upstream_timing_.last_upstream_rx_byte_received_ =
       stream_info.start_time_monotonic_ + std::chrono::milliseconds(7);
+  upstream_info->upstream_timing_.upstream_connect_start_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(1);
+  upstream_info->upstream_timing_.upstream_connect_complete_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(2);
+  upstream_info->upstream_timing_.upstream_handshake_complete_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(3);
+  upstream_info->upstream_timing_.first_upstream_rx_body_byte_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::microseconds(6'500);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
 
-  envoy_dynamic_module_type_timing_info timing;
+  envoy_dynamic_module_type_timing_info_v2 timing;
   envoy_dynamic_module_callback_http_get_timing_info(filter_.get(), &timing);
 
   EXPECT_EQ(10'000'000'000, timing.start_time_unix_ns);
@@ -3104,13 +3124,92 @@ TEST_F(DynamicModuleHttpFilterTest, GetTimingInfo) {
   EXPECT_EQ(7'000'000, timing.last_upstream_rx_byte_received_ns);
   EXPECT_EQ(2'000'000, timing.first_downstream_tx_byte_sent_ns);
   EXPECT_EQ(3'000'000, timing.last_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-4'000'000, timing.downstream_connection_begin_ns);
+  EXPECT_EQ(-3'000'000, timing.downstream_handshake_start_ns);
+  EXPECT_EQ(-2'000'000, timing.downstream_handshake_complete_ns);
+  EXPECT_EQ(500'000, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(1'000'000, timing.last_downstream_rx_byte_received_ns);
+  EXPECT_EQ(1'000'000, timing.upstream_connect_start_ns);
+  EXPECT_EQ(2'000'000, timing.upstream_connect_complete_ns);
+  EXPECT_EQ(3'000'000, timing.upstream_handshake_complete_ns);
+  EXPECT_EQ(6'500'000, timing.first_upstream_rx_body_byte_received_ns);
+  EXPECT_EQ(4'000'000, timing.last_downstream_ack_received_ns);
+  EXPECT_EQ(5'000'000, timing.downstream_connection_end_ns);
+  EXPECT_TRUE(timing.has_start_time);
+  EXPECT_TRUE(timing.has_downstream_connection_begin);
+  EXPECT_TRUE(timing.has_downstream_handshake_start);
+  EXPECT_TRUE(timing.has_downstream_handshake_complete);
+  EXPECT_TRUE(timing.has_last_downstream_header_rx_byte_received);
+  EXPECT_TRUE(timing.has_last_downstream_rx_byte_received);
+  EXPECT_TRUE(timing.has_upstream_connect_start);
+  EXPECT_TRUE(timing.has_upstream_connect_complete);
+  EXPECT_TRUE(timing.has_upstream_handshake_complete);
+  EXPECT_TRUE(timing.has_first_upstream_tx_byte_sent);
+  EXPECT_TRUE(timing.has_last_upstream_tx_byte_sent);
+  EXPECT_TRUE(timing.has_first_upstream_rx_byte_received);
+  EXPECT_TRUE(timing.has_first_upstream_rx_body_byte_received);
+  EXPECT_TRUE(timing.has_last_upstream_rx_byte_received);
+  EXPECT_TRUE(timing.has_first_downstream_tx_byte_sent);
+  EXPECT_TRUE(timing.has_last_downstream_tx_byte_sent);
+  EXPECT_TRUE(timing.has_last_downstream_ack_received);
+  EXPECT_TRUE(timing.has_request_complete);
+  EXPECT_TRUE(timing.has_downstream_connection_end);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoWithPreRequestMarkersAtMinusOneNanosecond) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_monotonic_ = MonotonicTime(std::chrono::seconds(1));
+  const MonotonicTime marker = stream_info.start_time_monotonic_ - std::chrono::nanoseconds(1);
+  stream_info.downstream_timing_.downstream_connection_begin_ = marker;
+  stream_info.downstream_timing_.downstream_handshake_start_ = marker;
+  stream_info.downstream_timing_.downstream_handshake_complete_ = marker;
+  auto* upstream_info =
+      dynamic_cast<NiceMock<StreamInfo::MockUpstreamInfo>*>(stream_info.upstream_info_.get());
+  ASSERT_NE(upstream_info, nullptr);
+  upstream_info->upstream_timing_.upstream_connect_start_ = marker;
+  upstream_info->upstream_timing_.upstream_connect_complete_ = marker;
+  upstream_info->upstream_timing_.upstream_handshake_complete_ = marker;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_http_get_timing_info(filter_.get(), &timing);
+
+  EXPECT_EQ(-1, timing.downstream_connection_begin_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_start_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_complete_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_start_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_complete_ns);
+  EXPECT_EQ(-1, timing.upstream_handshake_complete_ns);
+  EXPECT_TRUE(timing.has_downstream_connection_begin);
+  EXPECT_TRUE(timing.has_downstream_handshake_start);
+  EXPECT_TRUE(timing.has_downstream_handshake_complete);
+  EXPECT_TRUE(timing.has_upstream_connect_start);
+  EXPECT_TRUE(timing.has_upstream_connect_complete);
+  EXPECT_TRUE(timing.has_upstream_handshake_complete);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoWithHeaderOnlyRequestAtStart) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_timing_.last_downstream_header_rx_byte_received_ =
+      stream_info.start_time_monotonic_;
+  stream_info.downstream_timing_.last_downstream_rx_byte_received_ =
+      stream_info.start_time_monotonic_;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_http_get_timing_info(filter_.get(), &timing);
+
+  EXPECT_EQ(0, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(0, timing.last_downstream_rx_byte_received_ns);
+  EXPECT_TRUE(timing.has_last_downstream_header_rx_byte_received);
+  EXPECT_TRUE(timing.has_last_downstream_rx_byte_received);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoWithMissingMarkers) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
 
-  envoy_dynamic_module_type_timing_info timing;
+  envoy_dynamic_module_type_timing_info_v2 timing;
   envoy_dynamic_module_callback_http_get_timing_info(filter_.get(), &timing);
 
   EXPECT_EQ(-1, timing.request_complete_duration_ns);
@@ -3120,13 +3219,43 @@ TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoWithMissingMarkers) {
   EXPECT_EQ(-1, timing.last_upstream_rx_byte_received_ns);
   EXPECT_EQ(-1, timing.first_downstream_tx_byte_sent_ns);
   EXPECT_EQ(-1, timing.last_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.downstream_connection_begin_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_start_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_complete_ns);
+  EXPECT_EQ(-1, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_downstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_start_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_complete_ns);
+  EXPECT_EQ(-1, timing.upstream_handshake_complete_ns);
+  EXPECT_EQ(-1, timing.first_upstream_rx_body_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_downstream_ack_received_ns);
+  EXPECT_EQ(-1, timing.downstream_connection_end_ns);
+  EXPECT_TRUE(timing.has_start_time);
+  EXPECT_FALSE(timing.has_downstream_connection_begin);
+  EXPECT_FALSE(timing.has_downstream_handshake_start);
+  EXPECT_FALSE(timing.has_downstream_handshake_complete);
+  EXPECT_FALSE(timing.has_last_downstream_header_rx_byte_received);
+  EXPECT_FALSE(timing.has_last_downstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_upstream_connect_start);
+  EXPECT_FALSE(timing.has_upstream_connect_complete);
+  EXPECT_FALSE(timing.has_upstream_handshake_complete);
+  EXPECT_FALSE(timing.has_first_upstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_upstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_first_upstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_first_upstream_rx_body_byte_received);
+  EXPECT_FALSE(timing.has_last_upstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_first_downstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_downstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_downstream_ack_received);
+  EXPECT_FALSE(timing.has_request_complete);
+  EXPECT_FALSE(timing.has_downstream_connection_end);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoNoCallbacks) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter(nullptr, symbol_table, 0);
 
-  envoy_dynamic_module_type_timing_info timing;
+  envoy_dynamic_module_type_timing_info_v2 timing;
   envoy_dynamic_module_callback_http_get_timing_info(&filter, &timing);
 
   EXPECT_EQ(-1, timing.start_time_unix_ns);
@@ -3137,6 +3266,36 @@ TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoNoCallbacks) {
   EXPECT_EQ(-1, timing.last_upstream_rx_byte_received_ns);
   EXPECT_EQ(-1, timing.first_downstream_tx_byte_sent_ns);
   EXPECT_EQ(-1, timing.last_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.downstream_connection_begin_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_start_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_complete_ns);
+  EXPECT_EQ(-1, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_downstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_start_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_complete_ns);
+  EXPECT_EQ(-1, timing.upstream_handshake_complete_ns);
+  EXPECT_EQ(-1, timing.first_upstream_rx_body_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_downstream_ack_received_ns);
+  EXPECT_EQ(-1, timing.downstream_connection_end_ns);
+  EXPECT_FALSE(timing.has_start_time);
+  EXPECT_FALSE(timing.has_downstream_connection_begin);
+  EXPECT_FALSE(timing.has_downstream_handshake_start);
+  EXPECT_FALSE(timing.has_downstream_handshake_complete);
+  EXPECT_FALSE(timing.has_last_downstream_header_rx_byte_received);
+  EXPECT_FALSE(timing.has_last_downstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_upstream_connect_start);
+  EXPECT_FALSE(timing.has_upstream_connect_complete);
+  EXPECT_FALSE(timing.has_upstream_handshake_complete);
+  EXPECT_FALSE(timing.has_first_upstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_upstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_first_upstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_first_upstream_rx_body_byte_received);
+  EXPECT_FALSE(timing.has_last_upstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_first_downstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_downstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_downstream_ack_received);
+  EXPECT_FALSE(timing.has_request_complete);
+  EXPECT_FALSE(timing.has_downstream_connection_end);
 }
 
 TEST(ABIImpl, HttpCallout) {
@@ -5220,39 +5379,6 @@ TEST_F(DynamicModuleHttpFilterSchedulerTest,
   captured_cb();
 
   envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
-}
-
-// The deprecated get_headers callback keeps its released signature and behavior.
-TEST_P(DynamicModuleHttpFilterHeaderTest, DeprecatedGetHeaders) {
-  envoy_dynamic_module_type_http_header_type header_type = GetParam();
-
-  // Test with nullptr accessors.
-  envoy_dynamic_module_type_envoy_http_header result_headers[2];
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type, result_headers));
-
-  std::initializer_list<std::pair<std::string, std::string>> headers = {{"single", "value"},
-                                                                        {"other", "value1"}};
-  Http::TestRequestHeaderMapImpl request_headers{headers};
-  EXPECT_CALL(decoder_callbacks_, requestHeaders())
-      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
-  Http::TestRequestTrailerMapImpl request_trailers{headers};
-  EXPECT_CALL(decoder_callbacks_, requestTrailers())
-      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
-  Http::TestResponseHeaderMapImpl response_headers{headers};
-  EXPECT_CALL(encoder_callbacks_, responseHeaders())
-      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
-  Http::TestResponseTrailerMapImpl response_trailers{headers};
-  EXPECT_CALL(encoder_callbacks_, responseTrailers())
-      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
-
-  EXPECT_TRUE(
-      envoy_dynamic_module_callback_http_get_headers(filter_.get(), header_type, result_headers));
-
-  EXPECT_EQ(std::string(result_headers[0].key_ptr, result_headers[0].key_length), "single");
-  EXPECT_EQ(std::string(result_headers[0].value_ptr, result_headers[0].value_length), "value");
-  EXPECT_EQ(std::string(result_headers[1].key_ptr, result_headers[1].key_length), "other");
-  EXPECT_EQ(std::string(result_headers[1].value_ptr, result_headers[1].value_length), "value1");
 }
 
 } // namespace HttpFilters

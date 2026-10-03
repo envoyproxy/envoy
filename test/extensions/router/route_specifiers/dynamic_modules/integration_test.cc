@@ -552,6 +552,21 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RewritesPathAndHost) {
   EXPECT_EQ("upstream.local", upstream_headers->getHostValue());
 }
 
+// A recorded route name is the one the %ROUTE_NAME% access log command operator reports, so a
+// module built route carries an identity of its own end to end.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, SetRouteNameSurfacesInAccessLog) {
+  useAccessLog("%ROUTE_NAME%");
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest(
+      {{"x-decision", "override"}, {"x-cluster", "canary"}, {"x-set-route-name", "module_route"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_NE(std::string::npos, log.find("module_route"));
+}
+
 // A recorded prefix rewrite replaces the matched prefix of the path sent upstream, keeping the
 // query string.
 TEST_P(DynamicModuleRouteSpecifierIntegrationTest, PrefixRewriteRewritesUpstreamPath) {

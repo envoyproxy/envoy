@@ -29,7 +29,6 @@ envoy_extension_cc_dyn_module_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:config_lib",
-        "//source/extensions/dynamic_modules:abi_context_accessors_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/router/route_specifiers/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",

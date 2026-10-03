@@ -163,6 +163,8 @@ envoy_cc_test(
         "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:factory_context_mocks",
@@ -229,9 +231,13 @@ envoy_cc_benchmark_binary(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/listener_manager:filter_chain_manager_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:listener_component_factory_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
