@@ -5,6 +5,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/time/clock.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -138,7 +140,7 @@ void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index,
 int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
                                                     uint32_t worker_index,
                                                     absl::string_view network_namespace) {
-  if (parent_terminated_) {
+  if (parent_terminated_ || parent_unresponsive_) {
     return -1;
   }
 
@@ -147,10 +149,12 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
   wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_worker_index(worker_index);
   wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_network_namespace(
       network_namespace);
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+  if (!main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request)) {
+    onParentUnreachable("the listen socket request could not be sent");
+    return -1;
+  }
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply =
-      main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
+  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply();
   if (!main_rpc_stream_.replyIsExpectedType(wrapped_reply.get(),
                                             HotRestartMessage::Reply::kPassListenSocket)) {
     return -1;
@@ -158,17 +162,93 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
   return wrapped_reply->reply().pass_listen_socket().fd();
 }
 
+std::unique_ptr<HotRestartMessage> HotRestartingChild::waitForParentReply() {
+  const absl::Time start = absl::Now();
+  const absl::Duration reply_timeout = absl::FromChrono(parent_reply_timeout_);
+  const absl::Duration probe_interval = absl::FromChrono(parent_probe_interval_);
+  absl::Time next_probe = start + probe_interval;
+  while (true) {
+    // Returns after RECEIVE_TIMEOUT_SLICE without data, so the loop below runs regularly.
+    std::unique_ptr<HotRestartMessage> reply =
+        main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
+    if (reply != nullptr) {
+      return reply;
+    }
+    // Keep the parent's UDP forwarding flowing while we wait, so the parent never stalls on us.
+    const absl::Status status = onSocketEventUdpForwarding();
+    if (!status.ok()) {
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(5),
+                         "error servicing forwarded udp packets while waiting for the hot restart "
+                         "parent: {}",
+                         status.message());
+    }
+    const absl::Time now = absl::Now();
+    if (now - start >= reply_timeout) {
+      onParentUnreachable(fmt::format("no reply within {}ms", parent_reply_timeout_.count()));
+      return nullptr;
+    }
+    if (now >= next_probe) {
+      // The parent ignores this request; sending it only tells us whether its socket still
+      // exists. It cannot block us for longer than the stream's send timeout.
+      HotRestartMessage probe;
+      probe.mutable_request()->mutable_test_connection();
+      switch (main_rpc_stream_.trySendHotRestartMessage(parent_address_, probe)) {
+      case RpcStream::SendResult::Sent:
+        next_probe = now + probe_interval;
+        break;
+      case RpcStream::SendResult::ConnectionRefused:
+        onParentGone("its socket refused a liveness probe while a reply was pending");
+        return nullptr;
+      case RpcStream::SendResult::TimedOut:
+        onParentUnreachable("its socket is full and not being drained while a reply is pending");
+        return nullptr;
+      }
+    }
+  }
+}
+
+void HotRestartingChild::onParentUnreachable(absl::string_view reason) {
+  if (parent_unresponsive_) {
+    return;
+  }
+  parent_unresponsive_ = true;
+  ENVOY_LOG(error,
+            "hot restart parent is unresponsive ({}); continuing without it: parent stats will not "
+            "be merged and new listeners will bind their own sockets. The parent will still be "
+            "asked to terminate at the end of the drain period.",
+            reason);
+}
+
+void HotRestartingChild::onParentGone(absl::string_view reason) {
+  ENVOY_LOG(error, "hot restart parent is gone ({}); completing the drain from it", reason);
+  onParentUnreachable(reason);
+  if (parent_terminated_) {
+    return;
+  }
+  allDrainsImplicitlyComplete();
+  parent_terminated_ = true;
+  if (stat_merger_ != nullptr) {
+    stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
+    stat_merger_.reset();
+  }
+}
+
 std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
-  if (parent_terminated_ || skip_parent_stats_) {
+  if (parent_terminated_ || parent_unresponsive_ || skip_parent_stats_) {
     return nullptr;
   }
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_stats();
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+  if (!main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request)) {
+    onParentUnreachable("the stats request could not be sent");
+    return nullptr;
+  }
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply =
-      main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
+  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply();
+  if (wrapped_reply == nullptr) {
+    return nullptr;
+  }
   RELEASE_ASSERT(
       main_rpc_stream_.replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
       "Hot restart parent did not respond as expected to get stats request.");
@@ -177,10 +257,11 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
 
 void HotRestartingChild::drainParentListeners() {
   if (!parent_terminated_) {
-    // No reply expected.
+    // No reply expected. A parent that is gone or wedged has nothing to drain for us.
     HotRestartMessage wrapped_request;
     wrapped_request.mutable_request()->mutable_drain_listeners();
-    main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+    main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request,
+                                           /*allow_failure=*/true);
   }
 
   // Latch that the drain-listeners request was sent. The parent stops its listeners synchronously
@@ -218,16 +299,21 @@ void HotRestartingChild::allDrainsImplicitlyComplete() {
 
 std::optional<HotRestart::AdminShutdownResponse>
 HotRestartingChild::sendParentAdminShutdownRequest() {
-  if (parent_terminated_) {
+  if (parent_terminated_ || parent_unresponsive_) {
     return std::nullopt;
   }
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_shutdown_admin();
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+  if (!main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request)) {
+    onParentUnreachable("the admin shutdown request could not be sent");
+    return std::nullopt;
+  }
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply =
-      main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
+  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply();
+  if (wrapped_reply == nullptr) {
+    return std::nullopt;
+  }
   RELEASE_ASSERT(main_rpc_stream_.replyIsExpectedType(wrapped_reply.get(),
                                                       HotRestartMessage::Reply::kShutdownAdmin),
                  "Hot restart parent did not respond as expected to ShutdownParentAdmin.");
@@ -245,7 +331,9 @@ void HotRestartingChild::sendParentTerminateRequest() {
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_terminate();
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+  // A parent that is already gone cannot be told, and one that is wedged will not listen.
+  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request,
+                                         /*allow_failure=*/true);
   parent_terminated_ = true;
 
   // Note that the 'generation' counter needs to retain the contribution from
