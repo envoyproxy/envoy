@@ -429,7 +429,7 @@ public:
          const std::string& filter_config_name,
          Server::Configuration::ServerFactoryContext& factory_context,
          Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-         FilterConfigProviderManagerImplBase& filter_config_provider_manager,
+         std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager,
          const std::string& subscription_id);
   ~FilterConfigSubscription() override;
 
@@ -449,7 +449,7 @@ protected:
                            Server::Configuration::ServerFactoryContext& factory_context,
                            Upstream::ClusterManager& cluster_manager,
                            const std::string& stat_prefix,
-                           FilterConfigProviderManagerImplBase& filter_config_provider_manager,
+                           std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager,
                            const std::string& subscription_id, absl::Status& creation_status);
 
 private:
@@ -493,7 +493,7 @@ private:
   ExtensionConfigDiscoveryStats stats_;
 
   // FilterConfigProviderManagerImplBase maintains active subscriptions in a map.
-  FilterConfigProviderManagerImplBase& filter_config_provider_manager_;
+  std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager_;
   const std::string subscription_id_;
   absl::flat_hash_set<DynamicFilterConfigProviderImplBase*> filter_config_providers_;
   friend class DynamicFilterConfigProviderImplBase;
@@ -524,7 +524,8 @@ private:
 /**
  * Base class for a FilterConfigProviderManager.
  */
-class FilterConfigProviderManagerImplBase : Logger::Loggable<Logger::Id::filter> {
+class FilterConfigProviderManagerImplBase : public std::enable_shared_from_this<FilterConfigProviderManagerImplBase>,
+                                            Logger::Loggable<Logger::Id::filter> {
 public:
   virtual ~FilterConfigProviderManagerImplBase() = default;
 
