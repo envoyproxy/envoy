@@ -11,7 +11,7 @@ This command switches the repo to "release" mode by doing the following:
 - remove `-dev` suffix from version in `VERSION.txt`
 - set the date to today's UTC date in `changelogs/current.yaml`
 
-By default running the `release` command will also run the [sync](#bazel-run-toolsprojectsync) action. This can
+By default running the `release` command will also run the [sync](#bazel-run-envoy_reposync) action. This can
 be disabled with `--nosync`.
 
 All changes are committed on completion. This can be disabled with the `--nocommit` option.
@@ -63,7 +63,7 @@ This command switches the repo to "dev" mode by doing the following:
 - move `changelogs/current.yaml` -> `changelogs/$VERSION.yaml`
 - create new `changelogs/current.yaml` from template
 
-By default running the `release` command will also run the [sync](#bazel-run-toolsprojectsync) action. This can
+By default running the `release` command will also run the [sync](#bazel-run-envoy_reposync) action. This can
 be disabled with `--nosync`.
 
 All changes are committed on completion. This can be disabled with the `--nocommit` option.
@@ -184,8 +184,8 @@ This command synchronizes older release branches by doing the following:
 - fetching any newly available `rst` object/link inventories (used to map version in the documentation)
 - updating `docs/versions.yaml` with any new documentation mappings
 
-By default this command is always run when running the [dev](#bazel-run-toolsprojectdev) or
-[release](#bazel-run-toolsprojectrelease) commands.
+By default this command is always run when running the [dev](#bazel-run-envoy_repodev) or
+[release](#bazel-run-envoy_reporelease) commands.
 
 All changes are committed on completion. This can be disabled with the `--nocommit` option.
 
