@@ -190,89 +190,6 @@ TEST_P(StatsUtilityTest, Counters) {
   EXPECT_EQ("scope.x.token.y.tag1.value1.tag2.value2", ctags.name());
 }
 
-// Verifies the `*FromTaggedPrefix` helpers with a string_view leaf name. Unlike counterFromElements
-// (which appends tags to the flat name), the tagged prefix keeps the tag value at its original
-// position in the flat name (join of `tagged_prefix` and the leaf). The tag-extracted `base_prefix`
-// only surfaces through a store configured with tag extractors, so it is exercised at the store
-// level in thread_local_store_test / isolated_store_impl_test; here we pin the flat name the
-// utility helper builds.
-TEST_P(StatsUtilityTest, TaggedStatNames) {
-  ScopeSharedPtr scope = store_->createScope("scope.");
-  const StatName tag_extracted_prefix = pool_.add("prefix");
-  const StatName tagged_prefix = pool_.add("prefix.value");
-
-  Counter& c = Utility::counterFromTaggedPrefix(*scope, tag_extracted_prefix, tags_, tagged_prefix,
-                                                "requests");
-  EXPECT_EQ("scope.prefix.value.requests", c.name());
-
-  Gauge& g = Utility::gaugeFromTaggedPrefix(*scope, tag_extracted_prefix, tags_, tagged_prefix,
-                                            "active", Gauge::ImportMode::Accumulate);
-  EXPECT_EQ("scope.prefix.value.active", g.name());
-  EXPECT_EQ(Gauge::ImportMode::Accumulate, g.importMode());
-
-  Histogram& h = Utility::histogramFromTaggedPrefix(
-      *scope, tag_extracted_prefix, tags_, tagged_prefix, "latency", Histogram::Unit::Unspecified);
-  EXPECT_EQ("scope.prefix.value.latency", h.name());
-  EXPECT_EQ(Histogram::Unit::Unspecified, h.unit());
-
-  TextReadout& t = Utility::textReadoutFromTaggedPrefix(*scope, tag_extracted_prefix, tags_,
-                                                        tagged_prefix, "info");
-  EXPECT_EQ("scope.prefix.value.info", t.name());
-}
-
-// Verifies the `*FromTaggedPrefix` overloads that take a symbolic StatName leaf (rather than a
-// string_view), which are used when the leaf name is already interned.
-TEST_P(StatsUtilityTest, TaggedStatNamesWithStatNameLeaf) {
-  ScopeSharedPtr scope = store_->createScope("scope.");
-  const StatName tag_extracted_prefix = pool_.add("prefix");
-  const StatName tagged_prefix = pool_.add("prefix.value");
-  const StatName requests = pool_.add("requests");
-  const StatName active = pool_.add("active");
-  const StatName latency = pool_.add("latency");
-  const StatName info = pool_.add("info");
-
-  Counter& c = Utility::counterFromTaggedPrefix(*scope, tag_extracted_prefix, tags_, tagged_prefix,
-                                                requests);
-  EXPECT_EQ("scope.prefix.value.requests", c.name());
-
-  Gauge& g = Utility::gaugeFromTaggedPrefix(*scope, tag_extracted_prefix, tags_, tagged_prefix,
-                                            active, Gauge::ImportMode::NeverImport);
-  EXPECT_EQ("scope.prefix.value.active", g.name());
-  EXPECT_EQ(Gauge::ImportMode::NeverImport, g.importMode());
-
-  Histogram& h = Utility::histogramFromTaggedPrefix(*scope, tag_extracted_prefix, tags_,
-                                                    tagged_prefix, latency, Histogram::Unit::Bytes);
-  EXPECT_EQ("scope.prefix.value.latency", h.name());
-  EXPECT_EQ(Histogram::Unit::Bytes, h.unit());
-
-  TextReadout& t = Utility::textReadoutFromTaggedPrefix(*scope, tag_extracted_prefix, tags_,
-                                                        tagged_prefix, info);
-  EXPECT_EQ("scope.prefix.value.info", t.name());
-}
-
-// A tagged prefix with no tags: base and tagged forms coincide, so the flat name is just the prefix
-// joined with the leaf.
-TEST_P(StatsUtilityTest, TaggedStatNamesNoTags) {
-  ScopeSharedPtr scope = store_->createScope("scope.");
-  const StatName prefix = pool_.add("prefix");
-  Counter& c = Utility::counterFromTaggedPrefix(*scope, prefix, {}, prefix, "requests");
-  EXPECT_EQ("scope.prefix.requests", c.name());
-
-  Counter& c2 = Utility::counterFromTaggedPrefix(*scope, prefix, {}, StatName(), "requests");
-  EXPECT_EQ("scope.prefix.requests", c2.name());
-
-  Gauge& g = Utility::gaugeFromTaggedPrefix(*scope, prefix, {}, StatName(), "gauge",
-                                            Gauge::ImportMode::NeverImport);
-  EXPECT_EQ("scope.prefix.gauge", g.name());
-
-  Histogram& h = Utility::histogramFromTaggedPrefix(*scope, prefix, {}, StatName(), "histogram",
-                                                    Histogram::Unit::Milliseconds);
-  EXPECT_EQ("scope.prefix.histogram", h.name());
-
-  TextReadout& t = Utility::textReadoutFromTaggedPrefix(*scope, prefix, {}, StatName(), "text");
-  EXPECT_EQ("scope.prefix.text", t.name());
-}
-
 // Exercises TaggedStatName directly: it pre-encodes the base name, tagged name, and tags
 // into its own pool, copying the string_view inputs so callers need not keep them alive.
 TEST_P(StatsUtilityTest, TaggedStatNameAccessors) {
@@ -392,6 +309,122 @@ TEST_P(StatsUtilityTest, SanitizeStatsName) {
   EXPECT_EQ("a._", Utility::sanitizeStatsName(absl::string_view("a.\0", 3)));
   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a://b"));
   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a:/b"));
+}
+
+#define LITE_SCOPE_HELPER_TEST_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT)                      \
+  COUNTER(requests)                                                                                \
+  GAUGE(active, Accumulate)                                                                        \
+  HISTOGRAM(latency, Milliseconds)                                                                 \
+  TEXT_READOUT(info)
+
+struct LiteScopeHelperTestStats {
+  LITE_SCOPE_HELPER_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                               GENERATE_HISTOGRAM_STRUCT, GENERATE_TEXT_READOUT_STRUCT)
+};
+
+// A helper without a prefix or tags creates the same stats as the scope itself.
+TEST_P(StatsUtilityTest, LiteScopeHelperNoPrefix) {
+  LiteScopeHelper helper(*scope_);
+  EXPECT_TRUE(helper.basePrefix().empty());
+  EXPECT_TRUE(helper.prefix().empty());
+  EXPECT_TRUE(helper.tags().empty());
+  EXPECT_EQ(scope_.get(), &helper.scope());
+  EXPECT_EQ(&scope_->symbolTable(), &helper.symbolTable());
+  EXPECT_EQ(&scope_->constSymbolTable(), &helper.constSymbolTable());
+
+  Counter& c = helper.counterFromString("requests");
+  EXPECT_EQ("scope.requests", c.name());
+  EXPECT_EQ(&c, &scope_->counterFromString("requests"));
+}
+
+// A helper with a prefix but no tags: the flat prefix is ignored, and the stats are the ones the
+// scope creates for the joined name.
+TEST_P(StatsUtilityTest, LiteScopeHelperPrefixOnly) {
+  LiteScopeHelper helper(*scope_, "prefix.", {}, "ignored");
+  EXPECT_EQ("prefix", symbol_table_->toString(helper.basePrefix()));
+  EXPECT_EQ("prefix", symbol_table_->toString(helper.prefix()));
+  EXPECT_TRUE(helper.tags().empty());
+
+  Counter& c = helper.counterFromString("requests");
+  EXPECT_EQ("scope.prefix.requests", c.name());
+  EXPECT_EQ(&c, &scope_->counterFromString("prefix.requests"));
+
+  Gauge& g = helper.gaugeFromString("active", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("scope.prefix.active", g.name());
+  EXPECT_EQ(&g, &scope_->gaugeFromString("prefix.active", Gauge::ImportMode::Accumulate));
+
+  Histogram& h = helper.histogramFromString("latency", Histogram::Unit::Milliseconds);
+  EXPECT_EQ("scope.prefix.latency", h.name());
+  EXPECT_EQ(&h, &scope_->histogramFromString("prefix.latency", Histogram::Unit::Milliseconds));
+
+  TextReadout& t = helper.textReadoutFromString("info");
+  EXPECT_EQ("scope.prefix.info", t.name());
+  EXPECT_EQ(&t, &scope_->textReadoutFromString("prefix.info"));
+}
+
+// A helper with string tags can be used with the POOL_* macros in place of a scope. The stats are
+// created in the scope, with the tag value at its position in the flat name.
+TEST_P(StatsUtilityTest, LiteScopeHelperWithMacros) {
+  LiteScopeHelper helper(*scope_, "prefix", {{"tag", "value"}}, "prefix.value");
+  EXPECT_EQ("prefix", symbol_table_->toString(helper.basePrefix()));
+  EXPECT_EQ("prefix.value", symbol_table_->toString(helper.prefix()));
+  ASSERT_EQ(1, helper.tags().size());
+  EXPECT_EQ("tag", symbol_table_->toString(helper.tags()[0].first));
+  EXPECT_EQ("value", symbol_table_->toString(helper.tags()[0].second));
+
+  LiteScopeHelperTestStats stats{LITE_SCOPE_HELPER_TEST_STATS(
+      POOL_COUNTER(helper), POOL_GAUGE(helper), POOL_HISTOGRAM(helper), POOL_TEXT_READOUT(helper))};
+  EXPECT_EQ("scope.prefix.value.requests", stats.requests_.name());
+  EXPECT_EQ("scope.prefix.value.active", stats.active_.name());
+  EXPECT_EQ(Gauge::ImportMode::Accumulate, stats.active_.importMode());
+  EXPECT_EQ("scope.prefix.value.latency", stats.latency_.name());
+  EXPECT_EQ(Histogram::Unit::Milliseconds, stats.latency_.unit());
+  EXPECT_EQ("scope.prefix.value.info", stats.info_.name());
+
+  // The helper owns nothing: the stats are found in the scope.
+  bool found = false;
+  scope_->iterate(IterateFn<Counter>([&](const RefcountPtr<Counter>& counter) {
+    found = found || counter.get() == &stats.requests_;
+    return true;
+  }));
+  EXPECT_TRUE(found);
+
+  // The isolated store always honors explicit tags.
+  if (GetParam() == StoreType::Isolated) {
+    EXPECT_EQ("scope.prefix.requests", stats.requests_.tagExtractedName());
+    EXPECT_THAT(stats.requests_.tags(), testing::ElementsAre(Tag{"tag", "value"}));
+  }
+
+  // The macros with an additional string prefix work too.
+  LiteScopeHelperTestStats prefixed_stats{LITE_SCOPE_HELPER_TEST_STATS(
+      POOL_COUNTER_PREFIX(helper, "extra."), POOL_GAUGE_PREFIX(helper, "extra."),
+      POOL_HISTOGRAM_PREFIX(helper, "extra."), POOL_TEXT_READOUT_PREFIX(helper, "extra."))};
+  EXPECT_EQ("scope.prefix.value.extra.requests", prefixed_stats.requests_.name());
+}
+
+// A helper created from pre-encoded StatNames and used with StatName leaves.
+TEST_P(StatsUtilityTest, LiteScopeHelperWithStatNames) {
+  LiteScopeHelper helper(*scope_, pool_.add("prefix"), tags_, pool_.add("prefix.value1.value2"));
+
+  Counter& c = helper.counterFromStatName(pool_.add("requests"));
+  EXPECT_EQ("scope.prefix.value1.value2.requests", c.name());
+  EXPECT_EQ(&c, &helper.counterFromString("requests"));
+
+  Gauge& g = helper.gaugeFromStatName(pool_.add("active"), Gauge::ImportMode::NeverImport);
+  EXPECT_EQ("scope.prefix.value1.value2.active", g.name());
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, g.importMode());
+
+  Histogram& h = helper.histogramFromStatName(pool_.add("latency"), Histogram::Unit::Bytes);
+  EXPECT_EQ("scope.prefix.value1.value2.latency", h.name());
+  EXPECT_EQ(Histogram::Unit::Bytes, h.unit());
+
+  TextReadout& t = helper.textReadoutFromStatName(pool_.add("info"));
+  EXPECT_EQ("scope.prefix.value1.value2.info", t.name());
+
+  if (GetParam() == StoreType::Isolated) {
+    EXPECT_EQ("scope.prefix.requests", c.tagExtractedName());
+    EXPECT_THAT(c.tags(), testing::ElementsAre(Tag{"tag1", "value1"}, Tag{"tag2", "value2"}));
+  }
 }
 
 } // namespace

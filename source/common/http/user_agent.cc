@@ -34,18 +34,13 @@ void UserAgent::completeConnectionLength(Stats::Timespan& span) {
   }
 }
 
-UserAgentStats::UserAgentStats(Stats::StatName device, Stats::StatNameTagSpan device_tags,
-                               Stats::Scope& scope, const UserAgentContext& context)
-    : downstream_cx_total_(Stats::Utility::counterFromTaggedPrefix(
-          scope, context.user_agent_, device_tags, device, context.downstream_cx_total_)),
+UserAgentStats::UserAgentStats(Stats::LiteScopeHelper& helper, const UserAgentContext& context)
+    : downstream_cx_total_(helper.counterFromStatName(context.downstream_cx_total_)),
       downstream_cx_destroy_remote_active_rq_(
-          Stats::Utility::counterFromTaggedPrefix(scope, context.user_agent_, device_tags, device,
-                                                  context.downstream_cx_destroy_remote_active_rq_)),
-      downstream_rq_total_(Stats::Utility::counterFromTaggedPrefix(
-          scope, context.user_agent_, device_tags, device, context.downstream_rq_total_)),
-      downstream_cx_length_ms_(Stats::Utility::histogramFromTaggedPrefix(
-          scope, context.user_agent_, device_tags, device, context.downstream_cx_length_ms_,
-          Stats::Histogram::Unit::Milliseconds)) {
+          helper.counterFromStatName(context.downstream_cx_destroy_remote_active_rq_)),
+      downstream_rq_total_(helper.counterFromStatName(context.downstream_rq_total_)),
+      downstream_cx_length_ms_(helper.histogramFromStatName(context.downstream_cx_length_ms_,
+                                                            Stats::Histogram::Unit::Milliseconds)) {
   downstream_cx_total_.inc();
 }
 
@@ -57,11 +52,13 @@ void UserAgent::initializeFromHeaders(const RequestHeaderMap& headers, Stats::Sc
     const absl::string_view user_agent = headers.getUserAgentValue();
     if (!user_agent.empty()) {
       if (user_agent.find("iOS") != absl::string_view::npos) {
-        stats_ =
-            std::make_unique<UserAgentStats>(context_.ios_, context_.ios_tags_, scope, context_);
+        Stats::LiteScopeHelper helper(scope, context_.user_agent_, context_.ios_tags_,
+                                      context_.ios_);
+        stats_ = std::make_unique<UserAgentStats>(helper, context_);
       } else if (user_agent.find("android") != absl::string_view::npos) {
-        stats_ = std::make_unique<UserAgentStats>(context_.android_, context_.android_tags_, scope,
-                                                  context_);
+        Stats::LiteScopeHelper helper(scope, context_.user_agent_, context_.android_tags_,
+                                      context_.android_);
+        stats_ = std::make_unique<UserAgentStats>(helper, context_);
       }
     }
   }
