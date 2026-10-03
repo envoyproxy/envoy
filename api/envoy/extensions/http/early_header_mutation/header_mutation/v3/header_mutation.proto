@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.http.early_header_mutation.header_mutation.v3;
 
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -20,4 +21,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message HeaderMutation {
   repeated config.common.mutation_rules.v3.HeaderMutation mutations = 1
       [(validate.rules).repeated = {min_items: 1}];
+
+  // Formatter command parsers used for header values. Built-in command parsers are available
+  // without this field; use it to add extension parsers or override a built-in parser's
+  // configuration.
+  // [#extension-category: envoy.formatter]
+  repeated config.core.v3.TypedExtensionConfig formatters = 2;
 }
