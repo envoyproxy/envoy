@@ -80,7 +80,7 @@ TEST_F(ClientAssertionTest, CreateRS256Assertion) {
 
   auto result =
       ClientAssertion::create("my-client-id", "https://auth.example.com/token", RsaPrivateKeyPem,
-                              "RS256", std::chrono::seconds(60), test_time_, random_);
+                              "RS256", std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_TRUE(result.ok()) << result.status().message();
 
   const std::string& jwt = result.value();
@@ -114,7 +114,7 @@ TEST_F(ClientAssertionTest, CreateRS384Assertion) {
 
   auto result =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS384",
-                              std::chrono::seconds(120), test_time_, random_);
+                              std::chrono::seconds(120), test_time_, random_, "");
   ASSERT_TRUE(result.ok()) << result.status().message();
 
   std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
@@ -133,7 +133,7 @@ TEST_F(ClientAssertionTest, CreateRS512Assertion) {
 
   auto result =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS512",
-                              std::chrono::seconds(60), test_time_, random_);
+                              std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_TRUE(result.ok()) << result.status().message();
 
   std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
@@ -146,7 +146,7 @@ TEST_F(ClientAssertionTest, CreateRS512Assertion) {
 TEST_F(ClientAssertionTest, UnsupportedAlgorithm) {
   auto result =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "PS256",
-                              std::chrono::seconds(60), test_time_, random_);
+                              std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_FALSE(result.ok());
   EXPECT_NE(std::string::npos, result.status().message().find("Unsupported signing algorithm"));
 }
@@ -155,7 +155,7 @@ TEST_F(ClientAssertionTest, InvalidPrivateKey) {
   // uuid() is never reached — key import fails first.
   auto result =
       ClientAssertion::create("client", "https://auth.example.com/token", "not-a-valid-pem-key",
-                              "RS256", std::chrono::seconds(60), test_time_, random_);
+                              "RS256", std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_FALSE(result.ok());
   EXPECT_NE(std::string::npos, result.status().message().find("Failed to parse private key"));
 }
@@ -164,7 +164,7 @@ TEST_F(ClientAssertionTest, KeyTypeMismatch) {
   // An RSA algorithm with an EC key is rejected.
   auto rsa_alg_ec_key =
       ClientAssertion::create("client", "https://auth.example.com/token", EcP256PrivateKeyPem,
-                              "RS256", std::chrono::seconds(60), test_time_, random_);
+                              "RS256", std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_FALSE(rsa_alg_ec_key.ok());
   EXPECT_NE(std::string::npos,
             rsa_alg_ec_key.status().message().find("requires an RSA private key"));
@@ -172,7 +172,7 @@ TEST_F(ClientAssertionTest, KeyTypeMismatch) {
   // An EC algorithm with an RSA key is rejected.
   auto ec_alg_rsa_key =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "ES256",
-                              std::chrono::seconds(60), test_time_, random_);
+                              std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_FALSE(ec_alg_rsa_key.ok());
   EXPECT_NE(std::string::npos,
             ec_alg_rsa_key.status().message().find("requires an EC private key"));
@@ -183,7 +183,7 @@ TEST_F(ClientAssertionTest, CustomLifetime) {
 
   auto result =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS256",
-                              std::chrono::seconds(300), test_time_, random_);
+                              std::chrono::seconds(300), test_time_, random_, "");
   ASSERT_TRUE(result.ok()) << result.status().message();
 
   std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
@@ -195,10 +195,57 @@ TEST_F(ClientAssertionTest, CustomLifetime) {
   EXPECT_NE(std::string::npos, payload_json.find("\"exp\":1300"));
 }
 
+TEST_F(ClientAssertionTest, CreateAssertionWithKeyId) {
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
+
+  auto result =
+      ClientAssertion::create("my-client-id", "https://auth.example.com/token", RsaPrivateKeyPem,
+                              "RS256", std::chrono::seconds(60), test_time_, random_, "my-key-id");
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
+  ASSERT_EQ(3, parts.size());
+
+  const std::string header_json = Base64Url::decode(parts[0]);
+  EXPECT_NE(std::string::npos, header_json.find("\"kid\":\"my-key-id\""));
+  EXPECT_NE(std::string::npos, header_json.find("\"alg\":\"RS256\""));
+  EXPECT_NE(std::string::npos, header_json.find("\"typ\":\"JWT\""));
+}
+
+TEST_F(ClientAssertionTest, CreateAssertionWithoutKeyIdOmitsKid) {
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
+
+  auto result =
+      ClientAssertion::create("my-client-id", "https://auth.example.com/token", RsaPrivateKeyPem,
+                              "RS256", std::chrono::seconds(60), test_time_, random_, "");
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
+  ASSERT_EQ(3, parts.size());
+
+  EXPECT_EQ(std::string::npos, Base64Url::decode(parts[0]).find("kid"));
+}
+
+TEST_F(ClientAssertionTest, KeyIdIsJsonEscaped) {
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
+
+  auto result = ClientAssertion::create("my-client-id", "https://auth.example.com/token",
+                                        RsaPrivateKeyPem, "RS256", std::chrono::seconds(60),
+                                        test_time_, random_, R"(quote"injection)");
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
+  ASSERT_EQ(3, parts.size());
+
+  // The value must be escaped so it cannot break out of the JSON string.
+  const std::string header_json = Base64Url::decode(parts[0]);
+  EXPECT_NE(std::string::npos, header_json.find(R"("kid":"quote\"injection")"));
+}
+
 TEST_F(ClientAssertionTest, EmptyPrivateKey) {
   // uuid() is never reached — key import fails first.
   auto result = ClientAssertion::create("client", "https://auth.example.com/token", "", "RS256",
-                                        std::chrono::seconds(60), test_time_, random_);
+                                        std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_FALSE(result.ok());
   EXPECT_NE(std::string::npos, result.status().message().find("Failed to parse private key"));
 }
@@ -208,7 +255,7 @@ TEST_F(ClientAssertionTest, SignatureIsVerifiable) {
 
   auto result =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS256",
-                              std::chrono::seconds(60), test_time_, random_);
+                              std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_TRUE(result.ok()) << result.status().message();
 
   // Extract the three JWT parts.
@@ -237,10 +284,10 @@ TEST_F(ClientAssertionTest, TwoAssertionsHaveDifferentJti) {
 
   auto result1 =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS256",
-                              std::chrono::seconds(60), test_time_, random_);
+                              std::chrono::seconds(60), test_time_, random_, "");
   auto result2 =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS256",
-                              std::chrono::seconds(60), test_time_, random_);
+                              std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_TRUE(result1.ok());
   ASSERT_TRUE(result2.ok());
 
@@ -261,7 +308,7 @@ TEST_F(ClientAssertionTest, CreateES256Assertion) {
 
   auto result =
       ClientAssertion::create("my-client-id", "https://auth.example.com/token", EcP256PrivateKeyPem,
-                              "ES256", std::chrono::seconds(60), test_time_, random_);
+                              "ES256", std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_TRUE(result.ok()) << result.status().message();
 
   const std::string& jwt = result.value();
@@ -336,7 +383,7 @@ TEST_F(ClientAssertionTest, SigningFailureReturnsError) {
 
   auto result =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS256",
-                              std::chrono::seconds(60), test_time_, random_);
+                              std::chrono::seconds(60), test_time_, random_, "");
   ASSERT_FALSE(result.ok());
   EXPECT_NE(std::string::npos, result.status().message().find("Failed to sign JWT assertion"));
 }
