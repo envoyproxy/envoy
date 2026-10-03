@@ -15,6 +15,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "quiche/quic/core/quic_bandwidth.h"
+#include "quiche/quic/core/quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -222,7 +223,21 @@ std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClient
                                                  http3_options_.value());
 }
 
-quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStreamId /*id*/) {
+quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStreamId id) {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // A server may open a bidirectional stream only as part of a WebTransport session. Delegate to
+  // QUICHE, which creates a QuicServerInitiatedSpdyStream: a carrier for a WEBTRANSPORT_STREAM
+  // frame which fails on any HTTP semantics, so a server-initiated stream that is not a
+  // WebTransport data stream is still rejected. ShouldCreateIncomingStream() of QUICHE closes the
+  // connection with QUIC_HTTP_SERVER_INITIATED_BIDIRECTIONAL_STREAM when WebTransport was not
+  // negotiated; that check keys off LocallySupportedWebTransportVersions(), which is already empty
+  // unless the WebTransport runtime feature is enabled.
+  if (accept_server_initiated_streams_ && quic::QuicUtils::IsBidirectionalStreamId(id, version())) {
+    return quic::QuicSpdyClientSession::CreateIncomingStream(id);
+  }
+#else
+  UNREFERENCED_PARAMETER(id);
+#endif
   // Envoy doesn't support server initiated stream.
   return nullptr;
 }
@@ -305,6 +320,12 @@ void EnvoyQuicClientSession::setHttp3Options(
   if (!http3_options_->has_quic_protocol_options()) {
     return;
   }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Latched here rather than read on demand: setHttp3Options() runs before Initialize(), so the
+  // value is in place before any stream can arrive.
+  accept_server_initiated_streams_ =
+      http3_options_->quic_protocol_options().accept_server_initiated_streams();
+#endif
   static_cast<EnvoyQuicClientConnection*>(connection())
       ->setNumPtosForPortMigration(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 0));

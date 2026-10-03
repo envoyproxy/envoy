@@ -285,6 +285,10 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
       http2_options.value(), quic::kStreamReceiveWindowLimit);
   cluster->http3_options_.set_allow_extended_connect(true);
   cluster->http3_options_.set_allow_metadata(true);
+  if (client_accepts_server_initiated_streams_) {
+    cluster->http3_options_.mutable_quic_protocol_options()->set_accept_server_initiated_streams(
+        true);
+  }
 #endif
 
   cluster->http2_options_ = http2_options.value();

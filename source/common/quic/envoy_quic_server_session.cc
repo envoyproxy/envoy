@@ -19,6 +19,7 @@
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "quiche/quic/core/http/quic_server_initiated_spdy_stream.h"
 #include "quiche/quic/core/quic_config.h"
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/core/quic_stream.h"
@@ -146,6 +147,22 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // This virtual is protected, and on a server session QUICHE only calls it from
+  // CreateOutgoingBidirectionalWebTransportStream().
+  if (SupportsWebTransport()) {
+    // The caller does not consult ShouldCreateOutgoingBidirectionalStream(), so check it here to
+    // honor stream credit. Returning nullptr makes the bridge reset the paired upstream stream.
+    if (!ShouldCreateOutgoingBidirectionalStream()) {
+      ENVOY_LOG(debug, "Cannot create an outgoing WebTransport bidirectional stream.");
+      return nullptr;
+    }
+    auto* stream = new quic::QuicServerInitiatedSpdyStream(GetNextOutgoingBidirectionalStreamId(),
+                                                           this, quic::BIDIRECTIONAL);
+    ActivateStream(absl::WrapUnique(stream));
+    return stream;
+  }
+#endif
   IS_ENVOY_BUG("Unexpected disallowed server initiated stream");
   return nullptr;
 }
