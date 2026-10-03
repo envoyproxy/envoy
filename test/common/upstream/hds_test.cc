@@ -588,6 +588,43 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
   EXPECT_EQ(response.endpoints_health_size(), NumClusters * NumLocalities * NumEndpoints);
 }
 
+TEST_F(HdsTest, TestSendResponseSkipsEmptyLocality) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  message = createComplexSpecifier(1, 2, 1);
+  // HDS retains locality groups with no endpoints as empty host buckets.
+  message->mutable_cluster_health_checks(0)->add_locality_endpoints()->mutable_locality()->set_zone(
+      "empty");
+  expectCreateClientConnection();
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_))
+      .WillRepeatedly(Invoke([](const ClusterInfoFactory::CreateClusterInfoParams& params) {
+        std::shared_ptr<Upstream::MockClusterInfo> cluster_info{
+            new NiceMock<Upstream::MockClusterInfo>()};
+        cluster_info->name_ = params.cluster_.name();
+        return cluster_info;
+      }));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(2);
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  const auto& host_set = *hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0];
+  const auto& localities = host_set.hostsPerLocality().get();
+  ASSERT_EQ(localities.size(), 3);
+  EXPECT_TRUE(localities[2].empty());
+
+  const auto response = hds_delegate_->sendResponse().endpoint_health_response();
+  ASSERT_EQ(response.cluster_endpoints_health_size(), 1);
+  const auto& cluster_response = response.cluster_endpoints_health(0);
+  ASSERT_EQ(cluster_response.locality_endpoints_health_size(), 2);
+  EXPECT_EQ(cluster_response.locality_endpoints_health(0).locality().zone(), "zone0");
+  EXPECT_EQ(cluster_response.locality_endpoints_health(1).locality().zone(), "zone1");
+  EXPECT_EQ(response.endpoints_health_size(), 2);
+}
+
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message
 TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
