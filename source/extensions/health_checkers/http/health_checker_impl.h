@@ -51,8 +51,9 @@ public:
                         Server::Configuration::HealthCheckerFactoryContext& context,
                         HealthCheckEventLoggerPtr&& event_logger);
 
-  // Returns the HTTP protocol used for the health checker.
-  Http::Protocol protocol() const;
+  // Returns the HTTP protocol derived from `codec_client_type`. Note that a session whose codec was
+  // selected from the ALPN-negotiated protocol may be speaking something else.
+  Http::Protocol configuredProtocol() const;
 
   /**
    * Utility class checking if given http status matches configured expectations.
@@ -87,6 +88,16 @@ private:
     enum class HealthCheckResult { Succeeded, Degraded, Failed, Retriable };
     HealthCheckResult healthCheckResult(uint64_t response_code);
     bool shouldClose() const;
+    // Creates the session's codec client of `codec_type` on `data`'s connection and wires up the
+    // callbacks. Called only when there is no client yet; the client is then reused across
+    // intervals.
+    void initCodecClient(Upstream::Host::CreateConnectionData& data, Http::CodecType codec_type);
+    // Encodes the health check request on `client_`.
+    void sendRequest();
+    // Handles events on `negotiating_connection_` before it has a codec client.
+    void onNegotiatingConnectionEvent(Network::ConnectionEvent event);
+    // Aborts and disposes of `negotiating_connection_`, if any.
+    void abortNegotiatingConnection();
 
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -126,6 +137,22 @@ private:
       HttpActiveHealthCheckSession& parent_;
     };
 
+    // Callbacks for `negotiating_connection_` (ALPN negotiation path) before its codec client
+    // exists. Distinct from ConnectionCallbackImpl, whose callbacks assume `client_ != nullptr`.
+    class NegotiatingConnectionCallbackImpl : public Network::ConnectionCallbacks {
+    public:
+      NegotiatingConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
+      // Network::ConnectionCallbacks
+      void onEvent(Network::ConnectionEvent event) override {
+        parent_.onNegotiatingConnectionEvent(event);
+      }
+      void onAboveWriteBufferHighWatermark() override {}
+      void onBelowWriteBufferLowWatermark() override {}
+
+    private:
+      HttpActiveHealthCheckSession& parent_;
+    };
+
     class HttpConnectionCallbackImpl : public Http::ConnectionCallbacks {
     public:
       HttpConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
@@ -137,15 +164,20 @@ private:
     };
 
     ConnectionCallbackImpl connection_callback_impl_{*this};
+    NegotiatingConnectionCallbackImpl negotiating_connection_callback_impl_{*this};
     HttpConnectionCallbackImpl http_connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
+    // Set while a connection is being established and the codec has not been chosen yet. Mutually
+    // exclusive with `client_`.
+    Network::ClientConnectionPtr negotiating_connection_;
     Http::ResponseHeaderMapPtr response_headers_;
     Buffer::InstancePtr response_body_;
     const std::string& hostname_;
     Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
     // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-    const Http::Protocol protocol_;
+    // The protocol used for the health check request.
+    Http::Protocol protocol_;
     bool expect_reset_ : 1 = false;
     bool reuse_connection_ : 1 = false;
     bool request_in_flight_ : 1 = false;
@@ -153,7 +185,8 @@ private:
 
   using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;
 
-  virtual Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
+  virtual Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data,
+                                               Http::CodecType codec_type) PURE;
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
@@ -164,6 +197,10 @@ private:
   }
 
   Http::CodecType codecClientType(const envoy::type::v3::CodecClientType& type);
+
+  // Whether the codec is selected from the protocol the health check connection negotiates via
+  // ALPN, with `codec_client_type` used only when nothing is negotiated.
+  bool negotiateCodec() const;
 
   const std::string path_;
   const std::string host_value_;
@@ -188,7 +225,8 @@ public:
   using HttpHealthCheckerImpl::HttpHealthCheckerImpl;
 
   // HttpHealthCheckerImpl
-  Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data) override;
+  Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data,
+                                       Http::CodecType codec_type) override;
 };
 
 } // namespace Upstream
