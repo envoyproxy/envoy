@@ -1,10 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -28,10 +28,11 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "xfcc_value_fuzz_test",
     srcs = ["xfcc_value_fuzz_test.cc"],
     corpus = "xfcc_value_corpus",
+    extension_names = ["envoy.built_in_formatters.xfcc_value"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/formatter/xfcc_value:config",
