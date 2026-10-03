@@ -184,6 +184,7 @@ public:
   // For HTTP/3 the base connection pool does not track stream capacity, rather
   // the HTTP3 active client does.
   bool trackStreamCapacity() override { return false; }
+  uint32_t eagerPreconnectFloorToMaintain() const override { return 0; }
 
   std::unique_ptr<Network::ClientConnection>
   createClientConnection(Quic::QuicStatNames& quic_stat_names,

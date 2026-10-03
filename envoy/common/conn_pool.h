@@ -105,6 +105,15 @@ public:
    * @return true if a connection was preconnected, false otherwise.
    */
   virtual bool maybePreconnect(float preconnect_ratio) PURE;
+
+  /**
+   * Returns true if the pool currently holds at least one established connection with capacity
+   * to serve a new stream immediately. Connections that are still connecting, saturated (at
+   * concurrent stream capacity), or draining return false.
+   *
+   * @return true if the pool has a connection that can serve a new stream.
+   */
+  virtual bool hasReadyConnection() const PURE;
 };
 
 enum class PoolFailureReason {

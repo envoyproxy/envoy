@@ -1312,6 +1312,52 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_close_notify_.value());
 }
 
+TEST_F(Http2ConnPoolImplTest, GoAwayRefillsFloor) {
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_OK(r1.callbacks_.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true));
+
+  // GOAWAY drains the client and a replacement client is created.
+  expectClientCreate();
+  test_clients_[0].codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_close_notify_.value());
+
+  // The next stream uses the replacement client rather than creating a third.
+  ActiveTestRequest r2(*this, 1, false);
+  ASSERT_EQ(2, test_clients_.size());
+  expectClientConnect(1, r2);
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_OK(r2.callbacks_.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true));
+
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+  closeAllClients();
+}
+
+TEST_F(Http2ConnPoolImplTest, HasReadyConnection) {
+  EXPECT_FALSE(pool_->hasReadyConnection());
+
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  EXPECT_FALSE(pool_->hasReadyConnection());
+
+  // HTTP/2 keeps unused stream capacity, so the client stays ready with an active stream.
+  expectClientConnect(0, r1);
+  EXPECT_TRUE(pool_->hasReadyConnection());
+
+  completeRequest(r1);
+  EXPECT_TRUE(pool_->hasReadyConnection());
+
+  closeClient(0);
+  EXPECT_FALSE(pool_->hasReadyConnection());
+}
+
 TEST_F(Http2ConnPoolImplTest, NoActiveConnectionsByDefault) {
   EXPECT_FALSE(pool_->hasActiveConnections());
 }
