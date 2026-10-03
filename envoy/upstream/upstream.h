@@ -1343,6 +1343,15 @@ public:
   virtual bool warmHosts() const PURE;
 
   /**
+   * @return false if this cluster has opted out of gating the CDS ACK during warming
+   * (wait_for_warm_on_init: false in the cluster proto). When false, the cluster does not hold
+   * a CDS pause handle at any point during warming, including during initial health checks.
+   * For DNS and Redis cluster types, false additionally causes the cluster to complete
+   * initialization immediately without waiting for DNS resolution.
+   */
+  virtual bool waitForWarmOnInit() const PURE;
+
+  /**
    * @return true if this cluster is configured to set local interface name on upstream connections.
    */
   virtual bool setLocalInterfaceNameOnUpstreamConnections() const PURE;
