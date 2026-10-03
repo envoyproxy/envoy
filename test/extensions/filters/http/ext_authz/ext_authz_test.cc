@@ -20,6 +20,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
@@ -3197,6 +3198,208 @@ TEST_F(ResponseHeaderLimitTest, EncodeHeadersToOverwriteIfExistsExceedsSizeLimit
                                                    /*max_headers_count=*/9999);
 
   runTest(response_headers, response);
+}
+
+// Tests for propagate_call_metadata_namespaces / propagate_call_filter_state_keys: dynamic metadata
+// and FilterState written on the Check call's own stream (e.g. by a custom load balancer on the
+// authorization callout cluster) is copied onto the downstream request so downstream access logs
+// and filters can observe it.
+class PropagateCallMetadataTest : public HttpFilterTestBase<testing::Test> {};
+
+TEST_F(PropagateCallMetadataTest, CopiesConfiguredNamespaceFromCallStreamToDownstream) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  propagate_call_metadata_namespaces:
+  - "test.metadata_ns"
+  )EOF");
+
+  // Metadata a custom callout-cluster load balancer wrote on the Check call's own stream.
+  NiceMock<StreamInfo::MockStreamInfo> call_stream_info;
+  Envoy::Protobuf::Struct ns_value;
+  (*ns_value.mutable_fields())["authz_pod_ip"].set_string_value("10.4.5.6");
+  (*call_stream_info.metadata_.mutable_filter_metadata())["test.metadata_ns"] = ns_value;
+
+  prepareCheck();
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+  request_headers_.addCopy(Http::Headers::get().Scheme, "https");
+
+  Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks{};
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks = &callbacks; }));
+  EXPECT_CALL(*client_, streamInfo()).WillRepeatedly(Return(&call_stream_info));
+
+  // The filter stamps the configured callout-stream namespace onto the downstream request,
+  // carrying its value through unchanged.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata("test.metadata_ns", _))
+      .WillOnce(Invoke([](const std::string&, const Envoy::Protobuf::Struct& value) {
+        EXPECT_EQ(value.fields().at("authz_pod_ip").string_value(), "10.4.5.6");
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  request_callbacks->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+}
+
+TEST_F(PropagateCallMetadataTest, DoesNotCopyWhenUnconfigured) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  NiceMock<StreamInfo::MockStreamInfo> call_stream_info;
+  Envoy::Protobuf::Struct ns_value;
+  (*ns_value.mutable_fields())["authz_pod_ip"].set_string_value("10.4.5.6");
+  (*call_stream_info.metadata_.mutable_filter_metadata())["test.metadata_ns"] = ns_value;
+
+  prepareCheck();
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+  request_headers_.addCopy(Http::Headers::get().Scheme, "https");
+
+  Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks{};
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks = &callbacks; }));
+  EXPECT_CALL(*client_, streamInfo()).WillRepeatedly(Return(&call_stream_info));
+
+  // Unconfigured: the filter must not stamp the callout namespace onto the downstream request.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata("test.metadata_ns", _))
+      .Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  request_callbacks->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+}
+
+TEST_F(PropagateCallMetadataTest, RejectsEmptyNamespaceEntry) {
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
+  TestUtility::loadFromYaml(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  propagate_call_metadata_namespaces:
+  - ""
+  )EOF",
+                            proto_config);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfig config(proto_config, *stats_store_.rootScope(), "ext_authz_prefix", factory_context_,
+                      creation_status);
+  EXPECT_FALSE(creation_status.ok());
+}
+
+TEST_F(PropagateCallMetadataTest, CopiesConfiguredFilterStateKeyFromCallStreamToDownstream) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  propagate_call_filter_state_keys:
+  - "test.filter_state_key"
+  )EOF");
+
+  // FilterState a custom callout-cluster load balancer wrote on the Check call's own stream.
+  NiceMock<StreamInfo::MockStreamInfo> call_stream_info;
+  call_stream_info.filter_state_->setData(
+      "test.filter_state_key", std::make_shared<Router::StringAccessorImpl>("account-42"),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  prepareCheck();
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+  request_headers_.addCopy(Http::Headers::get().Scheme, "https");
+
+  Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks{};
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks = &callbacks; }));
+  EXPECT_CALL(*client_, streamInfo()).WillRepeatedly(Return(&call_stream_info));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  request_callbacks->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  // The configured key now carries the callout-stream object through to the downstream request.
+  const auto* propagated =
+      decoder_filter_callbacks_.stream_info_.filterState()
+          ->getDataReadOnly<Router::StringAccessorImpl>("test.filter_state_key");
+  ASSERT_NE(propagated, nullptr);
+  EXPECT_EQ(propagated->asString(), "account-42");
+}
+
+TEST_F(PropagateCallMetadataTest, SkipsFilterStateKeyAbsentOnCallStream) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  propagate_call_filter_state_keys:
+  - "test.filter_state_key"
+  )EOF");
+
+  // Call stream carries no object under the configured key; a per-request miss is expected.
+  NiceMock<StreamInfo::MockStreamInfo> call_stream_info;
+
+  prepareCheck();
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+  request_headers_.addCopy(Http::Headers::get().Scheme, "https");
+
+  Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks{};
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks = &callbacks; }));
+  EXPECT_CALL(*client_, streamInfo()).WillRepeatedly(Return(&call_stream_info));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // The absent key is skipped, not an error, and the downstream request stays untouched.
+  request_callbacks->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_FALSE(decoder_filter_callbacks_.stream_info_.filterState()->hasDataWithName(
+      "test.filter_state_key"));
+}
+
+TEST_F(PropagateCallMetadataTest, RejectsEmptyFilterStateKeyEntry) {
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
+  TestUtility::loadFromYaml(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  propagate_call_filter_state_keys:
+  - ""
+  )EOF",
+                            proto_config);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfig config(proto_config, *stats_store_.rootScope(), "ext_authz_prefix", factory_context_,
+                      creation_status);
+  EXPECT_FALSE(creation_status.ok());
 }
 
 } // namespace
