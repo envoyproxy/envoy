@@ -2015,7 +2015,7 @@ TEST_F(DynamicModuleClusterTest, MetricsResolveAndRecordByHandle) {
   auto counter_stat = server_context_.store_.findCounterByString(
       "dynamicmodulescustom.handle_counter.outcome.resolved");
   ASSERT_TRUE(counter_stat.has_value());
-  EXPECT_EQ(8, counter_stat->get().value());
+  EXPECT_EQ(8, counter_stat->value());
 
   // Resolving the same tuple again yields the same child, which is what makes a cached handle
   // equivalent to the id path rather than a second stat.
@@ -2043,7 +2043,7 @@ TEST_F(DynamicModuleClusterTest, MetricsResolveAndRecordByHandle) {
   auto gauge_stat = server_context_.store_.findGaugeByString(
       "dynamicmodulescustom.handle_gauge.outcome.resolved");
   ASSERT_TRUE(gauge_stat.has_value());
-  EXPECT_EQ(12, gauge_stat->get().value());
+  EXPECT_EQ(12, gauge_stat->value());
 
   // Histogram vec. The record forwards the value to the resolved child, which the isolated store
   // delivers to sinks, so intercept that to assert the tagged child receives the value.
@@ -3018,6 +3018,72 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedFound) {
   EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
       context_ptr, key_buf, &result));
   EXPECT_EQ("typed-v", absl::string_view(result.ptr, result.length));
+}
+
+// The typed getter keeps every serialized value alive for the whole host selection callback so a
+// module can hold several views at once, and the scope guard clears them when the outermost
+// callback returns.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedConsecutiveGettersStayValid) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k1",
+                                     std::make_unique<Router::StringAccessorImpl>("value-one"));
+  stream_info.filter_state_->setData("k2",
+                                     std::make_unique<Router::StringAccessorImpl>("value-two"));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  std::string key1 = "k1";
+  std::string key2 = "k2";
+  envoy_dynamic_module_type_module_buffer key1_buf = {key1.data(), key1.size()};
+  envoy_dynamic_module_type_module_buffer key2_buf = {key2.data(), key2.size()};
+  envoy_dynamic_module_type_envoy_buffer result1;
+  envoy_dynamic_module_type_envoy_buffer result2;
+  {
+    ClusterLbFilterStateScratchGuard guard;
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key1_buf, &result1));
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key2_buf, &result2));
+    // The first view is not clobbered by the second call.
+    EXPECT_EQ("value-one", absl::string_view(result1.ptr, result1.length));
+    EXPECT_EQ("value-two", absl::string_view(result2.ptr, result2.length));
+    EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+  }
+  EXPECT_EQ(0U, clusterLbFilterStateScratchSizeForTest());
+}
+
+// A nested guard keeps the outer scratch, and only the outermost guard clears it.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNestedGuardClearsAtOutermost) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k1",
+                                     std::make_unique<Router::StringAccessorImpl>("value-one"));
+  stream_info.filter_state_->setData("k2",
+                                     std::make_unique<Router::StringAccessorImpl>("value-two"));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  std::string key1 = "k1";
+  std::string key2 = "k2";
+  envoy_dynamic_module_type_module_buffer key1_buf = {key1.data(), key1.size()};
+  envoy_dynamic_module_type_module_buffer key2_buf = {key2.data(), key2.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  {
+    ClusterLbFilterStateScratchGuard outer;
+    EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        context_ptr, key1_buf, &result));
+    {
+      ClusterLbFilterStateScratchGuard inner;
+      EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+          context_ptr, key2_buf, &result));
+      EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+    }
+    // A nested guard does not clear the scratch.
+    EXPECT_EQ(2U, clusterLbFilterStateScratchSizeForTest());
+  }
+  // The outermost guard clears the scratch.
+  EXPECT_EQ(0U, clusterLbFilterStateScratchSizeForTest());
 }
 
 // Test set_filter_state_bytes with nullptr context.

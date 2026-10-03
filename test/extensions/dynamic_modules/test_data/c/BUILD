@@ -22,6 +22,7 @@ package(default_visibility = [
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
+    "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
@@ -216,6 +217,24 @@ test_program(name = "cluster_specifier_missing_select")
 
 test_program(name = "cluster_specifier_config_new_fail")
 
+test_program(name = "route_specifier_no_op")
+
+test_program(name = "route_specifier_missing_config_new")
+
+test_program(name = "route_specifier_missing_config_destroy")
+
+test_program(name = "route_specifier_missing_on_route")
+
+test_program(name = "route_specifier_config_new_fail")
+
+test_program(name = "route_specifier_unknown_decision")
+
+test_program(name = "route_specifier_continue_matching")
+
+test_program(name = "route_specifier_select_template")
+
+test_program(name = "route_specifier_override")
+
 test_program(name = "cluster_async_host_selection")
 
 test_program(name = "cluster_no_op")
@@ -301,6 +320,8 @@ test_program(name = "upstream_bridge_headers_end_stream_no_body")
 test_program(name = "upstream_bridge_terminal_response")
 
 test_program(name = "tracer_no_op")
+
+test_program(name = "tracer_no_op_no_reserve_tags")
 
 test_program(name = "tracer_config_fail")
 
