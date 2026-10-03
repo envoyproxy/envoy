@@ -1445,6 +1445,14 @@ TEST_P(GrpcMuxImplTest, LrsCoverageIncrease) {
   EXPECT_EQ(grpc_mux_->maybeCreateLoadStatsReporter(), nullptr);
 }
 
+TEST_P(GrpcMuxImplTest, RequestOnDemandUpdateNotSupported) {
+  setup();
+  EXPECT_ENVOY_BUG(grpc_mux_->requestOnDemandUpdate("type_url", {"for_update"}),
+                   "unexpected request for on demand update");
+  EXPECT_ENVOY_BUG(grpc_mux_->requestOnDemandUpdate("type_url", {"for_update"}, {"for_removal"}),
+                   "unexpected request for on demand update");
+}
+
 class NullGrpcMuxImplTest : public testing::Test {
 public:
   NullGrpcMuxImplTest() : null_mux_(std::make_unique<Config::XdsMux::NullGrpcMuxImpl>()) {}
@@ -1467,6 +1475,8 @@ TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
 
 TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
   EXPECT_ENVOY_BUG(null_mux_->requestOnDemandUpdate("type_url", {"for_update"}),
+                   "unexpected request for on demand update");
+  EXPECT_ENVOY_BUG(null_mux_->requestOnDemandUpdate("type_url", {"for_update"}, {"for_removal"}),
                    "unexpected request for on demand update");
 }
 

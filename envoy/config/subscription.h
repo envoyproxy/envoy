@@ -268,7 +268,16 @@ public:
    * Creates a discovery request for resources.
    * @param add_these_names resource ids for inclusion in the discovery request.
    */
-  virtual void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) PURE;
+  virtual void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) = 0;
+
+  /**
+   * Creates a discovery request for resources to be added and/or removed.
+   * @param add_these_names resource ids for inclusion in the discovery request.
+   * @param remove_these_names resource ids to unsubscribe from in the discovery request.
+   */
+  virtual void
+  requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names,
+                        const absl::flat_hash_set<std::string>& remove_these_names) = 0;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;

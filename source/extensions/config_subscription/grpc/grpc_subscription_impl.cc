@@ -58,8 +58,15 @@ void GrpcSubscriptionImpl::updateResourceInterest(
 }
 
 void GrpcSubscriptionImpl::requestOnDemandUpdate(
-    const absl::flat_hash_set<std::string>& for_update) {
-  grpc_mux_->requestOnDemandUpdate(type_url_, for_update);
+    const absl::flat_hash_set<std::string>& add_these_names) {
+  grpc_mux_->requestOnDemandUpdate(type_url_, add_these_names);
+  stats_.update_attempt_.inc();
+}
+
+void GrpcSubscriptionImpl::requestOnDemandUpdate(
+    const absl::flat_hash_set<std::string>& add_these_names,
+    const absl::flat_hash_set<std::string>& remove_these_names) {
+  grpc_mux_->requestOnDemandUpdate(type_url_, add_these_names, remove_these_names);
   stats_.update_attempt_.inc();
 }
 

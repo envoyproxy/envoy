@@ -53,6 +53,7 @@ public:
   void setDynamicContextChanged() { dynamic_context_changed_ = true; }
   void clearDynamicContextChanged() { dynamic_context_changed_ = false; }
   bool dynamicContextChanged() const { return dynamic_context_changed_; }
+  void clearXdsConfigTracker() { xds_config_tracker_.reset(); }
 
   void setControlPlaneIdentifier(const std::string& id) { control_plane_identifier_ = id; }
   std::string& controlPlaneIdentifier() { return control_plane_identifier_; }

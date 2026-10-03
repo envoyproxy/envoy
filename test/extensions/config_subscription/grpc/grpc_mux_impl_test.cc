@@ -1649,6 +1649,8 @@ TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
 TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
   EXPECT_ENVOY_BUG(null_mux_.requestOnDemandUpdate("type_url", {"for_update"}),
                    "unexpected request for on demand update");
+  EXPECT_ENVOY_BUG(null_mux_.requestOnDemandUpdate("type_url", {"for_update"}, {"for_removal"}),
+                   "unexpected request for on demand update");
 }
 
 TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
@@ -1914,6 +1916,7 @@ TEST_P(GrpcMuxImplTest, RequestOnDemandUpdateDoesNothing) {
   setup();
   // Should not throw or crash.
   grpc_mux_->requestOnDemandUpdate("foo", {"z"});
+  grpc_mux_->requestOnDemandUpdate("foo", {"z"}, {"y"});
 }
 
 } // namespace

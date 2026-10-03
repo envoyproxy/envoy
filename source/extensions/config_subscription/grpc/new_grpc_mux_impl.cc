@@ -321,11 +321,6 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
     }
   }
   auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, effective_resources);
-  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
-    for (absl::string_view resource : added_removed.removed_) {
-      xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
-    }
-  }
   if (options.use_namespace_matching_) {
     // This is to prevent sending out of requests that contain prefixes instead of resource names
     sub->second->sub_state_.updateSubscriptionInterest({}, {});
@@ -341,10 +336,16 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
 
 void NewGrpcMuxImpl::requestOnDemandUpdate(const std::string& type_url,
                                            const absl::flat_hash_set<std::string>& for_update) {
+  requestOnDemandUpdate(type_url, for_update, {});
+}
+
+void NewGrpcMuxImpl::requestOnDemandUpdate(const std::string& type_url,
+                                           const absl::flat_hash_set<std::string>& for_update,
+                                           const absl::flat_hash_set<std::string>& for_removal) {
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
-  sub->second->sub_state_.updateSubscriptionInterest(for_update, {});
+  sub->second->sub_state_.updateSubscriptionInterest(for_update, for_removal);
   // Tell the server about our change in interest, if any.
   if (sub->second->sub_state_.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();

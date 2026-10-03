@@ -85,6 +85,7 @@ public:
   bool dynamicContextChanged() const { return dynamic_context_changed_; }
   void setDynamicContextChanged() { dynamic_context_changed_ = true; }
   void clearDynamicContextChanged() { dynamic_context_changed_ = false; }
+  void clearXdsConfigTracker() { xds_config_tracker_.reset(); }
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const;
