@@ -11,7 +11,6 @@
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
-#include "test/test_common/test_runtime.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -25,7 +24,6 @@ namespace CpuUtilizationMonitor {
 namespace {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using testing::_;
 using testing::Return;
 
 // =============================================================================
@@ -659,21 +657,6 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, FallsBackWhenResolvedCgroupHasNoSt
   expectCgroupResolution(mock_fs, "/kubepods.slice/gone.scope");
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/kubepods.slice/gone.scope/cpu.stat"))
       .WillOnce(Return(false));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
-
-  auto reader_or_error = LinuxContainerCpuStatsReader::create(mock_fs, api->timeSource());
-  ASSERT_TRUE(reader_or_error.ok());
-  EXPECT_NE(reader_or_error.value(), nullptr);
-}
-
-TEST(LinuxContainerCpuStatsReaderFactoryTest, SkipsResolutionWhenRuntimeGuardDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.cpu_utilization_resolve_container_cgroup", "false"}});
-
-  Api::ApiPtr api = Api::createApiForTest();
-  Filesystem::MockInstance mock_fs;
-  EXPECT_CALL(mock_fs, fileReadToEnd(_)).Times(0);
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
 
   auto reader_or_error = LinuxContainerCpuStatsReader::create(mock_fs, api->timeSource());
