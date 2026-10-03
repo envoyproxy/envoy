@@ -84,7 +84,7 @@ message RouteTemplate {
 // configuration load rather than constructed on the request path. An entry that replaces no
 // property is rejected. A property an entry leaves unset keeps the value of the route the decision
 // produced, so an entry can never remove a property that route configures.
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message RouteOverride {
   // The identifier the module selects this override with. Must be unique within the specifier.
   string override_id = 1 [(validate.rules).string = {min_len: 1}];
@@ -125,6 +125,16 @@ message RouteOverride {
   // :ref:`max_rewritten_path_bytes
   // <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.max_rewritten_path_bytes>`.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 9;
+
+  // Tracing configuration replacing the tracing settings of the produced route, overriding the
+  // connection manager defaults for the request. This is a route level property, so it applies to
+  // a direct response or a redirect route as well as a route entry.
+  config.route.v3.Tracing tracing = 10;
+
+  // Metadata layered onto the metadata of the produced route, per namespace, so consumers such as
+  // the rate limit ROUTE_ENTRY action, ext_authz and the METADATA(ROUTE) formatter observe it. It
+  // is a route level property. An empty message layers nothing.
+  config.core.v3.Metadata metadata = 11;
 }
 
 // Configuration for the dynamic modules route specifier.

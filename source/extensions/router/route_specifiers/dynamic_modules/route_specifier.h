@@ -90,6 +90,16 @@ struct RouteOverride {
   // Regex rewrite of the request path, compiled once at configuration load. Null when unset.
   Regex::CompiledMatcherPtr regex_rewrite;
   std::string regex_rewrite_substitution;
+  // Route level properties, valid on any route rather than only a route entry.
+  std::shared_ptr<const Envoy::Router::RouteTracing> tracing;
+  envoy::config::core::v3::Metadata metadata;
+
+  // Whether the override carries a property only a route entry can carry.
+  bool hasRouteEntryProperties() const {
+    return retry_policy != nullptr || metadata_match_criteria != nullptr ||
+           !shadow_policies.empty() || hash_policy != nullptr || hedge_policy != nullptr ||
+           rate_limit_policy != nullptr || cors_policy != nullptr || regex_rewrite != nullptr;
+  }
 };
 
 using RouteOverrideMap = absl::flat_hash_map<std::string, RouteOverride>;
@@ -330,6 +340,7 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   std::optional<bool> filterDisabled(absl::string_view name) const override;
+  const Envoy::Router::RouteTracing* tracingConfig() const override;
 
 protected:
   const DynamicModuleRouteSpecifierConfigSharedPtr config_;
@@ -359,6 +370,7 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   std::optional<bool> filterDisabled(absl::string_view name) const override;
+  const Envoy::Router::RouteTracing* tracingConfig() const override;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
