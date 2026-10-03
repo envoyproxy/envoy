@@ -19,20 +19,6 @@ _WINDOWS_ENV = {
     "ENVOY_ABI_HEADER": "$(location //source/extensions/dynamic_modules/abi:abi.h)",
 }
 
-# @envoy_repo//:use_local_llvm matches the host OS, which is Windows or Linux.
-_LOCAL_LLVM_ENV = dict(
-    _WINDOWS_ENV,
-    LIBCLANG_PATH = "%s/bin" % LLVM_PATH,
-) if LLVM_HOST_WINDOWS else {
-    "LIBCLANG_PATH": "%s/lib/libclang.so" % LLVM_PATH,
-    "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-        "-resource-dir %s/lib/clang/%s" % (LLVM_PATH, LLVM_MAJOR),
-        "-isystem %s/lib/clang/%s/include" % (LLVM_PATH, LLVM_MAJOR),
-        "-isystem %s/include/x86_64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
-        "-isystem %s/include/aarch64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
-    ]),
-}
-
 _WINDOWS_DATA = ["//source/extensions/dynamic_modules/abi:abi.h"]
 
 cargo_build_script(
