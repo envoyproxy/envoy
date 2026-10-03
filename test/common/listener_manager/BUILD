@@ -150,7 +150,9 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/config:resource_name_lib",
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/common/network:addr_family_aware_socket_option_lib",
