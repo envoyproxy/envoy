@@ -1045,6 +1045,21 @@ case $CI_TARGET in
         ;;
 
     release|release.server_only|release.test_only)
+        if [[ "$CI_TARGET" == "release.test_only" && "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+            # CI experiment for #47485 only: decode the filter_persistence_test crash.
+            shim_dir="$(mktemp -d)"
+            if ! command -v addr2line >/dev/null; then
+                a2l="$(command -v llvm-addr2line || find /opt /usr -name 'llvm-addr2line*' -type f 2>/dev/null | head -1)"
+                if [[ -n "$a2l" ]]; then ln -s "$a2l" "${shim_dir}/addr2line"; fi
+            fi
+            echo "addr2line: $(PATH="${shim_dir}:$PATH" command -v addr2line || echo missing)"
+            echo "pmap: $(command -v pmap || echo missing)"
+            PATH="${shim_dir}:$PATH" bazel run "${BAZEL_BUILD_OPTIONS[@]}" -c opt --copt=-g --strip=never \
+                --run_under="python3 ${ENVOY_SRCDIR}/tools/stack_decode.py" \
+                //test/extensions/filters/http/rate_limit_quota:filter_persistence_test -- \
+                --gtest_filter='*TestPersistenceWithLdsUpdates*' || true
+            exit 1
+        fi
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # When testing memory consumption, we want to test against exact byte-counts
             # where possible. As these differ between platforms and compile options, we

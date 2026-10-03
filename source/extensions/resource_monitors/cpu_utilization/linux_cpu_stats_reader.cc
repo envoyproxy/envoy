@@ -14,6 +14,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/server/cgroup_cpu_util.h"
 
 #ifdef __linux__
@@ -208,14 +209,17 @@ absl::StatusOr<LinuxContainerCpuStatsReader::ContainerStatsReaderPtr>
 LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_source) {
   // Prefer the process's own cgroup: in the host cgroup namespace the mount point is
   // the cgroup root, which reports whole-machine usage and has no cpu.max.
-  const std::optional<CgroupInfo> cgroup = CgroupCpuUtil::getCurrentCgroupInfo(fs);
-  if (cgroup.has_value() && cgroup->version == "v2") {
-    const std::string base(absl::StripSuffix(cgroup->full_path, "/"));
-    if (CpuPaths::isV2(fs, base)) {
-      return std::make_unique<CgroupV2CpuStatsReader>(fs, time_source, base);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.cpu_utilization_resolve_container_cgroup")) {
+    const std::optional<CgroupInfo> cgroup = CgroupCpuUtil::getCurrentCgroupInfo(fs);
+    if (cgroup.has_value() && cgroup->version == "v2") {
+      const std::string base(absl::StripSuffix(cgroup->full_path, "/"));
+      if (CpuPaths::isV2(fs, base)) {
+        return std::make_unique<CgroupV2CpuStatsReader>(fs, time_source, base);
+      }
+      ENVOY_LOG_MISC(debug, "No cpu.stat in cgroup {}, falling back to {}", base,
+                     CpuPaths::V2::getBasePath());
     }
-    ENVOY_LOG_MISC(debug, "No cpu.stat in cgroup {}, falling back to {}", base,
-                   CpuPaths::V2::getBasePath());
   }
 
   if (CpuPaths::isV2(fs)) {

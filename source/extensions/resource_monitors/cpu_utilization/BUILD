@@ -51,6 +51,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/server:cgroup_cpu_util_lib",
         "//source/server:options_base",
         "@abseil-cpp//absl/strings",
