@@ -82,6 +82,9 @@ void LifecycleStatsHandler::onEvent(WasmEvent event) {
     lifecycle_stats_.created_.inc();
     vm_count_gauge_.inc();
     break;
+  case WasmEvent::VmCrashed:
+    lifecycle_stats_.crashed_.inc();
+    break;
   default:
     break;
   }
