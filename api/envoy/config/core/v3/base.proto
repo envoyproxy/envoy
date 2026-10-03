@@ -9,6 +9,7 @@ import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/semantic_version.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -556,7 +557,7 @@ message DataSource {
 }
 
 // The message specifies the retry policy of remote data source when fetching fails.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RetryPolicy";
 
@@ -599,6 +600,11 @@ message RetryPolicy {
 
   // For details, see :ref:`host_selection_retry_max_attempts <envoy_v3_api_field_config.route.v3.RetryPolicy.host_selection_retry_max_attempts>`.
   int64 host_selection_retry_max_attempts = 6;
+
+  // Specifies a non-zero upstream timeout per retry attempt (including the initial attempt).
+  // This parameter is optional. For details, see :ref:`per_try_timeout
+  // <envoy_v3_api_field_config.route.v3.RetryPolicy.per_try_timeout>`.
+  google.protobuf.Duration per_try_timeout = 7 [(validate.rules).duration = {gt {}}];
 }
 
 // The message specifies how to fetch data from remote and how to verify it.
