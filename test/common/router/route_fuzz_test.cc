@@ -149,6 +149,33 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     TestUtility::validate(input);
     const auto cleaned_route_config = cleanRouteConfig(input.config());
     ENVOY_LOG_MISC(debug, "cleaned route config: {}", cleaned_route_config.DebugString());
+
+    // Invariant check: Any virtual host where requiresProbeValidation returns false
+    // (qualifying for fast-path deferred creation) must NEVER fail direct VirtualHostImpl
+    // instantiation.
+    {
+      auto common_config_or_error = CommonConfigImpl::create(
+          cleaned_route_config, factory_context, ProtobufMessage::getNullValidationVisitor(),
+          factory_context.initManager());
+      if (common_config_or_error.ok()) {
+        auto global_config = common_config_or_error.value();
+        auto vhost_scope = factory_context.scope().scopeFromStatName(
+            factory_context.routerContext().virtualClusterStatNames().vhost_);
+        for (const auto& vhost_proto : cleaned_route_config.virtual_hosts()) {
+          const bool probe_required = requiresProbeValidation(
+              vhost_proto, global_config, /*validate_clusters=*/true, factory_context);
+          if (!probe_required) {
+            absl::Status vhost_status = absl::OkStatus();
+            VirtualHostImpl direct_vhost(vhost_proto, global_config, factory_context, *vhost_scope,
+                                         ProtobufMessage::getNullValidationVisitor(),
+                                         factory_context.initManager(), /*validate_clusters=*/true,
+                                         vhost_status);
+            FUZZ_ASSERT(vhost_status.ok());
+          }
+        }
+      }
+    }
+
     std::shared_ptr<ConfigImpl> config =
         THROW_OR_RETURN_VALUE(ConfigImpl::create(cleaned_route_config, factory_context,
                                                  ProtobufMessage::getNullValidationVisitor(),
@@ -160,6 +187,24 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     if (route != nullptr && route->routeEntry() != nullptr) {
       route->routeEntry()->finalizeRequestHeaders(headers, formatter_context, stream_info, true);
     }
+
+    // Also test with deferred virtual host creation enabled to verify lazy inflation during
+    // routing.
+    factory_context.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+        true);
+    std::shared_ptr<ConfigImpl> deferred_config =
+        THROW_OR_RETURN_VALUE(ConfigImpl::create(cleaned_route_config, factory_context,
+                                                 ProtobufMessage::getNullValidationVisitor(),
+                                                 factory_context.initManager(), true),
+                              std::shared_ptr<ConfigImpl>);
+    auto deferred_route = deferred_config->route(headers, stream_info, input.random_value()).route;
+    if (deferred_route != nullptr && deferred_route->routeEntry() != nullptr) {
+      deferred_route->routeEntry()->finalizeRequestHeaders(headers, formatter_context, stream_info,
+                                                           true);
+    }
+    factory_context.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
+        false);
+
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
