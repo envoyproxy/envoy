@@ -5,5 +5,3 @@ the server. The monitor now resolves its own cgroup from ``/proc/self/cgroup`` a
 ``/proc/self/mountinfo`` and reports container rather than host usage. cgroup v2 detection is keyed
 on ``cpu.stat``: an absent ``cpu.max`` means no CPU limit and an absent ``cpuset.cpus.effective``
 falls back to the CPU affinity count, while a file that exists but cannot be read fails the sample.
-The cgroup resolution can be disabled with the runtime guard
-``envoy.reloadable_features.cpu_utilization_resolve_container_cgroup``.
