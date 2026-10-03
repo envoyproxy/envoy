@@ -117,8 +117,15 @@ constexpr const char* envoy_dynamic_modules_abi_version = ENVOY_DYNAMIC_MODULES_
 
 extern "C" {
 #else
+#ifdef _MSC_VER
+// COFF weak definitions do not merge reliably across objects (e.g. when several modules are
+// statically linked into the same binary), so use a COMDAT instead.
+__declspec(selectany) const char* envoy_dynamic_modules_abi_version =
+    ENVOY_DYNAMIC_MODULES_ABI_VERSION;
+#else
 const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
     ENVOY_DYNAMIC_MODULES_ABI_VERSION;
+#endif
 
 #include <stdbool.h>
 #include <stddef.h>
