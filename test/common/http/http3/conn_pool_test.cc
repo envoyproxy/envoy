@@ -238,6 +238,16 @@ void Http3ConnPoolImplTest::createNewStream() {
   pool_->onConnectionEvent(*clients.front(), "", Network::ConnectionEvent::Connected);
 }
 
+TEST_F(Http3ConnPoolImplTest, EagerPreconnectFloorNotSupported) {
+  ON_CALL(mockHost(), coarseHealth()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+  ON_CALL(mockHost().cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+  initialize();
+
+  EXPECT_FALSE(pool_->maybePreconnect(0));
+  EXPECT_EQ(0, mockHost().cluster_.traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(0, mockHost().cluster_.traffic_stats_->upstream_cx_preconnect_blocked_.value());
+}
+
 TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) { createNewStream(); }
 
 TEST_F(Http3ConnPoolImplTest, CreationAndNewHappyEyeballsStream) {
