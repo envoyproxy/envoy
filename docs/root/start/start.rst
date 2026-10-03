@@ -14,8 +14,8 @@ These examples use the :ref:`v3 Envoy API <envoy_v3_api_reference>`.
     :maxdepth: 2
 
     install
-    quick-start/index
-    sandboxes/index
+    quick-start
+    sandboxes
     docker
     building
 
