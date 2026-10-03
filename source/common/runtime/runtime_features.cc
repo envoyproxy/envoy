@@ -35,6 +35,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
+RUNTIME_GUARD(envoy_reloadable_features_cache_parsed_tls_certificates);
 RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_formatter_accept_empty_values);
@@ -195,12 +196,6 @@ RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
-
-// When enabled, the parsed client/server certificate chain and private key are shared across TLS
-// contexts that reference identical PEM material through a process-wide cache, so a cluster with
-// many per-endpoint certificates (or a resend of such a cluster) parses each distinct certificate
-// only once instead of once per context. Defaults off pending broad soak of the shared parsed key.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_cache_parsed_tls_certificates);
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);

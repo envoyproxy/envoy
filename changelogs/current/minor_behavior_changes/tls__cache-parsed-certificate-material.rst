@@ -1,5 +1,4 @@
-Added caching of parsed certificate material (CA certificate bundles, certificate revocation lists,
-and certificate/key pairs) so that identical material is parsed once and reused across TLS contexts
-that share the same input, instead of being re-parsed for every context. This is guarded by
-``envoy.reloadable_features.cache_parsed_tls_certificates`` and defaults to false, so behavior is
-unchanged unless the guard is explicitly enabled.
+Parsed TLS certificate chains and private keys are now cached and shared across TLS contexts that
+reference identical PEM material, so each distinct certificate and key is parsed once instead of once
+per context. Password-protected private keys are not cached. This change can be reverted by setting
+the runtime guard ``envoy.reloadable_features.cache_parsed_tls_certificates`` to ``false``.

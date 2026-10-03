@@ -100,6 +100,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_CTX_get_ex_new_index \
   --uncomment-macro SSL_CTX_get_app_data \
   --uncomment-func-decl SSL_CTX_free \
+  --uncomment-func-decl SSL_CTX_add1_chain_cert \
   --uncomment-func-decl SSL_CTX_add_extra_chain_cert \
   --uncomment-func-decl SSL_CIPHER_get_name \
   --uncomment-func-decl SSL_CIPHER_get_id \

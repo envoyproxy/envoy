@@ -757,9 +757,7 @@ TlsContext::loadCertificateChain(const std::string& data, const std::string& dat
           absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
     }
     for (const auto& cert : shared_cert_chain_->intermediates) {
-      // SSL_CTX_add_extra_chain_cert takes ownership, so hand it an owned reference
-      // to the shared certificate rather than the cache's.
-      if (!SSL_CTX_add_extra_chain_cert(ssl_ctx_.get(), bssl::UpRef(cert.get()).release())) {
+      if (!SSL_CTX_add1_chain_cert(ssl_ctx_.get(), cert.get())) {
         return absl::InvalidArgumentError(
             absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
       }

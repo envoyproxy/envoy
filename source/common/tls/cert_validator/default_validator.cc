@@ -54,68 +54,6 @@ SINGLETON_MANAGER_REGISTRATION(ca_cert_cache);
 SINGLETON_MANAGER_REGISTRATION(cert_chain_cache);
 SINGLETON_MANAGER_REGISTRATION(private_key_cache);
 
-namespace {
-
-// Parses a PEM CRL bundle into a CrlList (with no owning-cache back-pointer). Shared by the CRL
-// cache and by the uncached path taken when the parsed-TLS-certificate cache is disabled.
-absl::StatusOr<CrlListSharedPtr> parseCrlList(const std::string& crl_pem,
-                                              const std::string& crl_path) {
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(crl_pem.data()), crl_pem.size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  // Based on BoringSSL's X509_load_cert_crl_file().
-  bssl::UniquePtr<STACK_OF(X509_INFO)> list(
-      PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-  if (list == nullptr) {
-    return absl::InvalidArgumentError(absl::StrCat("Failed to load CRL from ", crl_path));
-  }
-  auto crl_list = std::make_shared<CrlList>();
-  for (const X509_INFO* item : list.get()) {
-    if (item->crl) {
-      crl_list->crls.push_back(bssl::UpRef(item->crl));
-    }
-  }
-  return crl_list;
-}
-
-// Parses a PEM CA bundle into a CaCertList (with no owning-cache back-pointer). Shared by the CA
-// cache and by the uncached path taken when the parsed-TLS-certificate cache is disabled. A bundle
-// that parses but carries no certificate is not a usable trust anchor set and is rejected.
-absl::StatusOr<CaCertListSharedPtr> parseCaCertList(const std::string& ca_pem,
-                                                    const std::string& ca_path) {
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(ca_pem.data()), ca_pem.size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  // Based on BoringSSL's X509_load_cert_crl_file().
-  bssl::UniquePtr<STACK_OF(X509_INFO)> list(
-      PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-  if (list == nullptr) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
-  }
-  auto ca_cert_list = std::make_shared<CaCertList>();
-  for (const X509_INFO* item : list.get()) {
-    if (item->x509) {
-      ca_cert_list->certs.push_back(bssl::UpRef(item->x509));
-    }
-    if (item->crl) {
-      ca_cert_list->crls.push_back(bssl::UpRef(item->crl));
-    }
-  }
-  if (ca_cert_list->certs.empty()) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
-  }
-  return ca_cert_list;
-}
-
-// Whether the process-wide parsed-TLS-certificate caches (CA bundle, CRL, cert chain, private key)
-// are enabled. Off by default; gating keeps the shared-cache behavior opt-in and consistent with
-// the cert-chain and private-key caches in context_impl.cc.
-bool parsedTlsCertificateCacheEnabled() {
-  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cache_parsed_tls_certificates");
-}
-
-} // namespace
-
 absl::StatusOr<CrlListSharedPtr> CrlCache::getOrCreate(const std::string& crl_pem,
                                                        const std::string& crl_path) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -137,12 +75,24 @@ absl::StatusOr<CrlListSharedPtr> CrlCache::getOrCreate(const std::string& crl_pe
   // not grow without bound across xDS updates.
   absl::erase_if(cache_, [](const auto& entry) { return entry.second.expired(); });
 
-  absl::StatusOr<CrlListSharedPtr> crl_list_or_error = parseCrlList(crl_pem, crl_path);
-  RETURN_IF_NOT_OK_REF(crl_list_or_error.status());
-  CrlListSharedPtr crl_list = std::move(*crl_list_or_error);
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(crl_pem.data()), crl_pem.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  // Based on BoringSSL's X509_load_cert_crl_file().
+  bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+      PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+  if (list == nullptr) {
+    return absl::InvalidArgumentError(absl::StrCat("Failed to load CRL from ", crl_path));
+  }
+
+  auto crl_list = std::make_shared<CrlList>();
   // Hold the cache alive for as long as this entry is referenced, so callers
   // only need to keep the returned CrlList.
   crl_list->cache = shared_from_this();
+  for (const X509_INFO* item : list.get()) {
+    if (item->crl) {
+      crl_list->crls.push_back(bssl::UpRef(item->crl));
+    }
+  }
   cache_[key] = crl_list;
   return crl_list;
 }
@@ -184,12 +134,34 @@ absl::StatusOr<CaCertListSharedPtr> CaCertCache::getOrCreate(const std::string& 
   // not grow without bound across xDS updates.
   absl::erase_if(cache_, [](const auto& entry) { return entry.second.expired(); });
 
-  absl::StatusOr<CaCertListSharedPtr> ca_cert_list_or_error = parseCaCertList(ca_pem, ca_path);
-  RETURN_IF_NOT_OK_REF(ca_cert_list_or_error.status());
-  CaCertListSharedPtr ca_cert_list = std::move(*ca_cert_list_or_error);
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(ca_pem.data()), ca_pem.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  // Based on BoringSSL's X509_load_cert_crl_file().
+  bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+      PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+  if (list == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
+  }
+
+  auto ca_cert_list = std::make_shared<CaCertList>();
   // Hold the cache alive for as long as this entry is referenced, so callers
   // only need to keep the returned CaCertList.
   ca_cert_list->cache = shared_from_this();
+  for (const X509_INFO* item : list.get()) {
+    if (item->x509) {
+      ca_cert_list->certs.push_back(bssl::UpRef(item->x509));
+    }
+    if (item->crl) {
+      ca_cert_list->crls.push_back(bssl::UpRef(item->crl));
+    }
+  }
+  // A blob that parses but carries no certificate is not a usable trust bundle.
+  if (ca_cert_list->certs.empty()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
+  }
+
   cache_[key] = ca_cert_list;
   return ca_cert_list;
 }
@@ -367,15 +339,13 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
 
   if (config_ != nullptr && !config_->caCert().empty() && !provides_certificates) {
     ca_file_path_ = config_->caCertPath();
-    // Parse the trusted CA blob. When the parsed-TLS-certificate cache is enabled, go through a
-    // process-wide cache so that identical CA content referenced from many TLS contexts is
-    // materialized in memory only once; otherwise parse it directly for this context. Either way
-    // the returned CaCertList owns (or keeps the cache owning) the certificates.
+    // Parse the trusted CA blob through a process-wide cache so that identical CA
+    // content referenced from many TLS contexts is materialized in memory only
+    // once. The returned CaCertList keeps the cache alive, so no separate
+    // reference is needed.
+    std::shared_ptr<CaCertCache> ca_cert_cache = getCaCertCache(context_.singletonManager());
     absl::StatusOr<CaCertListSharedPtr> ca_certs_or_error =
-        parsedTlsCertificateCacheEnabled()
-            ? getCaCertCache(context_.singletonManager())
-                  ->getOrCreate(config_->caCert(), config_->caCertPath())
-            : parseCaCertList(config_->caCert(), config_->caCertPath());
+        ca_cert_cache->getOrCreate(config_->caCert(), config_->caCertPath());
     RETURN_IF_NOT_OK_REF(ca_certs_or_error.status());
     shared_ca_certs_ = std::move(*ca_certs_or_error);
 
@@ -412,16 +382,12 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
   }
 
   if (config_ != nullptr && !config_->certificateRevocationList().empty()) {
-    // Parse the CRL. When the parsed-TLS-certificate cache is enabled, go through a process-wide
-    // cache so that identical CRL content referenced from many TLS contexts is materialized in
-    // memory only once; otherwise parse it directly for this context.
-    absl::StatusOr<CrlListSharedPtr> crl_list_or_error =
-        parsedTlsCertificateCacheEnabled()
-            ? getCrlCache(context_.singletonManager())
-                  ->getOrCreate(config_->certificateRevocationList(),
-                                config_->certificateRevocationListPath())
-            : parseCrlList(config_->certificateRevocationList(),
-                           config_->certificateRevocationListPath());
+    // Parse the CRL through a process-wide cache so that identical CRL content
+    // referenced from many TLS contexts is materialized in memory only once. The
+    // returned CrlList keeps the cache alive, so no separate reference is needed.
+    std::shared_ptr<CrlCache> crl_cache = getCrlCache(context_.singletonManager());
+    absl::StatusOr<CrlListSharedPtr> crl_list_or_error = crl_cache->getOrCreate(
+        config_->certificateRevocationList(), config_->certificateRevocationListPath());
     RETURN_IF_NOT_OK_REF(crl_list_or_error.status());
     shared_crl_ = std::move(*crl_list_or_error);
 

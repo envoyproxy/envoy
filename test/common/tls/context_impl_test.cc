@@ -218,8 +218,6 @@ TEST_F(SslContextImplTest, TestCipherSuitesDeduplication) {
 // Validates that TLS contexts referencing identical CRL content share a single
 // parsed CRL, rather than each holding its own multi-megabyte parsed copy.
 TEST_F(SslContextImplTest, TestCrlSharedAcrossContexts) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cache_parsed_tls_certificates", "true"}});
   const std::string yaml = R"EOF(
   common_tls_context:
     validation_context:
@@ -274,8 +272,6 @@ TEST_F(SslContextImplTest, TestCrlSharedAcrossContexts) {
 // down both contexts is safe. Primarily intended to run under ASAN/TSAN to catch
 // lifetime regressions in the shared-CRL handling.
 TEST_F(SslContextImplTest, TestCrlSharedContextLifetime) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cache_parsed_tls_certificates", "true"}});
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -333,52 +329,10 @@ TEST_F(SslContextImplTest, TestCrlSharedContextLifetime) {
   EXPECT_EQ(crl_cache->size(), 0);
 }
 
-// With the cache disabled (the default), CA and CRL content is parsed per-context via the uncached
-// fallback rather than through the shared caches, and revocation is still enforced. Guards the
-// else branch taken when envoy.reloadable_features.cache_parsed_tls_certificates is off.
-TEST_F(SslContextImplTest, TestCrlAndCaUncachedWhenFlagDisabled) {
-  const std::string yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-      certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-      crl:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
-  require_client_certificate: true
-  )EOF";
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
-  auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  auto factory = *ServerSslSocketFactory::create(std::move(cfg), manager_, *store_.rootScope());
-
-  // The shared caches are never populated when the feature is disabled.
-  EXPECT_EQ(getCrlCache(server_factory_context_.singletonManager())->size(), 0);
-  EXPECT_EQ(getCaCertCache(server_factory_context_.singletonManager())->size(), 0);
-
-  // Revocation is still enforced through the per-context parse.
-  bssl::UniquePtr<X509> revoked_cert = readCertFromFile(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
-  Network::TransportSocketPtr socket = factory->createDownstreamTransportSocket();
-  SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
-  bssl::UniquePtr<X509_STORE_CTX> store_ctx(X509_STORE_CTX_new());
-  ASSERT_TRUE(X509_STORE_CTX_init(store_ctx.get(), SSL_CTX_get_cert_store(ssl_ctx),
-                                  revoked_cert.get(), nullptr));
-  EXPECT_EQ(X509_verify_cert(store_ctx.get()), 0);
-  EXPECT_EQ(X509_STORE_CTX_get_error(store_ctx.get()), X509_V_ERR_CERT_REVOKED);
-}
-
 // Validates that TLS contexts referencing identical certificate and key content
 // share a single parsed certificate chain and a single parsed private key, rather
 // than each re-parsing the PEM, when the cache is enabled.
 TEST_F(SslContextImplTest, TestClientCertAndKeySharedAcrossContexts) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cache_parsed_tls_certificates", "true"}});
-
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -427,9 +381,12 @@ TEST_F(SslContextImplTest, TestClientCertAndKeySharedAcrossContexts) {
   EXPECT_EQ(private_key_cache->size(), 2);
 }
 
-// With the cache disabled (the default), identical certificate and key content is
-// parsed per context and the caches are never populated.
+// With the runtime guard disabled, the certificate chain and private key are parsed per context
+// while the CA and CRL caches are still used.
 TEST_F(SslContextImplTest, TestClientCertAndKeyNotSharedWhenDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.cache_parsed_tls_certificates", "false"}});
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -437,6 +394,11 @@ TEST_F(SslContextImplTest, TestClientCertAndKeyNotSharedWhenDisabled) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
   )EOF";
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context1;
@@ -448,6 +410,8 @@ TEST_F(SslContextImplTest, TestClientCertAndKeyNotSharedWhenDisabled) {
 
   EXPECT_EQ(getCertChainCache(server_factory_context_.singletonManager())->size(), 0);
   EXPECT_EQ(getPrivateKeyCache(server_factory_context_.singletonManager())->size(), 0);
+  EXPECT_EQ(getCaCertCache(server_factory_context_.singletonManager())->size(), 1);
+  EXPECT_EQ(getCrlCache(server_factory_context_.singletonManager())->size(), 1);
 }
 
 // Validates the lifetime of certificate and key material shared between two TLS
@@ -455,9 +419,6 @@ TEST_F(SslContextImplTest, TestClientCertAndKeyNotSharedWhenDisabled) {
 // other, and destroying both releases the cache entries. Primarily intended to
 // run under ASAN/TSAN.
 TEST_F(SslContextImplTest, TestClientCertAndKeySharedContextLifetime) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cache_parsed_tls_certificates", "true"}});
-
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -501,9 +462,6 @@ TEST_F(SslContextImplTest, TestClientCertAndKeySharedContextLifetime) {
 // leaf is installed and each intermediate is added to the context. Covers the cached
 // multi-certificate chain path.
 TEST_F(SslContextImplTest, TestClientCertChainWithIntermediateShared) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cache_parsed_tls_certificates", "true"}});
-
   // Build a leaf-plus-intermediate chain from two existing single certificates.
   const std::string leaf = TestEnvironment::readFileToStringForTest(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"));
@@ -536,9 +494,6 @@ TEST_F(SslContextImplTest, TestClientCertChainWithIntermediateShared) {
 // A certificate chain that fails to parse surfaces an error through the cached path and is not
 // cached. Covers the cert chain cache getOrCreate parse failure and its propagation.
 TEST_F(SslContextImplTest, TestCachedCertChainParseErrorSurfaces) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cache_parsed_tls_certificates", "true"}});
-
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -560,9 +515,6 @@ TEST_F(SslContextImplTest, TestCachedCertChainParseErrorSurfaces) {
 // A private key that fails to parse surfaces an error through the cached path and is not cached.
 // Covers the private key cache getOrCreate parse failure and its propagation.
 TEST_F(SslContextImplTest, TestCachedPrivateKeyParseErrorSurfaces) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cache_parsed_tls_certificates", "true"}});
-
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -584,9 +536,6 @@ TEST_F(SslContextImplTest, TestCachedPrivateKeyParseErrorSurfaces) {
 // A private key that parses but does not match the certificate is rejected through the cached path.
 // Covers the SSL_CTX_use_PrivateKey failure branch in the cached private key load.
 TEST_F(SslContextImplTest, TestCachedPrivateKeyMismatchSurfaces) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cache_parsed_tls_certificates", "true"}});
-
   // A valid certificate paired with a valid but unrelated private key.
   const std::string yaml = R"EOF(
   common_tls_context:
