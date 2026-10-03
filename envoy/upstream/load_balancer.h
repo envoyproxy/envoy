@@ -262,6 +262,24 @@ public:
 using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;
 
 /**
+ * Provides access to host connection state.
+ */
+class ConnectionStateProvider {
+public:
+  virtual ~ConnectionStateProvider() = default;
+
+  /**
+   * @return true if the host has at least one active connection ready to serve requests.
+   */
+  virtual bool hasReadyConnection(const HostConstSharedPtr& host) const PURE;
+
+  /**
+   * Initiates preconnect for the host.
+   */
+  virtual void preconnect(const HostConstSharedPtr& host) PURE;
+};
+
+/**
  * Necessary parameters for creating a worker local load balancer.
  */
 struct LoadBalancerParams {
@@ -269,6 +287,8 @@ struct LoadBalancerParams {
   const PrioritySet& priority_set;
   // The worker local priority set of the local cluster.
   const PrioritySet* local_priority_set{};
+  // Optional provider for connection-aware load balancing.
+  ConnectionStateProvider* connection_state_provider{};
 };
 
 /**

@@ -407,6 +407,18 @@ TEST_F(ConnPoolMapImplTest, ErasePool) {
   EXPECT_NE(pool_ptr, &test_map->getPool(1, getBasicFactory()).value().get());
 }
 
+TEST_F(ConnPoolMapImplTest, HasReadyConnection) {
+  TestMapPtr test_map = makeTestMap();
+  EXPECT_FALSE(test_map->hasReadyConnection());
+
+  test_map->getPool(1, getBasicFactory());
+  EXPECT_CALL(*mock_pools_[0], hasReadyConnection()).WillOnce(Return(false));
+  EXPECT_FALSE(test_map->hasReadyConnection());
+
+  EXPECT_CALL(*mock_pools_[0], hasReadyConnection()).WillOnce(Return(true));
+  EXPECT_TRUE(test_map->hasReadyConnection());
+}
+
 // The following tests only die in debug builds, so don't run them if this isn't one.
 #if !defined(NDEBUG)
 class ConnPoolMapImplDeathTest : public ConnPoolMapImplTest {};

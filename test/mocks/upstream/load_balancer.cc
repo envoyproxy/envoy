@@ -15,5 +15,8 @@ MockLoadBalancer::MockLoadBalancer() {
 
 MockLoadBalancer::~MockLoadBalancer() = default;
 
+MockConnectionStateProvider::MockConnectionStateProvider() = default;
+MockConnectionStateProvider::~MockConnectionStateProvider() = default;
+
 } // namespace Upstream
 } // namespace Envoy

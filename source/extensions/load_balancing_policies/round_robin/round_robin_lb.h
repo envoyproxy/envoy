@@ -32,11 +32,13 @@ public:
       Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
       const envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin&
           round_robin_config,
-      TimeSource& time_source)
+      TimeSource& time_source, ConnectionStateProvider* connection_state_provider = nullptr)
       : EdfLoadBalancerBase(
             priority_set, local_priority_set, stats, runtime, random, healthy_panic_threshold,
             LoadBalancerConfigHelper::localityLbConfigFromProto(round_robin_config),
-            LoadBalancerConfigHelper::slowStartConfigFromProto(round_robin_config), time_source) {
+            LoadBalancerConfigHelper::slowStartConfigFromProto(round_robin_config),
+            LoadBalancerConfigHelper::connectionAwareLbConfigFromProto(round_robin_config),
+            time_source, connection_state_provider) {
     initialize();
   }
 
