@@ -46,7 +46,7 @@ public:
                                  bool allow_missing, JwksCache& jwks_cache,
                                  Upstream::ClusterManager& cluster_manager,
                                  CreateJwksFetcherCb create_jwks_fetcher_cb,
-                                 TimeSource& time_source);
+                                 TimeSource& time_source, bool extract_only = false);
 };
 
 /**
@@ -59,7 +59,7 @@ public:
   // Factory method for creating authenticator, and populate it with provider config.
   virtual AuthenticatorPtr create(const JwtVerify::CheckAudience* check_audience,
                                   const std::optional<std::string>& provider, bool allow_failed,
-                                  bool allow_missing) const PURE;
+                                  bool allow_missing, bool extract_only = false) const PURE;
 };
 
 } // namespace JwtAuthn
