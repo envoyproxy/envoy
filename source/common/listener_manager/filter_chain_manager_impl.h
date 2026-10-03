@@ -17,6 +17,7 @@
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/singleton/instance.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/hash.h"
@@ -107,6 +108,10 @@ struct FilterChainActionFactoryContext {
   FcdsClientCallbacks& fcds_callbacks_;
   const envoy::config::core::v3::ConfigSource& fcds_config_source_;
   Init::Manager& init_manager_;
+  // Optional sink: each FCDS subscription handle created while building the matcher is recorded
+  // here so the owning FilterChainManagerImpl can report its (routable) FCDS chains by name. Null
+  // when unused (e.g. no FCDS).
+  std::vector<FcdsSubscriptionHandleSharedPtr>* fcds_handles_sink_ = nullptr;
 };
 
 using FilterChainsByMatcher = absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch,
@@ -218,6 +223,7 @@ public:
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket& socket,
                                               const StreamInfo::StreamInfo& info) const override;
+  std::vector<absl::string_view> filterChainNames() const override;
 
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
@@ -419,6 +425,11 @@ private:
   // Matcher selecting the filter chain name.
   Matcher::MatchTreePtr<Network::MatchingData> matcher_;
 
+  // FCDS subscription handles created for matcher_ (one per matcher-referenced FCDS chain). A chain
+  // is routable via this listener only if its name is here (the matcher references it); used by
+  // filterChainNames() to report active, routable FCDS chains.
+  std::vector<FcdsSubscriptionHandleSharedPtr> fcds_handles_;
+
   // Index filter chains by name, used by the matcher actions.
   FilterChainsByName filter_chains_by_name_;
 
@@ -465,6 +476,11 @@ public:
   virtual ~FcdsSubscriptionHandle() = default;
   virtual const Network::FilterChain* filterChain() PURE;
   virtual FcdsClientCallbacks& callbacks() PURE;
+  // Name of the FCDS filter chain this handle subscribes to.
+  virtual absl::string_view filterChainName() const PURE;
+  // True when the subscribed chain is committed (active) in the shared manager, using the same
+  // active-state test that publishes the worker TLS set.
+  virtual bool isActive() const PURE;
 };
 using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
 
@@ -503,6 +519,14 @@ public:
   // Unsubscribes a listener from FCDS distribution.
   void unsubscribe(const std::string& filter_chain_name, FcdsSubscriptionHandle& handle);
 
+  // Names of FCDS filter chains that are active (warmed and committed). Main-thread only; reads the
+  // same per-subscription committed chain that updateTlsState() publishes as active.
+  std::vector<absl::string_view> activeFilterChainNames() const;
+
+  // True if the named subscription's committed (active) filter chain is present. Same active-state
+  // test as activeFilterChainNames(), scoped to one name. Main-thread only.
+  bool isFilterChainActive(const std::string& filter_chain_name) const;
+
   // FilterChainUpdateCallbacks
   absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;
   void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
@@ -532,6 +556,12 @@ private:
   // Coalesces thread local filter chain updates within a single event loop iteration.
   Event::SchedulableCallbackPtr tls_update_cb_;
 };
+
+// Helper function to look up the process-wide FCDS shared filter chain manager, returning it if it
+// has been created, else nullptr (non-constructing). The name must match
+// SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager) in listener_impl.cc.
+std::shared_ptr<FcdsSharedFilterChainManager>
+getFcdsSharedFilterChainManager(Singleton::Manager& singleton_manager);
 
 } // namespace Server
 } // namespace Envoy

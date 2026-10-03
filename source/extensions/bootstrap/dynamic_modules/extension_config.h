@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
@@ -19,6 +20,7 @@
 #include "source/extensions/dynamic_modules/metric_registry.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/functional/function_ref.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -168,6 +170,26 @@ public:
   void onListenerAddOrUpdate(absl::string_view listener_name,
                              const Network::ListenerConfig& listener_config) override;
   void onListenerRemoval(const std::string& listener_name) override;
+
+  /**
+   * Enumerates the names of the currently active resources of a single kind: the active listeners'
+   * filter chains (inline and FCDS), the clusters, their transport socket matches, or the active
+   * dynamic TLS certificate secrets. `emit` is invoked once per name. A no-op before the server is
+   * initialized. Main thread only.
+   *
+   * @param kind selects which kind of active resource to enumerate.
+   * @param emit is invoked for each name; the string_view is valid only during that invocation.
+   */
+  void getActiveResourceNames(envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
+                              absl::FunctionRef<void(absl::string_view)> emit);
+
+  /**
+   * Helper function to compute the transport socket match names present in every cluster that has
+   * matches. A match is observed only once it is in all such clusters; clusters with no matches do
+   * not constrain the result. Exposed for testing.
+   */
+  static std::vector<absl::string_view> transportSocketMatchIntersection(
+      const std::vector<std::vector<absl::string_view>>& per_cluster_matches);
 
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_bootstrap_extension_config_module_ptr in_module_config_ = nullptr;
