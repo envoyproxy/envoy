@@ -278,19 +278,25 @@ getRequestMcpNameHeader(Http::RequestHeaderMapOptConstRef request_headers) {
 }
 
 std::optional<std::string> decodeMcpHeaderValue(absl::string_view value) {
-  if (!absl::StartsWith(value, McpConstants::MCP_BASE64_PREFIX)) {
-    return std::string(value);
-  }
+  // Only a value with the complete "=?base64?...?=" wrapper is Base64-encoded. Anything else,
+  // including a value that starts with the prefix but lacks the suffix, is a literal.
   if (value.size() <
           McpConstants::MCP_BASE64_PREFIX.size() + McpConstants::MCP_BASE64_SUFFIX.size() ||
+      !absl::StartsWith(value, McpConstants::MCP_BASE64_PREFIX) ||
       !absl::EndsWith(value, McpConstants::MCP_BASE64_SUFFIX)) {
-    return std::nullopt;
+    return std::string(value);
   }
 
   const absl::string_view payload =
       value.substr(McpConstants::MCP_BASE64_PREFIX.size(),
                    value.size() - McpConstants::MCP_BASE64_PREFIX.size() -
                        McpConstants::MCP_BASE64_SUFFIX.size());
+
+  // An empty payload is the valid encoding of an empty string. Handle it here because
+  // Base64::decode() also returns an empty string on failure.
+  if (payload.empty()) {
+    return std::string();
+  }
 
   std::string decoded = Base64::decode(payload);
   if (decoded.empty()) {

@@ -1657,6 +1657,105 @@ TEST_F(McpJsonRestBridgeFilterTest,
   EXPECT_EQ(json_rpc_error["error"]["code"], -32020);
 }
 
+constexpr char kEmptyBase64Payload[] = "=?base64?"
+                                       "?=";
+
+enum class McpNameHeaderOutcome { Forwarded, HeaderMismatch, UnknownTool };
+
+struct McpNameHeaderDecodingCase {
+  std::string test_name;
+  std::string mcp_name_header;
+  std::string body_tool_name;
+  McpNameHeaderOutcome outcome;
+  std::string expected_path;
+};
+
+class McpNameHeaderDecodingTest : public McpJsonRestBridgeFilterTest,
+                                  public testing::WithParamInterface<McpNameHeaderDecodingCase> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    McpNameHeaderDecoding, McpNameHeaderDecodingTest,
+    testing::Values(
+        McpNameHeaderDecodingCase{"PlainLiteral", "list_api_keys", "list_api_keys",
+                                  McpNameHeaderOutcome::Forwarded,
+                                  "/v1/projects/test-codelab/apiKeys"},
+        McpNameHeaderDecodingCase{"ValidBase64", "=?base64?bGlzdF9hcGlfa2V5cw==?=", "list_api_keys",
+                                  McpNameHeaderOutcome::Forwarded,
+                                  "/v1/projects/test-codelab/apiKeys"},
+        McpNameHeaderDecodingCase{"PrefixWithoutSuffixIsLiteral", "=?base64?SGVsbG8=",
+                                  "=?base64?SGVsbG8=", McpNameHeaderOutcome::Forwarded,
+                                  "/v1/projects/test-codelab/literal"},
+        McpNameHeaderDecodingCase{"PrefixWithoutSuffixIsNotDecoded", "=?base64?SGVsbG8=", "Hello",
+                                  McpNameHeaderOutcome::HeaderMismatch, ""},
+        // The empty name passes header validation and then fails the tool lookup.
+        McpNameHeaderDecodingCase{"EmptyBase64PayloadDecodesToEmptyString", kEmptyBase64Payload, "",
+                                  McpNameHeaderOutcome::UnknownTool, ""},
+        McpNameHeaderDecodingCase{"EmptyBase64PayloadMismatchesNonEmptyName", kEmptyBase64Payload,
+                                  "list_api_keys", McpNameHeaderOutcome::HeaderMismatch, ""},
+        McpNameHeaderDecodingCase{"MalformedNonEmptyBase64IsRejected", "=?base64?%%%?=",
+                                  "list_api_keys", McpNameHeaderOutcome::HeaderMismatch, ""}),
+    [](const testing::TestParamInfo<McpNameHeaderDecodingCase>& info) {
+      return info.param.test_name;
+    });
+
+TEST_P(McpNameHeaderDecodingTest, ValidatesDecodedMcpNameHeader) {
+  const McpNameHeaderDecodingCase& test_case = GetParam();
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  auto* literal_tool = proto_config_.mutable_tool_config()->add_tools();
+  literal_tool->set_name("=?base64?SGVsbG8=");
+  literal_tool->mutable_http_rule()->set_get("/v1/{parent=projects/*}/literal");
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"mcp-method", "tools/call"},
+                      {"mcp-name", test_case.mcp_name_header}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  switch (test_case.outcome) {
+  case McpNameHeaderOutcome::Forwarded:
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+    break;
+  case McpNameHeaderOutcome::HeaderMismatch:
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Eq(Http::Code::BadRequest),
+                               testing::HasSubstr(R"json("code":-32020)json"), _, _,
+                               StrEq("mcp_json_rest_bridge_request_mcp_header_mismatch")));
+    break;
+  case McpNameHeaderOutcome::UnknownTool:
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Eq(Http::Code::OK),
+                               StrEq(R"json({"code":-32602,"message":"Unknown tool"})json"), _, _,
+                               StrEq("mcp_json_rest_bridge_request_tools_call_tool_name_unknown")));
+    break;
+  }
+
+  const nlohmann::json request = {
+      {"jsonrpc", "2.0"},
+      {"id", 123},
+      {"method", "tools/call"},
+      {"params",
+       {{"name", test_case.body_tool_name},
+        {"arguments", {{"parent", "projects/test-codelab"}}},
+        {"_meta",
+         {{"io.modelcontextprotocol/protocolVersion", "2026-07-28"},
+          {"io.modelcontextprotocol/clientCapabilities", nlohmann::json::object()}}}}}};
+  Buffer::OwnedImpl request_body(request.dump());
+
+  if (test_case.outcome == McpNameHeaderOutcome::Forwarded) {
+    EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+              Http::FilterDataStatus::Continue);
+    EXPECT_THAT(request_headers_.getPathValue(), StrEq(test_case.expected_path));
+    EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+  } else {
+    EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+              Http::FilterDataStatus::StopIterationNoBuffer);
+    EXPECT_THAT(request_headers_.getPathValue(), StrEq("/mcp"));
+  }
+}
+
 TEST_F(McpJsonRestBridgeFilterTest,
        ToolsCallLegacyProtocolVersionWithoutMcpHeadersProcessesRequest) {
   ASSERT_OK(makeFilter());
