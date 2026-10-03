@@ -28,11 +28,16 @@ envoy_cc_test_library(
 envoy_extension_cc_test(
     name = "external_buffer_impl_test",
     srcs = ["external_buffer_impl_test.cc"],
-    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    extension_names = [
+        "envoy.filters.http.ai_protocol_manager",
+        "envoy.ai_protocol_manager.external_buffer.in_memory",
+    ],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/registry",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -321,7 +326,10 @@ envoy_cc_fuzz_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    extension_names = [
+        "envoy.filters.http.ai_protocol_manager",
+        "envoy.ai_protocol_manager.external_buffer.in_memory",
+    ],
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
@@ -331,6 +339,7 @@ envoy_extension_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/ai_protocol_manager/external_buffer/in_memory/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
     ],
 )
