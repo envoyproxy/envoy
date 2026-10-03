@@ -952,14 +952,21 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     headers.removeInline(authorization_handle.handle());
   }
 
-  // The following 2 headers are guaranteed for regular requests. The asserts are helpful when
-  // writing test code to not forget these important variables in mock requests
+  // The :authority header is guaranteed to be present: it is required for CONNECT requests and
+  // validated for regular requests before the filter chain runs. The assert is helpful when
+  // writing test code to not forget this important variable in mock requests.
   const Http::HeaderEntry* host_header = headers.Host();
   ASSERT(host_header != nullptr);
   host_ = std::string(host_header->value().getStringView());
 
+  // The :path header is not present on plain CONNECT requests. The OAuth flow (redirect path
+  // matching, callback validation, redirect URL construction) cannot proceed without it, so fail
+  // closed instead of crashing on a null header entry.
   const Http::HeaderEntry* path_header = headers.Path();
-  ASSERT(path_header != nullptr);
+  if (path_header == nullptr) {
+    sendUnauthorizedResponse("OAuth flow failed: missing :path header.");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
   const absl::string_view path_str = path_header->value().getStringView();
   const bool redirect_from_auth_server = config_->redirectPathMatcher().match(path_str);
   // Remember the result so that the failure paths, which can run asynchronously, do not have to
