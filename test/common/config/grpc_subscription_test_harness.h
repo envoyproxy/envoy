@@ -52,6 +52,14 @@ public:
         should_use_unified_(legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
+    // Allow additional timers to be created beyond the two explicit ones below (e.g., TtlManager
+    // timers for dependent type URLs created lazily in GrpcMuxImpl::apiStateFor() when
+    // pause(dependentTypeUrls(...)) is called during onDiscoveryResponse).
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+        .Times(testing::AnyNumber())
+        .WillRepeatedly(
+            testing::Invoke([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
+
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     timer_ = new Event::MockTimer(&dispatcher_);
