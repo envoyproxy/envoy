@@ -730,9 +730,6 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "execution_context_test",
     srcs = ["execution_context_test.cc"],
-    copts = [
-        "-DENVOY_ENABLE_EXECUTION_CONTEXT",
-    ],
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:execution_context",

@@ -736,6 +736,14 @@ case $CI_TARGET in
               //test/server:cgroup_cpu_simple_integration_test
         ;;
 
+    execution-context)
+        setup_clang_toolchain
+        bazel test \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              --define=execution_context=enabled \
+              //test/common/common:execution_context_test
+        ;;
+
     debug)
         echo "Testing ${TEST_TARGETS[*]}"
         # Make sure that there are no regressions to building Envoy with autolink disabled.
