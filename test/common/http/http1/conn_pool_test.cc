@@ -153,10 +153,19 @@ public:
   Http1ConnPoolImplTest()
       : upstream_ready_cb_(new Event::MockSchedulableCallback(&dispatcher_)),
         conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_,
-                                                         upstream_ready_cb_, overload_manager_)) {}
+                                                         upstream_ready_cb_, overload_manager_)) {
+    // Capacity notifications must not run inline while a connection is being closed.
+    ON_CALL(dispatcher_, post(_)).WillByDefault([this](Event::PostCb cb) {
+      posted_callbacks_.push_back(std::move(cb));
+    });
+  }
 
   ~Http1ConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
+    conn_pool_.reset();
+    for (auto& cb : posted_callbacks_) {
+      cb();
+    }
   }
 
   NiceMock<Random::MockRandomGenerator> random_;
@@ -166,6 +175,7 @@ public:
   Event::MockSchedulableCallback* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
+  std::vector<Event::PostCb> posted_callbacks_;
 };
 
 /**
