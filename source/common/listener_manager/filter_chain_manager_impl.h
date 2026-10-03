@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/config/grpc_mux.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/schedulable_cb.h"
@@ -22,6 +23,7 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/listener_manager/fcds_api.h"
 #include "source/common/listener_manager/filter_chain_factory_context_callback.h"
@@ -518,6 +520,8 @@ private:
   ThreadLocal::TypedSlotPtr<ThreadLocalState> tls_slot_;
   Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
   Stats::ScopeSharedPtr scope_;
+  // Shared by all FCDS subscriptions so the resource decoder is built once.
+  const Config::ResourceTypeHelper<FilterChainProto> resource_type_helper_;
   struct SubscriptionState {
     std::unique_ptr<FcdsApiImpl> api_;
     absl::flat_hash_set<FcdsSubscriptionHandle*> handles_;
@@ -531,6 +535,9 @@ private:
 
   // Coalesces thread local filter chain updates within a single event loop iteration.
   Event::SchedulableCallbackPtr tls_update_cb_;
+
+  // Pauses filter chain discovery requests while a thread local publish is pending.
+  Config::ScopedResume xds_pause_;
 };
 
 } // namespace Server

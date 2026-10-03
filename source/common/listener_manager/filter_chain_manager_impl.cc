@@ -1,12 +1,15 @@
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.validate.h"
+#include "envoy/config/xds_manager.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
 #include "source/common/listener_manager/fcds_api.h"
 #include "source/common/matcher/matcher.h"
@@ -1040,6 +1043,8 @@ FcdsSharedFilterChainManager::FcdsSharedFilterChainManager(
               server_context,
               server_context.messageValidationContext().dynamicValidationVisitor())),
       scope_(server_context_.scope().createScope("filter_chain_manager.")),
+      resource_type_helper_(server_context.messageValidationContext().dynamicValidationVisitor(),
+                            "name"),
       tls_update_cb_(server_context.mainThreadDispatcher().createSchedulableCallback(
           [this]() { updateTlsState(); })) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalState>(); });
@@ -1078,9 +1083,9 @@ FcdsSharedFilterChainManager::subscribe(const envoy::config::core::v3::ConfigSou
   // xdstp names.
   if (iter == subscriptions_.end()) {
     absl::Status creation_status;
-    auto api = std::make_unique<FcdsApiImpl>(
-        config_source, filter_chain_name, *this, server_context_.clusterManager(), *scope_,
-        server_context_.messageValidationContext().dynamicValidationVisitor(), creation_status);
+    auto api = std::make_unique<FcdsApiImpl>(config_source, filter_chain_name, *this,
+                                             server_context_.clusterManager(), *scope_,
+                                             resource_type_helper_, creation_status);
     RETURN_IF_NOT_OK(creation_status);
     auto state = std::make_unique<SubscriptionState>();
     state->api_ = std::move(api);
@@ -1178,19 +1183,25 @@ void FcdsSharedFilterChainManager::onFilterChainRemoved(
 void FcdsSharedFilterChainManager::scheduleTlsUpdate() {
   // Skip rearming when a publish is already queued for this iteration.
   if (!tls_update_cb_->enabled()) {
+    // Pause filter chain discovery until the coalesced publish is posted to workers.
+    xds_pause_ = server_context_.xdsManager().pause(
+        Config::getTypeUrl<envoy::config::listener::v3::FilterChain>());
     tls_update_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
 void FcdsSharedFilterChainManager::updateTlsState() {
   auto filter_chains = std::make_shared<ThreadLocalState>();
+  filter_chains->filter_chains_.reserve(subscriptions_.size());
   for (const auto& name_and_state : subscriptions_) {
-    auto active_chain = name_and_state.second->api_->filterChain();
+    const auto& active_chain = name_and_state.second->api_->filterChain();
     if (active_chain != nullptr) {
       filter_chains->filter_chains_[name_and_state.first] = active_chain;
     }
   }
   tls_slot_->set([filter_chains](Event::Dispatcher&) { return filter_chains; });
+  // Resume filter chain discovery now that the update is posted to workers.
+  xds_pause_.reset();
 }
 
 } // namespace Server
