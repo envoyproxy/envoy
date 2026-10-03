@@ -1048,13 +1048,15 @@ case $CI_TARGET in
         if [[ "$CI_TARGET" == "release.test_only" && "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
             # CI experiment for #47485 only: decode the filter_persistence_test crash.
             shim_dir="$(mktemp -d)"
-            if ! command -v addr2line >/dev/null; then
-                a2l="$(command -v llvm-addr2line || find /opt /usr -name 'llvm-addr2line*' -type f 2>/dev/null | head -1)"
-                if [[ -n "$a2l" ]]; then ln -s "$a2l" "${shim_dir}/addr2line"; fi
-            fi
-            echo "addr2line: $(PATH="${shim_dir}:$PATH" command -v addr2line || echo missing)"
-            echo "pmap: $(command -v pmap || echo missing)"
+            # llvm-symbolizer behaves like GNU addr2line when invoked under that name.
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt @llvm_toolchain_llvm//:symbolizer || true
+            sym_rel="$(bazel cquery "${BAZEL_BUILD_OPTIONS[@]}" -c opt --output=files @llvm_toolchain_llvm//:symbolizer 2>/dev/null | head -1)"
+            sym="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" -c opt execution_root || true)/${sym_rel}"
+            echo "symbolizer: ${sym}"
+            ls -l "$sym" || true
+            ln -s "$sym" "${shim_dir}/addr2line"
             PATH="${shim_dir}:$PATH" bazel run "${BAZEL_BUILD_OPTIONS[@]}" -c opt --copt=-g --strip=never \
+                --test_sharding_strategy=disabled \
                 --run_under="python3 ${ENVOY_SRCDIR}/tools/stack_decode.py" \
                 //test/extensions/filters/http/rate_limit_quota:filter_persistence_test -- \
                 --gtest_filter='*TestPersistenceWithLdsUpdates*' || true
