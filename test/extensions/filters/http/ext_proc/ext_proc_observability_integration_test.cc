@@ -348,6 +348,12 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
   processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
   handleUpstreamRequest();
   processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
+  // In observability mode the filter does not wait for the side-stream response before
+  // continuing, so the downstream response can complete before the worker has processed the
+  // ext_proc server's reply and populated the side-stream logging info.
+  if (IsEnvoyGrpc()) {
+    test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_200", 1);
+  }
   verifyDownstreamResponse(*response, 200);
 }
 
