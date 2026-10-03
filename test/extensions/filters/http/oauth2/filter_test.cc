@@ -651,6 +651,21 @@ TEST_F(OAuth2Test, SecretsNotReadyReturnsServiceUnavailable) {
   EXPECT_EQ(1, config_->stats().oauth_failure_.value());
 }
 
+// A request with no :path header (for example a plain CONNECT tunnel request, which the connection
+// manager does not reject) must not cause a null dereference. The filter should fail closed with a
+// BadRequest local reply and stop iteration rather than dereferencing the null :path.
+TEST_F(OAuth2Test, MissingPathReturnsBadRequest) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Connect},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "", _, _, "oauth_missing_path"));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
 TEST_F(OAuth2Test, TlsClientAuthDoesNotRequireClientSecret) {
   auto secret_reader = std::make_shared<MockSecretReader>("", TEST_HMAC_SECRET);
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
