@@ -19,7 +19,7 @@ bazel build //source/exe:envoy-static
 At this time, only the BoringSSL FIPS build on x86_64 is supported and tested by the Envoy project.
 
 We are happy to accept patches to allow Envoy builds with other libraries or architectures, but
-the responsibility for maintenance, and resolving incompatibility remains with dowstream projects.
+the responsibility for maintenance, and resolving incompatibility remains with downstream projects.
 
 Envoy follows the [Update Stream](https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20260211.0/crypto/fipsmodule/FIPS.md#update-stream)
 of FIPS BoringSSL code. When an Envoy stable release branch is made, the BoringSSL FIPS version used
@@ -32,7 +32,9 @@ not be changed on the release branch unless a bug or security vulnerability whic
 bazel build --config=boringssl-fips //source/exe:envoy-static
 ```
 
-- **Supported architectures:** Linux x86_64, aarch64
+- **Supported architectures:** Linux x86_64. aarch64 does not currently build:
+  the `go-fips` module pins a `linux-amd64` Go toolchain, which BoringSSL's
+  `delocate` step then fails to execute on aarch64.
 - **Version string:** `BoringSSL-FIPS` (visible in `envoy --version`)
 
 ## OpenSSL
