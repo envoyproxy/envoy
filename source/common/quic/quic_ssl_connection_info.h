@@ -84,6 +84,7 @@ public:
   // certificate getters are not usable on its CRYPTO_BUFFER-based SSL object.
   // TODO(danzh) cache these fields during cert chain retrieval.
   const std::string& subjectLocalCertificate() const override { return EMPTY_STRING; }
+  const std::string& urlEncodedPemEncodedLocalCertificate() const override { return EMPTY_STRING; }
   absl::Span<const std::string> uriSanLocalCertificate() const override { return {}; }
   absl::Span<const std::string> dnsSansLocalCertificate() const override { return {}; }
   absl::Span<const std::string> ipSansLocalCertificate() const override { return {}; }

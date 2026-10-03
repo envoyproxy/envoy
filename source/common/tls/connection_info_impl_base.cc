@@ -217,6 +217,18 @@ const std::string& ConnectionInfoImplBase::pemEncodedPeerCertificate() const {
                                              });
 }
 
+const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedLocalCertificate() const {
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::UrlEncodedPemEncodedLocalCertificate, [](SSL* ssl) {
+        // The cert object is not owned.
+        X509* cert = SSL_get_certificate(ssl);
+        if (!cert) {
+          return std::string{};
+        }
+        return Envoy::Http::Utility::PercentEncoding::urlEncode(certToPem(*cert));
+      });
+}
+
 const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateChain() const {
   return getCachedValueOrCreate<std::string>(
       CachedValueTag::UrlEncodedPemEncodedPeerCertificateChain, [this](SSL*) {

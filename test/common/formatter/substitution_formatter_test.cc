@@ -3359,6 +3359,45 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_CERT");
+    EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(Return(nullptr));
+    EXPECT_EQ(std::nullopt, formatForTest(upstream_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.upstreamInfo()->setUpstreamSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_CERT");
+    EXPECT_EQ(std::nullopt, formatForTest(upstream_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_CERT");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, urlEncodedPemEncodedLocalCertificate())
+        .WillRepeatedly(ReturnRef(EMPTY_STRING));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(std::nullopt, formatForTest(upstream_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_CERT");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::string expected_cert = "<some local cert>";
+    EXPECT_CALL(*connection_info, urlEncodedPemEncodedLocalCertificate())
+        .WillRepeatedly(ReturnRef(expected_cert));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(expected_cert, formatForTest(upstream_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
+                ProtoEq(ValueUtil::stringValue(expected_cert)));
+  }
   // Test that the upstream local DNS san is returned by the formatter.
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
