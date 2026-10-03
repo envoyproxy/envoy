@@ -1046,20 +1046,45 @@ case $CI_TARGET in
 
     release|release.server_only|release.test_only)
         if [[ "$CI_TARGET" == "release.test_only" && "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
-            # CI experiment for #47485 only: decode the filter_persistence_test crash.
-            shim_dir="$(mktemp -d)"
-            # llvm-symbolizer behaves like GNU addr2line when invoked under that name.
+            # CI experiment for #47485 only: symbolize the filter_persistence_test crash.
             bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt @llvm_toolchain_llvm//:symbolizer || true
             sym_rel="$(bazel cquery "${BAZEL_BUILD_OPTIONS[@]}" -c opt --output=files @llvm_toolchain_llvm//:symbolizer 2>/dev/null | head -1)"
             sym="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" -c opt execution_root || true)/${sym_rel}"
             echo "symbolizer: ${sym}"
-            ls -l "$sym" || true
-            ln -s "$sym" "${shim_dir}/addr2line"
-            PATH="${shim_dir}:$PATH" bazel run "${BAZEL_BUILD_OPTIONS[@]}" -c opt --copt=-g --strip=never \
-                --test_sharding_strategy=disabled \
-                --run_under="python3 ${ENVOY_SRCDIR}/tools/stack_decode.py" \
+            wrap="$(mktemp -d)/wrap.sh"
+            cat > "$wrap" <<'WRAP'
+#!/bin/bash
+"$@" > /tmp/fp_out.log 2>&1 &
+pid=$!
+while kill -0 "$pid" 2>/dev/null; do cp "/proc/$pid/maps" /tmp/fp_maps.txt 2>/dev/null; sleep 0.01; done
+wait "$pid"
+echo "test exit status: $?" >> /tmp/fp_out.log
+WRAP
+            chmod +x "$wrap"
+            dbg_opts=(-c opt --copt=-g --strip=never)
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" "${dbg_opts[@]}" --test_sharding_strategy=disabled \
+                --run_under="$wrap" \
                 //test/extensions/filters/http/rate_limit_quota:filter_persistence_test -- \
                 --gtest_filter='*TestPersistenceWithLdsUpdates*' || true
+            bin="$(readlink -f "$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" "${dbg_opts[@]}" bazel-bin)/test/extensions/filters/http/rate_limit_quota/filter_persistence_test")"
+            base="$(grep -m1 'filter_persistence_test' /tmp/fp_maps.txt | cut -d- -f1)"
+            echo "binary: ${bin}"
+            echo "load base: 0x${base}"
+            echo "=== test output (tail) ==="
+            tail -60 /tmp/fp_out.log
+            echo "=== symbolized frames ==="
+            if [[ -z "$base" ]]; then
+                echo "no load base captured; maps lines: $(wc -l < /tmp/fp_maps.txt 2>/dev/null || echo 0)"
+                exit 1
+            fi
+            grep -oE '#[0-9]+: .*\[0x[0-9a-f]+\]$' /tmp/fp_out.log | head -12 | while read -r frame; do
+                addr="$(grep -oE '0x[0-9a-f]+\]$' <<<"$frame" | tr -d ']')"
+                rel=$(( addr - 0x${base} ))
+                echo "== ${frame}"
+                for a in "$rel" "$(( rel - 1 ))"; do
+                    "$sym" --obj="$bin" --inlining --functions=linkage --demangle --pretty-print "$(printf '0x%x' "$a")" || true
+                done
+            done
             exit 1
         fi
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
