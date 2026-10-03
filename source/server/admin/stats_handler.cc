@@ -98,7 +98,7 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(Http::ResponseHeaderMap
   return Http::Code::OK;
 }
 
-Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
+Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream, bool prometheus) {
   StatsParams params;
   Buffer::OwnedImpl response;
   Http::Code code = params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
@@ -106,15 +106,26 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     return Admin::makeStaticTextRequest(response, code);
   }
 
+  if (prometheus) {
+    params.format_ = StatsFormat::Prometheus;
+  }
   if (params.format_ == StatsFormat::Prometheus) {
-    // TODO(#16139): modify streaming algorithm to cover Prometheus.
-    //
-    // This may be easiest to accomplish by populating the set
-    // with tagExtractedName(), and allowing for vectors of
-    // stats as multiples will have the same tag-extracted names.
-    // Ideally we'd find a way to do this without slowing down
-    // the non-Prometheus implementations.
-    return std::make_unique<PrometheusRequest>(*this, params, admin_stream);
+    const auto& headers = admin_stream.getRequestHeaders();
+    const absl::Status status = PrometheusStatsFormatter::validateParams(params, headers);
+    if (!status.ok()) {
+      return Admin::makeStaticTextRequest(status.message(), Http::Code::BadRequest);
+    }
+    if (PrometheusStatsFormatter::useProtobufFormat(params, headers)) {
+      return std::make_unique<PrometheusRequest>(*this, params, admin_stream);
+    }
+    if (server_.statsConfig().flushOnAdmin()) {
+      server_.flushStats();
+    }
+    return PrometheusStatsFormatter::makeTextRequest(
+        server_.stats().counters(), server_.stats().gauges(), server_.stats().histograms(),
+        params.prometheus_text_readouts_ ? server_.stats().textReadouts()
+                                         : std::vector<Stats::TextReadoutSharedPtr>{},
+        server_.clusterManager(), params, server_.api().customStatNamespaces());
   }
 
   if (params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::PrometheusNative) {

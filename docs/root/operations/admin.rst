@@ -792,6 +792,14 @@ modify different aspects of the server:
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
   format. This can be used to integrate with a Prometheus server.
 
+  Text output is serialized incrementally, including metric families larger than a response
+  chunk. This reduces temporary serialization memory; transport buffers and metric snapshots
+  can still grow with the size of the response. Protobuf output remains buffered.
+
+  Text responses capture metric values before generating response chunks, so delays consuming
+  chunks do not change the sampled values. Collection is not an atomic snapshot across worker
+  threads. Histogram bucket counts or summary quantiles are copied into a flat value array.
+
   The output will either be the protobuf format or the v0.0.4 text format, depending on the value
   of the ``Accept`` header. A prometheus scrape configuration specifies the desired protocol:
 

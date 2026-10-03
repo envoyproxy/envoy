@@ -91,6 +91,8 @@ void AdminResponse::terminate() {
   absl::MutexLock lock(mutex_);
   if (!terminated_) {
     terminated_ = true;
+    // Release resources owned by the request before the server is destroyed.
+    request_.reset();
     sendErrorLockHeld();
     sendAbortChunkLockHeld();
   }
