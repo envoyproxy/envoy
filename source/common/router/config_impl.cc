@@ -465,6 +465,15 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
   }
 }
 
+absl::StatusOr<std::unique_ptr<RouteTracingImpl>>
+RouteTracingImpl::create(const envoy::config::route::v3::Tracing& tracing) {
+  absl::StatusOr<std::unique_ptr<RouteTracingImpl>> result;
+  TRY_NEEDS_AUDIT { result = std::make_unique<RouteTracingImpl>(tracing); }
+  END_TRY
+  CATCH(const EnvoyException& e, { result = absl::InvalidArgumentError(e.what()); });
+  return result;
+}
+
 const envoy::type::v3::FractionalPercent& RouteTracingImpl::getClientSampling() const {
   return client_sampling_;
 }

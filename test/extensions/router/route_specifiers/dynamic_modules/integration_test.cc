@@ -127,6 +127,14 @@ route_templates:
         disabled: true
     route:
       cluster: canary
+route_overrides:
+- override_id: traced
+  tracing:
+    client_sampling: {numerator: 10}
+- override_id: tagged
+  metadata:
+    filter_metadata:
+      envoy.test.override: {group: canary}
 )EOF" + extra_specifier_yaml;
           DynamicModuleRouteSpecifierProto specifier_config;
           TestUtility::loadFromYaml(specifier_yaml, specifier_config);
@@ -596,6 +604,20 @@ route_overrides:
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_NE(nullptr, upstream_headers);
   EXPECT_EQ("/internal/foo?q=1", upstream_headers->getPathValue());
+}
+
+// A route level override such as tracing is accepted on a direct response template, because it is
+// not a route entry property and so does not trip the route entry override check.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RouteLevelOverrideOnDirectResponse) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest(
+      {{"x-decision", "select-template"}, {"x-template", "direct_body"}, {"x-override", "traced"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("template", response->body());
+  EXPECT_EQ(0, counterValue("dynamicmodulescustom.route_specifier.test."
+                            "failure_override_on_non_route_entry"));
 }
 
 // A module reads the request, the stream info and the route through the context, which is how it

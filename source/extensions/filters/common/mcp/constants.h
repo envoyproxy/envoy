@@ -37,6 +37,7 @@ constexpr absl::string_view RESULT_TYPE_COMPLETE = "complete";
 constexpr absl::string_view ERROR_FIELD = "error";
 
 constexpr int MCP_HEADER_MISMATCH_ERROR_CODE = -32020;
+constexpr int JSONRPC_INVALID_PARAMS_ERROR_CODE = -32602;
 
 // MCP Initialize constants
 constexpr absl::string_view MCP_VERSION_2024_11_05 = "2024-11-05";
@@ -49,6 +50,8 @@ constexpr absl::string_view META_FIELD = "_meta";
 constexpr absl::string_view MCP_META_PROTOCOL_VERSION_FIELD =
     "io.modelcontextprotocol/protocolVersion";
 constexpr absl::string_view MCP_META_SERVER_INFO_FIELD = "io.modelcontextprotocol/serverInfo";
+constexpr absl::string_view MCP_META_CLIENT_CAPABILITIES_FIELD =
+    "io.modelcontextprotocol/clientCapabilities";
 constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
 constexpr absl::string_view TOOLS_FIELD = "tools";
 constexpr absl::string_view LIST_CHANGED_FIELD = "listChanged";
