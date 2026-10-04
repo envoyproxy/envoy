@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.quota_aware.v3;
+
+import "envoy/config/cluster/v3/cluster.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.quota_aware.v3";
+option java_outer_classname = "QuotaAwareProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/quota_aware/v3;quota_awarev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Quota Aware Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.quota_aware]
+
+// Configuration for the Quota Aware load balancing policy.
+//
+// This policy does not implement weight or priority itself. It wraps the child
+// ``fallback_policy`` and excludes hosts whose identity is absent from the
+// request DynamicMetadata candidate list for this request only. HostSet
+// membership is not mutated.
+//
+// Typical configuration:
+//
+// .. code-block:: yaml
+//
+//    metadata_namespace: envoy.filters.http.ratelimit
+//    candidates_key: candidates
+//    host_metadata_namespace: envoy.lb
+//    host_id_key: id
+//    host_secondary_id_key: secondary_id
+//    fallback_policy:
+//      policies:
+//      - typed_extension_config:
+//          name: envoy.load_balancing_policies.round_robin
+//          typed_config:
+//            "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
+//
+// The candidate list is a protobuf ListValue. Each element is a string id or a
+// struct with an id field and an optional secondary id (empty string allowed).
+// Field names are ``candidate_id_field`` / ``candidate_secondary_id_field``.
+//
+// Identities are opaque strings. A host matches a candidate id if they are
+// equal, or if the host id is a ``/``-delimited child of the candidate
+// (``svc-a`` matches ``svc-a/shard/0/member/1``, not ``svc-a-west/...``).
+// If the host has a secondary id, join is the pair ``(id, secondary)``.
+// If the host has no secondary id, any live pair whose id matches is enough.
+//
+// If the candidate list is missing or not a list, selection fail-opens to
+// ``fallback_policy`` unless ``fail_closed_on_missing_metadata`` is set.
+//
+// See the :ref:`load balancing architecture
+// overview<arch_overview_load_balancing_types>` for more information.
+message QuotaAware {
+  // DynamicMetadata filter name that holds the candidate list. Empty uses
+  // ``envoy.filters.http.ratelimit``.
+  string metadata_namespace = 1;
+
+  // Key under ``metadata_namespace`` for the candidate list. Empty uses
+  // ``candidates``.
+  string candidates_key = 2;
+
+  // Host metadata filter name. Empty uses ``envoy.lb``.
+  string host_metadata_namespace = 3;
+
+  // Host metadata key for the primary identity. Empty uses ``id``.
+  string host_id_key = 4;
+
+  // Host metadata key for the optional secondary identity. Empty uses
+  // ``secondary_id``.
+  string host_secondary_id_key = 7;
+
+  // Struct field on each candidate list entry for the primary id. Empty uses
+  // ``id``.
+  string candidate_id_field = 8;
+
+  // Struct field on each candidate list entry for the secondary id. Empty uses
+  // ``secondary_id``.
+  string candidate_secondary_id_field = 9;
+
+  // If true, missing or non-list candidate metadata fails host selection with
+  // HTTP 429. Proto3 default false is fail-open: the child policy runs with no
+  // exclusion.
+  bool fail_closed_on_missing_metadata = 5;
+
+  // Child load balancing policy used for weight, priority, locality, and
+  // health. Required.
+  config.cluster.v3.LoadBalancingPolicy fallback_policy = 6
+      [(validate.rules).message = {required: true}];
+}
