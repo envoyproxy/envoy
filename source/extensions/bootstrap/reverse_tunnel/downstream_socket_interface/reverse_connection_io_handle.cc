@@ -147,13 +147,13 @@ void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG(debug, "reverse_tunnel: Cleaning up {} established connections.", queue_size);
 
   while (!established_connections_.empty()) {
-    auto connection = std::move(established_connections_.front());
+    auto established = std::move(established_connections_.front());
     established_connections_.pop();
 
-    if (connection) {
-      auto state = connection->state();
+    if (established.connection) {
+      auto state = established.connection->state();
       if (state == Envoy::Network::Connection::State::Open) {
-        connection->close(Envoy::Network::ConnectionCloseType::FlushWrite);
+        established.connection->close(Envoy::Network::ConnectionCloseType::FlushWrite);
         ENVOY_LOG(debug, "Closed established connection.");
       } else {
         ENVOY_LOG(debug, "Connection already in state: {}.", static_cast<int>(state));
@@ -240,8 +240,9 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
       // queue is therefore the one that got established last.
       if (!established_connections_.empty()) {
         ENVOY_LOG(debug, "reverse_tunnel: getting connection from queue.");
-        auto connection = std::move(established_connections_.front());
+        auto established = std::move(established_connections_.front());
         established_connections_.pop();
+        auto& connection = established.connection;
         // Fill in address information for the reverse tunnel "client".
         // Use actual client address from established connection.
         if (addr && addrlen) {
@@ -292,14 +293,26 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         // Instead of moving the socket, duplicate the file descriptor.
         const Network::ConnectionSocketPtr& original_socket = connection->getSocket();
         if (!original_socket || !original_socket->isOpen()) {
-          ENVOY_LOG(error, "Original socket is not available or not open");
+          // The queued connection died before the handoff, for example the control-plane TLS stack
+          // read past the 200 and closed it. Release the key so the host is redialed instead of
+          // counting a phantom tunnel toward the target forever.
+          ENVOY_LOG(
+              error,
+              "reverse_tunnel: queued connection for key {} closed before accept(), releasing "
+              "its tunnel slot",
+              connection_key);
+          onDownstreamConnectionClosed(connection_key, connection_id);
           return nullptr;
         }
 
         // Duplicate the file descriptor.
         Network::IoHandlePtr duplicated_handle = original_socket->ioHandle().duplicate();
         if (!duplicated_handle || !duplicated_handle->isOpen()) {
-          ENVOY_LOG(error, "Failed to duplicate file descriptor");
+          // The fd could not be duplicated, so no tunnel handle will own this key. Release it so
+          // the host is redialed rather than left a phantom.
+          ENVOY_LOG(error, "reverse_tunnel: failed to duplicate fd for key {}, releasing its slot",
+                    connection_key);
+          onDownstreamConnectionClosed(connection_key, connection_id);
           return nullptr;
         }
 
@@ -319,9 +332,10 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         duplicated_socket->ioHandle().resetFileEvents();
 
         // Create RAII-based IoHandle with duplicated socket, passing parent pointer, connection
-        // key, and connection id.
+        // key, connection id, and any bytes the responder coalesced with the handshake response.
         auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-            std::move(duplicated_socket), this, connection_key, connection_id);
+            std::move(duplicated_socket), this, connection_key, connection_id,
+            std::move(established.residual_bytes));
 
         ENVOY_LOG(info,
                   "reverse_tunnel: RAII IoHandle created with duplicated socket for node_id: {}"
@@ -574,8 +588,9 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
             "connections per host",
             cluster_name, cluster_config.reverse_connection_count);
 
-  // Generate a temporary connection key for early failure tracking, to update stats gauges.
-  const std::string temp_connection_key = "temp_" + cluster_name + "_" + std::to_string(rand());
+  // Connection key for early cluster-level failure tracking. The state gauge is keyed by host and
+  // cluster and the terminal state is not persisted, so a stable key is sufficient.
+  const std::string temp_connection_key = cluster_name + "_cannot_connect";
 
   // Get thread local cluster to access resolved hosts.
   auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
@@ -794,27 +809,24 @@ void ReverseConnectionIOHandle::resetHostBackoff(const std::string& host_address
   }
 
   auto& host_info = host_it->second;
-  auto now = getTimeSource().monotonicTime();
+  const bool was_in_backoff = getTimeSource().monotonicTime() < host_info.backoff_until;
 
-  // Check if the host is actually in backoff before resetting.
-  if (now >= host_info.backoff_until) {
-    ENVOY_LOG(debug, "Host {} is not in backoff, skipping reset", host_address);
-    return;
-  }
-
+  // Clear the failure history on verified success regardless of the deadline, so the next failure
+  // starts a fresh exponential sequence rather than continuing the old one.
   host_info.failure_count = 0;
   host_info.backoff_until = getTimeSource().monotonicTime();
   ENVOY_LOG(debug, "reverse_tunnel: Reset backoff for host {}", host_address);
 
-  // Mark host as recovered using the same key used by backoff to change the state from backoff to
-  // recovered.
-  const std::string recovered_connection_key =
-      host_address + "_" + host_info.cluster_name + "_backoff";
-  updateConnectionState(host_address, host_info.cluster_name, recovered_connection_key,
-                        ReverseConnectionState::Recovered);
-  ENVOY_LOG(debug,
-            "reverse_tunnel: Marked host {} in cluster {} as Recovered with connection key {}",
-            host_address, host_info.cluster_name, recovered_connection_key);
+  // Only transition the state when the host was actually in backoff.
+  if (was_in_backoff) {
+    const std::string recovered_connection_key =
+        host_address + "_" + host_info.cluster_name + "_backoff";
+    updateConnectionState(host_address, host_info.cluster_name, recovered_connection_key,
+                          ReverseConnectionState::Recovered);
+    ENVOY_LOG(debug,
+              "reverse_tunnel: Marked host {} in cluster {} as Recovered with connection key {}",
+              host_address, host_info.cluster_name, recovered_connection_key);
+  }
 }
 
 void ReverseConnectionIOHandle::updateConnectionState(const std::string& host_address,
@@ -838,10 +850,15 @@ void ReverseConnectionIOHandle::updateConnectionState(const std::string& host_ad
       }
       // Decrement old state gauge using unified function.
       updateStateGauge(host_address, cluster_name, old_state, false /* decrement */);
+      host_it->second.connection_states.erase(old_state_it);
     }
 
-    // Set new connection state.
-    host_it->second.connection_states[connection_key] = new_state;
+    // Terminal failure states are observed through their state gauge and the host failure counter.
+    // They are not persisted, so the per-host map does not grow without bound across redials.
+    if (new_state != ReverseConnectionState::Failed &&
+        new_state != ReverseConnectionState::CannotConnect) {
+      host_it->second.connection_states[connection_key] = new_state;
+    }
   }
 
   // Increment new state gauge using unified function.
@@ -1058,9 +1075,9 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
 bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& cluster_name,
                                                              const std::string& host_address,
                                                              Upstream::HostConstSharedPtr host) {
-  // Generate a temporary connection key for early failure tracking.
-  const std::string temp_connection_key =
-      "temp_" + cluster_name + "_" + host_address + "_" + std::to_string(rand());
+  // Connection key for early host-level failure tracking. The state gauge is keyed by host and
+  // cluster and the terminal state is not persisted, so a stable key is sufficient.
+  const std::string temp_connection_key = host_address + "_" + cluster_name + "_cannot_connect";
 
   // Only validate host_address here since it's specific to this connection attempt.
   if (host_address.empty()) {
@@ -1134,6 +1151,8 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
               host_address, cluster_name);
     updateConnectionState(host_address, cluster_name, temp_connection_key,
                           ReverseConnectionState::CannotConnect);
+    // Install backoff so a host that cannot produce a connection is not redialed every tick.
+    trackConnectionFailure(host_address, cluster_name);
     return false;
   }
 
@@ -1141,6 +1160,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   // The wrapper will initiate and manage the reverse connection handshake using HTTP.
   auto wrapper = std::make_unique<RCConnectionWrapper>(*this, std::move(conn_data.connection_),
                                                        conn_data.host_description_, cluster_name);
+  RCConnectionWrapper* wrapper_ptr = wrapper.get();
 
   // Stamp the episode initiation time on the first dial of an establishment episode, and reuse it
   // for subsequent handshake retries. It is cleared on handshake success (see onConnectionDone()),
@@ -1151,18 +1171,34 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
                                                getTimeSource().systemTime().time_since_epoch())
                                                .count();
   }
+  const std::optional<int64_t> episode_initiation_time_ms = host_info.episode_initiation_time_ms;
+
+  // Publish wrapper ownership before dialing. A handshake that fails synchronously calls
+  // onConnectionDone() from within connect(), which looks the wrapper up here, so it must already
+  // be registered or the failure would leak it.
+  conn_wrapper_to_host_map_[wrapper_ptr] = normalized_host_key;
+  connection_wrappers_.push_back(std::move(wrapper));
 
   // Send the reverse connection handshake over the TCP connection.
+  const absl::Status connect_status =
+      wrapper_ptr->connect(config_.src_tenant_id, config_.src_cluster_id, config_.src_node_id,
+                           episode_initiation_time_ms);
+  if (!connect_status.ok()) {
+    // onConnectionDone() already ran and cleaned the wrapper up. The attempt is terminal, so report
+    // it as a failed dial without resetting the host backoff.
+    ENVOY_LOG(error, "reverse_tunnel: Handshake dispatch failed for host {}: {}", host_address,
+              connect_status.message());
+    return false;
+  }
+
+  // The dial is in flight. Key the Connecting state by the connection's local address so
+  // onConnectionDone() can later resolve it to success or failure.
+  auto* connection = wrapper_ptr->getConnection();
   const std::string connection_key =
-      wrapper->connect(config_.src_tenant_id, config_.src_cluster_id, config_.src_node_id,
-                       host_info.episode_initiation_time_ms);
+      connection != nullptr ? connection->connectionInfoProvider().localAddress()->asString()
+                            : ("cleanup_" + host_address);
   ENVOY_LOG(debug, "reverse_tunnel: Initiated reverse connection handshake for host {} with key {}",
             host_address, connection_key);
-
-  // Mark as Connecting after handshake is initiated. Use the actual connection key so that it can
-  // be marked as failed in onConnectionDone().
-  conn_wrapper_to_host_map_[wrapper.get()] = normalized_host_key;
-  connection_wrappers_.push_back(std::move(wrapper));
 
   {
     // Safely log address information without assuming IP is present (internal addresses possible).
@@ -1184,8 +1220,8 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
                 host_address, addr_str, cluster_name);
     }
   }
-  // Reset backoff for successful connection.
-  resetHostBackoff(normalized_host_key);
+  // Backoff is reset only on verified handshake success in onConnectionDone(), so a dial that is
+  // merely in flight does not clear prior failures.
   updateConnectionState(normalized_host_key, cluster_name, connection_key,
                         ReverseConnectionState::Connecting);
   return true;
@@ -1275,7 +1311,7 @@ void ReverseConnectionIOHandle::onConnectionDone(
               "'{}', key '{}'",
               host_address, cluster_name, connection_key);
   } else {
-    connection_key = "cleanup_" + host_address + "_" + std::to_string(rand());
+    connection_key = "cleanup_" + host_address;
     ENVOY_LOG(debug, "reverse_tunnel: Connection already null, using fallback key '{}'",
               connection_key);
   }
@@ -1341,8 +1377,9 @@ void ReverseConnectionIOHandle::onConnectionDone(
     ENVOY_LOG(info, "reverse_tunnel: Connection will be consumed by "
                     "reverse_conn_listener for HTTP processing");
 
-    // Move connection to established queue for reverse_conn_listener to consume.
-    established_connections_.push(std::move(released_conn));
+    // Move connection to established queue for reverse_conn_listener to consume, carrying any bytes
+    // the responder coalesced with the handshake response so accept() can replay them.
+    established_connections_.push({std::move(released_conn), wrapper->takeHandshakeResidual()});
 
     // Trigger accept mechanism safely.
     if (isTriggerPipeReady()) {

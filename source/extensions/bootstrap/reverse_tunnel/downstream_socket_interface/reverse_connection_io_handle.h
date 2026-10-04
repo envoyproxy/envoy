@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/io_handle.h"
@@ -95,6 +96,8 @@ struct ReverseConnectionSocketConfig {
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
   // How often to re-check each host and dial missing tunnels.
   uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
+  // Deadline for receiving the handshake response after a dial opens the connection.
+  uint64_t handshake_timeout_ms{15000};
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -385,6 +388,13 @@ public:
     return config_.handshake_headers;
   }
 
+  /**
+   * @return the handshake response deadline applied to each dial attempt.
+   */
+  std::chrono::milliseconds handshakeTimeout() const {
+    return std::chrono::milliseconds(config_.handshake_timeout_ms);
+  }
+
 private:
   /**
    * Get time source for consistent time operations.
@@ -538,10 +548,17 @@ private:
   os_fd_t trigger_pipe_read_fd_{INVALID_SOCKET};
   os_fd_t trigger_pipe_write_fd_{INVALID_SOCKET};
 
+  // An established tunnel awaiting accept(), with any bytes the responder coalesced with the
+  // handshake response so accept() can replay them before reading the socket.
+  struct EstablishedConnection {
+    Envoy::Network::ClientConnectionPtr connection;
+    Buffer::InstancePtr residual_bytes;
+  };
+
   // Connection management : We store the established connections in a queue.
   // and pop the last established connection when data is read on trigger_pipe_read_fd_
   // to determine the connection that got established last.
-  std::queue<Envoy::Network::ClientConnectionPtr> established_connections_;
+  std::queue<EstablishedConnection> established_connections_;
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
