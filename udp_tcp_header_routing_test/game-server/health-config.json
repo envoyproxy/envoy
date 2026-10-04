@@ -1,0 +1,36 @@
+{
+  "健康检查优化策略": {
+    "目标": "支持1500个游戏服务器的心跳探测",
+    "推荐配置": {
+      "心跳间隔": "30秒",
+      "超时时间": "10秒", 
+      "失败阈值": "3次",
+      "注销延迟": "2分钟"
+    },
+    "负载计算": {
+      "1500服务 × 30秒间隔": "50 QPS",
+      "内存占用": "约100-200MB",
+      "网络带宽": "约1-2 Mbps"
+    }
+  },
+  "服务注册模板": {
+    "AgentServiceRegistration": {
+      "ID": "game-server-{id}",
+      "Name": "game-server",
+      "Port": 8080,
+      "Tags": ["udp", "tcp", "game"],
+      "Meta": {
+        "envoy_external_port": "10000",
+        "protocol": "both",
+        "version": "1.0.0"
+      },
+      "Check": {
+        "Name": "Game Server TCP Check",
+        "TCP": "localhost:8080",
+        "Interval": "30s",      // 优化：从10秒延长到30秒
+        "Timeout": "10s",
+        "DeregisterCriticalServiceAfter": "120s"
+      }
+    }
+  }
+}

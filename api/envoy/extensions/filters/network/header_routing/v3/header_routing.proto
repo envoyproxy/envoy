@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.header_routing.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.header_routing.v3";
+option java_outer_classname = "HeaderRoutingProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/header_routing/v3;header_routingv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Header routing]
+// Configuration for the header_routing network filter.
+//
+// This filter parses a fixed 8-byte header at the beginning of the TCP byte stream
+// (``[Magic 1B][Version 1B][RoomIP 4B][RoomPort 2B big-endian]``), strips the header and routes
+// the remaining bytes to the room server encoded in the header. It must be placed before the
+// :ref:`sni dynamic forward proxy filter
+// <envoy_v3_api_msg_extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig>`,
+// which reads the ``envoy.upstream.dynamic_host`` / ``envoy.upstream.dynamic_port`` filter state
+// written by this filter.
+// [#extension: envoy.filters.network.header_routing]
+message HeaderRouting {
+  // The magic byte used to guard against misdetection of the header.
+  // Defaults to 0x55 if not set. NOTE: as a proto3 optional field the getter
+  // returns 0 when unset; the default of 0x55 is enforced by the filter
+  // implementation, so always check has_magic() before reading the field.
+  optional uint32 magic = 1;
+
+  // The protocol version byte.
+  // Defaults to 1 if not set. NOTE: as a proto3 optional field the getter
+  // returns 0 when unset; the default of 1 is enforced by the filter
+  // implementation, so always check has_version() before reading the field.
+  optional uint32 version = 2;
+
+  // Whether to forward the parsed 8-byte protocol header to the upstream unchanged.
+  // Defaults to true: the header is passed through together with the game data.
+  // When set to false, the header is stripped and only the game data is forwarded.
+  // NOTE: as a proto3 optional field the getter returns false when unset; the
+  // default of true is enforced by the filter implementation, so always check
+  // has_forward_header() before reading the field.
+  optional bool forward_header = 3;
+}
