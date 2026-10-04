@@ -665,6 +665,7 @@ envoy_cc_test_library(
         "//source/common/grpc:typed_async_client_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/server:generic_factory_context_lib",
         "//test/proto:helloworld_proto_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

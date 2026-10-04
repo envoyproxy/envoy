@@ -603,6 +603,40 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "grpc_service_initial_metadata_integration_test",
+    size = "large",
+    srcs = ["grpc_service_initial_metadata_integration_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    rbe_pool = "linux_x64_small",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/formatter/cel:config",
+        "//source/extensions/formatter/file_content:config",
+        "//source/extensions/formatter/generic_secret:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:server_factory_context_filter_config_proto_cc_proto",
+        "//test/integration/filters:server_factory_context_filter_lib",
+        "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/formatter/file_content/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/formatter/generic_secret/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http_service_headers_integration_test",
     size = "large",
     srcs = ["http_service_headers_integration_test.cc"],

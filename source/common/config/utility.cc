@@ -285,8 +285,11 @@ absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSour
   if (!maybe_grpc_service.value().has_value()) {
     return nullptr;
   }
-  return async_client_manager.factoryForGrpcService(*maybe_grpc_service.value(), scope,
-                                                    skip_cluster_check);
+  auto initial_metadata =
+      async_client_manager.parseGrpcServiceInitialMetadataForServer(*maybe_grpc_service.value());
+  RETURN_IF_NOT_OK_REF(initial_metadata.status());
+  return async_client_manager.factoryForGrpcService(
+      *maybe_grpc_service.value(), scope, skip_cluster_check, std::move(*initial_metadata));
 }
 
 absl::Status Utility::translateOpaqueConfig(const Protobuf::Any& typed_config,

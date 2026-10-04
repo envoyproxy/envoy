@@ -382,7 +382,7 @@ public:
 
   FilterConfigPerRoute(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config,
-      absl::Status& creation_status)
+      Grpc::GrpcServiceInitialMetadataSharedPtr initial_metadata, absl::Status& creation_status)
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
@@ -399,7 +399,8 @@ public:
         emit_client_span_(
             config.has_check_settings() && config.check_settings().has_emit_client_span()
                 ? std::make_optional(config.check_settings().emit_client_span().value())
-                : std::nullopt) {
+                : std::nullopt),
+        initial_metadata_(std::move(initial_metadata)) {
     if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
         config.check_settings().has_with_request_body()) {
       creation_status = absl::InvalidArgumentError(
@@ -438,6 +439,13 @@ public:
   }
 
   /**
+   * @return The parsed initial metadata of the per-route gRPC service, if any.
+   */
+  const Grpc::GrpcServiceInitialMetadataSharedPtr& grpcServiceInitialMetadata() const {
+    return initial_metadata_;
+  }
+
+  /**
    * @return The HTTP service override for this route, if any.
    */
   const std::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>&
@@ -460,6 +468,7 @@ private:
   const std::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>
       http_service_;
   std::optional<bool> emit_client_span_;
+  const Grpc::GrpcServiceInitialMetadataSharedPtr initial_metadata_;
 };
 
 /**
@@ -534,7 +543,8 @@ private:
 
   // Create a new gRPC client for per-route gRPC service configuration.
   Filters::Common::ExtAuthz::ClientPtr
-  createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service);
+  createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service,
+                           const Grpc::GrpcServiceInitialMetadataSharedPtr& initial_metadata);
 
   // Create a new HTTP client for per-route HTTP service configuration.
   Filters::Common::ExtAuthz::ClientPtr createPerRouteHttpClient(

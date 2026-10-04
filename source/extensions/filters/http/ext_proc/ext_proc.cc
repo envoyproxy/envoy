@@ -269,6 +269,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                            const std::string& stats_prefix, bool is_upstream,
                            Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                            Server::Configuration::CommonFactoryContext& context,
+                           Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata,
                            absl::Status& creation_status)
     : stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       untyped_forwarding_namespaces_(
@@ -292,6 +293,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
       allowed_override_modes_(config.allowed_override_modes()),
       grpc_service_(getFilterGrpcService(config)),
+      parsed_grpc_initial_metadata_(std::move(parsed_grpc_initial_metadata)),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
       filter_metadata_(config.filter_metadata()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
@@ -647,9 +649,11 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
 FilterConfigPerRoute::FilterConfigPerRoute(
     const ExtProcPerRoute& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-    Server::Configuration::CommonFactoryContext& context)
+    Server::Configuration::CommonFactoryContext& context,
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
       grpc_service_(initGrpcService(config)),
+      parsed_grpc_initial_metadata_(std::move(parsed_grpc_initial_metadata)),
       grpc_initial_metadata_(config.overrides().grpc_initial_metadata().begin(),
                              config.overrides().grpc_initial_metadata().end()),
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
@@ -675,6 +679,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       processing_mode_(mergeProcessingMode(less_specific, more_specific)),
       grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
                                                             : less_specific.grpcService()),
+      // Keep the parsed initial metadata matching the selected grpc_service_.
+      parsed_grpc_initial_metadata_(more_specific.grpcService().has_value()
+                                        ? more_specific.parsedGrpcInitialMetadata()
+                                        : less_specific.parsedGrpcInitialMetadata()),
       grpc_initial_metadata_(mergeGrpcInitialMetadata(less_specific, more_specific)),
       untyped_forwarding_namespaces_(more_specific.untypedForwardingMetadataNamespaces().has_value()
                                          ? more_specific.untypedForwardingMetadataNamespaces()
@@ -2233,7 +2241,8 @@ void Filter::mergePerRouteConfig() {
     ENVOY_STREAM_LOG(trace, "Setting new GrpcService from per-route configuration",
                      *decoder_callbacks_);
     grpc_service_ = *merged_config->grpcService();
-    config_with_hash_key_.setConfig(*merged_config->grpcService());
+    config_with_hash_key_.setConfig(*merged_config->grpcService(),
+                                    merged_config->parsedGrpcInitialMetadata());
   }
   if (!merged_config->grpcInitialMetadata().empty()) {
     ENVOY_STREAM_LOG(trace, "Overriding grpc initial metadata from per-route configuration",
@@ -2245,7 +2254,8 @@ void Filter::mergePerRouteConfig() {
                        header.key(), header.value());
       mergeHeaderValuesField(*ptr, header);
     }
-    config_with_hash_key_.setConfig(config);
+    // The merged initial metadata can't be parsed on the main thread.
+    config_with_hash_key_.setConfig(config, nullptr);
   }
 
   // For metadata namespaces, we only override the existing value if we have a

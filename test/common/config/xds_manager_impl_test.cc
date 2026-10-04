@@ -465,7 +465,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnknownCluster) {
             ByMove(absl::InvalidArgumentError("Unknown gRPC client cluster 'ads_cluster2'"))));
   } else {
     // Emulates an error for gRPC-cluster not found.
-    EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _))
+    EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _, _))
         .WillOnce(Return(
             ByMove(absl::InvalidArgumentError("Unknown gRPC client cluster 'ads_cluster2'"))));
   }
@@ -545,7 +545,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
         .WillOnce(Return(ByMove(std::make_shared<Grpc::MockAsyncClient>())));
   } else {
     EXPECT_CALL(cm_.async_client_manager_,
-                factoryForGrpcService(ProtoEq(expected_primary_grpc_service), _, _))
+                factoryForGrpcService(ProtoEq(expected_primary_grpc_service), _, _, _))
         .WillOnce(Return(ByMove(std::make_unique<Grpc::MockAsyncClientFactory>())));
   }
   // Emulates an error for non_existent_failover_ads_cluster not found.
@@ -559,7 +559,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
             "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'"))));
   } else {
     EXPECT_CALL(cm_.async_client_manager_,
-                factoryForGrpcService(ProtoEq(expected_failover_grpc_service), _, _))
+                factoryForGrpcService(ProtoEq(expected_failover_grpc_service), _, _, _))
         .WillOnce(Return(ByMove(absl::InvalidArgumentError(
             "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'"))));
   }
@@ -868,7 +868,7 @@ TEST_P(XdsManagerImplTest, AdsInitializationFailsWithNullPrimaryClient) {
     auto mock_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
     EXPECT_CALL(*mock_factory, createUncachedRawAsyncClient())
         .WillOnce(Return(ByMove(absl::StatusOr<Grpc::RawAsyncClientPtr>(nullptr))));
-    EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _))
+    EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _, _))
         .WillOnce(
             Return(ByMove(absl::StatusOr<Grpc::AsyncClientFactoryPtr>(std::move(mock_factory)))));
   }

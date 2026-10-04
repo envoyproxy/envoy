@@ -251,15 +251,19 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
                                                             : std::nullopt),
       emit_client_span_(more_specific.emit_client_span_.has_value()
                             ? more_specific.emit_client_span_
-                            : less_specific.emit_client_span_) {
+                            : less_specific.emit_client_span_),
+      // Keep the parsed initial metadata matching the selected (more-specific) grpc_service_.
+      initial_metadata_(more_specific.grpc_service_.has_value() ? more_specific.initial_metadata_
+                                                                : nullptr) {
   // Merge context extensions from more specific configuration, overriding less specific ones.
   for (const auto& extension : more_specific.context_extensions_) {
     context_extensions_[extension.first] = extension.second;
   }
 }
 
-Filters::Common::ExtAuthz::ClientPtr
-Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service) {
+Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteGrpcClient(
+    const envoy::config::core::v3::GrpcService& grpc_service,
+    const Grpc::GrpcServiceInitialMetadataSharedPtr& initial_metadata) {
   if (server_context_ == nullptr) {
     ENVOY_STREAM_LOG(
         debug, "ext_authz filter: server context not available for per-route gRPC client creation.",
@@ -278,8 +282,7 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
 
   // We can skip transport version check for per-route gRPC service here.
   // The transport version is already validated at the main configuration level.
-  Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-      Envoy::Grpc::GrpcServiceConfigWithHashKey(grpc_service);
+  Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service, initial_metadata);
 
   auto client_or_error = server_context_->clusterManager()
                              .grpcAsyncClientManager()
@@ -378,7 +381,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                        *decoder_callbacks_);
 
       // Create a new gRPC client for this route.
-      per_route_client_ = createPerRouteGrpcClient(grpc_service);
+      per_route_client_ = createPerRouteGrpcClient(
+          grpc_service, maybe_merged_per_route_config->grpcServiceInitialMetadata());
       if (per_route_client_ != nullptr) {
         client_to_use = per_route_client_.get();
         ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",

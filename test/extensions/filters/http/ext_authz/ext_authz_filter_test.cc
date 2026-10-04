@@ -2896,7 +2896,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsConfigCheck) {
 
   // Expect an error status while initializing the route's per filter config.
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigPerRoute config(settings, creation_status);
+  FilterConfigPerRoute config(settings, nullptr, creation_status);
   EXPECT_THAT(creation_status,
               HasStatus(absl::StatusCode::kInvalidArgument,
                         "Invalid configuration for check_settings. Only one of "

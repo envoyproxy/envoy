@@ -73,7 +73,8 @@ public:
    * @return GrpcAccessLoggerSharedPtr ready for logging requests.
    */
   virtual typename GrpcAccessLogger::SharedPtr
-  getOrCreateLogger(const ConfigProto& config, GrpcAccessLoggerType logger_type) PURE;
+  getOrCreateLogger(const ConfigProto& config, GrpcAccessLoggerType logger_type,
+                    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata) PURE;
 };
 
 } // namespace Detail
@@ -245,8 +246,9 @@ public:
     });
   }
 
-  typename GrpcAccessLogger::SharedPtr
-  getOrCreateLogger(const ConfigProto& config, GrpcAccessLoggerType logger_type) override {
+  typename GrpcAccessLogger::SharedPtr getOrCreateLogger(
+      const ConfigProto& config, GrpcAccessLoggerType logger_type,
+      Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata) override {
     // TODO(euroelessar): Consider cleaning up loggers.
     auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
     const auto cache_key = std::make_pair(MessageUtil::hash(config), logger_type);
@@ -255,7 +257,8 @@ public:
       return it->second;
     }
 
-    const auto logger = createLogger(config, cache.dispatcher_);
+    const auto logger =
+        createLogger(config, cache.dispatcher_, std::move(parsed_grpc_initial_metadata));
     cache.access_loggers_.emplace(cache_key, logger);
     return logger;
   }
@@ -279,8 +282,9 @@ private:
   };
 
   // Create the specific logger type for this cache.
-  virtual typename GrpcAccessLogger::SharedPtr createLogger(const ConfigProto& config,
-                                                            Event::Dispatcher& dispatcher) PURE;
+  virtual typename GrpcAccessLogger::SharedPtr
+  createLogger(const ConfigProto& config, Event::Dispatcher& dispatcher,
+               Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata) PURE;
 
   ThreadLocal::SlotSharedPtr tls_slot_;
 };

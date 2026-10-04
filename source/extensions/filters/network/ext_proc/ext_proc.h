@@ -201,7 +201,10 @@ public:
     IgnoreError,
   };
 
-  NetworkExtProcFilter(ConfigConstSharedPtr config, ExternalProcessorClientPtr&& client);
+  // `parsed_grpc_initial_metadata` is the gRPC service's initial metadata, parsed on the main
+  // thread by AsyncClientManager::parseGrpcServiceInitialMetadata().
+  NetworkExtProcFilter(ConfigConstSharedPtr config, ExternalProcessorClientPtr&& client,
+                       Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata);
   ~NetworkExtProcFilter() override;
 
   // Network::ReadFilter

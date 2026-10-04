@@ -16,8 +16,7 @@ ExtAuthzFilterConfigFactory::ExtAuthzFilterConfigFactory() : FactoryBase(std::st
 
 FilterFactoryCb ExtAuthzFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const FilterConfig& proto_config, Server::Configuration::FactoryContext& context) {
-  ConfigSharedPtr filter_config =
-      std::make_shared<Config>(proto_config, context.scope(), context.serverFactoryContext());
+  ConfigSharedPtr filter_config = std::make_shared<Config>(proto_config, context.scope(), context);
 
   return [filter_config](Network::UdpSessionFilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addReadFilter(std::make_shared<Filter>(filter_config, filter_config->createClient()));

@@ -70,6 +70,8 @@ areas:
     title: geoip
   golang:
     title: golang
+  grpc:
+    title: grpc
   http:
     title: http
   http2:

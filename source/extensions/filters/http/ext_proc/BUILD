@@ -84,6 +84,7 @@ envoy_cc_extension(
         "//source/common/http:http_service_headers_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/ext_proc/http_client:http_client_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
     ],
 )
