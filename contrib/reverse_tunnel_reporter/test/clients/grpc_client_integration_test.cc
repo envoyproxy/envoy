@@ -519,7 +519,7 @@ TEST_P(GrpcClientIntegrationTest, ListenerDrain) {
   // keep one request open on the downstream listener.
   auto client = makeHttpConnection(egressPort);
   auto resp = makeClientRequest("/slow", client);
-  test_server_->waitForGauge("http.node-1.downstream_cx_active", testing::Eq(1),
+  test_server_->waitForGauge("http.node-1.fault.active_faults", testing::Eq(1),
                              std::chrono::milliseconds(sendInterval * 3));
 
   removeListenerLds("node-1");
