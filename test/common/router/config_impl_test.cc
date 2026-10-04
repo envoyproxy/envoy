@@ -11252,6 +11252,41 @@ virtual_hosts:
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
 
+TEST_F(RouteMatcherTest, PatternMatchRedirectPrefixRewrite) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_redirect_use_request_path",
+        "true"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.uri_template_matcher
+            typed_config:
+              "@type": >-
+                type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one}/{two}"
+          case_sensitive: false
+        redirect:
+          prefix_rewrite: "/rest/redirect"
+  )EOF";
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                        true, creation_status_);
+
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/rest/a/b?q=1", "GET");
+  const DirectResponseEntry* direct_response =
+      config.route(headers, 0)->directResponseEntry();
+
+  direct_response->rewritePathHeader(headers, true);
+  EXPECT_EQ("/rest/redirect?q=1", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
 TEST_F(RouteMatcherTest, PatternMatchConfigMissingBracket) {
 
   const std::string yaml = R"EOF(

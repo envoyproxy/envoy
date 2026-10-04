@@ -1452,9 +1452,17 @@ UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
     : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       uri_template_(path_matcher_->uriTemplate()) {};
 
-void UriTemplateMatcherRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
-                                                         bool insert_envoy_original_path) const {
-  finalizePathHeaderForRedirect(headers, path_matcher_->uriTemplate(), insert_envoy_original_path);
+void UriTemplateMatcherRouteEntryImpl::rewritePathHeader(
+    Http::RequestHeaderMap& headers, bool insert_envoy_original_path) const {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.uri_template_redirect_use_request_path")) {
+    const absl::string_view path =
+        Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+    finalizePathHeaderForRedirect(headers, path, insert_envoy_original_path);
+  } else {
+    finalizePathHeaderForRedirect(headers, path_matcher_->uriTemplate(),
+                                  insert_envoy_original_path);
+  }
 }
 
 std::string UriTemplateMatcherRouteEntryImpl::currentUrlPathAfterRewrite(
