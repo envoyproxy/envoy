@@ -748,6 +748,7 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_template(
   const auto* route_template = context->config.routeTemplate(id);
   if (route_template == nullptr) {
     ENVOY_LOG_MISC(debug, "dynamic module route specifier selected unknown template '{}'", id);
+    context->template_selection_failed = true;
     return false;
   }
   context->selected_template = route_template;
@@ -759,16 +760,29 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_template(
   return true;
 }
 
+bool envoy_dynamic_module_callback_route_specifier_unset_route_template(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer template_id) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  const absl::string_view id = toStringView(template_id);
+  if (context->selected_template == nullptr || context->selected_template->id != id) {
+    return false;
+  }
+  context->selected_template = nullptr;
+  context->selected_route = nullptr;
+  return true;
+}
+
 void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     uint64_t user_data) {
   routeSpecifierContext(context_envoy_ptr)->user_data = user_data;
 }
 
-void envoy_dynamic_module_callback_route_specifier_set_chain_status(
+void envoy_dynamic_module_callback_route_specifier_set_decision(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_route_specifier_chain_status status) {
-  routeSpecifierContext(context_envoy_ptr)->chain_status = status;
+    envoy_dynamic_module_type_route_specifier_decision decision) {
+  routeSpecifierContext(context_envoy_ptr)->decision = decision;
 }
 
 bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
@@ -851,25 +865,22 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_override(
                    toStringView(override_id));
     return false;
   }
+  // Only the selection is recorded here. The path rewrite and the metadata the override carries
+  // are applied when the decision resolves, so unset_route_override can revert the selection
+  // cleanly and the values the module records itself win whatever the call order.
   context->overrides.route_override = entry;
-  // A regex rewrite carried by the override rewrites the request path, computed once here the same
-  // way set_prefix_rewrite does. A result over the bound or an empty rewrite leaves the path alone.
-  if (entry->regex_rewrite != nullptr) {
-    std::optional<std::string> rewritten = Envoy::Router::rewritePathByPrefixOrRegex(
-        context->headers.getPathValue(), "", "", entry->regex_rewrite.get(),
-        entry->regex_rewrite_substitution, context->config.maxRewrittenPathBytes());
-    if (rewritten.has_value()) {
-      context->overrides.path = std::move(*rewritten);
-    }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_unset_route_override(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer override_id) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  const auto* entry = context->config.routeOverride(toStringView(override_id));
+  if (entry == nullptr || context->overrides.route_override != entry) {
+    return false;
   }
-  // A metadata bundle carried by the override layers onto the route metadata, per namespace, the
-  // same way module recorded metadata does.
-  for (const auto& [name, fields] : entry->metadata.filter_metadata()) {
-    (*context->overrides.route_metadata.mutable_filter_metadata())[name].MergeFrom(fields);
-  }
-  for (const auto& [name, typed] : entry->metadata.typed_filter_metadata()) {
-    (*context->overrides.route_metadata.mutable_typed_filter_metadata())[name] = typed;
-  }
+  context->overrides.route_override = nullptr;
   return true;
 }
 

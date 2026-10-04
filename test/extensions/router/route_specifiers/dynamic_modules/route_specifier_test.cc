@@ -364,7 +364,7 @@ TEST_F(DynamicModuleRouteSpecifierTest, ValidConfigWithTemplatesAndOverrides) {
   EXPECT_EQ("matched_cluster", route.route->routeEntry()->clusterName());
 }
 
-// A module built against a newer ABI could return a decision this build does not know, which is
+// A module built against a newer ABI could record a decision this build does not know, which is
 // handled by the failure policy rather than trusted.
 TEST_F(DynamicModuleRouteSpecifierTest, UnknownDecisionPassesThrough) {
   const auto config = loadConfig(
@@ -387,6 +387,28 @@ TEST_F(DynamicModuleRouteSpecifierTest, UnknownDecisionFailsClosed) {
 
   const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
   EXPECT_EQ(nullptr, route.route);
+}
+
+// A module built against a newer ABI could also return a status this build does not know, which
+// is handled by the failure policy as well.
+TEST_F(DynamicModuleRouteSpecifierTest, UnknownStatusPassesThrough) {
+  const auto config = loadConfig(
+      specifierYaml("route_specifier_unknown_status", "      failure_policy: PASS_THROUGH\n"));
+  ASSERT_TRUE(config.ok());
+
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("matched_cluster", route.route->routeEntry()->clusterName());
+  EXPECT_EQ(
+      1, context_.store_.counter("dynamicmodulescustom.route_specifier.test.failure_module_error")
+             .value());
+  // A status Envoy does not know is not a decision the module recorded.
+  EXPECT_EQ(
+      1,
+      context_.store_.counter("dynamicmodulescustom.route_specifier.test.unknown_status").value());
+  EXPECT_EQ(
+      0,
+      context_.store_.counter("dynamicmodulescustom.route_specifier.test.decision_error").value());
 }
 
 // A virtual host that configures no routes at all is routed entirely by the module, which is how a
@@ -567,9 +589,10 @@ TEST_F(DynamicModuleRouteSpecifierTest, RegistersCustomStatNamespace) {
   // The statistics of the specifier are rooted at the configured metrics namespace.
   const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
   ASSERT_NE(nullptr, route.route);
+  // The no-op module records no decision, so the default Unspecified decision is in effect.
   EXPECT_EQ(
       1,
-      context_.store_.counter("custom_metrics.route_specifier.test.decision_pass_through").value());
+      context_.store_.counter("custom_metrics.route_specifier.test.decision_has_override").value());
 }
 
 // A decision that records route entry overrides produces a route entry wrapper. Its rewritten path,
@@ -772,8 +795,9 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteMetadataRejectionFailsOpen) {
              .value());
 }
 
-// A ContinueMatching decision drops the matched route and lets matching carry on to the next route.
-TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingDecisionSkipsToTheNextRoute) {
+// A StopIterationAndSkipRoute status drops the matched route and lets matching carry on to the
+// next route.
+TEST_F(DynamicModuleRouteSpecifierTest, SkipRouteStatusSkipsToTheNextRoute) {
   const auto config =
       loadRaw(catchAllRouteConfigYaml("route_specifier_continue_matching", "PASS_THROUGH"));
   ASSERT_TRUE(config.ok());
@@ -782,14 +806,14 @@ TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingDecisionSkipsToTheNextRo
   ASSERT_NE(nullptr, route.route);
   ASSERT_NE(nullptr, route.route->routeEntry());
   EXPECT_EQ("specific_cluster", route.route->routeEntry()->clusterName());
-  EXPECT_EQ(1, context_.store_
-                   .counter("dynamicmodulescustom.route_specifier.test.decision_continue_matching")
-                   .value());
+  EXPECT_EQ(
+      1,
+      context_.store_.counter("dynamicmodulescustom.route_specifier.test.route_skipped").value());
 }
 
-// A ContinueMatching decision on the last route that matches yields no route, since there is
-// nothing left to match.
-TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingDecisionOnTheLastRouteYieldsNoRoute) {
+// A StopIterationAndSkipRoute status on the last route that matches yields no route, since there
+// is nothing left to match.
+TEST_F(DynamicModuleRouteSpecifierTest, SkipRouteStatusOnTheLastRouteYieldsNoRoute) {
   const auto config =
       loadRaw(catchAllRouteConfigYaml("route_specifier_continue_matching", "PASS_THROUGH"));
   ASSERT_TRUE(config.ok());
@@ -813,10 +837,27 @@ TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingFailurePolicyContinuesOn
   EXPECT_EQ(
       1, context_.store_.counter("dynamicmodulescustom.route_specifier.test.failure_module_error")
              .value());
-  // The failure path does not count as a ContinueMatching decision.
-  EXPECT_EQ(0, context_.store_
-                   .counter("dynamicmodulescustom.route_specifier.test.decision_continue_matching")
-                   .value());
+  // The failure path has its own counters, so the skip it produced is not counted as one the
+  // module asked for.
+  EXPECT_EQ(
+      0,
+      context_.store_.counter("dynamicmodulescustom.route_specifier.test.route_skipped").value());
+}
+
+// A selection that names a template that is not declared cannot be honored, so the failure
+// policy applies rather than silently falling back to the resolved route.
+TEST_F(DynamicModuleRouteSpecifierTest, TemplateNotSelectedPassesThrough) {
+  const auto config = loadConfig(
+      specifierYaml("route_specifier_select_template", "      failure_policy: PASS_THROUGH\n"));
+  ASSERT_TRUE(config.ok());
+
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("matched_cluster", route.route->routeEntry()->clusterName());
+  EXPECT_EQ(1,
+            context_.store_
+                .counter("dynamicmodulescustom.route_specifier.test.failure_template_not_selected")
+                .value());
 }
 
 } // namespace

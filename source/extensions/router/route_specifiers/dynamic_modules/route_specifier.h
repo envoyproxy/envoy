@@ -51,12 +51,13 @@ constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 // The statistics of a route specifier.
 #define ALL_DYNAMIC_MODULE_ROUTE_SPECIFIER_STATS(COUNTER, HISTOGRAM)                               \
   COUNTER(decision_pass_through)                                                                   \
-  COUNTER(decision_override)                                                                       \
-  COUNTER(decision_select_template)                                                                \
+  COUNTER(decision_has_override)                                                                   \
+  COUNTER(decision_has_template)                                                                   \
   COUNTER(decision_no_route)                                                                       \
   COUNTER(decision_error)                                                                          \
   COUNTER(decision_reuse_previous)                                                                 \
-  COUNTER(decision_continue_matching)                                                              \
+  COUNTER(route_skipped)                                                                           \
+  COUNTER(unknown_status)                                                                          \
   COUNTER(runtime_skipped)                                                                         \
   COUNTER(failure_module_error)                                                                    \
   COUNTER(failure_template_not_selected)                                                           \
@@ -299,12 +300,19 @@ struct RouteSpecifierContext {
   const StreamInfo::StreamInfo& stream_info;
   const uint64_t random_value;
   const DynamicModuleRouteSpecifierConfig::Template* selected_template{nullptr};
+  // Whether a set_route_template call named an identifier that is not declared. When no template
+  // ends up selected and the decision is left Unspecified, the failure policy applies rather than
+  // silently falling back to the route the specifier was given. A module that wants to probe for
+  // a template without committing checks the configuration getters instead.
+  bool template_selection_failed{false};
   // The selected template evaluated against the request, set when set_route_template succeeds so
   // that the getters reflect the route being produced. Null keeps the getters on the route matching
   // resolved, whether no template was selected or its match did not hold.
   Envoy::Router::RouteConstSharedPtr selected_route;
-  envoy_dynamic_module_type_route_specifier_chain_status chain_status{
-      envoy_dynamic_module_type_route_specifier_chain_status_Default};
+  // The decision set_decision recorded, stored as the raw value the module passed, which may be
+  // outside the known enum values. Unspecified when the module recorded none.
+  envoy_dynamic_module_type_route_specifier_decision decision{
+      envoy_dynamic_module_type_route_specifier_decision_Unspecified};
   RouteOverrides overrides;
   // A u64 the module recorded on the route it produces. Forces the produced route to be wrapped
   // even with no override, so the route destroy hook fires for it. Unset when the module set none.
@@ -413,13 +421,16 @@ private:
 enum class Failure {
   // The decision was honored.
   None,
-  // The module returned the Error decision.
+  // The module recorded the Error decision, recorded a decision this build does not know, or
+  // returned a status this build does not know.
   ModuleError,
-  // The decision was SelectTemplate without a successful set_route_template.
+  // A template selection named an identifier that is not declared, no template ended up
+  // selected, and the decision was left Unspecified.
   TemplateNotSelected,
   // The match of the selected template does not hold for the request.
   TemplateMatchFailed,
-  // The decision was Override while route matching resolved no route.
+  // An override or user data was recorded, with no template to build a route from, while route
+  // matching resolved no route to apply them to.
   OverrideWithoutRoute,
   // Route entry overrides were recorded for a route that answers the request directly.
   OverrideOnNonRouteEntry,
@@ -454,8 +465,9 @@ private:
     Failure failure{Failure::None};
   };
 
-  // decision is the raw value the module returned, which may be outside the known enum values.
-  Decision resolve(RouteSpecifierContext& context, uint32_t decision) const;
+  // on_route_status is the raw value the module returned, which may be outside the known enum
+  // values. The decision the module recorded is read from the context.
+  Decision resolve(RouteSpecifierContext& context, uint32_t on_route_status) const;
   // The route the module asked for, without the failure policy applied.
   Decision wrap(Envoy::Router::RouteConstSharedPtr route, RouteSpecifierContext& context,
                 Envoy::Router::OnRouteStatus status) const;

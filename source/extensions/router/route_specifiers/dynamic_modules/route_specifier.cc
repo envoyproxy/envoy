@@ -15,6 +15,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/router/path_rewrite_utility.h"
 #include "source/common/router/retry_policy_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/runtime/runtime_features.h"
@@ -167,6 +168,37 @@ void applyHeaderMutations(Http::HeaderMap& headers,
   }
   for (const auto& key : headers_to_remove) {
     headers.remove(key);
+  }
+}
+
+// Applies what the selected route override carries onto the recorded overrides before the route
+// is built. Deferred to resolution so that unset_route_override can revert the selection cleanly,
+// and defined so that the values the module records itself win whatever the call order: the
+// override's regex rewrite applies only when the module recorded no path, and its metadata sits
+// under the metadata the module recorded.
+void applySelectedRouteOverride(RouteSpecifierContext& context) {
+  const RouteOverride* entry = context.overrides.route_override;
+  if (entry == nullptr) {
+    return;
+  }
+  if (entry->regex_rewrite != nullptr && !context.overrides.path.has_value()) {
+    // A result over the bound or an empty rewrite leaves the path alone, the same way
+    // set_prefix_rewrite does.
+    std::optional<std::string> rewritten = Envoy::Router::rewritePathByPrefixOrRegex(
+        context.headers.getPathValue(), "", "", entry->regex_rewrite.get(),
+        entry->regex_rewrite_substitution, context.config.maxRewrittenPathBytes());
+    if (rewritten.has_value()) {
+      context.overrides.path = std::move(*rewritten);
+    }
+  }
+  for (const auto& [name, fields] : entry->metadata.filter_metadata()) {
+    auto& slot = (*context.overrides.route_metadata.mutable_filter_metadata())[name];
+    Protobuf::Struct merged = fields;
+    merged.MergeFrom(slot);
+    slot = std::move(merged);
+  }
+  for (const auto& [name, typed] : entry->metadata.typed_filter_metadata()) {
+    context.overrides.route_metadata.mutable_typed_filter_metadata()->insert({name, typed});
   }
 }
 
@@ -658,9 +690,9 @@ DynamicModuleRouteSpecifier::onRoute(Envoy::Router::RouteConstSharedPtr route,
   }
 
   RouteSpecifierContext context{*config_, route, headers, stream_info, random};
-  // The module can return a decision this build does not know, for example from a newer ABI, so it
+  // The module can return a status this build does not know, for example from a newer ABI, so it
   // is read as its underlying integer. Loading an out of range enum value is undefined behavior.
-  const uint32_t decision = static_cast<uint32_t>(
+  const uint32_t on_route_status = static_cast<uint32_t>(
       config_->on_route_(config_->in_module_config_, static_cast<void*>(&context)));
   // Reading the clock is the most expensive thing this method does that is not the module itself,
   // so the start of the specifier doubles as the start of the module. Only the runtime fraction
@@ -670,26 +702,16 @@ DynamicModuleRouteSpecifier::onRoute(Envoy::Router::RouteConstSharedPtr route,
   config_->stats().on_route_duration_.recordValue(
       std::chrono::duration_cast<std::chrono::microseconds>(module_end - start).count());
 
-  Decision result = resolve(context, decision);
+  Decision result = resolve(context, on_route_status);
 
   record_duration(config_->stats().specifier_duration_);
   return {std::move(result.route), result.status};
 }
 
 DynamicModuleRouteSpecifier::Decision
-DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t decision) const {
+DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context,
+                                     uint32_t on_route_status) const {
   using Status = Envoy::Router::OnRouteStatus;
-  const auto status = [&context](Status by_decision) {
-    switch (context.chain_status) {
-    case envoy_dynamic_module_type_route_specifier_chain_status_Continue:
-      return Status::Continue;
-    case envoy_dynamic_module_type_route_specifier_chain_status_StopIteration:
-      return Status::StopIteration;
-    case envoy_dynamic_module_type_route_specifier_chain_status_Default:
-      break;
-    }
-    return by_decision;
-  };
   const auto fail = [this, &context](Failure failure) {
     switch (failure) {
     case Failure::ModuleError:
@@ -728,39 +750,68 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     return Decision{context.input_route, Status::Continue, failure};
   };
 
-  switch (decision) {
+  Status status;
+  switch (on_route_status) {
+  case envoy_dynamic_module_type_route_specifier_on_route_status_Continue:
+    status = Status::Continue;
+    break;
+  case envoy_dynamic_module_type_route_specifier_on_route_status_StopIteration:
+    status = Status::StopIteration;
+    break;
+  case envoy_dynamic_module_type_route_specifier_on_route_status_StopIterationAndSkipRoute:
+    // The skip turns the route down, so nothing is built for the request: the recorded decision,
+    // template and overrides are ignored.
+    config_->stats().route_skipped_.inc();
+    return {context.input_route, Status::StopIterationAndSkipRoute};
+  default:
+    // A module built against a newer ABI could return a status this build does not know. This is
+    // not a decision the module recorded, so it keeps its own counter.
+    config_->stats().unknown_status_.inc();
+    return fail(Failure::ModuleError);
+  }
+
+  switch (context.decision) {
   case envoy_dynamic_module_type_route_specifier_decision_PassThrough:
     config_->stats().decision_pass_through_.inc();
-    return {context.input_route, status(Status::Continue)};
+    return {context.input_route, status};
   case envoy_dynamic_module_type_route_specifier_decision_NoRoute:
     config_->stats().decision_no_route_.inc();
-    return {nullptr, status(Status::StopIteration)};
+    return {nullptr, status};
   case envoy_dynamic_module_type_route_specifier_decision_Error:
     config_->stats().decision_error_.inc();
     return fail(Failure::ModuleError);
-  case envoy_dynamic_module_type_route_specifier_decision_ContinueMatching:
-    config_->stats().decision_continue_matching_.inc();
-    // The skip is final by definition, so the chain status the module may have set is ignored.
-    return {context.input_route, Status::StopIterationAndSkipRoute};
-  case envoy_dynamic_module_type_route_specifier_decision_Override: {
-    config_->stats().decision_override_.inc();
-    if (context.input_route == nullptr) {
-      return fail(Failure::OverrideWithoutRoute);
+  case envoy_dynamic_module_type_route_specifier_decision_Unspecified: {
+    applySelectedRouteOverride(context);
+    if (context.selected_template != nullptr) {
+      // The two ways the default decision generates its route keep their own statistic, so
+      // selecting a template stays distinguishable from refining the resolved route.
+      config_->stats().decision_has_template_.inc();
+      // set_route_template evaluated the template against the request, so reuse the result rather
+      // than matching a second time. A null result means the match did not hold for the request.
+      if (context.selected_route == nullptr) {
+        return fail(Failure::TemplateMatchFailed);
+      }
+      Decision wrapped = wrap(context.selected_route, context, status);
+      return wrapped.failure == Failure::None ? wrapped : fail(wrapped.failure);
     }
-    Decision wrapped = wrap(context.input_route, context, status(Status::Continue));
-    return wrapped.failure == Failure::None ? wrapped : fail(wrapped.failure);
-  }
-  case envoy_dynamic_module_type_route_specifier_decision_SelectTemplate: {
-    config_->stats().decision_select_template_.inc();
-    if (context.selected_template == nullptr) {
+    if (context.template_selection_failed) {
+      // A selection that failed must not silently fall back to the route the specifier was
+      // given: the module asked for a template the configuration does not declare. A module
+      // that wants to probe without committing checks the configuration getters instead.
       return fail(Failure::TemplateNotSelected);
     }
-    // set_route_template evaluated the template against the request, so reuse the result rather
-    // than matching a second time. A null result means the match did not hold for the request.
-    if (context.selected_route == nullptr) {
-      return fail(Failure::TemplateMatchFailed);
+    config_->stats().decision_has_override_.inc();
+    if (context.input_route == nullptr) {
+      // With nothing recorded the default decision passes the route through unchanged, which is
+      // what makes it safe when the module records none: the run with no route stays a run with
+      // no route. Anything recorded needs a route to be applied to.
+      if (context.overrides.hasRouteEntryOverrides() || context.overrides.hasRouteOverrides() ||
+          context.user_data.has_value()) {
+        return fail(Failure::OverrideWithoutRoute);
+      }
+      return {nullptr, status};
     }
-    Decision wrapped = wrap(context.selected_route, context, status(Status::StopIteration));
+    Decision wrapped = wrap(context.input_route, context, status);
     return wrapped.failure == Failure::None ? wrapped : fail(wrapped.failure);
   }
   case envoy_dynamic_module_type_route_specifier_decision_ReusePrevious: {
@@ -772,10 +823,10 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     if (previous == nullptr) {
       return fail(Failure::ReusePreviousRejected);
     }
-    return {std::move(previous), status(Status::StopIteration)};
+    return {std::move(previous), status};
   }
   }
-  // A module built against a newer ABI could return a decision this build does not know.
+  // A module built against a newer ABI could record a decision this build does not know.
   config_->stats().decision_error_.inc();
   return fail(Failure::ModuleError);
 }
