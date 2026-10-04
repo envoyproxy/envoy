@@ -120,6 +120,54 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidMatcher) {
       EnvoyException, "Didn't find a registered implementation.*'input_not_found'");
 }
 
+// The data input for a custom_value bucket id builder is created when the configuration is loaded,
+// so an unknown input is rejected here rather than on a worker thread when a request matches.
+TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidCustomValueInput) {
+  std::string filter_config_yaml = R"EOF(
+  rlqs_server:
+    envoy_grpc:
+      cluster_name: "rate_limit_quota_server"
+  domain: test
+  bucket_matchers:
+    matcher_list:
+      matchers:
+        predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.inputs.request_headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: env
+            value_match:
+              exact: staging
+        on_match:
+          action:
+            name: rate_limit_quota
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+              bucket_id_builder:
+                bucket_id_builder:
+                  "name":
+                      custom_value:
+                        name: input_not_found
+                        typed_config:
+                          "@type": type.googleapis.com/google.protobuf.StringValue
+              reporting_interval: 60s
+  )EOF";
+  envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+
+  auto mock_stream_client = std::make_unique<RateLimitTestClient>();
+
+  RateLimitQuotaFilterFactory factory;
+  std::string stats_prefix = "test";
+  EXPECT_THROW_WITH_REGEX(
+      factory
+          .createFilterFactoryFromProto(filter_config, stats_prefix, mock_stream_client->context_)
+          .value(),
+      EnvoyException, "Didn't find a registered implementation.*'input_not_found'");
+}
+
 TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidGrpcClient) {
   std::string filter_config_yaml = R"EOF(
   rlqs_server:

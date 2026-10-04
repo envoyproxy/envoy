@@ -50,12 +50,10 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::ServerFactoryContext& factory_context,
-                       ProtobufMessage::ValidationVisitor& validation_visitor,
                        std::unique_ptr<RateLimitClient> local_client,
                        Grpc::GrpcServiceConfigWithHashKey config_with_hash_key,
                        Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher)
-      : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
-        validation_visitor_(validation_visitor), matcher_(matcher),
+      : config_(std::move(config)), config_with_hash_key_(config_with_hash_key), matcher_(matcher),
         client_(std::move(local_client)),
         time_source_(factory_context.mainThreadDispatcher().timeSource()) {}
 
@@ -87,9 +85,7 @@ private:
 
   FilterConfigConstSharedPtr config_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
-  RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 

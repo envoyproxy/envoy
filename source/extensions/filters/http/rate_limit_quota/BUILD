@@ -98,6 +98,7 @@ envoy_cc_library(
         "//source/common/matcher:matcher_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
     ],
