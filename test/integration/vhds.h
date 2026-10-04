@@ -181,9 +181,10 @@ public:
         virtualHostYaml("my_route/vhost_1", "vhost.first"));
   }
 
-  // Overridden to insert this stuff into the initialize() at the very beginning of
-  // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
-  void initialize() override {
+  // Brings the server up and drives the xDS handshake as far as the initial VHDS request, i.e. to
+  // the point where the only thing the route configuration is still waiting for is the initial
+  // VHDS response. The listener is still warming when this returns.
+  void initializeUpToInitialVhdsRequest() {
     if (routeConfigType() == RouteConfigType::Static) {
       // Static route config - remove the "rds" configuration in the HCM, and
       // set the contents statically in "route_config".
@@ -238,15 +239,40 @@ public:
 
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                              vhds_stream_.get()));
+  }
+
+  // Delivers the initial VHDS response that the route configuration is warming up on, and waits
+  // for Envoy to ack it.
+  void sendInitialVhdsResponse() {
     sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
         Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                              vhds_stream_.get()));
+  }
 
-    // Wait for our statically specified listener to become ready, and register its port in the
-    // test framework's downstream listener port map.
+  // Envoy starts its workers only once every init target has signalled readiness, so the listener
+  // is still warming for as long as this returns false. Note that a listener from the bootstrap is
+  // counted in listener_manager.total_listeners_active before the workers start, so that gauge
+  // can't be used to tell whether warming has finished.
+  bool workersStarted() {
+    auto gauge = test_server_->gauge("listener_manager.workers_started");
+    return gauge != nullptr && gauge->value() == 1;
+  }
+
+  // Waits for the route configuration to go live and the listener to finish warming, and registers
+  // its port in the test framework's downstream listener port map.
+  void waitForListenerToServe() {
     test_server_->waitUntilListenersReady();
+    test_server_->waitForGauge("listener_manager.workers_started", testing::Eq(1));
     registerTestServerPorts({"http"});
+  }
+
+  // Overridden to insert this stuff into the initialize() at the very beginning of
+  // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
+  void initialize() override {
+    initializeUpToInitialVhdsRequest();
+    sendInitialVhdsResponse();
+    waitForListenerToServe();
   }
 
   void useRdsWithVhosts() { use_rds_with_vhosts = true; }

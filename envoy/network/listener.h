@@ -7,8 +7,10 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
@@ -183,6 +185,13 @@ public:
    * @return whether the listener is a Quic listener.
    */
   virtual bool isQuic() const PURE;
+
+  /**
+   * @return envoy::config::listener::v3::Listener::DrainType the drain type configured on this
+   * listener. DEFAULT listeners drain in response to /healthcheck/fail in addition to listener
+   * removal/modification and hot restart; MODIFY_ONLY listeners do not.
+   */
+  virtual envoy::config::listener::v3::Listener::DrainType drainType() const PURE;
 
   /**
    * @return bool whether the listener should bypass overload manager actions
@@ -481,7 +490,7 @@ public:
   virtual const IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const PURE;
 };
 
-using UdpListenerCallbacksOptRef = std::optional<std::reference_wrapper<UdpListenerCallbacks>>;
+using UdpListenerCallbacksOptRef = OptRef<UdpListenerCallbacks>;
 
 /**
  * An abstract socket listener. Free the listener to stop listening on the socket.

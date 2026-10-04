@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "io_uring_impl_test",
     srcs = ["io_uring_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "nocompdb",
         "skip_on_windows",
@@ -31,7 +31,7 @@ envoy_cc_test(
         "//bazel:linux": ["io_uring_worker_impl_test.cc"],
         "//conditions:default": [],
     }),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//test/mocks/event:event_mocks",
         "//test/mocks/io:io_mocks",
@@ -52,7 +52,7 @@ envoy_cc_test(
         "//bazel:linux": ["io_uring_worker_impl_integration_test.cc"],
         "//conditions:default": [],
     }),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/api:os_sys_calls_interface",
         "//source/common/api:os_sys_calls_lib",
@@ -71,7 +71,7 @@ envoy_cc_test(
         "//bazel:linux": ["io_uring_worker_factory_impl_test.cc"],
         "//conditions:default": [],
     }),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",

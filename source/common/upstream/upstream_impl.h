@@ -994,7 +994,7 @@ public:
       return std::nullopt;
     }
 
-    return std::ref(*(optional_cluster_stats_->request_response_size_stats_));
+    return *optional_cluster_stats_->request_response_size_stats_;
   }
 
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
@@ -1005,7 +1005,7 @@ public:
       return std::nullopt;
     }
 
-    return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
+    return *optional_cluster_stats_->timeout_budget_stats_;
   }
 
   bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
@@ -1346,15 +1346,15 @@ private:
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
 
-  bool initialization_started_{};
   std::function<absl::Status()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
-  const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   ConstLocalitySharedPoolSharedPtr const_locality_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
-  UnitFloat drop_overload_{0};
   std::string drop_category_;
+  UnitFloat drop_overload_{0};
+  bool initialization_started_{};
+  const bool local_cluster_;
   static constexpr int kDropOverloadSize = 1;
 };
 

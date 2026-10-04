@@ -4,6 +4,7 @@
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/extensions/formatter/generic_secret/config.h"
 
+#include "test/common/formatter/formatter_test_utility.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/status_utility.h"
@@ -140,8 +141,46 @@ TEST_F(GenericSecretFormatterTest, FormatValueReturnsStringValue) {
   auto provider = parser->parse("SECRET", "my-token", std::nullopt).value();
   ASSERT_NE(nullptr, provider);
 
-  auto value = provider->formatValue(formatter_context_, stream_info_);
+  auto value = Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_);
   EXPECT_EQ("s3cret", value.string_value());
+}
+
+// An empty secret is reported as a missing value rather than as an empty string.
+TEST_F(GenericSecretFormatterTest, EmptySecretIsMissingValue) {
+  addStaticSecret("my-token", "");
+
+  envoy::extensions::formatter::generic_secret::v3::GenericSecret proto_config;
+  (*proto_config.mutable_secret_configs())["my-token"].set_name("my-token");
+
+  GenericSecretFormatterFactory factory;
+  auto parser = factory.createCommandParserFromProto(proto_config, context_);
+
+  auto provider = parser->parse("SECRET", "my-token", std::nullopt).value();
+  ASSERT_NE(nullptr, provider);
+
+  EXPECT_EQ(std::nullopt,
+            Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+  EXPECT_EQ(Protobuf::Value::KIND_NOT_SET,
+            Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                .kind_case());
+}
+
+// The secret is truncated to the configured max length on both the string and the value paths.
+TEST_F(GenericSecretFormatterTest, TruncatedSecret) {
+  addStaticSecret("my-token", "s3cret");
+
+  envoy::extensions::formatter::generic_secret::v3::GenericSecret proto_config;
+  (*proto_config.mutable_secret_configs())["my-token"].set_name("my-token");
+
+  GenericSecretFormatterFactory factory;
+  auto parser = factory.createCommandParserFromProto(proto_config, context_);
+
+  auto provider = parser->parse("SECRET", "my-token", 3).value();
+  ASSERT_NE(nullptr, provider);
+
+  EXPECT_EQ("s3c", Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+  EXPECT_EQ("s3c", Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                       .string_value());
 }
 
 // parse() returns nullptr for commands other than SECRET.

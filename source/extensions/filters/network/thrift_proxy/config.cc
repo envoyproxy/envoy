@@ -64,8 +64,8 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
           &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
         filter_config, context.serverFactoryContext().api().randomGenerator(),
-        context.serverFactoryContext().mainThreadDispatcher().timeSource(),
-        context.drainDecision()));
+        context.serverFactoryContext().mainThreadDispatcher().timeSource(), context.drainDecision(),
+        context.serverFactoryContext()));
   };
 }
 

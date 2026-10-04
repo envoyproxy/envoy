@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "source/common/config/utility.h"
 #include "source/extensions/filters/http/composite/filter.h"
@@ -63,7 +64,7 @@ CompositeFilterFactory::compileNamedFilterChains(
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           filter_config.typed_config(), context.messageValidationVisitor(), factory);
       auto callback_or_status =
-          factory.createFilterFactoryFromProto(*message, stats_prefix, context);
+          Server::Configuration::createHttpFilterFactory(factory, *message, stats_prefix, context);
       if (!callback_or_status.status().ok()) {
         return absl::InvalidArgumentError(
             fmt::format("Failed to create filter factory for filter '{}' in named filter chain "
@@ -169,7 +170,7 @@ CompositeFilterFactory::createRouteSpecificFilterConfigTyped(
   if (match_tree == nullptr) {
     return nullptr;
   }
-  return std::make_shared<CompositePerRouteConfig>(match_tree);
+  return std::make_shared<CompositePerRouteConfig>(match_tree, context.mainThreadDispatcher());
 }
 
 /**

@@ -22,12 +22,6 @@ py_library(
     ],
 )
 
-py_library(
-    name = "utils",
-    srcs = ["utils.py"],
-    visibility = ["//visibility:public"],
-)
-
 label_flag(
     name = "default_type_db_target",
     # While this is not completely empty but type_db_gen generates nothing on this target.

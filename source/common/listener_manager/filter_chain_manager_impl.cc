@@ -1,6 +1,7 @@
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
 #include "source/common/common/cleanup.h"
@@ -1038,7 +1039,9 @@ FcdsSharedFilterChainManager::FcdsSharedFilterChainManager(
           std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
               server_context,
               server_context.messageValidationContext().dynamicValidationVisitor())),
-      scope_(server_context_.scope().createScope("filter_chain_manager.")) {
+      scope_(server_context_.scope().createScope("filter_chain_manager.")),
+      tls_update_cb_(server_context.mainThreadDispatcher().createSchedulableCallback(
+          [this]() { updateTlsState(); })) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalState>(); });
 }
 
@@ -1146,7 +1149,7 @@ void FcdsSharedFilterChainManager::onFilterChainWarmed(
   ENVOY_LOG(debug, "FCDS: updating warmed shared filter chain name={}", filter_chain->name());
 
   state.api_->setFilterChain(std::move(filter_chain));
-  updateTlsState();
+  scheduleTlsUpdate();
 
   if (draining) {
     for (auto* handle : state.handles_) {
@@ -1165,10 +1168,17 @@ void FcdsSharedFilterChainManager::onFilterChainRemoved(
   SubscriptionState& state = *state_iter->second;
   ENVOY_LOG(debug, "FCDS: removing shared filter chain name={}", draining->name());
 
-  updateTlsState();
+  scheduleTlsUpdate();
 
   for (auto* handle : state.handles_) {
     handle->callbacks().drainFilterChain(draining);
+  }
+}
+
+void FcdsSharedFilterChainManager::scheduleTlsUpdate() {
+  // Skip rearming when a publish is already queued for this iteration.
+  if (!tls_update_cb_->enabled()) {
+    tls_update_cb_->scheduleCallbackCurrentIteration();
   }
 }
 

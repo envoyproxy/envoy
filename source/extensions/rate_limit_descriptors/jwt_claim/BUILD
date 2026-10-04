@@ -16,6 +16,7 @@ envoy_cc_extension(
         "//envoy/ratelimit:ratelimit_interface",
         "//envoy/registry",
         "//source/common/http:header_map_lib",
+        "//source/common/http:utility_lib",
         "//source/common/jwt:jwt_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/rate_limit_descriptors/jwt_claim/v3:pkg_cc_proto",

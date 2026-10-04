@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/io/io_uring.h"
+#include "envoy/common/optref.h"
 #include "envoy/network/io_handle.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -14,8 +15,7 @@ namespace Network {
 
 class IoUringSocketHandleImpl;
 
-using IoUringSocketHandleImplOptRef =
-    std::optional<std::reference_wrapper<IoUringSocketHandleImpl>>;
+using IoUringSocketHandleImplOptRef = OptRef<IoUringSocketHandleImpl>;
 
 enum class IoUringSocketType {
   Unknown,
@@ -34,6 +34,7 @@ public:
                           std::optional<int> domain = std::nullopt, bool is_server_socket = false);
   ~IoUringSocketHandleImpl() override;
 
+  void setAbortiveClose() override;
   Api::IoCallUint64Result close() override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;

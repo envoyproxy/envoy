@@ -52,8 +52,8 @@ SslIntegrationTestBase::makeSslClientConnection(const ClientSslTransportOptions&
     ENVOY_LOG_MISC(debug, "Executing {}", s_client_cmd);
     RELEASE_ASSERT(::system(s_client_cmd.c_str()) == 0, "");
   }
-  auto client_transport_socket_factory_ptr =
-      createClientSslTransportSocketFactory(options, *context_manager_, *api_);
+  auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
+      options, *context_manager_, *api_, &server_factory_context_.serverScope());
   return dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);

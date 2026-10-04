@@ -6,6 +6,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/exception.h"
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
@@ -154,15 +155,17 @@ void WorkerImpl::stopListener(Network::ListenerConfig& listener,
 }
 
 void WorkerImpl::onFilterChainDrain(uint64_t listener_tag,
-                                    const std::list<const Network::FilterChain*>& filter_chains) {
-  dispatcher_->post([this, listener_tag, &filter_chains]() -> void {
-    handler_->onFilterChainDrain(listener_tag, filter_chains);
+                                    const std::list<const Network::FilterChain*>& filter_chains,
+                                    Network::ConnectionDrainEvent drain_event) {
+  dispatcher_->post([this, listener_tag, &filter_chains, drain_event]() -> void {
+    handler_->onFilterChainDrain(listener_tag, filter_chains, drain_event);
   });
 }
 
-void WorkerImpl::onListenerDrain(Network::ListenerConfig& listener) {
-  const uint64_t listener_tag = listener.listenerTag();
-  dispatcher_->post([this, listener_tag]() -> void { handler_->onListenerDrain(listener_tag); });
+void WorkerImpl::onListenerDrain(uint64_t listener_tag, Network::ConnectionDrainEvent drain_event) {
+  dispatcher_->post([this, listener_tag, drain_event]() -> void {
+    handler_->onListenerDrain(listener_tag, drain_event);
+  });
 }
 
 void WorkerImpl::threadRoutine(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) {

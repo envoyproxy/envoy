@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
@@ -92,6 +93,8 @@ struct ReverseConnectionSocketConfig {
       additional_headers;       // Additional headers for the handshake request.
   bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
+  // How often to re-check each host and dial missing tunnels.
+  uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -185,7 +188,10 @@ public:
    */
   Api::IoCallUint64Result close() override;
 
-  /** Stop reverse-connection maintenance on listener teardown. */
+  /**
+   * Stop reverse-connection maintenance on listener teardown. On the owning worker this also
+   * shuts down in-flight handshake wrappers and deferred-deletes them.
+   */
   void resetFileEvents() override;
 
   /**
@@ -228,7 +234,7 @@ public:
    * Get the file descriptor for the pipe monitor used to wake up accept().
    * @return the file descriptor for the pipe monitor
    */
-  int getPipeMonitorFd() const;
+  os_fd_t getPipeMonitorFd() const;
 
   // Callbacks from RCConnectionWrapper.
   /**
@@ -299,8 +305,9 @@ public:
                              const std::string& connection_key);
 
   /**
-   * Handle downstream connection closure and update internal maps so that the next
-   * maintenance cycle re-initiates the connection.
+   * Handle downstream connection closure: drop the key from tracking (if still present) and always
+   * emit a connection_closed access log. When the key was already removed at drain time, host and
+   * cluster in the log may be empty; correlate via connection_key / connection_id.
    * @param connection_key the unique key identifying the closed connection.
    * @param connection_id the initiator's per-connection identifier for the closed connection.
    */
@@ -309,13 +316,17 @@ public:
   /**
    * Drop a tunnel from tracking because it has begun draining (the downstream HCM sent a
    * shutdownNotice/GOAWAY due to max_connection_duration or graceful shutdown, or the peer sent a
-   * GOAWAY) and kick maintenance to dial a replacement immediately. The underlying TCP socket is
-   * left alone so in-flight HTTP/2 streams can finish; onDownstreamConnectionClosed() no-ops when
-   * the socket eventually closes.
+   * GOAWAY) and kick maintenance to dial a replacement immediately. Emits a connection_draining
+   * access log. The underlying TCP socket is left alone so in-flight HTTP/2 streams can finish;
+   * onDownstreamConnectionClosed() later still emits connection_closed (host/cluster may be empty
+   * because the key was already dropped) so the close can be correlated via connection_key /
+   * connection_id.
    *
    * @param connection_key the local-address string of the outbound tunnel socket.
+   * @param connection_id the initiator's per-connection identifier for access-log correlation.
    */
-  void markTunnelDrainingAndDialReplacement(const std::string& connection_key);
+  void markTunnelDrainingAndDialReplacement(const std::string& connection_key,
+                                            uint64_t connection_id);
 
   /**
    * Remove a connection key from per-host tracking (the key set and its state gauge). Shared by the
@@ -329,7 +340,7 @@ public:
   /**
    * Child DownstreamReverseConnectionIOHandles register/unregister here at construction/destruction
    * so that, if this parent is destroyed while a tunnel connection is still draining, it can null
-   * each child's back-pointer (see cleanup()) and the child's parent() safely returns nullptr.
+   * each child's back-pointer (see cleanup()) and child drain/close notifications become no-ops.
    */
   void registerChildIoHandle(DownstreamReverseConnectionIOHandle& child) {
     child_io_handles_.insert(&child);
@@ -476,6 +487,12 @@ private:
   void removeStaleHostAndCloseConnections(const std::string& host);
 
   /**
+   * Drop a wrapper from tracking and deferred-delete it on the worker dispatcher.
+   * @param wrapper the handshake wrapper to remove
+   */
+  void removeAndDeferredDeleteWrapper(RCConnectionWrapper* wrapper);
+
+  /**
    * Per-host connection tracking for better management.
    * Contains all information needed to track and manage connections to a specific host.
    */
@@ -518,8 +535,8 @@ private:
 
   // Simple pipe-based trigger mechanism to wake up accept() when a connection is established.
   // Inlined directly for simplicity and reduced test coverage requirements.
-  int trigger_pipe_read_fd_{-1};
-  int trigger_pipe_write_fd_{-1};
+  os_fd_t trigger_pipe_read_fd_{INVALID_SOCKET};
+  os_fd_t trigger_pipe_write_fd_{INVALID_SOCKET};
 
   // Connection management : We store the established connections in a queue.
   // and pop the last established connection when data is read on trigger_pipe_read_fd_
@@ -538,7 +555,7 @@ private:
   Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread
 
   // Store original socket FD for cleanup.
-  os_fd_t original_socket_fd_{-1};
+  os_fd_t original_socket_fd_{INVALID_SOCKET};
 };
 
 } // namespace ReverseConnection

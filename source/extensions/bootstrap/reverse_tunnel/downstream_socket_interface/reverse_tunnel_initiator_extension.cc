@@ -40,6 +40,8 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
   enable_detailed_stats_ = config.enable_detailed_stats();
   max_reconnect_backoff_ms_ =
       PROTOBUF_GET_MS_OR_DEFAULT(config, max_reconnect_backoff, kDefaultMaxReconnectBackoffMs);
+  maintain_interval_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(
+      config, maintain_interval, ReverseConnectionUtility::kDefaultMaintainIntervalMs);
   if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
     handshake_request_path_ = config.http_handshake().request_path();
   } else {
@@ -120,8 +122,11 @@ void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance& serv
   // request. Built any earlier, the slot would be populated only on the main thread and the
   // formatter would resolve to an empty value on the workers.
   if (config_.has_http_handshake() && !config_.http_handshake().formatters().empty()) {
-    Server::GenericFactoryContextImpl formatter_context(context_,
-                                                        context_.messageValidationVisitor());
+    // These formatters come from the bootstrap, so validate them as static configuration. The
+    // context's default visitor cannot be used here: onServerInitialized() runs after the
+    // bootstrap has been loaded, so that visitor has already switched to the dynamic one.
+    Server::GenericFactoryContextImpl formatter_context(
+        context_, context_.messageValidationContext().staticValidationVisitor());
     auto command_parsers = returnOrThrow(Formatter::SubstitutionFormatStringUtils::parseFormatters(
         config_.http_handshake().formatters(), formatter_context));
     auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();

@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -397,6 +397,13 @@ message ExtAuthz {
   //
   // Defaults to ``false``.
   bool shadow_mode = 32;
+
+  // Whether to emit client-side spans for external authorization requests (e.g. gRPC or HTTP calls).
+  // When set to false, client-side egress spans will not be emitted/exported to trace collectors,
+  // but trace context (e.g. ``traceparent``) will still be propagated to the authorization server.
+  //
+  // If unset, defaults to ``true``.
+  google.protobuf.BoolValue emit_client_span = 33;
 }
 
 // Serialized form of the shadow-mode authorization decision written to FilterState
@@ -624,7 +631,7 @@ message ExtAuthzPerRoute {
 }
 
 // Extra settings for the check request.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message CheckSettings {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.CheckSettings";
@@ -673,4 +680,7 @@ message CheckSettings {
     // Override with an HTTP service configuration.
     HttpService http_service = 5;
   }
+
+  // Overrides the filter-level ``emit_client_span`` setting for this route.
+  google.protobuf.BoolValue emit_client_span = 6;
 }

@@ -58,6 +58,11 @@ public:
   virtual os_fd_t fdDoNotUse() const PURE;
 
   /**
+   * Requests RST on a subsequent close().
+   */
+  virtual void setAbortiveClose() PURE;
+
+  /**
    * Clean up IoHandle resources
    */
   virtual Api::IoCallUint64Result close() PURE;

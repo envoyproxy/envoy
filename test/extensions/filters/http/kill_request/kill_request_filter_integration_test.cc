@@ -26,17 +26,13 @@ typed_config:
 )EOF";
 };
 
-// Tests should run with all protocols.
-class KillRequestFilterIntegrationTestAllProtocols : public KillRequestFilterIntegrationTest {};
-
-// TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
-    Protocols, KillRequestFilterIntegrationTestAllProtocols,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    Protocols, KillRequestFilterIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Request crash Envoy controlled via header configuration.
-TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
+TEST_P(KillRequestFilterIntegrationTest, KillRequestCrashEnvoy) {
   initializeFilter(filter_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -54,7 +50,7 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
 // KillRequestCrashEnvoyOnResponse is flaky on Windows
 #ifndef WIN32
 // Request crash Envoy controlled via response.
-TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResponse) {
+TEST_P(KillRequestFilterIntegrationTest, KillRequestCrashEnvoyOnResponse) {
   const std::string filter_config_response =
       R"EOF(
       name: envoy.filters.http.kill_request
@@ -82,7 +78,7 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResp
 }
 #endif
 
-TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyWithCustomKillHeader) {
+TEST_P(KillRequestFilterIntegrationTest, KillRequestCrashEnvoyWithCustomKillHeader) {
   const std::string filter_config_with_custom_kill_header =
       R"EOF(
 name: envoy.filters.http.kill_request
@@ -106,14 +102,14 @@ typed_config:
 }
 #endif
 
-TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestDisabledWhenHeaderIsMissing) {
+TEST_P(KillRequestFilterIntegrationTest, KillRequestDisabledWhenHeaderIsMissing) {
   initializeFilter(filter_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 1024);
 }
 
-TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestDisabledWhenHeaderValueIsInvalid) {
+TEST_P(KillRequestFilterIntegrationTest, KillRequestDisabledWhenHeaderValueIsInvalid) {
   initializeFilter(filter_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -126,7 +122,7 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestDisabledWhenHead
       sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024);
 }
 
-TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestDisabledByZeroProbability) {
+TEST_P(KillRequestFilterIntegrationTest, KillRequestDisabledByZeroProbability) {
   const std::string zero_probability_filter_config =
       R"EOF(
 name: envoy.filters.http.kill_request

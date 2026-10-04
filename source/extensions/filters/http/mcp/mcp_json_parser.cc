@@ -135,6 +135,25 @@ McpParserConfig::getFieldsForMethod(const std::string& method) const {
   return (it != method_fields_.end()) ? it->second : empty;
 }
 
+std::string McpParserConfig::getNameAttributePath(const std::string& method) const {
+  using namespace Methods;
+  using namespace Paths;
+
+  if (method == TOOLS_CALL || method == PROMPTS_GET) {
+    return std::string(PARAMS_NAME);
+  }
+
+  if (method == RESOURCES_READ) {
+    return std::string(PARAMS_URI);
+  }
+
+  if (method == TASKS_GET || method == TASKS_UPDATE || method == TASKS_CANCEL) {
+    return std::string(PARAMS_TASK_ID);
+  }
+
+  return "";
+}
+
 const McpParserConfig::FieldRequirements&
 McpParserConfig::getFieldRequirementsForMethod(const std::string& method) const {
   auto it = method_requirements_.find(method);
@@ -426,13 +445,9 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
     }
 
     if (!path_stack_.empty()) {
-      // Update cached path before removing from stack
-      size_t last_dot = current_path_cache_.rfind('.');
-      if (last_dot != std::string::npos) {
-        current_path_cache_.resize(last_dot);
-      } else {
-        current_path_cache_.clear();
-      }
+      const size_t trim_size = path_stack_.back().size() + (path_stack_.size() > 1 ? 1 : 0);
+      ASSERT(current_path_cache_.size() >= trim_size);
+      current_path_cache_.resize(current_path_cache_.size() - trim_size);
       path_stack_.pop_back();
     }
     if (context_stack_.size() > 1) {

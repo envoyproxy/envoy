@@ -94,8 +94,14 @@ Envoy::Http::FilterHeadersStatus LocalResponsePolicy::encodeHeaders(
   ENVOY_BUG(encoder_callbacks->streamInfo().filterState()->getDataReadOnly<Policy>(
                 "envoy.filters.http.custom_response") == nullptr,
             "Filter State should not be set when using the LocalResponse policy.");
-  // Handle local body
   std::string body;
+  // When body_format is configured without an explicit body, seed %LOCAL_REPLY_BODY% with the
+  // body captured from the original local reply. Limiting this to the formatter path keeps an
+  // explicit body authoritative, while policies with neither body nor body_format retain their
+  // existing empty body behavior.
+  if (formatter_ && !local_body_.has_value()) {
+    body = std::string(custom_response_filter.localReplyBody());
+  }
   Envoy::Http::Code code = getStatusCodeForLocalReply(headers);
   formatBody(encoder_callbacks->streamInfo().getRequestHeaders() == nullptr
                  ? *Envoy::Http::StaticEmptyHeaders::get().request_headers

@@ -54,6 +54,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/queue_policy/queue_policy_base.h"
@@ -289,6 +290,21 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
   return cluster_options;
 }
 
+// Validates that an upstream bind source address with a configured network namespace can actually
+// be entered. This is only done at config load time when the bind config opts in via
+// `validate_network_namespaces`, so that a misconfigured (e.g. non-existent) network namespace is
+// rejected here rather than causing a connection failure later.
+absl::Status validateBindNetworkNamespace(const Network::Address::InstanceConstSharedPtr& address) {
+#if defined(__linux__)
+  if (address != nullptr && address->networkNamespace().has_value()) {
+    return Network::Utility::validateNetworkNamespace(*address->networkNamespace());
+  }
+#else
+  (void)address;
+#endif
+  return absl::OkStatus();
+}
+
 void appendBindAddressNoPortOption(UpstreamLocalAddress& upstream_local_address) {
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_bind_config_fix_port_exhaustion")) {
@@ -322,6 +338,9 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address());
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       upstream_local_address.address_ = address_or_error.value();
+      if (bind_config->validate_network_namespaces()) {
+        RETURN_IF_NOT_OK(validateBindNetworkNamespace(upstream_local_address.address_));
+      }
     }
     upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
 
@@ -338,6 +357,9 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       extra_upstream_local_address.address_ = address_or_error.value();
+      if (bind_config->validate_network_namespaces()) {
+        RETURN_IF_NOT_OK(validateBindNetworkNamespace(extra_upstream_local_address.address_));
+      }
 
       extra_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
@@ -363,6 +385,9 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       additional_upstream_local_address.address_ = address_or_error.value();
+      if (bind_config->validate_network_namespaces()) {
+        RETURN_IF_NOT_OK(validateBindNetworkNamespace(additional_upstream_local_address.address_));
+      }
       additional_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
       ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
@@ -1158,8 +1183,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
                : std::nullopt),
           config.protocol_selection() ==
               envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-          config.has_http2_protocol_options(), factory_context.serverFactoryContext(),
-          factory_context.messageValidationVisitor());
+          config.has_http2_protocol_options(), factory_context);
   RETURN_IF_NOT_OK_REF(options_or_error.status());
   return options_or_error.value();
 }
@@ -1744,15 +1768,15 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
       runtime_(cluster_context.serverFactoryContext().runtime()),
       wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       random_(cluster_context.serverFactoryContext().api().randomGenerator()),
-      local_cluster_(
-          cluster_context.serverFactoryContext().clusterManager().localClusterName().value_or("") ==
-          cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
           cluster_context.serverFactoryContext().singletonManager(),
           cluster_context.serverFactoryContext().mainThreadDispatcher())),
       const_locality_shared_pool_(LocalityPool::getConstLocalitySharedPool(
           cluster_context.serverFactoryContext().singletonManager(),
-          cluster_context.serverFactoryContext().mainThreadDispatcher())) {
+          cluster_context.serverFactoryContext().mainThreadDispatcher())),
+      local_cluster_(
+          cluster_context.serverFactoryContext().clusterManager().localClusterName().value_or("") ==
+          cluster.name()) {
   auto& server_context = cluster_context.serverFactoryContext();
 
   auto stats_scope = generateStatsScope(cluster, server_context);

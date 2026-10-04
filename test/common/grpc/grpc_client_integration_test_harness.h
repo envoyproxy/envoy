@@ -23,6 +23,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/router.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/client_ssl_socket.h"
@@ -32,6 +33,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
 #include "test/integration/fake_upstream.h"
+#include "test/integration/server.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -325,7 +327,11 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         api_(Api::createApiForTest(stats_store_, time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()) {}
+        http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()) {
+    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(server_factory_context_, serverScope())
+        .WillByDefault(ReturnRef(*stats_store_.rootScope()));
+  }
 
   virtual Network::Address::IpVersion getIpVersion() const PURE;
   virtual ClientType getClientType() const PURE;
@@ -399,9 +405,14 @@ public:
     }));
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
+    router_config_ = std::make_shared<Router::FilterConfig>(
+        server_factory_context_, http_context_.asyncClientStatPrefix(), *stats_store_.rootScope(),
+        cm_, server_factory_context_.runtime(), api_->randomGenerator(),
+        std::move(shadow_writer_ptr_), true, false, false, false, false, false, false,
+        Protobuf::RepeatedPtrField<std::string>{}, dispatcher_->timeSource(), http_context_,
+        router_context_);
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, cm_,
-        server_factory_context_, std::move(shadow_writer_ptr_), http_context_, router_context_);
+        cm_.thread_local_cluster_.cluster_.info_, *dispatcher_, router_config_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillRepeatedly(ReturnRef(*http_async_client_));
     envoy::config::core::v3::GrpcService config;
@@ -593,8 +604,10 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::IsolatedStoreImpl stats_store_{*symbol_table_};
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  // Serialize stats access while keeping the mock store as the single source of truth.
+  // This lets tests continue to inspect server_factory_context_.store_.
+  Stats::TestIsolatedStoreImpl stats_store_{server_factory_context_.store_};
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   DispatcherHelper dispatcher_helper_{*dispatcher_};
@@ -613,13 +626,13 @@ public:
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
   Upstream::ClusterConnectivityState state_;
   Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
   Upstream::MockClusterManager& cm_{server_factory_context_.cluster_manager_};
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
+  Router::FilterConfigSharedPtr router_config_;
   envoy::config::core::v3::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =
@@ -670,7 +683,11 @@ public:
 class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
   GrpcSslClientIntegrationTest() {
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_, serverFactoryContext())
+        .WillByDefault(ReturnRef(server_factory_context_));
+    ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(factory_context_, serverScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
     ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(server_factory_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(*dispatcher_));
   }
@@ -714,7 +731,7 @@ public:
 
     mock_host_description_->socket_factory_ =
         *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-            std::move(cfg), context_manager_, *stats_store_.rootScope());
+            std::move(cfg), context_manager_, server_factory_context_.serverScope());
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr, nullptr);
     FakeUpstreamConfig config(time_system_);
@@ -751,9 +768,8 @@ public:
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
 
-    static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
+        std::move(cfg), context_manager_, server_factory_context_.serverScope());
   }
 
   bool use_client_cert_{};

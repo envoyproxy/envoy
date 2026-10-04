@@ -2,6 +2,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -87,28 +88,7 @@ public:
       // Add a dynamic filter chain reference.
       listener_config_.mutable_filter_chains()->Clear();
 
-      const std::string matcher_yaml = R"EOF(
-        matcher_tree:
-          input:
-            name: port
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
-          exact_match_map:
-            map:
-              "10000":
-                action:
-                  name: filter-chain-name
-                  typed_config:
-                    "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: dynamic_filter_chain_1
-        on_no_match:
-          action:
-            name: filter-chain-name
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-              value: dynamic_filter_chain_1
-      )EOF";
-      TestUtility::loadFromYaml(matcher_yaml, *listener_config_.mutable_filter_chain_matcher());
+      TestUtility::loadFromYaml(matcher_yaml_, *listener_config_.mutable_filter_chain_matcher());
 
       if (two_listeners_) {
         listener_config2_ = listener_config_;
@@ -230,6 +210,24 @@ public:
     return filter_chain;
   }
 
+  envoy::config::listener::v3::FilterChain buildTcpProxyFilterChain(const std::string& name,
+                                                                    const std::string& cluster_name,
+                                                                    bool check_drain_close) {
+    envoy::config::listener::v3::FilterChain filter_chain;
+    filter_chain.set_name(name);
+    auto* filter = filter_chain.add_filters();
+    filter->set_name("envoy.filters.network.tcp_proxy");
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    tcp_proxy.set_stat_prefix("fcds_tcp");
+    tcp_proxy.set_cluster(cluster_name);
+    if (check_drain_close) {
+      tcp_proxy.mutable_check_drain_close()->set_value(true);
+    }
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    return filter_chain;
+  }
+
   void
   sendFcdsResponse(const std::vector<envoy::config::listener::v3::FilterChain>& added_or_updated,
                    const std::vector<std::string>& removed, const std::string& version) {
@@ -257,6 +255,29 @@ public:
   envoy::config::listener::v3::Listener listener_config2_;
   bool two_listeners_{false};
   std::string listener_name_{"testing-listener-0"};
+  // The filter chain matcher applied to the listener. Defaults to a single dynamic filter chain and
+  // can be overridden before initialize() to reference several chains.
+  std::string matcher_yaml_{R"EOF(
+        matcher_tree:
+          input:
+            name: port
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+          exact_match_map:
+            map:
+              "10000":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: dynamic_filter_chain_1
+        on_no_match:
+          action:
+            name: filter-chain-name
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: dynamic_filter_chain_1
+      )EOF"};
   FakeHttpConnectionPtr lds_connection_;
   FakeHttpConnectionPtr fcds_connection_;
   FakeStreamPtr lds_stream_;
@@ -305,6 +326,95 @@ TEST_P(ListenerFcdsIntegrationTest, BasicFcdsInPlaceUpdate) {
 
   // Assert that the listener was NOT added or created again (meaning no reconstruction).
   // Total added must remain 1.
+  EXPECT_EQ(1, test_server_->counter("listener_manager.listener_added")->value());
+}
+
+// Tests that a single FCDS push warming several filter chains leaves every chain serving traffic,
+// exercising the coalesced thread local update path for a batch of warmed chains.
+TEST_P(ListenerFcdsIntegrationTest, FcdsBatchWarmsMultipleFilterChains) {
+  const std::vector<std::string> chain_names{"dynamic_filter_chain_1", "dynamic_filter_chain_2",
+                                             "dynamic_filter_chain_3", "dynamic_filter_chain_4"};
+  matcher_yaml_ = R"EOF(
+        matcher_tree:
+          input:
+            name: port
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+          exact_match_map:
+            map:
+              "10001":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: dynamic_filter_chain_2
+              "10002":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: dynamic_filter_chain_3
+              "10003":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: dynamic_filter_chain_4
+        on_no_match:
+          action:
+            name: filter-chain-name
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: dynamic_filter_chain_1
+      )EOF";
+
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // Warm every referenced chain in a single FCDS response.
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200),
+                      buildFilterChain("dynamic_filter_chain_2", 201),
+                      buildFilterChain("dynamic_filter_chain_3", 202),
+                      buildFilterChain("dynamic_filter_chain_4", 203)},
+                     "1");
+  };
+  initialize();
+
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Every chain in the batch warms.
+  for (const std::string& name : chain_names) {
+    test_server_->waitForCounter(fmt::format("filter_chain_manager.{}.update_success", name),
+                                 Eq(1));
+  }
+
+  // The on_no_match chain serves live traffic.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  codec_client->close();
+
+  // A second push updates every chain at once.
+  sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404),
+                    buildFilterChain("dynamic_filter_chain_2", 211),
+                    buildFilterChain("dynamic_filter_chain_3", 212),
+                    buildFilterChain("dynamic_filter_chain_4", 213)},
+                   "2");
+  for (const std::string& name : chain_names) {
+    test_server_->waitForCounter(fmt::format("filter_chain_manager.{}.update_success", name),
+                                 Eq(2));
+  }
+
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort(listener_name_));
+  IntegrationStreamDecoderPtr response2 = codec_client2->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("404", response2->headers().getStatusValue());
+  codec_client2->close();
+
+  // The listener is updated in place rather than rebuilt.
   EXPECT_EQ(1, test_server_->counter("listener_manager.listener_added")->value());
 }
 
@@ -374,8 +484,11 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
   // Use HTTP2 to test GOAWAY behavior.
   downstream_protocol_ = Http::CodecType::HTTP2;
 
-  // Set a very short drain time so the test doesn't take long.
+  // Set a very short drain time so the test doesn't take long. The immediate strategy makes the
+  // draining connection drain-close on the first response after the update; the default gradual
+  // strategy would ramp that over the drain window instead.
   setDrainTime(std::chrono::seconds(5));
+  drain_strategy_ = Server::DrainStrategy::Immediate;
 
   on_server_init_function_ = [&]() {
     waitXdsStream();
@@ -434,6 +547,125 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
 
   // The connection should be closed.
   ASSERT_TRUE(codec_client2->waitForDisconnect(std::chrono::seconds(5)));
+}
+
+// Tests that removing a TCP Proxy filter chain via FCDS keeps the existing connection working while
+// it drains, closes it once the drain sequence completes, and rejects new connections.
+TEST_P(ListenerFcdsIntegrationTest, FcdsTcpFilterChainRemovalAndDraining) {
+  // SotW gRPC subscriptions do not support dynamic resource deletion notifications
+  // from empty discovery responses. Skip the test case for SotW runs.
+  if (this->sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+      this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw) {
+    GTEST_SKIP();
+  }
+
+  // Set a very short drain time so the test doesn't take long.
+  setDrainTime(std::chrono::seconds(5));
+
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // Resolve warming by sending FCDS response with a tcp_proxy filter chain.
+    sendFcdsResponse({buildTcpProxyFilterChain("dynamic_filter_chain_1", "cluster_0",
+                                               /*check_drain_close=*/false)},
+                     "1");
+  };
+  initialize();
+
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Establish a connection and confirm the proxy path works in both directions.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(listener_name_));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  tcp_client->waitForData("world");
+
+  // Now perform in-place FCDS update removing the filter chain.
+  sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
+
+  // Wait for Envoy's local stats to increment indicating FCDS update has completed.
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+
+  // Check that the filter chain is now draining.
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
+
+  // The existing connection keeps working while its filter chain drains.
+  tcp_client->clearData();
+  ASSERT_TRUE(fake_upstream_connection->write("world2"));
+  tcp_client->waitForData("world2");
+  EXPECT_EQ("world2", tcp_client->data());
+
+  // The connection is not drain-closed early because check_drain_close is not set.
+  EXPECT_EQ(0, test_server_->counter("tcp.fcds_tcp.downstream_cx_drain_close")->value());
+
+  // The connection is closed once the drain sequence completes.
+  tcp_client->waitForDisconnect();
+
+  // Wait for the draining filter chain count to drop to 0.
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+
+  // Try to connect after removal. We expect it to be rejected.
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort(listener_name_));
+  test_server_->waitForCounter(listenerStatPrefix("no_filter_chain_match"), Ge(1));
+  tcp_client2->waitForDisconnect();
+}
+
+// Tests that with check_drain_close enabled, removing a tcp_proxy filter chain via FCDS closes
+// the existing connection using the per-connection drain notification.
+TEST_P(ListenerFcdsIntegrationTest, FcdsTcpFilterChainGracefulDrainClose) {
+  // SotW gRPC subscriptions do not support dynamic resource deletion notifications
+  // from empty discovery responses. Skip the test case for SotW runs.
+  if (this->sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+      this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw) {
+    GTEST_SKIP();
+  }
+
+  // Set a very short drain time so the test doesn't take long. The immediate strategy makes the
+  // draining connection drain-close at the first opportunity; the default gradual strategy would
+  // ramp that over the drain window instead.
+  setDrainTime(std::chrono::seconds(5));
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // Resolve warming by sending FCDS response with a tcp_proxy filter chain.
+    sendFcdsResponse({buildTcpProxyFilterChain("dynamic_filter_chain_1", "cluster_0",
+                                               /*check_drain_close=*/true)},
+                     "1");
+  };
+  initialize();
+
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Establish a connection and confirm the proxy path works.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(listener_name_));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  // Now perform in-place FCDS update removing the filter chain.
+  sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
+
+  // Upstream data on the draining connection triggers the per-connection drain close.
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+
+  // The pending data is flushed to the client before the connection is drain-closed.
+  tcp_client->waitForData("world");
+  EXPECT_EQ("world", tcp_client->data());
+  tcp_client->waitForDisconnect();
+
+  // Confirm the drain-close path was taken.
+  test_server_->waitForCounter("tcp.fcds_tcp.downstream_cx_drain_close", Ge(1));
+
+  // Wait for the draining filter chain count to drop to 0.
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
 }
 
 // Tests that FCDS update failure during warming completes LDS warming
@@ -711,28 +943,7 @@ public:
       // Add a dynamic filter chain reference.
       listener_config_.mutable_filter_chains()->Clear();
 
-      const std::string matcher_yaml = R"EOF(
-        matcher_tree:
-          input:
-            name: port
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
-          exact_match_map:
-            map:
-              "10000":
-                action:
-                  name: filter-chain-name
-                  typed_config:
-                    "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: dynamic_filter_chain_1
-        on_no_match:
-          action:
-            name: filter-chain-name
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-              value: dynamic_filter_chain_1
-      )EOF";
-      TestUtility::loadFromYaml(matcher_yaml, *listener_config_.mutable_filter_chain_matcher());
+      TestUtility::loadFromYaml(matcher_yaml_, *listener_config_.mutable_filter_chain_matcher());
 
       if (two_listeners_) {
         listener_config2_ = listener_config_;

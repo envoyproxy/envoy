@@ -21,6 +21,9 @@ namespace HealthCheckers {
 namespace DynamicModules {
 namespace {
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 // Builds a HealthCheck config whose custom_health_check points at the dynamic module checker.
 std::string healthCheckYaml(const std::string& module_name, const std::string& checker_name,
                             bool with_config) {
@@ -92,6 +95,9 @@ TEST_F(DynamicModuleHealthCheckerFactoryTest, CreateValid) {
       dynamic_cast<DynamicModuleHealthChecker*>(
           factory_.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
               .get()));
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(context.server_context_.serverScope(), "module_load_error", "test"));
 }
 
 TEST_F(DynamicModuleHealthCheckerFactoryTest, InvalidModule) {
@@ -100,6 +106,8 @@ TEST_F(DynamicModuleHealthCheckerFactoryTest, InvalidModule) {
   EXPECT_THROW_WITH_REGEX(
       factory_.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context),
       EnvoyException, "Failed to load dynamic module.*");
+
+  EXPECT_EQ(1U, failureCounter(context.server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Each missing required symbol is rejected at config load with a symbol-resolution error.
@@ -118,6 +126,9 @@ TEST_F(DynamicModuleHealthCheckerFactoryTest, MissingSymbols) {
         factory_.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context),
         EnvoyException, "Failed to resolve symbol.*" + symbol);
   }
+
+  // The modules themselves loaded, so none of these are module load failures.
+  EXPECT_EQ(0U, failureCounter(context.server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Uses the Rust test module, whose factory returns None for an unknown name so the in-module config

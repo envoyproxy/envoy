@@ -6,10 +6,14 @@
 #include "source/common/common/fmt.h"
 
 #include "test/test_common/logging.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Config {
@@ -110,8 +114,8 @@ TEST(RegistryTest, VersionedFactory) {
   EXPECT_EQ(2, version.value().version().major_number());
   EXPECT_EQ(5, version.value().version().minor_number());
   EXPECT_EQ(39, version.value().version().patch());
-  EXPECT_EQ(1, version.value().metadata().fields().size());
-  EXPECT_EQ("alpha", version.value().metadata().fields().at("build.label").string_value());
+  EXPECT_THAT(version.value().metadata().fields(),
+              UnorderedElementsAre(IsStructString("build.label", "alpha")));
 }
 
 TEST(RegistryTest, TestDoubleRegistrationByName) {

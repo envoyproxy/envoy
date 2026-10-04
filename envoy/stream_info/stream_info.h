@@ -297,6 +297,7 @@ struct LocalCloseReasonValues {
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
   const std::string BufferHighWatermarkTimeout = "buffer_high_watermark_timeout_reached";
+  const std::string OverloadManagerClose = "overload_manager_close";
 };
 
 using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
@@ -985,6 +986,22 @@ public:
    * extended to allow a caller to extend or transfer ownership.
    */
   virtual Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
+
+  /**
+   * Records the wall time of one route resolution, adding to the total time and the count.
+   * @param duration the wall time the resolution took.
+   */
+  virtual void addRouteResolutionTime(std::chrono::nanoseconds duration) PURE;
+
+  /**
+   * @return the total wall time spent resolving the route of this stream.
+   */
+  virtual std::chrono::nanoseconds routeResolutionTime() const PURE;
+
+  /**
+   * @return how many times the route of this stream was resolved.
+   */
+  virtual uint32_t routeResolutionCount() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this

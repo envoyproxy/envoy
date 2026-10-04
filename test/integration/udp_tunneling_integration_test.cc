@@ -116,6 +116,40 @@ TEST_P(ConnectUdpTerminationIntegrationTest, ExchangeCapsules) {
   exchangeValidCapsules();
 }
 
+// Verify that capsules sent before the synthesized 200 response arrives are buffered and
+// forwarded once the terminated upgrade is accepted, rather than deadlocking the stream.
+TEST_P(ConnectUdpTerminationIntegrationTest, ExchangeCapsulesBeforeResponseHeaders) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http_pause_generic_upgrade_request_body", "true");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(connect_udp_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Send a capsule without waiting for the response headers.
+  const std::string sent_capsule_fragment =
+      absl::HexStringToBytes("00"             // DATAGRAM Capsule Type
+                             "08"             // Capsule Length
+                             "00"             // Context ID
+                             "a1a2a3a4a5a6a7" // UDP Proxying Payload
+      );
+  codec_client_->sendData(*request_encoder_, sent_capsule_fragment, false);
+
+  Network::UdpRecvData request_datagram;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+  EXPECT_EQ(absl::HexStringToBytes("a1a2a3a4a5a6a7"), request_datagram.buffer_->toString());
+
+  response_->waitForHeaders();
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    EXPECT_EQ("200", response_->headers().getStatusValue());
+  } else {
+    // For HTTP/2 and HTTP/3 downstreams the test client codec issues an extended CONNECT and
+    // transforms the 200 response back to the HTTP/1 style 101 Switching Protocols.
+    EXPECT_EQ("101", response_->headers().getStatusValue());
+  }
+}
+
 TEST_P(ConnectUdpTerminationIntegrationTest, ExchangeCapsulesWithHostMatch) {
   host_to_match_ = "foo.lyft.com:80";
   initialize();

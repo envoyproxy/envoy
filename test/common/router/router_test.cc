@@ -46,6 +46,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -53,14 +54,20 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Bool;
+using testing::Contains;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::IsSupersetOf;
 using testing::MockFunction;
 using testing::NiceMock;
+using testing::NotNull;
 using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Router {
@@ -381,8 +388,7 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
       }));
   EXPECT_CALL(
       callbacks_,
-      sendLocalReply(Http::Code::ServiceUnavailable,
-                     testing::Eq("missing required header: :method"), _, _,
+      sendLocalReply(Http::Code::ServiceUnavailable, Eq("missing required header: :method"), _, _,
                      "filter_removed_required_request_headers{missing_required_header:_:method}"))
       .WillOnce(InvokeWithoutArgs([] {}));
   router_->decodeHeaders(headers, true);
@@ -1718,7 +1724,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
       .Times(0);
   // The reset will be converted into a local reply.
-  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, testing::Eq(""), _, _,
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, Eq(""), _, _,
                                          "upstream_reset_before_response_started{remote_reset}"))
       .WillOnce(InvokeWithoutArgs([] {}));
   router_->decodeHeaders(headers, true);
@@ -6052,7 +6058,7 @@ protected:
   TestScopedRuntime scoped_runtime_;
 };
 
-INSTANTIATE_TEST_SUITE_P(StreamingShadow, RouterShadowingTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(StreamingShadow, RouterShadowingTest, Bool());
 
 TEST_P(RouterShadowingTest, ShadowNoClusterHeaderInHeader) {
   ShadowPolicyPtr policy = makeShadowPolicy("", "some_header", "bar");
@@ -6331,8 +6337,8 @@ filter_metadata:
         EXPECT_NE(it, options.metadata.filter_metadata().end());
         const auto& fields = it->second.fields();
         // Request-level value wins; connection-only value is preserved.
-        EXPECT_EQ("v2", fields.at("version").string_value());
-        EXPECT_EQ("yes", fields.at("from_connection").string_value());
+        EXPECT_THAT(fields, UnorderedElementsAre(IsStructString("version", "v2"),
+                                                 IsStructString("from_connection", "yes")));
         return &foo_request;
       }));
 
@@ -6417,8 +6423,8 @@ filter_metadata:
             options.metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
         EXPECT_NE(it, options.metadata.filter_metadata().end());
         const auto& fields = it->second.fields();
-        EXPECT_EQ("v1", fields.at("version").string_value());
-        EXPECT_EQ("yes", fields.at("from_connection").string_value());
+        EXPECT_THAT(fields, UnorderedElementsAre(IsStructString("version", "v1"),
+                                                 IsStructString("from_connection", "yes")));
         return &foo_request;
       }));
 
@@ -6469,7 +6475,7 @@ TEST_P(RouterShadowingTest, ShadowRequestForwardsDynamicMetadataToAllPolicies) {
     const auto it =
         options.metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
     EXPECT_NE(it, options.metadata.filter_metadata().end());
-    EXPECT_EQ("v2", it->second.fields().at("version").string_value());
+    EXPECT_THAT(it->second.fields(), Contains(IsStructString("version", "v2")));
   };
 
   EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
@@ -6926,7 +6932,7 @@ TEST_F(RouterTest, PropagatesShadowState) {
   Http::TestRequestHeaderMapImpl headers{};
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
-  ASSERT_THAT(response_decoder, testing::NotNull());
+  ASSERT_THAT(response_decoder, NotNull());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});

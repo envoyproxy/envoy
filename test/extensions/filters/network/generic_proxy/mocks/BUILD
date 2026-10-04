@@ -12,7 +12,7 @@ envoy_cc_mock(
     name = "filter_mocks",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/network/generic_proxy/interface:filter_interface",

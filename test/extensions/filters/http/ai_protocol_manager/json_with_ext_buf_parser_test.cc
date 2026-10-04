@@ -176,7 +176,7 @@ TEST_F(JsonWithExtBufParserTest, ReferenceResolvesAgainstTheOffloadedBody) {
 
   // Offload as the BufferManager does -- verbatim from offset 0 -- which is what
   // makes the recorded offsets valid buffer offsets.
-  buffer.write(std::make_unique<Buffer::OwnedImpl>(body),
+  buffer.write(std::make_unique<Buffer::OwnedImpl>(body), false,
                [](ExternalBufferStatus status) { EXPECT_EQ(status, ExternalBufferStatus::Ok); });
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   ASSERT_EQ(buffer.length(), body.size());
@@ -386,6 +386,21 @@ TEST_F(JsonWithExtBufParserTest, GeminiFunctionCallDepthParses) {
   EXPECT_EQ(doc.json()[0]["usageMetadata"]["totalTokenCount"], 15);
 }
 
+// The node budget bounds DOM amplification: a document of many tiny scalars
+// fails parsing once it exceeds max_nodes, regardless of its byte size.
+TEST_F(JsonWithExtBufParserTest, NodeBudgetBoundsAmplification) {
+  JsonWithExtBufParser::Config config;
+  config.max_nodes = 16;
+  JsonWithExtBufParser parser(config);
+  std::string body = "[";
+  for (int i = 0; i < 32; ++i) {
+    absl::StrAppend(&body, i == 0 ? "1" : ",1");
+  }
+  absl::StrAppend(&body, "]");
+  const absl::Status status = parser.feed(body, /*end_stream=*/true);
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status.message(), testing::HasSubstr("node budget"));
+}
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "client_connection_factory_test",
     srcs = ["client_connection_factory_test.cc"],
     extension_names = ["envoy.bootstrap.internal_listener"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
@@ -31,7 +31,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["internal_listener_registry_test.cc"],
     extension_names = ["envoy.bootstrap.internal_listener"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/bootstrap/internal_listener:config",
         "//test/mocks/thread_local:thread_local_mocks",
@@ -45,7 +45,7 @@ envoy_extension_cc_test(
         "internal_listener_integration_test.cc",
     ],
     extension_names = ["envoy.bootstrap.internal_listener"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",
@@ -64,6 +64,8 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/bootstrap/internal_listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -74,7 +76,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["active_internal_listener_test.cc"],
     extension_names = ["envoy.bootstrap.internal_listener"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/listener_manager:connection_handler_lib",
         "//source/common/network:address_lib",

@@ -100,7 +100,9 @@ envoy_cc_library(
         "//envoy/server:listener_manager_interface",
         "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/server:active_listener_base",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 
@@ -186,6 +188,7 @@ envoy_cc_library(
     deps = [
         ":hot_restarting_base",
         "//envoy/network:parent_drained_callback_registrar_interface",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:stat_merger_lib",
     ],
 )
@@ -197,6 +200,7 @@ envoy_cc_library(
     deps = [
         ":hot_restarting_base",
         "//envoy/network:connection_handler_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/common:hash_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:stat_merger_lib",
@@ -321,10 +325,30 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "trigger_lib",
+    hdrs = ["trigger.h"],
+    deps = [
+        "//envoy/server/overload:overload_manager_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "synchronous_feedback_trigger_lib",
+    hdrs = ["synchronous_feedback_trigger.h"],
+    deps = [
+        ":trigger_lib",
+        "//envoy/server:resource_monitor_interface",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "overload_manager_lib",
     srcs = ["overload_manager_impl.cc"],
     hdrs = ["overload_manager_impl.h"],
     deps = [
+        ":synchronous_feedback_trigger_lib",
+        ":trigger_lib",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/stats:stats_interface",
         "//envoy/thread_local:thread_local_interface",
@@ -333,7 +357,7 @@ envoy_cc_library(
         "//source/common/event:scaled_range_timer_manager_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
-        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
@@ -391,7 +415,7 @@ envoy_cc_library(
     name = "server_base_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cgroup_cpu_util_lib",
         ":configuration_lib",
@@ -493,6 +517,7 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:exception_interface",
         "//envoy/server:configuration_interface",
         "//envoy/server:guarddog_interface",

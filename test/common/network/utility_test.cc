@@ -965,16 +965,17 @@ TEST_F(ExecInNetnsTest, Basic) {
   EXPECT_THAT(result, IsOkAndHolds("ns1"));
 
   // Make sure the netns reverted back to the netns the execInNetworkNamespace function was called
-  // from. When the netns was noted before making the jump, it used the fd of "/proc/self/ns/net"
-  // and that is what would show up for the test.
-  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+  // from. When the netns was noted before making the jump, it used the fd of the calling thread's
+  // own namespace, "/proc/thread-self/ns/net" (not "/proc/self/ns/net", which is the main
+  // thread's), and that is what would show up for the test.
+  EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
 
   // Try another netns.
   result = Utility::execInNetworkNamespace(func, "ns2");
   EXPECT_THAT(result, IsOkAndHolds("ns2"));
 
   // Make sure the netns reverted back.
-  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+  EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
 }
 
 TEST_F(ExecInNetnsTest, OpenFail) {
@@ -1022,6 +1023,33 @@ TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {
         auto _ = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
       },
       "failed to restore original netns .*");
+}
+
+TEST_F(ExecInNetnsTest, ValidateNetworkNamespaceSuccess) {
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+
+  EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
+      .WillOnce(Invoke([](const char*, int) -> Api::SysCallIntResult { return {42, 0}; }));
+  EXPECT_CALL(os_syscalls, close(42)).WillOnce(Invoke([](int) -> Api::SysCallIntResult {
+    return {0, 0};
+  }));
+
+  EXPECT_TRUE(Utility::validateNetworkNamespace("/var/run/netns/ns1").ok());
+}
+
+TEST_F(ExecInNetnsTest, ValidateNetworkNamespaceOpenFail) {
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+
+  // open() fails (e.g. the namespace does not exist). No close() is expected.
+  EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
+      .WillOnce(Invoke([](const char*, int) -> Api::SysCallIntResult { return {-1, -1}; }));
+
+  auto status = Utility::validateNetworkNamespace("/var/run/netns/does_not_exist");
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_TRUE(status.message().starts_with("failed to open network namespace file"));
 }
 #endif
 

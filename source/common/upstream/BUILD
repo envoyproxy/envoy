@@ -79,7 +79,7 @@ envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
@@ -116,6 +116,7 @@ envoy_cc_library(
         "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/router:context_lib",
+        "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/tcp:async_tcp_client_lib",
@@ -219,6 +220,18 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "multi_health_checker_lib",
+    srcs = ["multi_health_checker.cc"],
+    hdrs = ["multi_health_checker.h"],
+    deps = [
+        ":health_checker_lib",
+        "//envoy/upstream:health_checker_interface",
+        "//source/common/common:callback_impl_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -389,7 +402,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cluster_factory_lib",
         ":default_local_address_selector_factory",
@@ -523,6 +536,7 @@ envoy_cc_library(
     deps = [
         ":cluster_factory_includes",
         ":health_checker_lib",
+        ":multi_health_checker_lib",
         ":upstream_includes",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
@@ -599,6 +613,19 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "udp_source_address_policy_lib",
+    srcs = ["udp_source_address_policy.cc"],
+    hdrs = ["udp_source_address_policy.h"],
+    deps = [
+        "//envoy/network:address_interface",
+        "//envoy/network:socket_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/network:socket_option_factory_lib",
     ],
 )
 
