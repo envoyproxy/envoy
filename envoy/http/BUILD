@@ -14,6 +14,7 @@ envoy_cc_library(
     deps = [
         "//envoy/common:time_interface",
         "//envoy/event:dispatcher_interface",
+        "@abseil-cpp//absl/status",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
