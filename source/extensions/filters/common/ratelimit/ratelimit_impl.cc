@@ -138,7 +138,7 @@ void GrpcClientImpl::onSuccess(
   request_ = nullptr;
   call_backs->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
                        std::move(request_headers_to_add), response->raw_body(),
-                       std::move(dynamic_metadata));
+                       std::move(dynamic_metadata), response->shadow_over_limit());
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string& msg,
@@ -151,7 +151,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   auto call_backs = callbacks_;
   callbacks_ = nullptr;
   request_ = nullptr;
-  call_backs->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
+  call_backs->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr, false);
 }
 
 ClientPtr rateLimitClient(Server::Configuration::ServerFactoryContext& context,

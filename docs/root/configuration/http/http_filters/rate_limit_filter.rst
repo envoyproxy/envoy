@@ -186,6 +186,7 @@ The rate limit filter outputs statistics in the ``cluster.<route target cluster>
   ok, Counter, Total under limit responses from the rate limit service
   error, Counter, Total errors contacting the rate limit service
   over_limit, Counter, total over limit responses from the rate limit service
+  shadow_over_limit, Counter, Total responses from the rate limit service with a descriptor over limit in shadow mode
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` set to false."
 
