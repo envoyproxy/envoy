@@ -159,9 +159,7 @@ protected:
     socket_manager_->cluster_to_node_info_map_[cluster_id].nodes.push_back(node_id);
   }
 
-  void addFDToNodeMapping(int fd, const std::string& node_id) {
-    socket_manager_->fd_to_node_map_[fd] = node_id;
-  }
+  void removeFDToClusterMapping(int fd) { socket_manager_->fd_to_cluster_map_.erase(fd); }
 
   // Helper to create a mock socket with proper address setup.
   Network::ConnectionSocketPtr createMockSocket(int fd = 123,
@@ -194,6 +192,15 @@ protected:
     socket->connection_info_provider_->setLocalAddress(local_address);
     socket->connection_info_provider_->setRemoteAddress(remote_address);
 
+    return socket;
+  }
+
+  Network::ConnectionSocketPtr addActiveSocket(const std::string& node_id,
+                                               const std::string& cluster_id, int fd) {
+    socket_manager_->addConnectionSocket(node_id, cluster_id, createMockSocket(fd),
+                                         std::chrono::seconds(30));
+    auto socket = socket_manager_->getConnectionSocket(node_id);
+    EXPECT_NE(socket, nullptr);
     return socket;
   }
 
@@ -1087,12 +1094,8 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadInvalidSocketNotInPool) {
   socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
 
   auto retrieved_socket = socket_manager_->getConnectionSocket(node_id);
-  EXPECT_NE(retrieved_socket, nullptr);
+  ASSERT_NE(retrieved_socket, nullptr);
 
-  addFDToNodeMapping(123, node_id);
-
-  // fd_to_cluster_map_ was erased during markSocketDead when socket
-  // was retrieved, so markSocketDead should fall back to node_to_cluster_map_.
   socket_manager_->markSocketDead(123);
 
   EXPECT_FALSE(verifyFDToNodeMap(123));
@@ -1100,8 +1103,12 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadInvalidSocketNotInPool) {
 
   // Test inconsistent state where fd is in fd_to_node_map_ but not in fd_to_cluster_map_.
   const int fd_456 = 456;
-  addFDToNodeMapping(fd_456, node_id);
-  addNodeToClusterMapping(node_id, cluster_id);
+  socket_manager_->addConnectionSocket(node_id, cluster_id, createMockSocket(fd_456),
+                                       ping_interval);
+  auto socket_without_cluster_mapping = socket_manager_->getConnectionSocket(node_id);
+  ASSERT_NE(socket_without_cluster_mapping, nullptr);
+  removeFDToClusterMapping(fd_456);
+  ASSERT_FALSE(verifyFDToClusterMap(fd_456));
 
   // Mark socket dead without having fd_to_cluster_map_ entry.
   // This should log a warning, use node_to_cluster_map_ as fallback, and continue cleanup.
@@ -1110,6 +1117,7 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadInvalidSocketNotInPool) {
   // Verify fd was removed from fd_to_node_map_ despite cluster map being missing initially.
   EXPECT_FALSE(verifyFDToNodeMap(fd_456));
   EXPECT_FALSE(verifyFDToClusterMap(fd_456));
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 0);
 }
 
 TEST_F(TestUpstreamSocketManager, MarkSocketDeadClusterFallbackLogic) {
@@ -1266,6 +1274,114 @@ TEST_F(TestUpstreamSocketManager, GetNodeWithSocketNodeIdLookup) {
   const std::string non_existent_cluster = "non-existent-cluster";
   std::string result_for_non_existent = socket_manager_->getNodeWithSocket(non_existent_cluster);
   EXPECT_EQ(result_for_non_existent, non_existent_cluster);
+}
+
+TEST_F(TestUpstreamSocketManager, RoundRobinSkipsDrainingNodeWithActiveTunnel) {
+  const std::string cluster_id = "test-cluster";
+  std::vector<Network::ConnectionSocketPtr> active_sockets;
+  for (int i = 0; i < 3; ++i) {
+    const std::string node_id = "node-" + std::to_string(i);
+    active_sockets.push_back(addActiveSocket(node_id, cluster_id, 100 + i));
+    EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 0);
+    EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), node_id);
+  }
+
+  socket_manager_->onGoAway(101);
+
+  // A draining connection remains alive for its existing streams, but no longer makes its node
+  // eligible. The other nodes remain eligible even though all their sockets are handed off.
+  EXPECT_EQ(getNodeToActiveFdCount("node-1"), 1);
+  EXPECT_TRUE(verifyFDToNodeMap(101));
+  ASSERT_NE(socket_manager_->getLifecycleInfo(101), nullptr);
+  EXPECT_TRUE(socket_manager_->getLifecycleInfo(101)->handed_off_to_upstream);
+  EXPECT_EQ(getNodeToClusterMapping("node-1"), cluster_id);
+  EXPECT_EQ(getClusterToNodeMapping(cluster_id).size(), 3);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("node-1"), "");
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "node-0");
+    EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "node-2");
+  }
+
+  socket_manager_->onGoAway(100);
+  socket_manager_->onGoAway(102);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("node-0"), "");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("node-2"), "");
+  EXPECT_EQ(getClusterToNodeMapping(cluster_id).size(), 3);
+}
+
+TEST_F(TestUpstreamSocketManager, DrainEligibilityTracksTunnelLifecycle) {
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  socket_manager_->markSocketDraining(123);
+  auto draining_socket = addActiveSocket(node_id, cluster_id, 123);
+  auto healthy_socket = addActiveSocket(node_id, cluster_id, 124);
+
+  socket_manager_->onGoAway(123);
+  socket_manager_->onGoAway(123);
+  socket_manager_->markSocketDraining(123);
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 2);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), node_id);
+
+  // Closing the remaining healthy tunnel must exclude the node even while the draining one lives.
+  socket_manager_->markSocketDead(124);
+  healthy_socket.reset();
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 1);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), "");
+
+  healthy_socket = addActiveSocket(node_id, cluster_id, 124);
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 2);
+  EXPECT_EQ(getClusterToNodeMapping(cluster_id).size(), 1);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), node_id);
+
+  // Removing the old draining socket must not decrement the replacement's eligibility.
+  socket_manager_->markSocketDead(123);
+  socket_manager_->markSocketDead(123);
+  draining_socket.reset();
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 1);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), node_id);
+
+  socket_manager_->onGoAway(124);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "");
+  socket_manager_->markSocketDead(124);
+  healthy_socket.reset();
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 0);
+  EXPECT_EQ(getNodeToClusterMapping(node_id), "");
+  EXPECT_TRUE(getClusterToNodeMapping(cluster_id).empty());
+
+  // A reused descriptor starts healthy and can be drained again.
+  draining_socket = addActiveSocket(node_id, cluster_id, 123);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), node_id);
+
+  socket_manager_->onGoAway(123);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), "");
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 1);
+}
+
+TEST_F(TestUpstreamSocketManager, DrainingNodeEligibilityIsTenantScoped) {
+  socket_manager_->setTenantIsolationEnabled(true);
+  socket_manager_->addConnectionSocket("node", "cluster", createMockSocket(123),
+                                       std::chrono::seconds(30), true, "tenant-a");
+  socket_manager_->addConnectionSocket("node", "cluster", createMockSocket(124),
+                                       std::chrono::seconds(30), true, "tenant-b");
+  auto tenant_a_socket = socket_manager_->getConnectionSocket("tenant-a:node");
+  auto tenant_b_socket = socket_manager_->getConnectionSocket("tenant-b:node");
+  ASSERT_NE(tenant_a_socket, nullptr);
+  ASSERT_NE(tenant_b_socket, nullptr);
+
+  socket_manager_->onGoAway(123);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("tenant-a:cluster"), "");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("tenant-a:node"), "");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("tenant-b:cluster"), "tenant-b:node");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("tenant-b:node"), "tenant-b:node");
+  EXPECT_EQ(getNodeToActiveFdCount("tenant-a:node"), 1);
+  EXPECT_EQ(getNodeToActiveFdCount("tenant-b:node"), 1);
 }
 
 // Test getNodeWithSocket with mixed calls with cluster ID and node ID.
@@ -1504,6 +1620,8 @@ TEST_F(TestUpstreamSocketManager, OnGoAwayWithoutExtension) {
   socket_manager_->addConnectionSocket("node", "cluster", std::move(socket),
                                        std::chrono::seconds(30), /*rebalanced=*/false);
   socket_manager_->onGoAway(fd);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("cluster"), "");
+  EXPECT_EQ(getNodeToActiveFdCount("node"), 1);
 }
 
 TEST_F(TestUpstreamSocketManager, MarkSocketDeadAndOnGoAwayAreDistinct) {

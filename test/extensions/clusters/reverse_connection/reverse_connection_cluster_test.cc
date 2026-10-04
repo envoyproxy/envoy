@@ -212,7 +212,7 @@ public:
   }
 
   // Helper to add a socket to the manager for testing.
-  void addTestSocket(const std::string& node_id, const std::string& cluster_id) {
+  void addTestSocket(const std::string& node_id, const std::string& cluster_id, int fd = 123) {
     if (!socket_interface_) {
       return;
     }
@@ -225,7 +225,7 @@ public:
     // Create a mock socket. Timer and file event creation will use the ON_CALL defaults.
     auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
-    EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+    EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(fd));
     EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
     socket->io_handle_ = std::move(mock_io_handle);
 
@@ -793,6 +793,46 @@ TEST_F(ReverseConnectionClusterTest, HostReuse) {
     EXPECT_NE(result2.host, nullptr);
     EXPECT_EQ(result1.host, result2.host);
   }
+}
+
+TEST_F(ReverseConnectionClusterTest, DrainingNodeCannotReuseCachedHost) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("test-node", "test-cluster");
+  auto* socket_manager = socket_interface_->getLocalRegistry()->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  auto draining_socket = socket_manager->getConnectionSocket("test-node");
+  ASSERT_NE(draining_socket, nullptr);
+
+  EXPECT_CALL(server_context_.dispatcher_, post(_));
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection, "x-remote-node-id", "test-cluster");
+  auto original_host = lb.chooseHost(&lb_context).host;
+  ASSERT_NE(original_host, nullptr);
+
+  socket_manager->onGoAway(123);
+  EXPECT_EQ(lb.chooseHost(&lb_context).host, nullptr);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-node"}}};
+  EXPECT_EQ(lb.chooseHost(&lb_context).host, nullptr);
+  EXPECT_NE(socket_manager->getLifecycleInfo(123), nullptr);
+
+  // A healthy replacement may reuse the host while the original tunnel is still draining.
+  addTestSocket("test-node", "test-cluster", 124);
+  EXPECT_EQ(lb.chooseHost(&lb_context).host, original_host);
 }
 
 // Test different hosts for different UUIDs.
