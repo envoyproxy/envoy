@@ -343,6 +343,36 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
   cleanupUpstreamAndDownstream();
 }
 
+// Companion to UpstreamCloseWithHalfCloseEnabled. With the force close in
+// TcpUpstream::onUpstreamData also disabled, the upstream's half close propagates as a downstream
+// end of stream rather than a reset, so the tunnel ends cleanly and everything the upstream sent
+// reaches the client. The stream then stays open until the client closes its own half, which is
+// the TCP semantic the independent half close support exists to provide.
+TEST_P(ConnectTerminationIntegrationTest, UpstreamHalfCloseWithoutForceReset) {
+  if (downstream_protocol_ != Http::CodecType::HTTP2) {
+    // HTTP/1 has no per stream half close, and HTTP/3 already takes the STOP_SENDING path.
+    return;
+  }
+  // Enabling independent half close is now sufficient; the force close is off by default.
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Queue payload the client has not read yet, then half close from the upstream side. Under the
+  // force close this reset the stream and discarded whatever was still queued.
+  const std::string payload(64 * 1024, 'a');
+  ASSERT_TRUE(fake_raw_upstream_connection_->write(payload));
+  ASSERT_TRUE(fake_raw_upstream_connection_->close());
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_FALSE(response_->reset());
+  EXPECT_EQ(absl::StrCat("there!", payload), response_->body());
+  cleanupUpstreamAndDownstream();
+}
+
 TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
   // When allow_multiplexed_upstream_half_close is enabled router and filter
   // manager do not reset streams where upstream ended before downstream.
@@ -351,6 +381,11 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
   // In this case the stream is reset in the TcpUpstream::onUpstreamData
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  // The force close is no longer implied by the flag above, so ask for it explicitly. Without this
+  // the stream now ends with a plain end of stream, which waitForAnyTermination() would accept
+  // while quietly no longer covering the TcpUpstream reset this test is named for.
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.tcp_tunnel_allow_upstream_half_close", "false");
   initialize();
 
   setUpConnection();
