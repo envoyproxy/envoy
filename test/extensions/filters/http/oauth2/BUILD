@@ -129,6 +129,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
         # so it needs the built-in HTTP command parsers registered.
         "//source/common/formatter:http_speicific_formatter_extension_lib",
