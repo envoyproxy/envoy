@@ -439,26 +439,26 @@ public:
       : config_(std::move(config)) {}
 
   // Router::RouteSpecifier
-  Envoy::Router::OnRouteResult onRoute(Envoy::Router::RouteConstSharedPtr route,
-                                       const Http::RequestHeaderMap& headers,
-                                       const StreamInfo::StreamInfo& stream_info,
-                                       uint64_t random) const override;
+  Envoy::Router::OnRouteResult
+  onRoute(Envoy::Router::RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
+          const StreamInfo::StreamInfo& stream_info, uint64_t random,
+          Envoy::Router::OnRouteInputStatus input_status) const override;
 
 private:
-  // The outcome of a decision, holding the route it produced, the chain status, the reason it could
-  // not be honored, and whether route matching should carry on with the next route.
+  // The outcome of a decision, holding the route it produced, the chain status and the reason it
+  // could not be honored. A chain status of StopIterationAndSkipRoute asks route matching to
+  // carry on with the next route.
   struct Decision {
     Envoy::Router::RouteConstSharedPtr route;
-    Envoy::Router::OnRouteChainStatus status{Envoy::Router::OnRouteChainStatus::Continue};
+    Envoy::Router::OnRouteStatus status{Envoy::Router::OnRouteStatus::Continue};
     Failure failure{Failure::None};
-    Envoy::Router::OnRouteMatchStatus match_status{Envoy::Router::OnRouteMatchStatus::Unspecified};
   };
 
   // decision is the raw value the module returned, which may be outside the known enum values.
   Decision resolve(RouteSpecifierContext& context, uint32_t decision) const;
   // The route the module asked for, without the failure policy applied.
   Decision wrap(Envoy::Router::RouteConstSharedPtr route, RouteSpecifierContext& context,
-                Envoy::Router::OnRouteChainStatus status) const;
+                Envoy::Router::OnRouteStatus status) const;
 
   const DynamicModuleRouteSpecifierConfigSharedPtr config_;
 };

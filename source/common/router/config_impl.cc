@@ -1898,14 +1898,17 @@ VirtualHostMatchResult VirtualHostImpl::getRouteFromRoutes(
     const bool has_route_specifiers =
         !config_specifiers.empty() || !route_specifiers_.empty() || !route_specifiers.empty();
     if (has_route_specifiers) {
-      OnRouteMatchStatus specifier_match_status = OnRouteMatchStatus::Unspecified;
-      route_entry = applyRouteSpecifiers(std::move(route_entry), config_specifiers,
-                                         route_specifiers_, route_specifiers, headers, stream_info,
-                                         random_value, specifier_match_status);
-      if (specifier_match_status == OnRouteMatchStatus::Continue) {
+      const OnRouteInputStatus input_status = (std::next(route) == routes.end())
+                                                  ? OnRouteInputStatus::NoMoreRoutes
+                                                  : OnRouteInputStatus::HasMoreRoutes;
+      OnRouteResult result =
+          applyRouteSpecifiers(std::move(route_entry), config_specifiers, route_specifiers_,
+                               route_specifiers, headers, stream_info, random_value, input_status);
+      if (result.status == OnRouteStatus::StopIterationAndSkipRoute) {
         // The specifiers turned this route down, carry on with the next one.
         continue;
       }
+      route_entry = std::move(result.route);
       if (route_entry == nullptr) {
         // The specifiers accepted the match and dropped the route, which leaves the request with
         // no route. There is nothing for the callback to look at, and the specifiers of the
@@ -2165,10 +2168,13 @@ VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::Reques
   route_result.route = std::move(match_result.route);
 
   if (!match_result.specifiers_applied) {
-    OnRouteMatchStatus match_status = OnRouteMatchStatus::Unspecified;
+    // This run happens outside the evaluation of a route list: either no virtual host or no
+    // route matched the request, so there is no next route a StopIterationAndSkipRoute could
+    // move on to, and the chain result stands whatever its status.
     route_result.route =
         applyRouteSpecifiers(std::move(route_result.route), config_specifiers, vhost_specifiers, {},
-                             headers, stream_info, random_value, match_status);
+                             headers, stream_info, random_value, OnRouteInputStatus::NoMoreRoutes)
+            .route;
   }
 
   if (route_result.route != nullptr) {

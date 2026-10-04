@@ -636,9 +636,11 @@ DynamicModuleRouteEntry::responseHeaderTransforms(const StreamInfo::StreamInfo& 
   return transforms;
 }
 
-Envoy::Router::OnRouteResult DynamicModuleRouteSpecifier::onRoute(
-    Envoy::Router::RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
-    const StreamInfo::StreamInfo& stream_info, uint64_t random) const {
+Envoy::Router::OnRouteResult
+DynamicModuleRouteSpecifier::onRoute(Envoy::Router::RouteConstSharedPtr route,
+                                     const Http::RequestHeaderMap& headers,
+                                     const StreamInfo::StreamInfo& stream_info, uint64_t random,
+                                     Envoy::Router::OnRouteInputStatus) const {
   const MonotonicTime start = config_->timeSource().monotonicTime();
   const auto record_duration = [&](Stats::Histogram& histogram) {
     histogram.recordValue(std::chrono::duration_cast<std::chrono::microseconds>(
@@ -671,12 +673,12 @@ Envoy::Router::OnRouteResult DynamicModuleRouteSpecifier::onRoute(
   Decision result = resolve(context, decision);
 
   record_duration(config_->stats().specifier_duration_);
-  return {std::move(result.route), result.status, result.match_status};
+  return {std::move(result.route), result.status};
 }
 
 DynamicModuleRouteSpecifier::Decision
 DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t decision) const {
-  using Status = Envoy::Router::OnRouteChainStatus;
+  using Status = Envoy::Router::OnRouteStatus;
   const auto status = [&context](Status by_decision) {
     switch (context.chain_status) {
     case envoy_dynamic_module_type_route_specifier_chain_status_Continue:
@@ -718,8 +720,7 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     ENVOY_LOG(debug, "dynamic module route specifier could not honor the decision, reason {}",
               static_cast<int>(failure));
     if (config_->continueMatchingOnFailure()) {
-      return Decision{context.input_route, Status::Continue, failure,
-                      Envoy::Router::OnRouteMatchStatus::Continue};
+      return Decision{context.input_route, Status::StopIterationAndSkipRoute, failure};
     }
     if (config_->failClosed()) {
       return Decision{nullptr, Status::StopIteration, failure};
@@ -739,8 +740,8 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     return fail(Failure::ModuleError);
   case envoy_dynamic_module_type_route_specifier_decision_ContinueMatching:
     config_->stats().decision_continue_matching_.inc();
-    return {context.input_route, status(Status::Continue), Failure::None,
-            Envoy::Router::OnRouteMatchStatus::Continue};
+    // The skip is final by definition, so the chain status the module may have set is ignored.
+    return {context.input_route, Status::StopIterationAndSkipRoute};
   case envoy_dynamic_module_type_route_specifier_decision_Override: {
     config_->stats().decision_override_.inc();
     if (context.input_route == nullptr) {
@@ -782,7 +783,7 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
 DynamicModuleRouteSpecifier::Decision
 DynamicModuleRouteSpecifier::wrap(Envoy::Router::RouteConstSharedPtr route,
                                   RouteSpecifierContext& context,
-                                  Envoy::Router::OnRouteChainStatus status) const {
+                                  Envoy::Router::OnRouteStatus status) const {
   const bool route_entry_overrides = context.overrides.hasRouteEntryOverrides();
   // User data forces a wrapper even with no override, so the route destroy hook fires for the
   // produced route.
