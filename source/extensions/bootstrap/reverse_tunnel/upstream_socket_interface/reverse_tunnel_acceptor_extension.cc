@@ -119,6 +119,11 @@ ReverseTunnelAcceptorExtension::ReverseTunnelAcceptorExtension(
       socket_interface_(&sock_interface),
       max_connections_per_node_(config.max_connections_per_node()) {
   stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_acceptor");
+  // Pre-create the pool_miss counter so a request that finds no cached reverse tunnel does not
+  // format and look up a stat name on the hot path.
+  Stats::StatNameManagedStorage pool_miss_storage(fmt::format("{}.pool_miss", stat_prefix_),
+                                                  context_.scope().symbolTable());
+  pool_miss_counter_ = &context_.scope().counterFromStatName(pool_miss_storage.statName());
   const uint32_t cfg_threshold = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ping_failure_threshold, 3);
   ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
   enable_detailed_stats_ = config.enable_detailed_stats();

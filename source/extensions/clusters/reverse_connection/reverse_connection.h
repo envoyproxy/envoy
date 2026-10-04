@@ -41,15 +41,7 @@ class UpstreamReverseConnectionAddress
       public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
 public:
   UpstreamReverseConnectionAddress(const std::string& node_id)
-      : node_id_(node_id), address_string_("127.0.0.1:0") {
-
-    // Create a simple socket address for filter chain matching.
-    // Use 127.0.0.1:0 which will match the catch-all filter chain
-    synthetic_sockaddr_.sin_family = AF_INET;
-    synthetic_sockaddr_.sin_port = htons(0);                 // Port 0 for reverse connections
-    synthetic_sockaddr_.sin_addr.s_addr = htonl(0x7f000001); // 127.0.0.1
-    memset(&synthetic_sockaddr_.sin_zero, 0, sizeof(synthetic_sockaddr_.sin_zero));
-
+      : node_id_(node_id), ipv4_instance_("127.0.0.1", /*port=*/uint32_t{0}) {
     ENVOY_LOG(
         debug,
         "UpstreamReverseConnectionAddress: node: {} using 127.0.0.1:0 for filter chain matching",
@@ -62,19 +54,19 @@ public:
     return other && node_id_ == other->node_id_;
   }
 
-  Network::Address::Type type() const override { return Network::Address::Type::Ip; }
-  const std::string& asString() const override { return address_string_; }
-  absl::string_view asStringView() const override { return address_string_; }
+  Network::Address::Type type() const override { return ipv4_instance_.type(); }
+  const std::string& asString() const override { return ipv4_instance_.asString(); }
+  absl::string_view asStringView() const override { return ipv4_instance_.asStringView(); }
   const std::string& logicalName() const override { return node_id_; }
-  const Network::Address::Ip* ip() const override { return &ip_; }
+  // Delegate the IP and sockaddr accessors to a real Ipv4Instance so core callers that dereference
+  // ip()->ipv4()->address() or copy sockAddr() operate on a concrete loopback address.
+  const Network::Address::Ip* ip() const override { return ipv4_instance_.ip(); }
   const Network::Address::Pipe* pipe() const override { return nullptr; }
   const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {
     return nullptr;
   }
-  const sockaddr* sockAddr() const override {
-    return reinterpret_cast<const sockaddr*>(&synthetic_sockaddr_);
-  }
-  socklen_t sockAddrLen() const override { return sizeof(synthetic_sockaddr_); }
+  const sockaddr* sockAddr() const override { return ipv4_instance_.sockAddr(); }
+  socklen_t sockAddrLen() const override { return ipv4_instance_.sockAddrLen(); }
   // Set to default so that the default client connection factory is used to initiate connections
   // to. the address.
   absl::string_view addressType() const override { return "default"; }
@@ -100,30 +92,27 @@ public:
   }
 
 private:
-  // Simple IPv4 implementation for upstream reverse connection addresses.
-  struct UpstreamReverseConnectionIp : public Network::Address::Ip {
-    const std::string& addressAsString() const override { return address_string_; }
-    bool isAnyAddress() const override { return true; }
-    bool isUnicastAddress() const override { return false; }
-    const Network::Address::Ipv4* ipv4() const override { return nullptr; }
-    const Network::Address::Ipv6* ipv6() const override { return nullptr; }
-    uint32_t port() const override { return 0; }
-    Network::Address::IpVersion version() const override { return Network::Address::IpVersion::v4; }
-
-    // Additional pure virtual methods that need implementation.
-    bool isLinkLocalAddress() const override { return false; }
-    bool isUniqueLocalAddress() const override { return false; }
-    bool isSiteLocalAddress() const override { return false; }
-    bool isTeredoAddress() const override { return false; }
-
-    std::string address_string_{"0.0.0.0:0"};
-  };
-
   std::string node_id_;
-  std::string address_string_;
-  UpstreamReverseConnectionIp ip_;
-  struct sockaddr_in synthetic_sockaddr_; // Socket address for filter chain matching
+  // Concrete loopback address backing the synthetic reverse connection address.
+  Network::Address::Ipv4Instance ipv4_instance_;
 };
+
+class RevConCluster;
+
+// Holds the shared_ptr to the RevConCluster for the thread-aware load balancer and its per-worker
+// load balancers. On destruction it posts the final cluster release to the cluster's main-thread
+// dispatcher, so the cluster and its main-thread cleanup timer are always destroyed on the main
+// thread even when the last worker reference is dropped during cluster removal.
+class RevConClusterHandle {
+public:
+  explicit RevConClusterHandle(std::shared_ptr<RevConCluster> cluster)
+      : cluster_(std::move(cluster)) {}
+  ~RevConClusterHandle();
+
+  std::shared_ptr<RevConCluster> cluster_;
+};
+
+using RevConClusterHandleSharedPtr = std::shared_ptr<RevConClusterHandle>;
 
 /**
  * The RevConCluster is a dynamic cluster that automatically adds hosts using
@@ -133,6 +122,7 @@ private:
  */
 class RevConCluster : public Upstream::ClusterImplBase, public Upstream::AdminEndpointProvider {
   friend class ReverseConnectionClusterTest;
+  friend class RevConClusterHandle;
 
 public:
   RevConCluster(
@@ -155,7 +145,7 @@ public:
 
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(const std::shared_ptr<RevConCluster>& parent) : parent_(parent) {}
+    LoadBalancer(const RevConClusterHandleSharedPtr& parent) : parent_(parent) {}
 
     // Chooses a host to send a downstream request over a reverse connection endpoint.
     // The request MUST provide a host identifier via dynamic metadata populated by a matcher
@@ -179,23 +169,23 @@ public:
     }
 
   private:
-    const std::shared_ptr<RevConCluster> parent_;
+    const RevConClusterHandleSharedPtr parent_;
   };
 
 private:
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
-    LoadBalancerFactory(const std::shared_ptr<RevConCluster>& cluster) : cluster_(cluster) {}
+    LoadBalancerFactory(const RevConClusterHandleSharedPtr& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory.
     Upstream::LoadBalancerPtr create() { return std::make_unique<LoadBalancer>(cluster_); }
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
     bool recreateOnHostChangeDeprecated() const override { return false; }
 
-    const std::shared_ptr<RevConCluster> cluster_;
+    const RevConClusterHandleSharedPtr cluster_;
   };
 
   struct ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
-    ThreadAwareLoadBalancer(const std::shared_ptr<RevConCluster>& cluster) : cluster_(cluster) {}
+    ThreadAwareLoadBalancer(const RevConClusterHandleSharedPtr& cluster) : cluster_(cluster) {}
 
     // Upstream::ThreadAwareLoadBalancer.
     Upstream::LoadBalancerFactorySharedPtr factory() override {
@@ -203,7 +193,7 @@ private:
     }
     absl::Status initialize() override { return absl::OkStatus(); }
 
-    const std::shared_ptr<RevConCluster> cluster_;
+    const RevConClusterHandleSharedPtr cluster_;
   };
 
   // Periodically cleans the stale hosts from host_map_.

@@ -1,3 +1,5 @@
+#include <fcntl.h>
+
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 
 #include "source/common/network/utility.h"
@@ -183,10 +185,25 @@ TEST_F(TestReverseTunnelAcceptor, SocketWithAddressNoThreadLocal) {
   EXPECT_NE(io_handle, nullptr);
   EXPECT_EQ(dynamic_cast<UpstreamReverseConnectionIOHandle*>(io_handle.get()), nullptr);
 
-  // Verify fallback counter increments for diagnostics.
-  // Counter name is "<scope>.<stat_prefix>.fallback_no_reverse_socket".
+  // The pool-miss socket must be non-blocking, which is the reason the acceptor returns a real fd
+  // rather than dialing the synthetic loopback address.
+#ifndef WIN32
+  const os_fd_t pool_miss_fd = io_handle->fdDoNotUse();
+  EXPECT_TRUE((fcntl(pool_miss_fd, F_GETFL) & O_NONBLOCK) != 0);
+#if defined(__linux__)
+  // Close-on-exec is requested via SOCK_CLOEXEC on Linux.
+  EXPECT_TRUE((fcntl(pool_miss_fd, F_GETFD) & FD_CLOEXEC) != 0);
+#endif
+#endif
+
+  // The returned handle fails connect() immediately with ECONNREFUSED and issues no syscall.
+  const Api::SysCallIntResult connect_result = io_handle->connect(address);
+  EXPECT_EQ(connect_result.return_value_, -1);
+  EXPECT_EQ(connect_result.errno_, ECONNREFUSED);
+
+  // Verify the pool_miss counter increments when no cached reverse tunnel is available.
   auto& scope = extension_->getStatsScope();
-  std::string counter_name = absl::StrCat(extension_->statPrefix(), ".fallback_no_reverse_socket");
+  std::string counter_name = absl::StrCat(extension_->statPrefix(), ".pool_miss");
   Stats::StatNameManagedStorage counter_name_storage(counter_name, scope.symbolTable());
   auto& counter = scope.counterFromStatName(counter_name_storage.statName());
   EXPECT_EQ(counter.value(), 1);

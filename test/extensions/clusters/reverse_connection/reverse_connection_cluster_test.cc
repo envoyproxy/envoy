@@ -139,6 +139,11 @@ public:
   }
 
   void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
+    // The cluster factory now requires the instantiated acceptor extension, so ensure it is wired
+    // before creating the cluster.
+    if (socket_interface_ == nullptr) {
+      setupUpstreamExtension();
+    }
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
                                                                false);
@@ -156,6 +161,9 @@ public:
     THROW_IF_NOT_OK_REF(status_or_pair.status());
 
     cluster_ = std::dynamic_pointer_cast<RevConCluster>(status_or_pair.value().first);
+    // Drop any handle cached for a previous cluster so the next clusterHandle() call wraps the
+    // cluster just created.
+    cluster_handle_.reset();
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) {
           membership_updated_.ready();
@@ -170,8 +178,31 @@ public:
     });
   }
 
+  // Create the cluster through the factory and return the resulting status. Used by error-path
+  // tests, since the private factory method is reachable only from this friend fixture.
+  absl::Status createClusterExpectingStatus(const std::string& yaml) {
+    const auto cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
+    RevConClusterFactory factory;
+    envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig
+        rev_con_config;
+    THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        cluster_config.cluster_type().typed_config(), validation_visitor_, rev_con_config));
+    return factory.createClusterWithConfig(cluster_config, rev_con_config, factory_context)
+        .status();
+  }
+
   void TearDown() override {
     // Do not assert on timer teardown; allow destructor-time disable.
+
+    // The cluster handle posts the final cluster release to the dispatcher when it is destroyed.
+    // Clear any per-test post expectations first so that release does not trip them, then drop the
+    // handle and cluster while the dispatcher is still alive so the cluster and its cleanup timer
+    // are freed.
+    testing::Mock::VerifyAndClearExpectations(&server_context_.dispatcher_);
+    cluster_handle_.reset();
+    cluster_.reset();
 
     // Clear extension from registered acceptor before destroying it to avoid dangling pointer
     // when the next test runs (getExtension() would otherwise return stale pointer).
@@ -241,14 +272,23 @@ public:
   // Helper method to call cleanup since this class is a friend of RevConCluster.
   void callCleanup() { cluster_->cleanup(); }
 
+  // Wrap cluster_ in a handle, which the load balancer, factory, and thread-aware holder take so
+  // the cluster is released back to the main thread.
+  RevConClusterHandleSharedPtr clusterHandle() {
+    if (cluster_handle_ == nullptr) {
+      cluster_handle_ = std::make_shared<RevConClusterHandle>(cluster_);
+    }
+    return cluster_handle_;
+  }
+
   // Helper method to create LoadBalancerFactory instance for testing.
   std::unique_ptr<RevConCluster::LoadBalancerFactory> createLoadBalancerFactory() {
-    return std::make_unique<RevConCluster::LoadBalancerFactory>(cluster_);
+    return std::make_unique<RevConCluster::LoadBalancerFactory>(clusterHandle());
   }
 
   // Helper method to create ThreadAwareLoadBalancer instance for testing.
   std::unique_ptr<RevConCluster::ThreadAwareLoadBalancer> createThreadAwareLoadBalancer() {
-    return std::make_unique<RevConCluster::ThreadAwareLoadBalancer>(cluster_);
+    return std::make_unique<RevConCluster::ThreadAwareLoadBalancer>(clusterHandle());
   }
 
   // Set log level to debug for this test class.
@@ -258,6 +298,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 
   std::shared_ptr<RevConCluster> cluster_;
+  RevConClusterHandleSharedPtr cluster_handle_;
   NiceMock<ReadyWatcher> membership_updated_;
   ReadyWatcher initialized_;
   Event::MockTimer* cleanup_timer_;
@@ -373,6 +414,98 @@ TEST_F(ReverseConnectionClusterTest, BasicSetup) {
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
+// The factory rejects the cluster when the upstream reverse tunnel bootstrap extension is
+// registered but not instantiated, so a request never dereferences a null extension.
+TEST_F(ReverseConnectionClusterTest, RejectsClusterWhenAcceptorExtensionMissing) {
+  auto* registered_socket_interface =
+      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+  ASSERT_NE(registered_socket_interface, nullptr);
+  auto* registered_acceptor = dynamic_cast<BootstrapReverseConnection::ReverseTunnelAcceptor*>(
+      const_cast<Network::SocketInterface*>(registered_socket_interface));
+  ASSERT_NE(registered_acceptor, nullptr);
+  registered_acceptor->extension_ = nullptr;
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  const absl::Status status = createClusterExpectingStatus(yaml);
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(std::string(status.message()), testing::HasSubstr("to be instantiated"));
+}
+
+// A configured cleanup interval below one millisecond is rounded up to one millisecond so the main
+// thread does not spin on an immediately expiring timer.
+TEST_F(ReverseConnectionClusterTest, SubMillisecondCleanupIntervalRoundsUp) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 0.0001s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  std::chrono::milliseconds armed_interval{0};
+  cleanup_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _)).WillOnce(testing::SaveArg<0>(&armed_interval));
+  EXPECT_CALL(*cleanup_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(initialized_, ready());
+  setup(Upstream::parseClusterFromV3Yaml(yaml));
+
+  EXPECT_EQ(armed_interval, std::chrono::milliseconds(1));
+}
+
+// The cluster handle defers the final cluster release to the main-thread dispatcher, so the cluster
+// and its main-thread cleanup timer are destroyed on the main thread even when the last reference
+// is dropped elsewhere.
+TEST_F(ReverseConnectionClusterTest, ClusterHandleDestructorPostsReleaseToMainThread) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+
+  // Wrap the cluster in a sole-owner handle, then drop the fixture reference so the handle holds
+  // the last reference to the cluster.
+  auto handle = std::make_shared<RevConClusterHandle>(cluster_);
+  std::weak_ptr<RevConCluster> weak_cluster = cluster_;
+  cluster_.reset();
+
+  // Dropping the handle posts the release rather than running it inline.
+  Event::PostCb release_cb;
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .WillOnce(testing::Invoke([&release_cb](Event::PostCb cb) { release_cb = std::move(cb); }));
+  handle.reset();
+
+  // The cluster is still alive, held only by the posted callback, not yet freed.
+  EXPECT_NE(weak_cluster.lock(), nullptr);
+
+  // Running the posted callback on the main thread releases the cluster.
+  ASSERT_TRUE(release_cb != nullptr);
+  release_cb();
+  EXPECT_EQ(weak_cluster.lock(), nullptr);
+}
+
 // Test host creation failure due to no context.
 TEST_F(ReverseConnectionClusterTest, NoContext) {
   const std::string yaml = R"EOF(
@@ -401,7 +534,7 @@ TEST_F(ReverseConnectionClusterTest, NoContext) {
   // No downstream connection => no host.
   {
     TestLoadBalancerContext lb_context(nullptr);
-    RevConCluster::LoadBalancer lb(cluster_);
+    RevConCluster::LoadBalancer lb(clusterHandle());
     EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
     Upstream::HostConstSharedPtr host = lb.chooseHost(&lb_context).host;
     EXPECT_EQ(host, nullptr);
@@ -409,7 +542,7 @@ TEST_F(ReverseConnectionClusterTest, NoContext) {
 
   // Test null context. It should return a nullptr.
   {
-    RevConCluster::LoadBalancer lb(cluster_);
+    RevConCluster::LoadBalancer lb(clusterHandle());
     Upstream::HostConstSharedPtr host = lb.chooseHost(nullptr).host;
     EXPECT_EQ(host, nullptr);
   }
@@ -436,7 +569,7 @@ TEST_F(ReverseConnectionClusterTest, NoHeaders) {
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
-    RevConCluster::LoadBalancer lb(cluster_);
+    RevConCluster::LoadBalancer lb(clusterHandle());
     EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
     Upstream::HostConstSharedPtr host = lb.chooseHost(&lb_context).host;
     EXPECT_EQ(host, nullptr);
@@ -467,7 +600,7 @@ TEST_F(ReverseConnectionClusterTest, NoHeadersAndConstantHostIdFormat) {
     NiceMock<Network::MockConnection> connection;
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     TestLoadBalancerContext lb_context(&connection, &stream_info);
-    RevConCluster::LoadBalancer lb(cluster_);
+    RevConCluster::LoadBalancer lb(clusterHandle());
 
     Upstream::HostConstSharedPtr host = lb.chooseHost(&lb_context).host;
     EXPECT_NE(host, nullptr);
@@ -497,7 +630,7 @@ TEST_F(ReverseConnectionClusterTest, MissingRequiredHeaders) {
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection, "x-random-header", "random-value");
-    RevConCluster::LoadBalancer lb(cluster_);
+    RevConCluster::LoadBalancer lb(clusterHandle());
     EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
     Upstream::HostConstSharedPtr host = lb.chooseHost(&lb_context).host;
     EXPECT_EQ(host, nullptr);
@@ -507,7 +640,7 @@ TEST_F(ReverseConnectionClusterTest, MissingRequiredHeaders) {
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection, "x-remote-node-id", "");
-    RevConCluster::LoadBalancer lb(cluster_);
+    RevConCluster::LoadBalancer lb(clusterHandle());
     Upstream::HostConstSharedPtr host = lb.chooseHost(&lb_context).host;
     EXPECT_EQ(host, nullptr);
   }
@@ -651,7 +784,7 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithSocketManager) {
   addTestSocket("test-uuid-123", "cluster-123");
   addTestSocket("test-uuid-456", "cluster-456");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Test host creation with Host header.
   {
@@ -712,7 +845,7 @@ TEST_F(ReverseConnectionClusterTest, HostIdExtractionWithSafeRegex) {
   addTestSocket("foo.bar", "cluster-foo-bar");
   addTestSocket("node-123", "cluster-node-123");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Request: header value "foo.bar" routes to host_id "foo.bar".
   {
@@ -776,7 +909,7 @@ TEST_F(ReverseConnectionClusterTest, HostReuse) {
   // Add test socket to the socket manager.
   addTestSocket("test-uuid-123", "cluster-123");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Create first host.
   {
@@ -820,7 +953,7 @@ TEST_F(ReverseConnectionClusterTest, DifferentHostsForDifferentUUIDs) {
   addTestSocket("test-uuid-123", "cluster-123");
   addTestSocket("test-uuid-456", "cluster-456");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Create first host.
   {
@@ -866,7 +999,7 @@ TEST_F(ReverseConnectionClusterTest, TestCleanup) {
   addTestSocket("test-uuid-123", "cluster-123");
   addTestSocket("test-uuid-456", "cluster-456");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Create two hosts.
   Upstream::HostSharedPtr host1, host2;
@@ -941,7 +1074,7 @@ TEST_F(ReverseConnectionClusterTest, TestCleanupWithUsedHosts) {
   addTestSocket("test-uuid-123", "cluster-123");
   addTestSocket("test-uuid-456", "cluster-456");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Create two hosts.
   Upstream::HostSharedPtr host1, host2;
@@ -1091,7 +1224,7 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerNoopMethods) {
 
   setupFromYaml(yaml);
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Test peekAnotherHost. It should return a nullptr.
   {
@@ -1265,10 +1398,10 @@ TEST_F(UpstreamReverseConnectionAddressTest, IPMethods) {
   const Network::Address::Ip* ip = address.ip();
   EXPECT_NE(ip, nullptr);
 
-  // Test IP address properties.
-  EXPECT_EQ(ip->addressAsString(), "0.0.0.0:0");
-  EXPECT_TRUE(ip->isAnyAddress());
-  EXPECT_FALSE(ip->isUnicastAddress());
+  // The synthetic address now delegates to a real loopback Ipv4Instance.
+  EXPECT_EQ(ip->addressAsString(), "127.0.0.1");
+  EXPECT_FALSE(ip->isAnyAddress());
+  EXPECT_TRUE(ip->isUnicastAddress());
   EXPECT_EQ(ip->port(), 0);
   EXPECT_EQ(ip->version(), Network::Address::IpVersion::v4);
 
@@ -1278,8 +1411,8 @@ TEST_F(UpstreamReverseConnectionAddressTest, IPMethods) {
   EXPECT_FALSE(ip->isSiteLocalAddress());
   EXPECT_FALSE(ip->isTeredoAddress());
 
-  // Test IPv4/IPv6 methods.
-  EXPECT_EQ(ip->ipv4(), nullptr);
+  // ipv4() is now a concrete instance, so core callers that dereference ip()->ipv4() do not crash.
+  EXPECT_NE(ip->ipv4(), nullptr);
   EXPECT_EQ(ip->ipv6(), nullptr);
 }
 
@@ -1403,7 +1536,7 @@ TEST_F(ReverseConnectionClusterTest, HeaderFormatterExpressions) {
   setupThreadLocalSlot();
   addTestSocket("production-node", "cluster-production");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Test header extraction.
   {
@@ -1439,7 +1572,7 @@ TEST_F(ReverseConnectionClusterTest, MultipleHeaderFormatters) {
   addTestSocket("prod-node-123", "cluster-prod");
   addTestSocket("dev-node-456", "cluster-dev");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Test 1: Production environment with node-123.
   {
@@ -1499,7 +1632,7 @@ TEST_F(ReverseConnectionClusterTest, ConnectionPropertyFormatters) {
   setupThreadLocalSlot();
   addTestSocket("conn-192.168.1.100:8080", "cluster-conn");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Create stream info with connection info.
   auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
@@ -1539,7 +1672,7 @@ TEST_F(ReverseConnectionClusterTest, FormatterErrorHandling) {
   setupUpstreamExtension();
   setupThreadLocalSlot();
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   lb_context.downstream_headers_ =
@@ -1570,7 +1703,7 @@ TEST_F(ReverseConnectionClusterTest, ComplexFormatterCombinations) {
   setupThreadLocalSlot();
   addTestSocket("svc-api-env-prod", "cluster-complex");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
@@ -1601,7 +1734,7 @@ TEST_F(ReverseConnectionClusterTest, ScalabilityManyHostIds) {
   setupUpstreamExtension();
   setupThreadLocalSlot();
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Create sockets for 100 different nodes.
   for (int i = 0; i < 100; ++i) {
@@ -1685,7 +1818,7 @@ TEST_F(ReverseConnectionClusterTest, ConcurrentHostCreation) {
   setupThreadLocalSlot();
   addTestSocket("concurrent-node-1", "cluster-concurrent");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Create multiple concurrent requests for the same node.
   std::vector<Upstream::HostConstSharedPtr> hosts;
@@ -1728,7 +1861,7 @@ TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
     setupThreadLocalSlot();
     addTestSocket("node-123", "cluster-123");
 
-    RevConCluster::LoadBalancer lb(cluster_);
+    RevConCluster::LoadBalancer lb(clusterHandle());
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
     lb_context.downstream_headers_ =
@@ -1759,7 +1892,7 @@ TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
     setupThreadLocalSlot();
     addTestSocket("tenant-a-us-west", "cluster-multi");
 
-    RevConCluster::LoadBalancer lb(cluster_);
+    RevConCluster::LoadBalancer lb(clusterHandle());
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
     lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
@@ -1789,7 +1922,7 @@ TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
     setupUpstreamExtension();
     setupThreadLocalSlot();
 
-    RevConCluster::LoadBalancer lb(cluster_);
+    RevConCluster::LoadBalancer lb(clusterHandle());
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
     lb_context.downstream_headers_ =
@@ -1888,7 +2021,7 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
   // Add socket with tenant-scoped identifier.
   addTestSocket("tenant-a:node-1", "tenant-a:cluster-1");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   // Don't include x-tenant-id header - tenant_id formatter will return empty.
@@ -1924,7 +2057,7 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
   // Add socket with tenant-scoped identifier.
   addTestSocket("tenant1:node1", "tenant1:cluster1");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
@@ -1961,7 +2094,7 @@ TEST_F(ReverseConnectionClusterTest,
   setupUpstreamExtension();
   setupThreadLocalSlot();
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   lb_context.downstream_headers_ =
@@ -1994,7 +2127,7 @@ TEST_F(ReverseConnectionClusterTest, ClusterUsesNonScopedIdentifierWhenTenantIso
   // Add socket with non-tenant-scoped identifier.
   addTestSocket("node1", "cluster1");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   lb_context.downstream_headers_ =
@@ -2030,7 +2163,7 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
   // Add socket with tenant-scoped identifier.
   addTestSocket("tenant-a:node-1", "tenant-a:cluster-1");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   // Include x-tenant-id header with "-" (default for missing) - should be treated as empty.
@@ -2067,7 +2200,7 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
   // Add socket with tenant-scoped identifier.
   addTestSocket("tenant1:node1", "tenant1:cluster1");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
@@ -2099,7 +2232,7 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest, ClusterUsesRequestStream
   setupThreadLocalSlot();
   addTestSocket("tenant1:node1", "tenant1:cluster1");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   TestLoadBalancerContext lb_context(&connection, &stream_info);
@@ -2141,7 +2274,7 @@ TEST_F(ReverseConnectionClusterTest, HostCreationUpdatesMembership) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
@@ -2187,7 +2320,7 @@ TEST_F(ReverseConnectionClusterTest, HostReuseDoesNotDoubleMembership) {
   EXPECT_CALL(server_context_.dispatcher_, post(_))
       .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
@@ -2238,7 +2371,7 @@ TEST_F(ReverseConnectionClusterTest, MultipleHostsMembershipUpdate) {
       .WillRepeatedly(
           testing::Invoke([&post_cbs](Event::PostCb cb) { post_cbs.push_back(std::move(cb)); }));
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
 
   // Create host A.
   {
@@ -2295,7 +2428,7 @@ TEST_F(ReverseConnectionClusterTest, CleanupRemovesHostsFromPrioritySet) {
   EXPECT_CALL(server_context_.dispatcher_, post(_))
       .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
@@ -2400,7 +2533,7 @@ TEST_F(ReverseConnectionClusterTest, AdminEndpointsSkipNodesWithRealHost) {
   EXPECT_EQ(1, cluster_->adminEndpoints().size());
 
   // Route a request to node-a so a real load-balanced host is created for it.
-  RevConCluster::LoadBalancer lb(cluster_);
+  RevConCluster::LoadBalancer lb(clusterHandle());
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
   lb_context.downstream_headers_ =
