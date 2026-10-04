@@ -58,8 +58,8 @@ absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
  * route, then virtual host, then route configuration. A nullptr route is a normal value flowing
  * through the chains rather than a stop condition, so a specifier can both drop a matched route
  * and supply one where matching found none. The one thing that does end the chain early is a
- * specifier declaring its result final, which skips every specifier after it, including those of
- * the later levels.
+ * specifier declaring its result final, with StopIteration or StopIterationAndSkipRoute, which
+ * skips every specifier after it, including those of the later levels.
  *
  * @param route the matched route, possibly already a wrapper produced by a cluster specifier
  *        plugin, or nullptr if nothing matched.
@@ -71,18 +71,21 @@ absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
  * @param headers the HTTP request headers.
  * @param stream_info the stream information for the request.
  * @param random a random value for use by the specifiers.
- * @param match_status set to the match status of the last specifier that returned one other than
- *        Unspecified, and left alone if none did.
+ * @param input_status whether there are more routes to evaluate after the one that matched,
+ *        handed unchanged to every specifier. NoMoreRoutes when the chains run outside the
+ *        evaluation of a route list, where there is nothing left to try.
  * @return the route to use for the request, @param route itself if every chain is empty, or
- *         nullptr if there is no route for the request.
+ *         nullptr if there is no route for the request, together with the status. A status of
+ *         StopIterationAndSkipRoute means a specifier turned the matched route down: the
+ *         returned route is discarded and route matching should carry on with the next route of
+ *         the list being evaluated.
  */
-RouteConstSharedPtr applyRouteSpecifiers(RouteConstSharedPtr route,
-                                         RouteSpecifierSpan config_specifiers,
-                                         RouteSpecifierSpan vhost_specifiers,
-                                         RouteSpecifierSpan route_specifiers,
-                                         const Http::RequestHeaderMap& headers,
-                                         const StreamInfo::StreamInfo& stream_info, uint64_t random,
-                                         OnRouteMatchStatus& match_status);
+OnRouteResult applyRouteSpecifiers(RouteConstSharedPtr route, RouteSpecifierSpan config_specifiers,
+                                   RouteSpecifierSpan vhost_specifiers,
+                                   RouteSpecifierSpan route_specifiers,
+                                   const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info, uint64_t random,
+                                   OnRouteInputStatus input_status);
 
 } // namespace Router
 } // namespace Envoy
