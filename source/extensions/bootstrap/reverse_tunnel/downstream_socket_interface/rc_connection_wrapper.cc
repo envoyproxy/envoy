@@ -112,28 +112,9 @@ absl::Status RCConnectionWrapper::connect(const std::string& src_tenant_id,
   absl::string_view tenant_id = src_tenant_id;
   absl::string_view cluster_id = src_cluster_id;
   absl::string_view node_id = src_node_id;
-  std::string host_value;
-  const auto& remote_address = connection_->connectionInfoProvider().remoteAddress();
-  // This is used when reverse connections need to be established through a HTTP proxy.
-  // The reverse connection listener connects to an internal cluster, to which an
-  // internal listener listens. This internal listener has tunneling configuration
-  // to tcp proxy the reverse connection requests over HTTP/1 CONNECT to the remote
-  // proxy.
-  if (remote_address->type() == Network::Address::Type::EnvoyInternal) {
-    const auto& internal_address =
-        std::dynamic_pointer_cast<const Network::Address::EnvoyInternalInstance>(remote_address);
-    ENVOY_LOG(debug,
-              "RCConnectionWrapper: connection: {}, remote address is internal "
-              "listener {}, using endpoint ID in host header",
-              connection_->id(), internal_address->envoyInternalAddress()->addressId());
-    host_value = internal_address->envoyInternalAddress()->endpointId();
-  } else {
-    host_value = remote_address->asString();
-    ENVOY_LOG(debug,
-              "RCConnectionWrapper: connection: {}, remote address is external, "
-              "using address as host header",
-              connection_->id());
-  }
+  // EnvoyInternal remote clusters are rejected before the dial because the user-space handle cannot
+  // be duplicated for the accepted tunnel, so the remote address is always a real network address.
+  const std::string host_value = connection_->connectionInfoProvider().remoteAddress()->asString();
   const Http::LowerCaseString& node_hdr =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelNodeIdHeader();
   const Http::LowerCaseString& cluster_hdr =

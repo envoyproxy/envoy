@@ -1143,6 +1143,20 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
     return false;
   }
 
+  // EnvoyInternal remote cluster addresses are not supported. The user-space io handle cannot be
+  // duplicated for the accepted tunnel, which aborts in debug builds and drops a tunnel every tick
+  // in release, so reject the host before dialing.
+  if (host != nullptr && host->address() != nullptr &&
+      host->address()->type() == Network::Address::Type::EnvoyInternal) {
+    ENVOY_LOG(
+        error,
+        "reverse_tunnel: EnvoyInternal remote cluster addresses are not supported for host {}",
+        host_address);
+    updateConnectionState(host_address, cluster_name, temp_connection_key,
+                          ReverseConnectionState::CannotConnect);
+    return false;
+  }
+
   ENVOY_LOG(debug,
             "reverse_tunnel: Initiating one reverse connection to host {} of cluster "
             "'{}', source node '{}'",
