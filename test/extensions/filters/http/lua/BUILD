@@ -114,6 +114,7 @@ envoy_extension_cc_benchmark_binary(
     deps = [
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",
+        "//source/common/singleton:manager_impl_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/common/set_filter_state:filter_config_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",

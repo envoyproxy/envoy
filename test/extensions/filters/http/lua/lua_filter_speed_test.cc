@@ -20,6 +20,7 @@
 
 #include "source/common/common/macros.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/lua/lua_filter.h"
 
@@ -376,7 +377,7 @@ public:
     absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_,
                                              *stats_store_.rootScope(), "bench.", kConcurrency,
-                                             creation_status);
+                                             singleton_manager_, creation_status);
     RELEASE_ASSERT(creation_status.ok(), std::string(creation_status.message()));
     rebuildStream();
   }
@@ -435,7 +436,7 @@ private:
   uint64_t counterValue(const std::string& name) {
     Stats::CounterOptConstRef counter = stats_store_.findCounterByString(name);
     RELEASE_ASSERT(counter.has_value(), name);
-    return counter->get().value();
+    return counter->value();
   }
 
   Event::TestRealTimeSystem time_system_;
@@ -443,6 +444,7 @@ private:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Api::MockApi> api_;
+  Singleton::ManagerImpl singleton_manager_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   std::unique_ptr<StreamInfo::StreamInfoImpl> stream_info_;
