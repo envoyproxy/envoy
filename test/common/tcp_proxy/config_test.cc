@@ -2,6 +2,8 @@
 
 #include "envoy/common/hashable.h"
 
+#include "source/common/upstream/od_cds_api_impl.h"
+
 #include "test/common/tcp_proxy/tcp_proxy_test_base.h"
 
 namespace Envoy {
@@ -1013,6 +1015,73 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
         }));
     filter_->onNewConnection();
   }
+}
+
+// Verifies which ODCDS implementation the given creation function is.
+void expectOdCdsCreationFunction(
+    const Upstream::ClusterManager::OdCdsCreationFunction& creation_function,
+    decltype(&Upstream::OdCdsApiImpl::create) expected) {
+  const auto* target = creation_function.target<decltype(&Upstream::OdCdsApiImpl::create)>();
+  ASSERT_NE(target, nullptr);
+  EXPECT_EQ(*target, expected);
+}
+
+// With singleton subscriptions for regular config sources disabled, on-demand CDS over a regular
+// config source uses the legacy OdCdsApiImpl.
+TEST(ConfigTest, OnDemandRegularConfigSourceWithSingletonSubscriptionsDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.odcds_singleton_subscriptions_for_config_source", "false"}});
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+on_demand:
+  odcds_config:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_CALL(factory_context.server_factory_context_.cluster_manager_,
+              allocateOdCdsApi(_, _, _, _))
+      .WillOnce(
+          Invoke([](Upstream::ClusterManager::OdCdsCreationFunction creation_function,
+                    const envoy::config::core::v3::ConfigSource&,
+                    OptRef<xds::core::v3::ResourceLocator>, ProtobufMessage::ValidationVisitor&) {
+            expectOdCdsCreationFunction(creation_function, &Upstream::OdCdsApiImpl::create);
+            return Upstream::MockOdCdsApiHandle::create();
+          }));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
+}
+
+// With singleton subscriptions for regular config sources disabled, on-demand CDS over ADS still
+// uses the XdstpOdCdsApiImpl.
+TEST(ConfigTest, OnDemandAdsConfigSourceWithSingletonSubscriptionsDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.odcds_singleton_subscriptions_for_config_source", "false"}});
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+on_demand:
+  odcds_config:
+    ads: {}
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_CALL(factory_context.server_factory_context_.cluster_manager_,
+              allocateOdCdsApi(_, _, _, _))
+      .WillOnce(
+          Invoke([](Upstream::ClusterManager::OdCdsCreationFunction creation_function,
+                    const envoy::config::core::v3::ConfigSource&,
+                    OptRef<xds::core::v3::ResourceLocator>, ProtobufMessage::ValidationVisitor&) {
+            expectOdCdsCreationFunction(creation_function, &Upstream::XdstpOdCdsApiImpl::create);
+            return Upstream::MockOdCdsApiHandle::create();
+          }));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
 }
 
 } // namespace

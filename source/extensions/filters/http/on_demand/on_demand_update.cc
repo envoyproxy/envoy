@@ -77,10 +77,19 @@ absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
   // (odcds_config->resources_locator().empty())").
   if (odcds == nullptr) {
     if (odcds_config->resources_locator().empty()) {
-      if (odcds_config->source().config_source_specifier_case() ==
-          envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
-        // If the config-source is ADS, use a singleton-subscription mechanism,
-        // similar to xDS-TP based configs.
+      const auto specifier_case = odcds_config->source().config_source_specifier_case();
+      // TODO(wbpcode): once the
+      // "envoy.reloadable_features.odcds_singleton_subscriptions_for_config_source" runtime flag
+      // is removed, simplify this condition to "specifier_case != CONFIG_SOURCE_SPECIFIER_NOT_SET".
+      if (specifier_case ==
+              envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds ||
+          (specifier_case != envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::
+                                 CONFIG_SOURCE_SPECIFIER_NOT_SET &&
+           Runtime::runtimeFeatureEnabled(
+               "envoy.reloadable_features.odcds_singleton_subscriptions_for_config_source"))) {
+        // If the config-source is ADS (or any other config-source when enabled
+        // by runtime), use a singleton-subscription mechanism, similar to
+        // xDS-TP based configs.
         auto odcds_or =
             cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create, odcds_config->source(),
                                 std::nullopt, validation_visitor);
