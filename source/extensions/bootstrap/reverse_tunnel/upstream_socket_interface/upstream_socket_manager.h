@@ -53,7 +53,7 @@ public:
    */
   void addConnectionSocket(const std::string& node_id, const std::string& cluster_id,
                            Network::ConnectionSocketPtr socket,
-                           const std::chrono::seconds& ping_interval, bool rebalanced = true,
+                           const std::chrono::milliseconds& ping_interval, bool rebalanced = true,
                            absl::string_view tenant_id = {},
                            absl::string_view initiator_worker_id = {},
                            absl::string_view initiator_connection_id = {});
@@ -80,7 +80,7 @@ public:
    */
   void handoffSocketToWorker(const std::string& node_id, const std::string& cluster_id,
                              Network::ConnectionSocketPtr socket,
-                             const std::chrono::seconds& ping_interval,
+                             const std::chrono::milliseconds& ping_interval,
                              absl::string_view tenant_id = {},
                              absl::string_view initiator_worker_id = {},
                              absl::string_view initiator_connection_id = {});
@@ -90,7 +90,8 @@ public:
    * @param node_id the node ID to get a socket for.
    * @return the connection socket, or nullptr if none available.
    */
-  Network::ConnectionSocketPtr getConnectionSocket(const std::string& node_id);
+  Network::ConnectionSocketPtr getConnectionSocket(const std::string& node_id,
+                                                   std::string* retained_ping_prefix = nullptr);
 
   /**
    * Mark connection socket dead and remove from internal maps.
@@ -203,10 +204,11 @@ private:
   bool hasAnySocketsForNode(const std::string& node_id);
 
   /**
-   * Compute the ping interval in milliseconds with 15% jitter applied.
+   * Compute the ping interval in milliseconds with 15% jitter applied for a single connection.
+   * @param fd the file descriptor whose configured interval to use.
    * @return jittered interval in milliseconds.
    */
-  uint64_t pingIntervalWithJitterMs();
+  uint64_t pingIntervalWithJitterMs(int fd);
 
   /**
    * Re-arm the per-connection ping send timer for the given fd with jitter.
@@ -273,7 +275,13 @@ private:
   static constexpr uint32_t kDefaultMissThreshold = 3;
   uint32_t miss_threshold_{kDefaultMissThreshold};
 
-  std::chrono::seconds ping_interval_{0};
+  // Per connection ping interval in milliseconds, carried end to end from the filter so a
+  // sub-second interval is honored rather than truncated to whole seconds.
+  absl::flat_hash_map<int, std::chrono::milliseconds> fd_to_ping_interval_;
+
+  // Per connection five byte scratch that retains a partial ping echo across edge triggered wakes
+  // and follows the socket into the pool at checkout.
+  absl::flat_hash_map<int, std::string> fd_to_ping_scratch_;
 
   // Per node counter for total active FDs.
   absl::flat_hash_map<std::string, uint32_t> node_to_active_fd_count_;
