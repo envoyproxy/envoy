@@ -38,6 +38,31 @@ TEST(Backward, SingleEntry) {
   BackwardsTrace::setLogToStderr(save_log_to_stderr);
 }
 
+TEST(Backward, LogLevels) {
+  const bool save_log_to_stderr = BackwardsTrace::logToStderr();
+  BackwardsTrace::setLogToStderr(false);
+  BackwardsTrace tracer;
+  tracer.capture();
+  EXPECT_LOG_CONTAINS("[trace]", "Envoy version:", tracer.logTrace(spdlog::level::trace));
+  EXPECT_LOG_CONTAINS("[debug]", "Envoy version:", tracer.logTrace(spdlog::level::debug));
+  EXPECT_LOG_CONTAINS("[info]", "Envoy version:", tracer.logTrace(spdlog::level::info));
+  EXPECT_LOG_CONTAINS("[warning]", "Envoy version:", tracer.logTrace(spdlog::level::warn));
+  EXPECT_LOG_CONTAINS("[error]", "Envoy version:", tracer.logTrace(spdlog::level::err));
+  EXPECT_LOG_CONTAINS("[critical]", "Envoy version:", tracer.logTrace(spdlog::level::critical));
+  // The default level remains critical.
+  EXPECT_LOG_CONTAINS("[critical]", "Envoy version:", tracer.logTrace());
+  BackwardsTrace::setLogToStderr(save_log_to_stderr);
+}
+
+TEST(Backward, LogLevelOffSilencesTrace) {
+  const bool save_log_to_stderr = BackwardsTrace::logToStderr();
+  BackwardsTrace::setLogToStderr(false);
+  BackwardsTrace tracer;
+  tracer.capture();
+  EXPECT_LOG_NOT_CONTAINS("Envoy version:", "Envoy version:", tracer.logTrace(spdlog::level::off));
+  BackwardsTrace::setLogToStderr(save_log_to_stderr);
+}
+
 TEST(Backward, InvalidUsageTest) {
   // Ensure we do not crash if logging is attempted when there was no trace captured
   BackwardsTrace tracer;

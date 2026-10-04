@@ -143,6 +143,80 @@ TEST_F(BacktraceActionTest, SingleBacktraceLogged) {
   EXPECT_EQ(0U, stats_.counter("watchdog.backtrace_action.backtraces_failed").value());
 }
 
+TEST_F(BacktraceActionTest, LogsAtConfiguredLevel) {
+#ifndef __linux__
+  GTEST_SKIP() << "signalThread (per-thread signaling) is not supported on this platform.";
+#endif
+  using ConfigProto = envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig;
+
+  const bool prev_log_to_stderr = BackwardsTrace::logToStderr();
+  BackwardsTrace::setLogToStderr(false);
+  LogLevelSetter save_levels(spdlog::level::trace);
+
+  const std::pair<ConfigProto::LogLevel, Logger::Levels> cases[] = {
+      {ConfigProto::CRITICAL, Logger::Levels::critical},
+      {ConfigProto::TRACE, Logger::Levels::trace},
+      {ConfigProto::DEBUG, Logger::Levels::debug},
+      {ConfigProto::INFO, Logger::Levels::info},
+      {ConfigProto::WARN, Logger::Levels::warn},
+      {ConfigProto::ERROR, Logger::Levels::error},
+  };
+
+  std::vector<std::unique_ptr<BacktraceAction>> actions;
+  for (const auto& test_case : cases) {
+    ConfigProto config;
+    config.set_log_level(test_case.first);
+    actions.push_back(std::make_unique<BacktraceAction>(config, context_));
+  }
+
+  Thread::ThreadId child_tid;
+  absl::Notification child_ready;
+  Thread::ThreadPtr thread =
+      api_->threadFactory().createThread([this, &child_tid, &child_ready]() -> void {
+        child_tid = api_->threadFactory().currentThreadId();
+        child_ready.Notify();
+        dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+      });
+  child_ready.WaitForNotification();
+
+  const auto now = api_->timeSource().monotonicTime();
+  const std::vector<std::pair<Thread::ThreadId, MonotonicTime>> tid_ltt_pairs = {{child_tid, now}};
+
+  for (size_t i = 0; i < actions.size(); ++i) {
+    const Logger::Levels expected_level = cases[i].second;
+    absl::Notification logged;
+    std::atomic<bool> wrong_level{false};
+    std::string wrong_level_msg;
+    {
+      LogExpectation expectation(GetLogSink(), [&](Logger::Levels level, const std::string& msg) {
+        const bool is_thread_id_log = msg.find("backtrace for thread") != std::string::npos;
+        const bool is_backtrace_log = msg.find("Envoy version:") != std::string::npos;
+        if (!is_thread_id_log && !is_backtrace_log) {
+          return;
+        }
+        if (level != expected_level) {
+          wrong_level = true;
+          wrong_level_msg = msg;
+        }
+        if (is_backtrace_log) {
+          logged.Notify();
+        }
+      });
+      dispatcher_->post([&]() {
+        actions[i]->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs,
+                        now);
+      });
+      EXPECT_TRUE(logged.WaitForNotificationWithTimeout(absl::Seconds(5)));
+    }
+    EXPECT_FALSE(wrong_level.load()) << "log at unexpected level: " << wrong_level_msg;
+  }
+
+  BackwardsTrace::setLogToStderr(prev_log_to_stderr);
+  dispatcher_->exit();
+  thread->join();
+  actions.clear();
+}
+
 TEST_F(BacktraceActionTest, MultipleBacktracesLogged) {
 #ifndef __linux__
   GTEST_SKIP() << "signalThread (per-thread signaling) is not supported on this platform.";
