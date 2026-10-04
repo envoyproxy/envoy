@@ -4176,7 +4176,9 @@
           },
           "envoy-base-utils": {
             "https://files.pythonhosted.org/packages/94/8b/aed2ee446b06c254de6d0b2a53959dd06916f7f059bc17e1e94b47cad45c/envoy_base_utils-0.6.9.tar.gz": "sha256:b088b7621b5075005c48cdbef5db5675827b7b63550be7d880d395261fdcdb20",
-            "https://files.pythonhosted.org/packages/c4/71/86288c14c8e557bbc3489d6bd2963caed7e54f478976b0c359f9b3597bf2/envoy_base_utils-0.6.9-py3-none-any.whl": "sha256:664dcc19ee12125398222a7628bdcbb40e265b3846e197e4014434fcd273fd61"
+            "https://files.pythonhosted.org/packages/bd/98/e3c1a16a299fe399092c45cb91e148c2f99a4a7a551d6729dd411ffc4c3d/envoy_base_utils-0.6.12.tar.gz": "sha256:d2ab511a1f6f59f7319c6dc6b70088bad139be2165466ed9ce6932b0c96faa02",
+            "https://files.pythonhosted.org/packages/c4/71/86288c14c8e557bbc3489d6bd2963caed7e54f478976b0c359f9b3597bf2/envoy_base_utils-0.6.9-py3-none-any.whl": "sha256:664dcc19ee12125398222a7628bdcbb40e265b3846e197e4014434fcd273fd61",
+            "https://files.pythonhosted.org/packages/d9/4d/275e6c7033b8b5d4f59216034d98c303feb2d99185da479963e458083699/envoy_base_utils-0.6.12-py3-none-any.whl": "sha256:8b860c9d88493f1eb1044cc48fa9ae953cd31d9da77102d05e9c6af65ff14eae"
           },
           "envoy-ci-report": {
             "https://files.pythonhosted.org/packages/43/c9/24aceda89afab59b701ea7f9f004c422a9e4adfb63003e086692a3c9a0dc/envoy_ci_report-0.1.1.tar.gz": "sha256:481115be4d05941b83ffbbd8fdac241f10e9823c076f850d8bef7f0308aa382d",
