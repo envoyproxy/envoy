@@ -27,7 +27,6 @@
 #include "source/common/tls/stats.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -75,26 +74,39 @@ protected:
 private:
   friend class ClientContextImplPeer;
 
-  struct SniSessionCacheEntry {
+  struct SessionCacheKey {
     std::string sni;
+    std::string endpoint;
+  };
+
+  struct SessionCacheEntry {
+    std::string sni;
+    std::string endpoint;
     bssl::UniquePtr<SSL_SESSION> session;
   };
 
-  using SniSessionCacheList = std::list<SniSessionCacheEntry>;
+  using SessionCacheList = std::list<SessionCacheEntry>;
 
-  struct SniSessionBucket {
-    // Iterators into sni_session_keys_lru_, newest first for this SNI.
-    std::deque<SniSessionCacheList::iterator> sessions;
+  struct EndpointSessionBucket {
+    // Iterators into session_keys_lru_, newest first for this endpoint.
+    std::deque<SessionCacheList::iterator> sessions;
   };
 
-  static int sslEffectiveSniIndex();
+  struct SniSessionBucket {
+    // Iterators into session_keys_lru_, newest first for this SNI.
+    std::deque<SessionCacheList::iterator> sessions;
+    absl::flat_hash_map<std::string, EndpointSessionBucket> sessions_by_endpoint;
+  };
+
+  static int sslSessionCacheKeyIndex();
 
   int newSessionKey(SSL* ssl, SSL_SESSION* session);
-  std::string effectiveSni(const Network::TransportSocketOptionsConstSharedPtr& options,
-                           Upstream::HostDescriptionConstSharedPtr host) const;
-  void setSessionForSni(SSL* ssl, absl::string_view sni);
+  SessionCacheKey sessionCacheKey(const Network::TransportSocketOptionsConstSharedPtr& options,
+                                  Upstream::HostDescriptionConstSharedPtr host) const;
+  void setSessionForKey(SSL* ssl, const SessionCacheKey& key);
   void setSessionFromContextCache(SSL* ssl);
   bool scopeUpstreamTlsSessionCacheBySni() const;
+  bool scopeUpstreamTlsSessionCacheByEndpoint() const;
 
   const std::string server_name_indication_;
   const bool auto_host_sni_;
@@ -103,7 +115,7 @@ private:
   const size_t max_session_keys_;
   absl::Mutex session_keys_mu_;
   std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
-  SniSessionCacheList sni_session_keys_lru_ ABSL_GUARDED_BY(session_keys_mu_);
+  SessionCacheList session_keys_lru_ ABSL_GUARDED_BY(session_keys_mu_);
   absl::flat_hash_map<std::string, SniSessionBucket>
       session_keys_by_sni_ ABSL_GUARDED_BY(session_keys_mu_);
   Ssl::UpstreamTlsCertificateSelectorPtr tls_certificate_selector_;
