@@ -20,6 +20,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -583,12 +584,18 @@ public:
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
       Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
-    std::string subscription_stat_prefix;
-    absl::string_view provider_stat_prefix;
-    subscription_stat_prefix =
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      absl::string_view stat_prefix) override {
+    const std::string subscription_stat_prefix =
         absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
-    provider_stat_prefix = subscription_stat_prefix;
+    // The subscription always uses the ECDS stats prefix. The filter factory uses the stats
+    // prefix of the parent so that the filter emits the same stats as a statically configured
+    // one.
+    const absl::string_view provider_stat_prefix =
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ecds_filter_use_parent_stats_prefix")
+            ? stat_prefix
+            : absl::string_view(subscription_stat_prefix);
 
     auto subscription = THROW_OR_RETURN_VALUE(
         getSubscription(config_source.config_source(), filter_config_name, server_context,

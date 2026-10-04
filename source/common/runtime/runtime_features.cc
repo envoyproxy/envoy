@@ -53,6 +53,9 @@ RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 // references a symbol the main program does not provide then fails to load rather than crashing
 // later when the symbol is first reached. Disable to restore the previous RTLD_LAZY behavior.
 RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_rtld_now);
+// When enabled, the filter factory of an ECDS HTTP filter uses the stats prefix of its parent
+// (e.g. "http.<stat_prefix>.") rather than "extension_config_discovery.<type>.<name>.".
+RUNTIME_GUARD(envoy_reloadable_features_ecds_filter_use_parent_stats_prefix);
 // When enabled, per-priority host updates that arrive during a main-thread batch host update are
 // posted to the worker threads as a single batched cross-thread update at the end of the batch,
 // instead of one post per priority. Combined with
