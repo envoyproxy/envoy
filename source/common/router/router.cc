@@ -1134,11 +1134,16 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   // Check if we would exceed buffer limits, regardless of current buffering state
   // This ensures error details are set even if retry state was cleared due to upstream reset.
-  // When an upstream filter (e.g. the buffer filter) has already buffered all data,
-  // the decoding buffer and `data` may be the same object. Avoid double-counting in that case.
-  const Buffer::Instance* decoding_buffer = callbacks_->decodingBuffer();
-  const uint64_t payload_length =
-      (decoding_buffer != &data) ? getLength(decoding_buffer) + data.length() : data.length();
+  const bool use_private_retry_buffer =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.router_use_private_retry_buffer");
+  uint64_t payload_length;
+  if (use_private_retry_buffer) {
+    payload_length = getLength(retry_buffer_.get()) + data.length();
+  } else {
+    const Buffer::Instance* decoding_buffer = callbacks_->decodingBuffer();
+    payload_length =
+        (decoding_buffer != &data) ? getLength(decoding_buffer) + data.length() : data.length();
+  }
   const bool would_exceed_buffer = (payload_length > effective_buffer_limit);
 
   // Handle buffer overflow.
@@ -1192,13 +1197,17 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
     }
 
-    // If we are potentially going to retry or buffer shadow this request we need to buffer.
-    // This will not cause the connection manager to 413 because before we hit the
-    // buffer limit we give up on retries and buffering. We must buffer using addDecodedData()
-    // so that all buffered data is available by the time we do request complete processing and
-    // potentially shadow. Additionally, we can't do a copy here because there's a check down
-    // this stack for whether `data` is the same buffer as already buffered data.
-    callbacks_->addDecodedData(data, true);
+    // Buffer the request body for potential retry/redirect.
+    if (use_private_retry_buffer) {
+      // Buffer into our own retry_buffer_.
+      if (!retry_buffer_) {
+        retry_buffer_ = std::make_unique<Buffer::OwnedImpl>();
+      }
+      retry_buffer_->move(data);
+    } else {
+      // Buffer into shared filter-chain buffered_request_data_.
+      callbacks_->addDecodedData(data, true);
+    }
   } else {
     if (!upstream_requests_.empty()) {
       upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
@@ -2232,11 +2241,18 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   // Redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ && (!request_buffer_overflowed_) && location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, headers, *location,
-                                               status_code) &&
-      callbacks_->recreateStream(&headers)) {
-    ENVOY_STREAM_LOG(debug, "Internal redirect succeeded", *callbacks_);
-    cluster_->trafficStats()->upstream_internal_redirect_succeeded_total_.inc();
-    return true;
+                                               status_code)) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.router_use_private_retry_buffer") &&
+        retry_buffer_ && retry_buffer_->length() > 0) {
+      Buffer::OwnedImpl copy(*retry_buffer_);
+      callbacks_->addDecodedData(copy, false);
+    }
+    if (callbacks_->recreateStream(&headers)) {
+      ENVOY_STREAM_LOG(debug, "Internal redirect succeeded", *callbacks_);
+      cluster_->trafficStats()->upstream_internal_redirect_succeeded_total_.inc();
+      return true;
+    }
   }
   // convertRequestHeadersForInternalRedirect logs failure reasons but log
   // details for other failure modes here.
@@ -2390,10 +2406,16 @@ bool Filter::convertRequestHeadersForInternalRedirect(
       downstream_headers.getMethodValue() != Http::Headers::get().MethodValues.Head) {
     downstream_headers.setMethod(Http::Headers::get().MethodValues.Get);
     downstream_headers.remove(Http::Headers::get().ContentLength);
-    // Requests without any body never allocate a decoding buffer, so we only drain when one exists.
-    // For example, a POST request with end_stream on headers will not allocate a decoding buffer.
-    if (callbacks_->decodingBuffer()) {
-      callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
+    // Requests without any body never allocate a retry buffer.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.router_use_private_retry_buffer")) {
+      if (retry_buffer_) {
+        retry_buffer_->drain(retry_buffer_->length());
+      }
+    } else {
+      if (callbacks_->decodingBuffer()) {
+        callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
+      }
     }
   }
 
@@ -2533,15 +2555,19 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_requests_.front()->acceptHeadersFromRouter(
-      !callbacks_->decodingBuffer() && !downstream_trailers_ && downstream_end_stream_);
+  const bool use_private_retry_buffer =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.router_use_private_retry_buffer");
+  const Buffer::Instance* buffered =
+      use_private_retry_buffer ? retry_buffer_.get() : callbacks_->decodingBuffer();
+  upstream_requests_.front()->acceptHeadersFromRouter(!buffered && !downstream_trailers_ &&
+                                                      downstream_end_stream_);
   // It's possible we got immediately reset which means the upstream request we just
   // added to the front of the list might have been removed, so we need to check to make
   // sure we don't send data on the wrong request.
   if (!upstream_requests_.empty() && (upstream_requests_.front().get() == upstream_request_tmp)) {
-    if (callbacks_->decodingBuffer()) {
+    if (buffered) {
       // If we are doing a retry we need to make a copy.
-      Buffer::OwnedImpl copy(*callbacks_->decodingBuffer());
+      Buffer::OwnedImpl copy(*buffered);
       upstream_requests_.front()->acceptDataFromRouter(copy, !downstream_trailers_ &&
                                                                  downstream_end_stream_);
     }
