@@ -16304,6 +16304,10 @@ typedef enum envoy_dynamic_module_type_route_specifier_decision {
   // previous route exists, otherwise Envoy applies the failure policy. Recorded overrides are
   // ignored.
   envoy_dynamic_module_type_route_specifier_decision_ReusePrevious = 4,
+  // Not a decision. Pins the type to a stable 32 bit size and widens its value range, so that a
+  // decision a newer ABI defines can be held and inspected by an Envoy that does not know it
+  // without undefined behavior.
+  envoy_dynamic_module_type_route_specifier_decision_Sentinel = 0x7FFFFFFF,
 } envoy_dynamic_module_type_route_specifier_decision;
 
 /**

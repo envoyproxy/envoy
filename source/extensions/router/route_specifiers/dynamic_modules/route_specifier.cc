@@ -825,6 +825,9 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context,
     }
     return {std::move(previous), status};
   }
+  case envoy_dynamic_module_type_route_specifier_decision_Sentinel:
+    // Not a decision a module records, handled like any other value this build does not know.
+    break;
   }
   // A module built against a newer ABI could record a decision this build does not know.
   config_->stats().decision_error_.inc();

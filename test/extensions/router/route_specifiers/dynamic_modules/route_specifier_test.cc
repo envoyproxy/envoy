@@ -860,6 +860,37 @@ TEST_F(DynamicModuleRouteSpecifierTest, TemplateNotSelectedPassesThrough) {
                 .value());
 }
 
+// The metadata a selected override carries is layered under the metadata the module records
+// itself: the module's value wins for the same key, the override contributes its other keys, and
+// the typed metadata the override carries reaches the produced route.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteOverrideMetadataLayersUnderModuleMetadata) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_override", R"EOF(      failure_policy: PASS_THROUGH
+      specifier_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: select-override
+      route_overrides:
+      - override_id: applied
+        metadata:
+          filter_metadata:
+            envoy.test.override: {group: override, extra: carried}
+          typed_filter_metadata:
+            envoy.test.typed:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: carried
+)EOF"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+
+  const auto& metadata = route.route->metadata();
+  const auto& fields = metadata.filter_metadata().at("envoy.test.override").fields();
+  // The module recorded group=module, which wins over the group=override the override carries.
+  EXPECT_EQ("module", fields.at("group").string_value());
+  EXPECT_EQ("carried", fields.at("extra").string_value());
+  EXPECT_TRUE(metadata.typed_filter_metadata().contains("envoy.test.typed"));
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace RouteSpecifiers

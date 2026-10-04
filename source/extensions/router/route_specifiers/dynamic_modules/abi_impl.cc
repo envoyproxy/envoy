@@ -782,6 +782,8 @@ void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
 void envoy_dynamic_module_callback_route_specifier_set_decision(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_route_specifier_decision decision) {
+  // The module may pass a value outside the named enumerators, for example from a newer ABI,
+  // which the Sentinel enumerator of the type makes well defined to hold.
   routeSpecifierContext(context_envoy_ptr)->decision = decision;
 }
 

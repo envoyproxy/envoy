@@ -152,7 +152,7 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   :widths: 1, 1, 2
 
   decision_pass_through, Counter, Requests for which the module kept the resolved route.
-  decision_has_override, Counter, Requests the default decision resolved from the route the specifier was given, with the recorded overrides applied.
+  decision_has_override, Counter, Requests the default decision resolved from the route the specifier was given with the recorded overrides applied.
   decision_has_template, Counter, Requests for which the module selected a route template.
   decision_no_route, Counter, Requests for which the module dropped the route.
   decision_error, Counter, Requests for which the module could not decide.

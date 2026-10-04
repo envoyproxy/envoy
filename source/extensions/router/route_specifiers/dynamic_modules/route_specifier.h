@@ -309,8 +309,8 @@ struct RouteSpecifierContext {
   // that the getters reflect the route being produced. Null keeps the getters on the route matching
   // resolved, whether no template was selected or its match did not hold.
   Envoy::Router::RouteConstSharedPtr selected_route;
-  // The decision set_decision recorded, stored as the raw value the module passed, which may be
-  // outside the known enum values. Unspecified when the module recorded none.
+  // The decision set_decision recorded, which may hold a value outside the named enumerators,
+  // for example from a newer ABI. Unspecified when the module recorded none.
   envoy_dynamic_module_type_route_specifier_decision decision{
       envoy_dynamic_module_type_route_specifier_decision_Unspecified};
   RouteOverrides overrides;

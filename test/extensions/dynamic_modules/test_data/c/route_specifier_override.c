@@ -62,6 +62,13 @@ envoy_dynamic_module_on_route_specifier_on_route(
     const envoy_dynamic_module_type_module_buffer override_id = {"applied", 7};
     envoy_dynamic_module_callback_route_specifier_set_route_override(context_envoy_ptr,
                                                                      override_id);
+    // Metadata the module records itself wins over what the override carries, which the metadata
+    // layering test reads back from the produced route.
+    const envoy_dynamic_module_type_module_buffer ns = {"envoy.test.override", 19};
+    const envoy_dynamic_module_type_module_buffer key = {"group", 5};
+    const envoy_dynamic_module_type_module_buffer value = {"module", 6};
+    envoy_dynamic_module_callback_route_specifier_set_route_metadata_string(context_envoy_ptr, ns,
+                                                                            key, value);
     return envoy_dynamic_module_type_route_specifier_on_route_status_Continue;
   }
   // Recording only a route name produces a route wrapper whose name replaces that of the route.

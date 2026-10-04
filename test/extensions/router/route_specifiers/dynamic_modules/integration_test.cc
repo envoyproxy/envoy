@@ -1275,6 +1275,29 @@ route_overrides:
   EXPECT_EQ("/api/foo?q=1", upstream_headers->getPathValue());
 }
 
+// Unsetting an override with an identifier that is not the selected one changes nothing, so the
+// selected override stays in effect.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest,
+       UnsetRouteOverrideWithAnotherIdLeavesTheSelection) {
+  setupTest(R"EOF(
+route_overrides:
+- override_id: regex
+  regex_rewrite:
+    pattern: {regex: "^/api/(.*)$"}
+    substitution: '/internal/\1'
+)EOF");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest(
+      {{":path", "/api/foo?q=1"}, {"x-override", "regex"}, {"x-unset-override", "other"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/internal/foo?q=1", upstream_headers->getPathValue());
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace RouteSpecifiers
