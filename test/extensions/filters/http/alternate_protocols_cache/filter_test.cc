@@ -205,6 +205,73 @@ TEST_F(FilterTest, ValidAltSvcMissingPort) {
   filter_->onDestroy();
 }
 
+TEST_F(FilterTest, ValidAltSvcNoUpstreamInfo) {
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
+
+  // Set up the cluster info correctly to have a cache configuration.
+  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  callbacks_.stream_info_.upstream_cluster_info_ = info;
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
+  EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
+      .Times(testing::AnyNumber())
+      .WillOnce(Return(alternate_protocols_cache_));
+
+  EXPECT_CALL(callbacks_, streamInfo())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
+
+  // There is no upstream info (e.g. a local reply before an upstream request was created).
+  callbacks_.stream_info_.upstream_info_ = nullptr;
+
+  // Without an upstream host the cache must not be written to.
+  EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  filter_->onDestroy();
+}
+
+TEST_F(FilterTest, ValidAltSvcNullIp) {
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
+
+  std::shared_ptr<Network::MockResolvedAddress> address =
+      std::make_shared<Network::MockResolvedAddress>("/path/to/uds", "/path/to/uds");
+  std::string hostname = "host1";
+
+  // Set up the cluster info correctly to have a cache configuration.
+  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  callbacks_.stream_info_.upstream_cluster_info_ = info;
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
+  EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
+      .Times(testing::AnyNumber())
+      .WillOnce(Return(alternate_protocols_cache_));
+
+  EXPECT_CALL(callbacks_, streamInfo())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
+  callbacks_.stream_info_.upstream_cluster_info_ = info;
+  EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
+  EXPECT_CALL(callbacks_.stream_info_, upstreamInfo()).Times(testing::AtLeast(1));
+  // Get the pointer to MockHostDescription.
+  std::shared_ptr<const Upstream::MockHostDescription> hd =
+      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
+          callbacks_.stream_info_.upstreamInfo()->upstreamHost());
+  EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
+  // A pipe / UDS address is non-null but has a null ip(). Alternate protocols (HTTP/3 over QUIC)
+  // are only meaningful for IP endpoints, so the filter skips caching rather than inventing a port.
+  EXPECT_CALL(*hd, address()).WillOnce(Return(address));
+  EXPECT_CALL(*address, ip()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  filter_->onDestroy();
+}
+
 } // namespace
 } // namespace AlternateProtocolsCache
 } // namespace HttpFilters
