@@ -48,6 +48,9 @@ public:
   void shutdown() {
     shutdown_ = true;
     xds_config_tracker_.reset();
+    for (auto& [type_url, subscription] : subscriptions_) {
+      subscription->sub_state_.clearXdsConfigTracker();
+    }
   }
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
@@ -58,6 +61,9 @@ public:
 
   void requestOnDemandUpdate(const std::string& type_url,
                              const absl::flat_hash_set<std::string>& for_update) override;
+  void requestOnDemandUpdate(const std::string& type_url,
+                             const absl::flat_hash_set<std::string>& for_update,
+                             const absl::flat_hash_set<std::string>& for_removal) override;
 
   EdsResourcesCacheOptRef edsResourcesCache() override {
     return makeOptRefFromPtr(eds_resources_cache_.get());

@@ -143,6 +143,13 @@ TEST_F(FilesystemSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
   EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028, "0"));
 }
 
+TEST_F(FilesystemSubscriptionImplTest, RequestOnDemandNotImplemented) {
+  EXPECT_ENVOY_BUG(subscription_.requestOnDemandUpdate({"cluster0"}),
+                   "unexpected request for on demand update");
+  EXPECT_ENVOY_BUG(subscription_.requestOnDemandUpdate({"cluster0"}, {"cluster1"}),
+                   "unexpected request for on demand update");
+}
+
 // TODO(htuch): Add generic test harness support for collection subscriptions so that we can test
 // gRPC/HTTP transports similar to below.
 class FilesystemCollectionSubscriptionImplTest : public testing::Test,

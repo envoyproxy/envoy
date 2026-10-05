@@ -115,8 +115,25 @@ public:
                                    OpaqueResourceDecoderSharedPtr resource_decoder,
                                    const SubscriptionOptions& options) PURE;
 
+  /**
+   * Request an on-demand update for a set of resources.
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.config.cluster.v3.Cluster.
+   * @param for_update set of resource names to request on-demand.
+   */
   virtual void requestOnDemandUpdate(const std::string& type_url,
-                                     const absl::flat_hash_set<std::string>& for_update) PURE;
+                                     const absl::flat_hash_set<std::string>& for_update) = 0;
+
+  /**
+   * Request an on-demand update to subscribe to and/or unsubscribe from a set of resources.
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.config.cluster.v3.Cluster.
+   * @param for_update set of resource names to subscribe to on-demand.
+   * @param for_removal set of resource names to unsubscribe from on-demand.
+   */
+  virtual void requestOnDemandUpdate(const std::string& type_url,
+                                     const absl::flat_hash_set<std::string>& for_update,
+                                     const absl::flat_hash_set<std::string>& for_removal) = 0;
 
   /**
    * Returns an EdsResourcesCache for this GrpcMux if there is one.

@@ -198,15 +198,6 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
   }
 
   auto added_removed = watch_map.updateWatchInterest(watch, effective_resources);
-  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
-    ENVOY_LOG(debug,
-              "GrpcMuxImpl::updateWatch calling onResourceUnsubscribed for "
-              "{} resources",
-              added_removed.removed_.size());
-    for (absl::string_view resource : added_removed.removed_) {
-      xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
-    }
-  }
   if (options.use_namespace_matching_) {
     // This is to prevent sending out of requests that contain prefixes instead of resource names
     sub.updateSubscriptionInterest({}, {});
@@ -482,8 +473,14 @@ GrpcMuxDelta::GrpcMuxDelta(GrpcMuxContext& grpc_mux_context)
 // GrpcStreamCallbacks for GrpcMuxDelta
 void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
                                          const absl::flat_hash_set<std::string>& for_update) {
+  requestOnDemandUpdate(type_url, for_update, {});
+}
+
+void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
+                                         const absl::flat_hash_set<std::string>& for_update,
+                                         const absl::flat_hash_set<std::string>& for_removal) {
   auto& sub = subscriptionStateFor(type_url);
-  sub.updateSubscriptionInterest(for_update, {});
+  sub.updateSubscriptionInterest(for_update, for_removal);
   // Tell the server about our change in interest, if any.
   if (sub.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();

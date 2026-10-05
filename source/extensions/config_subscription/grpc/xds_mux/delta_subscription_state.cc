@@ -80,6 +80,9 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     if (actually_erased) {
       names_removed_.insert(r);
       in_initial_legacy_wildcard_ = false;
+      if (xds_config_tracker_.has_value()) {
+        xds_config_tracker_->onResourceUnsubscribed(type_url_, r);
+      }
     }
   }
   // If we unsubscribe from wildcard resource, drop all the resources that came from wildcard from

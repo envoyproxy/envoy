@@ -74,6 +74,9 @@ public:
   void shutdown() override {
     shutdown_ = true;
     xds_config_tracker_.reset();
+    for (auto& [type_url, subscription_state] : subscriptions_) {
+      subscription_state->clearXdsConfigTracker();
+    }
   }
   bool isShutdown() { return shutdown_; }
 
@@ -270,6 +273,9 @@ public:
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
                              const absl::flat_hash_set<std::string>& for_update) override;
+  void requestOnDemandUpdate(const std::string& type_url,
+                             const absl::flat_hash_set<std::string>& for_update,
+                             const absl::flat_hash_set<std::string>& for_removal) override;
 
 private:
   absl::string_view methodName() const override {
@@ -285,6 +291,10 @@ public:
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
+    ENVOY_BUG(false, "unexpected request for on demand update");
+  }
+  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&,
+                             const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
 
@@ -317,6 +327,10 @@ public:
   }
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
+    ENVOY_BUG(false, "unexpected request for on demand update");
+  }
+  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&,
+                             const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
 

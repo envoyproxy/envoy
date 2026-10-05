@@ -132,6 +132,9 @@ public:
               (const absl::flat_hash_set<std::string>& update_to_these_names));
   MOCK_METHOD(void, requestOnDemandUpdate,
               (const absl::flat_hash_set<std::string>& add_these_names));
+  MOCK_METHOD(void, requestOnDemandUpdate,
+              (const absl::flat_hash_set<std::string>& add_these_names,
+               const absl::flat_hash_set<std::string>& remove_these_names));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -192,6 +195,9 @@ public:
   MOCK_METHOD(void, requestOnDemandUpdate,
               (const std::string& type_url,
                const absl::flat_hash_set<std::string>& add_these_names));
+  MOCK_METHOD(void, requestOnDemandUpdate,
+              (const std::string& type_url, const absl::flat_hash_set<std::string>& for_update,
+               const absl::flat_hash_set<std::string>& for_removal));
 
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
 

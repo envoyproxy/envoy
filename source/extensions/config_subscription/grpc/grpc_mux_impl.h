@@ -71,6 +71,8 @@ public:
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
   }
+  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&,
+                             const absl::flat_hash_set<std::string>&) override {}
 
   EdsResourcesCacheOptRef edsResourcesCache() override {
     return makeOptRefFromPtr(eds_resources_cache_.get());

@@ -24,7 +24,9 @@ void SotwSubscriptionState::updateSubscriptionInterest(
     names_tracked_.insert(a);
   }
   for (const auto& r : cur_removed) {
-    names_tracked_.erase(r);
+    if (names_tracked_.erase(r) > 0 && xds_config_tracker_.has_value()) {
+      xds_config_tracker_->onResourceUnsubscribed(type_url_, r);
+    }
   }
   if (!cur_added.empty() || !cur_removed.empty()) {
     update_pending_ = true;

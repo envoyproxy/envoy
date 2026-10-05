@@ -693,6 +693,16 @@ TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
   expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"z"}});
   grpc_mux_->requestOnDemandUpdate("foo", {"z"});
 
+  expectSendMessage(
+      {.type_url = "foo", .resource_names_subscribe = {"w"}, .resource_names_unsubscribe = {"z"}});
+  grpc_mux_->requestOnDemandUpdate("foo", {"w"}, {"z"});
+
+  expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"w"}});
+  grpc_mux_->requestOnDemandUpdate("foo", {}, {"w"});
+
+  // Unsubscribing from a resource that is not subscribed should not trigger a discovery request.
+  grpc_mux_->requestOnDemandUpdate("foo", {}, {"non_existent"});
+
   expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}});
 }
 
@@ -1194,6 +1204,37 @@ TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnConfigRejected) {
       }));
 
   onDiscoveryResponse(std::move(response));
+
+  shutdownMux();
+}
+
+TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnDemandUnsubscribed) {
+  use_config_tracker_ = true;
+  setup();
+
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"w"}, callbacks_, resource_decoder_, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"w"}, .with_node = true});
+  grpc_mux_->start();
+
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}});
+  grpc_mux_->requestOnDemandUpdate(type_url, {"x"});
+
+  EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "x"));
+  EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "non_existent")).Times(0);
+  expectSendMessage({.type_url = type_url,
+                     .resource_names_subscribe = {"y"},
+                     .resource_names_unsubscribe = {"x"}});
+  grpc_mux_->requestOnDemandUpdate(type_url, {"y"}, {"x", "non_existent"});
+
+  // Unsubscribing on-demand from a watched resource ("w") should notify the tracker once,
+  // and destroying the watch afterwards should not notify a second time.
+  EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "w"));
+  expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"w"}});
+  grpc_mux_->requestOnDemandUpdate(type_url, {}, {"w"});
+  foo_sub.reset();
 
   shutdownMux();
 }
