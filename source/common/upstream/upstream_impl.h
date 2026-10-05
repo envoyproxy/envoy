@@ -1346,15 +1346,15 @@ private:
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
 
-  bool initialization_started_{};
   std::function<absl::Status()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
-  const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   ConstLocalitySharedPoolSharedPtr const_locality_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
-  UnitFloat drop_overload_{0};
   std::string drop_category_;
+  UnitFloat drop_overload_{0};
+  bool initialization_started_{};
+  const bool local_cluster_;
   static constexpr int kDropOverloadSize = 1;
 };
 

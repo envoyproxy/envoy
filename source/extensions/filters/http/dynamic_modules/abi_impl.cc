@@ -2107,9 +2107,9 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
 
 void envoy_dynamic_module_callback_http_get_timing_info(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_timing_info* timing_out) {
+    envoy_dynamic_module_type_timing_info_v2* timing_out) {
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  ContextAccessor::getTimingInfo(filter->streamInfo(), timing_out);
+  ContextAccessor::getTimingInfoV2(filter->streamInfo(), timing_out);
 }
 
 void envoy_dynamic_module_callback_http_add_custom_flag(

@@ -1438,7 +1438,7 @@ public:
       return std::make_unique<ContextRecordingAiFilter>(context, seen);
     }});
     setRouteConfig();
-    callbacks_.stream_info_.filterState()->setData(RequestLlmProtocol::FilterStateKey,
+    callbacks_.stream_info_.filterState()->setData(FilterStateKeys::LlmProtocolRequest,
                                                    std::make_shared<RequestLlmProtocol>(named),
                                                    StreamInfo::FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);

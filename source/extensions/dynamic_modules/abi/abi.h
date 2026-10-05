@@ -229,6 +229,56 @@ typedef struct envoy_dynamic_module_type_timing_info {
   int64_t last_downstream_tx_byte_sent_ns;
 } envoy_dynamic_module_type_timing_info;
 
+/**
+ * Stream timing for HTTP filters and access loggers. start_time_unix_ns is a Unix timestamp in
+ * nanoseconds; the other numeric fields are nanosecond offsets from the monotonic request start.
+ * Check each numeric value's has_* field for availability. When the flag is false, the numeric
+ * value is -1. Zero and negative offsets are valid.
+ * downstream_connection_begin_ns records accept time, and downstream_handshake_start_ns records
+ * ClientHello. downstream_connection_end_ns is set only if the request is active when the
+ * connection closes. Envoy tracks the final ACK for QUIC.
+ */
+typedef struct envoy_dynamic_module_type_timing_info_v2 {
+  int64_t start_time_unix_ns;
+  int64_t downstream_connection_begin_ns;
+  int64_t downstream_handshake_start_ns;
+  int64_t downstream_handshake_complete_ns;
+  int64_t last_downstream_header_rx_byte_received_ns;
+  int64_t last_downstream_rx_byte_received_ns;
+  int64_t upstream_connect_start_ns;
+  int64_t upstream_connect_complete_ns;
+  int64_t upstream_handshake_complete_ns;
+  int64_t first_upstream_tx_byte_sent_ns;
+  int64_t last_upstream_tx_byte_sent_ns;
+  int64_t first_upstream_rx_byte_received_ns;
+  int64_t first_upstream_rx_body_byte_received_ns;
+  int64_t last_upstream_rx_byte_received_ns;
+  int64_t first_downstream_tx_byte_sent_ns;
+  int64_t last_downstream_tx_byte_sent_ns;
+  int64_t last_downstream_ack_received_ns;
+  int64_t request_complete_duration_ns;
+  int64_t downstream_connection_end_ns;
+  bool has_start_time;
+  bool has_downstream_connection_begin;
+  bool has_downstream_handshake_start;
+  bool has_downstream_handshake_complete;
+  bool has_last_downstream_header_rx_byte_received;
+  bool has_last_downstream_rx_byte_received;
+  bool has_upstream_connect_start;
+  bool has_upstream_connect_complete;
+  bool has_upstream_handshake_complete;
+  bool has_first_upstream_tx_byte_sent;
+  bool has_last_upstream_tx_byte_sent;
+  bool has_first_upstream_rx_byte_received;
+  bool has_first_upstream_rx_body_byte_received;
+  bool has_last_upstream_rx_byte_received;
+  bool has_first_downstream_tx_byte_sent;
+  bool has_last_downstream_tx_byte_sent;
+  bool has_last_downstream_ack_received;
+  bool has_request_complete;
+  bool has_downstream_connection_end;
+} envoy_dynamic_module_type_timing_info_v2;
+
 typedef enum envoy_dynamic_module_type_http_header_type {
   envoy_dynamic_module_type_http_header_type_RequestHeader,
   envoy_dynamic_module_type_http_header_type_RequestTrailer,
@@ -2987,16 +3037,15 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
 /**
  * Get a snapshot of the current stream timing information.
  *
- * This always populates the module-owned output struct. The request start time is a Unix timestamp;
- * all other fields are durations from the monotonic request start time. Fields are set to -1 when
- * the stream or an individual timing marker is unavailable at the current event hook.
+ * This always populates the module-owned output struct. Each has_* field reports whether its
+ * numeric value is available at the current event hook.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
  * @param timing_out is the module-owned output parameter for timing information.
  */
 void envoy_dynamic_module_callback_http_get_timing_info(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_timing_info* timing_out);
+    envoy_dynamic_module_type_timing_info_v2* timing_out);
 
 /**
  * envoy_dynamic_module_callback_http_filter_http_callout is called by the module to initiate
@@ -7409,6 +7458,9 @@ bool envoy_dynamic_module_callback_access_logger_get_protocol(
     envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_timing_info_v2 for the extended
+ * timing snapshot.
+ *
  * Get timing information from StreamInfo.
  *
  * This always populates the output struct. Individual fields are set to -1 if unavailable.
@@ -7419,6 +7471,19 @@ bool envoy_dynamic_module_callback_access_logger_get_protocol(
 void envoy_dynamic_module_callback_access_logger_get_timing_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_timing_info* timing_out);
+
+/**
+ * Get the extended timing snapshot from StreamInfo.
+ *
+ * This always populates the output struct. Each has_* field reports whether its numeric value is
+ * available.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param timing_out is the output parameter for timing info.
+ */
+void envoy_dynamic_module_callback_access_logger_get_timing_info_v2(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_timing_info_v2* timing_out);
 
 /**
  * Get byte count information from StreamInfo.
