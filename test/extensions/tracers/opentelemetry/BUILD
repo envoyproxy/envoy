@@ -75,6 +75,8 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings:string_view",
     ],
 )
 
