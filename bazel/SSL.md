@@ -32,9 +32,7 @@ not be changed on the release branch unless a bug or security vulnerability whic
 bazel build --config=boringssl-fips //source/exe:envoy-static
 ```
 
-- **Supported architectures:** Linux x86_64. aarch64 does not currently build:
-  the `go-fips` module pins a `linux-amd64` Go toolchain, which BoringSSL's
-  `delocate` step then fails to execute on aarch64.
+- **Supported architectures:** Linux x86_64, aarch64
 - **Version string:** `BoringSSL-FIPS` (visible in `envoy --version`)
 
 ## OpenSSL
