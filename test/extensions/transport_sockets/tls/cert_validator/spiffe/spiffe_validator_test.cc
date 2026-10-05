@@ -1270,8 +1270,12 @@ typed_config:
   ASSERT_OK(initialize(yaml + "\n  allow_optional_client_certificate: false\n"));
   EXPECT_EQ(original_digest, computeSpiffeSessionIdDigest(validator()));
   ASSERT_OK(initialize(yaml + "\n  allow_optional_client_certificate: true\n"));
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_OK(validator().addClientValidationContext(ctx.get(), false));
   const auto optional_digest = computeSpiffeSessionIdDigest(validator());
   EXPECT_NE(original_digest, optional_digest);
+  ASSERT_OK(validator().addClientValidationContext(ctx.get(), true));
+  EXPECT_NE(optional_digest, computeSpiffeSessionIdDigest(validator()));
   setSuppressClientCaList(true);
   ASSERT_OK(initialize(yaml));
   EXPECT_NE(optional_digest, computeSpiffeSessionIdDigest(validator()));

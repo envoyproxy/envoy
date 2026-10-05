@@ -6,6 +6,7 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/ssl_handshaker.h"
 
 #include "test/integration/integration.h"
 
@@ -164,6 +165,106 @@ typed_config:
       sendRequestAndWaitForResponse(default_request_headers_, 1024, default_response_headers_, 512);
   checkSimpleRequestSuccess(1024, 512, response.get());
   checkVerifyErrorCouter(0);
+}
+
+// The listeners share certificates and ticket keys, but differ in client authentication policy.
+TEST_P(SslSPIFFECertValidatorIntegrationTest, AnonymousSessionCannotResumeWithRequiredCertificate) {
+  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  allow_optional_client_certificate: true
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+)EOF"),
+                            *typed_conf);
+  custom_validator_config_ = typed_conf;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    auto* optional_listener = listeners->Mutable(0);
+    auto* transport_socket =
+        optional_listener->mutable_filter_chains(0)->mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    ASSERT_TRUE(transport_socket->typed_config().UnpackTo(&tls_context));
+    tls_context.mutable_session_ticket_keys()->add_keys()->set_filename(
+        TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"));
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
+    auto* required_listener = listeners->Add();
+    *required_listener = *optional_listener;
+    required_listener->set_name("required");
+    required_listener->set_stat_prefix("required");
+    tls_context.mutable_require_client_certificate()->set_value(true);
+    std::ignore = required_listener->mutable_filter_chains(0)
+                      ->mutable_transport_socket()
+                      ->mutable_typed_config()
+                      ->PackFrom(tls_context);
+  });
+  initialize();
+  registerTestServerPorts({"http", "required"});
+
+  ClientSslTransportOptions options;
+  options.no_cert_ = true;
+  options.setTlsVersion(tls_version_);
+  auto client_factory = createClientSslTransportSocketFactory(
+      options, *context_manager_, *api_, &server_factory_context_.serverScope());
+  bssl::UniquePtr<SSL_SESSION> session;
+  static const int session_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+
+  auto connect = [&](uint32_t port) -> Network::ClientConnectionPtr {
+    auto conn = dispatcher_->createClientConnection(
+        getSslAddress(version_, port), Network::Address::InstanceConstSharedPtr(),
+        client_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+    auto* handshaker = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+        conn->ssl().get());
+    SSL* ssl = handshaker->ssl();
+    SSL_set_ex_data(ssl, session_index, &session);
+    // TLS 1.3 tickets arrive after the handshake and must be captured through this callback.
+    SSL_CTX_set_session_cache_mode(SSL_get_SSL_CTX(ssl), SSL_SESS_CACHE_CLIENT);
+    SSL_CTX_sess_set_new_cb(SSL_get_SSL_CTX(ssl), [](SSL* ssl, SSL_SESSION* new_session) -> int {
+      auto* session =
+          static_cast<bssl::UniquePtr<SSL_SESSION>*>(SSL_get_ex_data(ssl, session_index));
+      session->reset(new_session);
+      return 1;
+    });
+    if (session) {
+      EXPECT_EQ(1, SSL_set_session(ssl, session.get()));
+    }
+    return conn;
+  };
+  codec_client_ = makeHttpConnection(connect(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 1024, default_response_headers_, 512);
+  checkSimpleRequestSuccess(1024, 512, response.get());
+  ASSERT_TRUE(session);
+  ASSERT_TRUE(SSL_SESSION_is_resumable(session.get()));
+  codec_client_->close();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Prove the ticket works on the original optional listener.
+  codec_client_ = makeHttpConnection(connect(lookupPort("http")));
+  response =
+      sendRequestAndWaitForResponse(default_request_headers_, 1024, default_response_headers_, 512);
+  checkSimpleRequestSuccess(1024, 512, response.get());
+  auto* handshaker = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      codec_client_->connection()->ssl().get());
+  ASSERT_TRUE(SSL_session_reused(handshaker->ssl()));
+  ASSERT_TRUE(SSL_SESSION_is_resumable(session.get()));
+  codec_client_->close();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  auto conn = connect(lookupPort("required"));
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
+    auto codec = makeRawHttpConnection(std::move(conn), std::nullopt);
+    EXPECT_FALSE(codec->connected());
+  } else {
+    auto codec = makeHttpConnection(std::move(conn));
+    ASSERT_TRUE(codec->waitForDisconnect());
+    codec->close();
+  }
+  EXPECT_EQ(0, test_server_->counter("listener.required.ssl.session_reused")->value());
 }
 
 void SslSPIFFECertValidatorIntegrationTest::testClientCertificateRequired(

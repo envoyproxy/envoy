@@ -160,6 +160,15 @@ ServerContextImpl::ServerContextImpl(
         });
   }
 
+  // Apply the client authentication policy before hashing it for session resumption.
+  if (!config.capabilities().verifies_peer_certificates) {
+    for (auto& ctx : tls_contexts_) {
+      SET_AND_RETURN_IF_NOT_OK(cert_validator_->addClientValidationContext(
+                                   ctx.ssl_ctx_.get(), config.requireClientCertificate()),
+                               creation_status);
+    }
+  }
+
   // Compute the session context ID hash. We use all the certificate identities,
   // since we should have a common ID for session resumption no matter what cert
   // is used. We do this early because it can fail.
@@ -173,11 +182,6 @@ ServerContextImpl::ServerContextImpl(
 
   for (uint32_t i = 0; i < tls_contexts_.size(); ++i) {
     auto& ctx = tls_contexts_[i];
-    if (!config.capabilities().verifies_peer_certificates) {
-      SET_AND_RETURN_IF_NOT_OK(cert_validator_->addClientValidationContext(
-                                   ctx.ssl_ctx_.get(), config.requireClientCertificate()),
-                               creation_status);
-    }
 
     if (!parsed_alpn_protocols_.empty() && !config.capabilities().handles_alpn_selection) {
       SSL_CTX_set_alpn_select_cb(

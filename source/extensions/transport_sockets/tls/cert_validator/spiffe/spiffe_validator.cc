@@ -253,7 +253,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 }
 
 absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool require_client_cert) {
-  if (allow_optional_client_certificate_ && !require_client_cert) {
+  require_client_certificate_ = !allow_optional_client_certificate_ || require_client_cert;
+  if (!require_client_certificate_) {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
   }
 
@@ -308,10 +309,14 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
     rc = EVP_DigestUpdate(md.get(), &suppress, sizeof(suppress));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
-  // Separate optional authentication sessions from the existing mandatory authentication policy.
+  // Hash the effective requirement so anonymous sessions cannot resume where certificates are
+  // required. Keep the digest unchanged for existing deployments that have not opted in.
   if (allow_optional_client_certificate_) {
     constexpr absl::string_view option = "allow_optional_client_certificate";
     rc = EVP_DigestUpdate(md.get(), option.data(), option.size());
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    rc = EVP_DigestUpdate(md.get(), &require_client_certificate_,
+                          sizeof(require_client_certificate_));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 }
