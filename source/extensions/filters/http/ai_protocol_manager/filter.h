@@ -234,9 +234,10 @@ private:
 
   // Copied out of the route configuration rather than held by pointer: the route
   // can be re-resolved mid-stream, which would leave a cached pointer dangling,
-  // and these are two scalars.
+  // and these are scalars.
   bool route_has_request_{false};
   LLMProtocol request_protocol_{LLMProtocol::Unspecified};
+  LLMProtocol route_response_protocol_{LLMProtocol::Unspecified};
 
   JsonWithExtBuf request_json_;
   // Cleared once parsing is done with, whether it completed, was abandoned, or

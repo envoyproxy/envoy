@@ -35,6 +35,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
+RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_formatter_accept_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
@@ -132,6 +133,7 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth2_client_retries_respect_user_retry
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_legacy_cbc_decrypt_compat);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_cluster_no_recreate_stream);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_vhds_no_recreate_stream);
+RUNTIME_GUARD(envoy_reloadable_features_orca_accept_unpadded_base64);
 RUNTIME_GUARD(envoy_reloadable_features_orca_weight_manager_use_named_metrics_first);
 RUNTIME_GUARD(envoy_reloadable_features_pqc_default_ecdh_curves);
 RUNTIME_GUARD(envoy_reloadable_features_preserve_downstream_keepalive);

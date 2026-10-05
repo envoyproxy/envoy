@@ -499,6 +499,7 @@ EXTENSIONS = {
     #
     "envoy.http.ai_filters.request_info":               "//source/extensions/http/ai_filters/request_info:config",
     "envoy.http.ai_filters.schema_validation":          "//source/extensions/http/ai_filters/schema_validation:config",
+    "envoy.http.ai_filters.transcoder":                 "//source/extensions/http/ai_filters/transcoder:config",
 
     #
     # Injected credentials
