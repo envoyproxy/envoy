@@ -133,9 +133,13 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
   // side effect.
   if (new_vhds_subscription != nullptr) {
     vhds_subscription_ = std::move(new_vhds_subscription);
+    // The new subscription starts out subscribed to the route configuration namespace only, so
+    // nothing guarantees any more that the server pushes updates for the ids the old one answered.
+    answered_vhds_resource_ids_.clear();
   } else if (!has_vhds) {
     // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
     vhds_subscription_.reset();
+    answered_vhds_resource_ids_.clear();
   }
   last_vhds_config_hash_ = new_vhds_config_hash;
   rds_virtual_hosts_ = std::move(rds_virtual_hosts);
@@ -187,6 +191,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   // before the update is published, because publishing runs the on-demand VHDS callbacks against
   // resourceIdsInLastVhdsUpdate().
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
+  answered_vhds_resource_ids_.insert(added_resource_ids.begin(), added_resource_ids.end());
   resource_ids_in_last_update_ = std::move(added_resource_ids);
   base_.startWarming();
   return true;

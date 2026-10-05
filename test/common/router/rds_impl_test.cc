@@ -1406,6 +1406,155 @@ virtual_hosts:
                      .size());
 }
 
+class RdsVhdsOnDemandTest : public RdsImplTest {
+public:
+  // Applies an RDS update that configures VHDS and returns the VHDS subscription callbacks.
+  Envoy::Config::SubscriptionCallbacks* setupWithVhds() {
+    setup();
+    auto rds_response = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+        vhdsRdsConfigJson("1"));
+    const auto decoded_rds_resources =
+        TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(rds_response);
+    EXPECT_CALL(init_watcher_, ready());
+    EXPECT_OK(
+        rds_callbacks_->onConfigUpdate(decoded_rds_resources.refvec_, rds_response.version_info()));
+    return server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  }
+
+  // A VHDS delta response resolving the alias for `domain` to a virtual host serving it.
+  static Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
+  aliasedVhdsResources(const std::string& name, const std::string& domain) {
+    auto resources = vhdsResources(name, domain);
+    resources.Mutable(0)->add_aliases("foo_route_config/" + domain);
+    return resources;
+  }
+
+  // A VHDS delta response answering that the virtual host of the aliased domain doesn't exist.
+  static Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
+  emptyVhdsResource(const std::string& domain) {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
+    resources.Add()->set_name("foo_route_config/" + domain);
+    return resources;
+  }
+
+  Envoy::Config::MockSubscription& vhdsSubscription() {
+    return *server_factory_context_.cluster_manager_.subscription_factory_.subscription_;
+  }
+
+  testing::NiceMock<Event::MockDispatcher> local_thread_dispatcher_;
+  testing::MockFunction<void(bool)> mock_callback_;
+  std::shared_ptr<Http::RouteConfigUpdatedCallback> callback_holder_{
+      std::make_shared<Http::RouteConfigUpdatedCallback>(mock_callback_.AsStdFunction())};
+};
+
+// An on-demand request for an alias the server has already resolved is answered from the
+// published route configuration, without another round trip through VHDS.
+TEST_F(RdsVhdsOnDemandTest, AnsweredAliasIsAnsweredLocally) {
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // The server resolves the alias of 'bar.com' to the virtual host 'vhost_bar'.
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+
+  // A later request for the answered alias doesn't go back to the server and is answered with
+  // the existence of the virtual host in the published configuration. Both dispatcher mocks run
+  // their posted callbacks inline.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(true));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+}
+
+// An alias the server answered with an empty resource (the virtual host doesn't exist) is
+// answered locally with 'false' on a repeated request instead of asking the server again.
+TEST_F(RdsVhdsOnDemandTest, AnsweredEmptyAliasIsAnsweredLocally) {
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Land the initial fetch, which is what publishes the route configuration.
+  const auto initial_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(initial_resources.refvec_, {}, "1"));
+
+  // The first request for an unanswered domain goes to the server.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(absl::flat_hash_set<std::string>{
+                                      "foo_route_config/unknown.com"}));
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("unknown.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // The server answers with an empty resource: the virtual host doesn't exist. That answers the
+  // queued request with 'false'.
+  const auto decoded_empty_resource =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          emptyVhdsResource("unknown.com"));
+  EXPECT_CALL(mock_callback_, Call(false));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_empty_resource.refvec_, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // A repeated request for the same domain is answered locally with 'false', without going back
+  // to the server.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(false));
+  rds_->requestVirtualHostsUpdate("unknown.com", local_thread_dispatcher_, callback_holder_);
+}
+
+// A callback that is queued although its alias is already answered (this happens when the
+// request arrives while the answering update is still warming, or when the update that carried
+// the alias is superseded before it is published) is resolved at the next publish, even though
+// that update doesn't carry the alias among its own resource ids.
+TEST_F(RdsVhdsOnDemandTest, QueuedCallbackForAnsweredAliasResolvesOnNextPublish) {
+  TestScopedRuntime scoped_runtime;
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // The server resolves the alias of 'bar.com'.
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+
+  // Queue a callback for the answered alias by disabling the cache for the request. This stands
+  // in for the warming window, which a unit test can't hold open: a request that arrives while
+  // the answering update is warming is queued the same way.
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.vhds_answered_alias_cache", "false"}});
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+
+  // With the cache enabled again, the next publish resolves the queued callback, although the
+  // update carries only an unrelated virtual host.
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.vhds_answered_alias_cache", "true"}});
+  EXPECT_CALL(mock_callback_, Call(true));
+  const auto decoded_other_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_baz", "baz.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_other_resources.refvec_, {}, "2"));
+}
+
+// With the runtime guard disabled, even an answered alias goes back to the server.
+TEST_F(RdsVhdsOnDemandTest, AnsweredAliasCacheDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.vhds_answered_alias_cache", "false"}});
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

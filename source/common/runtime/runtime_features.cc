@@ -190,6 +190,10 @@ RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 // they read is empty, instead of passing that prefix as a string and relying on every filter to
 // prepend it to its stat names itself.
 RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
+// When an on-demand VHDS request asks for an alias the server has already answered (including
+// with an empty resource meaning the virtual host doesn't exist), answer it from the published
+// route configuration instead of sending another VHDS request and waiting for the response.
+RUNTIME_GUARD(envoy_reloadable_features_vhds_answered_alias_cache);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);

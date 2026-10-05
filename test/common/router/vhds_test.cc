@@ -380,6 +380,76 @@ TEST_F(VhdsTest, VhdsUpdateWithoutChangesClearsTheResourceIdsOfTheLastUpdate) {
   EXPECT_TRUE(config_update_info->resourceIdsInLastVhdsUpdate().empty());
 }
 
+// verify that the resource ids of published VHDS updates accumulate, so that a repeated on-demand
+// request for an already answered alias can be answered locally
+TEST_F(VhdsTest, VhdsAnsweredResourceIdsAccumulateAcrossUpdates) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+
+  // The first update delivers a virtual host under its name.
+  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, {}, "2"));
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("my_route/unknown.com"));
+
+  // The second update is an empty resource, the way the server answers for an alias it couldn't
+  // resolve. Its id accumulates next to the one of the first update instead of replacing it.
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_resource;
+  empty_resource.Add()->set_name("my_route/unknown.com");
+  const auto decoded_empty_resource =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(empty_resource);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_empty_resource.refvec_, {}, "3"));
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("my_route/unknown.com"));
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+
+  // Removing the virtual host doesn't withdraw the answer: the published configuration now
+  // answers that the virtual host doesn't exist, and the subscription to the id stays, so the
+  // server pushes an update on its own if the virtual host comes back.
+  const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> nothing_added;
+  const auto decoded_nothing_added =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(nothing_added);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_nothing_added.refvec_, buildRemovedResources({"vhost1"}), "4"));
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+}
+
+// verify that accumulated answers don't survive the VHDS subscription they came from: a changed
+// VHDS configuration creates a new subscription which isn't subscribed to the previously answered
+// aliases, so nothing guarantees pushes for them any more
+TEST_F(VhdsTest, VhdsAnsweredResourceIdsAreDroppedWithTheSubscription) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, {}, "2"));
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+
+  // An RDS update with a different VHDS config source replaces the subscription.
+  const auto updated_route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: another_xds_cluster
+  )EOF");
+  EXPECT_OK(config_update_info->onRdsUpdate(updated_route_config, "2"));
+  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

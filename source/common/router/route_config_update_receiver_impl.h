@@ -17,6 +17,8 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/vhds.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -85,6 +87,15 @@ public:
   const std::set<std::string>& resourceIdsInLastVhdsUpdate() const override {
     return resource_ids_in_last_update_;
   }
+  bool vhdsResourceIdAnswered(const std::string& resource_id) const override {
+    if (configWarming()) {
+      // While an update is warming, the published configuration may predate the answer for id,
+      // return false to indicate that the resource ID has not been answered yet and the caller
+      // should retry after the configuration has finished warming.
+      return false;
+    }
+    return answered_vhds_resource_ids_.contains(resource_id);
+  }
   const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() const override {
     ASSERT(Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::RouteConfiguration>(
         &RouteConfigUpdateReceiverImpl::protobufConfiguration()));
@@ -122,6 +133,8 @@ private:
   // vhosts supplied by VHDS, to be merged with RDS vhosts in onRdsUpdate.
   std::unique_ptr<VirtualHostMap> vhds_virtual_hosts_;
   std::set<std::string> resource_ids_in_last_update_;
+  // All VHDS resource IDs that have been answered by the current subscription.
+  absl::flat_hash_set<std::string> answered_vhds_resource_ids_;
 };
 
 } // namespace Router
