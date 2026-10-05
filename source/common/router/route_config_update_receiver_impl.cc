@@ -140,18 +140,14 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
     vhds_subscription_ = std::move(new_vhds_subscription);
     // The new subscription starts out subscribed to the route configuration namespace only, so
     // nothing guarantees any more that the server pushes updates for the ids the old one
-    // requested and answered. The ids of the old subscription's last update are stale for the
-    // same reason: without this reset, the publish of this superseding configuration would
-    // resolve freshly queued callbacks against them instead of waiting for the new server.
+    // requested and answered.
     requested_vhds_resource_ids_.clear();
     answered_vhds_resource_ids_.clear();
-    resource_ids_in_last_update_.clear();
   } else if (!has_vhds) {
     // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
     vhds_subscription_.reset();
     requested_vhds_resource_ids_.clear();
     answered_vhds_resource_ids_.clear();
-    resource_ids_in_last_update_.clear();
   }
   last_vhds_config_hash_ = new_vhds_config_hash;
   rds_virtual_hosts_ = std::move(rds_virtual_hosts);

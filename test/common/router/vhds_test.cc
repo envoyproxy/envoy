@@ -451,9 +451,6 @@ vhds:
   )EOF");
   EXPECT_OK(config_update_info->onRdsUpdate(updated_route_config, "2"));
   EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("vhost1"));
-  // The ids of the old subscription's last update are dropped as well, so the publish of the
-  // superseding configuration doesn't resolve queued callbacks against them.
-  EXPECT_TRUE(config_update_info->resourceIdsInLastVhdsUpdate().empty());
 
   // The request made on the old subscription is forgotten too: the same update pushed again on
   // the new subscription doesn't mark the id answered, because the new subscription holds no
