@@ -319,6 +319,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:non_copyable",
+        "//source/common/coroutine:backtrace_lib",
         "//source/server:backtrace_lib",
     ],
 )
