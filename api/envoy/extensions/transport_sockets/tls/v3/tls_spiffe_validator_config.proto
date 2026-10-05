@@ -73,4 +73,11 @@ message SPIFFECertValidatorConfig {
   // If DataSource is a file, dynamic file watching will be enabled,
   // and updates to the specified file will trigger a refresh of the trust_bundles.
   config.core.v3.DataSource trust_bundles = 2;
+
+  // Allow optional downstream client certificates. Defaults to false, preserving the requirement
+  // for a client certificate even when
+  // :ref:`require_client_certificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`
+  // is false or unset. When true, that field controls whether a client certificate is required.
+  // Presented certificates are always validated. Upstream certificate validation is unaffected.
+  bool allow_optional_client_certificate = 3;
 }

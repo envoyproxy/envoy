@@ -293,23 +293,53 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
 TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
   ASSERT_OK(initialize());
   Stats::TestUtil::TestStore store;
-  EXPECT_EQ(SSL_VERIFY_PEER,
+  EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
             validator().initializeSslContexts({}, false, *store.rootScope()).value());
 }
 
 TEST_F(TestSPIFFEValidator, TestRequireClientCertificate) {
   ASSERT_OK(initialize());
+  for (bool require_client_certificate : {false, true}) {
+    SSLContextPtr ctx = SSL_CTX_new(TLS_method());
+    const int verify_mode =
+        validator().initializeSslContexts({}, false, *store().rootScope()).value();
+    SSL_CTX_set_verify(ctx.get(), verify_mode, nullptr);
+    ASSERT_OK(validator().addClientValidationContext(ctx.get(), require_client_certificate));
+    EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
+              SSL_CTX_get_verify_mode(ctx.get()));
+  }
+}
 
-  SSLContextPtr optional_ctx = SSL_CTX_new(TLS_method());
-  SSL_CTX_set_verify(optional_ctx.get(), SSL_VERIFY_PEER, nullptr);
-  ASSERT_OK(validator().addClientValidationContext(optional_ctx.get(), false));
-  EXPECT_EQ(SSL_VERIFY_PEER, SSL_CTX_get_verify_mode(optional_ctx.get()));
-
-  SSLContextPtr required_ctx = SSL_CTX_new(TLS_method());
-  SSL_CTX_set_verify(required_ctx.get(), SSL_VERIFY_PEER, nullptr);
-  ASSERT_OK(validator().addClientValidationContext(required_ctx.get(), true));
-  EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-            SSL_CTX_get_verify_mode(required_ctx.get()));
+TEST_F(TestSPIFFEValidator, TestOptionalClientCertificate) {
+  for (bool allow_optional_client_certificate : {false, true}) {
+    for (bool suppress_client_ca_list : {false, true}) {
+      setSuppressClientCaList(suppress_client_ca_list);
+      ASSERT_OK(
+          initialize(TestEnvironment::substitute(fmt::format(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  allow_optional_client_certificate: {}
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/ca_cert.pem"
+  )EOF",
+                                                             allow_optional_client_certificate))));
+      for (bool require_client_certificate : {false, true}) {
+        SSLContextPtr ctx = SSL_CTX_new(TLS_method());
+        const int verify_mode =
+            validator().initializeSslContexts({}, false, *store().rootScope()).value();
+        EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, verify_mode);
+        SSL_CTX_set_verify(ctx.get(), verify_mode, nullptr);
+        ASSERT_OK(validator().addClientValidationContext(ctx.get(), require_client_certificate));
+        const int expected = allow_optional_client_certificate && !require_client_certificate
+                                 ? SSL_VERIFY_PEER
+                                 : SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+        EXPECT_EQ(expected, SSL_CTX_get_verify_mode(ctx.get()));
+      }
+    }
+  }
 }
 
 TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
@@ -1223,6 +1253,28 @@ typed_config:
 
   EXPECT_NE(digest_suppressed, digest_not_suppressed)
       << "Session ID digests must differ when suppress_client_ca_list differs";
+}
+
+TEST_F(TestSPIFFEValidator, OptionalClientCertificateSessionIdDiffers) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF");
+  ASSERT_OK(initialize(yaml));
+  const auto original_digest = computeSpiffeSessionIdDigest(validator());
+  ASSERT_OK(initialize(yaml + "\n  allow_optional_client_certificate: false\n"));
+  EXPECT_EQ(original_digest, computeSpiffeSessionIdDigest(validator()));
+  ASSERT_OK(initialize(yaml + "\n  allow_optional_client_certificate: true\n"));
+  const auto optional_digest = computeSpiffeSessionIdDigest(validator());
+  EXPECT_NE(original_digest, optional_digest);
+  setSuppressClientCaList(true);
+  ASSERT_OK(initialize(yaml));
+  EXPECT_NE(optional_digest, computeSpiffeSessionIdDigest(validator()));
 }
 
 TEST_F(TestSPIFFEValidator, InvalidTrustBundleMapConfig) {

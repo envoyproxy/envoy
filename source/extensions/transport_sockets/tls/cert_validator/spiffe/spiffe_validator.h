@@ -94,6 +94,7 @@ private:
 
   void initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name);
 
+  bool allow_optional_client_certificate_{false};
   bool allow_expired_certificate_{false};
   bool suppress_client_ca_list_{false};
 

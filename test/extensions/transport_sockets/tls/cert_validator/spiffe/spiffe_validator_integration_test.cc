@@ -29,7 +29,11 @@ void SslSPIFFECertValidatorIntegrationTest::initialize() {
     RELEASE_ASSERT(
         filter_chain->mutable_transport_socket()->mutable_typed_config()->UnpackTo(&tls_context),
         "failed to unpack DownstreamTlsContext for SPIFFE validator test listener");
-    tls_context.mutable_require_client_certificate()->set_value(require_client_certificate_);
+    if (require_client_certificate_.has_value()) {
+      tls_context.mutable_require_client_certificate()->set_value(*require_client_certificate_);
+    } else {
+      tls_context.clear_require_client_certificate();
+    }
     std::ignore =
         filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
   });
@@ -136,6 +140,7 @@ TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorAcceptsTls
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  allow_optional_client_certificate: true
   trust_domains:
     - name: lyft.com
       trust_bundle:
@@ -161,21 +166,24 @@ typed_config:
   checkVerifyErrorCouter(0);
 }
 
-TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorRequiresClientCertificate) {
+void SslSPIFFECertValidatorIntegrationTest::testClientCertificateRequired(
+    bool allow_optional_client_certificate) {
   auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
-  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+  TestUtility::loadFromYaml(
+      TestEnvironment::substitute(fmt::format(
+          R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_domains:
+{}  trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
-  )EOF"),
-                            *typed_conf);
+        filename: "{{{{ test_rundir }}}}/test/config/integration/certs/cacert.pem"
+  )EOF",
+          allow_optional_client_certificate ? "  allow_optional_client_certificate: true\n" : "")),
+      *typed_conf);
 
   custom_validator_config_ = typed_conf;
-  require_client_certificate_ = true;
   initialize();
   ClientSslTransportOptions options;
   options.no_cert_ = true;
@@ -188,6 +196,22 @@ typed_config:
     ASSERT_TRUE(codec->waitForDisconnect());
     codec->close();
   }
+}
+
+TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorRequiresClientCertificate) {
+  require_client_certificate_ = true;
+  testClientCertificateRequired(true);
+}
+
+TEST_P(SslSPIFFECertValidatorIntegrationTest,
+       ServerRsaSPIFFEValidatorRequiresClientCertificateByDefault) {
+  testClientCertificateRequired(false);
+}
+
+TEST_P(SslSPIFFECertValidatorIntegrationTest,
+       ServerRsaSPIFFEValidatorRequiresClientCertificateWhenUnset) {
+  require_client_certificate_ = std::nullopt;
+  testClientCertificateRequired(false);
 }
 
 // Client certificate has expired but the config allows expired certificates, so this case should
@@ -247,6 +271,7 @@ TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorSANNotMatc
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  allow_optional_client_certificate: true
   trust_domains:
     - name: lyft.com
       trust_bundle:
@@ -284,6 +309,7 @@ TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorExpiredAnd
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  allow_optional_client_certificate: true
   trust_domains:
     - name: example.com
       trust_bundle:
@@ -313,6 +339,7 @@ TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorRejected1)
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  allow_optional_client_certificate: true
   trust_domains:
     - name: example.com
       trust_bundle:
@@ -341,6 +368,7 @@ TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorRejected2)
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  allow_optional_client_certificate: true
   trust_domains:
     - name: lyft.com
       trust_bundle:
@@ -402,6 +430,7 @@ TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorRejectedWo
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  allow_optional_client_certificate: true
   trust_domains:
     - name: lyft.com
       trust_bundle:

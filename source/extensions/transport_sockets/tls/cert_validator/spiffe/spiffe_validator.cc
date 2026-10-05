@@ -156,6 +156,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
                                ProtobufMessage::getStrictValidationVisitor(), message),
                            creation_status);
 
+  allow_optional_client_certificate_ = message.allow_optional_client_certificate();
+
   if (!config->subjectAltNameMatchers().empty()) {
     for (const auto& matcher : config->subjectAltNameMatchers()) {
       if (matcher.san_type() ==
@@ -251,8 +253,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 }
 
 absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool require_client_cert) {
-  if (require_client_cert) {
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+  if (allow_optional_client_certificate_ && !require_client_cert) {
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
   }
 
   // When suppressed, CAs are still used for validation (loaded via the trust bundle
@@ -306,11 +308,17 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
     rc = EVP_DigestUpdate(md.get(), &suppress, sizeof(suppress));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
+  // Separate optional authentication sessions from the existing mandatory authentication policy.
+  if (allow_optional_client_certificate_) {
+    constexpr absl::string_view option = "allow_optional_client_certificate";
+    rc = EVP_DigestUpdate(md.get(), option.data(), option.size());
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+  }
 }
 
 absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool,
                                                            Stats::Scope&) {
-  return SSL_VERIFY_PEER;
+  return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 }
 
 bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
