@@ -422,6 +422,13 @@ envoy_cc_test(
     ],
     deps = [
         ":vhds_lib",
+        # Required so the on_demand HTTP filter is linked into this test
+        # binary and can be referenced by name from the filter-chain YAML in
+        # OnDemandVhdsRecreateStreamRegressionTest.
+        "//source/extensions/filters/http/on_demand:config",
+        # Required so the trivial ``add-header-filter`` used by the
+        # regression tests (to count decode-chain invocations) is available.
+        "//test/integration/filters:add_header_filter_config_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],

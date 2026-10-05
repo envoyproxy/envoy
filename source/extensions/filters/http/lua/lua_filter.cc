@@ -111,13 +111,18 @@ void parseOptionsFromTable(lua_State* state, int index,
   }
 }
 
-const Protobuf::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
+const Protobuf::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks, absl::string_view ns) {
   if (!callbacks->route()) {
     return Protobuf::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->metadata();
 
-  {
+  if (!ns.empty()) {
+    auto filter_it = metadata.filter_metadata().find(ns);
+    if (filter_it != metadata.filter_metadata().end()) {
+      return filter_it->second;
+    }
+  } else {
     auto filter_it = metadata.filter_metadata().find(callbacks->filterConfigName());
     if (filter_it != metadata.filter_metadata().end()) {
       return filter_it->second;
@@ -793,11 +798,15 @@ int StreamHandleWrapper::luaTrailers(lua_State* state) {
 
 int StreamHandleWrapper::luaMetadata(lua_State* state) {
   ASSERT(state_ == State::Running);
-  if (metadata_wrapper_.get() != nullptr) {
-    metadata_wrapper_.pushStack();
+  const absl::string_view ns = lua_isnoneornil(state, 2)
+                                   ? absl::string_view()
+                                   : Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  if (auto it = metadata_wrappers_.find(ns); it != metadata_wrappers_.end()) {
+    it->second.pushStack();
   } else {
-    metadata_wrapper_.reset(
-        Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.metadata()), true);
+    const auto wrapper =
+        Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.metadata(ns));
+    metadata_wrappers_[ns].reset(wrapper, true);
   }
   return 1;
 }
@@ -1233,8 +1242,8 @@ void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buf
                              HttpResponseCodeDetails::get().LuaResponse);
 }
 
-const Protobuf::Struct& Filter::DecoderCallbacks::metadata() const {
-  return getMetadata(callbacks_);
+const Protobuf::Struct& Filter::DecoderCallbacks::metadata(absl::string_view ns) const {
+  return getMetadata(callbacks_, ns);
 }
 
 void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Instance*,
@@ -1244,8 +1253,8 @@ void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Ins
   luaL_error(state, "respond not currently supported in the response path");
 }
 
-const Protobuf::Struct& Filter::EncoderCallbacks::metadata() const {
-  return getMetadata(callbacks_);
+const Protobuf::Struct& Filter::EncoderCallbacks::metadata(absl::string_view ns) const {
+  return getMetadata(callbacks_, ns);
 }
 
 } // namespace Lua
