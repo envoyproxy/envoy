@@ -81,9 +81,14 @@ absl::Status RdsRouteConfigProviderImpl::onConfigUpdate() {
     return status;
   }
 
+  // Only queued on-demand callbacks are interested in a publish; most providers never have any.
+  if (config_update_callbacks_.empty()) {
+    return absl::OkStatus();
+  }
+
   const bool check_answered_ids =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache");
-  const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
+  const auto& aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) RDS updates don't populate aliases fields in resources, but any publish
   // can resolve a queued callback whose alias an earlier update already answered.
   if (aliases.empty() && !check_answered_ids) {
@@ -132,18 +137,18 @@ ConfigConstSharedPtr RdsRouteConfigProviderImpl::configCast() const {
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
-  auto alias = VhdsSubscription::domainNameToAlias(
-      config_update_info_->protobufConfigurationCast().name(), for_domain);
   // The RdsRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
   // determine if the RdsRouteConfigProviderImpl instance is still valid.
   factory_context_.mainThreadDispatcher().post(
-      [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), alias, &thread_local_dispatcher,
-       route_config_updated_cb]() -> void {
+      [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), for_domain,
+       &thread_local_dispatcher, route_config_updated_cb]() -> void {
         if (!maybe_still_alive.lock()) {
           return;
         }
+        const std::string alias = VhdsSubscription::domainNameToAlias(
+            config_update_info_->protobufConfigurationCast().name(), for_domain);
         if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache") &&
             config_update_info_->vhdsResourceIdAnswered(alias)) {
           // The server has already answered for this alias and the published route configuration

@@ -66,13 +66,16 @@ public:
   virtual const std::set<std::string>& resourceIdsInLastVhdsUpdate() const PURE;
 
   /**
-   * @return whether the given resource id (virtual host name or alias) was received in a VHDS
-   * update that has already been published for the current VHDS subscription. When this returns
-   * true, the published route configuration is the authoritative answer for the id, including a
-   * "doesn't exist" answer that the server gave with an empty resource: the delta subscription to
-   * the id is persistent, so the server pushes a new update on its own if the virtual host
-   * appears, changes or goes away later. Returns false while an update is still warming, because
-   * the published configuration may not reflect the server's answer for the id yet.
+   * @return whether the given resource id was requested on demand from the current VHDS
+   * subscription and received back in an update that has already been published. When this
+   * returns true, the published route configuration is the authoritative answer for the id,
+   * including a "doesn't exist" answer that the server gave with an empty resource: a requested
+   * id is part of the delta subscription interest, which is re-sent when the stream reconnects,
+   * so the server pushes a new update on its own if the virtual host appears, changes or goes
+   * away later. Ids the server volunteered without a request are deliberately never reported as
+   * answered, because no subscription guarantees further pushes for them. Returns false while an
+   * update is still warming, because the published configuration may not reflect the server's
+   * answer for the id yet.
    */
   virtual bool vhdsResourceIdAnswered(const std::string& resource_id) const PURE;
 };

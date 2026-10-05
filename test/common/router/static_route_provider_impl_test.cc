@@ -419,6 +419,23 @@ vhds:
 
   server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
 
+  // All posts, to the main thread and back to the worker, run inline.
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
+      .WillRepeatedly(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
+
+  // The first request for 'example.com' goes to the server and is queued.
+  bool cb_called = false;
+  auto cb = std::make_shared<Http::RouteConfigUpdatedCallback>([&cb_called](bool exists) {
+    cb_called = true;
+    EXPECT_TRUE(exists);
+  });
+  EXPECT_CALL(*subscription_ptr,
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo/example.com"}));
+  provider.requestVirtualHostsUpdate("example.com", server_factory_context_.dispatcher_, cb);
+  EXPECT_FALSE(cb_called);
+
+  // The server resolves the alias, which publishes the route configuration and answers the
+  // queued request.
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   auto* resource = resources.Add();
   resource->set_name("foo/example.com");
@@ -426,19 +443,12 @@ vhds:
   auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(resources, "name");
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+  EXPECT_TRUE(cb_called);
 
-  // A request for the answered alias doesn't go back to the server and is answered with the
-  // existence of the virtual host in the published configuration. The first post is to the main
-  // thread, the second one posts the answer back to the worker.
-  bool cb_called = false;
-  auto cb = std::make_shared<Http::RouteConfigUpdatedCallback>([&cb_called](bool exists) {
-    cb_called = true;
-    EXPECT_TRUE(exists);
-  });
+  // A repeated request for the answered alias doesn't go back to the server and is answered with
+  // the existence of the virtual host in the published configuration.
+  cb_called = false;
   EXPECT_CALL(*subscription_ptr, requestOnDemandUpdate(_)).Times(0);
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-      .Times(2)
-      .WillRepeatedly(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
   provider.requestVirtualHostsUpdate("example.com", server_factory_context_.dispatcher_, cb);
   EXPECT_TRUE(cb_called);
 }

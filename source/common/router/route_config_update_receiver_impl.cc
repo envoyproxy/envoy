@@ -131,15 +131,27 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
   // Now, the state is updated and previous warming update is aborted (if any), we can update the
   // VHDS subscription here. So the destruction of the previous subscription will not bring any
   // side effect.
+  // TODO(wbpcode): all previously requested on-demand VHDS resource IDs are lost when the
+  // subscription is replaced and won't be replayed on the new subscription, so still-queued
+  // requests remain queued until they time out. This is a known limitation that has existed
+  // since the initial implementation of on-demand VHDS requests; it could be addressed in the
+  // future if necessary.
   if (new_vhds_subscription != nullptr) {
     vhds_subscription_ = std::move(new_vhds_subscription);
     // The new subscription starts out subscribed to the route configuration namespace only, so
-    // nothing guarantees any more that the server pushes updates for the ids the old one answered.
+    // nothing guarantees any more that the server pushes updates for the ids the old one
+    // requested and answered. The ids of the old subscription's last update are stale for the
+    // same reason: without this reset, the publish of this superseding configuration would
+    // resolve freshly queued callbacks against them instead of waiting for the new server.
+    requested_vhds_resource_ids_.clear();
     answered_vhds_resource_ids_.clear();
+    resource_ids_in_last_update_.clear();
   } else if (!has_vhds) {
     // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
     vhds_subscription_.reset();
+    requested_vhds_resource_ids_.clear();
     answered_vhds_resource_ids_.clear();
+    resource_ids_in_last_update_.clear();
   }
   last_vhds_config_hash_ = new_vhds_config_hash;
   rds_virtual_hosts_ = std::move(rds_virtual_hosts);
@@ -191,7 +203,15 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   // before the update is published, because publishing runs the on-demand VHDS callbacks against
   // resourceIdsInLastVhdsUpdate().
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
-  answered_vhds_resource_ids_.insert(added_resource_ids.begin(), added_resource_ids.end());
+  // Only ids that were explicitly requested on demand enter the answered cache. The server may
+  // name a resource or attach aliases Envoy never asked for; Envoy holds no subscription
+  // interest in those, so nothing guarantees pushes for them after a stream reconnect, and
+  // answering them locally later would serve permanently stale data without ever subscribing.
+  for (absl::string_view resource_id : added_resource_ids) {
+    if (requested_vhds_resource_ids_.contains(resource_id)) {
+      answered_vhds_resource_ids_.emplace(resource_id);
+    }
+  }
   resource_ids_in_last_update_ = std::move(added_resource_ids);
   base_.startWarming();
   return true;

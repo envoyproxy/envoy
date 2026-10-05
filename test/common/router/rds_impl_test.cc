@@ -1447,23 +1447,54 @@ public:
       std::make_shared<Http::RouteConfigUpdatedCallback>(mock_callback_.AsStdFunction())};
 };
 
-// An on-demand request for an alias the server has already resolved is answered from the
-// published route configuration, without another round trip through VHDS.
+// An on-demand request for an alias the server has already answered to an earlier request is
+// answered from the published route configuration, without another round trip through VHDS.
 TEST_F(RdsVhdsOnDemandTest, AnsweredAliasIsAnsweredLocally) {
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
   ASSERT_NE(nullptr, vhds_callbacks);
 
-  // The server resolves the alias of 'bar.com' to the virtual host 'vhost_bar'.
+  // The first request for 'bar.com' goes to the server and is queued.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // The server resolves the alias of 'bar.com' to the virtual host 'vhost_bar', which answers
+  // the queued request.
+  EXPECT_CALL(mock_callback_, Call(true));
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // A repeated request for the answered alias doesn't go back to the server and is answered with
+  // the existence of the virtual host in the published configuration. Both dispatcher mocks run
+  // their posted callbacks inline.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(true));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+}
+
+// A name or alias the server volunteered without a request never enters the answered cache: the
+// first request for such an alias still goes to the server, so that the alias becomes part of
+// the subscription interest and survives a stream reconnect. Answering it locally instead would
+// serve data the server has no obligation to ever update.
+TEST_F(RdsVhdsOnDemandTest, UnrequestedAliasIsNotAnsweredLocally) {
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // The server pushes 'vhost_bar' with the alias of 'bar.com' unsolicited.
   const auto decoded_vhds_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
           aliasedVhdsResources("vhost_bar", "bar.com"));
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
 
-  // A later request for the answered alias doesn't go back to the server and is answered with
-  // the existence of the virtual host in the published configuration. Both dispatcher mocks run
-  // their posted callbacks inline.
-  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
-  EXPECT_CALL(mock_callback_, Call(true));
+  // The first request for 'bar.com' is not answered locally.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
   rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
 }
 
@@ -1512,11 +1543,16 @@ TEST_F(RdsVhdsOnDemandTest, QueuedCallbackForAnsweredAliasResolvesOnNextPublish)
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
   ASSERT_NE(nullptr, vhds_callbacks);
 
-  // The server resolves the alias of 'bar.com'.
+  // The first request for 'bar.com' goes to the server, which resolves the alias and answers it.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  EXPECT_CALL(mock_callback_, Call(true));
   const auto decoded_vhds_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
           aliasedVhdsResources("vhost_bar", "bar.com"));
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
 
   // Queue a callback for the answered alias by disabling the cache for the request. This stands
   // in for the warming window, which a unit test can't hold open: a request that arrives while

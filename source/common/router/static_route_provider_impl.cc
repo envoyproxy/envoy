@@ -113,9 +113,14 @@ void StaticRouteConfigProviderImpl::VhdsContext::onConfigWarmed() {
   // VHDS fetch.
   local_init_target_.ready();
 
+  // Only queued on-demand callbacks are interested in a publish.
+  if (config_update_callbacks_.empty()) {
+    return;
+  }
+
   const bool check_answered_ids =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache");
-  const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
+  const auto& aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) updates don't populate aliases fields in resources, but any publish can
   // resolve a queued callback whose alias an earlier update already answered.
   if (aliases.empty() && !check_answered_ids) {

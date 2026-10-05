@@ -74,6 +74,7 @@ public:
   }
   void updateOnDemand(const std::string& alias) override {
     if (vhds_subscription_ != nullptr) {
+      requested_vhds_resource_ids_.insert(alias);
       vhds_subscription_->updateOnDemand(alias);
     }
   }
@@ -89,9 +90,9 @@ public:
   }
   bool vhdsResourceIdAnswered(const std::string& resource_id) const override {
     if (configWarming()) {
-      // While an update is warming, the published configuration may predate the answer for id,
-      // return false to indicate that the resource ID has not been answered yet and the caller
-      // should retry after the configuration has finished warming.
+      // While an update is warming, the published configuration may predate the answer for the
+      // id, so return false to indicate that the resource ID has not been answered yet and the
+      // caller should retry after the configuration has finished warming.
       return false;
     }
     return answered_vhds_resource_ids_.contains(resource_id);
@@ -133,7 +134,9 @@ private:
   // vhosts supplied by VHDS, to be merged with RDS vhosts in onRdsUpdate.
   std::unique_ptr<VirtualHostMap> vhds_virtual_hosts_;
   std::set<std::string> resource_ids_in_last_update_;
-  // All VHDS resource IDs that have been answered by the current subscription.
+  // The resource IDs explicitly requested on demand from the current subscription.
+  absl::flat_hash_set<std::string> requested_vhds_resource_ids_;
+  // The requested VHDS resource IDs that have been answered by the current subscription.
   absl::flat_hash_set<std::string> answered_vhds_resource_ids_;
 };
 
