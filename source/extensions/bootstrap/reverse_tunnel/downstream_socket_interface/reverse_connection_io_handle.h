@@ -192,6 +192,15 @@ public:
   Api::IoCallUint64Result close() override;
 
   /**
+   * Return a fresh, unstarted reverse connection handle rather than a raw fd dup. The listener
+   * manager duplicates the listen socket per worker under ``reuse_port`` and on every LDS update,
+   * and a raw dup of this handle's fd never dials and can auto-bind an unadvertised port. The copy
+   * shares the configuration and backs its own dial loop once the worker initializes it.
+   * @return a new ReverseConnectionIOHandle over a fresh unbound TCP socket.
+   */
+  Network::IoHandlePtr duplicate() override;
+
+  /**
    * Stop reverse-connection maintenance on listener teardown. On the owning worker this also
    * shuts down in-flight handshake wrappers and deferred-deletes them.
    */
@@ -480,6 +489,12 @@ private:
    */
   bool isTriggerPipeReady() const;
 
+  /**
+   * Write a trigger byte so accept() consumes a queued tunnel. On a failed write the maintenance
+   * timer is rearmed to retry the wake while a tunnel remains queued.
+   */
+  void signalAcceptReady();
+
   // Host/cluster mapping management
   /**
    * Update cluster -> host mappings from the cluster manager. Called before connection initiation
@@ -536,6 +551,7 @@ private:
   const ReverseConnectionSocketConfig config_; // Configuration for reverse connections
   Upstream::ClusterManager& cluster_manager_;
   ReverseTunnelInitiatorExtension* extension_;
+  Stats::Scope& scope_; // Stats scope, forwarded to handles created by duplicate().
 
   // Connection wrapper management
   std::vector<std::unique_ptr<RCConnectionWrapper>>

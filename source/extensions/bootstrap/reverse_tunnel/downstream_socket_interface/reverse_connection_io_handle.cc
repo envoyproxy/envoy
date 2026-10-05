@@ -61,12 +61,30 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
                                                      const ReverseConnectionSocketConfig& config,
                                                      Upstream::ClusterManager& cluster_manager,
                                                      ReverseTunnelInitiatorExtension* extension,
-                                                     Stats::Scope&)
+                                                     Stats::Scope& scope)
     : IoSocketHandleImpl(fd), config_(config), cluster_manager_(cluster_manager),
-      extension_(extension), original_socket_fd_(fd) {
+      extension_(extension), scope_(scope), original_socket_fd_(fd) {
   ENVOY_LOG_MISC(debug,
                  "Created reverse_tunnel: fd={}, src_node={}, src_cluster: {}, num_clusters={}",
                  fd_, config_.src_node_id, config_.src_cluster_id, config_.remote_clusters.size());
+}
+
+Network::IoHandlePtr ReverseConnectionIOHandle::duplicate() {
+  // The fd only backs the listener until initializeFileEvent() swaps it for the socketpair read
+  // end, and listen() and bind() are no-ops here, so a plain stream socket is a sufficient
+  // placeholder regardless of the listener address family.
+  const Api::SysCallSocketResult socket_result =
+      Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, 0);
+  if (SOCKET_INVALID(socket_result.return_value_)) {
+    ENVOY_LOG(error, "reverse_tunnel: duplicate() failed to create socket: {}",
+              errorDetails(socket_result.errno_));
+    return nullptr;
+  }
+
+  ENVOY_LOG(debug, "reverse_tunnel: duplicate() created fresh handle with fd {}",
+            socket_result.return_value_);
+  return std::make_unique<ReverseConnectionIOHandle>(socket_result.return_value_, config_,
+                                                     cluster_manager_, extension_, scope_);
 }
 
 ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
@@ -441,6 +459,18 @@ void ReverseConnectionIOHandle::resetFileEvents() {
       wrapper->shutdown();
       worker_dispatcher_->deferredDelete(std::move(wrapper));
     }
+
+    // Close any established tunnels still queued for accept() on the worker that owns these
+    // ClientConnections. Leaving them for the main-thread destructor would close worker-owned
+    // connections off thread.
+    while (!established_connections_.empty()) {
+      auto established = std::move(established_connections_.front());
+      established_connections_.pop();
+      if (established.connection != nullptr &&
+          established.connection->state() == Network::Connection::State::Open) {
+        established.connection->close(Network::ConnectionCloseType::NoFlush);
+      }
+    }
   }
 
   IoSocketHandleImpl::resetFileEvents();
@@ -453,6 +483,26 @@ void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
 }
 
 os_fd_t ReverseConnectionIOHandle::getPipeMonitorFd() const { return trigger_pipe_read_fd_; }
+
+void ReverseConnectionIOHandle::signalAcceptReady() {
+  if (!isTriggerPipeReady()) {
+    return;
+  }
+  char trigger_byte = 1;
+  const auto send_result =
+      Api::OsSysCallsSingleton::get().send(trigger_pipe_write_fd_, &trigger_byte, 1, 0);
+  if (send_result.return_value_ == 1) {
+    ENVOY_LOG(debug, "reverse_tunnel: signaled accept() for a queued tunnel");
+    return;
+  }
+  // The wake was not delivered, so rearm the maintenance timer to retry the signal while a tunnel
+  // remains queued. This is practically unreachable given the socketpair buffer size.
+  ENVOY_LOG(error, "reverse_tunnel: failed to write trigger byte: {}",
+            errorDetails(send_result.errno_));
+  if (rev_conn_retry_timer_ != nullptr) {
+    rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(0));
+  }
+}
 
 // Get time source for consistent time operations.
 TimeSource& ReverseConnectionIOHandle::getTimeSource() const {
@@ -1063,6 +1113,12 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
   }
   ENVOY_LOG(debug, "Completed reverse TCP connection maintenance for all clusters.");
 
+  // Re-signal accept() for any tunnel still queued, in case an earlier trigger write was lost. A
+  // spurious wake with an empty queue is harmless.
+  if (!established_connections_.empty()) {
+    signalAcceptReady();
+  }
+
   // Enable the retry timer to periodically check for missing connections (like maintainConnCount).
   if (rev_conn_retry_timer_) {
     const uint64_t retry_timeout_ms = ReverseConnectionUtility::addJitter(
@@ -1381,21 +1437,8 @@ void ReverseConnectionIOHandle::onConnectionDone(
     // the responder coalesced with the handshake response so accept() can replay them.
     established_connections_.push({std::move(released_conn), wrapper->takeHandshakeResidual()});
 
-    // Trigger accept mechanism safely.
-    if (isTriggerPipeReady()) {
-      char trigger_byte = 1;
-      const auto send_result =
-          Api::OsSysCallsSingleton::get().send(trigger_pipe_write_fd_, &trigger_byte, 1, 0);
-      if (send_result.return_value_ == 1) {
-        ENVOY_LOG(info,
-                  "reverse_tunnel: Successfully triggered reverse_conn_listener "
-                  "accept() for host {}",
-                  host_address);
-      } else {
-        ENVOY_LOG(error, "reverse_tunnel: Failed to write trigger byte: {}",
-                  errorDetails(send_result.errno_));
-      }
-    }
+    // Wake accept() so it consumes the queued tunnel.
+    signalAcceptReady();
   }
 
   removeAndDeferredDeleteWrapper(wrapper);
