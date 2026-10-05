@@ -1453,6 +1453,15 @@ TEST_F(RdsVhdsOnDemandTest, AnsweredAliasIsAnsweredLocally) {
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
   ASSERT_NE(nullptr, vhds_callbacks);
 
+  // Land the initial fetch, which is what publishes the route configuration: the alias of a
+  // request is built from the published configuration's name, which is empty before the first
+  // publish. In production a worker can't reach the provider that early, because the initial
+  // fetch gates initialization.
+  const auto initial_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_initial", "initial.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(initial_resources.refvec_, {}, "1"));
+
   // The first request for 'bar.com' goes to the server and is queued.
   EXPECT_CALL(vhdsSubscription(),
               requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
@@ -1466,7 +1475,7 @@ TEST_F(RdsVhdsOnDemandTest, AnsweredAliasIsAnsweredLocally) {
   const auto decoded_vhds_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
           aliasedVhdsResources("vhost_bar", "bar.com"));
-  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "2"));
   ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
 
   // A repeated request for the answered alias doesn't go back to the server and is answered with
@@ -1543,6 +1552,13 @@ TEST_F(RdsVhdsOnDemandTest, QueuedCallbackForAnsweredAliasResolvesOnNextPublish)
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
   ASSERT_NE(nullptr, vhds_callbacks);
 
+  // Land the initial fetch first: a request made before the first publish can't build its alias,
+  // because the published route configuration's name is still empty.
+  const auto initial_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_initial", "initial.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(initial_resources.refvec_, {}, "1"));
+
   // The first request for 'bar.com' goes to the server, which resolves the alias and answers it.
   EXPECT_CALL(vhdsSubscription(),
               requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
@@ -1551,7 +1567,7 @@ TEST_F(RdsVhdsOnDemandTest, QueuedCallbackForAnsweredAliasResolvesOnNextPublish)
   const auto decoded_vhds_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
           aliasedVhdsResources("vhost_bar", "bar.com"));
-  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "2"));
   ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
 
   // Queue a callback for the answered alias by disabling the cache for the request. This stands
@@ -1569,7 +1585,7 @@ TEST_F(RdsVhdsOnDemandTest, QueuedCallbackForAnsweredAliasResolvesOnNextPublish)
   const auto decoded_other_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
           vhdsResources("vhost_baz", "baz.com"));
-  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_other_resources.refvec_, {}, "2"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_other_resources.refvec_, {}, "3"));
 }
 
 // With the runtime guard disabled, even an answered alias goes back to the server.
