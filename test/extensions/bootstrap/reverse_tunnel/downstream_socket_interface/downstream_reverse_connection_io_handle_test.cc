@@ -398,6 +398,80 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
   }
 }
 
+// Bytes the responder coalesced with the handshake response are replayed before the socket on the
+// read() path, then the handle falls through to the socket in order.
+TEST_F(DownstreamReverseConnectionIOHandleTest, ResidualBytesServedBeforeSocketRead) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  auto mock_io_handle = std::make_unique<Network::IoSocketHandleImpl>(fds[0]);
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+  auto* io_handle_ptr = mock_io_handle.release();
+  mock_socket->io_handle_.reset(io_handle_ptr);
+  auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
+
+  const std::string preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+  auto residual = std::make_unique<Buffer::OwnedImpl>();
+  residual->add(preface);
+  auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::move(socket_ptr), io_handle_.get(), "test_key", /*connection_id=*/1,
+      std::move(residual));
+
+  // The first read returns the residual preface rather than touching the socket.
+  Buffer::OwnedImpl buffer;
+  auto result = handle->read(buffer, std::nullopt);
+  EXPECT_EQ(result.err_, nullptr);
+  EXPECT_EQ(result.return_value_, preface.size());
+  EXPECT_EQ(buffer.toString(), preface);
+
+  // The next read falls through to the socket.
+  const std::string socket_data = "application bytes";
+  ASSERT_EQ(write(fds[1], socket_data.data(), socket_data.size()),
+            static_cast<ssize_t>(socket_data.size()));
+  Buffer::OwnedImpl buffer2;
+  auto result2 = handle->read(buffer2, std::nullopt);
+  EXPECT_EQ(result2.err_, nullptr);
+  EXPECT_EQ(buffer2.toString(), socket_data);
+
+  close(fds[1]);
+}
+
+// The TLS read path (readv) also replays the residual before the socket, draining it across calls
+// when the caller slice is smaller than the residual.
+TEST_F(DownstreamReverseConnectionIOHandleTest, ResidualBytesServedBeforeSocketReadv) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  auto mock_io_handle = std::make_unique<Network::IoSocketHandleImpl>(fds[0]);
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+  auto* io_handle_ptr = mock_io_handle.release();
+  mock_socket->io_handle_.reset(io_handle_ptr);
+  auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
+
+  const std::string preface = "PRI * HTTP/2.0\r\n\r\n";
+  auto residual = std::make_unique<Buffer::OwnedImpl>();
+  residual->add(preface);
+  auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::move(socket_ptr), io_handle_.get(), "test_key", /*connection_id=*/2,
+      std::move(residual));
+
+  // A small slice drains the residual across multiple calls, preserving order.
+  std::string assembled;
+  char scratch[8];
+  while (assembled.size() < preface.size()) {
+    Buffer::RawSlice slice{scratch, sizeof(scratch)};
+    auto result = handle->readv(sizeof(scratch), &slice, 1);
+    ASSERT_EQ(result.err_, nullptr);
+    ASSERT_GT(result.return_value_, 0);
+    assembled.append(scratch, result.return_value_);
+  }
+  EXPECT_EQ(assembled, preface);
+
+  close(fds[1]);
+}
+
 // Test read() method with partial data handling using real sockets.
 TEST_F(DownstreamReverseConnectionIOHandleTest, ReadPartialDataAndStateTransitions) {
   const std::string rping_msg = std::string(ReverseConnectionUtility::PING_MESSAGE);
