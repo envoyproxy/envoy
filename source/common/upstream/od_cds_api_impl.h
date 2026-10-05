@@ -44,6 +44,9 @@ public:
 
   // Upstream::OdCdsApi
   void updateOnDemand(std::string cluster_name) override;
+  bool isKnownMissing(absl::string_view cluster_name) const override {
+    return missing_names_.contains(cluster_name);
+  }
 
 private:
   // Config::SubscriptionCallbacks
@@ -68,6 +71,13 @@ private:
   Stats::ScopeSharedPtr scope_;
   StartStatus status_{StartStatus::NotStarted};
   absl::flat_hash_set<std::string> awaiting_names_;
+  // The names requested on demand through this instance. The delta subscription keeps the same
+  // names in its interest, so this mirrors state the subscription already holds and is re-sent
+  // to the server when the stream reconnects.
+  absl::flat_hash_set<std::string> requested_names_;
+  // The requested names the server has answered with "doesn't exist" (via removed_resources)
+  // and that no later update has delivered.
+  absl::flat_hash_set<std::string> missing_names_;
   const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
   Config::SubscriptionPtr subscription_;
 };
@@ -86,6 +96,7 @@ public:
 
   // Upstream::OdCdsApi
   void updateOnDemand(std::string cluster_name) override;
+  bool isKnownMissing(absl::string_view cluster_name) const override;
 
 private:
   class XdstpOdcdsSubscriptionsManager;

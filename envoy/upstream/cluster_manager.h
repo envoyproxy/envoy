@@ -217,6 +217,10 @@ public:
   // Subscribe to a cluster with a given name. It's meant to eventually send a discovery request
   // with the cluster name to the management server.
   virtual void updateOnDemand(std::string cluster_name) PURE;
+
+  // Whether the config source behind this instance has answered an earlier on-demand request for
+  // the cluster with "doesn't exist", and no later update has delivered the cluster.
+  virtual bool isKnownMissing(absl::string_view /*cluster_name*/) const { return false; }
 };
 
 using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
