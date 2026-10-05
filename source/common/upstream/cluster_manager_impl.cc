@@ -995,10 +995,6 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
     ASSERT(inserted);
   }
 
-  if (!cluster_reference.info()->waitForWarmOnInit()) {
-    cluster_entry_it->second->markSkipCdsPause();
-  }
-
   if (cluster_provided_lb) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(lb);
   } else {
@@ -1031,7 +1027,7 @@ void ClusterManagerImpl::updateClusterCounts() {
     // warming clusters hold a CDS pause handle until they finish warming. If a cluster
     // transitions to opt-out via an in-place update, release any existing handle immediately.
     for (const auto& [name, cluster_data] : warming_clusters_) {
-      if (cluster_data->skipCdsPause()) {
+      if (!cluster_data->cluster_->info()->waitForWarmOnInit()) {
         cds_pauses_.erase(name);
       } else if (!cds_pauses_.contains(name)) {
         cds_pauses_.emplace(name, xds_manager_.pause(type_url));

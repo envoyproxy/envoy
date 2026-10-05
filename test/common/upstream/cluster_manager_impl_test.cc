@@ -1993,13 +1993,10 @@ public:
     added_or_updated_ = true;
   }
   bool requiredForAds() const override { return required_for_ads_; }
-  void markSkipCdsPause() override { skip_cds_pause_ = true; }
-  bool skipCdsPause() const override { return skip_cds_pause_; }
 
   NiceMock<MockClusterMockPrioritySet> cluster_;
   bool added_or_updated_{};
   bool required_for_ads_{};
-  bool skip_cds_pause_{};
 };
 
 TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
