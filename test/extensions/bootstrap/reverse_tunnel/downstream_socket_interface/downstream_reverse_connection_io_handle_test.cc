@@ -167,6 +167,23 @@ protected:
                                                                  connection_key, connection_id);
   }
 
+  // Register a tunnel key on the parent so terminal cleanup has something to drop.
+  void registerParentHostKey(const std::string& host, const std::string& cluster,
+                             const std::string& key) {
+    ReverseConnectionIOHandle::HostConnectionInfo info;
+    info.host_address = host;
+    info.cluster_name = cluster;
+    info.target_connection_count = 1;
+    info.connection_keys.insert(key);
+    io_handle_->host_to_conn_info_map_[host] = std::move(info);
+  }
+
+  bool parentHostHasKey(const std::string& host, const std::string& key) const {
+    auto it = io_handle_->host_to_conn_info_map_.find(host);
+    return it != io_handle_->host_to_conn_info_map_.end() &&
+           it->second.connection_keys.contains(key);
+  }
+
   // Test fixtures.
   std::unique_ptr<NiceMock<Network::MockConnectionSocket>> mock_socket_;
   NiceMock<Network::MockIoHandle>* mock_io_handle_; // Raw pointer, managed by socket
@@ -223,6 +240,21 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, CloseMethod) {
     EXPECT_EQ(result2.err_, nullptr);
     EXPECT_ENVOY_BUG(handle->activateFileEvents(0), "Null file_event_");
   }
+}
+
+// A handle disposed without an explicit close(), as a listener filter timeout or rejection does,
+// still runs the terminal cleanup so the parent drops the tunnel key and redials.
+TEST_F(DownstreamReverseConnectionIOHandleTest, DestructorRunsTerminalCleanup) {
+  const std::string connection_key = "destructor_key";
+  registerParentHostKey("192.168.1.1", "test-cluster", connection_key);
+  ASSERT_TRUE(parentHostHasKey("192.168.1.1", connection_key));
+
+  // Destroy the handle without calling close().
+  {
+    auto handle = createHandle(io_handle_.get(), connection_key);
+  }
+
+  EXPECT_FALSE(parentHostHasKey("192.168.1.1", connection_key));
 }
 
 // Test getSocket() method.

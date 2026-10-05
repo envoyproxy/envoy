@@ -3749,6 +3749,8 @@ TEST_F(ReverseConnectionIOHandleTest, ChildMarkTunnelDrainingForwardsKeyAndId) {
       std::unique_ptr<Network::ConnectionSocket>(mock_socket.release()), io_handle_.get(),
       connection_key, /*connection_id=*/77);
 
+  // The child's destructor emits a connection_closed event after the drain, so allow extra logs.
+  EXPECT_CALL(*access_log, log(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*access_log, log(_, _))
       .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata =
@@ -3756,7 +3758,8 @@ TEST_F(ReverseConnectionIOHandleTest, ChildMarkTunnelDrainingForwardsKeyAndId) {
         EXPECT_EQ(metadata.fields().at("event").string_value(), "connection_draining");
         EXPECT_EQ(metadata.fields().at("connection_key").string_value(), connection_key);
         EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "77");
-      }));
+      }))
+      .RetiresOnSaturation();
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _));
 
   child->markTunnelDrainingAndDialReplacement();
@@ -3857,6 +3860,50 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsShutsDownHandshakeWrappers)
   EXPECT_TRUE(getConnWrapperToHostMap().empty());
   // shutdown() deferred-deletes the connection; resetFileEvents() deferred-deletes the wrapper.
   EXPECT_EQ(dispatcher_.to_delete_.size(), deferred_before + 2);
+}
+
+// duplicate() returns a fresh, unstarted reverse connection handle over its own fd rather than a
+// raw fd dup, so every worker and LDS update stands up its own dial loop.
+TEST_F(ReverseConnectionIOHandleTest, DuplicateReturnsFreshHandle) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto dup = io_handle_->duplicate();
+  ASSERT_NE(dup, nullptr);
+  auto* dup_handle = dynamic_cast<ReverseConnectionIOHandle*>(dup.get());
+  ASSERT_NE(dup_handle, nullptr);
+  EXPECT_TRUE(SOCKET_VALID(dup_handle->fdDoNotUse()));
+  EXPECT_NE(dup_handle->fdDoNotUse(), io_handle_->fdDoNotUse());
+}
+
+// resetFileEvents() closes tunnels still queued for accept() on the worker that owns them, so the
+// main-thread destructor does not close worker-owned connections off thread.
+TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsDrainsEstablishedQueue) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+  Event::FileReadyCb cb = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  auto open_conn = getDeletableConn();
+  EXPECT_CALL(*open_conn, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  EXPECT_CALL(*open_conn, close(Network::ConnectionCloseType::NoFlush));
+  addConnectionToEstablishedQueue(std::move(open_conn));
+  ASSERT_EQ(getEstablishedConnectionsSize(), 1);
+
+  io_handle_->resetFileEvents();
+
+  EXPECT_EQ(getEstablishedConnectionsSize(), 0);
 }
 
 } // namespace ReverseConnection
