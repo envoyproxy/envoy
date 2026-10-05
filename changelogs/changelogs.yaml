@@ -42,64 +42,138 @@ sections:
 areas:
   access_log:
     title: access_log
+  admin:
+    title: admin
+  aggregate_cluster:
+    title: aggregate_cluster
+  ai_protocol_manager:
+    title: ai_protocol_manager
   alts:
     title: alts
+  api:
+    title: api
   attributes:
     title: attributes
+  aws:
+    title: aws
   basic_auth:
     title: basic_auth
   build:
     title: build
+  cache:
+    title: cache
+  cares:
+    title: cares
   circuit_breaker:
     title: circuit_breaker
   composite:
     title: composite
+  composite_cluster:
+    title: composite_cluster
   compressor:
     title: compressor
+  config:
+    title: config
   contrib:
     title: contrib
   credential_injector:
     title: credential_injector
+  cpu_utilization:
+    title: cpu_utilization
+  dns:
+    title: dns
   dns_resolver:
     title: dns_resolver
+  drain:
+    title: drain
+  dynamic_forward_proxy:
+    title: dynamic_forward_proxy
   dynamic_modules:
     title: dynamic_modules
+  ext_authz:
+    title: ext_authz
+  ext_proc:
+    title: ext_proc
+  filter_chain:
+    title: filter_chain
+  formatter:
+    title: formatter
   gcp_authn:
     title: gcp_authn
   geoip:
     title: geoip
+  generic_proxy:
+    title: generic_proxy
   golang:
     title: golang
+  grpc_field_extraction:
+    title: grpc_field_extraction
+  grpc_http1_reverse_bridge:
+    title: grpc_http1_reverse_bridge
+  happy_eyeballs:
+    title: happy_eyeballs
   http:
     title: http
   http2:
     title: http2
+  http3:
+    title: http3
+  http_compressor:
+    title: http_compressor
   http_inspector:
     title: http_inspector
   ip_tagging:
     title: ip_tagging
   jwt_authn:
     title: jwt_authn
+  listener:
+    title: listener
   load_balancing:
     title: load_balancing
   load_report:
     title: load_report
+  local_ratelimit:
+    title: local_ratelimit
   logging:
     title: logging
+  lua:
+    title: lua
+  matching:
+    title: matching
+  mcp:
+    title: mcp
   mcp_json_rest_bridge:
     title: mcp_json_rest_bridge
   mcp_router:
     title: mcp_router
+  mcp_transcoder:
+    title: mcp_transcoder
   mysql_proxy:
     title: mysql_proxy
   network_ext_proc:
     title: network_ext_proc
   oauth2:
     title: oauth2
+  on_demand:
+    title: on_demand
+  opentelemetry:
+    title: opentelemetry
+  orca:
+    title: orca
+  original_dst:
+    title: original_dst
+  overload_manager:
+    title: overload_manager
+  postgres_proxy:
+    title: postgres_proxy
+  proxy_protocol:
+    title: proxy_protocol
   quic:
     title: quic
   ratelimit:
     title: ratelimit
+  ratelimit_descriptors:
+    title: ratelimit_descriptors
   rbac:
     title: rbac
   rds:
@@ -112,8 +186,12 @@ areas:
     title: reverse_tunnel
   router:
     title: router
+  safe_regex:
+    title: safe_regex
   sds:
     title: sds
+  server:
+    title: server
   set_metadata_filter:
     title: set_metadata_filter
   sockets:
@@ -130,21 +208,29 @@ areas:
     title: tcp_proxy
   tls:
     title: tls
+  tls_inspector:
+    title: tls_inspector
   tracing:
     title: tracing
-  vhds:
-    title: vhds
-  wasm:
-    title: wasm
-  watchdog:
-    title: watchdog
-  dns:
-    title: dns
-  proxy_protocol:
-    title: proxy_protocol
-  zstd:
-    title: zstd
-  server:
-    title: server
+  thrift_proxy:
+    title: thrift_proxy
   udp:
     title: udp
+  upstream:
+    title: upstream
+  uri_template:
+    title: uri_template
+  url_normalization:
+    title: url_normalization
+  vhds:
+    title: vhds
+  watchdog:
+    title: watchdog
+  wasm:
+    title: wasm
+  websocket:
+    title: websocket
+  zipkin:
+    title: zipkin
+  zstd:
+    title: zstd

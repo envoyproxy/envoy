@@ -2211,7 +2211,7 @@ TEST_F(LuaStatsScopeWrapperTest, HistogramUnits) {
 
   auto latency_ns = store_.findHistogramByString("lua.latency_ns");
   ASSERT_TRUE(latency_ns.has_value());
-  EXPECT_EQ(Stats::Histogram::Unit::Nanoseconds, latency_ns->get().unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Nanoseconds, latency_ns->unit());
 
   auto count = store_.findHistogramByString("lua.count");
   ASSERT_TRUE(count.has_value());
@@ -2282,6 +2282,91 @@ TEST_F(LuaStatsScopeWrapperTest, StatsPrefix) {
 
   // Verify the counter was created with the full prefix.
   EXPECT_EQ(1, store_.counter("http.lua.custom.my.counter").value());
+  wrapper.reset();
+}
+
+// Test that RouteWrapper returns metadata under the namespace that is specified by the script
+// rather than the filter config name.
+TEST_F(LuaRouteWrapperTest, GetMetadataWithNamespace) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      testPrint(object:metadata("custom.namespace"):get("foo.bar")["name"])
+      testPrint(object:metadata("another.namespace"):get("foo.bar")["name"])
+      -- The default namespace is still the filter config name.
+      testPrint(object:metadata():get("foo.bar")["name"])
+      testPrint(object:metadata(nil):get("foo.bar")["name"])
+      testPrint(object:metadata(""):get("foo.bar")["name"])
+      -- The wrappers of different namespaces could be used at the same time.
+      local custom = object:metadata("custom.namespace")
+      local default = object:metadata()
+      testPrint(custom:get("foo.bar")["prop"])
+      testPrint(default:get("foo.bar")["prop"])
+      -- The namespace that does not exist results in empty metadata.
+      for _, _ in pairs(object:metadata("unknown.namespace")) do
+        return
+      end
+      testPrint("No metadata found")
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+      custom.namespace:
+        foo.bar:
+          name: custom-foo
+          prop: custom-bar
+      another.namespace:
+        foo.bar:
+          name: another-foo
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  TestUtility::loadFromYaml(METADATA, route->metadata_);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.route_ = route;
+
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
+      RouteWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"), true);
+
+  EXPECT_CALL(printer_, testPrint("custom-foo"));
+  EXPECT_CALL(printer_, testPrint("another-foo"));
+  EXPECT_CALL(printer_, testPrint("foo")).Times(3);
+  EXPECT_CALL(printer_, testPrint("custom-bar"));
+  EXPECT_CALL(printer_, testPrint("bar"));
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  EXPECT_OK(start("callMe"));
+  wrapper.reset();
+}
+
+// Test that RouteWrapper rejects the namespace that is not a string.
+TEST_F(LuaRouteWrapperTest, GetMetadataWithBadNamespace) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:metadata({})
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
+      RouteWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"), true);
+
+  EXPECT_THAT(
+      start("callMe"),
+      StatusHelpers::HasStatusMessage(
+          "[string \"...\"]:3: bad argument #1 to 'metadata' (string expected, got table)"));
   wrapper.reset();
 }
 

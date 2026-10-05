@@ -212,6 +212,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
+        "//envoy/router:string_accessor_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
