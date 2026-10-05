@@ -1825,6 +1825,499 @@ TEST_P(McpNameHeaderDecodingTest, ValidatesDecodedMcpNameHeader) {
   }
 }
 
+// Tests for the validation of configured Mcp-Param-{name} headers.
+class McpParamHeaderTest : public McpJsonRestBridgeFilterTest {
+public:
+  void SetUp() override {
+    McpJsonRestBridgeFilterTest::SetUp();
+    proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+        "2026-07-28");
+    TestUtility::loadFromYaml(R"yaml(
+name: param_tool
+http_rule:
+  post: "/v1/params"
+  body: "*"
+mcp_param_headers:
+  - name: Region
+    property_path: ["region"]
+    type: STRING
+  - name: Count
+    property_path: ["count"]
+    type: INTEGER
+  - name: Dry-Run
+    property_path: ["dry_run"]
+    type: BOOLEAN
+  - name: Dotted
+    property_path: ["user.region"]
+    type: STRING
+  - name: Nested
+    property_path: ["user", "region"]
+    type: STRING
+)yaml",
+                              *proto_config_.mutable_tool_config()->add_tools());
+  }
+
+  void decodeToolsCallHeaders(absl::string_view tool_name,
+                              const std::vector<std::pair<std::string, std::string>>& extra_headers,
+                              bool stateless = true) {
+    request_headers_ = {{":method", "POST"},
+                        {":path", "/mcp"},
+                        {"mcp-method", "tools/call"},
+                        {"mcp-name", std::string(tool_name)}};
+    if (stateless) {
+      request_headers_.addCopy(Http::LowerCaseString("mcp-protocol-version"), "2026-07-28");
+    }
+    for (const auto& [name, value] : extra_headers) {
+      request_headers_.addCopy(Http::LowerCaseString(name), value);
+    }
+    EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+              Http::FilterHeadersStatus::StopIteration);
+  }
+
+  static std::string toolsCallBody(absl::string_view tool_name, const nlohmann::json& arguments,
+                                   bool stateless = true) {
+    nlohmann::json params = {{"name", std::string(tool_name)}, {"arguments", arguments}};
+    if (stateless) {
+      params["_meta"] = {{"io.modelcontextprotocol/protocolVersion", "2026-07-28"},
+                         {"io.modelcontextprotocol/clientCapabilities", nlohmann::json::object()}};
+    }
+    return nlohmann::json{
+        {"jsonrpc", "2.0"}, {"id", 123}, {"method", "tools/call"}, {"params", params}}
+        .dump();
+  }
+
+  void expectHeaderMismatch(absl::string_view header_name) {
+    EXPECT_CALL(
+        decoder_callbacks_,
+        sendLocalReply(
+            Eq(Http::Code::BadRequest),
+            testing::AllOf(testing::HasSubstr(R"json("code":-32020)json"),
+                           testing::HasSubstr(absl::StrCat(
+                               header_name, " header does not match the request body arguments"))),
+            _, _, StrEq("mcp_json_rest_bridge_request_mcp_header_mismatch")));
+  }
+};
+
+struct McpParamHeaderCase {
+  std::string test_name;
+  std::string arguments;
+  std::vector<std::pair<std::string, std::string>> headers;
+  std::string mismatched_header;
+};
+
+void PrintTo(const McpParamHeaderCase& test_case, std::ostream* os) { *os << test_case.test_name; }
+
+class McpParamHeaderValidationTest : public McpParamHeaderTest,
+                                     public testing::WithParamInterface<McpParamHeaderCase> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    McpParamHeaderValidation, McpParamHeaderValidationTest,
+    testing::ValuesIn(std::vector<McpParamHeaderCase>{
+        // Presence.
+        {"BothAbsent", R"({})", {}, ""},
+        {"ArgumentNullAndHeaderAbsent", R"({"region":null})", {}, ""},
+        {"ArgumentPresentAndHeaderMissing", R"({"region":"us-west1"})", {}, "mcp-param-region"},
+        {"HeaderPresentAndArgumentMissing",
+         R"({})",
+         {{"mcp-param-region", "us-west1"}},
+         "mcp-param-region"},
+        {"HeaderPresentAndArgumentNull",
+         R"({"region":null})",
+         {{"mcp-param-region", "null"}},
+         "mcp-param-region"},
+        {"DuplicateHeaderAndArgumentPresent",
+         R"({"region":"us-west1"})",
+         {{"mcp-param-region", "us-west1"}, {"mcp-param-region", "us-west1"}},
+         "mcp-param-region"},
+        {"DuplicateHeaderAndArgumentMissing",
+         R"({})",
+         {{"mcp-param-region", "us-west1"}, {"mcp-param-region", "us-west1"}},
+         "mcp-param-region"},
+        // STRING.
+        {"StringMatches", R"({"region":"us-west1"})", {{"mcp-param-region", "us-west1"}}, ""},
+        {"HeaderNameIsCaseInsensitive",
+         R"({"region":"us-west1"})",
+         {{"MCP-PARAM-REGION", "us-west1"}},
+         ""},
+        {"StringMismatch",
+         R"({"region":"us-west1"})",
+         {{"mcp-param-region", "us-east1"}},
+         "mcp-param-region"},
+        {"StringIsCaseSensitive",
+         R"({"region":"us-west1"})",
+         {{"mcp-param-region", "US-WEST1"}},
+         "mcp-param-region"},
+        {"StringWithInteriorSpaceAndTabMatches",
+         R"({"region":"us west\t1"})",
+         {{"mcp-param-region", "us west\t1"}},
+         ""},
+        {"Base64NonAsciiStringMatches",
+         R"({"region":"Hello, \u4e16\u754c"})",
+         {{"mcp-param-region", "=?base64?SGVsbG8sIOS4lueVjA==?="}},
+         ""},
+        {"Base64ControlCharacterStringMatches",
+         R"({"region":"line1\nline2"})",
+         {{"mcp-param-region", "=?base64?bGluZTEKbGluZTI=?="}},
+         ""},
+        {"Base64StringMismatch",
+         R"({"region":"Hello"})",
+         {{"mcp-param-region", "=?base64?SGVsbG8sIOS4lueVjA==?="}},
+         "mcp-param-region"},
+        {"MalformedBase64IsRejected",
+         R"({"region":"us-west1"})",
+         {{"mcp-param-region", "=?base64?%%%?="}},
+         "mcp-param-region"},
+        {"StringArgumentMustBeAString",
+         R"({"region":42})",
+         {{"mcp-param-region", "42"}},
+         "mcp-param-region"},
+        // Raw header characters.
+        {"RawNonAsciiValueIsRejected",
+         R"({"region":"caf\u00e9"})",
+         {{"mcp-param-region", "caf\xc3\xa9"}},
+         "mcp-param-region"},
+        {"RawDeleteCharacterIsRejected",
+         R"({"region":"us\u007fwest1"})",
+         {{"mcp-param-region", "us\x7f"
+                               "west1"}},
+         "mcp-param-region"},
+        {"RawControlCharacterIsRejected",
+         R"({"region":"us\u0001west1"})",
+         {{"mcp-param-region", "us\x01"
+                               "west1"}},
+         "mcp-param-region"},
+        // BOOLEAN.
+        {"BooleanTrueMatches", R"({"dry_run":true})", {{"mcp-param-dry-run", "true"}}, ""},
+        {"BooleanFalseMatches", R"({"dry_run":false})", {{"mcp-param-dry-run", "false"}}, ""},
+        {"BooleanMismatch",
+         R"({"dry_run":true})",
+         {{"mcp-param-dry-run", "false"}},
+         "mcp-param-dry-run"},
+        {"BooleanHeaderIsCaseSensitive",
+         R"({"dry_run":true})",
+         {{"mcp-param-dry-run", "True"}},
+         "mcp-param-dry-run"},
+        {"BooleanHeaderMustBeTrueOrFalse",
+         R"({"dry_run":true})",
+         {{"mcp-param-dry-run", "1"}},
+         "mcp-param-dry-run"},
+        {"BooleanArgumentMustBeABoolean",
+         R"({"dry_run":"true"})",
+         {{"mcp-param-dry-run", "true"}},
+         "mcp-param-dry-run"},
+        // INTEGER.
+        {"IntegerMatches", R"({"count":42})", {{"mcp-param-count", "42"}}, ""},
+        {"NegativeIntegerMatches", R"({"count":-7})", {{"mcp-param-count", "-7"}}, ""},
+        {"IntegralFloatArgumentMatchesInteger",
+         R"({"count":42.0})",
+         {{"mcp-param-count", "42"}},
+         ""},
+        {"IntegerArgumentMatchesIntegralDecimalHeader",
+         R"({"count":42})",
+         {{"mcp-param-count", "42.0"}},
+         ""},
+        {"MaxSafeIntegerMatches",
+         R"({"count":9007199254740991})",
+         {{"mcp-param-count", "9007199254740991"}},
+         ""},
+        {"MinSafeIntegerMatches",
+         R"({"count":-9007199254740991})",
+         {{"mcp-param-count", "-9007199254740991"}},
+         ""},
+        {"IntegerMismatch", R"({"count":42})", {{"mcp-param-count", "43"}}, "mcp-param-count"},
+        {"NonIntegralArgumentIsRejected",
+         R"({"count":42.5})",
+         {{"mcp-param-count", "42.5"}},
+         "mcp-param-count"},
+        {"NonIntegralHeaderIsRejected",
+         R"({"count":42})",
+         {{"mcp-param-count", "42.5"}},
+         "mcp-param-count"},
+        // Exact parsing: as doubles, these header values would round to the integral argument.
+        {"NonIntegralHeaderNearSafeRangeLimitIsRejected",
+         R"({"count":9007199254740990})",
+         {{"mcp-param-count", "9007199254740990.5"}},
+         "mcp-param-count"},
+        {"HeaderWithTinyFractionIsRejected",
+         R"({"count":42})",
+         {{"mcp-param-count", "42.00000000000000001"}},
+         "mcp-param-count"},
+        {"MaxSafeIntegerWithZeroFractionMatches",
+         R"({"count":9007199254740991})",
+         {{"mcp-param-count", "9007199254740991.000"}},
+         ""},
+        {"HeaderWithEmptyFractionIsRejected",
+         R"({"count":42})",
+         {{"mcp-param-count", "42."}},
+         "mcp-param-count"},
+        {"HeaderWithPlusSignIsRejected",
+         R"({"count":42})",
+         {{"mcp-param-count", "+42"}},
+         "mcp-param-count"},
+        {"HeaderWithExponentIsRejected",
+         R"({"count":1000})",
+         {{"mcp-param-count", "1e3"}},
+         "mcp-param-count"},
+        {"HeaderWithoutDigitsIsRejected",
+         R"({"count":42})",
+         {{"mcp-param-count", "-"}},
+         "mcp-param-count"},
+        {"EmptyHeaderDoesNotMatchZero",
+         R"({"count":0})",
+         {{"mcp-param-count", ""}},
+         "mcp-param-count"},
+        {"InfiniteHeaderIsRejected",
+         R"({"count":42})",
+         {{"mcp-param-count", "inf"}},
+         "mcp-param-count"},
+        {"NanHeaderIsRejected", R"({"count":0})", {{"mcp-param-count", "nan"}}, "mcp-param-count"},
+        {"HexadecimalHeaderIsRejected",
+         R"({"count":26})",
+         {{"mcp-param-count", "0x1a"}},
+         "mcp-param-count"},
+        // " 42 ", which Base64 can carry even though plain header values are trimmed.
+        {"Base64IntegerHeaderWithSpacesIsRejected",
+         R"({"count":42})",
+         {{"mcp-param-count", "=?base64?IDQyIA==?="}},
+         "mcp-param-count"},
+        {"ArgumentAboveSafeRangeIsRejected",
+         R"({"count":9007199254740992})",
+         {{"mcp-param-count", "9007199254740992"}},
+         "mcp-param-count"},
+        {"ArgumentBelowSafeRangeIsRejected",
+         R"({"count":-9007199254740992})",
+         {{"mcp-param-count", "-9007199254740992"}},
+         "mcp-param-count"},
+        // 2^64 - 1 only fits in an unsigned 64-bit integer. Read as signed, it would be -1.
+        {"UnsignedArgumentAboveInt64RangeIsRejected",
+         R"({"count":18446744073709551615})",
+         {{"mcp-param-count", "-1"}},
+         "mcp-param-count"},
+        {"FloatArgumentAboveSafeRangeIsRejected",
+         R"({"count":9007199254740992.0})",
+         {{"mcp-param-count", "9007199254740992"}},
+         "mcp-param-count"},
+        {"HeaderAboveSafeRangeIsRejected",
+         R"({"count":9007199254740991})",
+         {{"mcp-param-count", "9007199254740992"}},
+         "mcp-param-count"},
+        {"IntegerArgumentMustBeANumber",
+         R"({"count":"42"})",
+         {{"mcp-param-count", "42"}},
+         "mcp-param-count"},
+        {"Base64IntegerHeaderMatches",
+         R"({"count":42})",
+         {{"mcp-param-count", "=?base64?NDI=?="}},
+         ""},
+        // Literal property paths.
+        {"DottedLiteralKeyMatches", R"({"user.region":"eu"})", {{"mcp-param-dotted", "eu"}}, ""},
+        {"DottedLiteralKeyIsNotSplit",
+         R"({"user":{"region":"eu"}})",
+         {{"mcp-param-dotted", "eu"}, {"mcp-param-nested", "eu"}},
+         "mcp-param-dotted"},
+        {"NestedPathMatches", R"({"user":{"region":"eu"}})", {{"mcp-param-nested", "eu"}}, ""},
+        {"NestedPathDoesNotMatchDottedKey",
+         R"({"user.region":"eu"})",
+         {{"mcp-param-dotted", "eu"}, {"mcp-param-nested", "eu"}},
+         "mcp-param-nested"},
+        {"NestedPathWithMissingLeafIsAbsent", R"({"user":{}})", {}, ""},
+        {"NestedPathThroughNonObjectIsAbsent", R"({"user":"eu"})", {}, ""},
+        {"HeaderForNestedPathThroughNonObjectIsRejected",
+         R"({"user":"eu"})",
+         {{"mcp-param-nested", "eu"}},
+         "mcp-param-nested"},
+        {"HeaderForNestedPathThroughNullIsRejected",
+         R"({"user":null})",
+         {{"mcp-param-nested", "eu"}},
+         "mcp-param-nested"},
+        // Multiple mappings.
+        {"MultipleMappingsAllMatch",
+         R"({"region":"us-west1","count":3,"dry_run":false,"user":{"region":"eu"}})",
+         {{"mcp-param-region", "us-west1"},
+          {"mcp-param-count", "3"},
+          {"mcp-param-dry-run", "false"},
+          {"mcp-param-nested", "eu"}},
+         ""},
+        {"MultipleMappingsWithOneMismatch",
+         R"({"region":"us-west1","count":3,"dry_run":false,"user":{"region":"eu"}})",
+         {{"mcp-param-region", "us-west1"},
+          {"mcp-param-count", "4"},
+          {"mcp-param-dry-run", "false"},
+          {"mcp-param-nested", "eu"}},
+         "mcp-param-count"},
+    }),
+    [](const testing::TestParamInfo<McpParamHeaderCase>& info) { return info.param.test_name; });
+
+TEST_P(McpParamHeaderValidationTest, ValidatesConfiguredHeaders) {
+  const McpParamHeaderCase& test_case = GetParam();
+  ASSERT_OK(makeFilter());
+  decodeToolsCallHeaders("param_tool", test_case.headers);
+  Buffer::OwnedImpl body(toolsCallBody("param_tool", nlohmann::json::parse(test_case.arguments)));
+
+  if (test_case.mismatched_header.empty()) {
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+    EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+    EXPECT_THAT(request_headers_.getPathValue(), StrEq("/v1/params"));
+    EXPECT_THAT(request_headers_.getMethodValue(), StrEq("POST"));
+  } else {
+    expectHeaderMismatch(test_case.mismatched_header);
+    EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+              Http::FilterDataStatus::StopIterationNoBuffer);
+    EXPECT_THAT(request_headers_.getPathValue(), StrEq("/mcp"));
+  }
+}
+
+TEST_F(McpParamHeaderTest, MissingArgumentsFieldWithHeaderIsRejected) {
+  ASSERT_OK(makeFilter());
+  decodeToolsCallHeaders("param_tool", {{"mcp-param-region", "us-west1"}});
+
+  expectHeaderMismatch("mcp-param-region");
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"param_tool","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpParamHeaderTest, ValidatedHeaderIsForwardedUnchanged) {
+  ASSERT_OK(makeFilter());
+  decodeToolsCallHeaders("param_tool", {{"mcp-param-region", "=?base64?dXMtd2VzdDE=?="}});
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  Buffer::OwnedImpl body(toolsCallBody("param_tool", {{"region", "us-west1"}}));
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  EXPECT_EQ(request_headers_.get_("mcp-param-region"), "=?base64?dXMtd2VzdDE=?=");
+}
+
+TEST_F(McpParamHeaderTest, LegacyRequestSkipsValidation) {
+  ASSERT_OK(makeFilter());
+  decodeToolsCallHeaders("param_tool", {{"mcp-param-region", "us-east1"}}, /*stateless=*/false);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  Buffer::OwnedImpl body(
+      toolsCallBody("param_tool", {{"region", "us-west1"}, {"count", 1}}, /*stateless=*/false));
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/v1/params"));
+}
+
+TEST_F(McpParamHeaderTest, ToolWithoutMappingsIgnoresParamHeaders) {
+  ASSERT_OK(makeFilter());
+  decodeToolsCallHeaders("list_api_keys", {{"mcp-param-region", "us-east1"}});
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  Buffer::OwnedImpl body(toolsCallBody(
+      "list_api_keys", {{"parent", "projects/test-codelab"}, {"region", "us-west1"}}));
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(),
+              StrEq("/v1/projects/test-codelab/apiKeys?region=us-west1"));
+}
+
+TEST_F(McpParamHeaderTest, UnconfiguredParamHeaderIsIgnored) {
+  ASSERT_OK(makeFilter());
+  decodeToolsCallHeaders("param_tool", {{"mcp-param-other", "value"}});
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  Buffer::OwnedImpl body(toolsCallBody("param_tool", {{"other", "different"}}));
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+}
+
+TEST_F(McpParamHeaderTest, ToolsListIgnoresParamHeaders) {
+  ASSERT_OK(makeFilter());
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"mcp-method", "tools/list"},
+                      {"mcp-protocol-version", "2026-07-28"},
+                      {"mcp-param-region", "us-west1"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(),
+              StrEq("/discovery/v1/service/foo.googleapis.com/mcptools"));
+}
+
+TEST_F(McpParamHeaderTest, UnknownToolKeepsUnknownToolError) {
+  ASSERT_OK(makeFilter());
+  decodeToolsCallHeaders("unknown_tool", {{"mcp-param-region", "us-west1"}});
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK),
+                             StrEq(R"json({"code":-32602,"message":"Unknown tool"})json"), _, _,
+                             StrEq("mcp_json_rest_bridge_request_tools_call_tool_name_unknown")));
+  Buffer::OwnedImpl body(toolsCallBody("unknown_tool", {{"region", "us-east1"}}));
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpParamHeaderTest, MalformedArgumentsKeepMalformedArgumentsError) {
+  ASSERT_OK(makeFilter());
+  decodeToolsCallHeaders("param_tool", {{"mcp-param-region", "us-west1"}});
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(
+                  Eq(Http::Code::OK),
+                  StrEq(R"json({"code":-32602,"message":"Tool arguments must be an object"})json"),
+                  _, _, StrEq("mcp_json_rest_bridge_request_tools_call_arguments_malformed")));
+  Buffer::OwnedImpl body(toolsCallBody("param_tool", "us-west1"));
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpParamHeaderTest, MismatchedMcpNameKeepsMcpNameError) {
+  ASSERT_OK(makeFilter());
+  decodeToolsCallHeaders("list_api_keys", {{"mcp-param-region", "us-east1"}});
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::BadRequest),
+                             testing::HasSubstr("Mcp-Name header does not match"), _, _,
+                             StrEq("mcp_json_rest_bridge_request_mcp_header_mismatch")));
+  Buffer::OwnedImpl body(toolsCallBody("param_tool", {{"region", "us-west1"}}));
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpParamHeaderTest, PerRouteConfigMappingsAreValidated) {
+  ASSERT_OK(makeFilter());
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      per_route_proto;
+  TestUtility::loadFromYaml(R"yaml(
+tool_config:
+  - tools:
+      - name: route_tool
+        http_rule:
+          get: "/v1/route"
+        mcp_param_headers:
+          - name: Zone
+            property_path: ["zone"]
+            type: STRING
+)yaml",
+                            per_route_proto);
+  ASSERT_OK_AND_ASSIGN(auto per_route_config,
+                       McpJsonRestBridgePerRouteConfig::create(per_route_proto));
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig)
+      .WillByDefault(Return(per_route_config.get()));
+  decodeToolsCallHeaders("route_tool", {{"mcp-param-zone", "b"}});
+
+  expectHeaderMismatch("mcp-param-zone");
+  Buffer::OwnedImpl body(toolsCallBody("route_tool", {{"zone", "a"}}));
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpParamHeaderTest, ConfigWithoutToolReturnsNoMappings) {
+  ASSERT_OK(makeFilter());
+  EXPECT_THAT(config_->mcpParamHeaders("param_tool", "", "/mcp"), SizeIs(5));
+  EXPECT_THAT(config_->mcpParamHeaders("unknown_tool", "", "/mcp"), SizeIs(0));
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      per_route_proto;
+  ASSERT_OK_AND_ASSIGN(auto per_route_config,
+                       McpJsonRestBridgePerRouteConfig::create(per_route_proto));
+  EXPECT_THAT(per_route_config->mcpParamHeaders("param_tool", "", "/mcp"), SizeIs(0));
+}
+
 TEST_F(McpJsonRestBridgeFilterTest,
        ToolsCallLegacyProtocolVersionWithoutMcpHeadersProcessesRequest) {
   ASSERT_OK(makeFilter());
