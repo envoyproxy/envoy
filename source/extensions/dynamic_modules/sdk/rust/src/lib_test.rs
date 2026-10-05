@@ -4776,6 +4776,30 @@ fn test_http_filter_state_object_round_trip() {
   assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_set_filter_state_value(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+  _life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+  _stream_sharing: abi::envoy_dynamic_module_type_filter_state_stream_sharing,
+) -> bool {
+  true
+}
+
+#[test]
+fn test_http_set_filter_state_value() {
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  assert!(envoy_filter.set_filter_state_value(
+    b"key",
+    b"value",
+    abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+    abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection,
+  ));
+}
+
 // =========================================================================
 // Span ABI stubs
 // =========================================================================

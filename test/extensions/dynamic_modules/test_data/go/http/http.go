@@ -759,6 +759,14 @@ func (p *filterStateCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 		val.ToUnsafeString() != "typed_value" {
 		panic(fmt.Sprintf("typed filter state mismatch: ok=%v val=%q", ok, val.ToUnsafeString()))
 	}
+	if !p.handle.SetFilterStateValue("shared_filter_state_key", []byte("shared_filter_state_value"),
+		shared.FilterStateLifeSpanConnection, shared.FilterStateStreamSharingSharedWithUpstreamConnection) {
+		panic("failed to set filter state value")
+	}
+	if val, ok := p.handle.GetFilterState("shared_filter_state_key"); !ok ||
+		val.ToUnsafeString() != "shared_filter_state_value" {
+		panic(fmt.Sprintf("shared filter state mismatch: ok=%v val=%q", ok, val.ToUnsafeString()))
+	}
 	return shared.HeadersStatusContinue
 }
 

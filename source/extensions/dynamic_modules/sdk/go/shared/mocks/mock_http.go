@@ -1576,6 +1576,20 @@ func (mr *MockHttpFilterHandleMockRecorder) SetFilterState(key, value any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFilterState", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetFilterState), key, value)
 }
 
+// SetFilterStateValue mocks base method.
+func (m *MockHttpFilterHandle) SetFilterStateValue(key string, value []byte, lifeSpan shared.FilterStateLifeSpan, streamSharing shared.FilterStateStreamSharing) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetFilterStateValue", key, value, lifeSpan, streamSharing)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetFilterStateValue indicates an expected call of SetFilterStateValue.
+func (mr *MockHttpFilterHandleMockRecorder) SetFilterStateValue(key, value, lifeSpan, streamSharing any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFilterStateValue", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetFilterStateValue), key, value, lifeSpan, streamSharing)
+}
+
 // SetFilterStateTyped mocks base method.
 func (m *MockHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool {
 	m.ctrl.T.Helper()

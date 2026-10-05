@@ -90,6 +90,26 @@ const (
 	HttpFilterStreamResetReasonLocalRefusedStreamReset
 )
 
+// FilterStateLifeSpan specifies the lifespan of a filter state entry. Corresponds to
+// envoy_dynamic_module_type_filter_state_life_span.
+type FilterStateLifeSpan uint32
+
+const (
+	FilterStateLifeSpanFilterChain FilterStateLifeSpan = iota
+	FilterStateLifeSpanRequest
+	FilterStateLifeSpanConnection
+)
+
+// FilterStateStreamSharing specifies the upstream connection sharing option of a filter state
+// entry. Corresponds to envoy_dynamic_module_type_filter_state_stream_sharing.
+type FilterStateStreamSharing uint32
+
+const (
+	FilterStateStreamSharingNone FilterStateStreamSharing = iota
+	FilterStateStreamSharingSharedWithUpstreamConnection
+	FilterStateStreamSharingSharedWithUpstreamConnectionOnce
+)
+
 // Span is a tracing span associated with the current HTTP stream. It is owned by Envoy and is
 // valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span
 // because it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module
@@ -240,6 +260,10 @@ type HttpFilterHandle interface {
 
 	// SetFilterState sets the serialized filter state value of the stream.
 	SetFilterState(key string, value []byte)
+
+	// SetFilterStateValue sets the serialized filter state value of the stream with the given
+	// lifespan and upstream connection sharing options.
+	SetFilterStateValue(key string, value []byte, lifeSpan FilterStateLifeSpan, streamSharing FilterStateStreamSharing) bool
 
 	// SetFilterStateTyped sets the typed filter state value stored under the given key. The key
 	// MUST match a registered ObjectFactory; the bytes are passed to createFromBytes on that

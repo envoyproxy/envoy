@@ -561,6 +561,16 @@ public:
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
+  bool setFilterStateValue(std::string_view key, std::string_view value,
+                           FilterStateLifeSpan life_span,
+                           FilterStateStreamSharing stream_sharing) override {
+    return envoy_dynamic_module_callback_http_set_filter_state_value(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()},
+        static_cast<envoy_dynamic_module_type_filter_state_life_span>(life_span),
+        static_cast<envoy_dynamic_module_type_filter_state_stream_sharing>(stream_sharing));
+  }
+
   std::optional<std::string_view> getFilterStateTyped(std::string_view key) override {
     BufferView value{nullptr, 0};
     const bool ret = envoy_dynamic_module_callback_http_get_filter_state_typed(

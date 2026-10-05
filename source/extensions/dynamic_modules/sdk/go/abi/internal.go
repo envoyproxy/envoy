@@ -1051,6 +1051,19 @@ func (h *dymHttpFilterHandle) SetFilterState(key string, value []byte) {
 	runtime.KeepAlive(value)
 }
 
+func (h *dymHttpFilterHandle) SetFilterStateValue(key string, value []byte, lifeSpan shared.FilterStateLifeSpan, streamSharing shared.FilterStateStreamSharing) bool {
+	ret := C.envoy_dynamic_module_callback_http_set_filter_state_value(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+		bytesToModuleBuffer(value),
+		C.envoy_dynamic_module_type_filter_state_life_span(lifeSpan),
+		C.envoy_dynamic_module_type_filter_state_stream_sharing(streamSharing),
+	)
+	runtime.KeepAlive(key)
+	runtime.KeepAlive(value)
+	return bool(ret)
+}
+
 func (h *dymHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool {
 	ret := C.envoy_dynamic_module_callback_http_set_filter_state_typed(
 		h.hostPluginPtr,

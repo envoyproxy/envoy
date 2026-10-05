@@ -885,14 +885,22 @@ bool ContextAccessor::getFilterStateBytes(const StreamInfo::StreamInfo& stream_i
 
 bool ContextAccessor::setFilterStateBytes(
     StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
-    std::optional<StreamInfo::FilterState::LifeSpan> life_span) {
-  auto accessor = std::make_unique<Router::StringAccessorImpl>(value);
-  if (life_span.has_value()) {
-    stream_info.filterState()->setData(key, std::move(accessor), life_span.value());
-  } else {
-    stream_info.filterState()->setData(key, std::move(accessor));
+    std::optional<StreamInfo::FilterState::LifeSpan> life_span,
+    std::optional<StreamInfo::StreamSharingMayImpactPooling> stream_sharing) {
+  const auto& filter_state = stream_info.filterState();
+  if (!filter_state) {
+    return false;
   }
-  return true;
+  auto accessor = std::make_shared<Router::StringAccessorImpl>(value);
+  const auto* raw_ptr = accessor.get();
+  if (life_span.has_value() && stream_sharing.has_value()) {
+    filter_state->setData(key, std::move(accessor), life_span.value(), stream_sharing.value());
+  } else if (life_span.has_value()) {
+    filter_state->setData(key, std::move(accessor), life_span.value());
+  } else {
+    filter_state->setData(key, std::move(accessor));
+  }
+  return filter_state->getDataReadOnly<Router::StringAccessor>(key) == raw_ptr;
 }
 
 bool ContextAccessor::setFilterStateTyped(

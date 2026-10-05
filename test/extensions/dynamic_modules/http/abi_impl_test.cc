@@ -1808,6 +1808,159 @@ TEST(ABIImpl, filter_state) {
   EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), value_str);
 }
 
+TEST(ABIImpl, filter_state_value) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  const std::string key_none = "key_none";
+  const std::string val_none = "val_none";
+  const std::string key_shared = "key_shared";
+  const std::string val_shared = "val_shared";
+  const std::string key_shared_once = "key_shared_once";
+  const std::string val_shared_once = "val_shared_once";
+
+  // No stream info.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_value(
+      &filter, {key_none.data(), key_none.size()}, {val_none.data(), val_none.size()},
+      envoy_dynamic_module_type_filter_state_life_span_FilterChain,
+      envoy_dynamic_module_type_filter_state_stream_sharing_None));
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  // Null filter state.
+  auto saved_filter_state = std::move(stream_info.filter_state_);
+  stream_info.filter_state_ = nullptr;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_value(
+      &filter, {key_none.data(), key_none.size()}, {val_none.data(), val_none.size()},
+      envoy_dynamic_module_type_filter_state_life_span_FilterChain,
+      envoy_dynamic_module_type_filter_state_stream_sharing_None));
+  stream_info.filter_state_ = std::move(saved_filter_state);
+
+  // Store with FilterChain + None.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
+      &filter, {key_none.data(), key_none.size()}, {val_none.data(), val_none.size()},
+      envoy_dynamic_module_type_filter_state_life_span_FilterChain,
+      envoy_dynamic_module_type_filter_state_stream_sharing_None));
+
+  // Store with Request + SharedWithUpstreamConnection.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
+      &filter, {key_shared.data(), key_shared.size()}, {val_shared.data(), val_shared.size()},
+      envoy_dynamic_module_type_filter_state_life_span_Request,
+      envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnection));
+
+  // Store with Connection + SharedWithUpstreamConnectionOnce.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
+      &filter, {key_shared_once.data(), key_shared_once.size()},
+      {val_shared_once.data(), val_shared_once.size()},
+      envoy_dynamic_module_type_filter_state_life_span_Connection,
+      envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnectionOnce));
+
+  // Verify values can be retrieved via get_filter_state_bytes.
+  envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, {key_none.data(), key_none.size()}, &result_buffer));
+  EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), val_none);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, {key_shared.data(), key_shared.size()}, &result_buffer));
+  EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), val_shared);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, {key_shared_once.data(), key_shared_once.size()}, &result_buffer));
+  EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), val_shared_once);
+
+  // Verify life_span and upstream sharing.
+  EXPECT_TRUE(stream_info.filter_state_->hasDataAtOrAboveLifeSpan(
+      StreamInfo::FilterState::LifeSpan::Connection));
+  auto shared_objects = stream_info.filter_state_->objectsSharedWithUpstreamConnection();
+  ASSERT_NE(shared_objects, nullptr);
+  ASSERT_EQ(shared_objects->size(), 2);
+  bool found_shared = false;
+  bool found_shared_once = false;
+  for (const auto& obj : *shared_objects) {
+    if (obj.name_ == key_shared) {
+      found_shared = true;
+      EXPECT_EQ(obj.stream_sharing_,
+                StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    } else if (obj.name_ == key_shared_once) {
+      found_shared_once = true;
+      // SharedWithUpstreamConnectionOnce transitions to None when exported to upstream connection.
+      EXPECT_EQ(obj.stream_sharing_, StreamInfo::StreamSharingMayImpactPooling::None);
+    }
+  }
+  EXPECT_TRUE(found_shared);
+  EXPECT_TRUE(found_shared_once);
+}
+
+TEST(ABIImpl, filter_state_value_conflicting_life_span) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  const std::string key_str = "envoy.test.bytes";
+  const std::string val1 = "val1";
+  const std::string val2 = "val2";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
+      &filter, {key_str.data(), key_str.size()}, {val1.data(), val1.size()},
+      envoy_dynamic_module_type_filter_state_life_span_Request,
+      envoy_dynamic_module_type_filter_state_stream_sharing_None));
+
+  envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_value(
+            &filter, {key_str.data(), key_str.size()}, {val2.data(), val2.size()},
+            envoy_dynamic_module_type_filter_state_life_span_Connection,
+            envoy_dynamic_module_type_filter_state_stream_sharing_None));
+        EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+            &filter, {key_str.data(), key_str.size()}, &result_buffer));
+        EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), val1);
+      },
+      "conflicting life_span");
+}
+
+TEST(ABIImpl, filter_state_value_unknown_enums) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  const std::string key1 = "key_unknown_lifespan";
+  const std::string key2 = "key_unknown_sharing";
+  const std::string val = "val";
+
+  EXPECT_ENVOY_BUG(
+      {
+        EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
+            &filter, {key1.data(), key1.size()}, {val.data(), val.size()},
+            static_cast<envoy_dynamic_module_type_filter_state_life_span>(99),
+            envoy_dynamic_module_type_filter_state_stream_sharing_None));
+      },
+      "unknown filter state life_span");
+
+  EXPECT_ENVOY_BUG(
+      {
+        EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
+            &filter, {key2.data(), key2.size()}, {val.data(), val.size()},
+            envoy_dynamic_module_type_filter_state_life_span_FilterChain,
+            static_cast<envoy_dynamic_module_type_filter_state_stream_sharing>(99)));
+      },
+      "unknown filter state stream_sharing");
+}
+
 TEST(ABIImpl, filter_state_typed) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
