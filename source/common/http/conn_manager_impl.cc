@@ -244,6 +244,17 @@ ConnectionManagerImpl::ConnectionManagerImpl(
       trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
       "found. Is it configured?");
+  if (config_->recordRouteResolutionStats()) {
+    Stats::SymbolTable& symbol_table = stats_.scope_.symbolTable();
+    Stats::StatNameManagedStorage route_resolution_time_us_stat_name(
+        "downstream_rq_route_resolution_time_us", symbol_table);
+    route_resolution_time_us_histogram_ = stats_.scope_.histogramFromStatName(
+        route_resolution_time_us_stat_name.statName(), Stats::Histogram::Unit::Microseconds);
+    Stats::StatNameManagedStorage route_resolutions_stat_name("downstream_rq_route_resolutions",
+                                                              symbol_table);
+    route_resolutions_histogram_ = stats_.scope_.histogramFromStatName(
+        route_resolutions_stat_name.statName(), Stats::Histogram::Unit::Unspecified);
+  }
 }
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -1134,6 +1145,15 @@ void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
 
+  if (connection_manager_.route_resolution_time_us_histogram_.has_value()) {
+    const StreamInfo::StreamInfo& stream_info = filter_manager_.streamInfo();
+    connection_manager_.route_resolution_time_us_histogram_->recordValue(
+        std::chrono::duration_cast<std::chrono::microseconds>(stream_info.routeResolutionTime())
+            .count());
+    connection_manager_.route_resolutions_histogram_->recordValue(
+        stream_info.routeResolutionCount());
+  }
+
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   if (filter_manager_.streamInfo().healthCheck()) {
     connection_manager_.config_->tracingStats().health_check_.inc();
@@ -1929,8 +1949,13 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
+      // Measure the wall time of the route resolution.
+      const MonotonicTime start = connection_manager_.timeSource().monotonicTime();
       route_result = snapped_route_config_->route(cb, *request_headers_,
                                                   filter_manager_.streamInfo(), stream_id_);
+      filter_manager_.streamInfo().addRouteResolutionTime(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              connection_manager_.timeSource().monotonicTime() - start));
     }
   }
 
@@ -2577,6 +2602,17 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
 
   setCachedRoute({});
   cached_cluster_info_ = std::optional<Upstream::ClusterInfoConstSharedPtr>();
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshRouteConfigSnapshot() {
+  if (connection_manager_.config_->routeConfigProvider() != nullptr) {
+    snapped_route_config_ = connection_manager_.config_->routeConfigProvider()->configCast();
+  } else if (connection_manager_.config_->scopedRouteConfigProvider() != nullptr &&
+             connection_manager_.config_->scopeKeyBuilder().has_value() &&
+             request_headers_ != nullptr) {
+    snapped_scoped_routes_config_ =
+        connection_manager_.config_->scopedRouteConfigProvider()->config<Router::ScopedConfig>();
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {

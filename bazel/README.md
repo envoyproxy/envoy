@@ -95,32 +95,23 @@ for how to update or override dependencies.
     ### Linux
     Envoy uses a hermetic Clang toolchain that is automatically downloaded by Bazel, so you do not
     need to install Clang manually. Note that despite the toolchain being hermetic, `libxml2` must
-    be installed on the host (included in the package lists above). To use the hermetic toolchain,
-    add `--config=clang` to your build command:
+    be installed on the host (included in the package lists above). The hermetic toolchain is the
+    default and requires no compiler configuration flag:
     ```console
-    bazel build --config=clang envoy
+    bazel build envoy
     ```
 
-    If you want to make clang the default, add it to your `user.bazelrc`:
-    ```console
-    echo "build --config=clang" >> user.bazelrc
-    ```
-
-    Note: `libc++` is the recommended standard library for Envoy development and is automatically used with `--config=clang`.
+    Note: `libc++` is the recommended standard library for Envoy development and is automatically used with the default Clang toolchain.
 
     #### Compiler and Standard Library Configuration
     Envoy supports the following compiler toolchains:
 
-    - `--config=clang` (recommended): Uses `clang` compiler with `libc++` (LLVM standard library)
+    - No config flag (recommended): Uses the hermetic `clang` compiler with `libc++` (LLVM standard library)
     - `--config=gcc`: Uses `gcc` compiler with `libstdc++` (GNU standard library)
-    - No config flag: Uses system default compiler settings
 
-    Note: While it's possible to use `clang` with `libstdc++` by setting CC/CXX environment variables without a config flag, this combination is not tested or supported.
+    Note: The C++ standard library is derived from the compiler: clang (the default) and Apple builds use `libc++`, `--config=gcc` uses `libstdc++`. Other combinations such as clang with `libstdc++` are not supported or tested; if you need one, you will need to set up your own `cc_toolchain`.
 
-    For more granular control:
-    - `--config=clang-common`: Provides base clang configuration without standard library settings
-    - `--config=libc++`: Provides just the libc++ standard library flags
-    - `--config=libstdc++`: Provides just the libstdc++ standard library flags
+    The `--config=libc++` and `--config=libstdc++` configs are used internally (e.g. by `--config=gcc` and `bazel/setup_local_tsan.sh`) and are not intended for direct use.
 
 
     ### macOS
@@ -249,11 +240,9 @@ environment. Upstream Envoy builds are unaffected when no host toolchain is regi
 
 ## Linking against libc++ on Linux
 
-When using `--config=clang`, Envoy is automatically linked against libc++. No additional configuration is needed.
+With the default Clang toolchain, Envoy is automatically linked against libc++. No additional configuration is needed.
 
 For remote execution or Docker sandbox builds, use `--config=remote-clang` or `--config=docker-clang` respectively.
-
-If you want to ensure clang with libc++ is always used by default, add `build --config=clang` to the `user.bazelrc` file in Envoy source root.
 
 ## Using a compiler toolchain in a non-standard location
 

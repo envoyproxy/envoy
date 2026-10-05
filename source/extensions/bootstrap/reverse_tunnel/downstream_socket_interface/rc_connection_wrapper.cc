@@ -355,7 +355,7 @@ void RCConnectionWrapper::shutdown() {
   http1_client_codec_.reset();
 
   if (!connection_) {
-    ENVOY_LOG(error, "RCConnectionWrapper: Connection already null, nothing to shutdown");
+    ENVOY_LOG(debug, "RCConnectionWrapper: Connection already null, nothing to shutdown");
     return;
   }
 

@@ -15,6 +15,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/ascii.h"
@@ -135,6 +136,23 @@ TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
       child_module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
   EXPECT_OK(getSomeVariable);
   EXPECT_EQ(getSomeVariable.value()(), 42);
+}
+
+// By default the loader binds now (RTLD_NOW), resolving every referenced symbol at load. The
+// runtime guard reverts it to lazy binding (RTLD_LAZY). A self-contained module loads under both
+// bindings, so loading it in each mode exercises both branches of the binding-mode selection.
+TEST(DynamicModuleTestLanguages, RtldNowIsDefaultAndRuntimeGuardReverts) {
+  // Default: RTLD_NOW. A self-contained module resolves every symbol at load.
+  absl::StatusOr<DynamicModulePtr> now_module =
+      newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_OK(now_module);
+
+  // The runtime guard reverts the loader to RTLD_LAZY. The module still loads with lazy binding.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.dynamic_modules_rtld_now", "false"}});
+  absl::StatusOr<DynamicModulePtr> lazy_module =
+      newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_OK(lazy_module);
 }
 
 TEST_P(DynamicModuleTestLanguages, NoProgramInit) {

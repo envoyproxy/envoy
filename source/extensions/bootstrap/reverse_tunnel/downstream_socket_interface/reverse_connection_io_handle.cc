@@ -379,13 +379,13 @@ ReverseConnectionIOHandle::connect(Envoy::Network::Address::InstanceConstSharedP
 // Individual reverse connections initiated by this ReverseConnectionIOHandle are managed via
 // DownstreamReverseConnectionIOHandle RAII ownership.
 Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
-  ENVOY_LOG(error, "reverse_tunnel: performing graceful shutdown.");
+  ENVOY_LOG(debug, "reverse_tunnel: performing graceful shutdown.");
 
   // If initializeFileEvent() ran, fd_ was reassigned to trigger_pipe_read_fd_ and the base class
   // will close that. We must close original_socket_fd_ explicitly since nothing else owns it.
   // If initializeFileEvent() did not run, fd_ == original_socket_fd_ and the base class handles it.
   if (original_socket_fd_ != fd_ && SOCKET_VALID(original_socket_fd_)) {
-    ENVOY_LOG(error, "Closing original socket FD: {}.", original_socket_fd_);
+    ENVOY_LOG(debug, "Closing original socket FD: {}.", original_socket_fd_);
     Api::OsSysCallsSingleton::get().close(original_socket_fd_);
   }
   SET_SOCKET_INVALID(original_socket_fd_);
@@ -393,7 +393,7 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
   // CRITICAL: If we're using pipe trigger FD, let the IoSocketHandleImpl::close()
   // close it and cleanup() set the pipe FDs to -1.
   if (isTriggerPipeReady() && getPipeMonitorFd() == fd_) {
-    ENVOY_LOG(error,
+    ENVOY_LOG(debug,
               "Skipping close of pipe trigger FD {} - will be handled by base close() method.",
               fd_);
   }

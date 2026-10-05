@@ -228,6 +228,10 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     parent_.chargeGetAddrInfoErrorStats(status, timeouts);
 
     if (!isResponseWithNoRecords(status)) {
+      // A family deliberately skipped by filter_unroutable_families is not a DNS failure.
+      if (status != ARES_EBADFAMILY) {
+        had_resolution_failure_ = true;
+      }
       ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
                       "dns resolution for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
                       status, ares_strerror(status));
@@ -361,6 +365,12 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 }
 
 void DnsResolverImpl::PendingResolution::finishResolve() {
+  if (had_resolution_failure_ && pending_response_.address_list_.empty() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.cares_dual_resolution_preserve_failure")) {
+    pending_response_.status_ = ResolutionStatus::Failure;
+  }
+
   ENVOY_LOG_EVENT(trace, "cares_dns_resolution_complete",
                   "dns resolution for {} completed with status {:#06x}: \"{}\"", dns_name_,
                   static_cast<int>(pending_response_.status_), pending_response_.details_);

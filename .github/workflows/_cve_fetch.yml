@@ -31,11 +31,11 @@ jobs:
         DAY=$(date +%u)
         if [[ "$DAY" == 7 && "${{ inputs.scheduled }}" == "true" ]]; then
             echo "weekly_run=true" >> $GITHUB_OUTPUT
-            export OVERWRITE_ALL_CVE_DATA=1
+            echo "OVERWRITE_ALL_CVE_DATA=1" >> "$GITHUB_ENV"
         else
             echo "weekly_run=false" >> $GITHUB_OUTPUT
         fi
-    - uses: envoyproxy/toolshed/actions/gcp/setup@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/gcp/setup@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cve-key }}

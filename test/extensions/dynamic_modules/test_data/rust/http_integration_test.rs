@@ -600,7 +600,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    assert!(envoy_filter.get_upstream_connection_id() > 0);
+    assert_ne!(envoy_filter.get_upstream_connection_id(), None);
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
@@ -2015,8 +2015,42 @@ struct StreamTimingFilter {
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamTimingFilter {
   fn on_stream_complete(&self, envoy_filter: &mut EHF) {
     let timing = envoy_filter.get_timing_info();
-    assert!(timing.start_time_unix_ns > 0);
-    assert!(timing.request_complete_duration_ns >= 0);
+    assert!(timing.start_time_unix_ns.unwrap() > 0);
+    assert!(timing.downstream_connection_begin_ns.is_some());
+    assert_eq!(timing.downstream_handshake_start_ns, None);
+    assert_eq!(timing.downstream_handshake_complete_ns, None);
+    assert!(timing.last_downstream_header_rx_byte_received_ns.unwrap() >= 0);
+    assert!(
+      timing.last_downstream_rx_byte_received_ns.unwrap()
+        >= timing.last_downstream_header_rx_byte_received_ns.unwrap()
+    );
+    assert!(timing.upstream_connect_start_ns.unwrap() >= 0);
+    assert!(
+      timing.upstream_connect_complete_ns.unwrap() >= timing.upstream_connect_start_ns.unwrap()
+    );
+    assert_eq!(timing.upstream_handshake_complete_ns, None);
+    assert!(timing.first_upstream_tx_byte_sent_ns.unwrap() >= 0);
+    assert!(
+      timing.last_upstream_tx_byte_sent_ns.unwrap()
+        >= timing.first_upstream_tx_byte_sent_ns.unwrap()
+    );
+    assert!(timing.first_upstream_rx_byte_received_ns.unwrap() >= 0);
+    assert!(
+      timing.first_upstream_rx_body_byte_received_ns.unwrap()
+        >= timing.first_upstream_rx_byte_received_ns.unwrap()
+    );
+    assert!(
+      timing.last_upstream_rx_byte_received_ns.unwrap()
+        >= timing.first_upstream_rx_body_byte_received_ns.unwrap()
+    );
+    assert!(timing.first_downstream_tx_byte_sent_ns.unwrap() >= 0);
+    assert!(
+      timing.last_downstream_tx_byte_sent_ns.unwrap()
+        >= timing.first_downstream_tx_byte_sent_ns.unwrap()
+    );
+    assert_eq!(timing.last_downstream_ack_received_ns, None);
+    assert!(timing.request_complete_duration_ns.unwrap() >= 0);
+    assert_eq!(timing.downstream_connection_end_ns, None);
     envoy_filter
       .increment_counter(self.timing_observed_total, 1)
       .unwrap();

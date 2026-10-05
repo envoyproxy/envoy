@@ -14,6 +14,7 @@
 #include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
+#include "absl/strings/numbers.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
 
@@ -206,6 +207,39 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
     }
   }
   setAttribute(name, value);
+}
+
+void Span::setTypedTag(absl::string_view name, absl::string_view value,
+                       Tracing::TagValueType type) {
+  switch (type) {
+  case Tracing::TagValueType::Int: {
+    int64_t int_value = 0;
+    if (absl::SimpleAtoi(value, &int_value)) {
+      setAttribute(name, int_value);
+      return;
+    }
+    break;
+  }
+  case Tracing::TagValueType::Double: {
+    double double_value = 0;
+    if (absl::SimpleAtod(value, &double_value)) {
+      setAttribute(name, double_value);
+      return;
+    }
+    break;
+  }
+  case Tracing::TagValueType::Bool: {
+    bool bool_value = false;
+    if (absl::SimpleAtob(value, &bool_value)) {
+      setAttribute(name, bool_value);
+      return;
+    }
+    break;
+  }
+  case Tracing::TagValueType::String:
+    break;
+  }
+  setTag(name, value);
 }
 
 void Span::reserveTags(size_t size) {
