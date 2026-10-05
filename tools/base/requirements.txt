@@ -484,9 +484,9 @@ dependatool==0.3.1 \
     --hash=sha256:265fc69e8b1605edb8e33872a36d3a2c2cc055743bec8e58d1ed3c72a17a9431 \
     --hash=sha256:6be19ce9fbdffccf639bad0393e454080b7bba8510a98edc78855a6a93895020
     # via -r tools/base/requirements.in
-envoy-base-utils==0.6.9 \
-    --hash=sha256:664dcc19ee12125398222a7628bdcbb40e265b3846e197e4014434fcd273fd61 \
-    --hash=sha256:b088b7621b5075005c48cdbef5db5675827b7b63550be7d880d395261fdcdb20
+envoy-base-utils==0.6.12 \
+    --hash=sha256:8b860c9d88493f1eb1044cc48fa9ae953cd31d9da77102d05e9c6af65ff14eae \
+    --hash=sha256:d2ab511a1f6f59f7319c6dc6b70088bad139be2165466ed9ce6932b0c96faa02
     # via
     #   -r tools/base/requirements.in
     #   envoy-code-check
@@ -499,10 +499,10 @@ envoy-ci-report==0.1.1 \
     --hash=sha256:481115be4d05941b83ffbbd8fdac241f10e9823c076f850d8bef7f0308aa382d \
     --hash=sha256:a38da2e996b266b32ff80f2f404018d1887f156ad086e3fa8fd4233bb4cd6fe7
     # via -r tools/base/requirements.in
-envoy-code-check==0.6.7 \
-    --hash=sha256:76b0edf0b95d8a31b5d78481b3a7f5ae4a2925c04d2158e77cc3549653a4213e \
-    --hash=sha256:7b7fbc99c114f663126be738095945d479e0b4c6f71d3d784bc234d9d9098a8d
-    # via -r requirements.in
+envoy-code-check==0.6.9 \
+    --hash=sha256:9a212107476b4a36b3743fb550eacad3ede72b3cdbf825dc944c25e48e4e1eb6 \
+    --hash=sha256:9ded56211e8e81ffc27c97b923e17dd7a6dd60e72454755f07bb1555ca019279
+    # via -r tools/base/requirements.in
 envoy-dependency-check==0.2.1 \
     --hash=sha256:a037ab34b7db9893ecf07247c8e9149481148de26f340f1c27e4adfa7a48e227 \
     --hash=sha256:d91134dc18d2a6a69694623b70a7cb0571647f141a493f0e1bff12d843ec9f7b
