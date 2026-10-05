@@ -2605,6 +2605,33 @@ TEST_F(LuaHttpFilterTest, GetConnectionDynamicMetadata) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
 
+// Verify that connectionStreamInfo() returns nil (rather than crashing) when the downstream
+// connection is not available.
+TEST_F(LuaHttpFilterTest, GetConnectionStreamInfoWithoutConnection) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:connectionStreamInfo() == nil then
+        request_handle:logTrace("Connection stream info is nil")
+      else
+        request_handle:logTrace("Connection stream info is present")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  // Return an empty OptRef to simulate a context without a downstream connection.
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillOnce(Return(OptRef<const Network::Connection>{}));
+  EXPECT_LOG_CONTAINS("trace", "Connection stream info is nil", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
 // Verify that typed metadata on the connection stream info could be accessed using LUA.
 TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadata) {
   const std::string SCRIPT{R"EOF(
