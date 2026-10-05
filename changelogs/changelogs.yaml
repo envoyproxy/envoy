@@ -52,6 +52,8 @@ areas:
     title: alts
   api:
     title: api
+  api_key_auth:
+    title: api_key_auth
   attributes:
     title: attributes
   aws:
