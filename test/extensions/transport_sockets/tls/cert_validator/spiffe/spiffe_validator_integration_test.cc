@@ -230,7 +230,16 @@ typed_config:
       return 1;
     });
     if (session) {
-      EXPECT_EQ(1, SSL_set_session(ssl, session.get()));
+      // OpenSSL consumes TLS 1.3 sessions on use. Resume a copy so the captured ticket remains
+      // available for the required listener after checking it on the optional listener.
+      uint8_t* bytes = nullptr;
+      size_t length = 0;
+      EXPECT_EQ(1, SSL_SESSION_to_bytes(session.get(), &bytes, &length));
+      bssl::UniquePtr<uint8_t> owned_bytes(bytes);
+      bssl::UniquePtr<SSL_SESSION> resumed_session(
+          SSL_SESSION_from_bytes(bytes, length, SSL_get_SSL_CTX(ssl)));
+      EXPECT_NE(nullptr, resumed_session);
+      EXPECT_EQ(1, SSL_set_session(ssl, resumed_session.get()));
     }
     return conn;
   };
