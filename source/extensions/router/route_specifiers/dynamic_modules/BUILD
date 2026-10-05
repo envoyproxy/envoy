@@ -20,6 +20,7 @@ envoy_cc_library(
     hdrs = ["route_specifier.h"],
     deps = [
         "//envoy/common:exception_lib",
+        "//envoy/common:regex_interface",
         "//envoy/formatter:http_formatter_context_interface",
         "//envoy/http:codes_interface",
         "//envoy/ratelimit:ratelimit_interface",
@@ -29,6 +30,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:regex_lib",
         "//source/common/common:statusor_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:metadata_lib",
@@ -42,6 +44,7 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/common/router:delegating_route_lib",
         "//source/common/router:metadatamatchcriteria_lib",
+        "//source/common/router:path_rewrite_utility_lib",
         "//source/common/router:retry_policy_lib",
         "//source/common/router:router_ratelimit_lib",
         "//source/common/stats:utility_lib",

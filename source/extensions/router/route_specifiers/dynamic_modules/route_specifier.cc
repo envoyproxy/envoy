@@ -6,6 +6,7 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/hash_policy.h"
@@ -62,6 +63,19 @@ buildRouteOverride(const RouteOverrideProto& proto_override,
     entry.hedge_policy =
         std::make_unique<Envoy::Router::HedgePolicyImpl>(proto_override.hedge_policy());
   }
+  if (proto_override.has_regex_rewrite()) {
+    auto regex_or_error =
+        Regex::Utility::parseRegex(proto_override.regex_rewrite().pattern(), context.regexEngine());
+    RETURN_IF_NOT_OK_REF(regex_or_error.status());
+    entry.regex_rewrite = std::move(regex_or_error.value());
+    entry.regex_rewrite_substitution = proto_override.regex_rewrite().substitution();
+  }
+  if (proto_override.has_tracing()) {
+    auto tracing_or_error = Envoy::Router::RouteTracingImpl::create(proto_override.tracing());
+    RETURN_IF_NOT_OK_REF(tracing_or_error.status());
+    entry.tracing = std::move(tracing_or_error.value());
+  }
+  entry.metadata = proto_override.metadata();
   if (!proto_override.rate_limits().empty() || proto_override.has_cors()) {
     // RateLimitPolicyImpl and CorsPolicyImpl build extension backed matchers that throw on a
     // rejected input, so a build failure is turned into a configuration error.
@@ -83,10 +97,13 @@ buildRouteOverride(const RouteOverrideProto& proto_override,
   // Validate what was built rather than what was configured. A metadata_match without an envoy.lb
   // entry contributes nothing, so a populated looking configuration can still build an override
   // that replaces no property, which set_route_override would then accept as a decision.
+  const bool has_metadata =
+      !entry.metadata.filter_metadata().empty() || !entry.metadata.typed_filter_metadata().empty();
   if (entry.retry_policy == nullptr && entry.metadata_match_criteria == nullptr &&
       entry.shadow_policies.empty() && entry.hash_policy == nullptr &&
       entry.hedge_policy == nullptr && entry.rate_limit_policy == nullptr &&
-      entry.cors_policy == nullptr) {
+      entry.cors_policy == nullptr && entry.regex_rewrite == nullptr && entry.tracing == nullptr &&
+      !has_metadata) {
     return absl::InvalidArgumentError("Route override must replace at least one property");
   }
   return entry;
@@ -183,14 +200,17 @@ bool RouteOverrides::hasRouteEntryOverrides() const {
   return !cluster_name.empty() || timeout.has_value() || idle_timeout.has_value() ||
          max_stream_duration.has_value() || request_body_buffer_limit.has_value() ||
          priority.has_value() || cluster_not_found_response_code.has_value() ||
-         route_override != nullptr || path.has_value() || host.has_value() ||
-         !request_headers_to_add.empty() || !request_headers_to_remove.empty() ||
-         !response_headers_to_add.empty() || !response_headers_to_remove.empty();
+         (route_override != nullptr && route_override->hasRouteEntryProperties()) ||
+         path.has_value() || host.has_value() || !request_headers_to_add.empty() ||
+         !request_headers_to_remove.empty() || !response_headers_to_add.empty() ||
+         !response_headers_to_remove.empty();
 }
 
 bool RouteOverrides::hasRouteOverrides() const {
   return !route_metadata.filter_metadata().empty() ||
-         !route_metadata.typed_filter_metadata().empty() || !filter_disabled.empty();
+         !route_metadata.typed_filter_metadata().empty() || !filter_disabled.empty() ||
+         (route_override != nullptr && route_override->tracing != nullptr) ||
+         route_name.has_value();
 }
 
 DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
@@ -203,8 +223,13 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
       specifier_name_(proto_config.specifier_name()), specifier_config_(specifier_config),
       specifier_instance_id_(proto_config.specifier_instance_id()),
       runtime_fraction_(buildRuntimeFraction(proto_config)),
+      max_rewritten_path_bytes_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_rewritten_path_bytes, 65536)),
       fail_closed_(proto_config.failure_policy() ==
                    envoy::extensions::router::route_specifiers::dynamic_modules::v3::NO_ROUTE),
+      continue_matching_on_failure_(
+          proto_config.failure_policy() ==
+          envoy::extensions::router::route_specifiers::dynamic_modules::v3::CONTINUE_MATCHING),
       cluster_manager_(context.serverFactoryContext().clusterManager()),
       runtime_(context.serverFactoryContext().runtime()),
       time_source_(context.serverFactoryContext().timeSource()),
@@ -400,6 +425,11 @@ DynamicModuleRoute::~DynamicModuleRoute() {
   }
 }
 
+const std::string& DynamicModuleRoute::routeName() const {
+  return overrides_.route_name.has_value() ? *overrides_.route_name
+                                           : Envoy::Router::DelegatingRoute::routeName();
+}
+
 const envoy::config::core::v3::Metadata& DynamicModuleRoute::metadata() const {
   return metadata_pack_ != nullptr ? metadata_pack_->proto_metadata_
                                    : Envoy::Router::DelegatingRoute::metadata();
@@ -415,6 +445,13 @@ std::optional<bool> DynamicModuleRoute::filterDisabled(absl::string_view name) c
   return it != overrides_.filter_disabled.end()
              ? std::optional<bool>(it->second)
              : Envoy::Router::DelegatingRoute::filterDisabled(name);
+}
+
+const Envoy::Router::RouteTracing* DynamicModuleRoute::tracingConfig() const {
+  const RouteOverride* entry = overrides_.route_override;
+  return entry != nullptr && entry->tracing != nullptr
+             ? entry->tracing.get()
+             : Envoy::Router::DelegatingRoute::tracingConfig();
 }
 
 DynamicModuleRouteEntry::DynamicModuleRouteEntry(
@@ -433,6 +470,11 @@ DynamicModuleRouteEntry::~DynamicModuleRouteEntry() {
   }
 }
 
+const std::string& DynamicModuleRouteEntry::routeName() const {
+  return overrides_.route_name.has_value() ? *overrides_.route_name
+                                           : DelegatingRouteEntry::routeName();
+}
+
 const envoy::config::core::v3::Metadata& DynamicModuleRouteEntry::metadata() const {
   return metadata_pack_ != nullptr ? metadata_pack_->proto_metadata_
                                    : DelegatingRouteEntry::metadata();
@@ -447,6 +489,12 @@ std::optional<bool> DynamicModuleRouteEntry::filterDisabled(absl::string_view na
   const auto it = overrides_.filter_disabled.find(name);
   return it != overrides_.filter_disabled.end() ? std::optional<bool>(it->second)
                                                 : DelegatingRouteEntry::filterDisabled(name);
+}
+
+const Envoy::Router::RouteTracing* DynamicModuleRouteEntry::tracingConfig() const {
+  const RouteOverride* entry = overrides_.route_override;
+  return entry != nullptr && entry->tracing != nullptr ? entry->tracing.get()
+                                                       : DelegatingRouteEntry::tracingConfig();
 }
 
 const std::string& DynamicModuleRouteEntry::clusterName() const {
@@ -588,9 +636,11 @@ DynamicModuleRouteEntry::responseHeaderTransforms(const StreamInfo::StreamInfo& 
   return transforms;
 }
 
-Envoy::Router::OnRouteResult DynamicModuleRouteSpecifier::onRoute(
-    Envoy::Router::RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
-    const StreamInfo::StreamInfo& stream_info, uint64_t random) const {
+Envoy::Router::OnRouteResult
+DynamicModuleRouteSpecifier::onRoute(Envoy::Router::RouteConstSharedPtr route,
+                                     const Http::RequestHeaderMap& headers,
+                                     const StreamInfo::StreamInfo& stream_info, uint64_t random,
+                                     Envoy::Router::OnRouteInputStatus) const {
   const MonotonicTime start = config_->timeSource().monotonicTime();
   const auto record_duration = [&](Stats::Histogram& histogram) {
     histogram.recordValue(std::chrono::duration_cast<std::chrono::microseconds>(
@@ -628,7 +678,7 @@ Envoy::Router::OnRouteResult DynamicModuleRouteSpecifier::onRoute(
 
 DynamicModuleRouteSpecifier::Decision
 DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t decision) const {
-  using Status = Envoy::Router::OnRouteChainStatus;
+  using Status = Envoy::Router::OnRouteStatus;
   const auto status = [&context](Status by_decision) {
     switch (context.chain_status) {
     case envoy_dynamic_module_type_route_specifier_chain_status_Continue:
@@ -669,6 +719,9 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     }
     ENVOY_LOG(debug, "dynamic module route specifier could not honor the decision, reason {}",
               static_cast<int>(failure));
+    if (config_->continueMatchingOnFailure()) {
+      return Decision{context.input_route, Status::StopIterationAndSkipRoute, failure};
+    }
     if (config_->failClosed()) {
       return Decision{nullptr, Status::StopIteration, failure};
     }
@@ -685,6 +738,10 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
   case envoy_dynamic_module_type_route_specifier_decision_Error:
     config_->stats().decision_error_.inc();
     return fail(Failure::ModuleError);
+  case envoy_dynamic_module_type_route_specifier_decision_ContinueMatching:
+    config_->stats().decision_continue_matching_.inc();
+    // The skip is final by definition, so the chain status the module may have set is ignored.
+    return {context.input_route, Status::StopIterationAndSkipRoute};
   case envoy_dynamic_module_type_route_specifier_decision_Override: {
     config_->stats().decision_override_.inc();
     if (context.input_route == nullptr) {
@@ -698,8 +755,8 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
     if (context.selected_template == nullptr) {
       return fail(Failure::TemplateNotSelected);
     }
-    // set_template evaluated the template against the request, so reuse the result rather than
-    // matching a second time. A null result means the match did not hold for the request.
+    // set_route_template evaluated the template against the request, so reuse the result rather
+    // than matching a second time. A null result means the match did not hold for the request.
     if (context.selected_route == nullptr) {
       return fail(Failure::TemplateMatchFailed);
     }
@@ -726,7 +783,7 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context, uint32_t de
 DynamicModuleRouteSpecifier::Decision
 DynamicModuleRouteSpecifier::wrap(Envoy::Router::RouteConstSharedPtr route,
                                   RouteSpecifierContext& context,
-                                  Envoy::Router::OnRouteChainStatus status) const {
+                                  Envoy::Router::OnRouteStatus status) const {
   const bool route_entry_overrides = context.overrides.hasRouteEntryOverrides();
   // User data forces a wrapper even with no override, so the route destroy hook fires for the
   // produced route.

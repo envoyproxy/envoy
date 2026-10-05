@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/router/route_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/http/codes.h"
@@ -55,6 +56,7 @@ constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
   COUNTER(decision_no_route)                                                                       \
   COUNTER(decision_error)                                                                          \
   COUNTER(decision_reuse_previous)                                                                 \
+  COUNTER(decision_continue_matching)                                                              \
   COUNTER(runtime_skipped)                                                                         \
   COUNTER(failure_module_error)                                                                    \
   COUNTER(failure_template_not_selected)                                                           \
@@ -85,6 +87,19 @@ struct RouteOverride {
   std::unique_ptr<Envoy::Router::HedgePolicy> hedge_policy;
   std::unique_ptr<const Envoy::Router::RateLimitPolicy> rate_limit_policy;
   std::unique_ptr<const Envoy::Router::CorsPolicy> cors_policy;
+  // Regex rewrite of the request path, compiled once at configuration load. Null when unset.
+  Regex::CompiledMatcherPtr regex_rewrite;
+  std::string regex_rewrite_substitution;
+  // Route level properties, valid on any route rather than only a route entry.
+  std::shared_ptr<const Envoy::Router::RouteTracing> tracing;
+  envoy::config::core::v3::Metadata metadata;
+
+  // Whether the override carries a property only a route entry can carry.
+  bool hasRouteEntryProperties() const {
+    return retry_policy != nullptr || metadata_match_criteria != nullptr ||
+           !shadow_policies.empty() || hash_policy != nullptr || hedge_policy != nullptr ||
+           rate_limit_policy != nullptr || cors_policy != nullptr || regex_rewrite != nullptr;
+  }
 };
 
 using RouteOverrideMap = absl::flat_hash_map<std::string, RouteOverride>;
@@ -114,6 +129,8 @@ struct RouteOverrides {
   // Metadata the module layered onto the route, keyed by namespace. Empty when the module set none.
   envoy::config::core::v3::Metadata route_metadata;
   absl::flat_hash_map<std::string, bool> filter_disabled;
+  // Name the module recorded for the route it produces. Unset when the module set none.
+  std::optional<std::string> route_name;
   std::optional<std::string> path;
   std::optional<std::string> host;
   std::vector<HeaderMutation> request_headers_to_add;
@@ -190,7 +207,9 @@ public:
   const std::optional<RuntimeFraction>& runtimeFraction() const { return runtime_fraction_; }
   const std::string& specifierInstanceId() const { return specifier_instance_id_; }
   OnRouteSpecifierRouteDestroyType onRouteDestroy() const { return on_route_destroy_; }
+  uint32_t maxRewrittenPathBytes() const { return max_rewritten_path_bytes_; }
   bool failClosed() const { return fail_closed_; }
+  bool continueMatchingOnFailure() const { return continue_matching_on_failure_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Runtime::Loader& runtime() const { return runtime_; }
   TimeSource& timeSource() const { return time_source_; }
@@ -242,7 +261,9 @@ private:
   Envoy::Router::RouteBuilder* config_new_route_builder_{nullptr};
   bool config_new_validate_clusters_{false};
   const std::optional<RuntimeFraction> runtime_fraction_;
+  const uint32_t max_rewritten_path_bytes_;
   const bool fail_closed_;
+  const bool continue_matching_on_failure_;
   Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
@@ -278,8 +299,8 @@ struct RouteSpecifierContext {
   const StreamInfo::StreamInfo& stream_info;
   const uint64_t random_value;
   const DynamicModuleRouteSpecifierConfig::Template* selected_template{nullptr};
-  // The selected template evaluated against the request, set when set_template succeeds so that the
-  // getters reflect the route being produced. Null keeps the getters on the route matching
+  // The selected template evaluated against the request, set when set_route_template succeeds so
+  // that the getters reflect the route being produced. Null keeps the getters on the route matching
   // resolved, whether no template was selected or its match did not hold.
   Envoy::Router::RouteConstSharedPtr selected_route;
   envoy_dynamic_module_type_route_specifier_chain_status chain_status{
@@ -315,9 +336,11 @@ public:
   ~DynamicModuleRoute() override;
 
   // Router::Route
+  const std::string& routeName() const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   std::optional<bool> filterDisabled(absl::string_view name) const override;
+  const Envoy::Router::RouteTracing* tracingConfig() const override;
 
 protected:
   const DynamicModuleRouteSpecifierConfigSharedPtr config_;
@@ -343,9 +366,11 @@ public:
   ~DynamicModuleRouteEntry() override;
 
   // Router::Route
+  const std::string& routeName() const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   std::optional<bool> filterDisabled(absl::string_view name) const override;
+  const Envoy::Router::RouteTracing* tracingConfig() const override;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -390,7 +415,7 @@ enum class Failure {
   None,
   // The module returned the Error decision.
   ModuleError,
-  // The decision was SelectTemplate without a successful set_template.
+  // The decision was SelectTemplate without a successful set_route_template.
   TemplateNotSelected,
   // The match of the selected template does not hold for the request.
   TemplateMatchFailed,
@@ -414,16 +439,18 @@ public:
       : config_(std::move(config)) {}
 
   // Router::RouteSpecifier
-  Envoy::Router::OnRouteResult onRoute(Envoy::Router::RouteConstSharedPtr route,
-                                       const Http::RequestHeaderMap& headers,
-                                       const StreamInfo::StreamInfo& stream_info,
-                                       uint64_t random) const override;
+  Envoy::Router::OnRouteResult
+  onRoute(Envoy::Router::RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
+          const StreamInfo::StreamInfo& stream_info, uint64_t random,
+          Envoy::Router::OnRouteInputStatus input_status) const override;
 
 private:
-  // The route a decision produced, along with why it could not be produced.
+  // The outcome of a decision, holding the route it produced, the chain status and the reason it
+  // could not be honored. A chain status of StopIterationAndSkipRoute asks route matching to
+  // carry on with the next route.
   struct Decision {
     Envoy::Router::RouteConstSharedPtr route;
-    Envoy::Router::OnRouteChainStatus status{Envoy::Router::OnRouteChainStatus::Continue};
+    Envoy::Router::OnRouteStatus status{Envoy::Router::OnRouteStatus::Continue};
     Failure failure{Failure::None};
   };
 
@@ -431,7 +458,7 @@ private:
   Decision resolve(RouteSpecifierContext& context, uint32_t decision) const;
   // The route the module asked for, without the failure policy applied.
   Decision wrap(Envoy::Router::RouteConstSharedPtr route, RouteSpecifierContext& context,
-                Envoy::Router::OnRouteChainStatus status) const;
+                Envoy::Router::OnRouteStatus status) const;
 
   const DynamicModuleRouteSpecifierConfigSharedPtr config_;
 };

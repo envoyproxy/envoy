@@ -663,7 +663,8 @@ public:
   // Router::RouteSpecifier
   MOCK_METHOD(OnRouteResult, onRoute,
               (RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
-               const StreamInfo::StreamInfo& stream_info, uint64_t random_value),
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
+               OnRouteInputStatus input_status),
               (const));
 };
 

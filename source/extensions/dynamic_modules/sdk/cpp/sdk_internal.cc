@@ -96,17 +96,12 @@ public:
       return {};
     }
 
-    std::vector<envoy_dynamic_module_type_envoy_http_header> raw(header_count);
-    size_t size_out = 0;
-    if (!envoy_dynamic_module_callback_http_get_headers(host_plugin_ptr_, Type, raw.data(),
-                                                        raw.size(), &size_out)) {
+    std::vector<HeaderView> result_headers(header_count);
+    if (!envoy_dynamic_module_callback_http_get_headers(
+            host_plugin_ptr_, Type,
+            reinterpret_cast<envoy_dynamic_module_type_envoy_http_header*>(
+                result_headers.data()))) {
       return {};
-    }
-    std::vector<HeaderView> result_headers;
-    result_headers.reserve(size_out);
-    for (size_t i = 0; i < size_out; i++) {
-      result_headers.emplace_back(raw[i].key_ptr, raw[i].key_length, raw[i].value_ptr,
-                                  raw[i].value_length);
     }
     return result_headers;
   }
@@ -616,17 +611,35 @@ public:
   }
 
   TimingInfo getTimingInfo() override {
-    envoy_dynamic_module_type_timing_info info{};
+    envoy_dynamic_module_type_timing_info_v2 info{};
     envoy_dynamic_module_callback_http_get_timing_info(host_plugin_ptr_, &info);
+    const auto available = [](int64_t value, bool has_value) -> std::optional<int64_t> {
+      return has_value ? std::optional<int64_t>(value) : std::nullopt;
+    };
     return TimingInfo{
-        info.start_time_unix_ns,
-        info.request_complete_duration_ns,
-        info.first_upstream_tx_byte_sent_ns,
-        info.last_upstream_tx_byte_sent_ns,
-        info.first_upstream_rx_byte_received_ns,
-        info.last_upstream_rx_byte_received_ns,
-        info.first_downstream_tx_byte_sent_ns,
-        info.last_downstream_tx_byte_sent_ns,
+        available(info.start_time_unix_ns, info.has_start_time),
+        available(info.downstream_connection_begin_ns, info.has_downstream_connection_begin),
+        available(info.downstream_handshake_start_ns, info.has_downstream_handshake_start),
+        available(info.downstream_handshake_complete_ns, info.has_downstream_handshake_complete),
+        available(info.last_downstream_header_rx_byte_received_ns,
+                  info.has_last_downstream_header_rx_byte_received),
+        available(info.last_downstream_rx_byte_received_ns,
+                  info.has_last_downstream_rx_byte_received),
+        available(info.upstream_connect_start_ns, info.has_upstream_connect_start),
+        available(info.upstream_connect_complete_ns, info.has_upstream_connect_complete),
+        available(info.upstream_handshake_complete_ns, info.has_upstream_handshake_complete),
+        available(info.first_upstream_tx_byte_sent_ns, info.has_first_upstream_tx_byte_sent),
+        available(info.last_upstream_tx_byte_sent_ns, info.has_last_upstream_tx_byte_sent),
+        available(info.first_upstream_rx_byte_received_ns,
+                  info.has_first_upstream_rx_byte_received),
+        available(info.first_upstream_rx_body_byte_received_ns,
+                  info.has_first_upstream_rx_body_byte_received),
+        available(info.last_upstream_rx_byte_received_ns, info.has_last_upstream_rx_byte_received),
+        available(info.first_downstream_tx_byte_sent_ns, info.has_first_downstream_tx_byte_sent),
+        available(info.last_downstream_tx_byte_sent_ns, info.has_last_downstream_tx_byte_sent),
+        available(info.last_downstream_ack_received_ns, info.has_last_downstream_ack_received),
+        available(info.request_complete_duration_ns, info.has_request_complete),
+        available(info.downstream_connection_end_ns, info.has_downstream_connection_end),
     };
   }
 

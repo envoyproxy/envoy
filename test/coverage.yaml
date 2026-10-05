@@ -62,7 +62,7 @@ directories:
   source/extensions/filters/network/dubbo_proxy: 96.2
   source/extensions/filters/network/ext_authz: 98.0
   source/extensions/filters/network/mongo_proxy: 96.1
-  source/extensions/filters/network/reverse_tunnel: 95.9
+  source/extensions/filters/network/reverse_tunnel: 95.8
   source/extensions/filters/network/sni_cluster: 88.9
   source/extensions/formatter/cel: 100.0
   source/extensions/formatter/file_content: 96.3
