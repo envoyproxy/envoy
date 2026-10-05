@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/tracing:trace_driver_interface",
         "//source/common/common:empty_string",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

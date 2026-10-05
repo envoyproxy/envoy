@@ -150,10 +150,15 @@ std::string Span::getTraceId() const {
   return absl::StrCat(absl::Hex(span_->id()));
 }
 
+void Span::setTraceId(absl::string_view) {}
+
 std::string Span::getSpanId() const {
   // TODO(#34412): This method is not yet implemented for Datadog.
   return EMPTY_STRING;
 }
+
+void Span::setParentId(absl::string_view) {}
+void Span::setTracestate(absl::string_view) {}
 
 } // namespace Datadog
 } // namespace Tracers

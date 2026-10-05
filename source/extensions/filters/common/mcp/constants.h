@@ -52,6 +52,7 @@ constexpr absl::string_view MCP_VERSION_2025_11_25 = "2025-11-25";
 constexpr absl::string_view MCP_VERSION_2026_07_28 = "2026-07-28";
 constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
 constexpr absl::string_view META_FIELD = "_meta";
+constexpr absl::string_view TRACEPARENT_FIELD = "traceparent";
 constexpr absl::string_view MCP_META_PROTOCOL_VERSION_FIELD =
     "io.modelcontextprotocol/protocolVersion";
 constexpr absl::string_view MCP_META_SERVER_INFO_FIELD = "io.modelcontextprotocol/serverInfo";

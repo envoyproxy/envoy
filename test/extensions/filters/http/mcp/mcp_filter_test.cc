@@ -3511,6 +3511,60 @@ TEST_F(McpFilterTest, RejectModeRejectsDeleteWithoutSessionId) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
+TEST_F(McpFilterTest, TraceContextReparentActiveSpan) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context()->set_reparent_active_span(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // SPELLCHECKER(off)
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  Buffer::OwnedImpl buffer(json);
+
+  static constexpr absl::string_view kSpanIdHex = "21b6bcb2a5588606";
+
+  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+      .WillOnce(
+          testing::Invoke([&buffer](std::function<void(Buffer::Instance&)> cb) { cb(buffer); }));
+  EXPECT_CALL(decoder_callbacks_.active_span_, getSpanId())
+      .WillOnce(Return(std::string(kSpanIdHex)));
+  EXPECT_CALL(decoder_callbacks_.active_span_, setTraceId("4bf92f3577b34da6a3ce929d0e0e4736"));
+  EXPECT_CALL(decoder_callbacks_.active_span_, setParentId("00f067aa0ba902b7"));
+  EXPECT_CALL(decoder_callbacks_.active_span_, setSampled(true));
+  EXPECT_CALL(decoder_callbacks_.active_span_, setTracestate("rojo=00f067aa0ba902b7"));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kSpanIdHex, "-01"),
+            headers.get_("traceparent"));
+  EXPECT_EQ("rojo=00f067aa0ba902b7", headers.get_("tracestate"));
+
+  // The request's traceparent should have been rewritten such that the parent
+  // ID is equal to the active span's ID.
+  EXPECT_THAT(buffer.toString(),
+              HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kSpanIdHex, "-01")));
+}
+
 TEST_F(McpFilterTest, TraceContextEnabledValidParentAndState) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_propagate_trace_context();

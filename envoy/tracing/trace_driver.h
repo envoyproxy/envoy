@@ -2,11 +2,12 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_config.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -204,10 +205,28 @@ public:
   virtual std::string getTraceId() const PURE;
 
   /**
+   * Set the trace ID for this span.
+   * @param trace_id the new trace ID
+   */
+  virtual void setTraceId(absl::string_view) PURE;
+
+  /**
    * Retrieve the span's identifier.
    * @return span ID as a hex string
    */
   virtual std::string getSpanId() const PURE;
+
+  /**
+   * Set the parent ID for this span.
+   * @param parent_id the new parent ID
+   */
+  virtual void setParentId(absl::string_view) PURE;
+
+  /**
+   * Set the tracestate for this span.
+   * @param tracestate the new tracestate
+   */
+  virtual void setTracestate(absl::string_view) PURE;
 };
 
 /**

@@ -4,6 +4,8 @@
 
 #include "source/common/common/empty_string.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Tracing {
 
@@ -27,6 +29,9 @@ public:
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   std::string getSpanId() const override { return EMPTY_STRING; }
   std::string getTraceId() const override { return EMPTY_STRING; }
+  void setTraceId(absl::string_view) override {}
+  void setParentId(absl::string_view) override {}
+  void setTracestate(absl::string_view) override {}
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
   }

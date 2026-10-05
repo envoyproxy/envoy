@@ -50,7 +50,10 @@ public:
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
   std::string getTraceId() const override;
+  void setTraceId(absl::string_view trace_id) override;
   std::string getSpanId() const override;
+  void setParentId(absl::string_view parent_id) override;
+  void setTracestate(absl::string_view tracestate) override;
 
 private:
   datadog::tracing::Optional<datadog::tracing::Span> span_;

@@ -206,7 +206,7 @@ private:
     Mismatch,
   };
   ProtocolVersionValidationResult validateProtocolVersion() const;
-  Http::FilterDataStatus completeParsing();
+  Http::FilterDataStatus completeParsing(Buffer::Instance& data);
   void setDynamicMetadataStatus(Protobuf::Struct metadata);
   void populateMetadataFromHeaders();
   bool shouldUseNewSpecSemantics() const;

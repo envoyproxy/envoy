@@ -179,7 +179,10 @@ public:
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
   std::string getTraceId() const override;
+  void setTraceId(absl::string_view) override {}
   std::string getSpanId() const override;
+  void setParentId(absl::string_view) override {}
+  void setTracestate(absl::string_view) override {}
 
 private:
   // config

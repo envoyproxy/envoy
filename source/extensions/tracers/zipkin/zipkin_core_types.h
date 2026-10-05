@@ -315,6 +315,8 @@ public:
    */
   void setTraceId(const uint64_t val) { trace_id_ = val; }
 
+  void setTraceId(absl::string_view) override { /* not implemented */ }
+
   /**
    * Sets the span's name attribute.
    */
@@ -329,6 +331,10 @@ public:
    * Sets the span's parent id.
    */
   void setParentId(const uint64_t val) { parent_id_ = val; }
+
+  void setParentId(absl::string_view) override { /* not implemented */ }
+
+  void setTracestate(absl::string_view) override { /* not implemented */ }
 
   /**
    * @return Whether or not the parent_id attribute is set.

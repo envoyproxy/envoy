@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
@@ -16,19 +17,29 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/tracing/trace_driver.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/base64.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/tracing/tracing_validation.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
+#include "absl/base/nullability.h"
+#include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -37,6 +48,8 @@ namespace HttpFilters {
 namespace Mcp {
 
 using FilterStateObject = Filters::Common::Mcp::FilterStateObject;
+using SpanContext = Envoy::Extensions::Tracers::OpenTelemetry::SpanContext;
+using SpanContextExtractor = Envoy::Extensions::Tracers::OpenTelemetry::SpanContextExtractor;
 
 namespace {
 const Http::LowerCaseString kMcpSessionId{
@@ -124,13 +137,20 @@ const Http::LowerCaseString& baggageHeader() {
 }
 
 void injectTraceContext(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
-                        Http::RequestHeaderMap& headers) {
-  const auto& tp_it = meta_fields.find("traceparent");
-  if (tp_it == meta_fields.end() || tp_it->second.kind_case() != Protobuf::Value::kStringValue) {
-    return;
+                        const RewriteTraceContextResult* absl_nullable rewrite_result,
+                        Http::RequestHeaderMap& headers,
+                        Envoy::Tracing::Span* absl_nullable active_span) {
+  absl::string_view tp;
+  if (rewrite_result != nullptr) {
+    tp = rewrite_result->rewritten_traceparent;
+  } else {
+    const auto& tp_it = meta_fields.find("traceparent");
+    if (tp_it == meta_fields.end() || tp_it->second.kind_case() != Protobuf::Value::kStringValue) {
+      return;
+    }
+    tp = tp_it->second.string_value();
   }
 
-  const std::string& tp = tp_it->second.string_value();
   if (!Envoy::Tracing::isValidTraceParent(tp)) {
     return;
   }
@@ -145,7 +165,20 @@ void injectTraceContext(const Protobuf::Map<std::string, Protobuf::Value>& meta_
     const std::string& ts = ts_it->second.string_value();
     if (Envoy::Tracing::isValidTraceState(ts)) {
       headers.setCopy(tracestateHeader(), ts);
+      if (active_span != nullptr) {
+        // When the OpenTelemetry tracer is configured, it sets the tracestate
+        // header based on the active span. Update the active span so it doesn't
+        // set the header based on the default empty tracestate that was created
+        // before the span was reparented.
+        active_span->setTracestate(ts);
+      }
     }
+  }
+
+  if (active_span != nullptr && rewrite_result != nullptr) {
+    active_span->setTraceId(rewrite_result->parsed_traceparent.traceId());
+    active_span->setParentId(rewrite_result->original_parent_id);
+    active_span->setSampled(rewrite_result->parsed_traceparent.sampled());
   }
 }
 
@@ -161,6 +194,73 @@ void injectBaggage(const Protobuf::Map<std::string, Protobuf::Value>& meta_field
     headers.setCopy(baggageHeader(), bg);
   }
 }
+
+// Extract a mutable pointer to the traceparent field located at
+// `params._meta.traceparent`.
+absl::StatusOr<std::string * absl_nonnull> findParamsMetaTraceparent(Protobuf::Struct& body) {
+  auto& fields = *body.mutable_fields();
+
+  auto params_it = fields.find(Filters::Common::Mcp::McpConstants::PARAMS_FIELD);
+  if (params_it == fields.end()) {
+    return absl::InvalidArgumentError("Failed to find params field");
+  }
+  if (!params_it->second.has_struct_value()) {
+    return absl::InvalidArgumentError("Failed to parse params field to JSON");
+  }
+  Protobuf::Struct& params = *params_it->second.mutable_struct_value();
+
+  auto meta_it = params.mutable_fields()->find(Filters::Common::Mcp::McpConstants::META_FIELD);
+  if (meta_it == params.fields().end()) {
+    return absl::InvalidArgumentError("Failed to find _meta in params");
+  }
+  if (!meta_it->second.has_struct_value()) {
+    return absl::InvalidArgumentError("Failed to parse _meta field to JSON");
+  }
+
+  Protobuf::Struct& meta = *meta_it->second.mutable_struct_value();
+  auto traceparent_it =
+      meta.mutable_fields()->find(Filters::Common::Mcp::McpConstants::TRACEPARENT_FIELD);
+  if (traceparent_it == meta.fields().end()) {
+    return absl::InvalidArgumentError("Failed to find traceparent in _meta");
+  }
+  if (!traceparent_it->second.has_string_value()) {
+    return absl::InvalidArgumentError("Failed to parse traceparent field to string");
+  }
+  return traceparent_it->second.mutable_string_value();
+}
+
+// Rewrites the MCP request body's traceparent with the new parent ID. This
+// reparses the entire body and injects `new_parent_id` into the traceparent
+// located at `params._meta.traceparent`.
+//
+// TODO: Consider skipping the parse and doing a naive textual replacement.
+absl::StatusOr<std::string>
+rewriteBodyWithNewTraceparent(const Buffer::Instance& body, absl::string_view new_parent_id) {
+  if (new_parent_id.empty()) {
+    return absl::InvalidArgumentError("New parent ID is empty");
+  }
+  Protobuf::Struct parsed_body;
+  RETURN_IF_NOT_OK(MessageUtil::loadFromJsonNoThrow(body.toString(), parsed_body));
+  absl::StatusOr<std::string * absl_nonnull> traceparent_ptr =
+      findParamsMetaTraceparent(parsed_body);
+  RETURN_IF_NOT_OK_REF(traceparent_ptr.status());
+  absl::StatusOr<SpanContext> parsed_traceparent =
+      SpanContextExtractor::parseTraceparent(**traceparent_ptr, "");
+  RETURN_IF_NOT_OK_REF(parsed_traceparent.status());
+  std::string original_parent_id(parsed_traceparent->spanId());
+
+  // Modify the traceparent's parent ID and serialize it.
+  parsed_traceparent->setSpanId(std::string(new_parent_id));
+  std::string new_traceparent = SpanContextExtractor::serializeTraceparent(*parsed_traceparent);
+
+  // Modify the body's traceparent and serialize it.
+  **traceparent_ptr = new_traceparent;
+  std::string new_body;
+  RETURN_IF_NOT_OK(Protobuf::util::MessageToJsonString(parsed_body, &new_body));
+
+  return new_body;
+}
+
 } // namespace
 
 McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
@@ -613,13 +713,13 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
           return Http::FilterDataStatus::StopIterationNoBuffer;
         } else {
           passthrough_reason_ = Filters::Common::Mcp::Status::NotJsonRpc;
-          return completeParsing();
+          return completeParsing(data);
         }
       }
 
       if (parser_->isParsingComplete()) {
         ENVOY_LOG(debug, "mcp parse complete: found all fields");
-        return completeParsing();
+        return completeParsing(data);
       }
 
       // Stop buffering once routing attributes are collected, even if the root
@@ -631,7 +731,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
         // partial-parse error is expected and intentionally ignored.
         const absl::Status finalize_status = parser_->finishParse();
         ENVOY_LOG(trace, "mcp early termination finalize status: {}", finalize_status.message());
-        return completeParsing();
+        return completeParsing(data);
       }
     }
 
@@ -659,7 +759,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
           ENVOY_LOG(debug, "parse error in PASS_THROUGH mode; proceeding");
           passthrough_reason_ = Filters::Common::Mcp::Status::ParseError;
         }
-        return completeParsing();
+        return completeParsing(data);
       }
       Filters::Common::Mcp::Status status = Filters::Common::Mcp::Status::ParseError;
       if (truncated_by_limit) {
@@ -669,7 +769,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
       sendErrorReply("reached end_stream or configured body size, don't get enough data.", status);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
-    return completeParsing();
+    return completeParsing(data);
   }
 
   return Http::FilterDataStatus::StopIterationAndWatermark;
@@ -875,7 +975,7 @@ McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() 
   return ProtocolVersionValidationResult::Ok;
 }
 
-Http::FilterDataStatus McpFilter::completeParsing() {
+Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
   parsing_complete_ = true;
   is_mcp_request_ = parser_->isValidMcpRequest();
 
@@ -967,13 +1067,61 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   // Handle tracing field extraction and header injection.
   if (config_->propagateTraceContext().has_value() || config_->propagateBaggage().has_value()) {
-    const Protobuf::Value* meta_value = parser_->getNestedValue(
-        std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
+    const Protobuf::Value* meta_value =
+        parser_->getNestedValue(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META);
     auto headers = decoder_callbacks_->requestHeaders();
     if (meta_value != nullptr && meta_value->has_struct_value() && headers.has_value()) {
       const auto& meta_fields = meta_value->struct_value().fields();
       if (config_->propagateTraceContext().has_value()) {
-        injectTraceContext(meta_fields, *headers);
+        if (config_->propagateTraceContext()->reparent_active_span()) {
+          // MCP version 2026-07-28 puts the traceparent in the body instead of
+          // a header. If the traceparent was not duplicated in a header, the
+          // active span was created without the necessary context, meaning its
+          // trace ID and parent ID are based on nothing, and are therefore
+          // disconnected from the body's traceparent. Left unchecked, this
+          // would break the distributed trace.
+          //
+          // To ensure the distributed trace is coherent, we will reparent the
+          // active span below the body's traceparent. We also must rewrite the
+          // body so upstream spans are a child of the active span. To this end,
+          // we'll perform the following steps:
+          //
+          // 1. Rewrite the request body's traceparent, setting its parent ID
+          //    to the active span's ID (a convenient, fresh ID).
+          // 2. Rewrite the request's "traceparent" header to match the body.
+          // 3. Set the active span's trace ID and parent ID to the values in
+          //    the body's traceparent.
+          // 4. Relatedly, we should also set the active span's sampled bit
+          //    based on the request body.
+          Tracing::Span& active_span = decoder_callbacks_->activeSpan();
+          std::string new_parent_id(active_span.getSpanId());
+          if (new_parent_id.empty()) {
+            ENVOY_LOG(warn, "Active span's ID is empty");
+          } else {
+            decoder_callbacks_->addDecodedData(data, /*streaming_filter=*/true);
+
+            Buffer::Instance* buffer = nullptr;
+            decoder_callbacks_->modifyDecodingBuffer(
+                [&buffer](Buffer::Instance& b) { buffer = &b; });
+            ASSERT(buffer != nullptr);
+
+            absl::StatusOr<RewriteTraceContextResult> rewrite_result =
+                rewriteBodyWithNewTraceparent(*buffer, new_parent_id);
+            if (!rewrite_result.ok()) {
+              ENVOY_LOG_EVERY_POW_2(warn, "MCP filter failed to rewrite traceparent: {}",
+                                    rewrite_result.status().ToString());
+            } else {
+              buffer->drain(buffer->length());
+              buffer->add(rewrite_result->rewritten_body);
+              headers->setContentLength(buffer->length());
+
+              injectTraceContext(meta_fields, &rewrite_result.value(), *headers, &active_span);
+            }
+          }
+        } else {
+          injectTraceContext(meta_fields, /*rewrite_result=*/nullptr, *headers,
+                             /*active_span=*/nullptr);
+        }
       }
       if (config_->propagateBaggage().has_value()) {
         injectBaggage(meta_fields, *headers);

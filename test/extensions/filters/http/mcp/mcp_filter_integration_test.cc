@@ -1,11 +1,21 @@
+#include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
+#include "envoy/http/header_map.h"
 
 #include "source/common/protobuf/utility.h"
 
 #include "test/integration/fake_access_log.h"
+#include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
+
+#include "absl/strings/escaping.h"
+#include "absl/strings/substitute.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -1306,6 +1316,169 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersInjected) {
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that tracing headers and the request body are correctly rewritten when
+// `propagate_trace_context.reparent_active_span` is enabled.
+TEST_P(McpFilterIntegrationTest, TracingHeadersAndBodyRewrittenWhenReparentingEnabled) {
+  using envoy::config::trace::v3::OpenTelemetryConfig;
+  using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
+
+  fake_upstreams_count_++;
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* trace_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    trace_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    trace_cluster->set_name("trace-receiver");
+
+    // Set a short flush interval so spans are exported quickly.
+    auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
+    layer->set_name("test_otel_static_layer");
+    Protobuf::Struct runtime_config;
+    (*runtime_config.mutable_fields())["tracing.opentelemetry.flush_interval_ms"].set_number_value(
+        5);
+    (*runtime_config.mutable_fields())["tracing.opentelemetry.min_flush_spans"].set_number_value(1);
+    *layer->mutable_static_layer() = runtime_config;
+  });
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& hcm) -> void {
+    auto* trace_receiver_upstream_ = fake_upstreams_.back().get();
+
+    HttpConnectionManager::Tracing tracing;
+    tracing.mutable_random_sampling()->set_value(100);
+    tracing.mutable_spawn_upstream_span()->set_value(false);
+
+    OpenTelemetryConfig otel_config;
+    otel_config.set_service_name("my-service");
+
+    auto* http_service = otel_config.mutable_http_service();
+    auto* http_uri = http_service->mutable_http_uri();
+    http_uri->set_uri(fmt::format("http://{}:{}/v1/traces",
+                                  Network::Test::getLoopbackAddressUrlString(GetParam()),
+                                  trace_receiver_upstream_->localAddress()->ip()->port()));
+    http_uri->set_cluster("trace-receiver");
+    http_uri->mutable_timeout()->set_seconds(1);
+
+    auto* header = http_service->add_request_headers_to_add();
+    header->mutable_header()->set_key("x-custom-formatter");
+    header->mutable_header()->set_value("%HOSTNAME%");
+
+    tracing.mutable_provider()->set_name("envoy.tracers.opentelemetry");
+    std::ignore = tracing.mutable_provider()->mutable_typed_config()->PackFrom(otel_config);
+
+    *hcm.mutable_tracing() = tracing;
+  });
+
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+      propagate_trace_context: {
+        reparent_active_span: true
+      }
+      propagate_baggage: {}
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // SPELLCHECKER(off)
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7",
+        "baggage": "userId=alice"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+  auto tp = upstream_request_->headers().get(Http::LowerCaseString("traceparent"));
+  ASSERT_FALSE(tp.empty());
+  // The traceparent header should have a modified parent ID.
+  EXPECT_NE(tp[0]->value().getStringView(),
+            "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
+  EXPECT_THAT(tp[0]->value().getStringView(),
+              testing::MatchesRegex("00-4bf92f3577b34da6a3ce929d0e0e4736-[0-9a-f-A-F]{16}-01"));
+
+  auto ts = upstream_request_->headers().get(Http::LowerCaseString("tracestate"));
+  ASSERT_FALSE(ts.empty());
+  // SPELLCHECKER(off)
+  EXPECT_EQ("rojo=00f067aa0ba902b7", ts[0]->value().getStringView());
+  // SPELLCHECKER(on)
+
+  auto baggage = upstream_request_->headers().get(Http::LowerCaseString("baggage"));
+  ASSERT_FALSE(baggage.empty());
+  EXPECT_EQ("userId=alice", baggage[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Capture the exported span. Its parent ID should be based on the incoming
+  // request's traceparent.
+  opentelemetry::proto::trace::v1::Span span;
+  {
+    FakeHttpConnectionPtr trace_connection;
+    ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, trace_connection));
+    FakeStreamPtr trace_stream;
+    ASSERT_TRUE(trace_connection->waitForNewStream(*dispatcher_, trace_stream));
+    ASSERT_TRUE(trace_stream->waitForEndStream(*dispatcher_));
+    trace_stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+    opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest export_request;
+    ASSERT_TRUE(export_request.ParseFromString(trace_stream->body().toString()));
+    ASSERT_EQ(export_request.resource_spans_size(), 1);
+    ASSERT_EQ(export_request.resource_spans(0).scope_spans_size(), 1);
+    ASSERT_EQ(export_request.resource_spans(0).scope_spans(0).spans_size(), 1);
+    span = export_request.resource_spans(0).scope_spans(0).spans(0);
+    EXPECT_EQ(absl::BytesToHexString(span.trace_id()), "4bf92f3577b34da6a3ce929d0e0e4736");
+    EXPECT_EQ(absl::BytesToHexString(span.parent_span_id()), "00f067aa0ba902b7");
+    EXPECT_NE(absl::BytesToHexString(span.span_id()), "");
+    EXPECT_NE(absl::BytesToHexString(span.span_id()), "00f067aa0ba902b7");
+
+    ASSERT_TRUE(trace_connection->close());
+    ASSERT_TRUE(trace_connection->waitForDisconnect());
+  }
+
+  // Capture the rewritten request body. Its traceparent should have a parent ID
+  // equal to the exported span's ID.
+  Protobuf::Struct body;
+  TestUtility::loadFromJson(upstream_request_->body().toString(), body);
+
+  Protobuf::Struct want_body;
+  // SPELLCHECKER(off)
+  TestUtility::loadFromJson(absl::Substitute(
+                                R"json({
+            "params": {
+              "name": "test",
+              "_meta": {
+                "baggage": "userId=alice",
+                "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-$0-01",
+                "tracestate": "rojo=00f067aa0ba902b7"
+              }
+            },
+            "jsonrpc": "2.0",
+            "method": "tools/call"
+          })json",
+                                absl::BytesToHexString(span.span_id())),
+                            want_body);
+  // SPELLCHECKER(on)
+
+  EXPECT_THAT(body, ProtoEq(want_body));
 }
 
 // Test that tracing headers are NOT injected when disabled.

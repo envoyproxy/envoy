@@ -72,8 +72,20 @@ message Mcp {
     HEADERS = 2;
   }
 
+  // [#next-free-field: 2]
   message TraceContextPropagationConfig {
     option (xds.annotations.v3.message_status).work_in_progress = true;
+
+    // When true, reparent the active span below the request body's traceparent.
+    //
+    // This requires rewriting the request body, headers, and the active span
+    // such that (a) the active span is a child of the body's traceparent and
+    // (b) the upstream's spans are children of the active span.
+    //
+    // This is useful for gateways that want to emit a span that captures time
+    // spent in the gateway itself, rather than simply forwarding the
+    // traceparent from the incoming body.
+    bool reparent_active_span = 1;
   }
 
   message BaggagePropagationConfig {

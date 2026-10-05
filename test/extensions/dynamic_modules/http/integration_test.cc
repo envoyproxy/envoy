@@ -48,7 +48,10 @@ public:
   std::string getBaggage(absl::string_view) override { return ""; }
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getTraceId() const override { return ""; }
+  void setTraceId(absl::string_view) override {}
   std::string getSpanId() const override { return ""; }
+  void setParentId(absl::string_view) override {}
+  void setTracestate(absl::string_view) override {}
 
 private:
   std::string operation_;

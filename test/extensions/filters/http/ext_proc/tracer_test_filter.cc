@@ -10,6 +10,7 @@
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.validate.h"
 
+#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -104,10 +105,13 @@ public:
     /* not implemented */
     return EMPTY_STRING;
   };
+  void setTraceId(absl::string_view) override { /* not implemented */ }
   std::string getSpanId() const override {
     /* not implemented */
     return EMPTY_STRING;
   };
+  void setParentId(absl::string_view) override { /* not implemented */ }
+  void setTracestate(absl::string_view) override { /* not implemented */ }
 
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& operation_name,
                               SystemTime) override {

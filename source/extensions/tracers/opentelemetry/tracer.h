@@ -132,7 +132,7 @@ public:
   /**
    * Sets the span's trace id attribute.
    */
-  void setTraceId(absl::string_view trace_id_hex) {
+  void setTraceId(absl::string_view trace_id_hex) override {
     span_.set_trace_id(absl::HexStringToBytes(trace_id_hex));
   }
 
@@ -159,7 +159,7 @@ public:
   /**
    * Sets the span's parent id.
    */
-  void setParentId(absl::string_view parent_span_id_hex) {
+  void setParentId(absl::string_view parent_span_id_hex) override {
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
   }
 
@@ -174,7 +174,7 @@ public:
   /**
    * Sets the span's tracestate.
    */
-  void setTracestate(absl::string_view tracestate) {
+  void setTracestate(absl::string_view tracestate) override {
     span_.set_trace_state(std::string{tracestate});
   }
 
