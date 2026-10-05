@@ -1028,9 +1028,12 @@ void ClusterManagerImpl::updateClusterCounts() {
   if (all_clusters_initialized && !shutdown_ && xds_manager_.adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
     // Clusters with wait_for_warm_on_init: false opt out of blocking CDS. All other
-    // warming clusters hold a CDS pause handle until they finish warming.
+    // warming clusters hold a CDS pause handle until they finish warming. If a cluster
+    // transitions to opt-out via an in-place update, release any existing handle immediately.
     for (const auto& [name, cluster_data] : warming_clusters_) {
-      if (!cds_pauses_.contains(name) && !cluster_data->skipCdsPause()) {
+      if (cluster_data->skipCdsPause()) {
+        cds_pauses_.erase(name);
+      } else if (!cds_pauses_.contains(name)) {
         cds_pauses_.emplace(name, xds_manager_.pause(type_url));
       }
     }
