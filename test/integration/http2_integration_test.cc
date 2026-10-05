@@ -1215,16 +1215,8 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
                                Eq(kRequestsSentPerIOCycle), TestUtility::DefaultTimeout * 10);
 }
 
-// Regression test for a CONTINUATION-flag desync between the underlying HTTP/2
-// codec and Envoy's Http2Visitor. nghttp2 masks reserved CONTINUATION flag bits
-// when merging into its in-progress HEADERS frame, but forwards the raw
-// CONTINUATION frame header to on_begin_frame. Prior to the fix guarded by
-// `envoy.reloadable_features.http2_mask_continuation_flags`, Http2Visitor OR'd
-// all raw bits into the accumulated HEADERS flags, so a reserved `0x01` bit on
-// a CONTINUATION frame aliased FLAG_END_STREAM and caused Envoy to run the
-// decoder filter chain to completion while the codec still considered the
-// stream open. A subsequent trailers HEADERS then re-entered decodeTrailers()
-// on a completed filter chain and tripped a debug ASSERT.
+// Verifies that reserved flag bits on CONTINUATION frames (e.g. 0x01) are ignored and do
+// not prematurely end the stream or cause an assertion failure when follow-up trailers arrive.
 TEST_P(Http2FrameIntegrationTest, ContinuationReservedFlagsIgnored) {
   beginSession();
 
@@ -1239,8 +1231,8 @@ TEST_P(Http2FrameIntegrationTest, ContinuationReservedFlagsIgnored) {
   headers.adjustPayloadSize();
 
   // CONTINUATION, flags=0x05 (END_HEADERS | reserved bit 0x01), empty payload.
-  // RFC 9113 §6.10 defines only END_HEADERS for CONTINUATION; the 0x01 bit is
-  // reserved and MUST be ignored on receipt.
+  // RFC 9113 §6.10 defines only END_HEADERS for CONTINUATION; all other bits are
+  // reserved and MUST be ignored on receipt according to §4.1.
   Http2Frame cont =
       Http2Frame::makeEmptyContinuationFrame(sid, static_cast<Http2Frame::HeadersFlags>(0x05));
 
@@ -1281,10 +1273,6 @@ TEST_P(Http2FrameIntegrationTest, ContinuationReservedFlagsIgnored) {
 // omitted here so the legacy behavior can be observed without crashing; the
 // crash reproduction is covered by the vh_poc harness with the guard disabled.
 TEST_P(Http2FrameIntegrationTest, ContinuationReservedFlagsLegacy) {
-  // The desync is only observable via the nghttp2 on_begin_frame callback path.
-  if (GetParam().http2_implementation != Http2Impl::Nghttp2) {
-    return;
-  }
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_mask_continuation_flags",
                                     "false");
   autonomous_upstream_ = true;

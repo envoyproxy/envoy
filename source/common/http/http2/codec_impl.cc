@@ -1979,11 +1979,8 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
     }
     current_frame_.length += length;
     if (mask_continuation_flags_) {
-      // RFC 9113 §6.10: CONTINUATION defines only END_HEADERS (0x04); all other
-      // flag bits are reserved and MUST be ignored on receipt. nghttp2 masks
-      // these bits when merging into its own frame header but forwards the raw
-      // CONTINUATION header to on_begin_frame, so mask here to prevent a
-      // reserved 0x01 bit aliasing FLAG_END_STREAM on the accumulated HEADERS.
+      // Retain only known flags per RFC 9113 §6.10 (only END_HEADERS is defined; all other flags
+      // are reserved and must be ignored per §4.1).
       static constexpr uint8_t CONTINUATION_END_HEADERS_FLAG = 0x04;
       current_frame_.flags |= (flags & CONTINUATION_END_HEADERS_FLAG);
     } else {
