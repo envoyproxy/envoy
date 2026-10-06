@@ -96,3 +96,5 @@ areas:
     title: wasm
   zstd:
     title: zstd
+  api_key_auth:
+    title: api_key_auth
