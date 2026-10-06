@@ -279,6 +279,11 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_iterate_counter
                envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
                envoy_dynamic_module_type_counter_iterator_fn, void*)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names,
+               envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+               envoy_dynamic_module_type_bootstrap_active_resource_kind,
+               envoy_dynamic_module_type_bootstrap_active_resource_name_fn, void*)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges,
                envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
                envoy_dynamic_module_type_gauge_iterator_fn, void*)
@@ -2097,9 +2102,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_remove_response_he
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
-WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_chain_status,
+WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_decision,
                envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
-               envoy_dynamic_module_type_route_specifier_chain_status)
+               envoy_dynamic_module_type_route_specifier_decision)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_cluster_name, false,
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
@@ -2141,6 +2146,10 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_override
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_unset_route_override, false,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool,
                envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
                envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
@@ -2161,6 +2170,10 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_typed_me
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_template, false,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_unset_route_template, false,
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 

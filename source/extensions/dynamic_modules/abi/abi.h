@@ -8888,6 +8888,28 @@ typedef enum envoy_dynamic_module_type_file_watcher_event {
   envoy_dynamic_module_type_file_watcher_event_Modified = 0x2,
 } envoy_dynamic_module_type_file_watcher_event;
 
+/**
+ * envoy_dynamic_module_type_bootstrap_active_resource_kind selects which kind of active resource
+ * envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names enumerates. New kinds
+ * may be appended as new values without changing the enumeration function's signature.
+ */
+typedef enum {
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_FilterChain = 0,
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster = 1,
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_TransportSocketMatch = 2,
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret = 3,
+} envoy_dynamic_module_type_bootstrap_active_resource_kind;
+
+/**
+ * The callback type invoked once per active resource name during enumeration.
+ *
+ * @param name is the name of the resource. The buffer is owned by Envoy and is valid only for the
+ * duration of this call.
+ * @param user_data is the user data passed to the enumeration function.
+ */
+typedef void (*envoy_dynamic_module_type_bootstrap_active_resource_name_fn)(
+    envoy_dynamic_module_type_envoy_buffer name, void* user_data);
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
@@ -9777,6 +9799,36 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
  */
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - Active Resource Names --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names is called by the
+ * module to enumerate the names of the currently active resources of a single kind, invoking
+ * name_fn once per name. Each name is reported at most once. To read several kinds, call once per
+ * kind. A no-op before the server is initialized. Must be called on the main thread.
+ *
+ * The kinds report:
+ * - FilterChain: the named filter chains of the active listeners: inline chains, the default
+ *   filter chain, and FCDS chains. An FCDS chain is reported only while an active listener's
+ *   matcher references it and its chain is committed, so a reported name is routable.
+ * - Cluster: the names of the active clusters.
+ * - TransportSocketMatch: the transport socket match names present in every active cluster that
+ *   has transport socket matches. Clusters with no matches do not constrain the result, and a name
+ *   missing from any cluster that has matches is not reported.
+ * - Secret: the names of the dynamic (SDS) secrets that have been delivered: TLS certificates,
+ *   certificate validation contexts, session ticket keys and generic secrets.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param kind selects which kind of active resource to enumerate.
+ * @param name_fn is the callback function to call for each resource name.
+ * @param user_data is the user data to pass to the callback function.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
+    envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data);
 
 // =============================================================================
 // Common Host Types (shared by cluster and standalone load balancer extensions)
@@ -16470,44 +16522,51 @@ typedef const void* envoy_dynamic_module_type_route_specifier_config_module_ptr;
 typedef void* envoy_dynamic_module_type_route_specifier_context_envoy_ptr;
 
 /**
- * envoy_dynamic_module_type_route_specifier_decision is the decision a route specifier returns for
- * a request. It selects how Envoy builds the route.
+ * envoy_dynamic_module_type_route_specifier_decision is the decision a route specifier records for
+ * a request with envoy_dynamic_module_callback_route_specifier_set_decision. It selects how Envoy
+ * builds the route.
  */
 typedef enum envoy_dynamic_module_type_route_specifier_decision {
-  // Use the route the specifier was given, unchanged. Recorded overrides are ignored.
-  envoy_dynamic_module_type_route_specifier_decision_PassThrough = 0,
-  // Use the route the specifier was given with the recorded overrides applied.
-  envoy_dynamic_module_type_route_specifier_decision_Override = 1,
-  // Use the template recorded with
-  // envoy_dynamic_module_callback_route_specifier_set_route_template,
-  // evaluated against the request like a configured route, with the recorded overrides applied.
-  envoy_dynamic_module_type_route_specifier_decision_SelectTemplate = 2,
+  // The default behavior, in effect when the module records no decision: Envoy generates a new
+  // route based on what the envoy_dynamic_module_callback_route_specifier_set_* callbacks
+  // recorded. The base is the route template recorded with set_route_template, evaluated against
+  // the request like a configured route, or the route the specifier was given when no template
+  // was recorded, and the recorded overrides are applied on top of it. With nothing recorded the
+  // route the specifier was given is used unchanged, a null route included.
+  envoy_dynamic_module_type_route_specifier_decision_Unspecified = 0,
+  // Use the route the specifier was given, unchanged. The recorded template and overrides are
+  // ignored.
+  envoy_dynamic_module_type_route_specifier_decision_PassThrough = 1,
   // Use no route, so the request is handled as if nothing had matched.
-  envoy_dynamic_module_type_route_specifier_decision_NoRoute = 3,
+  envoy_dynamic_module_type_route_specifier_decision_NoRoute = 2,
   // The module could not reach a decision, and Envoy applies the configured failure policy.
-  envoy_dynamic_module_type_route_specifier_decision_Error = 4,
+  envoy_dynamic_module_type_route_specifier_decision_Error = 3,
   // Use the previous route of the stream unchanged, without building a new route. Valid only when a
   // previous route exists, otherwise Envoy applies the failure policy. Recorded overrides are
-  // ignored. The chain stops by default.
-  envoy_dynamic_module_type_route_specifier_decision_ReusePrevious = 5,
-  // Skip the route the specifier was given and let route matching carry on with the next route. The
-  // recorded overrides and the returned route are ignored.
-  envoy_dynamic_module_type_route_specifier_decision_ContinueMatching = 6,
+  // ignored.
+  envoy_dynamic_module_type_route_specifier_decision_ReusePrevious = 4,
+  // Not a decision. Pins the type to a stable 32 bit size and widens its value range, so that a
+  // decision a newer ABI defines can be held and inspected by an Envoy that does not know it
+  // without undefined behavior.
+  envoy_dynamic_module_type_route_specifier_decision_Sentinel = 0x7FFFFFFF,
 } envoy_dynamic_module_type_route_specifier_decision;
 
 /**
- * envoy_dynamic_module_type_route_specifier_chain_status controls whether the route specifiers
- * configured after this one run for the request.
+ * envoy_dynamic_module_type_route_specifier_on_route_status is what
+ * envoy_dynamic_module_on_route_specifier_on_route returns: whether the route specifiers
+ * configured after this one run for the request, and whether route matching accepts the route the
+ * decision produced. A value Envoy does not know is handled by the configured failure policy.
  */
-typedef enum envoy_dynamic_module_type_route_specifier_chain_status {
-  // Envoy decides. The chain continues for the PassThrough, Override and ContinueMatching decisions
-  // and stops for the SelectTemplate, NoRoute and ReusePrevious decisions.
-  envoy_dynamic_module_type_route_specifier_chain_status_Default = 0,
-  // The chain continues.
-  envoy_dynamic_module_type_route_specifier_chain_status_Continue = 1,
-  // The chain stops and the result of this specifier is the final route.
-  envoy_dynamic_module_type_route_specifier_chain_status_StopIteration = 2,
-} envoy_dynamic_module_type_route_specifier_chain_status;
+typedef enum envoy_dynamic_module_type_route_specifier_on_route_status {
+  // The chain continues: the route the decision produced is handed to the next specifier.
+  envoy_dynamic_module_type_route_specifier_on_route_status_Continue = 0,
+  // The chain stops and the route the decision produced is the final route.
+  envoy_dynamic_module_type_route_specifier_on_route_status_StopIteration = 1,
+  // The chain stops, the route is turned down, and route matching carries on with the next route
+  // of the list being evaluated. The recorded decision, template and overrides are ignored, since
+  // no route is built for a request this specifier skipped.
+  envoy_dynamic_module_type_route_specifier_on_route_status_StopIterationAndSkipRoute = 2,
+} envoy_dynamic_module_type_route_specifier_on_route_status;
 
 /**
  * envoy_dynamic_module_type_route_specifier_route_kind is the kind of a route. A route is exactly
@@ -16617,21 +16676,25 @@ void envoy_dynamic_module_on_route_specifier_config_destroy(
  * envoy_dynamic_module_on_route_specifier_on_route is called while the route is being resolved for
  * a request, and again whenever the route is recomputed, for example after a filter clears the
  * route cache. The module reads the request and the route that route matching resolved with the
- * getter callbacks, records a template and overrides with the setter callbacks, and returns the
- * decision that tells Envoy how to build the route.
+ * getter callbacks, records a template, overrides and the decision that tells Envoy how to build
+ * the route with the setter callbacks, and returns the status that tells Envoy whether the route
+ * specifiers configured after this one run and whether route matching accepts the produced route.
  *
  * This may be called concurrently on multiple worker threads with the same in-module configuration,
  * so the module must treat the configuration as read-only and avoid shared mutable state. The call
  * is synchronous and cannot be time boxed, so the module must not block or perform I/O.
  *
- * Recorded overrides take effect only for the Override and SelectTemplate decisions.
+ * The recorded template and overrides take effect only when the decision is left Unspecified,
+ * the default, under which Envoy generates a new route based on what the
+ * envoy_dynamic_module_callback_route_specifier_set_* callbacks recorded.
  *
  * @param config_module_ptr is the pointer to the in-module route specifier configuration.
  * @param context_envoy_ptr is the pointer to the Envoy route decision context, valid only during
  * this call.
- * @return the decision for the request.
+ * @return the status for the request.
  */
-envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route_specifier_on_route(
+envoy_dynamic_module_type_route_specifier_on_route_status
+envoy_dynamic_module_on_route_specifier_on_route(
     envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
 
@@ -17320,10 +17383,16 @@ bool envoy_dynamic_module_callback_route_specifier_get_selected_template_id(
 // nothing when an argument is rejected. Envoy copies every module buffer.
 
 /**
- * envoy_dynamic_module_callback_route_specifier_set_route_template selects the route template the
- * SelectTemplate decision uses. Envoy evaluates the match of the template against the request when
- * this is called, like it does for a configured route, and applies the failure policy when the
- * match does not hold. After a successful selection the input route getters reflect the template.
+ * envoy_dynamic_module_callback_route_specifier_set_route_template selects the route template
+ * Envoy generates the final route from, in place of the route the specifier was given, when the
+ * decision is left Unspecified. Envoy evaluates the match
+ * of the template against the request when this is called, like it does for a configured route,
+ * and applies the failure policy when the match does not hold. After a successful selection the
+ * input route getters reflect the template. A call that names an identifier that is not declared
+ * returns false and, when no template ends up selected and the decision is left Unspecified, is
+ * handled by the failure policy rather than silently falling back to the route the specifier was
+ * given. A module that wants to probe for a template without committing checks
+ * envoy_dynamic_module_callback_route_specifier_config_get_template_kind instead.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
  * @param template_id is the identifier of the template. The buffer is owned by the module.
@@ -17334,10 +17403,25 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_template(
     envoy_dynamic_module_type_module_buffer template_id);
 
 /**
+ * envoy_dynamic_module_callback_route_specifier_unset_route_template reverts a set_route_template
+ * call with the same identifier, so the route the specifier was given becomes the base of the
+ * final route again and the input route getters reflect it again. The recorded overrides stay in
+ * effect.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param template_id is the identifier of the template. The buffer is owned by the module.
+ * @return true if the identifier named the selected template, false otherwise, in which case
+ * nothing changes.
+ */
+bool envoy_dynamic_module_callback_route_specifier_unset_route_template(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer template_id);
+
+/**
  * envoy_dynamic_module_callback_route_specifier_set_route_user_data records a u64 on the route this
  * decision produces. It forces the produced route to be wrapped even when no other override was
  * recorded, so that envoy_dynamic_module_on_route_specifier_route_destroy fires for it with this
- * value. It is effective for the Override and SelectTemplate decisions.
+ * value. It is effective when the decision is left Unspecified.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
  * @param user_data is the value passed to on_route_specifier_route_destroy when the route is
@@ -17370,6 +17454,10 @@ bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
  * declared in the route specifier configuration by override_id. It replaces the retry policy,
  * metadata match criteria, request mirroring policies, hash policy, hedge policy, rate limits and
  * CORS policy of the route with the ones the override builds, for the properties that it sets.
+ * The path rewrite and the metadata the override carries are applied when the decision resolves,
+ * and the values the module records itself win whatever the call order: the override's regex
+ * rewrite applies only when the module recorded no path, and its metadata sits under the metadata
+ * the module recorded.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
  * @param override_id is the identifier of the entry in route_overrides. The buffer is owned by
@@ -17381,15 +17469,33 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_override(
     envoy_dynamic_module_type_module_buffer override_id);
 
 /**
- * envoy_dynamic_module_callback_route_specifier_set_chain_status selects whether the route
- * specifiers configured after this one run for the request.
+ * envoy_dynamic_module_callback_route_specifier_unset_route_override reverts a
+ * set_route_override call with the same identifier, so nothing of the override applies to the
+ * final route. The values the module recorded itself stay in effect.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
- * @param status is the chain status to record.
+ * @param override_id is the identifier of the entry in route_overrides. The buffer is owned by
+ * the module.
+ * @return true if the identifier named the selected override, false otherwise, in which case
+ * nothing changes.
  */
-void envoy_dynamic_module_callback_route_specifier_set_chain_status(
+bool envoy_dynamic_module_callback_route_specifier_unset_route_override(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_route_specifier_chain_status status);
+    envoy_dynamic_module_type_module_buffer override_id);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_decision records the decision that tells
+ * Envoy how to build the route. Unspecified is the default when the module records none, under
+ * which Envoy generates a new route based on what the
+ * envoy_dynamic_module_callback_route_specifier_set_* callbacks recorded. A later call replaces
+ * the decision of an earlier one.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param decision is the decision to record.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_decision(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_decision decision);
 
 /**
  * envoy_dynamic_module_callback_route_specifier_set_cluster_name records the upstream cluster the
