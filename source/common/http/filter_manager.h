@@ -270,6 +270,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   // Http::StreamDecoderFilterCallbacks
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
   void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
+  void injectDecodedHeadersToFilterChain(bool end_stream) override;
   RequestTrailerMap& addDecodedTrailers() override;
   MetadataMapVector& addDecodedMetadata() override;
   void continueDecoding() override;
@@ -359,6 +360,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   // Http::StreamEncoderFilterCallbacks
   void addEncodedData(Buffer::Instance& data, bool streaming) override;
   void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
+  void injectEncodedHeadersToFilterChain(bool end_stream) override;
   ResponseTrailerMap& addEncodedTrailers() override;
   void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
   void onEncoderFilterAboveWriteBufferHighWatermark() override;
