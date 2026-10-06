@@ -152,17 +152,9 @@ TEST_F(FilterTest, ValidAltSvc) {
   filter_->onDestroy();
 }
 
-TEST_F(FilterTest, ValidAltSvcMissingPort) {
+TEST_F(FilterTest, ValidAltSvcNullAddress) {
   Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
-  Http::HttpServerPropertiesCache::Origin expected_origin("https", "host1", 443);
-  MonotonicTime now = simTime().monotonicTime();
-  const std::vector<Http::HttpServerPropertiesCache::AlternateProtocol> expected_protocols = {
-      Http::HttpServerPropertiesCache::AlternateProtocol("h3-29", "", 443,
-                                                         now + std::chrono::seconds(86400)),
-      Http::HttpServerPropertiesCache::AlternateProtocol("h3", "", 443,
-                                                         now + std::chrono::seconds(60)),
-  };
 
   std::string hostname = "host1";
 
@@ -187,19 +179,10 @@ TEST_F(FilterTest, ValidAltSvcMissingPort) {
       std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
           callbacks_.stream_info_.upstreamInfo()->upstreamHost());
   EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
-  // The address() call returns nullptr, so we won't get a port, but the filter should use the
-  // default port.
+  // The host has no address, so there is no IP endpoint to associate the alternate protocols
+  // with and nothing is cached.
   EXPECT_CALL(*hd, address()).WillOnce(Return(nullptr));
-  EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _))
-      .WillOnce(testing::DoAll(
-          testing::WithArg<0>(Invoke([expected_origin](auto& actual_origin) {
-            EXPECT_EQ(expected_origin, actual_origin)
-                << dumpOrigin(expected_origin) << dumpOrigin(actual_origin);
-          })),
-          testing::WithArg<1>(Invoke([expected_protocols](auto& actual_protocols) {
-            EXPECT_EQ(expected_protocols, actual_protocols) << dumpAlternative(actual_protocols[0]);
-            ;
-          }))));
+  EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _)).Times(0);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   filter_->onDestroy();
