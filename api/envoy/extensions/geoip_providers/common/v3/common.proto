@@ -148,38 +148,55 @@ message CommonGeoipProviderConfig {
     // depending on the check result.
     string apple_private_relay = 11;
 
-    // If set, the key will be used to populate the GeoNames ID of the city associated with the IP address.
+    // If set, the key will be used to populate the `GeoNames <https://www.geonames.org/>`_
+    // ID of the city associated with the IP address. Requires the city database.
     string city_geoname_id = 13;
 
-    // If set, the key will be used to populate the approximate WGS84 latitude of the location associated with the IP address.
+    // If set, the key will be used to populate the approximate WGS84 latitude of the location
+    // associated with the IP address. Requires the city database.
+    // Value is formatted with four decimal places (e.g. ``"58.4167"``).
     string latitude = 14;
 
-    // If set, the key will be used to populate the approximate WGS84 longitude of the location associated with the IP address.
+    // If set, the key will be used to populate the approximate WGS84 longitude of the location
+    // associated with the IP address. Requires the city database.
+    // Value is formatted with four decimal places (e.g. ``"-122.3149"``).
     string longitude = 15;
 
     // If set, the key will be used to populate the time zone associated with the IP address
-    // (IANA Time Zone Database format, e.g. "Europe/London").
+    // as found in the `IANA Time Zone Database <https://www.iana.org/time-zones>`_
+    // (e.g. ``"Europe/London"``). Requires the city database.
     string time_zone = 16;
 
     // If set, the key will be used to populate the postal code associated with the IP address.
+    // Requires the city database.
     string postal_code = 17;
 
-    // If set, the key will be used to populate the English name of the region (least specific subdivision) associated with the IP address.
+    // If set, the key will be used to populate the English name of the region
+    // (least specific subdivision) associated with the IP address. Requires the city database.
     string region_name = 18;
 
-    // If set, the key will be used to populate the GeoNames ID of the region (least specific subdivision) associated with the IP address.
+    // If set, the key will be used to populate the `GeoNames <https://www.geonames.org/>`_
+    // ID of the region (least specific subdivision) associated with the IP address.
+    // Requires the city database.
     string region_geoname_id = 19;
 
-    // If set, the key will be used to populate the GeoNames ID of the subregion (second least specific subdivision) associated with the IP address.
+    // If set, the key will be used to populate the `GeoNames <https://www.geonames.org/>`_
+    // ID of the subregion (second least specific subdivision) associated with the IP address.
+    // Requires the city database.
     string subregion_geoname_id = 20;
 
-    // If set, the key will be used to populate the GeoNames ID of the country associated with the IP address.
+    // If set, the key will be used to populate the `GeoNames <https://www.geonames.org/>`_
+    // ID of the country associated with the IP address. Uses the country database when
+    // available, falling back to the city database.
     string country_geoname_id = 21;
 
-    // If set, the key will be used to populate the GeoNames ID of the continent associated with the IP address.
+    // If set, the key will be used to populate the `GeoNames <https://www.geonames.org/>`_
+    // ID of the continent associated with the IP address. Uses the country database when
+    // available, falling back to the city database.
     string continent_geoname_id = 22;
 
-    // If set, the key will be used to populate the metro code (DMA code in the US) associated with the IP address.
+    // If set, the key will be used to populate the metro code (DMA code in the US)
+    // associated with the IP address. Requires the city database.
     string metro_code = 23;
   }
 
