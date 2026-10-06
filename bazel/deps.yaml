@@ -1208,7 +1208,7 @@ brotli:
   project_name: "brotli"
   project_desc: "brotli compression library"
   project_url: "https://brotli.org"
-  release_date: "2025-10-27"
+  release_date: "2026-09-30"
   use_category:
   - dataplane_core
   - dataplane_ext
