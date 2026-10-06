@@ -414,9 +414,12 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   // If metadata key is set in both the connection and request metadata,
   // then the value will be the request metadata value.
   envoy::config::core::v3::Metadata metadata_context;
-  fillMetadataContext({&decoder_callbacks_->streamInfo().dynamicMetadata(),
-                       &decoder_callbacks_->connection()->streamInfo().dynamicMetadata()},
-                      config_->metadataContextNamespaces(),
+  std::vector<const MetadataProto*> metadata_sources{
+      &decoder_callbacks_->streamInfo().dynamicMetadata()};
+  if (const auto connection = decoder_callbacks_->connection(); connection.has_value()) {
+    metadata_sources.push_back(&connection->streamInfo().dynamicMetadata());
+  }
+  fillMetadataContext(metadata_sources, config_->metadataContextNamespaces(),
                       config_->typedMetadataContextNamespaces(), metadata_context);
 
   // Fill route_metadata_context from the selected route's metadata.
