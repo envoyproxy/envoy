@@ -21,12 +21,14 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
+#include "source/common/common/thread.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/san_matcher.h"
 #include "source/common/tls/stats.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/functional/function_ref.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "openssl/sha.h"
@@ -38,116 +40,134 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-class CrlCache;
+// Process-wide cache that shares one parsed copy of each distinct PEM blob across all TLS contexts.
+// Entries are keyed by the PEM's SHA-256 digest and held as weak_ptrs.
+//   - Lookups and inserts run on the main thread only.
+//   - Each entry's deleter erases its key when the last reference is released. That can happen on
+//     any thread, so the map is guarded by a mutex.
+//   - BoringSSL reference counts the parsed objects, so each SSL_CTX or X509_STORE keeps them valid
+//     independent of this cache.
+template <class T>
+class SharedPemCache : public Singleton::Instance,
+                       public std::enable_shared_from_this<SharedPemCache<T>> {
+public:
+  using Key = std::array<uint8_t, SHA256_DIGEST_LENGTH>;
+
+  // Number of distinct entries currently referenced by at least one context. Exposed for testing.
+  size_t size() const {
+    absl::MutexLock lock(mutex_);
+    return entries_.size();
+  }
+
+protected:
+  // Returns the shared entry for `pem`, calling `parse` and caching its result on first use. A
+  // parse error is returned to the caller and nothing is cached.
+  absl::StatusOr<std::shared_ptr<T>>
+  getOrParse(absl::string_view pem, absl::FunctionRef<absl::StatusOr<std::unique_ptr<T>>()> parse) {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    Key key;
+    SHA256(reinterpret_cast<const uint8_t*>(pem.data()), pem.size(), key.data());
+    {
+      absl::MutexLock lock(mutex_);
+      if (auto it = entries_.find(key); it != entries_.end()) {
+        if (std::shared_ptr<T> existing = it->second.lock(); existing != nullptr) {
+          return existing;
+        }
+      }
+    }
+
+    // Parse without holding the lock. Inserts only happen on the main thread, so no other
+    // caller can add this key in the meantime.
+    absl::StatusOr<std::unique_ptr<T>> parsed = parse();
+    if (!parsed.ok()) {
+      return parsed.status();
+    }
+    std::shared_ptr<T> entry(parsed->release(), Releaser{this->shared_from_this(), key});
+    absl::MutexLock lock(mutex_);
+    entries_[key] = entry;
+    ENVOY_LOG_MISC(debug, "tls: cached parsed PEM entry, {} entries", entries_.size());
+    return entry;
+  }
+
+private:
+  // Deleter for entries handed out by getOrParse(). Holding the cache keeps it alive for as long
+  // as any of its entries is referenced.
+  struct Releaser {
+    std::shared_ptr<SharedPemCache<T>> cache;
+    Key key;
+
+    void operator()(T* value) const {
+      cache->erase(key);
+      delete value;
+    }
+  };
+
+  // Erases `key` unless it has already been replaced by a live entry, which happens when the key
+  // is re-added on the main thread while the previous entry's last reference is being released.
+  void erase(const Key& key) {
+    absl::MutexLock lock(mutex_);
+    if (auto it = entries_.find(key); it != entries_.end() && it->second.expired()) {
+      entries_.erase(it);
+      ENVOY_LOG_MISC(debug, "tls: released parsed PEM entry, {} entries", entries_.size());
+    }
+  }
+
+  mutable absl::Mutex mutex_;
+  absl::flat_hash_map<Key, std::weak_ptr<T>> entries_ ABSL_GUARDED_BY(mutex_);
+};
 
 // Holds the parsed CRLs for a single CRL PEM blob. A PEM blob may contain more
 // than one CRL, so they are kept as a list. Instances are shared (via
 // shared_ptr) between every TLS context that references identical CRL content,
 // so the parsed structures - which can be tens of megabytes for CRLs with many
-// revoked entries - are materialized in memory only once. A shared_ptr to the
-// owning cache is held so that holding a CrlListSharedPtr alone is enough to
-// keep both the parsed CRLs and the cache alive.
+// revoked entries - are materialized in memory only once.
 struct CrlList {
   std::vector<bssl::UniquePtr<X509_CRL>> crls;
-  std::shared_ptr<CrlCache> cache;
 };
 using CrlListSharedPtr = std::shared_ptr<CrlList>;
 
-// Process-wide cache that parses each distinct CRL blob once and shares the
-// parsed representation across all TLS contexts that reference it. Without this,
-// a CRL referenced from many `common_tls_context`s is parsed and held in memory
-// once per context, which can consume a large amount of memory for big CRLs.
-//
-// Threading and lifetime model (mirrors SharedPool::ObjectSharedPool):
-//   - All methods must be called on the main (or test) thread. TLS context
-//     creation, the only caller, is confined to that thread.
-//   - Only a weak_ptr is stored, so an entry is released as soon as the last
-//     CrlList referencing it is destroyed (for example after an xDS update).
-//     Each returned CrlList holds a shared_ptr back to this cache, so the cache
-//     outlives every entry handed out from it.
-//   - The parsed X509_CRLs are reference counted by BoringSSL; each X509_STORE a
-//     CRL is added to holds its own reference, so it remains valid for that
-//     store's lifetime independent of this cache.
-class CrlCache : public Singleton::Instance, public std::enable_shared_from_this<CrlCache> {
+// Parses each distinct CRL blob once and shares the parsed representation across all TLS contexts
+// that reference it. Without this, a CRL referenced from many `common_tls_context`s is parsed and
+// held in memory once per context, which can consume a large amount of memory for big CRLs.
+class CrlCache : public SharedPemCache<CrlList> {
 public:
   // Returns the shared parsed representation of `crl_pem`, parsing and caching
   // it on first use. `crl_path` is only used to build the error message.
   // Returns an error if `crl_pem` cannot be parsed.
   absl::StatusOr<CrlListSharedPtr> getOrCreate(const std::string& crl_pem,
                                                const std::string& crl_path);
-
-  // Number of distinct CRL blobs currently referenced by at least one context.
-  // Exposed for testing.
-  size_t size() const;
-
-private:
-  // Keyed by a SHA-256 digest of the CRL PEM (rather than the PEM itself, to
-  // avoid holding a second full copy of potentially large CRL data); stores a
-  // weak_ptr so entries do not outlive the contexts that use them.
-  absl::flat_hash_map<std::array<uint8_t, SHA256_DIGEST_LENGTH>, std::weak_ptr<CrlList>> cache_;
 };
 
 // Returns the process-wide CRL cache, creating it on first use.
 std::shared_ptr<CrlCache> getCrlCache(Singleton::Manager& singleton_manager);
 
-class CaCertCache;
-
 // Holds the certificates - and any CRLs, since a trusted CA PEM blob is allowed
 // to carry both - parsed from a single trusted CA PEM blob. Instances are shared
 // (via shared_ptr) between every TLS context that references identical CA
 // content, so the parsed X509 structures, which for a large trust bundle
-// dominate a context's memory, are materialized in memory only once. A
-// shared_ptr to the owning cache is held so that holding a CaCertListSharedPtr
-// alone is enough to keep both the parsed certificates and the cache alive.
+// dominate a context's memory, are materialized in memory only once.
 struct CaCertList {
   std::vector<bssl::UniquePtr<X509>> certs;
   std::vector<bssl::UniquePtr<X509_CRL>> crls;
-  std::shared_ptr<CaCertCache> cache;
 };
 using CaCertListSharedPtr = std::shared_ptr<CaCertList>;
 
-// Process-wide cache that parses each distinct trusted CA blob once and shares
-// the parsed representation across all TLS contexts that reference it. Without
-// this, a trust bundle referenced from many `common_tls_context`s is parsed and
-// held in memory once per context. That is the common shape for upstream
-// clusters, which frequently share a single trust root, so the duplication grows
-// linearly with the number of clusters.
-//
-// Threading and lifetime model is identical to CrlCache above:
-//   - All methods must be called on the main (or test) thread. TLS context
-//     creation, the only caller, is confined to that thread.
-//   - Only a weak_ptr is stored, so an entry is released as soon as the last
-//     CaCertList referencing it is destroyed (for example after an xDS update).
-//     Each returned CaCertList holds a shared_ptr back to this cache, so the
-//     cache outlives every entry handed out from it.
-//   - The parsed X509s are reference counted by BoringSSL; each X509_STORE a
-//     certificate is added to holds its own reference, so it remains valid for
-//     that store's lifetime independent of this cache. Only the immutable parsed
-//     material is shared - each context keeps its own X509_STORE and therefore
-//     its own store flags.
-class CaCertCache : public Singleton::Instance, public std::enable_shared_from_this<CaCertCache> {
+// Parses each distinct trusted CA blob once and shares the parsed representation across all TLS
+// contexts that reference it. Without this, a trust bundle referenced from many
+// `common_tls_context`s is parsed and held in memory once per context. That is the common shape for
+// upstream clusters, which frequently share a single trust root. Only the immutable parsed material
+// is shared; each context keeps its own X509_STORE and therefore its own store flags.
+class CaCertCache : public SharedPemCache<CaCertList> {
 public:
   // Returns the shared parsed representation of `ca_pem`, parsing and caching it
   // on first use. `ca_path` is only used to build the error message. Returns an
   // error if `ca_pem` cannot be parsed or contains no certificate.
   absl::StatusOr<CaCertListSharedPtr> getOrCreate(const std::string& ca_pem,
                                                   const std::string& ca_path);
-
-  // Number of distinct CA blobs currently referenced by at least one context.
-  // Exposed for testing.
-  size_t size() const;
-
-private:
-  // Keyed by a SHA-256 digest of the CA PEM (rather than the PEM itself, to
-  // avoid holding a second full copy of potentially large trust bundles); stores
-  // a weak_ptr so entries do not outlive the contexts that use them.
-  absl::flat_hash_map<std::array<uint8_t, SHA256_DIGEST_LENGTH>, std::weak_ptr<CaCertList>> cache_;
 };
 
 // Returns the process-wide trusted CA cache, creating it on first use.
 std::shared_ptr<CaCertCache> getCaCertCache(Singleton::Manager& singleton_manager);
-
-class CertChainCache;
 
 // Holds the parsed local certificate chain - the leaf plus any intermediate
 // certificates - from a single certificate-chain PEM blob. Instances are shared
@@ -156,89 +176,49 @@ class CertChainCache;
 // and the PEM is parsed only once. This is the common shape for a cluster that
 // carries a distinct client certificate per endpoint: the same chain is
 // referenced from many transport socket matches, and every xDS resend of the
-// cluster re-parses all of them. A shared_ptr to the owning cache is held so
-// that holding a CertChainSharedPtr alone keeps both the parsed chain and the
-// cache alive.
+// cluster re-parses all of them.
 struct CertChain {
   bssl::UniquePtr<X509> leaf;
   std::vector<bssl::UniquePtr<X509>> intermediates;
-  std::shared_ptr<CertChainCache> cache;
 };
 using CertChainSharedPtr = std::shared_ptr<CertChain>;
 
-// Process-wide cache that parses each distinct certificate-chain blob once and
-// shares the parsed representation across all TLS contexts that reference it.
-// All methods run on the main thread only (asserted). Entries are held as
-// weak_ptrs and each returned CertChain holds a shared_ptr back to this cache,
-// so an entry lives exactly as long as some context references it. The parsed
-// X509s are reference counted by BoringSSL; each SSL_CTX the chain is bound to
-// holds its own reference, so it stays valid for that context's lifetime
-// independent of this cache.
-class CertChainCache : public Singleton::Instance,
-                       public std::enable_shared_from_this<CertChainCache> {
+// Parses each distinct certificate-chain blob once and shares the parsed representation across all
+// TLS contexts that reference it.
+class CertChainCache : public SharedPemCache<CertChain> {
 public:
   // Returns the shared parsed representation of `cert_pem`, parsing and caching
   // it on first use. `cert_path` is only used to build the error message.
   // Returns an error if `cert_pem` cannot be parsed or carries no certificate.
   absl::StatusOr<CertChainSharedPtr> getOrCreate(const std::string& cert_pem,
                                                  const std::string& cert_path);
-
-  // Number of distinct certificate chains currently referenced by at least one
-  // context. Exposed for testing.
-  size_t size() const;
-
-private:
-  // Keyed by a SHA-256 digest of the certificate-chain PEM; stores a weak_ptr so
-  // entries do not outlive the contexts that use them.
-  absl::flat_hash_map<std::array<uint8_t, SHA256_DIGEST_LENGTH>, std::weak_ptr<CertChain>> cache_;
 };
 
 // Returns the process-wide certificate-chain cache, creating it on first use.
 std::shared_ptr<CertChainCache> getCertChainCache(Singleton::Manager& singleton_manager);
 
-class PrivateKeyCache;
-
 // Holds a parsed private key from a single private-key PEM blob, together with
 // whether it has already passed the FIPS pairwise consistency check (run once
 // per distinct key rather than once per context). Instances are shared (via
 // shared_ptr) between every TLS context that references identical key content.
-// A shared_ptr to the owning cache is held so that holding a ParsedPrivateKey
-// alone keeps both the key and the cache alive.
 struct ParsedPrivateKey {
   bssl::UniquePtr<EVP_PKEY> pkey;
   // Set once the key has passed the FIPS pairwise check; skipped on later hits.
   // FIPS mode is fixed for the process, so a single validation is sufficient.
   bool fips_validated{false};
-  std::shared_ptr<PrivateKeyCache> cache;
 };
 using ParsedPrivateKeySharedPtr = std::shared_ptr<ParsedPrivateKey>;
 
-// Process-wide cache that parses each distinct private-key blob once and shares
-// the parsed key across all TLS contexts that reference it. Only unencrypted
-// (no-password) keys are cached; the private-key-method-provider path never
-// reaches this cache. All methods run on the main thread only (asserted).
-// Entries are held as weak_ptrs and each returned ParsedPrivateKey holds a
-// shared_ptr back to this cache, so an entry lives exactly as long as some
-// context references it. The parsed EVP_PKEY is reference counted by BoringSSL;
-// each SSL_CTX the key is bound to holds its own reference.
-class PrivateKeyCache : public Singleton::Instance,
-                        public std::enable_shared_from_this<PrivateKeyCache> {
+// Parses each distinct private-key blob once and shares the parsed key across all TLS contexts that
+// reference it. Only unencrypted (no-password) keys are cached; the private-key-method-provider
+// path never reaches this cache.
+class PrivateKeyCache : public SharedPemCache<ParsedPrivateKey> {
 public:
   // Returns the shared parsed representation of `key_pem`, parsing and caching it
   // on first use. `key_path` is only used to build the error message. Returns an
   // error if `key_pem` cannot be parsed.
   absl::StatusOr<ParsedPrivateKeySharedPtr> getOrCreate(const std::string& key_pem,
                                                         const std::string& key_path);
-
-  // Number of distinct private keys currently referenced by at least one
-  // context. Exposed for testing.
-  size_t size() const;
-
-private:
-  // Keyed by a SHA-256 digest of the private-key PEM; stores a weak_ptr so
-  // entries do not outlive the contexts that use them.
-  absl::flat_hash_map<std::array<uint8_t, SHA256_DIGEST_LENGTH>, std::weak_ptr<ParsedPrivateKey>>
-      cache_;
 };
 
 // Returns the process-wide private-key cache, creating it on first use.
