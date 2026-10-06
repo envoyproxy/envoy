@@ -26,7 +26,7 @@ constexpr absl::string_view LlmProtocolResponse = "envoy.ai.llm_protocol.respons
 constexpr absl::string_view UriPatternRequest = "envoy.ai.uri_pattern.request";
 // The URI pattern the upstream expects. See UriPattern.
 constexpr absl::string_view UriPatternResponse = "envoy.ai.uri_pattern.response";
-// The model the request names. See Model.
+// The model the request names, as the request_info AI filter records it.
 constexpr absl::string_view ModelRequest = "envoy.ai.model.request";
 // The model to send upstream, when it differs from the one the request names. It replaces the model
 // in the request body and in the rewritten path.
