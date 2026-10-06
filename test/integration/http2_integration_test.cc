@@ -1265,13 +1265,11 @@ TEST_P(Http2FrameIntegrationTest, ContinuationReservedFlagsIgnored) {
   tcp_client_->close();
 }
 
-// Companion to ContinuationReservedFlagsIgnored covering the guard-off legacy
-// path. With the guard disabled the reserved 0x01 bit on the CONTINUATION frame
+// With the guard disabled the reserved 0x01 bit on the CONTINUATION frame
 // aliases END_STREAM, so Envoy treats the request as complete after
 // HEADERS+CONTINUATION alone and forwards it upstream as a header-only request.
 // The follow-up trailers frame that triggers the debug ASSERT is intentionally
-// omitted here so the legacy behavior can be observed without crashing; the
-// crash reproduction is covered by the vh_poc harness with the guard disabled.
+// omitted here so the legacy behavior can be observed without crashing.
 TEST_P(Http2FrameIntegrationTest, ContinuationReservedFlagsLegacy) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_mask_continuation_flags",
                                     "false");
