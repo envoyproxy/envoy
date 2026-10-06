@@ -790,15 +790,18 @@ TEST(LeafAwaitableTest, SynchronousCompleteInsideOnStartResumesCleanly) {
   EXPECT_EQ(sum, 1000 * 1001 / 2);
 }
 
-template <typename T> Task<absl::StatusOr<T>> backtraceLevel2(absl::AnyInvocable<T()> f) {
+Task<absl::StatusOr<std::vector<std::string>>>
+backtraceLevel2(absl::AnyInvocable<std::vector<std::string>()> f) {
   co_return std::move(f)();
 }
 
-template <typename T> Task<absl::StatusOr<T>> backtraceLevel1(absl::AnyInvocable<T()> f) {
+Task<absl::StatusOr<std::vector<std::string>>>
+backtraceLevel1(absl::AnyInvocable<std::vector<std::string>()> f) {
   co_return co_await backtraceLevel2(std::move(f));
 }
 
-template <typename T> Task<absl::StatusOr<T>> backtraceLevel0(absl::AnyInvocable<T()> f) {
+Task<absl::StatusOr<std::vector<std::string>>>
+backtraceLevel0(absl::AnyInvocable<std::vector<std::string>()> f) {
   co_return co_await backtraceLevel1(std::move(f));
 }
 
@@ -827,7 +830,7 @@ TEST(BacktraceTest, BacktraceWorks) {
   };
 
   DetachedHandle handle = launch(
-      backtraceLevel0<std::vector<std::string>>(std::move(dump)), exec,
+      backtraceLevel0(std::move(dump)), exec,
       [&result](absl::StatusOr<std::vector<std::string>> status) { result = std::move(status); });
   exec->drain();
   EXPECT_OK(result);
@@ -853,7 +856,7 @@ TEST(BacktraceClassTest, DumpsTrace) {
   };
 
   DetachedHandle handle = launch(
-      backtraceLevel0<std::vector<std::string>>(std::move(dump)), exec,
+      backtraceLevel0(std::move(dump)), exec,
       [&result](absl::StatusOr<std::vector<std::string>> status) { result = std::move(status); });
   exec->drain();
   EXPECT_OK(result);

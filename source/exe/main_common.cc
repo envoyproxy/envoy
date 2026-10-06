@@ -72,6 +72,7 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
       options_.logLevel(), options_.logFormat(), restarter_->logLock(), options_.logFormatEscaped(),
       options_.mode() == Server::Mode::Validate ? false : options_.enableFineGrainLogging());
   BackwardsTrace::setSingleLine(options_.logStacktraceSingleEntry());
+  Coroutine::Backtrace::setSingleLine(options_.logStacktraceSingleEntry());
   Assert::EnvoyBugStackTrace::setSingleLine(options_.logStacktraceSingleEntry());
   init(time_system, listener_hooks, std::move(random_generator), std::move(process_context),
        createFunction());

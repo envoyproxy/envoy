@@ -177,7 +177,7 @@ struct PromiseBase {
   // Always lazy start: the frame suspends at creation so its context can be set
   // before it runs (a child inherits it at `co_await`; a root gets it from launch()).
   auto initial_suspend() noexcept {
-    struct Awaiter : public std::suspend_always {
+    struct InitialAwaiter : public std::suspend_always {
       PromiseBase& promise;
 
       void await_resume() { on_coroutine_resume(promise); }
@@ -185,7 +185,7 @@ struct PromiseBase {
 
     caller_ = __builtin_return_address(0);
 
-    return Awaiter{.promise = *this};
+    return InitialAwaiter{.promise = *this};
   }
 
   // No exceptions on the data plane: errors travel as absl::Status values. A
