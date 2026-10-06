@@ -1,0 +1,18 @@
+date: October 6, 2026
+
+bug_fixes:
+- area: api_key_auth
+  change: |
+    Fix: `GHSA-47vj-9r25-wv5j <https://github.com/envoyproxy/envoy/security/advisories/GHSA-47vj-9r25-wv5j>`_
+
+    Fixed a crash in the ``api_key_auth`` HTTP filter when ``hide_credentials`` is enabled with a query
+    parameter key source and a request without a ``:path`` header (for example a CONNECT request) is
+    authenticated via another key source. The filter now skips query-string rewriting when there is no
+    ``:path``.
+- area: oauth2
+  change: |
+    Fix: `GHSA-8vc2-jrm4-835w <https://github.com/envoyproxy/envoy/security/advisories/GHSA-8vc2-jrm4-835w>`_
+
+    Fixed a crash in the ``oauth2`` HTTP filter when a request without a ``:path`` header (for example a
+    plain CONNECT tunnel request) reached the filter. The filter now rejects a request that has no
+    ``:path`` with a ``400`` (Bad Request) local reply.
