@@ -892,7 +892,6 @@ bool ContextAccessor::setFilterStateBytes(
     return false;
   }
   auto accessor = std::make_shared<Router::StringAccessorImpl>(value);
-  const auto* raw_ptr = accessor.get();
   if (life_span.has_value() && stream_sharing.has_value()) {
     filter_state->setData(key, std::move(accessor), life_span.value(), stream_sharing.value());
   } else if (life_span.has_value()) {
@@ -900,7 +899,7 @@ bool ContextAccessor::setFilterStateBytes(
   } else {
     filter_state->setData(key, std::move(accessor));
   }
-  return filter_state->getDataReadOnly<Router::StringAccessor>(key) == raw_ptr;
+  return true;
 }
 
 bool ContextAccessor::setFilterStateTyped(
