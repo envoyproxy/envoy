@@ -39,6 +39,8 @@
 #include "source/common/tls/utility.h"
 
 #include "absl/synchronization/mutex.h"
+#include "openssl/err.h"
+#include "openssl/pem.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
@@ -49,6 +51,8 @@ namespace Tls {
 
 SINGLETON_MANAGER_REGISTRATION(crl_cache);
 SINGLETON_MANAGER_REGISTRATION(ca_cert_cache);
+SINGLETON_MANAGER_REGISTRATION(cert_chain_cache);
+SINGLETON_MANAGER_REGISTRATION(private_key_cache);
 
 absl::StatusOr<CrlListSharedPtr> CrlCache::getOrCreate(const std::string& crl_pem,
                                                        const std::string& crl_path) {
@@ -176,6 +180,131 @@ size_t CaCertCache::size() const {
 std::shared_ptr<CaCertCache> getCaCertCache(Singleton::Manager& singleton_manager) {
   return singleton_manager.getTyped<CaCertCache>(SINGLETON_MANAGER_REGISTERED_NAME(ca_cert_cache),
                                                  [] { return std::make_shared<CaCertCache>(); });
+}
+
+absl::StatusOr<CertChainSharedPtr> CertChainCache::getOrCreate(const std::string& cert_pem,
+                                                               const std::string& cert_path) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+  // Key by a SHA-256 digest of the chain PEM rather than the PEM itself. SHA-256
+  // is collision resistant, so distinct chains never share a cache entry.
+  std::array<uint8_t, SHA256_DIGEST_LENGTH> key;
+  SHA256(reinterpret_cast<const uint8_t*>(cert_pem.data()), cert_pem.size(), key.data());
+
+  if (auto it = cache_.find(key); it != cache_.end()) {
+    if (CertChainSharedPtr existing = it->second.lock(); existing != nullptr) {
+      return existing;
+    }
+  }
+
+  // Only reached when a new distinct chain is seen. Release entries whose last
+  // referencing context has been torn down so the map does not grow without
+  // bound across xDS updates.
+  absl::erase_if(cache_, [](const auto& entry) { return entry.second.expired(); });
+
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert_pem.data()), cert_pem.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  // The leaf carries trust settings, so read it with the AUX variant; any
+  // remaining certificates are the intermediate chain.
+  auto cert_chain = std::make_shared<CertChain>();
+  cert_chain->leaf.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
+  if (cert_chain->leaf == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load certificate chain from ", cert_path));
+  }
+  while (true) {
+    bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+    if (cert == nullptr) {
+      break;
+    }
+    cert_chain->intermediates.push_back(std::move(cert));
+  }
+  // A trailing "no start line" error just marks EOF after the last certificate;
+  // any other error is a real parse failure.
+  const uint32_t err = ERR_peek_last_error();
+  if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+    ERR_clear_error();
+  } else {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load certificate chain from ", cert_path));
+  }
+
+  // Hold the cache alive for as long as this entry is referenced.
+  cert_chain->cache = shared_from_this();
+  cache_[key] = cert_chain;
+  return cert_chain;
+}
+
+size_t CertChainCache::size() const {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  size_t count = 0;
+  for (const auto& entry : cache_) {
+    if (!entry.second.expired()) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+std::shared_ptr<CertChainCache> getCertChainCache(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<CertChainCache>(
+      SINGLETON_MANAGER_REGISTERED_NAME(cert_chain_cache),
+      [] { return std::make_shared<CertChainCache>(); });
+}
+
+absl::StatusOr<ParsedPrivateKeySharedPtr>
+PrivateKeyCache::getOrCreate(const std::string& key_pem, const std::string& key_path) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+  // Key by a SHA-256 digest of the key PEM rather than the PEM itself. SHA-256
+  // is collision resistant, so distinct keys never share a cache entry.
+  std::array<uint8_t, SHA256_DIGEST_LENGTH> key;
+  SHA256(reinterpret_cast<const uint8_t*>(key_pem.data()), key_pem.size(), key.data());
+
+  if (auto it = cache_.find(key); it != cache_.end()) {
+    if (ParsedPrivateKeySharedPtr existing = it->second.lock(); existing != nullptr) {
+      return existing;
+    }
+  }
+
+  // Only reached when a new distinct key is seen. Release entries whose last
+  // referencing context has been torn down so the map does not grow without
+  // bound across xDS updates.
+  absl::erase_if(cache_, [](const auto& entry) { return entry.second.expired(); });
+
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(key_pem.data()), key_pem.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  auto parsed_key = std::make_shared<ParsedPrivateKey>();
+  parsed_key->pkey.reset(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+  if (parsed_key->pkey == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load private key from ", key_path,
+                     ", Cause: ", Utility::getLastCryptoError().value_or("unknown")));
+  }
+
+  // Hold the cache alive for as long as this entry is referenced. The FIPS
+  // pairwise check is deferred to the first caller (see loadPrivateKey), so it
+  // runs once per distinct key rather than once per context.
+  parsed_key->cache = shared_from_this();
+  cache_[key] = parsed_key;
+  return parsed_key;
+}
+
+size_t PrivateKeyCache::size() const {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  size_t count = 0;
+  for (const auto& entry : cache_) {
+    if (!entry.second.expired()) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+std::shared_ptr<PrivateKeyCache> getPrivateKeyCache(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<PrivateKeyCache>(
+      SINGLETON_MANAGER_REGISTERED_NAME(private_key_cache),
+      [] { return std::make_shared<PrivateKeyCache>(); });
 }
 
 DefaultCertValidator::DefaultCertValidator(

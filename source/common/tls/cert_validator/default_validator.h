@@ -147,6 +147,103 @@ private:
 // Returns the process-wide trusted CA cache, creating it on first use.
 std::shared_ptr<CaCertCache> getCaCertCache(Singleton::Manager& singleton_manager);
 
+class CertChainCache;
+
+// Holds the parsed local certificate chain - the leaf plus any intermediate
+// certificates - from a single certificate-chain PEM blob. Instances are shared
+// (via shared_ptr) between every TLS context that references identical chain
+// content, so the parsed X509 structures are materialized in memory only once
+// and the PEM is parsed only once. This is the common shape for a cluster that
+// carries a distinct client certificate per endpoint: the same chain is
+// referenced from many transport socket matches, and every xDS resend of the
+// cluster re-parses all of them. A shared_ptr to the owning cache is held so
+// that holding a CertChainSharedPtr alone keeps both the parsed chain and the
+// cache alive.
+struct CertChain {
+  bssl::UniquePtr<X509> leaf;
+  std::vector<bssl::UniquePtr<X509>> intermediates;
+  std::shared_ptr<CertChainCache> cache;
+};
+using CertChainSharedPtr = std::shared_ptr<CertChain>;
+
+// Process-wide cache that parses each distinct certificate-chain blob once and
+// shares the parsed representation across all TLS contexts that reference it.
+// All methods run on the main thread only (asserted). Entries are held as
+// weak_ptrs and each returned CertChain holds a shared_ptr back to this cache,
+// so an entry lives exactly as long as some context references it. The parsed
+// X509s are reference counted by BoringSSL; each SSL_CTX the chain is bound to
+// holds its own reference, so it stays valid for that context's lifetime
+// independent of this cache.
+class CertChainCache : public Singleton::Instance,
+                       public std::enable_shared_from_this<CertChainCache> {
+public:
+  // Returns the shared parsed representation of `cert_pem`, parsing and caching
+  // it on first use. `cert_path` is only used to build the error message.
+  // Returns an error if `cert_pem` cannot be parsed or carries no certificate.
+  absl::StatusOr<CertChainSharedPtr> getOrCreate(const std::string& cert_pem,
+                                                 const std::string& cert_path);
+
+  // Number of distinct certificate chains currently referenced by at least one
+  // context. Exposed for testing.
+  size_t size() const;
+
+private:
+  // Keyed by a SHA-256 digest of the certificate-chain PEM; stores a weak_ptr so
+  // entries do not outlive the contexts that use them.
+  absl::flat_hash_map<std::array<uint8_t, SHA256_DIGEST_LENGTH>, std::weak_ptr<CertChain>> cache_;
+};
+
+// Returns the process-wide certificate-chain cache, creating it on first use.
+std::shared_ptr<CertChainCache> getCertChainCache(Singleton::Manager& singleton_manager);
+
+class PrivateKeyCache;
+
+// Holds a parsed private key from a single private-key PEM blob, together with
+// whether it has already passed the FIPS pairwise consistency check (run once
+// per distinct key rather than once per context). Instances are shared (via
+// shared_ptr) between every TLS context that references identical key content.
+// A shared_ptr to the owning cache is held so that holding a ParsedPrivateKey
+// alone keeps both the key and the cache alive.
+struct ParsedPrivateKey {
+  bssl::UniquePtr<EVP_PKEY> pkey;
+  // Set once the key has passed the FIPS pairwise check; skipped on later hits.
+  // FIPS mode is fixed for the process, so a single validation is sufficient.
+  bool fips_validated{false};
+  std::shared_ptr<PrivateKeyCache> cache;
+};
+using ParsedPrivateKeySharedPtr = std::shared_ptr<ParsedPrivateKey>;
+
+// Process-wide cache that parses each distinct private-key blob once and shares
+// the parsed key across all TLS contexts that reference it. Only unencrypted
+// (no-password) keys are cached; the private-key-method-provider path never
+// reaches this cache. All methods run on the main thread only (asserted).
+// Entries are held as weak_ptrs and each returned ParsedPrivateKey holds a
+// shared_ptr back to this cache, so an entry lives exactly as long as some
+// context references it. The parsed EVP_PKEY is reference counted by BoringSSL;
+// each SSL_CTX the key is bound to holds its own reference.
+class PrivateKeyCache : public Singleton::Instance,
+                        public std::enable_shared_from_this<PrivateKeyCache> {
+public:
+  // Returns the shared parsed representation of `key_pem`, parsing and caching it
+  // on first use. `key_path` is only used to build the error message. Returns an
+  // error if `key_pem` cannot be parsed.
+  absl::StatusOr<ParsedPrivateKeySharedPtr> getOrCreate(const std::string& key_pem,
+                                                        const std::string& key_path);
+
+  // Number of distinct private keys currently referenced by at least one
+  // context. Exposed for testing.
+  size_t size() const;
+
+private:
+  // Keyed by a SHA-256 digest of the private-key PEM; stores a weak_ptr so
+  // entries do not outlive the contexts that use them.
+  absl::flat_hash_map<std::array<uint8_t, SHA256_DIGEST_LENGTH>, std::weak_ptr<ParsedPrivateKey>>
+      cache_;
+};
+
+// Returns the process-wide private-key cache, creating it on first use.
+std::shared_ptr<PrivateKeyCache> getPrivateKeyCache(Singleton::Manager& singleton_manager);
+
 class DefaultCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
   DefaultCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
