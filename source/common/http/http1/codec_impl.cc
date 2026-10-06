@@ -454,15 +454,29 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
 #endif
 
-  const HeaderEntry* method = headers.Method();
-  const HeaderEntry* path = headers.Path();
-  const HeaderEntry* host = headers.Host();
+  const absl::string_view method = headers.getMethodValue();
+  const absl::string_view path = headers.getPathValue();
+  const absl::string_view host = headers.getHostValue();
   bool is_connect = HeaderUtility::isConnect(headers);
   const Http::HeaderValues& header_values = Http::Headers::get();
 
-  if (method->value() == header_values.MethodValues.Head) {
+  if (method.empty()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("missing or empty required header: ", header_values.Method.get()));
+  }
+  if (is_connect) {
+    if (host.empty()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing or empty required header: ", header_values.Host.get()));
+    }
+  } else if (path.empty()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("missing or empty required header: ", header_values.Path.get()));
+  }
+
+  if (method == header_values.MethodValues.Head) {
     head_request_ = true;
-  } else if (method->value() == header_values.MethodValues.Connect) {
+  } else if (method == header_values.MethodValues.Connect) {
     disableChunkEncoding();
     connection_.connection().enableHalfClose(true);
     connect_request_ = true;
@@ -482,28 +496,17 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Scheme.get()));
     }
-    if (!host) {
+    if (host.empty()) {
       return absl::InvalidArgumentError(
-          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
+          absl::StrCat("missing or empty required header: ", header_values.Host.get()));
     }
-    ASSERT(path);
-    ASSERT(host);
 
-    std::string url = absl::StrCat(scheme->value().getStringView(), "://",
-                                   host->value().getStringView(), path->value().getStringView());
+    std::string url = absl::StrCat(scheme->value().getStringView(), "://", host, path);
     ENVOY_CONN_LOG(trace, "Sending fully qualified URL: {}", connection_.connection(), url);
-    connection_.buffer().addFragments(
-        {method->value().getStringView(), SPACE, url, REQUEST_POSTFIX});
+    connection_.buffer().addFragments({method, SPACE, url, REQUEST_POSTFIX});
   } else {
-    absl::string_view host_or_path_view;
-    if (is_connect) {
-      host_or_path_view = host->value().getStringView();
-    } else {
-      host_or_path_view = path->value().getStringView();
-    }
-
-    connection_.buffer().addFragments(
-        {method->value().getStringView(), SPACE, host_or_path_view, REQUEST_POSTFIX});
+    const absl::string_view host_or_path_view = is_connect ? host : path;
+    connection_.buffer().addFragments({method, SPACE, host_or_path_view, REQUEST_POSTFIX});
   }
 
   encodeHeadersBase(headers, std::nullopt, end_stream,

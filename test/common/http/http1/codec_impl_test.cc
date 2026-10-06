@@ -5431,5 +5431,45 @@ TEST_F(Http1ClientConnectionImplTest, RequestAfterConnectionClose) {
   }
 }
 
+// A request with a missing or empty required pseudo-header must fail cleanly instead of crashing
+// or writing a malformed request line.
+TEST_F(Http1ClientConnectionImplTest, EncodeHeadersMissingOrEmptyRequiredHeaders) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+
+  // Missing :path on a non-CONNECT request.
+  {
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    const auto status =
+        request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true);
+    EXPECT_THAT(status.message(), testing::HasSubstr("required header: :path"));
+  }
+
+  // Empty :path on a non-CONNECT request.
+  {
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    const auto status = request_encoder.encodeHeaders(
+        TestRequestHeaderMapImpl{{":method", "GET"}, {":path", ""}, {":authority", "host"}}, true);
+    EXPECT_THAT(status.message(), testing::HasSubstr("required header: :path"));
+  }
+
+  // Empty :method.
+  {
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    const auto status = request_encoder.encodeHeaders(
+        TestRequestHeaderMapImpl{{":method", ""}, {":path", "/"}, {":authority", "host"}}, true);
+    EXPECT_THAT(status.message(), testing::HasSubstr("required header: :method"));
+  }
+
+  // Empty :authority on a CONNECT request.
+  {
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    const auto status = request_encoder.encodeHeaders(
+        TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", ""}}, true);
+    EXPECT_THAT(status.message(), testing::HasSubstr("required header: :authority"));
+  }
+}
+
 } // namespace Http
 } // namespace Envoy
