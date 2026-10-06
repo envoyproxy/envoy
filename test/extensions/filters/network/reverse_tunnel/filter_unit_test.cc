@@ -599,6 +599,25 @@ TEST_F(ReverseTunnelFilterUnitTest, AcceptanceCompletesAcrossSplitWrites) {
   EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.accepted"));
 }
 
+// Codec stats must outlive the onData() call that created the codec. Pipelined requests with
+// unread responses trip the codec's flood check, and so increment a codec stat, on a later
+// dispatch.
+TEST_F(ReverseTunnelFilterUnitTest, PipelinedRequestsUseCodecStatsAfterFirstDispatch) {
+  // Keep the responses queued, as a peer that never reads would.
+  Buffer::OwnedImpl unread;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(
+          testing::Invoke([&unread](Buffer::Instance& data, bool) { unread.move(data); }));
+
+  Buffer::OwnedImpl requests(makeHttpRequest("GET", "/health") + makeHttpRequest("GET", "/health") +
+                             makeHttpRequest("GET", "/health"));
+  // The codec parses one request per dispatch, so redeliver the remaining bytes.
+  for (int i = 0; i < 3 && requests.length() > 0; ++i) {
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(requests, false));
+  }
+  EXPECT_EQ(1, handshakeCounter(stats_store_, "http1.response_flood"));
+}
+
 // Exercise RequestDecoder interface methods by obtaining the decoder via
 // ReverseTunnelFilter::newStream (avoids accessing the private impl type).
 TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderInterfaceCoverageViaNewStream) {
