@@ -1327,15 +1327,12 @@ TEST(TranscodingEngineTest, IrRequestToGeminiRefusesAModelThatIsNotAModelId) {
 // treatment, with its own layout.
 TEST(TranscodingEngineTest, RequestEnvelopeIsDataInThePack) {
   TranscodingEngine engine;
-  ASSERT_THAT(engine.registerPack(DialectTranscodePack{
-                  .protocol = LLMProtocol::OpenAiResponses,
-                  .envelope =
-                      PathTemplate{
-                          .pattern = *UriPattern::parse(
-                              "/v2/engines/{model}:{predict|streamPredict?stream=1}"),
-                      },
-              }),
-              IsOk());
+  ASSERT_THAT(
+      engine.registerPack(DialectTranscodePack{
+          .protocol = LLMProtocol::OpenAiResponses,
+          .envelope = *UriPattern::parse("/v2/engines/{model}:{predict|streamPredict?stream=1}"),
+      }),
+      IsOk());
   const TranscodeLeg to_ir{PayloadKind::Request, TranscodeDirection::ToIr,
                            LLMProtocol::OpenAiResponses};
   const TranscodeLeg from_ir{PayloadKind::Request, TranscodeDirection::FromIr,

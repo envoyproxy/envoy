@@ -1502,11 +1502,8 @@ DialectTranscodePack createGeminiTranscodePack() {
       // The Gemini API's layout. A route in front of another, such as Vertex AI's, rewrites the
       // `/v1beta/models/` prefix, or an instruction ahead of the transcoder names the path outright
       // (see `TranscodeContext::response_uri_pattern`).
-      .envelope =
-          PathTemplate{
-              .pattern = *UriPattern::parse(
-                  "/v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}"),
-          },
+      .envelope = *UriPattern::parse(
+          "/v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}"),
   };
 }
 
@@ -2697,28 +2694,18 @@ absl::StatusOr<const DialectTranscodePack*> TranscodingEngine::findPack(LLMProto
 
 namespace {
 
-// The body members a request path can carry: the dialect's own names when it has an envelope,
-// and the IR's otherwise, which is what the dialects that name the model in the body call them.
-struct PathFields {
-  std::string model;
-  std::string stream;
-};
-
-PathFields pathFields(const std::optional<PathTemplate>& envelope) {
-  if (envelope.has_value()) {
-    return PathFields{envelope->model_field, envelope->stream_field};
-  }
-  return PathFields{"model", "stream"};
-}
+// The body members a request path can carry. Every dialect, and the IR, names them so.
+constexpr absl::string_view kModelField = "model";
+constexpr absl::string_view kStreamField = "stream";
 
 // The pattern a request leg follows: the instruction set for this request when there is one, and
 // the dialect's own layout otherwise. Null when there is neither.
 const UriPattern* patternFor(const UriPattern* instruction,
-                             const std::optional<PathTemplate>& envelope) {
+                             const std::optional<UriPattern>& envelope) {
   if (instruction != nullptr) {
     return instruction;
   }
-  return envelope.has_value() ? &envelope->pattern : nullptr;
+  return envelope.has_value() ? &*envelope : nullptr;
 }
 
 // Request `ToIr`: writes what `request_path` names, per `pattern`, into the body, where the body
@@ -2726,8 +2713,8 @@ const UriPattern* patternFor(const UriPattern* instruction,
 //
 // TODO(ginama): `readGeminiTarget()` in the request_info AI filter's extractor.cc parses the same
 // paths for the same reason. Have it read them through the engine rather than keep its own copy.
-bool liftFromRequestPath(const UriPattern& pattern, const PathFields& fields,
-                         absl::string_view request_path, nlohmann::json& json) {
+bool liftFromRequestPath(const UriPattern& pattern, absl::string_view request_path,
+                         nlohmann::json& json) {
   const std::optional<UriPattern::Match> target = pattern.match(request_path);
   if (!target.has_value()) {
     return false;
@@ -2735,39 +2722,38 @@ bool liftFromRequestPath(const UriPattern& pattern, const PathFields& fields,
   if (!json.is_object()) {
     return true;
   }
-  if (pattern.hasModel() && !json.contains(fields.model)) {
-    json[fields.model] = target->model;
+  if (pattern.hasModel() && !json.contains(kModelField)) {
+    json[kModelField] = target->model;
   }
-  if (target->stream && !json.contains(fields.stream)) {
-    json[fields.stream] = true;
+  if (target->stream && !json.contains(kStreamField)) {
+    json[kStreamField] = true;
   }
   return true;
 }
 
 // Request `FromIr`: renders `pattern` from what the body names, and, when `erase_fields`, moves
 // those members out of the body, for a dialect whose API names them in the path alone.
-absl::StatusOr<std::string> renderRequestPath(const UriPattern& pattern, const PathFields& fields,
-                                              LLMProtocol dialect, nlohmann::json& json,
-                                              bool erase_fields) {
+absl::StatusOr<std::string> renderRequestPath(const UriPattern& pattern, LLMProtocol dialect,
+                                              nlohmann::json& json, bool erase_fields) {
   absl::string_view model;
   if (pattern.hasModel()) {
-    const auto it = json.find(fields.model);
+    const auto it = json.find(kModelField);
     if (it == json.end() || !it->is_string() || !isModelId(it->get_ref<const std::string&>())) {
       return absl::InvalidArgumentError(
           absl::StrCat("the request path to ", llmProtocolName(dialect), " names the model, so `",
-                       fields.model, "` must be a model id"));
+                       kModelField, "` must be a model id"));
     }
     model = it->get_ref<const std::string&>();
   }
-  const auto stream = json.find(fields.stream);
+  const auto stream = json.find(kStreamField);
   const bool streaming = stream != json.end() && stream->is_boolean() && stream->get<bool>();
   absl::StatusOr<std::string> path = pattern.render(model, streaming);
   if (!path.ok()) {
     return path.status();
   }
   if (erase_fields && json.is_object()) {
-    json.erase(fields.model);
-    json.erase(fields.stream);
+    json.erase(kModelField);
+    json.erase(kStreamField);
   }
   return path;
 }
@@ -2785,15 +2771,14 @@ std::string irModel(const nlohmann::json& json) {
 // as the instructions in `ctx`, or failing those the dialect's own layout (`pack.envelope`), say.
 absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirection direction,
                               TranscodeContext& ctx, nlohmann::json& json) {
-  const std::optional<PathTemplate>& envelope = pack.envelope;
-  const PathFields fields = pathFields(envelope);
+  const std::optional<UriPattern>& envelope = pack.envelope;
   const bool is_ir = pack.protocol == TranscodingEngine::kIrProtocol;
   ctx.rewritten_path.reset();
   ctx.request_path_matched = false;
   if (direction == TranscodeDirection::ToIr) {
     // The rules then see what the path names as if the body had named it.
     if (const UriPattern* pattern = patternFor(ctx.request_uri_pattern, envelope)) {
-      ctx.request_path_matched = liftFromRequestPath(*pattern, fields, ctx.request_path, json);
+      ctx.request_path_matched = liftFromRequestPath(*pattern, ctx.request_path, json);
     }
     if (!is_ir) {
       absl::Status status = pack.request.to_ir.execute(json, &ctx);
@@ -2823,7 +2808,7 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
   std::optional<std::string> path;
   if (const UriPattern* pattern = patternFor(ctx.response_uri_pattern, envelope)) {
     absl::StatusOr<std::string> rendered =
-        renderRequestPath(*pattern, fields, pack.protocol, json, envelope.has_value());
+        renderRequestPath(*pattern, pack.protocol, json, envelope.has_value());
     if (!rendered.ok()) {
       return rendered.status();
     }
@@ -3086,7 +3071,7 @@ std::string TranscodingEngine::modelFromRequestPath(LLMProtocol dialect, absl::s
     if (pack == packs_.end() || !pack->second.envelope.has_value()) {
       return "";
     }
-    pattern = &pack->second.envelope->pattern;
+    pattern = &*pack->second.envelope;
   }
   std::optional<UriPattern::Match> target = pattern->match(path);
   return target.has_value() ? std::move(target->model) : "";

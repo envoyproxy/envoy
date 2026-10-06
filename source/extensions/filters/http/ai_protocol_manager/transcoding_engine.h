@@ -540,6 +540,7 @@ struct TranscodeContext {
   absl::string_view request_path{};
   // Instructions a filter ahead of the transcoder set for this request (see
   // `FilterStateKeys`); each is followed when set, and the dialect's own layout applies otherwise.
+  //
   // The pattern `request_path` follows, which a request `ToIr` leg lifts the model and streaming
   // mode from.
   const UriPattern* request_uri_pattern{nullptr};
@@ -694,23 +695,6 @@ struct StreamGrammars {
   StreamGrammar from_ir{};
 };
 
-// Where a dialect's API names request members in the request path rather than the body. Gemini
-// names the model and the streaming mode there, calling a custom method on the model:
-// `/v1beta/models/{model}:generateContent`, or `:streamGenerateContent` to stream the response.
-//
-// A request `ToIr` leg lifts what `TranscodeContext::request_path` names into the IR body, unless
-// the body names it itself. A request `FromIr` leg moves it out of the body into
-// `TranscodeContext::rewritten_path`. `pattern` is the dialect's own layout; an instruction set
-// ahead of the transcoder (`TranscodeContext::request_uri_pattern` / `response_uri_pattern`)
-// takes its place for one request.
-struct PathTemplate {
-  // The API's own request path, as the dialect documents it.
-  UriPattern pattern;
-  // The IR members the path carries: the model, and whether the response is streamed.
-  std::string model_field{"model"};
-  std::string stream_field{"stream"};
-};
-
 // Declarative dialect pack: every rule needed to move one dialect's payloads to and from the IR.
 //
 // `dialect_schema` is the protocol's own `PayloadSchema`; it is what a request converted out of
@@ -725,8 +709,16 @@ struct DialectTranscodePack {
   LegRules response{};
   // Streamed response events.
   StreamGrammars stream{};
-  // Request members the dialect's API names in the request path, if any.
-  std::optional<PathTemplate> envelope{};
+  // Where the dialect's API names the request's `model` and `stream` in the request path rather
+  // than the body, if it does. Gemini calls a custom method on the model:
+  // `/v1beta/models/{model}:generateContent`, or `:streamGenerateContent` to stream the response.
+  //
+  // A request `ToIr` leg lifts what `TranscodeContext::request_path` names into the body, unless
+  // the body names it itself. A request `FromIr` leg moves it out of the body into
+  // `TranscodeContext::rewritten_path`. An instruction set ahead of the transcoder
+  // (`TranscodeContext::request_uri_pattern` / `response_uri_pattern`) takes the envelope's place
+  // for one request.
+  std::optional<UriPattern> envelope{};
   const PayloadSchema* dialect_schema{nullptr};
   const PayloadSchema* ir_schema{nullptr};
 };
