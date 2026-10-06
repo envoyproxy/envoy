@@ -1,12 +1,14 @@
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/xds_manager.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
-#include "envoy/singleton/manager.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
 #include "source/common/listener_manager/fcds_api.h"
 #include "source/common/matcher/matcher.h"
@@ -27,9 +29,6 @@
 
 namespace Envoy {
 namespace Server {
-
-SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
-
 namespace FilterChain {
 
 // Return a fake address for use when either the source or destination is unix domain socket.
@@ -1042,7 +1041,9 @@ FcdsSharedFilterChainManager::FcdsSharedFilterChainManager(
           std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
               server_context,
               server_context.messageValidationContext().dynamicValidationVisitor())),
-      scope_(server_context_.scope().createScope("filter_chain_manager.")) {
+      scope_(server_context_.scope().createScope("filter_chain_manager.")),
+      tls_update_cb_(server_context.mainThreadDispatcher().createSchedulableCallback(
+          [this]() { updateTlsState(); })) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalState>(); });
 }
 
@@ -1150,7 +1151,7 @@ void FcdsSharedFilterChainManager::onFilterChainWarmed(
   ENVOY_LOG(debug, "FCDS: updating warmed shared filter chain name={}", filter_chain->name());
 
   state.api_->setFilterChain(std::move(filter_chain));
-  updateTlsState();
+  scheduleTlsUpdate();
 
   if (draining) {
     for (auto* handle : state.handles_) {
@@ -1169,10 +1170,20 @@ void FcdsSharedFilterChainManager::onFilterChainRemoved(
   SubscriptionState& state = *state_iter->second;
   ENVOY_LOG(debug, "FCDS: removing shared filter chain name={}", draining->name());
 
-  updateTlsState();
+  scheduleTlsUpdate();
 
   for (auto* handle : state.handles_) {
     handle->callbacks().drainFilterChain(draining);
+  }
+}
+
+void FcdsSharedFilterChainManager::scheduleTlsUpdate() {
+  // Skip rearming when a publish is already queued for this iteration.
+  if (!tls_update_cb_->enabled()) {
+    // Pause filter chain discovery until the coalesced publish is posted to workers.
+    xds_pause_ = server_context_.xdsManager().pause(
+        Config::getTypeUrl<envoy::config::listener::v3::FilterChain>());
+    tls_update_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
@@ -1185,6 +1196,8 @@ void FcdsSharedFilterChainManager::updateTlsState() {
     }
   }
   tls_slot_->set([filter_chains](Event::Dispatcher&) { return filter_chains; });
+  // Resume filter chain discovery now that the update is posted to workers.
+  xds_pause_.reset();
 }
 
 } // namespace Server

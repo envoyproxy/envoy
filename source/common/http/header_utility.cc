@@ -259,6 +259,10 @@ bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
 }
 
+bool HeaderUtility::isQuery(const RequestHeaderMap& headers) {
+  return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Query;
+}
+
 bool HeaderUtility::isConnectUdpRequest(const RequestHeaderMap& headers) {
   return headers.Upgrade() && absl::EqualsIgnoreCase(headers.getUpgradeValue(),
                                                      Http::Headers::get().UpgradeValues.ConnectUdp);
@@ -448,7 +452,7 @@ constexpr bool isInvalidToken(unsigned char c) {
   return true;
 }
 
-std::optional<std::reference_wrapper<const absl::string_view>>
+OptRef<const absl::string_view>
 HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.
   if (headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
@@ -526,7 +530,13 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
   return Http::okStatus();
 }
 
+std::atomic<bool> HeaderUtility::disable_request_header_validation_for_tests_{false};
+
 Http::Status HeaderUtility::checkValidRequestHeaders(const Http::RequestHeaderMap& headers) {
+  if (disable_request_header_validation_for_tests_.load(std::memory_order_relaxed)) {
+    return Http::okStatus();
+  }
+
   const HeaderEntry* invalid_entry = nullptr;
   bool invalid_key = false;
   headers.iterate([&invalid_entry, &invalid_key](const HeaderEntry& header) -> HeaderMap::Iterate {

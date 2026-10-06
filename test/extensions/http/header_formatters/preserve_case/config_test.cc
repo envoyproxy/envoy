@@ -4,6 +4,7 @@
 #include "source/extensions/http/header_formatters/preserve_case/config.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -31,7 +32,10 @@ TEST(PreserveCaseFormatterFactoryConfigTest, Basic) {
   TestUtility::loadFromYaml(yaml, typed_config);
   auto header_formatter_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
       typed_config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
-  EXPECT_NE(factory->createFromProto(*header_formatter_config), nullptr);
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  auto formatter_factory = factory->createFactoryFromProto(*header_formatter_config, context);
+  ASSERT_TRUE(formatter_factory.ok());
+  EXPECT_NE(formatter_factory.value(), nullptr);
 }
 
 TEST(PreserveCaseFormatterFactoryConfigTest, InvalidfFormatterTypeOnEnvoyHeaders) {
@@ -66,8 +70,10 @@ TEST(PreserveCaseFormatterFactoryConfigTest, PreserveCaseFormatterFactoryConfig_
   TestUtility::loadFromYaml(yaml, typed_config);
   auto header_formatter_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
       typed_config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
-  auto formatter_factory = factory->createFromProto(*header_formatter_config);
-  auto formatter = formatter_factory->create();
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  auto formatter_factory = factory->createFactoryFromProto(*header_formatter_config, context);
+  ASSERT_TRUE(formatter_factory.ok());
+  auto formatter = formatter_factory.value()->create();
 
   formatter->processKey("Foo");
   EXPECT_EQ("Foo", formatter->format("foo"));
@@ -90,8 +96,10 @@ TEST(PreserveCaseFormatterFactoryConfigTest, PreserveCaseFormatterFactoryConfig_
   TestUtility::loadFromYaml(yaml, typed_config);
   auto header_formatter_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
       typed_config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
-  auto formatter_factory = factory->createFromProto(*header_formatter_config);
-  auto formatter = formatter_factory->create();
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  auto formatter_factory = factory->createFactoryFromProto(*header_formatter_config, context);
+  ASSERT_TRUE(formatter_factory.ok());
+  auto formatter = formatter_factory.value()->create();
 
   formatter->processKey("Foo");
   EXPECT_EQ("Foo", formatter->format("foo"));

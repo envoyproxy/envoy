@@ -8,7 +8,6 @@
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
@@ -126,12 +125,6 @@ private:
   std::unique_ptr<ProtoScrubber> response_scrubber_;
 };
 
-class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {
-private:
-  Http::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ProtoApiScrubberConfig& proto_config, const std::string&,
-                                    Server::Configuration::FactoryContext&) override;
-};
 } // namespace ProtoApiScrubber
 } // namespace HttpFilters
 } // namespace Extensions

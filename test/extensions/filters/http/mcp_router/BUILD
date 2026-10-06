@@ -34,6 +34,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "header_forwarding_utils_test",
+    srcs = ["header_forwarding_utils_test.cc"],
+    extension_names = ["envoy.filters.http.mcp_router"],
+    deps = [
+        "//source/extensions/filters/http/mcp_router:header_forwarding_utils_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "mcp_router_test",
     srcs = ["mcp_router_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
@@ -69,7 +80,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["mcp_router_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/clusters/mcp_multicluster:cluster",
         "//source/extensions/filters/http/mcp:config",

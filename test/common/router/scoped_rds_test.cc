@@ -42,9 +42,11 @@ using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::IsNull;
+using testing::Key;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Router {
@@ -637,9 +639,11 @@ key:
       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
   auto scoped_config = getScopedRdsProvider()->config<ScopedConfigImpl>();
   ASSERT_THAT(scoped_config, Not(IsNull()));
+  // The route configuration configures VHDS, so it isn't published to the scope until the initial
+  // VHDS fetch has landed.
   const auto config_after_rds = scoped_config->getRouteConfig(scope_key);
   ASSERT_THAT(config_after_rds, Not(IsNull()));
-  EXPECT_EQ("foo_routes", config_after_rds->name());
+  EXPECT_EQ("", config_after_rds->name());
 
   // VHDS adds a virtual host to foo_routes.
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
@@ -658,10 +662,11 @@ routes:
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "222"));
 
-  // The scope now serves the route configuration that VHDS rebuilt, not the one RDS left behind.
+  // The scope now serves the route configuration that the initial VHDS fetch completed.
   const auto config_after_vhds =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(scope_key);
   ASSERT_THAT(config_after_vhds, Not(IsNull()));
+  EXPECT_EQ("foo_routes", config_after_vhds->name());
   EXPECT_NE(config_after_rds.get(), config_after_vhds.get());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -737,7 +742,7 @@ key:
   const auto decoded_resources_2 = TestUtility::decodeResources({resource});
   EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, "3"));
   EXPECT_EQ(1UL, all_scopes_.value());
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope")));
   EXPECT_EQ(2UL,
             server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
@@ -824,7 +829,7 @@ key:
   const auto decoded_resources_2 = TestUtility::decodeResources({resource});
   EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, deletes, "2"));
   EXPECT_EQ(1UL, all_scopes_.value());
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope")));
   EXPECT_EQ(2UL,
             server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
@@ -1035,9 +1040,7 @@ key:
                 .value());
   // foo_scope is deleted, and foo_scope2 is added.
   EXPECT_EQ(all_scopes_.value(), 2UL);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope1"), 0);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope2"), Key("foo_scope3")));
   // The same scope-key now points to the same route table.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
@@ -1063,9 +1066,7 @@ key:
       testing::MatchesRegex(
           ".*scope key conflict found, first scope is 'foo_scope2', second scope is 'foo_scope4'"));
   EXPECT_EQ(2UL, all_scopes_.value());
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope1"), 0);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope2"), Key("foo_scope3")));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(scope_key_builder_->computeScopeKey(
@@ -1080,8 +1081,7 @@ key:
                 .value(),
             3UL);
   EXPECT_EQ(2UL, all_scopes_.value());
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope3"), Key("foo_scope4")));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(scope_key_builder_->computeScopeKey(
@@ -1110,8 +1110,7 @@ key:
                 .value(),
             4UL);
   EXPECT_EQ(2UL, all_scopes_.value());
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope3"), Key("foo_scope4")));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(scope_key_builder_->computeScopeKey(
@@ -1144,8 +1143,7 @@ key:
                 .value(),
             6UL);
   EXPECT_EQ(2UL, all_scopes_.value());
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope2"), Key("foo_scope3")));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(scope_key_builder_->computeScopeKey(
@@ -1221,9 +1219,7 @@ key:
                 .value());
   // foo_scope is deleted, and foo_scope2 is added.
   EXPECT_EQ(all_scopes_.value(), 2UL);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope1"), 0);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope2"), Key("foo_scope3")));
   // The same scope-key now points to the same route table.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
@@ -1248,9 +1244,7 @@ key:
       testing::MatchesRegex(
           ".*scope key conflict found, first scope is 'foo_scope2', second scope is 'foo_scope4'"));
   EXPECT_EQ(2UL, all_scopes_.value());
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope1"), 0);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope2"), Key("foo_scope3")));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(scope_key_builder_->computeScopeKey(
@@ -1267,8 +1261,7 @@ key:
                 .value(),
             3UL);
   EXPECT_EQ(2UL, all_scopes_.value());
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope3"), Key("foo_scope4")));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(scope_key_builder_->computeScopeKey(
@@ -1297,8 +1290,7 @@ key:
                 .value(),
             4UL);
   EXPECT_EQ(2UL, all_scopes_.value());
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope3"), Key("foo_scope4")));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(scope_key_builder_->computeScopeKey(
@@ -1332,8 +1324,7 @@ key:
                 .value(),
             6UL);
   EXPECT_EQ(2UL, all_scopes_.value());
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope2"), Key("foo_scope3")));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(scope_key_builder_->computeScopeKey(
@@ -1605,6 +1596,59 @@ dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump7));
+}
+
+// Tests that multiple dynamic scopes in /config_dump are returned in sorted order.
+TEST_F(ScopedRdsTest, ConfigDumpDeterministicOrdering) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  const auto res_z = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: z-scope
+route_configuration_name: z-routes
+key:
+  fragments: { string_key: "172.30.30.30" }
+)EOF");
+  const auto res_a = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: a-scope
+route_configuration_name: a-routes
+key:
+  fragments: { string_key: "172.30.30.10" }
+)EOF");
+  const auto res_m = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: m-scope
+route_configuration_name: m-routes
+key:
+  fragments: { string_key: "172.30.30.20" }
+)EOF");
+
+  const auto decoded_resources = TestUtility::decodeResources({res_z, res_a, res_m});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
+  pushRdsConfig({"z-routes", "a-routes", "m-routes"}, "1");
+
+  UniversalStringMatcher universal_matcher;
+  auto message_ptr =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
+  const auto& scoped_routes_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
+          *message_ptr);
+
+  ASSERT_EQ(scoped_routes_config_dump.dynamic_scoped_route_configs_size(), 1);
+  const auto& dynamic_config = scoped_routes_config_dump.dynamic_scoped_route_configs(0);
+  ASSERT_EQ(dynamic_config.scoped_route_configs_size(), 3);
+
+  envoy::config::route::v3::ScopedRouteConfiguration scope0, scope1, scope2;
+  EXPECT_TRUE(dynamic_config.scoped_route_configs(0).UnpackTo(&scope0));
+  EXPECT_TRUE(dynamic_config.scoped_route_configs(1).UnpackTo(&scope1));
+  EXPECT_TRUE(dynamic_config.scoped_route_configs(2).UnpackTo(&scope2));
+
+  EXPECT_EQ(scope0.name(), "a-scope");
+  EXPECT_EQ(scope1.name(), "m-scope");
+  EXPECT_EQ(scope2.name(), "z-scope");
 }
 
 // Tests whether scope key conflict with updated scopes is ignored.

@@ -176,13 +176,10 @@ TEST_P(CdnLoopFilterIntegrationTest, CdnLoop2Allowed3Seen) {
   EXPECT_EQ("502", response->headers().getStatusValue());
 }
 
-INSTANTIATE_TEST_SUITE_P(Protocols, CdnLoopFilterIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
-                             // Upstream doesn't matter, so by testing only 1,
-                             // the test is twice as fast.
-                             {Http::CodecType::HTTP1})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CdnLoopFilterIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace
 } // namespace CdnLoop

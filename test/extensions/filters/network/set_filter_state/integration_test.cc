@@ -132,8 +132,8 @@ public:
   }
 
   Network::ClientConnectionPtr makeTlsClientConnection() {
-    auto client_transport_socket_factory =
-        Ssl::createClientSslTransportSocketFactory(/*options=*/{}, context_manager_, *api_);
+    auto client_transport_socket_factory = Ssl::createClientSslTransportSocketFactory(
+        /*options=*/{}, context_manager_, *api_, &server_factory_context_.serverScope());
     auto address = Ssl::getSslAddress(version_, lookupPort("listener_0"));
     return dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),

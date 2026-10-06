@@ -38,6 +38,8 @@ public:
   void setPausedForConnect(bool) override {}
   bool pausedForWebsocketUpgrade() const override { return false; }
   void setPausedForWebsocketUpgrade(bool) override {}
+  bool pausedForGenericUpgrade() const override { return false; }
+  void setPausedForGenericUpgrade(bool) override {}
   void disableRouteTimeoutForWebsocketUpgrade() override {}
   void disablePerTryTimeoutForWebsocketUpgrade() override {}
   const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {

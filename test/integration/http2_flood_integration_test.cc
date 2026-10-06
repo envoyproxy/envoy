@@ -293,14 +293,7 @@ Http2FloodMitigationTest::prefillOutboundUpstreamQueue(uint32_t frame_count) {
   return response;
 }
 
-void Http2FloodMitigationTest::triggerListenerDrain() {
-  absl::Notification drain_sequence_started;
-  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence(Network::DrainDirection::All, [] {});
-    drain_sequence_started.Notify();
-  });
-  drain_sequence_started.WaitForNotification();
-}
+void Http2FloodMitigationTest::triggerListenerDrain() { startServerDrain(); }
 
 TEST_P(Http2FloodMitigationTest, Ping) {
   setNetworkConnectionBufferSize();
@@ -764,6 +757,11 @@ TEST_P(Http2FloodMitigationTest, DownstreamConnectionDurationTimeoutTriggersFloo
 // Verify detection of frame flood when sending GOAWAY frame during processing of response headers
 // on a draining listener.
 TEST_P(Http2FloodMitigationTest, GoawayOverflowDuringResponseWhenDraining) {
+  // The test needs the next response to drain-close the connection. Under the default gradual
+  // strategy the drain-close probability ramps from zero over the drain window, so ask for an
+  // immediate drain instead of racing the ramp.
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+
   // pre-fill one away from overflow
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
 
@@ -805,6 +803,10 @@ typed_config:
         auto size = hcm.http_filters_size();
         hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
       });
+
+  // As in GoawayOverflowDuringResponseWhenDraining, drain immediately so that the next response
+  // reliably drain-closes the connection.
+  drain_strategy_ = Server::DrainStrategy::Immediate;
 
   // pre-fill one away from overflow
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);

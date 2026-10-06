@@ -43,24 +43,29 @@ RCConnectionWrapper::~RCConnectionWrapper() {
 }
 
 void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose) {
-    if (!connection_) {
-      ENVOY_LOG(debug, "RCConnectionWrapper: connection is null, skipping event handling");
-      return;
-    }
-
-    // Store connection info before it gets invalidated.
-    const std::string connectionKey =
-        connection_->connectionInfoProvider().localAddress()->asString();
-    const uint64_t connectionId = connection_->id();
-
-    ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, found connection {} remote closed",
-              connectionId, connectionKey);
-
-    // Don't call shutdown() here as it may cause cleanup during event processing
-    // Instead, just notify parent of closure.
-    parent_.onConnectionDone("Connection closed", this, true);
+  // Any close before the handshake completes is terminal for this attempt. A successful handshake
+  // removes these callbacks, so a close seen here always means the peer or local stack dropped the
+  // connection first.
+  if (event != Network::ConnectionEvent::RemoteClose &&
+      event != Network::ConnectionEvent::LocalClose) {
+    return;
   }
+  if (!connection_) {
+    ENVOY_LOG(debug, "RCConnectionWrapper: connection is null, skipping event handling");
+    return;
+  }
+
+  // Store connection info before it gets invalidated.
+  const std::string connection_key =
+      connection_->connectionInfoProvider().localAddress()->asString();
+  const uint64_t connection_id = connection_->id();
+
+  ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, connection {} closed before handshake",
+            connection_id, connection_key);
+
+  // Do not call shutdown() here, as that may trigger cleanup during event processing. Notify the
+  // parent instead, which treats the premature close as a terminal handshake failure.
+  parent_.onConnectionDone("Connection closed", this, true);
 }
 
 // SimpleConnReadFilter::onData implementation.
@@ -77,10 +82,10 @@ Network::FilterStatus SimpleConnReadFilter::onData(Buffer::Instance& buffer, boo
   return Network::FilterStatus::StopIteration;
 }
 
-std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
-                                         const std::string& src_cluster_id,
-                                         const std::string& src_node_id,
-                                         std::optional<int64_t> initiation_time_ms) {
+absl::Status RCConnectionWrapper::connect(const std::string& src_tenant_id,
+                                          const std::string& src_cluster_id,
+                                          const std::string& src_node_id,
+                                          std::optional<int64_t> initiation_time_ms) {
   // Register connection callbacks.
   ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, adding connection callbacks",
             connection_->id());
@@ -232,9 +237,27 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   if (!encode_status.ok()) {
     ENVOY_LOG(error, "RCConnectionWrapper: encodeHeaders failed: {}", encode_status.message());
     onHandshakeFailure(HandshakeFailureReason::encodeError());
+    return absl::InternalError(absl::StrCat("handshake encode failed: ", encode_status.message()));
   }
 
-  return connection_->connectionInfoProvider().localAddress()->asString();
+  // Arm the handshake response deadline so a peer that completes TCP and TLS but never answers
+  // cannot hold the attempt open forever.
+  handshake_timer_ = connection_->dispatcher().createTimer([this]() { onHandshakeTimeout(); });
+  handshake_timer_->enableTimer(parent_.handshakeTimeout());
+
+  return absl::OkStatus();
+}
+
+void RCConnectionWrapper::onHandshakeTimeout() {
+  ENVOY_LOG(debug, "RCConnectionWrapper: connection {} handshake timed out",
+            connection_ ? connection_->id() : 0);
+  onHandshakeFailure(HandshakeFailureReason::timeout());
+}
+
+void RCConnectionWrapper::disarmHandshakeTimer() {
+  if (handshake_timer_ != nullptr) {
+    handshake_timer_->disableTimer();
+  }
 }
 
 void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool) {
@@ -281,12 +304,44 @@ RCConnectionWrapper::parseRetryAfter(const Http::ResponseHeaderMap& headers) {
 }
 
 void RCConnectionWrapper::dispatchHttp1(Buffer::Instance& buffer) {
-  if (http1_parse_connection_ != nullptr) {
-    const Http::Status status = http1_parse_connection_->dispatch(buffer);
-    if (!status.ok()) {
-      ENVOY_LOG(debug, "RCConnectionWrapper: HTTP/1 codec dispatch error: {}", status.message());
-    }
+  if (http1_parse_connection_ == nullptr) {
+    return;
   }
+  const Http::Status status = http1_parse_connection_->dispatch(buffer);
+
+  // On success the handoff runs here so bytes the responder coalesced with the response are
+  // captured from the buffer before the tunnel is queued. The codec reports those trailing bytes as
+  // an extraneous-data error, which is expected and superseded by the successful handshake.
+  if (pending_handoff_) {
+    captureHandshakeResidual(buffer);
+    completeHandshakeHandoff();
+    return;
+  }
+
+  if (!status.ok()) {
+    ENVOY_LOG(debug, "RCConnectionWrapper: HTTP/1 codec dispatch error: {}", status.message());
+    // A malformed handshake response is unusable, so fail the attempt now rather than wait for the
+    // deadline.
+    onHandshakeFailure(HandshakeFailureReason::connectionClose(status.message()));
+  }
+}
+
+void RCConnectionWrapper::decodeData(Buffer::Instance& data, bool) {
+  // In HTTP/1 upgrade mode the responder's post-101 bytes arrive here instead of staying in the
+  // dispatch buffer, so carry them with the tunnel to replay before the socket is read.
+  if (pending_handoff_) {
+    captureHandshakeResidual(data);
+  }
+}
+
+void RCConnectionWrapper::captureHandshakeResidual(Buffer::Instance& buffer) {
+  if (buffer.length() == 0) {
+    return;
+  }
+  if (handshake_residual_ == nullptr) {
+    handshake_residual_ = std::make_unique<Buffer::OwnedImpl>();
+  }
+  handshake_residual_->move(buffer);
 }
 
 ReverseTunnelInitiatorExtension* RCConnectionWrapper::getDownstreamExtension() const {
@@ -304,8 +359,13 @@ Network::ClientConnectionPtr RCConnectionWrapper::releaseConnection() {
 }
 
 void RCConnectionWrapper::onHandshakeSuccess() {
-  std::string message = "reverse connection accepted";
-  ENVOY_LOG(debug, "handshake succeeded: {}", message);
+  if (handshake_completed_) {
+    return;
+  }
+  handshake_completed_ = true;
+  disarmHandshakeTimer();
+
+  ENVOY_LOG(debug, "handshake succeeded");
 
   // Track handshake success stats.
   auto* extension = getDownstreamExtension();
@@ -313,11 +373,24 @@ void RCConnectionWrapper::onHandshakeSuccess() {
     extension->incrementHandshakeStats(cluster_name_, true, "");
   }
 
-  parent_.onConnectionDone(message, this, false);
+  // Defer the handoff to completeHandshakeHandoff(), run by dispatchHttp1() once dispatch returns,
+  // so bytes the responder coalesced with the response are captured and carried with the tunnel.
+  pending_handoff_ = true;
+}
+
+void RCConnectionWrapper::completeHandshakeHandoff() {
+  pending_handoff_ = false;
+  parent_.onConnectionDone("reverse connection accepted", this, false);
 }
 
 void RCConnectionWrapper::onHandshakeFailure(const HandshakeFailureReason& reason,
                                              std::optional<std::chrono::milliseconds> retry_after) {
+  if (handshake_completed_) {
+    return;
+  }
+  handshake_completed_ = true;
+  disarmHandshakeTimer();
+
   const std::string error_message = reason.getDetailedName();
   const std::string stats_failure_reason = reason.getNameForStats();
 
@@ -339,8 +412,14 @@ void RCConnectionWrapper::shutdown() {
   }
   shutdown_called_ = true;
 
+  // Stop the handshake deadline and reads before tearing down the connection.
+  handshake_timer_.reset();
+  read_filter_->clearParent();
+  http1_parse_connection_ = nullptr;
+  http1_client_codec_.reset();
+
   if (!connection_) {
-    ENVOY_LOG(error, "RCConnectionWrapper: Connection already null, nothing to shutdown");
+    ENVOY_LOG(debug, "RCConnectionWrapper: Connection already null, nothing to shutdown");
     return;
   }
 
@@ -353,7 +432,13 @@ void RCConnectionWrapper::shutdown() {
   connection_->removeConnectionCallbacks(*this);
   connection_->removeReadFilter(read_filter_);
 
-  // Defer the deletion of the connection and the codec.
+  // Close before deferred-delete so ConnectionImpl is not destroyed with an open socket.
+  if (connection_->state() == Network::Connection::State::Open) {
+    if (connection_->getSocket()) {
+      connection_->getSocket()->ioHandle().resetFileEvents();
+    }
+    connection_->close(Network::ConnectionCloseType::NoFlush);
+  }
   connection_->dispatcher().deferredDelete(std::move(connection_));
 }
 

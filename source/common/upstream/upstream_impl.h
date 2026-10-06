@@ -994,7 +994,7 @@ public:
       return std::nullopt;
     }
 
-    return std::ref(*(optional_cluster_stats_->request_response_size_stats_));
+    return *optional_cluster_stats_->request_response_size_stats_;
   }
 
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
@@ -1005,7 +1005,7 @@ public:
       return std::nullopt;
     }
 
-    return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
+    return *optional_cluster_stats_->timeout_budget_stats_;
   }
 
   bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
@@ -1026,6 +1026,13 @@ public:
       return *typed_metadata_;
     }
     CONSTRUCT_ON_FIRST_USE(ClusterTypedMetadata, DefaultMetadata::get());
+  }
+
+  OptRef<const PendingRqQueuePolicy> pendingRqQueuePolicy() const override {
+    if (pending_rq_queue_policy_ == nullptr) {
+      return std::nullopt;
+    }
+    return *pending_rq_queue_policy_;
   }
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
@@ -1162,6 +1169,7 @@ private:
   const std::unique_ptr<const envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
   const std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
+  std::unique_ptr<const PendingRqQueuePolicy> pending_rq_queue_policy_;
   LoadBalancerConfigPtr load_balancer_config_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
@@ -1338,15 +1346,15 @@ private:
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
 
-  bool initialization_started_{};
   std::function<absl::Status()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
-  const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   ConstLocalitySharedPoolSharedPtr const_locality_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
-  UnitFloat drop_overload_{0};
   std::string drop_category_;
+  UnitFloat drop_overload_{0};
+  bool initialization_started_{};
+  const bool local_cluster_;
   static constexpr int kDropOverloadSize = 1;
 };
 

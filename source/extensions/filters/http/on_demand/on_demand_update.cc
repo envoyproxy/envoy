@@ -77,19 +77,16 @@ absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
   // (odcds_config->resources_locator().empty())").
   if (odcds == nullptr) {
     if (odcds_config->resources_locator().empty()) {
-      // If the config-source is ADS, use a singleton-subscription mechanism,
-      // similar to xDS-TP based configs.
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.odcds_over_ads_fix")) {
-        if (odcds_config->source().config_source_specifier_case() ==
-            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
-          auto odcds_or =
-              cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create, odcds_config->source(),
-                                  std::nullopt, validation_visitor);
-          RETURN_IF_NOT_OK_REF(odcds_or.status());
-          odcds = std::move(odcds_or.value());
-        }
-      }
-      if (odcds == nullptr) {
+      if (odcds_config->source().config_source_specifier_case() ==
+          envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
+        // If the config-source is ADS, use a singleton-subscription mechanism,
+        // similar to xDS-TP based configs.
+        auto odcds_or =
+            cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create, odcds_config->source(),
+                                std::nullopt, validation_visitor);
+        RETURN_IF_NOT_OK_REF(odcds_or.status());
+        odcds = std::move(odcds_or.value());
+      } else {
         auto odcds_or = cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create, odcds_config->source(),
                                             std::nullopt, validation_visitor);
         RETURN_IF_NOT_OK_REF(odcds_or.status());
@@ -253,6 +250,26 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     return;
   }
 
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.on_demand_vhds_no_recreate_stream")) {
+    // Continue the existing stream so the decoder filters before on_demand do not run again.
+    // Refreshing the route config snapshot lets the router see the newly discovered virtual host,
+    // and re-running decodeHeaders() starts on-demand CDS if the resolved cluster is unknown. In
+    // that case onClusterDiscoveryCompletion() resumes the stream.
+    if (route_exists) {
+      callbacks_->downstreamCallbacks()->refreshRouteConfigSnapshot();
+      callbacks_->downstreamCallbacks()->clearRouteCache();
+      getConfig()->decodeHeadersBehavior().decodeHeaders(*this);
+      if (filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration) {
+        return;
+      }
+    }
+    callbacks_->continueDecoding();
+    return;
+  }
+
+  // Legacy behavior (guard disabled): recreate the stream so processing restarts from the
+  // beginning against the newly-discovered route.
   // Track end_stream state to support stream recreation with fully read bodies.
   const bool can_recreate_stream = downstream_end_stream_;
   if (route_exists &&        // route can be resolved after an on-demand

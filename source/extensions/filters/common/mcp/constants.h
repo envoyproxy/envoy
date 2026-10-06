@@ -32,17 +32,26 @@ constexpr absl::string_view TYPE_FIELD = "type";
 constexpr absl::string_view TEXT_FIELD = "text";
 constexpr absl::string_view CONTENT_FIELD = "content";
 constexpr absl::string_view IS_ERROR_FIELD = "isError";
+constexpr absl::string_view RESULT_TYPE_FIELD = "resultType";
+constexpr absl::string_view RESULT_TYPE_COMPLETE = "complete";
 constexpr absl::string_view ERROR_FIELD = "error";
 
+constexpr int MCP_HEADER_MISMATCH_ERROR_CODE = -32020;
+constexpr int JSONRPC_INVALID_PARAMS_ERROR_CODE = -32602;
+
 // MCP Initialize constants
-constexpr absl::string_view LATEST_SUPPORTED_MCP_VERSION = "2025-11-25";
-// Based on the 2025-11-25 spec, if the MCP-Protocol-Version header is not
-// provided, the fallback protocol version is 2025-03-26.
-// https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#protocol-version-header
-constexpr absl::string_view FALLBACK_PROTOCOL_VERSION = "2025-03-26";
 constexpr absl::string_view MCP_VERSION_2024_11_05 = "2024-11-05";
+constexpr absl::string_view MCP_VERSION_2025_03_26 = "2025-03-26";
 constexpr absl::string_view MCP_VERSION_2025_06_18 = "2025-06-18";
+constexpr absl::string_view MCP_VERSION_2025_11_25 = "2025-11-25";
+constexpr absl::string_view MCP_VERSION_2026_07_28 = "2026-07-28";
 constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
+constexpr absl::string_view META_FIELD = "_meta";
+constexpr absl::string_view MCP_META_PROTOCOL_VERSION_FIELD =
+    "io.modelcontextprotocol/protocolVersion";
+constexpr absl::string_view MCP_META_SERVER_INFO_FIELD = "io.modelcontextprotocol/serverInfo";
+constexpr absl::string_view MCP_META_CLIENT_CAPABILITIES_FIELD =
+    "io.modelcontextprotocol/clientCapabilities";
 constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
 constexpr absl::string_view TOOLS_FIELD = "tools";
 constexpr absl::string_view LIST_CHANGED_FIELD = "listChanged";
@@ -51,9 +60,17 @@ constexpr absl::string_view NAME_FIELD = "name";
 constexpr absl::string_view VERSION_FIELD = "version";
 constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
 
+// MCP server/discover constants
+constexpr absl::string_view SUPPORTED_VERSIONS_FIELD = "supportedVersions";
+constexpr absl::string_view TTL_MS_FIELD = "ttlMs";
+constexpr absl::string_view CACHE_SCOPE_FIELD = "cacheScope";
+constexpr absl::string_view CACHE_SCOPE_PUBLIC = "public";
+constexpr absl::string_view CACHE_SCOPE_PRIVATE = "private";
+
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
 constexpr absl::string_view IS_EXCEEDING_LIMIT = "is_exceeding_limit";
 constexpr absl::string_view STATUS = "status";
+constexpr absl::string_view PASSTHROUGH_REASON = "passthrough_reason";
 
 namespace StatusValues {
 constexpr absl::string_view OK = "mcp_ok";
@@ -67,6 +84,12 @@ constexpr absl::string_view BODY_TOO_LARGE = "mcp_body_too_large";
 // HTTP header names
 constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
 constexpr absl::string_view MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version";
+constexpr absl::string_view MCP_METHOD_HEADER = "mcp-method";
+constexpr absl::string_view MCP_NAME_HEADER = "mcp-name";
+
+// Delimiters for encoded header values.
+constexpr absl::string_view MCP_BASE64_PREFIX = "=?base64?";
+constexpr absl::string_view MCP_BASE64_SUFFIX = "?=";
 
 // Method names
 namespace Methods {
@@ -93,6 +116,17 @@ constexpr absl::string_view LOGGING_SET_LEVEL = "logging/setLevel";
 
 // Lifecycle
 constexpr absl::string_view INITIALIZE = "initialize";
+
+// Discovery
+constexpr absl::string_view SERVER_DISCOVER = "server/discover";
+
+// Subscriptions
+constexpr absl::string_view SUBSCRIPTIONS_LISTEN = "subscriptions/listen";
+
+// Tasks
+constexpr absl::string_view TASKS_GET = "tasks/get";
+constexpr absl::string_view TASKS_UPDATE = "tasks/update";
+constexpr absl::string_view TASKS_CANCEL = "tasks/cancel";
 
 // Sampling
 constexpr absl::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
@@ -130,6 +164,9 @@ constexpr absl::string_view NOTIFICATION = "notification";
 constexpr absl::string_view LOGGING = "logging";
 constexpr absl::string_view SAMPLING = "sampling";
 constexpr absl::string_view COMPLETION = "completion";
+constexpr absl::string_view DISCOVERY = "discovery";
+constexpr absl::string_view SUBSCRIPTION = "subscription";
+constexpr absl::string_view TASK = "task";
 constexpr absl::string_view UNKNOWN = "unknown";
 } // namespace MethodGroups
 
@@ -137,6 +174,7 @@ constexpr absl::string_view UNKNOWN = "unknown";
 namespace Paths {
 constexpr absl::string_view PARAMS_NAME = "params.name";
 constexpr absl::string_view PARAMS_URI = "params.uri";
+constexpr absl::string_view PARAMS_TASK_ID = "params.taskId";
 constexpr absl::string_view PARAMS_LEVEL = "params.level";
 constexpr absl::string_view PARAMS_REF = "params.ref";
 constexpr absl::string_view PARAMS_PROTOCOL_VERSION = "params.protocolVersion";

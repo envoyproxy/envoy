@@ -77,9 +77,16 @@ protected:
   const std::string name_;
 };
 
+/**
+ * DEPRECATED: use UnifiedFactoryBase instead. This base class is only kept to give the
+ * out-of-tree extensions time to migrate to the unified factory interface and will be removed
+ * once the migration is complete.
+ */
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
-class FactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
-                    public Server::Configuration::NamedHttpFilterConfigFactory {
+class [[deprecated(
+    "Extend UnifiedFactoryBase and implement createHttpFilterFactoryFromProtoTyped instead")]]
+FactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
+              public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
   FactoryBase(const std::string& name) : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
 
@@ -133,9 +140,16 @@ public:
   }
 };
 
+/**
+ * DEPRECATED: use UnifiedFactoryBase instead. This base class is only kept to give the
+ * out-of-tree extensions time to migrate to the unified factory interface and will be removed
+ * once the migration is complete.
+ */
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
-class ExceptionFreeFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
-                                 public Server::Configuration::NamedHttpFilterConfigFactory {
+class [[deprecated(
+    "Extend UnifiedFactoryBase and implement createHttpFilterFactoryFromProtoTyped instead")]]
+ExceptionFreeFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
+                           public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
   ExceptionFreeFactoryBase(const std::string& name)
       : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
@@ -173,10 +187,18 @@ public:
   }
 };
 
+/**
+ * DEPRECATED: use UnifiedFactoryBase instead. UnifiedFactoryBase supports both the downstream
+ * and the upstream HTTP filter chains. This base class is only kept to give the out-of-tree
+ * extensions time to migrate to the unified factory interface and will be removed once the
+ * migration is complete.
+ */
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
-class DualFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
-                        public Server::Configuration::NamedHttpFilterConfigFactory,
-                        public Server::Configuration::UpstreamHttpFilterConfigFactory {
+class [[deprecated(
+    "Extend UnifiedFactoryBase and implement createHttpFilterFactoryFromProtoTyped instead")]]
+DualFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
+                  public Server::Configuration::NamedHttpFilterConfigFactory,
+                  public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
   DualFactoryBase(const std::string& name)
       : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
@@ -254,6 +276,52 @@ private:
         "DualFactoryBase: creating filter factory from server factory context is not supported");
     return nullptr;
   }
+};
+
+/**
+ * Base class for HTTP filter factory registrations. This is the recommended base class for all
+ * the HTTP filter factories. It supports both the downstream and the upstream HTTP filter chains
+ * and only requires the single createHttpFilterFactoryFromProtoTyped() entry point.
+ */
+template <class ConfigProto, class RouteConfigProto = ConfigProto>
+class UnifiedFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
+                           public Server::Configuration::NamedHttpFilterConfigFactory,
+                           public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  UnifiedFactoryBase(const std::string& name)
+      : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
+
+  bool isUnifiedFilter() final { return true; }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) final {
+    auto extra_context = Server::Configuration::ExtraFactoryContext::create(context, stats_prefix);
+    return createHttpFilterFactoryFromProto(proto_config, context.serverFactoryContext(),
+                                            extra_context);
+  }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::UpstreamFactoryContext& context) final {
+    auto extra_context = Server::Configuration::ExtraFactoryContext::create(context, stats_prefix);
+    return createHttpFilterFactoryFromProto(proto_config, context.serverFactoryContext(),
+                                            extra_context);
+  }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProto(
+      const Protobuf::Message& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) final {
+    return createHttpFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config, extra_context.visitor),
+        context, extra_context);
+  }
+
+  virtual absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const ConfigProto& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) PURE;
 };
 
 } // namespace Common

@@ -21,12 +21,6 @@ Http::FilterFactoryCb createFilterFactory(
 }
 } // namespace
 
-absl::StatusOr<Http::FilterFactoryCb> BodySizeLimitFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit& proto_config,
-    const std::string&, DualInfo, Server::Configuration::ServerFactoryContext&) {
-  return createFilterFactory(proto_config);
-}
-
 absl::StatusOr<Http::FilterFactoryCb>
 BodySizeLimitFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit& proto_config,

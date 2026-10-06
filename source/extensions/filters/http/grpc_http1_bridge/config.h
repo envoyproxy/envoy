@@ -14,16 +14,10 @@ namespace GrpcHttp1Bridge {
  * Config registration for the grpc HTTP1 bridge filter. @see NamedHttpFilterConfigFactory.
  */
 class GrpcHttp1BridgeFilterConfig
-    : public Common::ExceptionFreeFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::grpc_http1_bridge::v3::Config> {
 public:
-  GrpcHttp1BridgeFilterConfig()
-      : ExceptionFreeFactoryBase("envoy.filters.http.grpc_http1_bridge") {}
-
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::FactoryContext& factory_context) override;
+  GrpcHttp1BridgeFilterConfig() : UnifiedFactoryBase("envoy.filters.http.grpc_http1_bridge") {}
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,

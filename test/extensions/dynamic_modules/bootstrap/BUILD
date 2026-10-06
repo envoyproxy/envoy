@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
+    "envoy_cc_dyn_module_test",
     "envoy_package",
 )
 
@@ -8,7 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "extension_config_test",
     srcs = ["extension_config_test.cc"],
     data = [
@@ -46,7 +46,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     data = [
@@ -77,7 +77,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "extension_test",
     srcs = ["extension_test.cc"],
     data = [
@@ -97,10 +97,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:bootstrap_extension_new_null",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_config_new",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
     ],
@@ -109,12 +110,13 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/bootstrap/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -127,6 +129,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_http_combined_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_init_target_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_iterate_panic_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_listener_lifecycle_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_shared_data_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",

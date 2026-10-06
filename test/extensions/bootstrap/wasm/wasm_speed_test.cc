@@ -54,8 +54,7 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   *plugin_config.mutable_root_id() = "some_long_root_id";
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(test);
   plugin_config.mutable_vm_config()->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
-  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info);
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(plugin_config, local_info);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       plugin->wasmConfig(), "vm_key", scope, *api, cluster_manager, *dispatcher);
   std::string code;
@@ -132,7 +131,7 @@ int main(int argc, char** argv) {
   // Create a Runfiles object for runfiles lookup.
   // https://github.com/bazelbuild/bazel/blob/master/tools/cpp/runfiles/runfiles_src.h#L32
   std::string error;
-  std::unique_ptr<Runfiles> runfiles(Runfiles::Create(argv[0], &error));
+  std::unique_ptr<Runfiles> runfiles(Runfiles::Create(argv[0], BAZEL_CURRENT_REPOSITORY, &error));
   RELEASE_ASSERT(Envoy::TestEnvironment::getOptionalEnvVar("NORUNFILES").has_value() ||
                      runfiles != nullptr,
                  error);

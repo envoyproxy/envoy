@@ -17,7 +17,7 @@ protected:
 
   Event::SimulatedTimeSystem time_system_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::IsolatedStoreImpl store_{factory_context_.server_context_.serverScope().symbolTable()};
   Api::ApiPtr api_;
 };
 } // namespace Envoy

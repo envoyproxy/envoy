@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <vector>
 
 #include "envoy/common/matchers.h"
@@ -398,6 +399,11 @@ public:
   static bool isConnect(const RequestHeaderMap& headers);
 
   /**
+   * @brief a helper function to determine if the headers represent a QUERY request (RFC 10008).
+   */
+  static bool isQuery(const RequestHeaderMap& headers);
+
+  /**
    * @brief a helper function to determine if the headers represent a CONNECT-UDP request.
    */
   static bool isConnectUdpRequest(const RequestHeaderMap& headers);
@@ -439,8 +445,7 @@ public:
    * @param headers to validate
    * @return details of the error if an error is present, otherwise std::nullopt
    */
-  static std::optional<std::reference_wrapper<const absl::string_view>>
-  requestHeadersValid(const RequestHeaderMap& headers);
+  static OptRef<const absl::string_view> requestHeadersValid(const RequestHeaderMap& headers);
 
   /**
    * Determines if the response should be framed by Connection: Close based on protocol
@@ -501,13 +506,20 @@ public:
   /* Does a common header check ensuring that header keys and values are valid and do not contain
    * forbidden characters (e.g. valid HTTP header keys/values should never contain embedded NULLs
    * or new lines.)
-   * Callers are expected to gate this check behind the
-   * `envoy.reloadable_features.validate_upstream_headers` runtime feature, latched at codec
-   * connection construction; the check itself runs unconditionally.
    * @return Status containing the result. If failed, message includes details on which header key
    * or value was invalid.
    */
   static Http::Status checkValidRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * When set, checkValidRequestHeaders() accepts every header name and value. This lets
+   * integration tests drive Envoy's own codecs to send deliberately malformed requests at
+   * Envoy's server codecs. Never set this outside of tests.
+   *
+   * Atomic because tests clear it while Envoy's worker threads are still running, and those
+   * threads read it whenever they encode an upstream request.
+   */
+  static std::atomic<bool> disable_request_header_validation_for_tests_;
 
   /**
    * Returns true if a header may be safely removed without causing additional

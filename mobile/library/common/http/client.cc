@@ -410,8 +410,15 @@ void Client::DirectStream::saveLatestStreamIntel() {
   stream_intel_.stream_id = static_cast<uint64_t>(stream_handle_);
   stream_intel_.attempt_count = info.attemptCount().value_or(0);
 
-  const auto* scone_state =
+  const Envoy::Quic::SconeState* scone_state =
       info.filterState().getDataReadOnly<Envoy::Quic::SconeState>(Envoy::Quic::SconeStateKey);
+  // If SconeState is not present on the stream filter state, fall back to checking
+  // the upstream connection's filter state where EnvoyQuicClientSession records SCONE updates.
+  if (!scone_state && info.upstreamInfo() && info.upstreamInfo()->upstreamFilterState()) {
+    scone_state =
+        info.upstreamInfo()->upstreamFilterState()->getDataReadOnly<Envoy::Quic::SconeState>(
+            Envoy::Quic::SconeStateKey);
+  }
   if (scone_state && scone_state->scone_max_kbps.has_value() &&
       scone_state->timestamp_ms.has_value()) {
     // Only update if the new timestamp from scone_state is greater than the last recorded

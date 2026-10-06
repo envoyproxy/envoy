@@ -4,8 +4,10 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/config/grpc_mux.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -453,9 +455,6 @@ private:
   Configuration::TransportSocketFactoryContext& factory_context_;
 };
 
-constexpr absl::string_view FcdsSharedFilterChainManagerName =
-    "fcds_shared_filter_chain_manager_singleton";
-
 class FcdsClientCallbacks {
 public:
   virtual ~FcdsClientCallbacks() = default;
@@ -510,6 +509,8 @@ public:
   void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
 
 private:
+  friend class FcdsSharedFilterChainManagerPeer;
+
   struct ThreadLocalState : public ThreadLocal::ThreadLocalObject {
     absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_;
   };
@@ -527,6 +528,13 @@ private:
 
   void onFilterChainWarmed(Network::DrainableFilterChainSharedPtr filter_chain);
   void updateTlsState();
+  void scheduleTlsUpdate();
+
+  // Coalesces thread local filter chain updates within a single event loop iteration.
+  Event::SchedulableCallbackPtr tls_update_cb_;
+
+  // Pauses filter chain discovery requests while a thread local publish is pending.
+  Config::ScopedResume xds_pause_;
 };
 
 } // namespace Server

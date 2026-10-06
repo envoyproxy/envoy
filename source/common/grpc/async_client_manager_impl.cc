@@ -6,6 +6,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/grpc/async_client_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -84,7 +85,12 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     Stats::Scope& scope, Server::Configuration::CommonFactoryContext& context,
     const StatNames& stat_names, absl::Status& creation_status)
     : google_tls_slot_(google_tls_slot),
-      scope_(scope.createScope(fmt::format("grpc.{}.", config.google_grpc().stat_prefix()))),
+      // grpc.(<stat_prefix>).**
+      scope_(scope.createScopeWithTaggedName(
+          "grpc",
+          {Stats::TagStringView{Envoy::Config::TagNames::get().GOOGLE_GRPC_CLIENT_PREFIX,
+                                config.google_grpc().stat_prefix()}},
+          fmt::format("grpc.{}.", config.google_grpc().stat_prefix()))),
       config_(config), factory_context_(context), stat_names_(stat_names) {
 #ifndef ENVOY_GOOGLE_GRPC
   UNREFERENCED_PARAMETER(google_tls_slot_);

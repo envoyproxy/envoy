@@ -49,6 +49,7 @@ public:
   // Http::ConnectionCallbacks
   MOCK_METHOD(void, onGoAway, (GoAwayErrorCode error_code));
   MOCK_METHOD(void, onSettings, (ReceivedSettings & settings));
+  MOCK_METHOD(void, onMetadata, (MetadataMapPtr && metadata_map));
 };
 
 class MockFilterManagerCallbacks : public FilterManagerCallbacks {
@@ -232,6 +233,7 @@ public:
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
+  MOCK_METHOD(void, refreshRouteConfigSnapshot, ());
   MOCK_METHOD(void, refreshRouteCluster, ());
   MOCK_METHOD(void, recreateClusterInfo, ());
 
@@ -704,6 +706,7 @@ public:
   MOCK_METHOD(bool, shouldNormalizePath, (), (const));
   MOCK_METHOD(bool, shouldMergeSlashes, (), (const));
   MOCK_METHOD(bool, shouldStripTrailingHostDot, (), (const));
+  MOCK_METHOD(bool, recordRouteResolutionStats, (), (const));
   MOCK_METHOD(Http::StripPortType, stripPortType, (), (const));
   MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,
               headersWithUnderscoresAction, (), (const));

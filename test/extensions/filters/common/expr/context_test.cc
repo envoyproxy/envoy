@@ -16,11 +16,13 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
+#include "flatbuffers/idl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -1036,6 +1038,45 @@ TEST(Context, FilterStateAttributes) {
     EXPECT_EQ(6666, port->Int64OrDie());
     auto other = map[CelValue::CreateStringView(address_key)];
     EXPECT_FALSE(other.has_value());
+  }
+
+  // Test CelState with FlatBuffers
+  std::string schema_file;
+  EXPECT_TRUE(
+      flatbuffers::LoadFile(TestEnvironment::runfilesPath(
+                                "test/extensions/filters/common/expr/test_data/flatbuffers.bfbs")
+                                .c_str(),
+                            true, &schema_file));
+  flatbuffers::Parser parser;
+  EXPECT_TRUE(
+      parser.Deserialize(reinterpret_cast<const uint8_t*>(schema_file.data()), schema_file.size()));
+  EXPECT_TRUE(parser.Parse(R"({
+      f_int: 42,
+      f_string: "hello_flatbuffers"
+  })"));
+  CelStatePrototype fb_prototype(true, CelStateType::FlatBuffers, schema_file,
+                                 StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto fb_cel_state = std::make_shared<CelState>(fb_prototype);
+  fb_cel_state->setValue(
+      absl::string_view(reinterpret_cast<const char*>(parser.builder_.GetBufferPointer()),
+                        parser.builder_.GetSize()));
+  const std::string fb_cel_key = "fb_cel_state_key";
+  filter_state.setData(fb_cel_key, fb_cel_state);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(fb_cel_key)];
+    ASSERT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMap());
+    auto& map = *value.value().MapOrDie();
+    auto int_val = map[CelValue::CreateStringView("f_int")];
+    ASSERT_TRUE(int_val.has_value());
+    ASSERT_TRUE(int_val.value().IsInt64());
+    EXPECT_EQ(int_val.value().Int64OrDie(), 42);
+
+    auto str_val = map[CelValue::CreateStringView("f_string")];
+    ASSERT_TRUE(str_val.has_value());
+    ASSERT_TRUE(str_val.value().IsString());
+    EXPECT_EQ(str_val.value().StringOrDie().value(), "hello_flatbuffers");
   }
 }
 

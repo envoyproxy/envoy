@@ -28,6 +28,9 @@
 #include "gtest/gtest.h"
 #include "xds/data/orca/v3/orca_load_report.pb.h"
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
@@ -190,6 +193,23 @@ TEST_F(OrcaOobManagerLifecycleTest, DestructionDisarmsActiveSessions) {
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   manager.reset();
+}
+
+// Two managers sharing one stats scope (e.g. load_aware_locality and its child
+// ClientSideWeightedRoundRobin policy each enabling OOB) must compose deltas on the shared
+// active_sessions gauge rather than clobber each other via absolute set().
+TEST_F(OrcaOobManagerLifecycleTest, ActiveSessionsGaugeComposesAcrossManagers) {
+  auto manager1 = makeManager();
+  ASSERT_OK(manager1->initialize());
+  auto manager2 = makeManager();
+  ASSERT_OK(manager2->initialize());
+
+  priority_set_.runUpdateCallbacks(0, {makeHost(), makeHost()}, {});
+  EXPECT_EQ(activeOobSessions(), 4);
+
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  manager1.reset();
+  EXPECT_EQ(activeOobSessions(), 2);
 }
 
 // Wire fixture: drives end-to-end ORCA OOB decode path through a real CodecClient
@@ -1069,8 +1089,8 @@ TEST(ApplyOrcaOobConnectionOverridesTest, PopulatedProtoIsMerged) {
   EXPECT_EQ(config.port_value, 9001u);
   EXPECT_EQ(config.authority, "backend.example.com");
   ASSERT_NE(config.transport_socket_match_metadata, nullptr);
-  EXPECT_TRUE(config.transport_socket_match_metadata->filter_metadata().contains(
-      "envoy.transport_socket_match"));
+  EXPECT_THAT(config.transport_socket_match_metadata->filter_metadata(),
+              Contains(Key("envoy.transport_socket_match")));
   EXPECT_TRUE(config.transport_socket_match_metadata->filter_metadata()
                   .at("envoy.transport_socket_match")
                   .fields()

@@ -11,7 +11,6 @@ android_artifacts(
     name = "envoy_aar",
     android_library = ":envoy_lib",
     archive_name = "envoy",
-    manifest = "EnvoyManifest.xml",
     native_deps = select({
         "@envoy//bazel:opt_build": ["//library/jni:libenvoy_jni.so.debug_info"],
         "//conditions:default": ["//library/jni:libenvoy_jni.so"],
@@ -33,6 +32,7 @@ kt_android_library(
     custom_package = "io.envoyproxy.envoymobile",
     manifest = "EnvoyManifest.xml",
     visibility = ["//visibility:public"],
+    exports = [":envoy_interfaces_lib"],
     deps = [
         ":envoy_interfaces_lib",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",

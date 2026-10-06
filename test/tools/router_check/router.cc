@@ -139,7 +139,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
   auto config = *Router::ConfigImpl::create(route_config, *factory_context,
-                                            ProtobufMessage::getNullValidationVisitor(), false);
+                                            ProtobufMessage::getNullValidationVisitor(),
+                                            factory_context->initManager(), false);
   if (!disable_deprecation_check) {
     ProtobufMessage::StrictValidationVisitorImpl visitor;
     visitor.setRuntime(factory_context->runtime_loader_);
@@ -330,6 +331,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
         },
         [this](auto&... params) -> bool { return this->compareRedirectCode(params...); },
         [this](auto&... params) -> bool { return this->compareTimeout(params...); },
+        [this](auto&... params) -> bool { return this->compareRouteMetadata(params...); },
         [this](auto&... params) -> bool { return this->compareRequestHeaderFields(params...); },
         [this](auto&... params) -> bool { return this->compareResponseHeaderFields(params...); },
     };
@@ -544,6 +546,32 @@ bool RouterCheckTool::compareTimeout(ToolConfig& tool_config,
     *failure.mutable_expected_timeout() = expected.timeout();
     failure.mutable_actual_timeout()->set_seconds(actual / 1000);
     failure.mutable_actual_timeout()->set_nanos((actual % 1000) * 1000000);
+  }
+  return matches;
+}
+
+bool RouterCheckTool::compareRouteMetadata(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+    envoy::RouterCheckToolSchema::ValidationFailure&) {
+  if (expected.route_metadata().empty()) {
+    return true;
+  }
+  bool matches = true;
+  for (const auto& entry : expected.route_metadata()) {
+    std::string actual;
+    if (tool_config.route_ != nullptr) {
+      const auto& filter_metadata = tool_config.route_->metadata().filter_metadata();
+      const auto ns_it = filter_metadata.find(entry.namespace_());
+      if (ns_it != filter_metadata.end()) {
+        const auto key_it = ns_it->second.fields().find(entry.key());
+        if (key_it != ns_it->second.fields().end()) {
+          actual = key_it->second.string_value();
+        }
+      }
+    }
+    if (!compareResults(actual, entry.value(), "route_metadata")) {
+      matches = false;
+    }
   }
   return matches;
 }

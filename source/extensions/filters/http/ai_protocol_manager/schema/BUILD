@@ -9,6 +9,17 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "gemini_generate_content_lib",
+    srcs = ["gemini_generate_content.cc"],
+    hdrs = ["gemini_generate_content.h"],
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "openai_chat_completions_lib",
     srcs = ["openai_chat_completions.cc"],
     hdrs = ["openai_chat_completions.h"],
@@ -18,12 +29,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "schema_registry_lib",
-    srcs = ["schema_registry.cc"],
-    hdrs = ["schema_registry.h"],
+    name = "anthropic_messages_lib",
+    srcs = ["anthropic_messages.cc"],
+    hdrs = ["anthropic_messages.h"],
     deps = [
-        ":openai_chat_completions_lib",
         "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
-        "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
     ],
 )

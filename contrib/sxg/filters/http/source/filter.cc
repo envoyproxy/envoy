@@ -1,5 +1,6 @@
 #include "contrib/sxg/filters/http/source/filter.h"
 
+#include <format>
 #include <string>
 
 #include "envoy/http/codes.h"
@@ -22,8 +23,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (headers.Host() && headers.Path() && clientAcceptSXG(headers)) {
     client_accept_sxg_ = true;
     headers.setReference(xCanAcceptSxgKey(), xCanAcceptSxgValue());
-    auto origin = fmt::format("https://{}", headers.getHostValue());
-    auto url = fmt::format("{}{}", origin, headers.getPathValue());
+    auto origin = std::format("https://{}", headers.getHostValue());
+    auto url = std::format("{}{}", origin, headers.getPathValue());
     encoder_->setOrigin(origin);
     encoder_->setUrl(url);
     config_->stats().total_client_can_accept_sxg_.inc();

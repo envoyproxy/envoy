@@ -28,7 +28,7 @@ The redirect policy can be used to override the original response by internally 
 Local Response Policy
 #####################
 
-The local response policy can be used to override the original response with a locally stored response body. The policy config can be used to modify the response headers and the response status code.
+The local response policy can be used to override the original response with a locally stored response body. The policy config can be used to modify the response headers and the response status code. When the policy sends a local reply, :ref:`response code details <config_access_log_format_response_code_details>` are cleared by default. Set ``preserve_response_code_details: true`` to keep the reason that was already on the stream, or set ``response_code_details`` to replace it with a custom string. These options are mutually exclusive, omit both for legacy behavior.
 
 * This extension should be configued with the type URL ``type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy>`

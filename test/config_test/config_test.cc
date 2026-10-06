@@ -11,6 +11,7 @@
 #include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/server/config_validation/server.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/options_impl.h"
@@ -61,13 +62,18 @@ class ConfigTest {
 public:
   ConfigTest(OptionsImplBase& options)
       : api_(Api::createApiForTest(time_system_)),
-        ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()), options_(options) {
+        ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()), options_(options),
+        network_config_provider_manager_(
+            std::make_shared<Filter::NetworkFilterConfigProviderManagerImpl>()),
+        tcp_listener_config_provider_manager_(
+            std::make_shared<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {
     ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
     ON_CALL(server_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
+    ON_CALL(server_.api_, customStatNamespaces()).WillByDefault(ReturnRef(custom_stat_namespaces_));
     ON_CALL(server_.api_, threadFactory()).WillByDefault(Invoke([&]() -> Thread::ThreadFactory& {
       return api_->threadFactory();
     }));
@@ -135,10 +141,10 @@ public:
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                 Server::Configuration::FilterChainFactoryContext& context) {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-                  filters, context, network_config_provider_manager_);
+                  filters, context, *network_config_provider_manager_);
             }));
     ON_CALL(component_factory_, getTcpListenerConfigProviderManager())
-        .WillByDefault(Return(&tcp_listener_config_provider_manager_));
+        .WillByDefault(Return(tcp_listener_config_provider_manager_.get()));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
@@ -181,13 +187,15 @@ public:
   Server::ListenerManagerImpl listener_manager_{server_, std::move(component_factory_ptr_),
                                                 worker_factory_, false, server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
-  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
-  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
+  std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
 };
 
 void testMerge() {

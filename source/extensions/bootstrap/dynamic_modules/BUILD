@@ -24,8 +24,8 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/http:message_lib",
         "//source/common/init:target_lib",
-        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
     ],
 )
 

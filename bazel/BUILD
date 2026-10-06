@@ -1,36 +1,101 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
-load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
-load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
-load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
+load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load(":deprecated_features.bzl", "check_removed_fips_define")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load(":deprecated_features.bzl", "check_removed_fips_define", "check_removed_wasm_defines")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# TODO(jwendell): Remove after https://github.com/protocolbuffers/protobuf/issues/20760 is fixed.
+# Envoy has no first-class Java, but protobuf's Java tooling still needs a hermetic JDK and a
+# javabuilder workaround while https://github.com/protocolbuffers/protobuf/issues/20760 is open.
+# MODULE.bazel registers this compile toolchain plus the runtime toolchains below so downstream
+# bzlmod consumers get the same hermetic Java setup without copying .bazelrc flags.
 default_java_toolchain(
     name = "envoy_java_toolchain",
     java_runtime = "@rules_java//toolchains:remotejdk_25",
     javabuilder_jvm_opts = ["--sun-misc-unsafe-memory-access=allow"],
+    # protobuf-java's UnsafeUtil uses sun.misc.Unsafe memory accessors that JDK 23+ marks
+    # forRemoval (JEP 471). Compile-time counterpart of
+    # --sun-misc-unsafe-memory-access=allow above; remove once protobuf migrates off Unsafe.
+    misc = ["-Xlint:-removal"],
     source_version = "11",
     target_version = "11",
 )
+
+# Hermetic default Java runtime. Registered from MODULE.bazel so that consumers of @envoy do not
+# need to set --java_runtime_version / --tool_java_runtime_version. The
+# @rules_java//toolchains:remotejdk_25 target is a java_runtime_version_alias that resolves its
+# runtime via toolchain resolution, so these wrappers must point at the concrete per-platform
+# @remotejdk25_*//:jdk targets to avoid a self-cycle through runtime toolchain resolution.
+_JDK_PLATFORMS = {
+    "linux": [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    "linux_aarch64": [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+    "linux_ppc64le": [
+        "@platforms//os:linux",
+        "@platforms//cpu:ppc64le",
+    ],
+    "linux_s390x": [
+        "@platforms//os:linux",
+        "@platforms//cpu:s390x",
+    ],
+    "macos": [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+    "macos_aarch64": [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+    "win": [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+    ],
+    "win_arm64": [
+        "@platforms//os:windows",
+        "@platforms//cpu:aarch64",
+    ],
+}
+
+[
+    toolchain(
+        name = "envoy_java_runtime_toolchain_" + suffix,
+        target_compatible_with = constraints,
+        toolchain = "@remotejdk25_%s//:jdk" % suffix,
+        toolchain_type = "@bazel_tools//tools/jdk:runtime_toolchain_type",
+    )
+    for suffix, constraints in _JDK_PLATFORMS.items()
+]
+
+[
+    toolchain(
+        name = "envoy_java_bootstrap_runtime_toolchain_" + suffix,
+        target_compatible_with = constraints,
+        toolchain = "@remotejdk25_%s//:jdk" % suffix,
+        toolchain_type = "@bazel_tools//tools/jdk:bootstrap_runtime_toolchain_type",
+    )
+    for suffix, constraints in _JDK_PLATFORMS.items()
+]
 
 exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
-    "repository_locations.bzl",
     "deps.yaml",
+    "gazelle.patch",
+    "googleapis.patch",
+    "rules_go.patch",
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
 ])
@@ -79,6 +144,15 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
+)
+
+# For Windows, which must list each exported symbol individually.
+genrule(
+    name = "exported_symbols_windows",
+    srcs = ["//source/extensions/dynamic_modules/abi:abi.h"],
+    outs = ["exported_symbols_windows.def"],
+    cmd = "$(location //tools/windows:gen_dynamic_modules_exports) $(location //source/extensions/dynamic_modules/abi:abi.h) $@",
+    tools = ["//tools/windows:gen_dynamic_modules_exports"],
 )
 
 cc_library(
@@ -182,14 +256,6 @@ config_setting(
 )
 
 config_setting(
-    name = "local_asan_build",
-    flag_values = {
-        "@envoy_repo//:use_local_llvm_flag": "True",
-    },
-    values = {"define": "ENVOY_CONFIG_ASAN=1"},
-)
-
-config_setting(
     name = "tsan_build",
     values = {"define": "ENVOY_CONFIG_TSAN=1"},
 )
@@ -248,6 +314,16 @@ config_setting(
 bool_flag(
     name = "jemalloc",
     build_setting_default = False,
+)
+
+bool_flag(
+    name = "deprecated_repo_arg_allowed",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "deprecated_repo_arg_is_allowed",
+    flag_values = {":deprecated_repo_arg_allowed": "True"},
 )
 
 config_setting(
@@ -521,11 +597,6 @@ config_setting(
     values = {"define": "perf_tracing=enabled"},
 )
 
-config_setting(
-    name = "force_libcpp",
-    values = {"define": "force_libcpp=enabled"},
-)
-
 # SSL library selection using label_flag and bool_flag
 label_flag(
     name = "ssl",
@@ -535,6 +606,31 @@ label_flag(
 label_flag(
     name = "crypto",
     build_setting_default = "@boringssl//:crypto",
+)
+
+label_flag(
+    name = "test_main",
+    build_setting_default = "//test:main",
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "test_pch",
+    build_setting_default = "//test:test_pch",
+    visibility = ["//visibility:public"],
+)
+
+# wee8 engine: envoy_toolshed prebuilt by default, source for configs the
+# prebuilt is incompatible with (gcc libstdc++ ABI; sanitizers need instrumented deps).
+alias(
+    name = "wee8_engine",
+    actual = select({
+        ":gcc_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":asan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":msan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        "//conditions:default": "@envoy_toolshed//v8:wee8",
+    }),
 )
 
 bool_flag(
@@ -559,7 +655,7 @@ config_setting(
 
 config_setting(
     name = "using_boringssl_fips",
-    flag_values = {":ssl": "@boringssl_fips//:ssl"},
+    flag_values = {":ssl": "@boringssl-fips//:ssl"},
 )
 
 config_setting(
@@ -581,29 +677,38 @@ check_removed_fips_define(
     visibility = ["//visibility:public"],
 )
 
+check_removed_wasm_defines(
+    name = "check_removed_wasm_defines",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
 label_flag(
     name = "zlib",
     build_setting_default = "@zlib-ng",
 )
 
+# Wasm engine config settings. The single source of truth for engine selection
+# is @proxy-wasm-cpp-host//bazel:engine (a string_flag defined in that repo).
+# Use --@proxy-wasm-cpp-host//bazel:engine=<value> to select the engine.
 config_setting(
     name = "wasm_v8",
-    values = {"define": "wasm=v8"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "v8"},
 )
 
 config_setting(
     name = "wasm_wamr",
-    values = {"define": "wasm=wamr"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "wamr"},
 )
 
 config_setting(
     name = "wasm_wasmtime",
-    values = {"define": "wasm=wasmtime"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "wasmtime"},
 )
 
 config_setting(
     name = "wasm_disabled",
-    values = {"define": "wasm=disabled"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "disabled"},
 )
 
 # This config setting enables Universal Header Validator and disables
@@ -930,82 +1035,65 @@ selects.config_setting_group(
 )
 
 alias(
-    name = "remote_jdk11",
-    actual = "@rules_java//toolchains:remote_jdk11",
-)
-
-alias(
     name = "windows",
     actual = "@bazel_tools//src/conditions:windows",
 )
 
-json_data(
-    name = "repository_locations_version_info",
-    data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
-)
-
-json_merge(
-    name = "repository_locations",
-    srcs = [":repository_locations_version_info"],
-    filter = """
-    .[0] as $versions
-    | .[1] as $metadata
-    | $versions
-    | keys
-    | reduce .[] as $k ({};
-        . + {($k): (
-          ($versions[$k] + ($metadata[$k] // {}))
-          | .version as $ver
-          | if .license_url and $ver then
-              .license_url |= (
-                gsub("{version}"; $ver)
-                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
-                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
-              )
-            else . end
-        )}
-      )
-    """,
-    visibility = ["//visibility:public"],
-    yaml_srcs = [":deps.yaml"],
-)
-
-json_data(
-    name = "all_repository_locations_version_info",
-    data = merge_dicts(
-        load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
-        load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
-    ),
-)
-
 json_merge(
     name = "all_repository_locations",
-    srcs = [":all_repository_locations_version_info"],
+    srcs = [
+        "@envoy_mod_graph//:deps.json",
+    ],
     filter = """
-    .[0] as $versions
+    .
+    | .[0] as $modules
     | .[1] as $metadata1
     | .[2] as $metadata2
     | ($metadata1 * $metadata2) as $metadata
-    | $versions
-    | keys
-    | reduce .[] as $k ({};
-        . + {($k): (
-          ($versions[$k] + ($metadata[$k] // {}))
-          | .version as $ver
-          | if .license_url and $ver then
-              .license_url |= (
-                gsub("{version}"; $ver)
-                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
-                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
-              )
-            else . end
-        )}
-      )
+    | def module_source($dep):
+        if $modules[$dep] then
+          ($modules[$dep] + {module_name: $dep})
+        elif ($dep | startswith("com_google_")) and $modules[$dep | sub("^com_google_"; "")] then
+          (($dep | sub("^com_google_"; "")) as $m | $modules[$m] + {module_name: $m})
+        elif $modules[$dep | gsub("_"; "-")] then
+          ($dep | gsub("_"; "-")) as $m | $modules[$m] + {module_name: $m}
+        elif ($metadata[$dep].apparent_name // null) as $a | $a and $modules[$a] then
+          ($metadata[$dep].apparent_name) as $m | $modules[$m] + {module_name: $m}
+        else null end;
+      def dependency_source($dep):
+        module_source($dep);
+      $metadata
+      | keys
+      | reduce .[] as $k ({};
+          (dependency_source($k)) as $source
+          | if $source then
+              . + {($k): (
+                ($source + ($metadata[$k] // {}))
+                | .version as $ver
+                | if .license_url and $ver then
+                    .license_url |= (
+                      gsub("{version}"; $ver)
+                      | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
+                      | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
+                    )
+                  else . end
+              )}
+            else . + {($k): $metadata[$k]}
+            end
+        )
     """,
+    visibility = ["//visibility:public"],
     yaml_srcs = [
         ":deps.yaml",
         "@envoy_api//bazel:deps.yaml",
     ],
+)
+
+py_test(
+    name = "all_repository_locations_test",
+    srcs = ["all_repository_locations_test.py"],
+    args = ["$(location :all_repository_locations)"],
+    data = [":all_repository_locations"],
 )
 
 # A dependency required by python protobuf
@@ -1015,31 +1103,6 @@ json_merge(
 cc_library(
     name = "python_headers",
     visibility = ["//visibility:public"],
-)
-
-# These can be run as follows:
-#
-# $ bazel run //bazel:update ENVOY_DEP NEW_VERSION
-# $ bazel run //bazel:api-update API_DEP NEW_VERSION
-updater(
-    name = "update",
-    data = ["//tools/dependency:check"],
-    dependencies = "//tools/dependency:filtered-dependencies",
-    post_script = ":version_update_post.sh",
-    pydict = True,
-    tags = ["skip_on_windows"],
-    version_file = ":repository_locations.bzl",
-)
-
-updater(
-    name = "api-update",
-    data = ["//tools/dependency:check"],
-    dependencies = "@envoy_api//bazel:repository_locations",
-    post_script = ":version_update_post.sh",
-    pydict = True,
-    tags = ["skip_on_windows"],
-    version_file = "@envoy_api//bazel:repository_locations.bzl",
-    version_path_replace = "external/envoy_api:api",
 )
 
 cc_library(
@@ -1082,26 +1145,29 @@ config_setting(
     },
 )
 
-bool_flag(
-    name = "libc++",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "libc++_enabled",
-    flag_values = {
-        ":libc++": "True",
-    },
-)
-
-bool_flag(
-    name = "libstdc++",
-    build_setting_default = False,
-)
-
-config_setting(
+# The C++ standard library is derived from the compiler: clang and Apple builds use libc++,
+# gcc uses libstdc++. Other combinations (e.g. clang + libstdc++) are not supported; if you
+# need one you must provide your own cc_toolchain.
+alias(
     name = "libstdc++_enabled",
-    flag_values = {
-        ":libstdc++": "True",
-    },
+    actual = ":gcc_build",
+)
+
+selects.config_setting_group(
+    name = "libc++_enabled",
+    match_any = [
+        ":apple",
+        ":clang_build",
+    ],
+)
+
+# Back-compat for existing //bazel:force_libcpp label references.
+alias(
+    name = "force_libcpp",
+    actual = ":libc++_enabled",
+)
+
+alias(
+    name = "cpp_runfiles",
+    actual = "@bazel_tools//tools/cpp/runfiles",
 )

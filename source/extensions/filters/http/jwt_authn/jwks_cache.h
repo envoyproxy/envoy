@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/init/manager.h"
 
 #include "source/common/jwt/jwks.h"
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
@@ -109,8 +110,8 @@ public:
   // Factory function to create an instance.
   static absl::StatusOr<JwksCachePtr>
   create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
-         Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
-         JwtAuthnFilterStats& stats);
+         Server::Configuration::ServerFactoryContext& context, OptRef<Init::Manager> init_manager,
+         CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats);
 };
 
 } // namespace JwtAuthn

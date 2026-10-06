@@ -164,9 +164,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "drain_strategy_interface",
+    hdrs = ["drain_strategy.h"],
+)
+
+envoy_cc_library(
     name = "options_interface",
     hdrs = ["options.h"],
     deps = [
+        ":drain_strategy_interface",
         "//envoy/network:address_interface",
         "//envoy/stats:stats_interface",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -250,6 +256,8 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
+        "//envoy/http:http_filter_factory_context_interface",
+        "//envoy/init:manager_interface",
         "//envoy/server:transport_socket_config_interface",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/singleton:manager_interface",
@@ -257,6 +265,7 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
         "//source/common/common:macros",
         "//source/common/protobuf",
         "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
@@ -283,6 +292,7 @@ envoy_cc_library(
         "//envoy/filter:config_provider_manager_interface",
         "//envoy/network:address_interface",
         "//envoy/network:connection_handler_interface",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:socket_interface",
         "//envoy/network:socket_interface_interface",

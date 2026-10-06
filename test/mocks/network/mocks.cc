@@ -206,6 +206,8 @@ MockConnectionHandler::~MockConnectionHandler() = default;
 
 MockUdpListenerWorkerRouter::~MockUdpListenerWorkerRouter() = default;
 
+MockNonDispatchedUdpPacketHandler::~MockNonDispatchedUdpPacketHandler() = default;
+
 MockIp::MockIp() = default;
 MockIp::~MockIp() = default;
 

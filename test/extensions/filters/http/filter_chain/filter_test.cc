@@ -6,6 +6,7 @@
 
 #include "source/extensions/filters/http/filter_chain/config.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
@@ -26,6 +27,7 @@ using testing::ElementsAre;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 constexpr absl::string_view FilterConfigName = "envoy.filters.http.filter_chain";
 
@@ -96,8 +98,11 @@ public:
   const Router::RouteSpecificFilterConfig* makePerRoute(const std::string& yaml) {
     FilterChainConfigProtoPerRoute proto_per_route;
     TestUtility::loadFromYaml(yaml, proto_per_route);
-    auto config_or_error = factory_.createRouteSpecificFilterConfig(
-        proto_per_route, context_.serverFactoryContext(), context_.messageValidationVisitor());
+    const std::string empty_stats_prefix;
+    Server::Configuration::ExtraFactoryContext extra_context{context_.messageValidationVisitor(),
+                                                             empty_stats_prefix};
+    auto config_or_error = factory_.createHttpFilterRouteConfig(
+        proto_per_route, context_.serverFactoryContext(), extra_context);
     EXPECT_OK(config_or_error.status());
     per_route_configs_.push_back(config_or_error.value());
     return per_route_configs_.back().get();
@@ -299,6 +304,54 @@ TEST_F(FilterChainFactoryTest, IgnoresUnrelatedPerRouteConfig) {
   cb_(callbacks_);
   EXPECT_EQ(mock_factory_->filter_added_, 1);
   EXPECT_THAT(applied_filters_, ElementsAre("filter_a"));
+}
+
+// A per-route configuration released off the main thread hands its filter chain to the main
+// dispatcher rather than destroying it in place, because tearing down the chain's filter
+// configuration providers is not thread safe.
+TEST_F(FilterChainFactoryTest, PerRouteConfigReleasedOffMainThreadIsPostedToMainDispatcher) {
+  NiceMock<Event::MockDispatcher> main_dispatcher;
+  ON_CALL(main_dispatcher, isThreadSafe()).WillByDefault(Return(false));
+  ON_CALL(context_.server_factory_context_, mainThreadDispatcher())
+      .WillByDefault(ReturnRef(main_dispatcher));
+
+  makePerRoute(R"EOF(
+    filter_chain:
+      filters:
+      - name: filter_a
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF");
+
+  Event::PostCb posted;
+  EXPECT_CALL(main_dispatcher, post(_)).WillOnce(Invoke([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  }));
+  per_route_configs_.clear();
+  ASSERT_TRUE(posted != nullptr);
+
+  // Running the posted callback releases the chain on the main thread.
+  posted();
+}
+
+// A per-route configuration released on the main thread is destroyed in place, with nothing
+// posted to the dispatcher.
+TEST_F(FilterChainFactoryTest, PerRouteConfigReleasedOnMainThreadIsDestroyedInPlace) {
+  NiceMock<Event::MockDispatcher> main_dispatcher;
+  ON_CALL(main_dispatcher, isThreadSafe()).WillByDefault(Return(true));
+  ON_CALL(context_.server_factory_context_, mainThreadDispatcher())
+      .WillByDefault(ReturnRef(main_dispatcher));
+
+  makePerRoute(R"EOF(
+    filter_chain:
+      filters:
+      - name: filter_a
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF");
+
+  EXPECT_CALL(main_dispatcher, post(_)).Times(0);
+  per_route_configs_.clear();
 }
 
 } // namespace
