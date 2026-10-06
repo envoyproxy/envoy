@@ -557,7 +557,7 @@ private:
 
       proto_histogram->mutable_positive_delta()->Reserve(needed_indices.size());
       for (int32_t idx : needed_indices) {
-        // The upper bound of bucket idx is base^idx = 2^(idx * 2^-schema). ldexp() is exact and
+        // The upper bound of bucket idx is base^idx = 2^(idx * 2^-schema). `ldexp()` is exact and
         // exp2() of an integer is an exact power of two, so bounds that are powers of two are
         // exact. std::pow(base, idx) can land just below them, putting a value on the bound in the
         // next bucket.
@@ -660,8 +660,8 @@ private:
       // Clamp lower bound to zero_threshold to prevent log(0).
       const double effective_lower = std::max(bucket.lower_bound_, zero_threshold);
       // Prometheus bucket i covers (base^(i-1), base^i], so value v is in bucket
-      // ceil(log2(v) * 2^schema). log2() of a power of two and the ldexp() scaling are both exact,
-      // so a value exactly on a boundary maps to the bucket it is the upper bound of.
+      // ceil(log2(v) * 2^schema). log2() of a power of two and the `ldexp()` scaling are both
+      // exact, so a value exactly on a boundary maps to the bucket it is the upper bound of.
       const int32_t lower_index =
           static_cast<int32_t>(std::ceil(std::ldexp(std::log2(effective_lower), schema)));
       const int32_t upper_index =
