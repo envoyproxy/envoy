@@ -1408,6 +1408,7 @@ TEST(TranscodingEngineTest, RequestUriPatternLiftsFromTheClientsPath) {
   ctx.request_path = "/gateway/gemini-2.5-flash/chat-stream?key=x";
   ctx.request_uri_pattern = &*gateway;
   ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, gemini), IsOk());
+  EXPECT_TRUE(ctx.request_path_matched);
   EXPECT_EQ(gemini["model"], "gemini-2.5-flash");
   EXPECT_EQ(gemini["stream"], true);
   EXPECT_EQ(ctx.ir_model, "gemini-2.5-flash");
@@ -1417,6 +1418,7 @@ TEST(TranscodingEngineTest, RequestUriPatternLiftsFromTheClientsPath) {
       nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
   ctx.request_path = "/v1beta/models/gemini-2.5-flash:generateContent";
   ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, own_layout), IsOk());
+  EXPECT_FALSE(ctx.request_path_matched);
   EXPECT_FALSE(own_layout.contains("model"));
 
   const absl::StatusOr<UriPattern> vertex =

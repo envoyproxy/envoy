@@ -569,6 +569,10 @@ struct TranscodeContext {
   // must be sent to, which the caller applies along with the body. Every other request leg clears
   // it.
   std::optional<std::string> rewritten_path{};
+  // Set by a request `ToIr` leg: whether `request_path` matched the pattern the leg followed
+  // (`request_uri_pattern` or the dialect's own layout), and so had its model and streaming mode
+  // lifted. False when there was no pattern, or on any other leg.
+  bool request_path_matched{false};
 };
 
 // The rule sets for one payload kind of a dialect: `to_ir` converts the dialect into the IR

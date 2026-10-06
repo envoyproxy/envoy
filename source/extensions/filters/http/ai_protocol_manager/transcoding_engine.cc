@@ -2722,15 +2722,18 @@ const UriPattern* patternFor(const UriPattern* instruction,
 }
 
 // Request `ToIr`: writes what `request_path` names, per `pattern`, into the body, where the body
-// does not name it itself.
+// does not name it itself. Returns whether the path matched the pattern at all.
 //
 // TODO(ginama): `readGeminiTarget()` in the request_info AI filter's extractor.cc parses the same
 // paths for the same reason. Have it read them through the engine rather than keep its own copy.
-void liftFromRequestPath(const UriPattern& pattern, const PathFields& fields,
+bool liftFromRequestPath(const UriPattern& pattern, const PathFields& fields,
                          absl::string_view request_path, nlohmann::json& json) {
   const std::optional<UriPattern::Match> target = pattern.match(request_path);
-  if (!target.has_value() || !json.is_object()) {
-    return;
+  if (!target.has_value()) {
+    return false;
+  }
+  if (!json.is_object()) {
+    return true;
   }
   if (pattern.hasModel() && !json.contains(fields.model)) {
     json[fields.model] = target->model;
@@ -2738,6 +2741,7 @@ void liftFromRequestPath(const UriPattern& pattern, const PathFields& fields,
   if (target->stream && !json.contains(fields.stream)) {
     json[fields.stream] = true;
   }
+  return true;
 }
 
 // Request `FromIr`: renders `pattern` from what the body names, and, when `erase_fields`, moves
@@ -2785,10 +2789,11 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
   const PathFields fields = pathFields(envelope);
   const bool is_ir = pack.protocol == TranscodingEngine::kIrProtocol;
   ctx.rewritten_path.reset();
+  ctx.request_path_matched = false;
   if (direction == TranscodeDirection::ToIr) {
     // The rules then see what the path names as if the body had named it.
     if (const UriPattern* pattern = patternFor(ctx.request_uri_pattern, envelope)) {
-      liftFromRequestPath(*pattern, fields, ctx.request_path, json);
+      ctx.request_path_matched = liftFromRequestPath(*pattern, fields, ctx.request_path, json);
     }
     if (!is_ir) {
       absl::Status status = pack.request.to_ir.execute(json, &ctx);

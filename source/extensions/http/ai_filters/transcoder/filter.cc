@@ -289,13 +289,12 @@ absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstruction
   }
 
   // The model the client's path names is read again under the pattern it actually follows, for
-  // a response that needs it when no request leg of this instance reports the IR's.
+  // a response that needs it when no request leg of this instance reports the IR's. The pattern
+  // replaces the dialect's own layout outright, as it does in the engine: a path it does not
+  // match names no model.
   if (instructions.request_uri_pattern.has_value()) {
-    std::string model = config_->engine().modelFromRequestPath(
+    request_model_ = config_->engine().modelFromRequestPath(
         source_protocol_, request_headers_.getPathValue(), &*instructions.request_uri_pattern);
-    if (!model.empty()) {
-      request_model_ = std::move(model);
-    }
   }
   return instructions;
 }
@@ -322,6 +321,14 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
   if (!status.ok()) {
     config_->stats().failed_.inc();
     return status;
+  }
+  if (instructions.request_uri_pattern.has_value() && leg->direction == TranscodeDirection::ToIr &&
+      !ctx.request_path_matched) {
+    // The instruction was set on purpose, so a path it does not match is more likely a
+    // misconfiguration than intent. The request still goes through on what the body says.
+    ENVOY_LOG(debug, "transcoder: {} `{}` does not match the request path `{}`",
+              FilterStateKeys::UriPatternRequest, instructions.request_uri_pattern->source(),
+              ctx.request_path);
   }
   if (!ctx.ir_model.empty()) {
     request_model_ = std::move(ctx.ir_model);
