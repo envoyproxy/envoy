@@ -119,7 +119,7 @@ LogicalDnsCluster::LogicalDnsCluster(
 
 void LogicalDnsCluster::startPreInit() {
   startResolve();
-  if (!wait_for_warm_on_init_) {
+  if (!info()->waitForWarmOnInit()) {
     onPreInitComplete();
   }
 }

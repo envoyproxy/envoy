@@ -1743,7 +1743,6 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }),
       runtime_(cluster_context.serverFactoryContext().runtime()),
-      wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       random_(cluster_context.serverFactoryContext().api().randomGenerator()),
       local_cluster_(
           cluster_context.serverFactoryContext().clusterManager().localClusterName().value_or("") ==
