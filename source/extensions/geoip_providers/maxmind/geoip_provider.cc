@@ -186,6 +186,13 @@ GeoipProviderConfig::GeoipProviderConfig(
     setFieldKey(GeoField::AnonProxy, keys.anon_proxy());
     setFieldKey(GeoField::Isp, keys.isp());
     setFieldKey(GeoField::ApplePrivateRelay, keys.apple_private_relay());
+  };
+
+  if (common_config.has_geo_field_keys()) {
+    // Use geo_field_keys (preferred).
+    const auto& keys = common_config.geo_field_keys();
+    set_common_field_keys(keys);
+    // Extended fields — only available in geo_field_keys, not in the deprecated geo_headers_to_add.
     setFieldKey(GeoField::CityGeonameId, keys.city_geoname_id());
     setFieldKey(GeoField::Latitude, keys.latitude());
     setFieldKey(GeoField::Longitude, keys.longitude());
@@ -197,12 +204,6 @@ GeoipProviderConfig::GeoipProviderConfig(
     setFieldKey(GeoField::CountryGeonameId, keys.country_geoname_id());
     setFieldKey(GeoField::ContinentGeonameId, keys.continent_geoname_id());
     setFieldKey(GeoField::MetroCode, keys.metro_code());
-  };
-
-  if (common_config.has_geo_field_keys()) {
-    // Use geo_field_keys (preferred).
-    const auto& keys = common_config.geo_field_keys();
-    set_common_field_keys(keys);
   } else if (common_config.has_geo_headers_to_add()) {
     // Fall back to deprecated geo_headers_to_add for backward compatibility.
     const auto& headers = common_config.geo_headers_to_add();
