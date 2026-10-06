@@ -80,6 +80,7 @@ envoy_cc_library(
         "//envoy/api:io_error_interface",
         "//envoy/common:base_includes",
         "//envoy/common:random_generator_interface",
+        "//envoy/event:timer_interface",
         "//envoy/grpc:async_client_interface",
         "//envoy/network:address_interface",
         "//envoy/network:io_handle_interface",
