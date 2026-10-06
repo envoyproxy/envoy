@@ -168,7 +168,6 @@ protected:
     // Configure the reverse tunnel filter.
     envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
     rt_config.mutable_ping_interval()->set_seconds(ping_interval_seconds);
-    rt_config.set_auto_close_connections(true);
     rt_config.set_request_path("/reverse_connections/request");
     rt_config.set_request_method(envoy::config::core::v3::GET);
     std::ignore = rt_filter->mutable_typed_config()->PackFrom(rt_config);
@@ -752,9 +751,9 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MutualTLSSurvivesRpingKeepalive)
     };
 
     // 1s is the smallest usable ping_interval: the filter and socket manager both hold it as
-    // whole seconds, so sub-second values truncate to zero. configureReverseTunnelSetup enables
-    // auto_close_connections, so the handshake connection is closed after the 200 and the
-    // duplicated fd owns the idle tunnel.
+    // whole seconds, so sub-second values truncate to zero. The reverse_tunnel filter always
+    // detaches the handshake connection after the acceptance response, so the duplicated fd owns
+    // the idle tunnel.
     configureReverseTunnelSetup(bootstrap, loopback_addr, tunnel_listener_port, "test-node-id",
                                 "test-cluster-id", "test-tenant-id", tunnel_cluster_modifier,
                                 tunnel_listener_modifier, /*add_lua_host_id_filter=*/true,
@@ -953,7 +952,6 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
 
       envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
       rt_config.mutable_ping_interval()->set_seconds(60);
-      rt_config.set_auto_close_connections(true);
       rt_config.set_request_path("/reverse_connections/request");
       rt_config.set_request_method(envoy::config::core::v3::GET);
       std::ignore = rt_filter->mutable_typed_config()->PackFrom(rt_config);

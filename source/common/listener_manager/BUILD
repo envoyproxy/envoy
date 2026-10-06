@@ -131,7 +131,9 @@ envoy_cc_library(
     deps = [
         ":fcds_api_lib",
         ":filter_chain_factory_context_callback",
+        "//envoy/config:grpc_mux_interface",
         "//envoy/config:typed_metadata_interface",
+        "//envoy/config:xds_manager_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:schedulable_cb_interface",
         "//envoy/init:manager_interface",
@@ -141,6 +143,7 @@ envoy_cc_library(
         "//envoy/server:listener_manager_interface",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/common:empty_string",
+        "//source/common/config:resource_name_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
         "//source/common/matcher:matcher_lib",
