@@ -151,6 +151,8 @@ std::optional<UriPattern::Match> UriPattern::matchFrom(size_t first, absl::strin
     case Piece::Kind::Alternative: {
       // The stream side first: it commonly extends the unary one (`streamGenerateContent` does not,
       // but `converse-stream` extends `converse`), and a prefix match must take the longer.
+      // TODO(ginama): the query is ignored, so sides that differ only by query (`{|?stream=true}`)
+      // always match as streaming; when both paths are identical, decide by the request's query.
       const absl::string_view stream = withoutQuery(piece.stream_text);
       const absl::string_view unary = withoutQuery(piece.text);
       if (stream.size() >= unary.size() && absl::StartsWith(rest, stream)) {
