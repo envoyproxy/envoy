@@ -149,6 +149,10 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       filter_metadata_(config.has_filter_metadata() ? std::optional(config.filter_metadata())
                                                     : std::nullopt),
       emit_filter_state_stats_(config.emit_filter_state_stats()),
+      propagate_call_metadata_namespaces_(config.propagate_call_metadata_namespaces().begin(),
+                                          config.propagate_call_metadata_namespaces().end()),
+      propagate_call_filter_state_keys_(config.propagate_call_filter_state_keys().begin(),
+                                        config.propagate_call_filter_state_keys().end()),
       enforce_response_header_limits_(config.enforce_response_header_limits()),
       filter_enabled_(config.has_filter_enabled()
                           ? std::optional<Runtime::FractionalPercent>(
@@ -199,6 +203,22 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
     creation_status =
         absl::InvalidArgumentError("Invalid duplicate configuration for allowed_headers.");
     return;
+  }
+
+  for (const auto& ns : propagate_call_metadata_namespaces_) {
+    if (ns.empty()) {
+      creation_status = absl::InvalidArgumentError(
+          "ext_authz: propagate_call_metadata_namespaces entries must be non-empty.");
+      return;
+    }
+  }
+
+  for (const auto& key : propagate_call_filter_state_keys_) {
+    if (key.empty()) {
+      creation_status = absl::InvalidArgumentError(
+          "ext_authz: propagate_call_filter_state_keys entries must be non-empty.");
+      return;
+    }
   }
 
   // An unset request_headers_matchers_ means that all client request headers are allowed through
@@ -686,6 +706,53 @@ void Filter::updateLoggingInfo(const std::optional<Grpc::Status::GrpcStatus>& gr
   }
 }
 
+void Filter::propagateCallState() {
+  if (config_->propagateCallMetadataNamespaces().empty() &&
+      config_->propagateCallFilterStateKeys().empty()) {
+    return;
+  }
+  // Read the stream that actually served this Check call; state a custom callout-cluster load
+  // balancer wrote there is otherwise invisible to the downstream request.
+  auto const* call_stream_info =
+      active_client_ ? active_client_->streamInfo() : client_->streamInfo();
+  if (call_stream_info == nullptr) {
+    return;
+  }
+  propagateCallDynamicMetadata(*call_stream_info);
+  propagateCallFilterState(*call_stream_info);
+}
+
+void Filter::propagateCallDynamicMetadata(const StreamInfo::StreamInfo& call_stream_info) {
+  const auto& call_metadata = call_stream_info.dynamicMetadata().filter_metadata();
+  for (const auto& metadata_namespace : config_->propagateCallMetadataNamespaces()) {
+    auto it = call_metadata.find(metadata_namespace);
+    if (it != call_metadata.end()) {
+      decoder_callbacks_->streamInfo().setDynamicMetadata(metadata_namespace, it->second);
+    }
+  }
+}
+
+void Filter::propagateCallFilterState(const StreamInfo::StreamInfo& call_stream_info) {
+  const auto& filter_state_keys = config_->propagateCallFilterStateKeys();
+  if (filter_state_keys.empty()) {
+    return;
+  }
+  // getDataSharedMutableGeneric hands back the object by shared pointer; the call's StreamInfo is
+  // exposed as const through the async-client interface, so const_cast to reach that getter.
+  auto& call_filter_state = const_cast<StreamInfo::FilterState&>(call_stream_info.filterState());
+  const auto& downstream_filter_state = decoder_callbacks_->streamInfo().filterState();
+  for (const auto& key : filter_state_keys) {
+    // Leave any object the downstream request already carries under this key untouched.
+    if (downstream_filter_state->hasDataWithName(key)) {
+      continue;
+    }
+    auto object = call_filter_state.getDataSharedMutableGeneric(key);
+    if (object != nullptr) {
+      downstream_filter_state->setData(key, object, StreamInfo::FilterState::LifeSpan::Request);
+    }
+  }
+}
+
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
   encoder_callbacks_ = &callbacks;
 }
@@ -717,6 +784,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   updateLoggingInfo(response->grpc_status);
+  propagateCallState();
   active_client_ = nullptr;
 
   if (response->saw_invalid_append_actions) {

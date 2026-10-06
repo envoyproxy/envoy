@@ -277,6 +277,14 @@ public:
 
   bool emitFilterStateStats() const { return emit_filter_state_stats_; }
 
+  const std::vector<std::string>& propagateCallMetadataNamespaces() const {
+    return propagate_call_metadata_namespaces_;
+  }
+
+  const std::vector<std::string>& propagateCallFilterStateKeys() const {
+    return propagate_call_filter_state_keys_;
+  }
+
   bool enforceResponseHeaderLimits() const { return enforce_response_header_limits_; }
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
@@ -335,6 +343,8 @@ private:
   LabelsMap destination_labels_;
   const std::optional<Protobuf::Struct> filter_metadata_;
   const bool emit_filter_state_stats_;
+  const std::vector<std::string> propagate_call_metadata_namespaces_;
+  const std::vector<std::string> propagate_call_filter_state_keys_;
   const bool enforce_response_header_limits_;
 
   const std::optional<Runtime::FractionalPercent> filter_enabled_;
@@ -551,6 +561,14 @@ private:
   void setShadowFilterState(Filters::Common::ExtAuthz::Response& response);
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const std::optional<Grpc::Status::GrpcStatus>& grpc_status);
+  // Resolves the Check call's own stream and copies the configured state from it onto the
+  // downstream request, so state produced during the call (e.g. by a custom callout-cluster load
+  // balancer) is visible to downstream access logs and filters.
+  void propagateCallState();
+  // Copies the configured dynamic metadata namespaces from the Check call's stream downstream.
+  void propagateCallDynamicMetadata(const StreamInfo::StreamInfo& call_stream_info);
+  // Copies the configured FilterState keys from the Check call's stream downstream.
+  void propagateCallFilterState(const StreamInfo::StreamInfo& call_stream_info);
   void updateEffect(const Filters::Common::ProcessingEffect::Effect effect);
 
   // This holds a set of flags defined in per-route configuration.
