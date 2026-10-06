@@ -112,9 +112,9 @@ absl::Status RCConnectionWrapper::connect(const std::string& src_tenant_id,
   absl::string_view tenant_id = src_tenant_id;
   absl::string_view cluster_id = src_cluster_id;
   absl::string_view node_id = src_node_id;
-  // EnvoyInternal remote clusters are rejected before the dial because the user-space handle cannot
-  // be duplicated for the accepted tunnel, so the remote address is always a real network address.
-  const std::string host_value = connection_->connectionInfoProvider().remoteAddress()->asString();
+  // EnvoyInternal remote clusters are rejected before the dial, so the remote address is always a
+  // real network address.
+  const std::string& host_value = connection_->connectionInfoProvider().remoteAddress()->asString();
   const Http::LowerCaseString& node_hdr =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelNodeIdHeader();
   const Http::LowerCaseString& cluster_hdr =

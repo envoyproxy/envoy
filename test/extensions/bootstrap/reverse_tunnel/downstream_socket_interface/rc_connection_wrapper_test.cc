@@ -258,53 +258,6 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeSuccess) {
   EXPECT_TRUE(result.ok());
 }
 
-// Test RCConnectionWrapper::connect() method with HTTP proxy (internal address) scenario.
-TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithHttpProxy) {
-  // Create a mock connection.
-  auto mock_connection = getDeletableConn(dispatcher_);
-
-  // Set up connection expectations.
-  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
-  EXPECT_CALL(*mock_connection, addReadFilter(_));
-  EXPECT_CALL(*mock_connection, connect());
-  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
-  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
-
-  // Set up socket expectations for internal address (HTTP proxy scenario).
-  auto mock_internal_address = std::make_shared<Network::Address::EnvoyInternalInstance>(
-      "internal_listener_name", "endpoint_id_123");
-  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
-
-  // Set up connection info provider expectations with internal address.
-  EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke(
-          [mock_internal_address, mock_local_address]() -> const Network::ConnectionInfoProvider& {
-            static auto mock_provider = std::make_unique<Network::ConnectionInfoSetterImpl>(
-                mock_local_address, mock_internal_address);
-            return *mock_provider;
-          }));
-
-  // Capture the written buffer to verify HTTP request and simulate kernel drain.
-  Buffer::OwnedImpl captured_buffer;
-  EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
-        captured_buffer.add(buffer);
-        buffer.drain(buffer.length());
-      }));
-
-  // Create a mock host.
-  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-
-  // Create RCConnectionWrapper with the mock connection.
-  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
-
-  // Call connect() method.
-  const absl::Status result = wrapper.connect("test-tenant", "test-cluster", "test-node");
-
-  // The handshake request was dispatched successfully.
-  EXPECT_TRUE(result.ok());
-}
-
 // Test RCConnectionWrapper::connect() honors custom request paths.
 TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithCustomRequestPath) {
   auto mock_connection = getDeletableConn(dispatcher_);

@@ -435,6 +435,35 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowAccepts) {
   EXPECT_EQ(1, accepted->value());
 }
 
+// Identifiers at the 255-byte limit enforced by the initiator resolver are accepted here, so that
+// bound never produces a handshake header the acceptor would reject.
+TEST_F(ReverseTunnelFilterUnitTest, FullFlowAcceptsMaxLengthIdentifiers) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_OK(config_or_error);
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+
+  const std::string max_id(255, 'a');
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", max_id, max_id, max_id));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
+  ASSERT_NE(nullptr, accepted);
+  EXPECT_EQ(1, accepted->value());
+}
+
 TEST_F(ReverseTunnelFilterUnitTest, FullFlowMissingHeadersIsBadRequest) {
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;

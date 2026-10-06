@@ -8,11 +8,9 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 namespace {
-// Upper bound on each reverse connection identifier. Identifiers flow into stat names, access log
-// fields, and handshake header values, so a bound keeps those outputs finite.
+// Identifiers flow into stat names, log fields, and handshake headers, so bound their length.
 constexpr size_t kMaxIdentifierLength = 255;
-// Bounds on the per-host connection count. One tick dials inline, so an unbounded count would stall
-// the worker, and zero connections is never useful.
+// One maintenance tick dials inline, so bound the per-host count; zero connections is never useful.
 constexpr uint32_t kMinConnectionCount = 1;
 constexpr uint32_t kMaxConnectionCount = 1024;
 
@@ -119,8 +117,7 @@ ReverseConnectionResolver::extractReverseConnectionConfig(
     return absl::InvalidArgumentError("Remote cluster name cannot be empty");
   }
 
-  // Each identifier is carried in a handshake header, so reject values that cannot be sent or that
-  // would make stat names and log fields unbounded.
+  // Validate every parsed identifier.
   for (const auto& [field, value] :
        {std::pair<absl::string_view, absl::string_view>{"source node ID", source_parts[0]},
         {"source cluster ID", source_parts[1]},

@@ -220,6 +220,37 @@ TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigIdentifierIn
                                 testing::HasSubstr("invalid in an HTTP header value")));
 }
 
+// The lower bound of the supported connection count range is accepted.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigCountMin) {
+  auto socket_address = createSocketAddress(
+      createReverseConnectionAddress("node", "cluster", "tenant", "remote-cluster", 1));
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_OK(result);
+  EXPECT_EQ(result.value().connection_count, 1);
+}
+
+// The upper bound of the supported connection count range is accepted.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigCountMax) {
+  auto socket_address = createSocketAddress(
+      createReverseConnectionAddress("node", "cluster", "tenant", "remote-cluster", 1024));
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_OK(result);
+  EXPECT_EQ(result.value().connection_count, 1024);
+}
+
+// A 255-byte identifier sits on the limit and is accepted.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigIdentifierAtLimit) {
+  const std::string max_id(255, 'a');
+  auto socket_address = createSocketAddress(
+      createReverseConnectionAddress(max_id, "cluster", "tenant", "remote-cluster", 5));
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_OK(result);
+  EXPECT_EQ(result.value().src_node_id, max_id);
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
