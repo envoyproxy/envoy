@@ -83,7 +83,12 @@ public:
       auto handle_or_error = fcds_manager->subscribe(
           context.fcds_config_source_, name, context.fcds_callbacks_, context.init_manager_);
       THROW_IF_NOT_OK(handle_or_error.status());
-      return std::make_shared<DynamicFilterChainAction>(std::move(handle_or_error).value());
+      auto handle = std::move(handle_or_error).value();
+      // Record the handle so the owning manager can report this listener's routable FCDS chains.
+      if (context.fcds_handles_sink_ != nullptr) {
+        context.fcds_handles_sink_->push_back(handle);
+      }
+      return std::make_shared<DynamicFilterChainAction>(std::move(handle));
     }
     return std::make_shared<NoopFilterChainAction>();
   }
@@ -342,6 +347,7 @@ absl::Status FilterChainManagerImpl::maybeConstructMatcher(
   // Discover FCDS filter chain names by filtering inlined names from the actions.
   if (filter_chain_matcher) {
     filter_chains_by_name_ = std::move(filter_chains_by_name);
+    fcds_handles_.clear();
     FilterChain::FilterChainNameActionValidationVisitor validation_visitor;
     FilterChainActionFactoryContext action_factory_context{
         .server_ = parent_context.serverFactoryContext(),
@@ -351,6 +357,7 @@ absl::Status FilterChainManagerImpl::maybeConstructMatcher(
         .fcds_callbacks_ = fcds_callbacks,
         .fcds_config_source_ = fcds_config_source,
         .init_manager_ = init_manager_,
+        .fcds_handles_sink_ = &fcds_handles_,
     };
     // MatchTreeFactory::create doesn't have an exception-free variant.
     TRY_NEEDS_AUDIT {
@@ -616,6 +623,28 @@ makeCidrListEntry(const std::string& cidr, const T& data, absl::Status& creation
 }
 
 }; // namespace
+
+std::vector<absl::string_view> FilterChainManagerImpl::filterChainNames() const {
+  std::vector<absl::string_view> names;
+  names.reserve(fc_contexts_.size() + fcds_handles_.size() + 1);
+  for (const auto& [proto, chain] : fc_contexts_) {
+    if (!chain->name().empty()) {
+      names.push_back(chain->name());
+    }
+  }
+  if (default_filter_chain_ != nullptr && !default_filter_chain_->name().empty()) {
+    names.push_back(default_filter_chain_->name());
+  }
+  // FCDS chains this listener's matcher references. Report a name only when its subscription is
+  // committed (active): the chain is then both routable via this listener and active, matching the
+  // inline-chain invariant so a pod is not observed ready before its netns routing is installed.
+  for (const auto& handle : fcds_handles_) {
+    if (handle->isActive()) {
+      names.push_back(handle->filterChainName());
+    }
+  }
+  return names;
+}
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket,
@@ -1058,6 +1087,12 @@ public:
     return shared_manager_->findThreadLocalFilterChain(filter_chain_name_);
   }
 
+  absl::string_view filterChainName() const override { return filter_chain_name_; }
+
+  bool isActive() const override {
+    return shared_manager_->isFilterChainActive(filter_chain_name_);
+  }
+
   ~FcdsSubscriptionHandleImpl() override {
     shared_manager_->unsubscribe(filter_chain_name_, *this);
   }
@@ -1198,6 +1233,13 @@ void FcdsSharedFilterChainManager::updateTlsState() {
   tls_slot_->set([filter_chains](Event::Dispatcher&) { return filter_chains; });
   // Resume filter chain discovery now that the update is posted to workers.
   xds_pause_.reset();
+}
+
+bool FcdsSharedFilterChainManager::isFilterChainActive(const std::string& filter_chain_name) const {
+  // A subscription's committed chain is non-null exactly when it is active (same test
+  // updateTlsState() uses to publish the active set to workers).
+  auto it = subscriptions_.find(filter_chain_name);
+  return it != subscriptions_.end() && it->second->api_->filterChain() != nullptr;
 }
 
 } // namespace Server
