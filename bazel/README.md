@@ -233,6 +233,11 @@ The `envoy_llvm.host(path = ...)` extension detects the installed LLVM version b
 `bin/clang --version`. Its optional `llvm_version` attribute can be set to cross-check the detected
 major version. This mechanism supports host LLVM versions other than 22; the separate
 `toolchains_llvm` toolchain's `llvm_version` must also match the installed host version.
+If `path` is omitted, the installation is taken from the `BAZEL_LLVM_PATH` or `BAZEL_LLVM`
+environment variable.
+
+Windows builds always use the host LLVM, as if `envoy_llvm.host()` was specified without a `path`,
+so `BAZEL_LLVM` (which the Windows clang-cl toolchain also uses) or `BAZEL_LLVM_PATH` must be set.
 
 **Note:** Building with host-provided toolchains is **not supported** by the Envoy project. The
 hermetic toolchain remains the supported default. Other host tools may fail depending on the build
