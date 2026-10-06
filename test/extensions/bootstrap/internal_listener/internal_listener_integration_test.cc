@@ -272,6 +272,39 @@ TEST_P(InternalListenerResetIntegrationTest, UpstreamRstPropagation) {
   auto log_result = waitForAccessLog(real_access_log_path_);
   EXPECT_THAT(log_result, testing::Eq("RemoteReset"));
 }
+
+// Verifies that when downstream sends half-close (FIN) across the internal listener, followed by
+// a full close from the upstream, both listeners detect a Normal close rather than RemoteReset.
+TEST_P(InternalListenerResetIntegrationTest, DownstreamHalfClosePreservesNormalClose) {
+  setupAccessLog();
+  enableHalfClose(true);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("real_listener"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Downstream sends data with end_stream=true (half-close).
+  ASSERT_TRUE(tcp_client->write("hello", /*end_stream=*/true));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+
+  // Upstream sends response data and closes gracefully.
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  ASSERT_TRUE(fake_upstream_connection->close(Network::ConnectionCloseType::FlushWrite));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Downstream should receive response data and disconnect.
+  tcp_client->waitForData("world");
+  tcp_client->waitForDisconnect();
+
+  // Internal listener should detect a normal downstream close, NOT RemoteReset.
+  auto internal_log = waitForAccessLog(internal_access_log_path_);
+  EXPECT_THAT(internal_log, testing::Eq("Normal"));
+  // Real listener should detect a normal upstream close, NOT RemoteReset.
+  auto real_log = waitForAccessLog(real_access_log_path_);
+  EXPECT_THAT(real_log, testing::Eq("Normal"));
+}
 #endif
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerResetIntegrationTest,

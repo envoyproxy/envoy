@@ -75,6 +75,11 @@ jobs:
     secrets:
       dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
       dockerhub-write-token: ${{ secrets.DOCKERHUB_WRITE_TOKEN }}
+      gcp-docs-archive-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.GCP_DOCS_ARCHIVE_KEY
+            || '' }}
       ENVOY_CI_SYNC_APP_ID: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)

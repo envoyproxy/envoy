@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -28,10 +27,11 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "file_content_integration_test",
     size = "large",
     srcs = ["file_content_integration_test.cc"],
+    extension_names = ["envoy.formatter.file_content"],
     rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",

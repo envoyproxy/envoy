@@ -5,9 +5,12 @@
 
 #include "envoy/data/ai/v3/request_info.pb.h"
 #include "envoy/extensions/http/ai_filters/request_info/v3/request_info.pb.h"
+#include "envoy/router/string_accessor.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
@@ -37,6 +40,7 @@ using HttpFilters::AiProtocolManager::FilterManager;
 using HttpFilters::AiProtocolManager::InMemoryExternalBufferFactory;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LLMProtocol;
+namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 
 constexpr absl::string_view DefaultNamespace = "envoy.ai.request_info";
 
@@ -49,9 +53,14 @@ public:
 
   ~RequestInfoFilterTest() override { buffer_manager_.onDestroy(); }
 
-  RequestInfoFilterConfigSharedPtr makeConfig(const std::string& metadata_namespace = "") {
+  RequestInfoFilterConfigSharedPtr
+  makeConfig(const std::string& metadata_namespace = "",
+             std::optional<double> tokens_per_byte = std::nullopt) {
     envoy::extensions::http::ai_filters::request_info::v3::RequestInfo proto;
     proto.set_metadata_namespace(metadata_namespace);
+    if (tokens_per_byte.has_value()) {
+      proto.mutable_token_estimation()->set_tokens_per_byte(*tokens_per_byte);
+    }
     return std::make_shared<const RequestInfoFilterConfig>(proto, *stats_store_.rootScope());
   }
 
@@ -66,16 +75,19 @@ public:
     std::vector<AiFilterSharedPtr> filters;
     filters.push_back(std::make_unique<RequestInfoFilter>(
         config != nullptr ? std::move(config) : makeConfig(),
-        AiFilterContext{stream_info_, request_headers_, protocol}));
+        AiFilterContext{stream_info_, request_headers_, protocol, payload.size()}));
     FilterManager manager(std::move(filters));
 
     absl::Status status;
     bool completed = false;
-    manager.startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
-                         [&status, &completed](absl::Status s) {
-                           status = std::move(s);
-                           completed = true;
-                         });
+    manager.startRequest(
+        std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+        [&status, &completed](absl::Status s) {
+          status = std::move(s);
+          completed = true;
+        },
+        /*request_headers=*/nullptr, /*local_reply_fn=*/nullptr, /*always_serialize=*/true,
+        protocol);
     for (int i = 0; i < 20; ++i) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
@@ -94,6 +106,12 @@ public:
     envoy::data::ai::v3::RequestInfo record;
     EXPECT_TRUE(it->second.UnpackTo(&record));
     return record;
+  }
+
+  std::optional<std::string> storedModel() {
+    const auto* model = stream_info_.filterState()->getDataReadOnly<Router::StringAccessor>(
+        FilterStateKeys::ModelRequest);
+    return model != nullptr ? std::make_optional(std::string(model->asString())) : std::nullopt;
   }
 
   uint64_t counterValue(const std::string& name) {
@@ -135,6 +153,62 @@ TEST_F(RequestInfoFilterTest, PublishesTypedRecordAndForwardsPayloadUnchanged) {
   EXPECT_EQ(counterValue("duplicate"), 0);
 }
 
+TEST_F(RequestInfoFilterTest, StoresModelInFilterState) {
+  run(R"({"model":"gpt-4o","messages":[]})", LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(storedModel(), "gpt-4o");
+  const auto* object =
+      stream_info_.filterState()->getDataReadOnlyGeneric(FilterStateKeys::ModelRequest);
+  ASSERT_NE(object, nullptr);
+  EXPECT_EQ(object->serializeAsString(), "gpt-4o");
+}
+
+// The object was set with a wider life span than the filter's, so writing over it would be an
+// access violation.
+TEST_F(RequestInfoFilterTest, KeepsModelSetAhead) {
+  stream_info_.filterState()->setData(FilterStateKeys::ModelRequest,
+                                      std::make_shared<Router::StringAccessorImpl>("alias"),
+                                      StreamInfo::FilterState::LifeSpan::Request);
+  run(R"({"model":"gpt-4o"})", LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(storedModel(), "alias");
+  EXPECT_EQ(published()->model(), "gpt-4o");
+}
+
+TEST_F(RequestInfoFilterTest, NoEstimateUnlessTokenEstimationIsConfigured) {
+  run(R"({"model":"gpt-4o"})", LLMProtocol::OpenAiChatCompletions);
+  const auto record = published();
+  ASSERT_TRUE(record.has_value());
+  EXPECT_FALSE(record->has_estimated_input_tokens());
+}
+
+TEST_F(RequestInfoFilterTest, EstimatesInputTokensFromPayloadBytes) {
+  const std::string payload = R"({"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]})";
+  run(payload, LLMProtocol::OpenAiChatCompletions, "/v1/chat/completions",
+      makeConfig("", /*tokens_per_byte=*/0.5));
+  const auto record = published();
+  ASSERT_TRUE(record.has_value());
+  EXPECT_EQ(record->estimated_input_tokens().value(), (payload.size() + 1) / 2);
+}
+
+TEST_F(RequestInfoFilterTest, PartialTokenRoundsUp) {
+  run(R"({"model":"gpt-4o"})", LLMProtocol::OpenAiChatCompletions, "/v1/chat/completions",
+      makeConfig("", /*tokens_per_byte=*/0.001));
+  const auto record = published();
+  ASSERT_TRUE(record.has_value());
+  EXPECT_EQ(record->estimated_input_tokens().value(), 1);
+}
+
+// The estimate reads no JSON, so it is published where the extractor reads almost nothing.
+TEST_F(RequestInfoFilterTest, EstimatePublishedWithoutDeclaredProtocol) {
+  const std::string payload = R"({"model":"gpt-4o"})";
+  run(payload, LLMProtocol::Unspecified, "/v1/chat/completions",
+      makeConfig("", /*tokens_per_byte=*/0.25));
+  const auto record = published();
+  ASSERT_TRUE(record.has_value());
+  EXPECT_EQ(record->input_llm_protocol(), envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED);
+  EXPECT_EQ(record->estimated_input_tokens().value(),
+            static_cast<uint64_t>((payload.size() + 3) / 4));
+}
+
 TEST_F(RequestInfoFilterTest, AbsentAttributesAreLeftUnset) {
   run(R"({"messages":[]})", LLMProtocol::AnthropicMessages, "/v1/messages");
   const auto record = published();
@@ -145,6 +219,7 @@ TEST_F(RequestInfoFilterTest, AbsentAttributesAreLeftUnset) {
   EXPECT_FALSE(record->has_max_output_tokens());
   EXPECT_EQ(record->message_count().value(), 0);
   EXPECT_FALSE(record->has_tool_count());
+  EXPECT_FALSE(storedModel().has_value());
 }
 
 TEST_F(RequestInfoFilterTest, FlagsPartialWhenAnAttributeIsUnusable) {
@@ -153,6 +228,7 @@ TEST_F(RequestInfoFilterTest, FlagsPartialWhenAnAttributeIsUnusable) {
   ASSERT_TRUE(record.has_value());
   EXPECT_TRUE(record->model().empty());
   EXPECT_TRUE(record->stream().value());
+  EXPECT_FALSE(storedModel().has_value());
   EXPECT_EQ(counterValue("published"), 1);
   EXPECT_EQ(counterValue("partial"), 1);
 }
@@ -168,6 +244,7 @@ TEST_F(RequestInfoFilterTest, ReadsGeminiTargetFromRequestPath) {
   EXPECT_TRUE(record->stream().value());
   EXPECT_EQ(record->max_output_tokens().value(), 32);
   EXPECT_EQ(record->message_count().value(), 1);
+  EXPECT_EQ(storedModel(), "gemini-2.5-pro");
 }
 
 TEST_F(RequestInfoFilterTest, UnspecifiedProtocolPublishesSharedAttributesOnly) {

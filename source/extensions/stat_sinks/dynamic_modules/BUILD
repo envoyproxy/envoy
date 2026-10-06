@@ -59,6 +59,7 @@ envoy_cc_library(
         "//envoy/stats:sink_interface",
         "//source/common/common:assert_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@abseil-cpp//absl/cleanup",
     ],
 )
 

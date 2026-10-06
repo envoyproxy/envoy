@@ -47,12 +47,11 @@ std::vector<std::string> stringsFromGoSlice(void* slice_data, int slice_len) {
   return list;
 }
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace {
 
-CAPIStatus envoyGoFilterProcessStateHandlerWrapper(
-    void* s, std::function<CAPIStatus(std::shared_ptr<Filter>&, ProcessorState&)> f) {
+// The handlers are templates rather than std::function parameters: most callbacks capture more
+// than the std::function small buffer can hold, which would heap allocate on every cgo call.
+template <class F> CAPIStatus envoyGoFilterProcessStateHandlerWrapper(void* s, const F& f) {
   auto state = static_cast<ProcessorState*>(reinterpret_cast<processState*>(s));
   if (!state->isProcessingInGo()) {
     return CAPIStatus::CAPINotInGo;
@@ -65,8 +64,7 @@ CAPIStatus envoyGoFilterProcessStateHandlerWrapper(
   return CAPIStatus::CAPIFilterIsGone;
 }
 
-CAPIStatus envoyGoFilterHandlerWrapper(void* r,
-                                       std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
+template <class F> CAPIStatus envoyGoFilterHandlerWrapper(void* r, const F& f) {
   auto req = reinterpret_cast<HttpRequestInternal*>(r);
   auto weak_filter = req->weakFilter();
   if (auto filter = weak_filter.lock()) {
@@ -81,8 +79,7 @@ CAPIStatus envoyGoFilterHandlerWrapper(void* r,
   return CAPIStatus::CAPIFilterIsGone;
 }
 
-CAPIStatus
-envoyGoConfigHandlerWrapper(void* c, std::function<CAPIStatus(std::shared_ptr<FilterConfig>&)> fc) {
+template <class F> CAPIStatus envoyGoConfigHandlerWrapper(void* c, const F& fc) {
   auto config = reinterpret_cast<httpConfigInternal*>(c);
   auto weak_filter_config = config->weakFilterConfig();
   if (auto filter_config = weak_filter_config.lock()) {
@@ -90,6 +87,12 @@ envoyGoConfigHandlerWrapper(void* c, std::function<CAPIStatus(std::shared_ptr<Fi
   }
   return CAPIStatus::CAPIFilterIsGone;
 }
+
+} // namespace
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 CAPIStatus envoyGoFilterHttpContinue(void* s, int status) {
   return envoyGoFilterProcessStateHandlerWrapper(

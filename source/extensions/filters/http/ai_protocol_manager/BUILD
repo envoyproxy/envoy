@@ -15,7 +15,9 @@ envoy_cc_library(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/common:pure_lib",
+        "//envoy/config:typed_config_interface",
         "//envoy/event:dispatcher_interface",
+        "//envoy/server:factory_context_interface",
         "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
@@ -123,6 +125,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ai_filter_state_lib",
+    srcs = ["ai_filter_state.cc"],
+    hdrs = ["ai_filter_state.h"],
+    deps = [
+        ":llm_protocol_conversion_lib",
+        ":token_usage_lib",
+        "//envoy/registry",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/router:string_accessor_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "llm_protocol_adapters_lib",
     srcs = ["llm_protocol_adapters.cc"],
     deps = [
@@ -179,10 +195,31 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "transcoding_engine_lib",
+    srcs = ["transcoding_engine.cc"],
+    hdrs = ["transcoding_engine.h"],
+    deps = [
+        ":json_with_ext_buf_lib",
+        ":llm_protocol_adapters_lib",
+        ":schema_lib",
+        ":token_usage_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
     name = "ai_request_lib",
     hdrs = ["ai_request.h"],
     deps = [
         ":json_with_ext_buf_lib",
+        ":token_usage_lib",
         "@nlohmann_json//:json",
     ],
 )
@@ -342,6 +379,7 @@ envoy_cc_library(
         ":buffer_manager_lib",
         ":filter_pipeline_lib",
         ":json_with_ext_buf_lib",
+        ":replay_awaitable_lib",
         ":serializer_lib",
         ":task_group_lib",
         "//envoy/event:dispatcher_interface",
@@ -385,6 +423,7 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":ai_filter_lib",
+        ":ai_filter_state_lib",
         ":buffer_manager_lib",
         ":external_buffer_interface",
         ":filter_chain_bridge_lib",

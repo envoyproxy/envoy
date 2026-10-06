@@ -66,6 +66,19 @@ public:
 
 REGISTER_FACTORY(HttpTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
+// A second typed object factory under a distinct name, so a test can store two filter-state values
+// and verify that consecutive getter calls do not invalidate each other.
+class HttpSecondTestTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.http_typed_object_second"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(HttpSecondTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 // A filter state object that does not support serialization. This is used to test the
 // `get_filter_state_typed` fallback when `serializeAsString()` returns nullopt.
 class HttpNonSerializableObject : public StreamInfo::FilterState::Object {};
@@ -760,6 +773,77 @@ TEST_F(DynamicModuleHttpFilterTest, SocketOptionMultipleOptions) {
   EXPECT_EQ(bytes_val, std::string(bytes_result.ptr, bytes_result.length));
 }
 
+// A module that sets the same option twice reads back the latest value, not the first one stored.
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionLatestValueWins) {
+  const int64_t level = 7;
+  const int64_t name = 8;
+  const std::string first = "first";
+  const std::string second = "second";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, {first.data(), first.size()}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, {second.data(), second.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, &result));
+  EXPECT_EQ(second, std::string(result.ptr, result.length));
+}
+
+// A module that sets the same int option twice reads back the latest value, not the first stored.
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionIntLatestValueWins) {
+  const int64_t level = 11;
+  const int64_t name = 12;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, 100));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, 200));
+
+  int64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, &result));
+  EXPECT_EQ(200, result);
+}
+
+// A bytes option view keeps a stable address as more options are appended, so a module holding the
+// view never reads freed memory where the old vector backed store would have reallocated.
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionBytesViewSurvivesAppends) {
+  const int64_t level = 9;
+  const int64_t name = 10;
+  const std::string value = "stable-bytes";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, {value.data(), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer first_view;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, &first_view));
+  const char* first_ptr = first_view.ptr;
+
+  // Append enough options to force a reallocation of the old vector backed store.
+  for (int64_t i = 0; i < 256; ++i) {
+    const std::string filler = "filler";
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+        filter_.get(), 1000 + i, 1000 + i, envoy_dynamic_module_type_socket_option_state_Bound,
+        envoy_dynamic_module_type_socket_direction_Upstream, {filler.data(), filler.size()}));
+  }
+
+  envoy_dynamic_module_type_envoy_buffer second_view;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, &second_view));
+  // The stored element never moved, so the address is unchanged and the bytes are intact.
+  EXPECT_EQ(first_ptr, second_view.ptr);
+  EXPECT_EQ(value, std::string(second_view.ptr, second_view.length));
+}
+
 TEST_F(DynamicModuleHttpFilterTest, SocketOptionDirectionDifferentiation) {
   // Set the same option with different directions - they should be stored separately.
   const int64_t level = 1;
@@ -1098,6 +1182,63 @@ TEST(ABIImpl, metadata) {
       {namespace_str.data(), namespace_str.size()}, {lbendpoint_key.data(), lbendpoint_key.size()},
       &result_buffer));
   EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), lbendpoint_value);
+}
+
+// Host and locality metadata snapshots accumulate in the metadata scratch across getters in one
+// hook so earlier views stay valid, and the scratch is cleared when the outermost hook returns.
+TEST(ABIImpl, metadata_scratch_retains_snapshots_until_outermost_hook) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  const std::string namespace_str = "foo";
+  const std::string host_key = "host_key";
+  const std::string locality_key = "locality_key";
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  auto upstream_info = std::make_shared<StreamInfo::MockUpstreamInfo>();
+  auto upstream_host = std::make_shared<Upstream::MockHostDescription>();
+  EXPECT_CALL(*upstream_info, upstreamHost).WillRepeatedly(testing::Return(upstream_host));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  auto host_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  host_metadata->mutable_filter_metadata()->insert({namespace_str, Protobuf::Struct()});
+  Protobuf::Value host_value_proto;
+  host_value_proto.set_string_value("host_value");
+  host_metadata->mutable_filter_metadata()
+      ->at(namespace_str)
+      .mutable_fields()
+      ->insert({host_key, host_value_proto});
+  EXPECT_CALL(*upstream_host, metadata()).WillRepeatedly(testing::Return(host_metadata));
+
+  auto locality_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  locality_metadata->mutable_filter_metadata()->insert({namespace_str, Protobuf::Struct()});
+  Protobuf::Value locality_value_proto;
+  locality_value_proto.set_string_value("locality_value");
+  locality_metadata->mutable_filter_metadata()
+      ->at(namespace_str)
+      .mutable_fields()
+      ->insert({locality_key, locality_value_proto});
+  EXPECT_CALL(*upstream_host, localityMetadata())
+      .WillRepeatedly(testing::Return(locality_metadata));
+
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  {
+    DynamicModuleHttpFilter::HookScope hook(filter);
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+        &filter, envoy_dynamic_module_type_metadata_source_Host,
+        {namespace_str.data(), namespace_str.size()}, {host_key.data(), host_key.size()}, &result));
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+        &filter, envoy_dynamic_module_type_metadata_source_HostLocality,
+        {namespace_str.data(), namespace_str.size()}, {locality_key.data(), locality_key.size()},
+        &result));
+    // Both snapshots are retained so an earlier metadata view is not freed by a later getter.
+    EXPECT_EQ(filter.metadataScratchSizeForTest(), 2);
+  }
+  // The outermost hook clears the metadata scratch.
+  EXPECT_EQ(filter.metadataScratchSizeForTest(), 0);
 }
 
 TEST(ABIImpl, metadata_bool) {
@@ -1698,6 +1839,69 @@ TEST(ABIImpl, filter_state_typed) {
       &filter, {key_str.data(), key_str.size()}, &result_buffer));
   EXPECT_EQ(result_buffer.length, value_str.size());
   EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), value_str);
+}
+
+TEST(ABIImpl, filter_state_typed_consecutive_getters_stay_valid) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  const std::string key1 = "envoy.test.http_typed_object";
+  const std::string value1 = "first_value";
+  const std::string key2 = "envoy.test.http_typed_object_second";
+  const std::string value2 = "second_value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_typed(
+      &filter, {key1.data(), key1.size()}, {value1.data(), value1.size()}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_typed(
+      &filter, {key2.data(), key2.size()}, {value2.data(), value2.size()}));
+
+  // Read the first value, then the second. The first view must stay valid after the second call.
+  envoy_dynamic_module_type_envoy_buffer result1 = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_typed(
+      &filter, {key1.data(), key1.size()}, &result1));
+  envoy_dynamic_module_type_envoy_buffer result2 = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_typed(
+      &filter, {key2.data(), key2.size()}, &result2));
+
+  EXPECT_EQ(std::string(result1.ptr, result1.length), value1);
+  EXPECT_EQ(std::string(result2.ptr, result2.length), value2);
+}
+
+TEST(ABIImpl, filter_state_typed_scratch_cleared_at_outermost_hook) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  const std::string key = "envoy.test.http_typed_object";
+  const std::string value = "value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_typed(
+      &filter, {key.data(), key.size()}, {value.data(), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  {
+    DynamicModuleHttpFilter::HookScope outer(filter);
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_typed(
+        &filter, {key.data(), key.size()}, &result));
+    {
+      DynamicModuleHttpFilter::HookScope inner(filter);
+      EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_typed(
+          &filter, {key.data(), key.size()}, &result));
+    }
+    // A nested hook does not clear the scratch.
+    EXPECT_EQ(filter.filterStateScratchSizeForTest(), 2);
+  }
+  // The outermost hook clears the scratch.
+  EXPECT_EQ(filter.filterStateScratchSizeForTest(), 0);
 }
 
 TEST(ABIImpl, filter_state_typed_no_factory) {
@@ -2864,6 +3068,236 @@ TEST(ABIImpl, GetHttpSizeAttributesWithoutHeaderMaps) {
   EXPECT_EQ(43, result);
 }
 
+TEST_F(DynamicModuleHttpFilterTest, GetTimingInfo) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_monotonic_ = MonotonicTime(std::chrono::seconds(1));
+  stream_info.start_time_ = SystemTime(std::chrono::seconds(10));
+  stream_info.end_time_ = std::chrono::nanoseconds(5'000'000);
+  stream_info.downstream_timing_.downstream_connection_begin_ =
+      stream_info.start_time_monotonic_ - std::chrono::milliseconds(4);
+  stream_info.downstream_timing_.downstream_handshake_start_ =
+      stream_info.start_time_monotonic_ - std::chrono::milliseconds(3);
+  stream_info.downstream_timing_.downstream_handshake_complete_ =
+      stream_info.start_time_monotonic_ - std::chrono::milliseconds(2);
+  stream_info.downstream_timing_.last_downstream_header_rx_byte_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::microseconds(500);
+  stream_info.downstream_timing_.last_downstream_rx_byte_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(1);
+  stream_info.downstream_timing_.first_downstream_tx_byte_sent_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(2);
+  stream_info.downstream_timing_.last_downstream_tx_byte_sent_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(3);
+  stream_info.downstream_timing_.last_downstream_ack_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(4);
+  stream_info.downstream_timing_.downstream_connection_end_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(5);
+
+  auto* upstream_info =
+      dynamic_cast<NiceMock<StreamInfo::MockUpstreamInfo>*>(stream_info.upstream_info_.get());
+  ASSERT_NE(upstream_info, nullptr);
+  upstream_info->upstream_timing_.first_upstream_tx_byte_sent_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(4);
+  upstream_info->upstream_timing_.last_upstream_tx_byte_sent_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(5);
+  upstream_info->upstream_timing_.first_upstream_rx_byte_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(6);
+  upstream_info->upstream_timing_.last_upstream_rx_byte_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(7);
+  upstream_info->upstream_timing_.upstream_connect_start_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(1);
+  upstream_info->upstream_timing_.upstream_connect_complete_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(2);
+  upstream_info->upstream_timing_.upstream_handshake_complete_ =
+      stream_info.start_time_monotonic_ + std::chrono::milliseconds(3);
+  upstream_info->upstream_timing_.first_upstream_rx_body_byte_received_ =
+      stream_info.start_time_monotonic_ + std::chrono::microseconds(6'500);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_http_get_timing_info(filter_.get(), &timing);
+
+  EXPECT_EQ(10'000'000'000, timing.start_time_unix_ns);
+  EXPECT_EQ(5'000'000, timing.request_complete_duration_ns);
+  EXPECT_EQ(4'000'000, timing.first_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(5'000'000, timing.last_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(6'000'000, timing.first_upstream_rx_byte_received_ns);
+  EXPECT_EQ(7'000'000, timing.last_upstream_rx_byte_received_ns);
+  EXPECT_EQ(2'000'000, timing.first_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(3'000'000, timing.last_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-4'000'000, timing.downstream_connection_begin_ns);
+  EXPECT_EQ(-3'000'000, timing.downstream_handshake_start_ns);
+  EXPECT_EQ(-2'000'000, timing.downstream_handshake_complete_ns);
+  EXPECT_EQ(500'000, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(1'000'000, timing.last_downstream_rx_byte_received_ns);
+  EXPECT_EQ(1'000'000, timing.upstream_connect_start_ns);
+  EXPECT_EQ(2'000'000, timing.upstream_connect_complete_ns);
+  EXPECT_EQ(3'000'000, timing.upstream_handshake_complete_ns);
+  EXPECT_EQ(6'500'000, timing.first_upstream_rx_body_byte_received_ns);
+  EXPECT_EQ(4'000'000, timing.last_downstream_ack_received_ns);
+  EXPECT_EQ(5'000'000, timing.downstream_connection_end_ns);
+  EXPECT_TRUE(timing.has_start_time);
+  EXPECT_TRUE(timing.has_downstream_connection_begin);
+  EXPECT_TRUE(timing.has_downstream_handshake_start);
+  EXPECT_TRUE(timing.has_downstream_handshake_complete);
+  EXPECT_TRUE(timing.has_last_downstream_header_rx_byte_received);
+  EXPECT_TRUE(timing.has_last_downstream_rx_byte_received);
+  EXPECT_TRUE(timing.has_upstream_connect_start);
+  EXPECT_TRUE(timing.has_upstream_connect_complete);
+  EXPECT_TRUE(timing.has_upstream_handshake_complete);
+  EXPECT_TRUE(timing.has_first_upstream_tx_byte_sent);
+  EXPECT_TRUE(timing.has_last_upstream_tx_byte_sent);
+  EXPECT_TRUE(timing.has_first_upstream_rx_byte_received);
+  EXPECT_TRUE(timing.has_first_upstream_rx_body_byte_received);
+  EXPECT_TRUE(timing.has_last_upstream_rx_byte_received);
+  EXPECT_TRUE(timing.has_first_downstream_tx_byte_sent);
+  EXPECT_TRUE(timing.has_last_downstream_tx_byte_sent);
+  EXPECT_TRUE(timing.has_last_downstream_ack_received);
+  EXPECT_TRUE(timing.has_request_complete);
+  EXPECT_TRUE(timing.has_downstream_connection_end);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoWithPreRequestMarkersAtMinusOneNanosecond) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_monotonic_ = MonotonicTime(std::chrono::seconds(1));
+  const MonotonicTime marker = stream_info.start_time_monotonic_ - std::chrono::nanoseconds(1);
+  stream_info.downstream_timing_.downstream_connection_begin_ = marker;
+  stream_info.downstream_timing_.downstream_handshake_start_ = marker;
+  stream_info.downstream_timing_.downstream_handshake_complete_ = marker;
+  auto* upstream_info =
+      dynamic_cast<NiceMock<StreamInfo::MockUpstreamInfo>*>(stream_info.upstream_info_.get());
+  ASSERT_NE(upstream_info, nullptr);
+  upstream_info->upstream_timing_.upstream_connect_start_ = marker;
+  upstream_info->upstream_timing_.upstream_connect_complete_ = marker;
+  upstream_info->upstream_timing_.upstream_handshake_complete_ = marker;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_http_get_timing_info(filter_.get(), &timing);
+
+  EXPECT_EQ(-1, timing.downstream_connection_begin_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_start_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_complete_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_start_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_complete_ns);
+  EXPECT_EQ(-1, timing.upstream_handshake_complete_ns);
+  EXPECT_TRUE(timing.has_downstream_connection_begin);
+  EXPECT_TRUE(timing.has_downstream_handshake_start);
+  EXPECT_TRUE(timing.has_downstream_handshake_complete);
+  EXPECT_TRUE(timing.has_upstream_connect_start);
+  EXPECT_TRUE(timing.has_upstream_connect_complete);
+  EXPECT_TRUE(timing.has_upstream_handshake_complete);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoWithHeaderOnlyRequestAtStart) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_timing_.last_downstream_header_rx_byte_received_ =
+      stream_info.start_time_monotonic_;
+  stream_info.downstream_timing_.last_downstream_rx_byte_received_ =
+      stream_info.start_time_monotonic_;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_http_get_timing_info(filter_.get(), &timing);
+
+  EXPECT_EQ(0, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(0, timing.last_downstream_rx_byte_received_ns);
+  EXPECT_TRUE(timing.has_last_downstream_header_rx_byte_received);
+  EXPECT_TRUE(timing.has_last_downstream_rx_byte_received);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoWithMissingMarkers) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_http_get_timing_info(filter_.get(), &timing);
+
+  EXPECT_EQ(-1, timing.request_complete_duration_ns);
+  EXPECT_EQ(-1, timing.first_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.last_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.first_upstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_upstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.first_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.last_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.downstream_connection_begin_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_start_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_complete_ns);
+  EXPECT_EQ(-1, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_downstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_start_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_complete_ns);
+  EXPECT_EQ(-1, timing.upstream_handshake_complete_ns);
+  EXPECT_EQ(-1, timing.first_upstream_rx_body_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_downstream_ack_received_ns);
+  EXPECT_EQ(-1, timing.downstream_connection_end_ns);
+  EXPECT_TRUE(timing.has_start_time);
+  EXPECT_FALSE(timing.has_downstream_connection_begin);
+  EXPECT_FALSE(timing.has_downstream_handshake_start);
+  EXPECT_FALSE(timing.has_downstream_handshake_complete);
+  EXPECT_FALSE(timing.has_last_downstream_header_rx_byte_received);
+  EXPECT_FALSE(timing.has_last_downstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_upstream_connect_start);
+  EXPECT_FALSE(timing.has_upstream_connect_complete);
+  EXPECT_FALSE(timing.has_upstream_handshake_complete);
+  EXPECT_FALSE(timing.has_first_upstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_upstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_first_upstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_first_upstream_rx_body_byte_received);
+  EXPECT_FALSE(timing.has_last_upstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_first_downstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_downstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_downstream_ack_received);
+  EXPECT_FALSE(timing.has_request_complete);
+  EXPECT_FALSE(timing.has_downstream_connection_end);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetTimingInfoNoCallbacks) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter(nullptr, symbol_table, 0);
+
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_http_get_timing_info(&filter, &timing);
+
+  EXPECT_EQ(-1, timing.start_time_unix_ns);
+  EXPECT_EQ(-1, timing.request_complete_duration_ns);
+  EXPECT_EQ(-1, timing.first_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.last_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.first_upstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_upstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.first_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.last_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.downstream_connection_begin_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_start_ns);
+  EXPECT_EQ(-1, timing.downstream_handshake_complete_ns);
+  EXPECT_EQ(-1, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_downstream_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_start_ns);
+  EXPECT_EQ(-1, timing.upstream_connect_complete_ns);
+  EXPECT_EQ(-1, timing.upstream_handshake_complete_ns);
+  EXPECT_EQ(-1, timing.first_upstream_rx_body_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_downstream_ack_received_ns);
+  EXPECT_EQ(-1, timing.downstream_connection_end_ns);
+  EXPECT_FALSE(timing.has_start_time);
+  EXPECT_FALSE(timing.has_downstream_connection_begin);
+  EXPECT_FALSE(timing.has_downstream_handshake_start);
+  EXPECT_FALSE(timing.has_downstream_handshake_complete);
+  EXPECT_FALSE(timing.has_last_downstream_header_rx_byte_received);
+  EXPECT_FALSE(timing.has_last_downstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_upstream_connect_start);
+  EXPECT_FALSE(timing.has_upstream_connect_complete);
+  EXPECT_FALSE(timing.has_upstream_handshake_complete);
+  EXPECT_FALSE(timing.has_first_upstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_upstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_first_upstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_first_upstream_rx_body_byte_received);
+  EXPECT_FALSE(timing.has_last_upstream_rx_byte_received);
+  EXPECT_FALSE(timing.has_first_downstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_downstream_tx_byte_sent);
+  EXPECT_FALSE(timing.has_last_downstream_ack_received);
+  EXPECT_FALSE(timing.has_request_complete);
+  EXPECT_FALSE(timing.has_downstream_connection_end);
+}
+
 TEST(ABIImpl, HttpCallout) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
@@ -3130,17 +3564,17 @@ TEST(ABIImpl, Stats) {
   Stats::CounterOptConstRef counter_vec = stats_store.findCounterByString(
       "dynamicmodulescustom.some_counter_vec.some_label.some_value");
   EXPECT_TRUE(counter_vec.has_value());
-  EXPECT_EQ(counter_vec->get().value(), 10);
+  EXPECT_EQ(counter_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_vec_id, counter_vec_labels_values.data(), counter_vec_labels_values.size(),
       10);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_vec->get().value(), 20);
+  EXPECT_EQ(counter_vec->value(), 20);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_vec_id, counter_vec_labels_values.data(), counter_vec_labels_values.size(),
       42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_vec->get().value(), 62);
+  EXPECT_EQ(counter_vec->value(), 62);
 
   const std::string counter_no_labels_name{"some_counter_no_labels"};
   size_t counter_no_labels_id;
@@ -3151,15 +3585,15 @@ TEST(ABIImpl, Stats) {
   Stats::CounterOptConstRef counter_no_labels =
       stats_store.findCounterByString("dynamicmodulescustom.some_counter_no_labels");
   EXPECT_TRUE(counter_no_labels.has_value());
-  EXPECT_EQ(counter_no_labels->get().value(), 0);
+  EXPECT_EQ(counter_no_labels->value(), 0);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_no_labels_id, nullptr, 0, 15);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_no_labels->get().value(), 15);
+  EXPECT_EQ(counter_no_labels->value(), 15);
   result = envoy_dynamic_module_callback_http_filter_increment_counter(
       &filter, counter_no_labels_id, nullptr, 0, 25);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_no_labels->get().value(), 40);
+  EXPECT_EQ(counter_no_labels->value(), 40);
 
   const std::string gauge_vec_name{"some_gauge_vec"};
   const std::string gauge_vec_label_name{"some_label"};
@@ -3182,19 +3616,19 @@ TEST(ABIImpl, Stats) {
   Stats::GaugeOptConstRef gauge_vec =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_vec.some_label.some_value");
   EXPECT_TRUE(gauge_vec.has_value());
-  EXPECT_EQ(gauge_vec->get().value(), 10);
+  EXPECT_EQ(gauge_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_increment_gauge(
       &filter, gauge_vec_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 10);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 20);
+  EXPECT_EQ(gauge_vec->value(), 20);
   result = envoy_dynamic_module_callback_http_filter_decrement_gauge(
       &filter, gauge_vec_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 12);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 8);
+  EXPECT_EQ(gauge_vec->value(), 8);
   result = envoy_dynamic_module_callback_http_filter_set_gauge(
       &filter, gauge_vec_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 9001);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 9001);
+  EXPECT_EQ(gauge_vec->value(), 9001);
 
   const std::string gauge_no_labels_name{"some_gauge_no_labels"};
   size_t gauge_no_labels_id;
@@ -3205,19 +3639,19 @@ TEST(ABIImpl, Stats) {
   Stats::GaugeOptConstRef gauge_no_labels =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_no_labels");
   EXPECT_TRUE(gauge_no_labels.has_value());
-  EXPECT_EQ(gauge_no_labels->get().value(), 0);
+  EXPECT_EQ(gauge_no_labels->value(), 0);
   result = envoy_dynamic_module_callback_http_filter_increment_gauge(&filter, gauge_no_labels_id,
                                                                      nullptr, 0, 15);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_no_labels->get().value(), 15);
+  EXPECT_EQ(gauge_no_labels->value(), 15);
   result = envoy_dynamic_module_callback_http_filter_decrement_gauge(&filter, gauge_no_labels_id,
                                                                      nullptr, 0, 5);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_no_labels->get().value(), 10);
+  EXPECT_EQ(gauge_no_labels->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_set_gauge(&filter, gauge_no_labels_id, nullptr,
                                                                0, 42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_no_labels->get().value(), 42);
+  EXPECT_EQ(gauge_no_labels->value(), 42);
 
   const std::string histogram_vec_name{"some_histogram_vec"};
   const std::string histogram_vec_label_name{"some_label"};
@@ -3386,12 +3820,12 @@ TEST(ABIImpl, ConfigStats) {
   Stats::CounterOptConstRef counter_vec = stats_store.findCounterByString(
       "dynamicmodulescustom.some_counter_vec.some_label.some_value");
   EXPECT_TRUE(counter_vec.has_value());
-  EXPECT_EQ(counter_vec->get().value(), 10);
+  EXPECT_EQ(counter_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_config_increment_counter(
       filter_config.get(), counter_vec_id, counter_vec_labels_values.data(),
       counter_vec_labels_values.size(), 42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_vec->get().value(), 52);
+  EXPECT_EQ(counter_vec->value(), 52);
 
   // counter without labels
   const std::string counter_no_labels_name{"some_counter_no_labels"};
@@ -3406,7 +3840,7 @@ TEST(ABIImpl, ConfigStats) {
   Stats::CounterOptConstRef counter_no_labels =
       stats_store.findCounterByString("dynamicmodulescustom.some_counter_no_labels");
   EXPECT_TRUE(counter_no_labels.has_value());
-  EXPECT_EQ(counter_no_labels->get().value(), 15);
+  EXPECT_EQ(counter_no_labels->value(), 15);
 
   // gauge with labels
   const std::string gauge_vec_name{"some_gauge_vec"};
@@ -3431,17 +3865,17 @@ TEST(ABIImpl, ConfigStats) {
   Stats::GaugeOptConstRef gauge_vec =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_vec.some_label.some_value");
   EXPECT_TRUE(gauge_vec.has_value());
-  EXPECT_EQ(gauge_vec->get().value(), 10);
+  EXPECT_EQ(gauge_vec->value(), 10);
   result = envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
       filter_config.get(), gauge_vec_id, gauge_vec_labels_values.data(),
       gauge_vec_labels_values.size(), 2);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 8);
+  EXPECT_EQ(gauge_vec->value(), 8);
   result = envoy_dynamic_module_callback_http_filter_config_set_gauge(
       filter_config.get(), gauge_vec_id, gauge_vec_labels_values.data(),
       gauge_vec_labels_values.size(), 9001);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec->get().value(), 9001);
+  EXPECT_EQ(gauge_vec->value(), 9001);
 
   // gauge without labels
   const std::string gauge_no_labels_name{"some_gauge_no_labels"};
@@ -3462,7 +3896,7 @@ TEST(ABIImpl, ConfigStats) {
   Stats::GaugeOptConstRef gauge_no_labels =
       stats_store.findGaugeByString("dynamicmodulescustom.some_gauge_no_labels");
   EXPECT_TRUE(gauge_no_labels.has_value());
-  EXPECT_EQ(gauge_no_labels->get().value(), 42);
+  EXPECT_EQ(gauge_no_labels->value(), 42);
 
   // histogram with labels
   const std::string histogram_vec_name{"some_histogram_vec"};
@@ -4003,6 +4437,94 @@ TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionIdNoUpstreamInfo) {
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
 
   EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_id(filter_.get()));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionAttemptsNoUpstreamInfo) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_upstream_remote_address(filter_.get(), &address));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(filter_.get()));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(filter_.get(), nullptr));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+                   filter_.get()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+      filter_.get(), nullptr));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionAttemptsEmpty) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  upstream_info->setUpstreamRemoteAddress(nullptr);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_upstream_remote_address(filter_.get(), &address));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(filter_.get()));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(filter_.get(), nullptr));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+                   filter_.get()));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+      filter_.get(), nullptr));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamRemoteAddressUsesConnectedSocket) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  auto selected_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  selected_host->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 443);
+  upstream_info->setUpstreamHost(selected_host);
+  upstream_info->setUpstreamRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2", 8443));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_upstream_remote_address(filter_.get(), &address));
+  EXPECT_EQ("10.0.0.2:8443", std::string(address.ptr, address.length));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionAttemptHistories) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  auto first_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto missing_address_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto second_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  first_host->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 443);
+  missing_address_host->address_ = nullptr;
+  second_host->address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2", 8443);
+  ON_CALL(*first_host, address()).WillByDefault(testing::Return(first_host->address_));
+  ON_CALL(*missing_address_host, address()).WillByDefault(testing::Return(nullptr));
+  ON_CALL(*second_host, address()).WillByDefault(testing::Return(second_host->address_));
+  upstream_info->upstream_hosts_attempted_ = {first_host, nullptr, missing_address_host,
+                                              second_host};
+  upstream_info->upstream_connection_ids_attempted_ = {10, 20, 30};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  EXPECT_EQ(2, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(filter_.get()));
+  envoy_dynamic_module_type_envoy_buffer hosts[2];
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(filter_.get(), hosts));
+  EXPECT_EQ("10.0.0.1:443", std::string(hosts[0].ptr, hosts[0].length));
+  EXPECT_EQ("10.0.0.2:8443", std::string(hosts[1].ptr, hosts[1].length));
+
+  EXPECT_EQ(3, envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+                   filter_.get()));
+  uint64_t connection_ids[3];
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+      filter_.get(), connection_ids));
+  EXPECT_EQ(10, connection_ids[0]);
+  EXPECT_EQ(20, connection_ids[1]);
+  EXPECT_EQ(30, connection_ids[2]);
 }
 
 // Test GetClusterHostCount with a properly configured filter and mocked cluster manager.

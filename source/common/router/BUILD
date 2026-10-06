@@ -42,6 +42,7 @@ envoy_cc_library(
         ":header_parser_lib",
         ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
+        ":path_rewrite_utility_lib",
         ":per_filter_config_lib",
         ":retry_policy_lib",
         ":retry_state_lib",
@@ -160,6 +161,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "path_rewrite_utility_lib",
+    srcs = ["path_rewrite_utility.cc"],
+    hdrs = ["path_rewrite_utility.h"],
+    deps = [
+        "//source/common/common:regex_lib",
+        "//source/common/http:path_utility_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "config_utility_lib",
     srcs = ["config_utility.cc"],
     hdrs = ["config_utility.h"],
@@ -213,6 +225,7 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/rds:rds_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

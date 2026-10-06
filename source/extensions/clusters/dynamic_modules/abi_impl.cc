@@ -4,6 +4,8 @@
 
 #include <chrono>
 #include <cstring>
+#include <deque>
+#include <string>
 
 #include "envoy/registry/registry.h"
 
@@ -204,7 +206,34 @@ bool addHosts(envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uin
   return true;
 }
 
+// Host selection runs serially per worker thread, so a thread local deque gives each serialized
+// filter state value a stable address for the duration of the host selection callback. A deque is
+// used because it never relocates existing elements. The depth counter clears the storage when the
+// outermost callback is entered and again when it returns.
+thread_local std::deque<std::string> cluster_lb_filter_state_scratch;
+thread_local uint32_t cluster_lb_hook_depth = 0;
+
 } // namespace
+
+namespace Envoy {
+namespace Extensions {
+namespace Clusters {
+namespace DynamicModules {
+ClusterLbFilterStateScratchGuard::ClusterLbFilterStateScratchGuard() {
+  if (++cluster_lb_hook_depth == 1) {
+    cluster_lb_filter_state_scratch.clear();
+  }
+}
+ClusterLbFilterStateScratchGuard::~ClusterLbFilterStateScratchGuard() {
+  if (--cluster_lb_hook_depth == 0) {
+    cluster_lb_filter_state_scratch.clear();
+  }
+}
+size_t clusterLbFilterStateScratchSizeForTest() { return cluster_lb_filter_state_scratch.size(); }
+} // namespace DynamicModules
+} // namespace Clusters
+} // namespace Extensions
+} // namespace Envoy
 
 extern "C" {
 
@@ -1005,13 +1034,12 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
     return false;
   }
 
-  // Cluster host selection runs on a worker thread serially per request. We stash the
-  // serialized buffer on a thread-local so its address survives until the next call to
-  // this function on the same thread (matching the documented lifetime in abi.h).
-  thread_local std::string last_serialized_filter_state;
-  last_serialized_filter_state = std::move(serialized.value());
-  result->ptr = const_cast<char*>(last_serialized_filter_state.data());
-  result->length = last_serialized_filter_state.size();
+  // Stash the serialized value so its address stays valid for the whole host selection callback.
+  // ClusterLbFilterStateScratchGuard clears the storage when the callback returns.
+  const std::string& stored =
+      cluster_lb_filter_state_scratch.emplace_back(std::move(serialized.value()));
+  result->ptr = const_cast<char*>(stored.data());
+  result->length = stored.size();
   return true;
 }
 
