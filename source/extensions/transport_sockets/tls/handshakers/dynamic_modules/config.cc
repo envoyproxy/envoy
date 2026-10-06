@@ -139,7 +139,8 @@ absl::StatusOr<DynamicModuleHandshakerConfigSharedPtr> newDynamicModuleHandshake
                                                         handshaker_name.size()};
   envoy_dynamic_module_type_envoy_buffer config_buffer = {handshaker_config.data(),
                                                           handshaker_config.size()};
-  config->in_module_config_ = on_config_new.value()(name_buffer, config_buffer, &capabilities);
+  config->in_module_config_ = on_config_new.value()(static_cast<void*>(config.get()), name_buffer,
+                                                    config_buffer, &capabilities);
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module TLS handshaker config");
   }

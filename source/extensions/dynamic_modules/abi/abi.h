@@ -12965,6 +12965,16 @@ bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
 // =============================================================================
 
 /**
+ * envoy_dynamic_module_type_tls_handshaker_config_envoy_ptr is a pointer to the
+ * DynamicModuleHandshakerConfig object in Envoy passed to the module during config creation.
+ *
+ * OWNERSHIP: Envoy owns this object. The pointer remains stable until
+ * envoy_dynamic_module_on_tls_handshaker_config_destroy returns for the corresponding in-module
+ * config.
+ */
+typedef void* envoy_dynamic_module_type_tls_handshaker_config_envoy_ptr;
+
+/**
  * envoy_dynamic_module_type_tls_handshaker_config_module_ptr is a pointer to the in-module
  * handshaker configuration created and owned by the module. It is shared across all connections
  * using the handshaker.
@@ -13054,6 +13064,8 @@ typedef struct envoy_dynamic_module_type_tls_handshaker_capabilities {
  * handshaker config is loaded. The module returns a config pointer and fills the capabilities
  * struct.
  *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleHandshakerConfig object for the
+ * corresponding config.
  * @param name is the name of the handshaker owned by Envoy.
  * @param config is the configuration for the module owned by Envoy.
  * @param capabilities is pre-filled with the default capabilities and may be overridden by the
@@ -13064,6 +13076,7 @@ typedef struct envoy_dynamic_module_type_tls_handshaker_capabilities {
  */
 envoy_dynamic_module_type_tls_handshaker_config_module_ptr
 envoy_dynamic_module_on_tls_handshaker_config_new(
+    envoy_dynamic_module_type_tls_handshaker_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config,
     envoy_dynamic_module_type_tls_handshaker_capabilities* capabilities);
 
