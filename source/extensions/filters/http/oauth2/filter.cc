@@ -1042,7 +1042,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     scheme = Http::Headers::get().SchemeValues.Http;
   }
   const std::string base_path = absl::StrCat(scheme, "://", host_);
-  const std::string original_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
+  const std::string original_url = absl::StrCat(base_path, headers.getPathValue());
 
   // First, check if the CSRF token cookie exists.
   // The CSRF token cookie contains the CSRF token that is used to prevent CSRF attacks for the
