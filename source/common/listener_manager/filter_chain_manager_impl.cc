@@ -1,12 +1,14 @@
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/xds_manager.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
 #include "source/common/listener_manager/fcds_api.h"
 #include "source/common/matcher/matcher.h"
@@ -1178,6 +1180,9 @@ void FcdsSharedFilterChainManager::onFilterChainRemoved(
 void FcdsSharedFilterChainManager::scheduleTlsUpdate() {
   // Skip rearming when a publish is already queued for this iteration.
   if (!tls_update_cb_->enabled()) {
+    // Pause filter chain discovery until the coalesced publish is posted to workers.
+    xds_pause_ = server_context_.xdsManager().pause(
+        Config::getTypeUrl<envoy::config::listener::v3::FilterChain>());
     tls_update_cb_->scheduleCallbackCurrentIteration();
   }
 }
@@ -1191,6 +1196,8 @@ void FcdsSharedFilterChainManager::updateTlsState() {
     }
   }
   tls_slot_->set([filter_chains](Event::Dispatcher&) { return filter_chains; });
+  // Resume filter chain discovery now that the update is posted to workers.
+  xds_pause_.reset();
 }
 
 } // namespace Server
