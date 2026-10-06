@@ -1103,7 +1103,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     scheme = Http::Headers::get().SchemeValues.Http;
   }
   const std::string base_path = absl::StrCat(scheme, "://", host_);
-  const std::string original_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
+  const std::string original_url = absl::StrCat(base_path, headers.getPathValue());
 
   const CookieNames& cookie_names = config_->cookieNames();
 
