@@ -1866,6 +1866,17 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
   // the complexity until someone asks for it.
   retry_state_.reset();
 
+  // Apply response_headers_to_remove to informational (1xx) responses so
+  // upstream-internal headers are stripped before forwarding downstream.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.response_headers_to_remove_on_1xx")) {
+    for (const Http::LowerCaseString& header :
+         route_entry_->responseHeaderTransforms(callbacks_->streamInfo(), false)
+             .headers_to_remove) {
+      headers->remove(header);
+    }
+  }
+
   callbacks_->encode1xxHeaders(std::move(headers));
 }
 
