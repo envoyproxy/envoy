@@ -624,11 +624,14 @@ makeCidrListEntry(const std::string& cidr, const T& data, absl::Status& creation
 
 std::vector<absl::string_view> FilterChainManagerImpl::filterChainNames() const {
   std::vector<absl::string_view> names;
-  names.reserve(fc_contexts_.size() + fcds_handles_.size());
+  names.reserve(fc_contexts_.size() + fcds_handles_.size() + 1);
   for (const auto& [proto, chain] : fc_contexts_) {
     if (!chain->name().empty()) {
       names.push_back(chain->name());
     }
+  }
+  if (default_filter_chain_ != nullptr && !default_filter_chain_->name().empty()) {
+    names.push_back(default_filter_chain_->name());
   }
   // FCDS chains this listener's matcher references. Report a name only when its subscription is
   // committed (active): the chain is then both routable via this listener and active, matching the
@@ -1225,28 +1228,11 @@ void FcdsSharedFilterChainManager::updateTlsState() {
   tls_slot_->set([filter_chains](Event::Dispatcher&) { return filter_chains; });
 }
 
-std::vector<absl::string_view> FcdsSharedFilterChainManager::activeFilterChainNames() const {
-  std::vector<absl::string_view> names;
-  names.reserve(subscriptions_.size());
+bool FcdsSharedFilterChainManager::isFilterChainActive(const std::string& filter_chain_name) const {
   // A subscription's committed chain is non-null exactly when it is active (same test
   // updateTlsState() uses to publish the active set to workers).
-  for (const auto& [name, state] : subscriptions_) {
-    if (state->api_->filterChain() != nullptr) {
-      names.push_back(name);
-    }
-  }
-  return names;
-}
-
-bool FcdsSharedFilterChainManager::isFilterChainActive(const std::string& filter_chain_name) const {
   auto it = subscriptions_.find(filter_chain_name);
   return it != subscriptions_.end() && it->second->api_->filterChain() != nullptr;
-}
-
-std::shared_ptr<FcdsSharedFilterChainManager>
-getFcdsSharedFilterChainManager(Singleton::Manager& singleton_manager) {
-  return singleton_manager.getTyped<FcdsSharedFilterChainManager>(
-      "fcds_shared_filter_chain_manager_singleton");
 }
 
 } // namespace Server

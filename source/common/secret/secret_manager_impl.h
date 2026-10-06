@@ -73,7 +73,7 @@ public:
                                     Server::Configuration::ServerFactoryContext& server_context,
                                     OptRef<Init::Manager> init_manager, bool warm) override;
 
-  std::vector<std::string> dynamicActiveTlsCertificateSecretNames() const override;
+  std::vector<absl::string_view> dynamicActiveSecretNames() const override;
 
 private:
   ProtobufTypes::MessagePtr dumpSecretConfigs(const Matchers::StringMatcher& name_matcher);

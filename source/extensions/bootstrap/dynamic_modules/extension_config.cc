@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "source/common/common/assert.h"
-#include "source/common/listener_manager/filter_chain_manager_impl.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -126,18 +125,26 @@ void DynamicModuleBootstrapExtensionConfig::getActiveResourceNames(
   if (!server_initialized_) {
     return;
   }
+  // Each name is emitted at most once, e.g. an FCDS chain shared by several listeners.
+  absl::flat_hash_set<absl::string_view> seen;
+  auto emit_once = [&seen, &emit](absl::string_view name) {
+    if (seen.insert(name).second) {
+      emit(name);
+    }
+  };
   switch (kind) {
   case envoy_dynamic_module_type_bootstrap_active_resource_kind_FilterChain: {
     // Filter chains across all active listeners. filterChainNames() returns the listener's inline
-    // chains plus, for an fcds_config listener, the FCDS chains its matcher references that are
-    // active. Reporting only via active listeners ties a reported name to being routable (an active
-    // listener's matcher dispatches to it) and active: a chain active in the process-wide FCDS
-    // manager but not yet referenced by an active listener's matcher is not reported.
+    // and default chains plus, for an fcds_config listener, the FCDS chains its matcher references
+    // that are active. Reporting only via active listeners ties a reported name to being routable
+    // (an active listener's matcher dispatches to it) and active: a chain active in the
+    // process-wide FCDS manager but referenced only by a warming listener is not reported. An FCDS
+    // chain shared by several listeners is reported once.
     if (listener_manager_ != nullptr) {
       for (Network::ListenerConfig& listener :
            listener_manager_->listeners(Server::ListenerManager::ListenerState::ACTIVE)) {
         for (absl::string_view name : listener.filterChainManager().filterChainNames()) {
-          emit(name);
+          emit_once(name);
         }
       }
     }
@@ -145,7 +152,7 @@ void DynamicModuleBootstrapExtensionConfig::getActiveResourceNames(
   }
   case envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster:
     for (const auto& cluster_entry : context_.clusterManager().clusters().active_clusters_) {
-      emit(cluster_entry.first);
+      emit_once(cluster_entry.first);
     }
     break;
   case envoy_dynamic_module_type_bootstrap_active_resource_kind_TransportSocketMatch: {
@@ -158,14 +165,13 @@ void DynamicModuleBootstrapExtensionConfig::getActiveResourceNames(
       per_cluster_matches.push_back(cluster.get().info()->transportSocketMatcher().matchNames());
     }
     for (absl::string_view match_name : transportSocketMatchIntersection(per_cluster_matches)) {
-      emit(match_name);
+      emit_once(match_name);
     }
     break;
   }
   case envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret:
-    for (const std::string& secret_name :
-         context_.secretManager().dynamicActiveTlsCertificateSecretNames()) {
-      emit(secret_name);
+    for (absl::string_view secret_name : context_.secretManager().dynamicActiveSecretNames()) {
+      emit_once(secret_name);
     }
     break;
   }

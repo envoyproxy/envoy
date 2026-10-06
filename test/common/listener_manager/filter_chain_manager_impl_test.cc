@@ -211,6 +211,35 @@ TEST_P(FilterChainManagerImplTest, FilterChainMatchCaseInSensitive) {
   EXPECT_NE(filter_chain, nullptr);
 }
 
+TEST_P(FilterChainManagerImplTest, FilterChainNamesIncludeNamedDefaultChain) {
+  auto chain = std::make_shared<NiceMock<Network::MockFilterChain>>();
+  ON_CALL(*chain, name()).WillByDefault(Return("foo"));
+  EXPECT_CALL(*build_out_fallback_filter_chain_, name()).WillRepeatedly(Return("default_chain"));
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
+      .WillOnce(Return(build_out_fallback_filter_chain_));
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
+      .WillOnce(Return(chain))
+      .RetiresOnSaturation();
+  addSingleFilterChainHelper(filter_chain_template_, &fallback_filter_chain_);
+
+  EXPECT_THAT(filter_chain_manager_->filterChainNames(),
+              testing::UnorderedElementsAre("foo", "default_chain"));
+}
+
+TEST_P(FilterChainManagerImplTest, FilterChainNamesOmitUnnamedDefaultChain) {
+  auto chain = std::make_shared<NiceMock<Network::MockFilterChain>>();
+  ON_CALL(*chain, name()).WillByDefault(Return("foo"));
+  EXPECT_CALL(*build_out_fallback_filter_chain_, name()).WillRepeatedly(Return(""));
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
+      .WillOnce(Return(build_out_fallback_filter_chain_));
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
+      .WillOnce(Return(chain))
+      .RetiresOnSaturation();
+  addSingleFilterChainHelper(filter_chain_template_, &fallback_filter_chain_);
+
+  EXPECT_THAT(filter_chain_manager_->filterChainNames(), testing::UnorderedElementsAre("foo"));
+}
+
 TEST_P(FilterChainManagerImplTest, AddSingleFilterChain) {
   addSingleFilterChainHelper(filter_chain_template_);
   {
@@ -497,9 +526,9 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
   handle.reset();
 }
 
-// activeFilterChainNames() reports a chain only once it is warmed and committed, and drops it once
-// the subscription is torn down. Mirrors the active set updateTlsState() publishes to workers.
-TEST_P(FilterChainManagerImplTest, FcdsActiveFilterChainNames) {
+// A subscription handle reports its chain active only once it is warmed and committed. Mirrors the
+// active set updateTlsState() publishes to workers.
+TEST_P(FilterChainManagerImplTest, FcdsSubscriptionHandleIsActive) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
 
   auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
@@ -532,8 +561,9 @@ TEST_P(FilterChainManagerImplTest, FcdsActiveFilterChainNames) {
   ASSERT_TRUE(handle_or_status.ok());
   auto handle = std::move(handle_or_status).value();
 
+  EXPECT_EQ(handle->filterChainName(), filter_chain_name);
   // Subscribed but not yet warmed/committed: the chain is not active.
-  EXPECT_THAT(fcds_shared_manager->activeFilterChainNames(), testing::IsEmpty());
+  EXPECT_FALSE(handle->isActive());
 
   Init::ExpectableWatcherImpl init_watcher;
   EXPECT_CALL(init_watcher, ready());
@@ -549,12 +579,11 @@ TEST_P(FilterChainManagerImplTest, FcdsActiveFilterChainNames) {
   EXPECT_OK(fcds_callbacks->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
 
   // Committed: the chain is reported active.
-  EXPECT_THAT(fcds_shared_manager->activeFilterChainNames(),
-              testing::ElementsAre(absl::string_view(filter_chain_name)));
+  EXPECT_TRUE(handle->isActive());
 
-  // Destroyed (last handle released, subscription torn down): no longer reported.
+  // Last handle released, subscription torn down: the name is no longer active.
   handle.reset();
-  EXPECT_THAT(fcds_shared_manager->activeFilterChainNames(), testing::IsEmpty());
+  EXPECT_FALSE(fcds_shared_manager->isFilterChainActive(filter_chain_name));
 }
 
 // Warming a batch of filter chains in one event loop iteration publishes to workers only once.

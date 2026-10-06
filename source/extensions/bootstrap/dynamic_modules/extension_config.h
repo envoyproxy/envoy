@@ -173,9 +173,9 @@ public:
 
   /**
    * Enumerates the names of the currently active resources of a single kind: the active listeners'
-   * filter chains (inline and FCDS), the clusters, their transport socket matches, or the active
-   * dynamic TLS certificate secrets. `emit` is invoked once per name. A no-op before the server is
-   * initialized. Main thread only.
+   * filter chains (inline, default and routable FCDS chains), the clusters, the transport socket
+   * match names present in every cluster that has matches, or the active dynamic secrets. `emit`
+   * is invoked at most once per name. A no-op before the server is initialized. Main thread only.
    *
    * @param kind selects which kind of active resource to enumerate.
    * @param emit is invoked for each name; the string_view is valid only during that invocation.

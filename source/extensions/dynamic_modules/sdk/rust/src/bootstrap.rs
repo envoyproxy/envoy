@@ -13,9 +13,16 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 /// [`EnvoyBootstrapExtensionConfig::active_resource_names`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveResourceKind {
+  /// The named filter chains of the active listeners: inline chains, the default filter chain,
+  /// and FCDS chains that an active listener's matcher references and that are committed.
   FilterChain,
+  /// The names of the active clusters.
   Cluster,
+  /// The transport socket match names present in every active cluster that has matches. Clusters
+  /// with no matches do not constrain the result.
   TransportSocketMatch,
+  /// The names of the delivered dynamic (SDS) secrets: TLS certificates, certificate validation
+  /// contexts, session ticket keys and generic secrets.
   Secret,
 }
 
@@ -258,9 +265,8 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// This should be called at most once. Subsequent calls are no-ops and return `false`.
   fn enable_listener_lifecycle(&self) -> bool;
 
-  /// Returns the names of the currently active resources of the given kind: the active listeners'
-  /// filter chains, the clusters, their transport socket matches, or the active dynamic TLS
-  /// certificate secrets. This must be called on the main thread.
+  /// Returns the names of the currently active resources of the given kind, each at most once. See
+  /// [`ActiveResourceKind`] for what each kind reports. This must be called on the main thread.
   fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String>;
 }
 

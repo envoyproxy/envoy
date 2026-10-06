@@ -17,7 +17,6 @@
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/singleton/instance.h"
-#include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/hash.h"
@@ -519,12 +518,8 @@ public:
   // Unsubscribes a listener from FCDS distribution.
   void unsubscribe(const std::string& filter_chain_name, FcdsSubscriptionHandle& handle);
 
-  // Names of FCDS filter chains that are active (warmed and committed). Main-thread only; reads the
-  // same per-subscription committed chain that updateTlsState() publishes as active.
-  std::vector<absl::string_view> activeFilterChainNames() const;
-
-  // True if the named subscription's committed (active) filter chain is present. Same active-state
-  // test as activeFilterChainNames(), scoped to one name. Main-thread only.
+  // True if the named subscription's committed (active) filter chain is present, using the same
+  // active-state test that updateTlsState() publishes to workers. Main-thread only.
   bool isFilterChainActive(const std::string& filter_chain_name) const;
 
   // FilterChainUpdateCallbacks
@@ -556,12 +551,6 @@ private:
   // Coalesces thread local filter chain updates within a single event loop iteration.
   Event::SchedulableCallbackPtr tls_update_cb_;
 };
-
-// Helper function to look up the process-wide FCDS shared filter chain manager, returning it if it
-// has been created, else nullptr (non-constructing). The name must match
-// SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager) in listener_impl.cc.
-std::shared_ptr<FcdsSharedFilterChainManager>
-getFcdsSharedFilterChainManager(Singleton::Manager& singleton_manager);
 
 } // namespace Server
 } // namespace Envoy

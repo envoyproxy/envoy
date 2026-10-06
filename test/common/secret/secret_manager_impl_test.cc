@@ -403,7 +403,7 @@ tls_certificate:
             tls_config.privateKey());
 }
 
-TEST_F(SecretManagerImplTest, DynamicActiveTlsCertificateSecretNames) {
+TEST_F(SecretManagerImplTest, DynamicActiveSecretNames) {
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
   envoy::config::core::v3::ConfigSource config_source;
@@ -412,7 +412,7 @@ TEST_F(SecretManagerImplTest, DynamicActiveTlsCertificateSecretNames) {
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(init_manager, add(_))
-      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
+      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
       }));
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
@@ -420,29 +420,62 @@ TEST_F(SecretManagerImplTest, DynamicActiveTlsCertificateSecretNames) {
   EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
   EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
 
-  auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
+  // Delivers `yaml` to the most recently created provider's subscription.
+  auto deliver = [&](const std::string& yaml) {
+    envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+    const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+    init_target_handle->initialize(init_watcher);
+    EXPECT_OK(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, ""));
+  };
+
+  auto tls_provider = secret_manager->findOrCreateTlsCertificateProvider(
       config_source, "abc.com", secret_context.server_context_, init_manager, true);
   // Before delivery the secret is warming, not active.
-  EXPECT_TRUE(secret_manager->dynamicActiveTlsCertificateSecretNames().empty());
-
-  const std::string yaml =
-      R"EOF(
+  EXPECT_TRUE(secret_manager->dynamicActiveSecretNames().empty());
+  deliver(R"EOF(
 name: "abc.com"
 tls_certificate:
   certificate_chain:
     filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
   private_key:
     filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
-)EOF";
-  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
-  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
-  init_target_handle->initialize(init_watcher);
-  EXPECT_OK(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
-                ->onConfigUpdate(decoded_resources.refvec_, ""));
-  // Delivered: the secret is now active.
-  EXPECT_THAT(secret_manager->dynamicActiveTlsCertificateSecretNames(),
-              testing::UnorderedElementsAre("abc.com"));
+)EOF");
+  EXPECT_THAT(secret_manager->dynamicActiveSecretNames(), testing::UnorderedElementsAre("abc.com"));
+
+  auto validation_provider = secret_manager->findOrCreateCertificateValidationContextProvider(
+      config_source, "abc.com.validation", secret_context.server_context_, init_manager);
+  EXPECT_THAT(secret_manager->dynamicActiveSecretNames(), testing::UnorderedElementsAre("abc.com"));
+  deliver(R"EOF(
+name: "abc.com.validation"
+validation_context:
+  trusted_ca:
+    inline_string: "DUMMY_INLINE_STRING_TRUSTED_CA"
+)EOF");
+
+  auto stek_provider = secret_manager->findOrCreateTlsSessionTicketKeysContextProvider(
+      config_source, "abc.com.stek", secret_context.server_context_, init_manager);
+  deliver(R"EOF(
+name: "abc.com.stek"
+session_ticket_keys:
+  keys:
+    - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
+)EOF");
+
+  auto generic_provider = secret_manager->findOrCreateGenericSecretProvider(
+      config_source, "signing_key", secret_context.server_context_, init_manager, true);
+  EXPECT_THAT(secret_manager->dynamicActiveSecretNames(),
+              testing::UnorderedElementsAre("abc.com", "abc.com.validation", "abc.com.stek"));
+  deliver(R"EOF(
+name: "signing_key"
+generic_secret:
+  secret:
+    inline_string: "DUMMY_ECDSA_KEY"
+)EOF");
+  EXPECT_THAT(secret_manager->dynamicActiveSecretNames(),
+              testing::UnorderedElementsAre("abc.com", "abc.com.validation", "abc.com.stek",
+                                            "signing_key"));
 }
 
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {

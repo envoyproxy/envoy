@@ -6,4 +6,6 @@ filter chains, clusters, transport socket matches or secrets, so future kinds ar
 changing the ABI signature. The Rust SDK exposes this as ``active_resource_names``. For the filter
 chain kind, an FCDS-delivered chain is reported only while an active listener's matcher references
 it, so a name is returned only when the chain is both active and reachable, not merely committed in
-the process-wide FCDS manager.
+the process-wide FCDS manager. For the transport socket match kind, a name is reported only when it
+is present in every active cluster that has transport socket matches. The secret kind reports
+delivered dynamic TLS certificate, validation context, session ticket key and generic secrets.
