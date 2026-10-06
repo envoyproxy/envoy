@@ -10,7 +10,9 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/config/metadata.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/listener_manager/listener_impl.h"
 #include "source/common/listener_manager/listener_info_impl.h"
@@ -139,11 +141,43 @@ public:
     }
   }
 
+  // The pause trackers are fixture members so they outlive the manager built in each test.
+  void setupFcdsUpdateMocks(MockListenerComponentFactory& listener_component_factory) {
+    ON_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
+            subscriptionFromConfigSource(_, _, _, _, _, _))
+        .WillByDefault(Invoke(
+            [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
+                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
+                   const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+              fcds_subscription_callbacks_.push_back(&callbacks);
+              return std::make_unique<NiceMock<Config::MockSubscription>>();
+            }));
+    ON_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _))
+        .WillByDefault(
+            Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                      Configuration::FilterChainFactoryContext&)
+                       -> absl::StatusOr<Filter::NetworkFilterFactoriesList> {
+              return Filter::NetworkFilterFactoriesList{};
+            }));
+    ON_CALL(parent_context_.server_factory_context_.xds_manager_,
+            pause(fcds_filter_chain_type_url_))
+        .WillByDefault(Invoke([this](const std::string&) {
+          fcds_xds_paused_ = true;
+          fcds_pause_count_++;
+          return std::make_unique<Cleanup>([this]() { fcds_xds_paused_ = false; });
+        }));
+  }
+
   // Intermediate states.
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::vector<std::shared_ptr<Network::MockConnectionSocket>> sockets_;
   Event::MockSchedulableCallback* fcds_tls_update_cb_{};
+  std::vector<Config::SubscriptionCallbacks*> fcds_subscription_callbacks_;
+  const std::string fcds_filter_chain_type_url_{
+      Config::getTypeUrl<envoy::config::listener::v3::FilterChain>()};
+  bool fcds_xds_paused_{false};
+  int fcds_pause_count_{0};
 
   // Reusable template.
   const std::string filter_chain_yaml = R"EOF(
@@ -501,31 +535,13 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
 TEST_P(FilterChainManagerImplTest, FcdsCoalescesThreadLocalUpdates) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
   auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
+  setupFcdsUpdateMocks(listener_component_factory);
 
   envoy::config::core::v3::ConfigSource config_source;
   config_source.mutable_api_config_source()->set_api_type(
       envoy::config::core::v3::ApiConfigSource::GRPC);
   config_source.mutable_api_config_source()->set_transport_api_version(
       envoy::config::core::v3::ApiVersion::V3);
-
-  std::vector<Config::SubscriptionCallbacks*> subscription_callbacks;
-  ON_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
-          subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillByDefault(Invoke(
-          [&subscription_callbacks](
-              const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
-              Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
-              const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
-            subscription_callbacks.push_back(&callbacks);
-            return std::make_unique<NiceMock<Config::MockSubscription>>();
-          }));
-  ON_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _))
-      .WillByDefault(
-          Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
-                    Configuration::FilterChainFactoryContext&)
-                     -> absl::StatusOr<Filter::NetworkFilterFactoriesList> {
-            return Filter::NetworkFilterFactoriesList{};
-          }));
 
   testing::StrictMock<MockFcdsClientCallbacks> callbacks;
   const std::vector<std::string> names{"chain_a", "chain_b", "chain_c"};
@@ -536,7 +552,7 @@ TEST_P(FilterChainManagerImplTest, FcdsCoalescesThreadLocalUpdates) {
     ASSERT_TRUE(handle_or_status.ok());
     handles.push_back(std::move(handle_or_status).value());
   }
-  ASSERT_EQ(subscription_callbacks.size(), names.size());
+  ASSERT_EQ(fcds_subscription_callbacks_.size(), names.size());
 
   Init::ExpectableWatcherImpl init_watcher;
   EXPECT_CALL(init_watcher, ready());
@@ -549,17 +565,21 @@ TEST_P(FilterChainManagerImplTest, FcdsCoalescesThreadLocalUpdates) {
     filter_chain.set_name(names[i]);
     const auto decoded_resources = TestUtility::decodeResources({filter_chain});
     Protobuf::RepeatedPtrField<std::string> removed_resources;
-    EXPECT_OK(subscription_callbacks[i]->onConfigUpdate(decoded_resources.refvec_,
-                                                        removed_resources, "v1"));
+    EXPECT_OK(fcds_subscription_callbacks_[i]->onConfigUpdate(decoded_resources.refvec_,
+                                                              removed_resources, "v1"));
   }
 
-  // The publish is deferred, so workers observe nothing until the callback runs.
+  // The publish is deferred, so workers observe nothing and discovery stays paused until the
+  // callback runs. The batch pauses discovery exactly once.
+  EXPECT_TRUE(fcds_xds_paused_);
+  EXPECT_EQ(fcds_pause_count_, 1);
   for (const auto& name : names) {
     EXPECT_EQ(fcds_shared_manager->findThreadLocalFilterChain(name), nullptr);
   }
 
-  // Running the single coalesced callback publishes the full snapshot.
+  // Running the single coalesced callback publishes the full snapshot and resumes discovery.
   fcds_tls_update_cb_->invokeCallback();
+  EXPECT_FALSE(fcds_xds_paused_);
   for (const auto& name : names) {
     EXPECT_NE(fcds_shared_manager->findThreadLocalFilterChain(name), nullptr);
   }
@@ -571,11 +591,14 @@ TEST_P(FilterChainManagerImplTest, FcdsCoalescesThreadLocalUpdates) {
   for (size_t i = 0; i < 2; i++) {
     Protobuf::RepeatedPtrField<std::string> removed_resources;
     removed_resources.Add(std::string(names[i]));
-    EXPECT_OK(subscription_callbacks[i]->onConfigUpdate({}, removed_resources, "v2"));
+    EXPECT_OK(fcds_subscription_callbacks_[i]->onConfigUpdate({}, removed_resources, "v2"));
   }
   EXPECT_NE(fcds_shared_manager->findThreadLocalFilterChain(names[0]), nullptr);
+  EXPECT_TRUE(fcds_xds_paused_);
+  EXPECT_EQ(fcds_pause_count_, 2);
 
   fcds_tls_update_cb_->invokeCallback();
+  EXPECT_FALSE(fcds_xds_paused_);
   EXPECT_EQ(fcds_shared_manager->findThreadLocalFilterChain(names[0]), nullptr);
   EXPECT_EQ(fcds_shared_manager->findThreadLocalFilterChain(names[1]), nullptr);
   EXPECT_NE(fcds_shared_manager->findThreadLocalFilterChain(names[2]), nullptr);
@@ -583,6 +606,43 @@ TEST_P(FilterChainManagerImplTest, FcdsCoalescesThreadLocalUpdates) {
   for (auto& handle : handles) {
     handle.reset();
   }
+}
+
+// Destroying the manager with a publish pending releases the xDS pause.
+TEST_P(FilterChainManagerImplTest, FcdsReleasesPauseOnDestruction) {
+  NiceMock<MockListenerComponentFactory> listener_component_factory;
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
+  setupFcdsUpdateMocks(listener_component_factory);
+
+  envoy::config::core::v3::ConfigSource config_source;
+  config_source.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::GRPC);
+  config_source.mutable_api_config_source()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
+
+  auto handle_or_status =
+      fcds_shared_manager->subscribe(config_source, "chain", dummy_fcds_callbacks_, init_manager_);
+  ASSERT_TRUE(handle_or_status.ok());
+  auto handle = std::move(handle_or_status).value();
+  ASSERT_EQ(fcds_subscription_callbacks_.size(), 1);
+
+  Init::ExpectableWatcherImpl init_watcher;
+  EXPECT_CALL(init_watcher, ready());
+  init_manager_.initialize(init_watcher);
+
+  envoy::config::listener::v3::FilterChain filter_chain;
+  filter_chain.set_name("chain");
+  const auto decoded_resources = TestUtility::decodeResources({filter_chain});
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_OK(fcds_subscription_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_,
+                                                            removed_resources, "v1"));
+
+  // The publish is pending, so discovery is paused.
+  EXPECT_TRUE(fcds_xds_paused_);
+
+  handle.reset();
+  fcds_shared_manager.reset();
+  EXPECT_FALSE(fcds_xds_paused_);
 }
 
 TEST_P(FilterChainManagerImplTest, FcdsNoMatcherFails) {

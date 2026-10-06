@@ -105,6 +105,13 @@ namespace {
 // carried by an 'envoy.http_conn_manager_prefix' tag.
 constexpr absl::string_view HttpBaseStatPrefix = "http";
 
+// Fraction of the drain time over which the probability of drain-closing on a response ramps up
+// to one. Every response sent later in the drain sequence drains the connection.
+constexpr double DrainCloseRampFactor = 0.5;
+// Fraction of the drain time after which the connections that are still not draining start to
+// be drained proactively, see ConnectionManagerImpl::onDrain().
+constexpr double ProactiveDrainWindowStart = 2.0 / 3.0;
+
 std::string httpFlatStatPrefix(absl::string_view stat_prefix) {
   return absl::StrCat(HttpBaseStatPrefix, ".", stat_prefix, ".");
 }
@@ -740,9 +747,26 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 }
 
 void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
-  if (!connection_drain_event_.has_value()) {
-    connection_drain_event_ = drain_event;
+  // The legacy path polls the DrainDecision instead and never looks at the event.
+  if (!use_connection_event_drain_ || connection_drain_event_.has_value()) {
+    return;
   }
+  connection_drain_event_ = drain_event;
+
+  // The drain-close decision is otherwise only made when a response is encoded, so a connection
+  // that is idle, has a low request rate or only carries long-lived streams would stay open until
+  // the end of the drain sequence and then be closed without notice, together with every other
+  // connection like it. Arrange for the connection to drain itself in the last part of the drain
+  // window instead, early enough for the drain sequence (drainTimeout()) to complete. A connection
+  // accepted after that part of the window has begun is not drained proactively.
+  const std::chrono::milliseconds delay = Network::proactiveDrainDelay(
+      server_context_, drain_event, config_->drainTimeout(), ProactiveDrainWindowStart);
+  if (delay.count() == 0) {
+    return;
+  }
+  proactive_drain_timer_ =
+      dispatcher_->createTimer([this]() -> void { onProactiveDrainTimeout(); });
+  proactive_drain_timer_->enableTimer(delay);
 }
 
 bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
@@ -750,7 +774,8 @@ bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
     return drain_close_.drainClose(scope);
   }
 
-  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
+  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_,
+                                   DrainCloseRampFactor);
 }
 
 void ConnectionManagerImpl::doConnectionClose(
@@ -769,6 +794,11 @@ void ConnectionManagerImpl::doConnectionClose(
   if (drain_timer_) {
     drain_timer_->disableTimer();
     drain_timer_.reset();
+  }
+
+  if (proactive_drain_timer_) {
+    proactive_drain_timer_->disableTimer();
+    proactive_drain_timer_.reset();
   }
 
   if (!streams_.empty()) {
@@ -918,6 +948,60 @@ void ConnectionManagerImpl::onDrainTimeout() {
   codec_->goAway();
   drain_state_ = DrainState::Closing;
   checkForDeferredClose(false);
+  // Only once the end of the drain window is near: a drain sequence started earlier (e.g. by a
+  // response) must not cut the tunneling streams short while other traffic on the connection can
+  // still complete normally.
+  if (proactive_drain_) {
+    resetTunnelingStreams();
+  }
+}
+
+void ConnectionManagerImpl::onProactiveDrainTimeout() {
+  ENVOY_CONN_LOG(debug, "drain deadline approaching, draining connection",
+                 read_callbacks_->connection());
+  proactive_drain_ = true;
+  if (!codec_) {
+    // Nothing was ever received on this connection, so there is no peer to drain gracefully.
+    stats_.named_.downstream_cx_drain_close_.inc();
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, std::nullopt,
+                      StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection);
+  } else if (drain_state_ == DrainState::NotDraining) {
+    // Start the drain sequence. The tunneling streams still active when it completes are reset in
+    // onDrainTimeout().
+    stats_.named_.downstream_cx_drain_close_.inc();
+    startDrainSequence();
+  } else if (drain_state_ == DrainState::Closing) {
+    // The connection is only kept open by its remaining streams. On HTTP/1 this is the case for
+    // every WebSocket or CONNECT tunnel, as establishing it marks the connection as closing.
+    // On HTTP/2 and HTTP/3 it happens when a drain sequence started earlier, e.g.
+    // by the response of an ordinary stream, completed while a tunneling stream was still active.
+    // Either way nothing else will end the tunneling streams, so reset them now.
+    stats_.named_.downstream_cx_drain_close_.inc();
+    resetTunnelingStreams();
+  }
+  // Otherwise the drain sequence is already running and onDrainTimeout() resets the tunneling
+  // streams when it completes.
+}
+
+void ConnectionManagerImpl::resetTunnelingStreams() {
+  ASSERT(drain_state_ == DrainState::Closing);
+  // Upgraded and CONNECT streams cannot be told to go away (no "Connection: close" can be sent on
+  // them anymore, and a GOAWAY does not end them), and they would otherwise all be terminated at
+  // the same moment at the end of the drain sequence. Reset them now: this happens at a different
+  // time for every connection, which spreads out the reconnects. Ordinary requests are left to
+  // complete.
+  for (auto it = streams_.begin(); it != streams_.end();) {
+    // Resetting the stream removes it from the list, so advance first.
+
+    auto stream = (it++)->get();
+    if (!stream->state_.is_tunneling_ || stream->state_.is_zombie_stream_) {
+      continue;
+    }
+    ENVOY_STREAM_LOG(debug, "resetting tunneling stream of drained connection", *stream);
+    stream->filter_manager_.streamInfo().setResponseCodeDetails(
+        StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection);
+    stream->resetStream();
+  }
 }
 
 void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
@@ -2118,9 +2202,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     }
   }
 
-  // If we are destroying a stream before remote is complete and the connection does not support
-  // multiplexing, we should disconnect since we don't want to wait around for the request to
-  // finish.
+  // If the response headers are sent before the request is complete and the connection does not
+  // support multiplexing, the connection has to be closed once this stream ends: the rest of the
+  // request cannot be skipped to get to the next one.
+  // Besides early responses (e.g. rejecting a large upload), this covers every HTTP/1 upgrade and
+  // CONNECT, as their request "body" is the tunneled payload, so such a connection is Closing from
+  // the moment the tunnel is established and closes as soon as the tunnel ends.
   if (!filter_manager_.hasLastDownstreamByteReceived()) {
     if (connection_manager_.codec_->protocol() < Protocol::Http2) {
       connection_manager_.drain_state_ = DrainState::Closing;

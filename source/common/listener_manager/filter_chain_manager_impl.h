@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/config/grpc_mux.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/schedulable_cb.h"
@@ -531,6 +532,9 @@ private:
 
   // Coalesces thread local filter chain updates within a single event loop iteration.
   Event::SchedulableCallbackPtr tls_update_cb_;
+
+  // Pauses filter chain discovery requests while a thread local publish is pending.
+  Config::ScopedResume xds_pause_;
 };
 
 } // namespace Server
