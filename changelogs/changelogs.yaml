@@ -42,6 +42,8 @@ sections:
 areas:
   access_log:
     title: access_log
+  api_key_auth:
+    title: api_key_auth
   attributes:
     title: attributes
   build:
