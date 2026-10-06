@@ -149,6 +149,7 @@ def _host_llvm_repo_impl(repository_ctx):
     build = _llvm_repo_build(version)
     repository_ctx.file(
         "BUILD.bazel",
+#        build,
         _add_exe_suffix(build) if is_windows else build,
     )
     _write_llvm_bzl(repository_ctx, version, lib_dir, True)
@@ -230,7 +231,7 @@ _host_llvm = tag_class(
     attrs = {
         "llvm_version": attr.string(default = ""),
         # Defaults to the BAZEL_LLVM_PATH or BAZEL_LLVM environment variable.
-        "path": attr.string(mandatory = True),
+        "path": attr.string(default = ""),
     },
 )
 
