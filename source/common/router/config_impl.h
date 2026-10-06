@@ -1110,6 +1110,7 @@ public:
 
 private:
   const std::string uri_template_;
+  const bool uri_template_redirect_use_request_path_;
 };
 
 /**
