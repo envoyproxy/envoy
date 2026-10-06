@@ -352,6 +352,39 @@ TEST_F(GeoipProviderTest, CountryGeonameIdFallbackToCityDb) {
   expectStats("city_db");
 }
 
+TEST_F(GeoipProviderTest, CityDbExtendedFieldsUsAddress) {
+  // US IP exercises metro_code (UINT16), postal_code, and latitude/longitude formatting.
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+        city: "x-geo-city"
+        latitude: "x-geo-latitude"
+        longitude: "x-geo-longitude"
+        time_zone: "x-geo-time-zone"
+        postal_code: "x-geo-postal-code"
+        metro_code: "x-geo-metro-code"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("216.160.83.56");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  ASSERT_EQ(7, captured_lookup_response_.size());
+  EXPECT_EQ("US", captured_lookup_response_["x-geo-country"]);
+  EXPECT_EQ("Milton", captured_lookup_response_["x-geo-city"]);
+  EXPECT_EQ("47.2513", captured_lookup_response_["x-geo-latitude"]);
+  EXPECT_EQ("-122.3149", captured_lookup_response_["x-geo-longitude"]);
+  EXPECT_EQ("America/Los_Angeles", captured_lookup_response_["x-geo-time-zone"]);
+  EXPECT_EQ("98354", captured_lookup_response_["x-geo-postal-code"]);
+  EXPECT_EQ("819", captured_lookup_response_["x-geo-metro-code"]);
+  expectStats("city_db");
+}
+
 TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
@@ -1052,6 +1085,18 @@ TEST_F(GeoipProviderTest, GeoDbPathDoesNotExist) {
   )EOF";
   EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
                           "Unable to open Maxmind database file");
+}
+
+TEST_F(GeoipProviderTest, CityOnlyFieldsWithoutCityDbRejected) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+        latitude: "x-geo-latitude"
+    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
+                          "city_db_path is required when any of the following geo_field_keys");
 }
 
 struct GeoipProviderGeoDbNotSetTestCase {
