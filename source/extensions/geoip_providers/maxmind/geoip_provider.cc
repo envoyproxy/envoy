@@ -124,22 +124,25 @@ std::optional<std::string> lookupValue(MMDB_lookup_result_s& mmdb_lookup_result,
     return std::nullopt;
   }
 
-  if (entry_data.type == MMDB_DATA_TYPE_UTF8_STRING) {
+  switch (entry_data.type) {
+  case MMDB_DATA_TYPE_UTF8_STRING:
     return std::string(entry_data.utf8_string, entry_data.data_size);
-  }
-  if (entry_data.type == MMDB_DATA_TYPE_UINT32 && entry_data.uint32 > 0) {
-    return std::to_string(entry_data.uint32);
-  }
-  if (entry_data.type == MMDB_DATA_TYPE_BOOLEAN) {
+  case MMDB_DATA_TYPE_UINT32:
+    // A value of 0 is treated as unset (e.g. GeoNames ID not available).
+    return entry_data.uint32 > 0 ? std::make_optional(std::to_string(entry_data.uint32))
+                                 : std::nullopt;
+  case MMDB_DATA_TYPE_UINT16:
+    // A value of 0 is treated as unset (e.g. metro code not available).
+    return entry_data.uint16 > 0 ? std::make_optional(std::to_string(entry_data.uint16))
+                                 : std::nullopt;
+  case MMDB_DATA_TYPE_BOOLEAN:
     return entry_data.boolean ? "true" : "false";
+  case MMDB_DATA_TYPE_DOUBLE:
+    // Fixed 4-decimal-place format for predictable output (e.g. "58.4167", "-122.3149").
+    return fmt::format("{:.4f}", entry_data.double_value);
+  default:
+    return std::nullopt;
   }
-  if (entry_data.type == MMDB_DATA_TYPE_UINT16 && entry_data.uint16 > 0) {
-    return std::to_string(entry_data.uint16);
-  }
-  if (entry_data.type == MMDB_DATA_TYPE_DOUBLE) {
-    return fmt::format("{}", entry_data.double_value);
-  }
-  return std::nullopt;
 }
 
 void populateGeoLookupResults(const GeoipProviderConfig& config,
