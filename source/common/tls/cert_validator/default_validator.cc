@@ -56,56 +56,24 @@ SINGLETON_MANAGER_REGISTRATION(private_key_cache);
 
 absl::StatusOr<CrlListSharedPtr> CrlCache::getOrCreate(const std::string& crl_pem,
                                                        const std::string& crl_path) {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-
-  // Key by a SHA-256 digest of the CRL rather than the CRL itself, to avoid
-  // holding a second full copy of potentially large CRL data. SHA-256 is
-  // collision resistant, so distinct CRLs never share a cache entry.
-  std::array<uint8_t, SHA256_DIGEST_LENGTH> key;
-  SHA256(reinterpret_cast<const uint8_t*>(crl_pem.data()), crl_pem.size(), key.data());
-
-  if (auto it = cache_.find(key); it != cache_.end()) {
-    if (CrlListSharedPtr existing = it->second.lock(); existing != nullptr) {
-      return existing;
+  return getOrParse(crl_pem, [&]() -> absl::StatusOr<std::unique_ptr<CrlList>> {
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(crl_pem.data()), crl_pem.size()));
+    RELEASE_ASSERT(bio != nullptr, "");
+    // Based on BoringSSL's X509_load_cert_crl_file().
+    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+    if (list == nullptr) {
+      return absl::InvalidArgumentError(absl::StrCat("Failed to load CRL from ", crl_path));
     }
-  }
 
-  // Only reached when a new distinct CRL is seen, which is uncommon. Release
-  // entries whose last referencing context has been torn down so the map does
-  // not grow without bound across xDS updates.
-  absl::erase_if(cache_, [](const auto& entry) { return entry.second.expired(); });
-
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(crl_pem.data()), crl_pem.size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  // Based on BoringSSL's X509_load_cert_crl_file().
-  bssl::UniquePtr<STACK_OF(X509_INFO)> list(
-      PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-  if (list == nullptr) {
-    return absl::InvalidArgumentError(absl::StrCat("Failed to load CRL from ", crl_path));
-  }
-
-  auto crl_list = std::make_shared<CrlList>();
-  // Hold the cache alive for as long as this entry is referenced, so callers
-  // only need to keep the returned CrlList.
-  crl_list->cache = shared_from_this();
-  for (const X509_INFO* item : list.get()) {
-    if (item->crl) {
-      crl_list->crls.push_back(bssl::UpRef(item->crl));
+    auto crl_list = std::make_unique<CrlList>();
+    for (const X509_INFO* item : list.get()) {
+      if (item->crl) {
+        crl_list->crls.push_back(bssl::UpRef(item->crl));
+      }
     }
-  }
-  cache_[key] = crl_list;
-  return crl_list;
-}
-
-size_t CrlCache::size() const {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-  size_t count = 0;
-  for (const auto& entry : cache_) {
-    if (!entry.second.expired()) {
-      ++count;
-    }
-  }
-  return count;
+    return crl_list;
+  });
 }
 
 std::shared_ptr<CrlCache> getCrlCache(Singleton::Manager& singleton_manager) {
@@ -115,66 +83,33 @@ std::shared_ptr<CrlCache> getCrlCache(Singleton::Manager& singleton_manager) {
 
 absl::StatusOr<CaCertListSharedPtr> CaCertCache::getOrCreate(const std::string& ca_pem,
                                                              const std::string& ca_path) {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-
-  // Key by a SHA-256 digest of the CA blob rather than the blob itself, to avoid
-  // holding a second full copy of a potentially large trust bundle. SHA-256 is
-  // collision resistant, so distinct bundles never share a cache entry.
-  std::array<uint8_t, SHA256_DIGEST_LENGTH> key;
-  SHA256(reinterpret_cast<const uint8_t*>(ca_pem.data()), ca_pem.size(), key.data());
-
-  if (auto it = cache_.find(key); it != cache_.end()) {
-    if (CaCertListSharedPtr existing = it->second.lock(); existing != nullptr) {
-      return existing;
+  return getOrParse(ca_pem, [&]() -> absl::StatusOr<std::unique_ptr<CaCertList>> {
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(ca_pem.data()), ca_pem.size()));
+    RELEASE_ASSERT(bio != nullptr, "");
+    // Based on BoringSSL's X509_load_cert_crl_file().
+    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+    if (list == nullptr) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
     }
-  }
 
-  // Only reached when a new distinct CA blob is seen, which is uncommon. Release
-  // entries whose last referencing context has been torn down so the map does
-  // not grow without bound across xDS updates.
-  absl::erase_if(cache_, [](const auto& entry) { return entry.second.expired(); });
-
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(ca_pem.data()), ca_pem.size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  // Based on BoringSSL's X509_load_cert_crl_file().
-  bssl::UniquePtr<STACK_OF(X509_INFO)> list(
-      PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-  if (list == nullptr) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
-  }
-
-  auto ca_cert_list = std::make_shared<CaCertList>();
-  // Hold the cache alive for as long as this entry is referenced, so callers
-  // only need to keep the returned CaCertList.
-  ca_cert_list->cache = shared_from_this();
-  for (const X509_INFO* item : list.get()) {
-    if (item->x509) {
-      ca_cert_list->certs.push_back(bssl::UpRef(item->x509));
+    auto ca_cert_list = std::make_unique<CaCertList>();
+    for (const X509_INFO* item : list.get()) {
+      if (item->x509) {
+        ca_cert_list->certs.push_back(bssl::UpRef(item->x509));
+      }
+      if (item->crl) {
+        ca_cert_list->crls.push_back(bssl::UpRef(item->crl));
+      }
     }
-    if (item->crl) {
-      ca_cert_list->crls.push_back(bssl::UpRef(item->crl));
+    // A blob that parses but carries no certificate is not a usable trust bundle.
+    if (ca_cert_list->certs.empty()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
     }
-  }
-  // A blob that parses but carries no certificate is not a usable trust bundle.
-  if (ca_cert_list->certs.empty()) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
-  }
-
-  cache_[key] = ca_cert_list;
-  return ca_cert_list;
-}
-
-size_t CaCertCache::size() const {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-  size_t count = 0;
-  for (const auto& entry : cache_) {
-    if (!entry.second.expired()) {
-      ++count;
-    }
-  }
-  return count;
+    return ca_cert_list;
+  });
 }
 
 std::shared_ptr<CaCertCache> getCaCertCache(Singleton::Manager& singleton_manager) {
@@ -184,66 +119,35 @@ std::shared_ptr<CaCertCache> getCaCertCache(Singleton::Manager& singleton_manage
 
 absl::StatusOr<CertChainSharedPtr> CertChainCache::getOrCreate(const std::string& cert_pem,
                                                                const std::string& cert_path) {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-
-  // Key by a SHA-256 digest of the chain PEM rather than the PEM itself. SHA-256
-  // is collision resistant, so distinct chains never share a cache entry.
-  std::array<uint8_t, SHA256_DIGEST_LENGTH> key;
-  SHA256(reinterpret_cast<const uint8_t*>(cert_pem.data()), cert_pem.size(), key.data());
-
-  if (auto it = cache_.find(key); it != cache_.end()) {
-    if (CertChainSharedPtr existing = it->second.lock(); existing != nullptr) {
-      return existing;
+  return getOrParse(cert_pem, [&]() -> absl::StatusOr<std::unique_ptr<CertChain>> {
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert_pem.data()), cert_pem.size()));
+    RELEASE_ASSERT(bio != nullptr, "");
+    // The leaf carries trust settings, so read it with the AUX variant; any
+    // remaining certificates are the intermediate chain.
+    auto cert_chain = std::make_unique<CertChain>();
+    cert_chain->leaf.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
+    if (cert_chain->leaf == nullptr) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load certificate chain from ", cert_path));
     }
-  }
-
-  // Only reached when a new distinct chain is seen. Release entries whose last
-  // referencing context has been torn down so the map does not grow without
-  // bound across xDS updates.
-  absl::erase_if(cache_, [](const auto& entry) { return entry.second.expired(); });
-
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert_pem.data()), cert_pem.size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  // The leaf carries trust settings, so read it with the AUX variant; any
-  // remaining certificates are the intermediate chain.
-  auto cert_chain = std::make_shared<CertChain>();
-  cert_chain->leaf.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
-  if (cert_chain->leaf == nullptr) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load certificate chain from ", cert_path));
-  }
-  while (true) {
-    bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-    if (cert == nullptr) {
-      break;
+    while (true) {
+      bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+      if (cert == nullptr) {
+        break;
+      }
+      cert_chain->intermediates.push_back(std::move(cert));
     }
-    cert_chain->intermediates.push_back(std::move(cert));
-  }
-  // A trailing "no start line" error just marks EOF after the last certificate;
-  // any other error is a real parse failure.
-  const uint32_t err = ERR_peek_last_error();
-  if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
-    ERR_clear_error();
-  } else {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load certificate chain from ", cert_path));
-  }
-
-  // Hold the cache alive for as long as this entry is referenced.
-  cert_chain->cache = shared_from_this();
-  cache_[key] = cert_chain;
-  return cert_chain;
-}
-
-size_t CertChainCache::size() const {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-  size_t count = 0;
-  for (const auto& entry : cache_) {
-    if (!entry.second.expired()) {
-      ++count;
+    // A trailing "no start line" error just marks EOF after the last certificate;
+    // any other error is a real parse failure.
+    const uint32_t err = ERR_peek_last_error();
+    if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+      ERR_clear_error();
+    } else {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load certificate chain from ", cert_path));
     }
-  }
-  return count;
+    return cert_chain;
+  });
 }
 
 std::shared_ptr<CertChainCache> getCertChainCache(Singleton::Manager& singleton_manager) {
@@ -254,51 +158,20 @@ std::shared_ptr<CertChainCache> getCertChainCache(Singleton::Manager& singleton_
 
 absl::StatusOr<ParsedPrivateKeySharedPtr>
 PrivateKeyCache::getOrCreate(const std::string& key_pem, const std::string& key_path) {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-
-  // Key by a SHA-256 digest of the key PEM rather than the PEM itself. SHA-256
-  // is collision resistant, so distinct keys never share a cache entry.
-  std::array<uint8_t, SHA256_DIGEST_LENGTH> key;
-  SHA256(reinterpret_cast<const uint8_t*>(key_pem.data()), key_pem.size(), key.data());
-
-  if (auto it = cache_.find(key); it != cache_.end()) {
-    if (ParsedPrivateKeySharedPtr existing = it->second.lock(); existing != nullptr) {
-      return existing;
+  // The FIPS pairwise check is deferred to the first caller (see loadPrivateKey), so it runs once
+  // per distinct key rather than once per context.
+  return getOrParse(key_pem, [&]() -> absl::StatusOr<std::unique_ptr<ParsedPrivateKey>> {
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(key_pem.data()), key_pem.size()));
+    RELEASE_ASSERT(bio != nullptr, "");
+    auto parsed_key = std::make_unique<ParsedPrivateKey>();
+    parsed_key->pkey.reset(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+    if (parsed_key->pkey == nullptr) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load private key from ", key_path,
+                       ", Cause: ", Utility::getLastCryptoError().value_or("unknown")));
     }
-  }
-
-  // Only reached when a new distinct key is seen. Release entries whose last
-  // referencing context has been torn down so the map does not grow without
-  // bound across xDS updates.
-  absl::erase_if(cache_, [](const auto& entry) { return entry.second.expired(); });
-
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(key_pem.data()), key_pem.size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  auto parsed_key = std::make_shared<ParsedPrivateKey>();
-  parsed_key->pkey.reset(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
-  if (parsed_key->pkey == nullptr) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load private key from ", key_path,
-                     ", Cause: ", Utility::getLastCryptoError().value_or("unknown")));
-  }
-
-  // Hold the cache alive for as long as this entry is referenced. The FIPS
-  // pairwise check is deferred to the first caller (see loadPrivateKey), so it
-  // runs once per distinct key rather than once per context.
-  parsed_key->cache = shared_from_this();
-  cache_[key] = parsed_key;
-  return parsed_key;
-}
-
-size_t PrivateKeyCache::size() const {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-  size_t count = 0;
-  for (const auto& entry : cache_) {
-    if (!entry.second.expired()) {
-      ++count;
-    }
-  }
-  return count;
+    return parsed_key;
+  });
 }
 
 std::shared_ptr<PrivateKeyCache> getPrivateKeyCache(Singleton::Manager& singleton_manager) {
