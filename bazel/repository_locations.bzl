@@ -359,10 +359,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://archives.boost.io/release/{version}/source/boost_{underscore_version}.tar.gz"],
     ),
     brotli = dict(
-        version = "1.2.0",
-        sha256 = "816c96e8e8f193b40151dad7e8ff37b1221d019dbcb9c35cd3fadbfe6477dfec",
+        version = "42a2ed4355bc6287da6bb6319f090b499cba4550",
+        sha256 = "aae3527bd1eeb596d1dbc994e3eb45b4df6d1c59666438400f09073b761fe913",
         strip_prefix = "brotli-{version}",
-        urls = ["https://github.com/google/brotli/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/google/brotli/archive/{version}.tar.gz"],
     ),
     zstd = dict(
         version = "1.5.7",
