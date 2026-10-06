@@ -8,8 +8,10 @@
 #include "envoy/extensions/http/ai_filters/transcoder/v3/transcoder.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
@@ -58,9 +60,11 @@ using HttpFilters::AiProtocolManager::InMemoryExternalBufferFactory;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
+using HttpFilters::AiProtocolManager::ResponseLlmProtocol;
 using HttpFilters::AiProtocolManager::SseStreamPropagator;
 using HttpFilters::AiProtocolManager::SseStreamReceiver;
 using HttpFilters::AiProtocolManager::TranscodingEngine;
+namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 using TranscoderProto = envoy::extensions::http::ai_filters::transcoder::v3::Transcoder;
 
 // Intermediate AI filter that sits between `TO_IR` and `FROM_IR` and verifies that the payload
@@ -163,10 +167,15 @@ public:
   }
 
   void runDecodeChain(std::vector<AiFilterSharedPtr> filters, const std::string& payload) {
+    FilterManager manager(std::move(filters));
+    runDecodeChain(manager, payload);
+  }
+
+  // Runs `payload` through `manager`'s request chain.
+  void runDecodeChain(FilterManager& manager, const std::string& payload) {
     JsonWithExtBuf doc;
     doc.setJson(nlohmann::json::parse(payload));
 
-    FilterManager manager(std::move(filters));
     manager.startRequest(
         std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
         [this](absl::Status s) {
@@ -202,6 +211,10 @@ public:
   std::string runResponse(std::vector<AiFilterSharedPtr> filters, const std::string& body,
                           bool sse) {
     FilterManager manager(std::move(filters));
+    return runResponse(manager, body, sse);
+  }
+
+  std::string runResponse(FilterManager& manager, const std::string& body, bool sse) {
     FakeBridge bridge(*dispatcher_);
     BufferManager out(BufferManager::Config{}, factory_, bridge);
     absl::Status status;
@@ -231,6 +244,18 @@ public:
     const auto counter =
         TestUtility::findCounter(stats_store_, "ai_protocol_manager.transcoder." + name);
     return counter != nullptr ? counter->value() : 0;
+  }
+
+  // Leaves a string instruction at `key` in the stream's filter state, as a filter ahead of the
+  // transcoder (a model router, `set_filter_state`, an ext_proc callout) would.
+  void setInstruction(absl::string_view key, absl::string_view value) {
+    stream_info_.filterState()->setData(key, std::make_shared<Router::StringAccessorImpl>(value),
+                                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+  void setResponseProtocolInstruction(LLMProtocol protocol) {
+    stream_info_.filterState()->setData(FilterStateKeys::LlmProtocolResponse,
+                                        std::make_shared<ResponseLlmProtocol>(protocol),
+                                        StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
   Api::ApiPtr api_;
@@ -485,6 +510,119 @@ TEST_F(TranscoderFilterTest, UnsetRequestHandlingPassesRequestThroughUntouched) 
   EXPECT_EQ(counterValue("transcoded"), 0);
   EXPECT_EQ(counterValue("failed"), 0);
   EXPECT_EQ(counterValue("unresolved"), 0);
+}
+
+// ---------------------------------------------------------------------------
+// Transcoding instructions in filter state.
+
+// An OpenAI client, a route that declares Gemini, and a model router that chose Claude on Vertex
+// AI instead: it leaves the backend's dialect, the path Vertex expects, and the resolved model in
+// filter state, and the request goes out as Anthropic Messages to that path, naming that model.
+// The response then comes back through the same instance as Anthropic, not Gemini.
+TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChose) {
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+  setResponseProtocolInstruction(LLMProtocol::AnthropicMessages);
+  setInstruction(FilterStateKeys::UriPatternResponse,
+                 "/v1/projects/p/locations/l/publishers/anthropic/models/"
+                 "{model}:{rawPredict|streamRawPredict}");
+  setInstruction(FilterStateKeys::ModelResolved, "claude-sonnet-4-5@20250929");
+
+  FilterManager manager({std::make_shared<TranscoderFilter>(
+      makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR),
+      makeContext(LLMProtocol::OpenAiChatCompletions))});
+  runDecodeChain(manager, R"({
+    "model": "claude-sonnet", "max_completion_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(local_reply_code_, Http::Code::OK);
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/projects/p/locations/l/publishers/anthropic/"
+                                             "models/claude-sonnet-4-5@20250929:rawPredict");
+  const nlohmann::json out = forwarded();
+  EXPECT_EQ(out["model"], "claude-sonnet-4-5@20250929");
+  EXPECT_EQ(out["max_tokens"], 16);
+  EXPECT_EQ(out["messages"][0]["content"], "Hi");
+  EXPECT_EQ(counterValue("transcoded"), 1);
+
+  const std::string wire = runResponse(
+      manager,
+      R"({"id":"msg_1","type":"message","role":"assistant","model":"claude-sonnet-4-5@20250929",)"
+      R"("content":[{"type":"text","text":"Hello back!"}],"stop_reason":"end_turn",)"
+      R"("usage":{"input_tokens":12,"output_tokens":30}})",
+      /*sse=*/false);
+  const nlohmann::json response = nlohmann::json::parse(wire);
+  EXPECT_EQ(response["object"], "chat.completion");
+  EXPECT_EQ(response["model"], "claude-sonnet-4-5@20250929");
+  EXPECT_EQ(response["choices"][0]["message"]["content"], "Hello back!");
+  EXPECT_EQ(counterValue("transcoded"), 2);
+  EXPECT_EQ(counterValue("failed"), 0);
+  EXPECT_EQ(counterValue("unresolved"), 0);
+}
+
+// A request pattern tells the `TO_IR` leg where the client's path names the model and streaming
+// mode, for a dialect whose own layout says nothing about the path.
+TEST_F(TranscoderFilterTest, RequestUriPatternLiftsTheModelFromTheClientsPath) {
+  setInstruction(FilterStateKeys::UriPatternRequest, "/anthropic/{model}/{messages|stream}");
+
+  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::AnthropicMessages,
+                  R"({"max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})",
+                  "/anthropic/claude-sonnet-4-5/stream");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(local_reply_code_, Http::Code::OK);
+  const nlohmann::json out = forwarded();
+  EXPECT_EQ(out["model"], "claude-sonnet-4-5");
+  EXPECT_EQ(out["stream"], true);
+  EXPECT_EQ(counterValue("transcoded"), 1);
+}
+
+// An instance that transcodes no request still reads the instructions: the backend's dialect
+// decides which response leg runs, and the request pattern names the model a Gemini response
+// lacks.
+TEST_F(TranscoderFilterTest, ResponseOnlyInstanceFollowsTheInstructionsToo) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                    {":path", "/gateway/gemini-2.5-pro/chat"}};
+  setResponseProtocolInstruction(LLMProtocol::GeminiGenerateContent);
+  setInstruction(FilterStateKeys::UriPatternRequest, "/gateway/{model}/{chat|chat-stream}");
+
+  FilterManager manager({std::make_shared<TranscoderFilter>(
+      makeConfig(TranscoderProto::DIRECTION_UNSPECIFIED, TranscoderProto::TO_IR),
+      makeContext(LLMProtocol::OpenAiChatCompletions))});
+  runDecodeChain(manager, R"({"messages": [{"role": "user", "content": "Hi"}]})");
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/gateway/gemini-2.5-pro/chat");
+
+  const std::string wire =
+      runResponse(manager,
+                  R"({"candidates":[{"content":{"role":"model","parts":[{"text":"Hello back!"}]},)"
+                  R"("finishReason":"STOP"}]})",
+                  /*sse=*/false);
+  const nlohmann::json response = nlohmann::json::parse(wire);
+  EXPECT_EQ(response["object"], "chat.completion");
+  EXPECT_EQ(response["model"], "gemini-2.5-pro");
+  EXPECT_EQ(response["choices"][0]["message"]["content"], "Hello back!");
+  EXPECT_EQ(counterValue("transcoded"), 1);
+}
+
+// A pattern that does not parse is the proxy's configuration at fault, so the request fails with
+// a 500, counted as `unresolved`, before anything is transcoded.
+TEST_F(TranscoderFilterTest, UnparseablePatternInstructionFailsTheRequest) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  setInstruction(FilterStateKeys::UriPatternResponse, "/v1/{model/messages");
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
+                  R"({"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"}]})");
+
+  EXPECT_EQ(local_reply_code_, Http::Code::InternalServerError);
+  EXPECT_THAT(local_reply_details_, testing::HasSubstr("envoy.ai.uri_pattern.response"));
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/chat/completions");
+  EXPECT_EQ(counterValue("unresolved"), 1);
+  EXPECT_EQ(counterValue("failed"), 0);
+  EXPECT_EQ(counterValue("transcoded"), 0);
 }
 
 // When `response_handling` is unset, an SSE response also passes through untouched.
