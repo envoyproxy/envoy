@@ -1804,7 +1804,12 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
     // notifies the cluster manager about it.
     return;
   }
-  // Let all the worker threads know that the discovery timed out.
+  if (status == ClusterDiscoveryStatus::Missing) {
+    cm_stats_.odcds_missing_.inc();
+  } else if (status == ClusterDiscoveryStatus::Timeout) {
+    cm_stats_.odcds_timeout_.inc();
+  }
+  // Let all worker threads know how the discovery completed.
   tls_.runOnAllThreads(
       [name = std::string(name), status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
         ENVOY_LOG(
