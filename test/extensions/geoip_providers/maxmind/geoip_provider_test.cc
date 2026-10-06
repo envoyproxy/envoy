@@ -351,7 +351,8 @@ TEST_F(GeoipProviderTest, CountryGeonameIdFallbackToCityDb) {
   EXPECT_EQ("6255148", captured_lookup_response_["x-geo-continent-geoname-id"]);
   expectStats("city_db");
 }
- {
+
+TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_field_keys:
