@@ -34,6 +34,13 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
     "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
     "envoy.filters.network.peer_metadata":                      "//contrib/istio/filters/network/peer_metadata/source:config",
+    "envoy.filters.network.istio_hbone":                        "//contrib/istio/filters/network/hbone/source:config",
+
+    #
+    # Transport sockets
+    #
+
+    "envoy.transport_sockets.istio_hbone":                      "//contrib/istio/filters/network/hbone/source:upstream_config",
 
     #
     # Listener filters

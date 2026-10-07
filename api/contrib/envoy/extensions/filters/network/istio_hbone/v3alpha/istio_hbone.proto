@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.istio_hbone.v3alpha;
+
+import "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto";
+import "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.istio_hbone.v3alpha";
+option java_outer_classname = "IstioHboneProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/network/istio_hbone/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Istio HBONE origination shim]
+
+// Terminal filter for a single-HBONE origination internal listener. Use together
+// with UpstreamConfig on the cluster connecting to this listener. The upstream
+// cluster must use HTTP/2 and configure the required HBONE mutual TLS context.
+// [#extension: envoy.filters.network.istio_hbone]
+message Config {
+  // TCP proxy settings. HTTP CONNECT tunneling and immediate upstream connection
+  // establishment are required. Application TLS and PROXY protocol wrapping of
+  // the internal connection are not supported by this shim.
+  envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy tcp_proxy = 1
+      [(validate.rules).message = {required: true}];
+}
+
+// Transport socket for clusters whose endpoints are HBONE origination internal
+// listeners using Config. Holds connection readiness and all application bytes
+// until the peer filter receives a successful CONNECT response.
+// [#extension: envoy.transport_sockets.istio_hbone]
+message UpstreamConfig {
+  // Metadata to pass to the internal listener, including original destination
+  // metadata when required by the listener's original destination filter.
+  repeated envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
+      .MetadataValueSource passthrough_metadata = 1;
+}

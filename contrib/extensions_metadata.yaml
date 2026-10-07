@@ -186,6 +186,20 @@ envoy.filters.network.peer_metadata:
   status: alpha
   type_urls:
   - envoy.extensions.network_filters.peer_metadata.Config
+envoy.filters.network.istio_hbone:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.istio_hbone.v3alpha.Config
+envoy.transport_sockets.istio_hbone:
+  categories:
+  - envoy.transport_sockets.upstream
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.istio_hbone.v3alpha.UpstreamConfig
 envoy.filters.network.metadata_exchange:
   categories:
   - envoy.filters.network
