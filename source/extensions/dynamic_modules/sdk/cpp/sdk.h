@@ -753,6 +753,14 @@ public:
   virtual bool setFilterStateTyped(std::string_view key, std::string_view value) = 0;
 
   /**
+   * Checks whether a filter state entry with the given key exists, regardless of its type. Unlike
+   * the getter methods, this does not read or serialize the stored object.
+   * @param key The filter state key.
+   * @return true if the key exists.
+   */
+  virtual bool hasFilterState(std::string_view key) = 0;
+
+  /**
    * Returns the worker index assigned to the current filter instance.
    */
   virtual uint32_t getWorkerIndex() = 0;

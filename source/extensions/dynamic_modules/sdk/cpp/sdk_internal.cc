@@ -575,6 +575,11 @@ public:
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
+  bool hasFilterState(std::string_view key) override {
+    return envoy_dynamic_module_callback_http_has_filter_state(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()});
+  }
+
   std::optional<std::string_view> getAttributeString(AttributeID id) override {
     BufferView value{nullptr, 0};
 
