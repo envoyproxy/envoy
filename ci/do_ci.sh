@@ -922,6 +922,8 @@ case $CI_TARGET in
         bazel run --config=ci \
                   --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
                   --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
+                  --host_action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
                   --sandbox_writable_path="${HOME}/.docker/" \
                   --sandbox_writable_path="$HOME" \
                   @envoy_examples//:verify_examples
