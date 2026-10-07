@@ -16,6 +16,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:cluster_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:cluster_null_lb",
         "//test/extensions/dynamic_modules/test_data/c:cluster_run_on_all_workers",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],

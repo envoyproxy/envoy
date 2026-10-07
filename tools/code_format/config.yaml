@@ -37,6 +37,7 @@ paths:
   - bazel/external/cargo/remote/
   - bazel/external/http_parser/
   - bazel/rbe/toolchains/configs/
+  - bazel/tests/codeql/
   - bazel/tests/external/
   - bazel-
   - compat/openssl/
@@ -176,6 +177,7 @@ paths:
     - source/extensions/filters/udp
     - source/extensions/filters/listener
     - source/extensions/formatter
+    - source/extensions/geoip_providers/maxmind/config.cc
     - source/extensions/geoip_providers/maxmind/geoip_provider.cc
     - source/extensions/grpc_credentials
     - source/extensions/health_check/event_sinks/file/file_sink_impl.h
@@ -367,6 +369,11 @@ paths:
     - test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc
     - test/test_common/wasm_base.h
 
+  # Files that can use std::optional<std::reference_wrapper<T>> instead of OptRef<T>
+  optional_reference_wrapper:
+    include:
+    - test/common/common/optref_test.cc
+
 dir_order:
 - envoy
 - common
@@ -391,6 +398,7 @@ re:
   mangled_protobuf_name: envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}
   maintainers: .*github.com.(.*)\)\)
   old_mock_method: MOCK_METHOD\d
+  optional_reference_wrapper: \bstd::optional<\s*(std::)?reference_wrapper\b
   owner: "@\\S+"
   runtime_guard_flag: RUNTIME_GUARD\((.*)\);
   test_name_starting_lc: TEST(_.\(.*,\s|\()[a-z].*\)\s\{
@@ -438,6 +446,7 @@ visibility_excludes:
 - source/extensions/dynamic_modules/
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
+- source/extensions/filters/http/on_demand/BUILD
 - source/extensions/filters/network/common/BUILD
 - source/extensions/filters/network/generic_proxy/interface/BUILD
 - source/extensions/formatter/file_content/BUILD

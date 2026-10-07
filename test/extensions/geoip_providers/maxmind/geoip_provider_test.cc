@@ -3,6 +3,7 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/geoip_providers/maxmind/config.h"
 #include "source/extensions/geoip_providers/maxmind/geoip_provider.h"
 
@@ -33,14 +34,28 @@ public:
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
     return provider->config_->getStatsScopeForTest();
   }
+  // The stats of the database file the provider looks the given type up in.
+  static const DbFileStats& dbFileStats(const DriverSharedPtr& driver, absl::string_view db_type) {
+    auto provider = std::static_pointer_cast<GeoipProvider>(driver);
+    const DbFileProviders& db_file_providers = provider->db_file_providers_;
+    for (const DbFileProviderSharedPtr& db_file_provider :
+         {db_file_providers.city_db_, db_file_providers.isp_db_, db_file_providers.anon_db_,
+          db_file_providers.asn_db_, db_file_providers.country_db_}) {
+      if (db_file_provider != nullptr && dbTypeName(db_file_provider->dbType()) == db_type) {
+        return db_file_provider->stats_;
+      }
+    }
+    PANIC(absl::StrCat("no Maxmind database file configured for ", db_type));
+  }
   static Thread::ThreadSynchronizer& synchronizer(const DriverSharedPtr& driver) {
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
     return provider->synchronizer_;
   }
   static void setCountryDbToNull(const DriverSharedPtr& driver) {
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
-    absl::MutexLock lock(provider->mmdb_mutex_);
-    provider->country_db_.reset();
+    auto& db_file_provider = *provider->db_file_providers_.country_db_;
+    absl::MutexLock lock(db_file_provider.mmdb_mutex_);
+    db_file_provider.db_.reset();
   }
 };
 
@@ -185,21 +200,18 @@ public:
               error_count);
 
     if (build_epoch > 0) {
-      EXPECT_EQ(provider_scope
-                    .gaugeFromString(absl::StrCat(db_type, ".db_build_epoch"),
-                                     Stats::Gauge::ImportMode::Accumulate)
-                    .value(),
+      // Database file level stats belong to the shared database file rather than to this
+      // provider. See DbFileStatsLiveInTheProviderScopeAndNameTheFile for their naming.
+      EXPECT_EQ(GeoipProviderPeer::dbFileStats(provider_, db_type).db_build_epoch_.value(),
                 build_epoch);
     }
   }
 
   void expectReloadStats(const absl::string_view& db_type, const uint32_t reload_success_count = 0,
                          const uint32_t reload_error_count = 0) {
-    auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
-    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".db_reload_success")).value(),
-              reload_success_count);
-    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".db_reload_error")).value(),
-              reload_error_count);
+    const DbFileStats& stats = GeoipProviderPeer::dbFileStats(provider_, db_type);
+    EXPECT_EQ(stats.db_reload_success_.value(), reload_success_count);
+    EXPECT_EQ(stats.db_reload_error_.value(), reload_error_count);
   }
 
   Event::MockDispatcher dispatcher_;
@@ -398,7 +410,7 @@ TEST_F(GeoipProviderTest, AsnDbAndIspDbNotSetCausesEnvoyBug) {
   // Configuration that exposes the logical bug:
   // 1. ASN header is requested (triggers lookupInAsnDb call)
   // 2. No ASN database path configured (asn_db_ptr will be null)
-  // 3. No ISP database path configured (isIspDbPathSet() returns false)
+  // 3. No ISP database path configured (isIspDbSet() returns false)
   // This should trigger IS_ENVOY_BUG.
   const std::string config_yaml = R"EOF(
     common_provider_config:
@@ -906,7 +918,7 @@ TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndCityFallback) {
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
 
   // Country header should be missing because the country DB is null and the city DB
-  // skipped the country lookup because isCountryDbPathSet() is true.
+  // skipped the country lookup because isCountryDbSet() is true.
   const auto& country_it = captured_lookup_response_.find("x-geo-country");
   EXPECT_EQ(captured_lookup_response_.end(), country_it);
 
@@ -1476,6 +1488,30 @@ TEST_F(GeoipProviderNonIpAddressDeathTest, EnvoyInternalAddress) {
 
 TEST_F(GeoipProviderNonIpAddressDeathTest, NullAddress) { expectLookupAsserts(nullptr); }
 #endif
+
+TEST_F(GeoipProviderTest, DbFileStatsLiveInTheProviderScopeAndNameTheFile) {
+  initializeProvider(default_city_config_yaml, cb_added_nullopt);
+
+  // A database file is shared between listeners, so the stats describing it are rooted at the
+  // provider singleton's "maxmind." scope rather than at this provider's "prefix.maxmind."
+  // namespace, and the file's path is part of the stat name so that two files of the same type
+  // stay distinguishable. The path is supplied as a db_name tag too, which this store honors;
+  // a store running in legacy (non explicit-tags) mode keeps the name but drops the tag.
+  const std::string db_name =
+      Stats::Utility::sanitizeStatsName(TestEnvironment::substitute(default_city_db_path));
+  const Stats::GaugeSharedPtr build_epoch = TestUtility::findGauge(
+      stats_store_, absl::StrCat("maxmind.city_db.", db_name, ".db_build_epoch"));
+  ASSERT_NE(build_epoch, nullptr);
+  EXPECT_EQ(build_epoch->value(), 1671567063);
+  EXPECT_EQ(build_epoch->tagExtractedName(), "maxmind.city_db.db_build_epoch");
+  const Stats::TagVector tags = build_epoch->tags();
+  ASSERT_EQ(tags.size(), 1);
+  EXPECT_EQ(tags[0].name_, "db_name");
+  EXPECT_EQ(tags[0].value_, db_name);
+
+  // The provider's own namespace carries the lookup stats only.
+  EXPECT_EQ(TestUtility::findGauge(stats_store_, "prefix.maxmind.city_db.db_build_epoch"), nullptr);
+}
 
 } // namespace Maxmind
 } // namespace GeoipProviders

@@ -1465,11 +1465,6 @@ TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
   EXPECT_NO_THROW(scoped = null_mux_->pause(params));
 }
 
-TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
-  EXPECT_ENVOY_BUG(null_mux_->requestOnDemandUpdate("type_url", {"for_update"}),
-                   "unexpected request for on demand update");
-}
-
 TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
   NiceMock<MockSubscriptionCallbacks> callbacks;
   OpaqueResourceDecoderSharedPtr resource_decoder(

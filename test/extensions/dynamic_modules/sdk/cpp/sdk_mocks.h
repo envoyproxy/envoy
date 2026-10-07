@@ -144,6 +144,7 @@ public:
   MOCK_METHOD(std::optional<std::string_view>, getAttributeString, (AttributeID id), (override));
   MOCK_METHOD(std::optional<uint64_t>, getAttributeNumber, (AttributeID id), (override));
   MOCK_METHOD(std::optional<bool>, getAttributeBool, (AttributeID id), (override));
+  MOCK_METHOD(TimingInfo, getTimingInfo, (), (override));
   MOCK_METHOD(std::optional<std::string_view>, getFilterState, (std::string_view key), (override));
   MOCK_METHOD(void, setFilterState, (std::string_view key, std::string_view value), (override));
   MOCK_METHOD(void, sendLocalResponse,
@@ -165,6 +166,7 @@ public:
               (override));
   MOCK_METHOD(bool, setFilterStateTyped, (std::string_view key, std::string_view value),
               (override));
+  MOCK_METHOD(bool, hasFilterState, (std::string_view key), (override));
   MOCK_METHOD(uint32_t, getWorkerIndex, (), (override));
   MOCK_METHOD(bool, setSocketOptionInt,
               (int64_t level, int64_t name, SocketOptionState state, SocketDirection direction,
@@ -184,6 +186,9 @@ public:
   MOCK_METHOD(std::optional<std::string_view>, getClusterName, (), (override));
   MOCK_METHOD(std::optional<ClusterHostCounts>, getClusterHostCounts, (uint32_t priority),
               (override));
+  MOCK_METHOD(std::optional<std::string_view>, getUpstreamRemoteAddress, (), (override));
+  MOCK_METHOD(std::vector<std::string_view>, getUpstreamHostsAttempted, (), (override));
+  MOCK_METHOD(std::vector<uint64_t>, getUpstreamConnectionIdsAttempted, (), (override));
   MOCK_METHOD(bool, setUpstreamOverrideHost, (std::string_view host, bool strict), (override));
   MOCK_METHOD(void, resetStream, (HttpFilterStreamResetReason reason, std::string_view details),
               (override));

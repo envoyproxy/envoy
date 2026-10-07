@@ -1,0 +1,34 @@
+--- a/bio_test.cc
++++ b/bio_test.cc
+@@ -1124,7 +1124,13 @@
+   {
+     UniquePtr<BIO> bio(BIO_new_file(temp.path().c_str(), "rb"));
+     ASSERT_TRUE(bio);
++#ifdef BSSL_COMPAT
++    // OpenSSL's file BIO reports a write error by returning zero, rather than
++    // the negative value that BoringSSL returns.
++    EXPECT_EQ(BIO_write(bio.get(), "foo", 3), 0);
++#else   // BSSL_COMPAT
+     EXPECT_EQ(BIO_write(bio.get(), "foo", 3), -1);
++#endif  // BSSL_COMPAT
+     EXPECT_FALSE(BIO_should_retry(bio.get()));
+   }
+ 
+@@ -1279,9 +1285,17 @@
+   // `bio1` no longer has the "init" flag set, so reads and writes will fail at
+   // the BIO framework.
+   EXPECT_FALSE(BIO_get_init(bio1.get()));
++#ifdef BSSL_COMPAT
++  // OpenSSL returns -2 (operation not supported) from an uninitialized BIO,
++  // whereas BoringSSL returns -1.
++  EXPECT_EQ(-2, BIO_write(bio1.get(), "12345", 5));
++  EXPECT_TRUE(ErrorEquals(ERR_get_error(), ERR_LIB_BIO, BIO_R_UNINITIALIZED));
++  EXPECT_EQ(-2, BIO_read(bio1.get(), buf, sizeof(buf)));
++#else   // BSSL_COMPAT
+   EXPECT_EQ(-1, BIO_write(bio1.get(), "12345", 5));
+   EXPECT_TRUE(ErrorEquals(ERR_get_error(), ERR_LIB_BIO, BIO_R_UNINITIALIZED));
+   EXPECT_EQ(-1, BIO_read(bio1.get(), buf, sizeof(buf)));
++#endif  // BSSL_COMPAT
+   EXPECT_TRUE(ErrorEquals(ERR_get_error(), ERR_LIB_BIO, BIO_R_UNINITIALIZED));
+ 
+   // Although in this disconnected state, `BIO_ctrl` works. `bio1` should

@@ -858,7 +858,7 @@ typed_config:
     EXPECT_EQ(captured_typed_usage_.input_tokens().value(), 5);
     EXPECT_EQ(captured_typed_usage_.output_tokens().value(), 7);
     EXPECT_EQ(captured_typed_usage_.total_tokens().value(), 12);
-    EXPECT_EQ(captured_typed_usage_.api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+    EXPECT_EQ(captured_typed_usage_.llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
     EXPECT_EQ(captured_typed_usage_.extraction_status(), envoy::data::ai::v3::TokenUsage::COMPLETE);
   }
 

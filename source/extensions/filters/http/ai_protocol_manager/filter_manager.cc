@@ -18,11 +18,13 @@ FilterManager::~FilterManager() { cancel(); }
 void FilterManager::startRequest(JsonWithExtBuf payload_index, BufferManager* buffer_manager,
                                  Event::Dispatcher& dispatcher, StreamInfo::StreamInfo& stream_info,
                                  OnCompleteFn on_complete, Http::RequestHeaderMap* request_headers,
-                                 LocalReplyFn local_reply_fn) {
+                                 LocalReplyFn local_reply_fn, bool always_serialize,
+                                 LLMProtocol request_protocol) {
   ASSERT(request_manager_ == nullptr);
   request_manager_ = std::make_unique<RequestFilterManager>(
       filters_, std::move(payload_index), buffer_manager, dispatcher, stream_info,
-      std::move(on_complete), request_headers, std::move(local_reply_fn));
+      std::move(on_complete), request_headers, std::move(local_reply_fn), always_serialize,
+      request_protocol);
   request_manager_->start();
 }
 
@@ -32,6 +34,19 @@ void FilterManager::startSseResponse(ExternalBufferFactory& buffer_factory,
                                      ResponseFilterManager::Config config) {
   ASSERT(response_manager_ == nullptr);
   std::vector<AiFilterSharedPtr> reversed(filters_.rbegin(), filters_.rend());
+  response_manager_ =
+      std::make_unique<ResponseFilterManager>(std::move(reversed), buffer_factory, bridge,
+                                              out_buffer_manager, std::move(on_complete), config);
+  response_manager_->start();
+}
+
+void FilterManager::startUnaryResponse(ExternalBufferFactory& buffer_factory,
+                                       FilterChainBridge& bridge, BufferManager& out_buffer_manager,
+                                       OnCompleteFn on_complete) {
+  ASSERT(response_manager_ == nullptr);
+  std::vector<AiFilterSharedPtr> reversed(filters_.rbegin(), filters_.rend());
+  ResponseFilterManager::Config config;
+  config.mode = ResponseFilterManager::Mode::Unary;
   response_manager_ =
       std::make_unique<ResponseFilterManager>(std::move(reversed), buffer_factory, bridge,
                                               out_buffer_manager, std::move(on_complete), config);

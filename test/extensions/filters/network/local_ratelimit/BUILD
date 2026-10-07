@@ -1,11 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -53,10 +53,11 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "local_ratelimit_fuzz_test",
     srcs = ["local_ratelimit_fuzz_test.cc"],
     corpus = "local_ratelimit_corpus",
+    extension_names = ["envoy.filters.network.local_ratelimit"],
     rbe_pool = "linux_x64_small",
     deps = [
         ":local_ratelimit_fuzz_proto_cc_proto",

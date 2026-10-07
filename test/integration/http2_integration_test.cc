@@ -955,6 +955,103 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
   tcp_client_->close();
 }
 
+// Verifies that the HCM accepts a connection-level (stream 0) METADATA frame without tearing down
+// the connection: a subsequent request still round-trips with a normal response.
+TEST_P(Http2FrameIntegrationTest, ConnectionMetadataFrameAccepted) {
+  // Allow metadata usage on both upstream and downstream.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  beginSession();
+
+  std::string buffer;
+  // A normal request on stream 1.
+  auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(0), "a", "/",
+                                             {{"no_trailers", "1"}});
+  absl::StrAppend(&buffer, std::string(request));
+  // Connection-level metadata on stream 0, interleaved with the request.
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  auto metadata = Http2Frame::makeMetadataFrameFromMetadataMap(
+      0, metadata_map, Http2Frame::MetadataFlags::EndMetadata);
+  absl::StrAppend(&buffer, std::string(metadata));
+  // End the request stream.
+  auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(0), "",
+                                        Http2Frame::DataFlags::EndStream);
+  absl::StrAppend(&buffer, std::string(data));
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+  upstream_request->encodeHeaders(default_response_headers_, true);
+
+  // The connection must stay open: a normal response is received (no GOAWAY).
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
+  ASSERT_TRUE(tcp_client_->connected());
+  tcp_client_->close();
+}
+
+// Verifies that an empty connection-level (stream 0) METADATA frame is not delivered but is counted
+// by the http2.metadata_empty_frames stat.
+TEST_P(Http2FrameIntegrationTest, ConnectionMetadataEmptyFrameCounted) {
+  // Allow metadata usage on both upstream and downstream.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  beginSession();
+
+  std::string buffer;
+  auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(0), "a", "/",
+                                             {{"no_trailers", "1"}});
+  absl::StrAppend(&buffer, std::string(request));
+  // An empty connection-level METADATA frame on stream 0.
+  const Http::MetadataMap empty_metadata_map;
+  auto metadata = Http2Frame::makeMetadataFrameFromMetadataMap(
+      0, empty_metadata_map, Http2Frame::MetadataFlags::EndMetadata);
+  absl::StrAppend(&buffer, std::string(metadata));
+  auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(0), "",
+                                        Http2Frame::DataFlags::EndStream);
+  absl::StrAppend(&buffer, std::string(data));
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+  upstream_request->encodeHeaders(default_response_headers_, true);
+
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+
+  EXPECT_EQ(1, test_server_->counter("http2.metadata_empty_frames")->value());
+  tcp_client_->close();
+}
+
 // Validate the request completion during processing of deferred list works.
 TEST_P(Http2FrameIntegrationTest, MultipleRequestsDecodeHeadersEndsRequest) {
   const int kRequestsSentPerIOCycle = 20;

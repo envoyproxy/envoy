@@ -1064,8 +1064,12 @@ WEAK_STUB(ListenerFilterConfigSchedulerCommit,
           envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(nullptr, 0))
 WEAK_STUB(AccessLoggerGetBytesInfo,
           envoy_dynamic_module_callback_access_logger_get_bytes_info(nullptr, nullptr))
+WEAK_STUB(AccessLoggerGetDownstreamWireBytes,
+          envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(nullptr, nullptr))
 WEAK_STUB(AccessLoggerGetTimingInfo,
           envoy_dynamic_module_callback_access_logger_get_timing_info(nullptr, nullptr))
+WEAK_STUB(AccessLoggerGetTimingInfoV2,
+          envoy_dynamic_module_callback_access_logger_get_timing_info_v2(nullptr, nullptr))
 WEAK_STUB(ListenerFilterCloseSocket,
           envoy_dynamic_module_callback_listener_filter_close_socket(nullptr, {nullptr, 0}))
 WEAK_STUB(ListenerFilterSetDownstreamTransportFailureReason,
@@ -2028,6 +2032,7 @@ WEAK_STUB(HttpFilterGetAttributeInt,
 WEAK_STUB(HttpFilterGetAttributeBool,
           envoy_dynamic_module_callback_http_filter_get_attribute_bool(
               nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(HttpGetTimingInfo, envoy_dynamic_module_callback_http_get_timing_info(nullptr, nullptr))
 WEAK_STUB(NetworkFilterGetAttributeString,
           envoy_dynamic_module_callback_network_filter_get_attribute_string(
               nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
@@ -2130,6 +2135,17 @@ WEAK_STUB(HttpSetUpstreamOverrideHost,
                                                                         false))
 WEAK_STUB(HttpGetUpstreamConnectionId,
           envoy_dynamic_module_callback_http_get_upstream_connection_id(nullptr))
+WEAK_STUB(HttpGetUpstreamRemoteAddress,
+          envoy_dynamic_module_callback_http_get_upstream_remote_address(nullptr, nullptr))
+WEAK_STUB(HttpGetUpstreamHostsAttemptedSize,
+          envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(nullptr))
+WEAK_STUB(HttpGetUpstreamHostsAttempted,
+          envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(nullptr, nullptr))
+WEAK_STUB(HttpGetUpstreamConnectionIdsAttemptedSize,
+          envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(nullptr))
+WEAK_STUB(HttpGetUpstreamConnectionIdsAttempted,
+          envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(nullptr,
+                                                                                   nullptr))
 WEAK_STUB(HttpFilterResetStream,
           envoy_dynamic_module_callback_http_filter_reset_stream(
               nullptr, envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset,

@@ -35,6 +35,7 @@ envoy_cc_library(
     ],
     deps = [
         ":action_lib",
+        "//envoy/event:dispatcher_interface",
         "//envoy/http:filter_interface",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",

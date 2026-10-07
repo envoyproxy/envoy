@@ -192,6 +192,10 @@ public:
   OptRef<const StreamInfo::StreamInfo> trackedStream() const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
+  void encodeMetadata(const MetadataMapVector& metadata_map_vector) override {
+    encodeMetadata(metadata_map_vector, 0); // 0 is the stream for connection metadata.
+  }
+
 protected:
   friend class ProdNghttp2SessionFactory;
 
@@ -401,8 +405,6 @@ protected:
     // Consumes any decoded data, buffering if backed up.
     void decodeData();
 
-    // Get MetadataEncoder for this stream.
-    NewMetadataEncoder& getMetadataEncoder();
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
     // Callback function for MetadataDecoder.
@@ -450,7 +452,6 @@ protected:
     Buffer::InstancePtr pending_send_data_;
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
-    std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
     std::optional<StreamResetReason> deferred_reset_;
     // Holds the reset reason for this stream. Useful if we have buffered data
     // to determine whether we should continue processing that data.
@@ -797,6 +798,8 @@ protected:
 
   const MonotonicTime& lastReceivedDataTime() { return last_received_data_time_; }
 
+  void encodeMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id);
+
 private:
   friend class Http2CodecImplTestFixture;
 
@@ -832,6 +835,12 @@ private:
   bool slowContainsStreamId(int32_t stream_id) const;
   virtual StreamResetReason getMessagingErrorResetReason() const PURE;
 
+  // Callback function for MetadataDecoder.
+  void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
+
+  NewMetadataEncoder& getMetadataEncoder();
+  MetadataDecoder& getMetadataDecoder();
+
   // Tracks the current slice we're processing in the dispatch loop.
   const Buffer::RawSlice* current_slice_ = nullptr;
   // Streams that are pending deferred reset. Using an ordered map provides determinism in the rare
@@ -849,6 +858,8 @@ private:
   std::chrono::milliseconds keepalive_interval_;
   std::chrono::milliseconds keepalive_timeout_;
   uint32_t keepalive_interval_jitter_percent_;
+  std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
+  std::unique_ptr<MetadataDecoder> metadata_decoder_;
 };
 
 /**

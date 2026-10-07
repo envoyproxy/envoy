@@ -1,4 +1,4 @@
-//go:generate mockgen -source=http.go -destination=mocks/mock_http.go -package=mocks
+//go:generate mockgen -source=http.go -destination=mocks/mock_http.go -package=mocks -aux_files=github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared=common.go
 package shared
 
 // HTTP filter SDK surface for dynamic modules — handle, buffer, header, span, and watermark
@@ -6,7 +6,7 @@ package shared
 //
 // Cross-surface primitives (UnsafeEnvoyBuffer, LogLevel, MetricID, AttributeID, Scheduler,
 // HttpCalloutInitResult/Result/Callback, HttpStreamCallback/ResetReason, SocketOption*,
-// ClusterHostCounts, HttpHeaderType) live in types.go.
+// ClusterHostCounts, TimingInfo, HttpHeaderType) live in types.go.
 
 // BodyBuffer is an interface that provides access to the request and response body.
 // This should be implemented by the SDK or runtime.
@@ -263,6 +263,9 @@ type HttpFilterHandle interface {
 	// Returns attribute value and true if found, otherwise false.
 	GetAttributeBool(attributeID AttributeID) (bool, bool)
 
+	// GetTimingInfo returns a snapshot of the current stream timing information.
+	GetTimingInfo() TimingInfo
+
 	// GetFilterStateTyped retrieves the serialized bytes of a typed filter state object stored
 	// under the given key. Unlike GetFilterState, this calls serializeAsString on the registered
 	// typed object, so it works for any filter state object type (not just StringAccessor).
@@ -270,6 +273,10 @@ type HttpFilterHandle interface {
 	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
 	// need to keep it past the current callback.
 	GetFilterStateTyped(key string) (UnsafeEnvoyBuffer, bool)
+
+	// HasFilterState checks whether a filter state entry with the given key exists, regardless of
+	// its type. Unlike the getter methods, this does not read or serialize the stored object.
+	HasFilterState(key string) bool
 
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
@@ -364,6 +371,19 @@ type HttpFilterHandle interface {
 	// GetClusterHostCounts returns the host counts for the routed cluster at the given priority.
 	// Returns host counts and true if successful, otherwise a zero-valued struct and false.
 	GetClusterHostCounts(priority uint32) (ClusterHostCounts, bool)
+
+	// GetUpstreamRemoteAddress returns the remote address of the connected upstream socket,
+	// including the port. This can differ from AttributeIDUpstreamAddress, which exposes the
+	// selected upstream host address. The buffer is owned by Envoy and is valid until the current
+	// event hook returns.
+	GetUpstreamRemoteAddress() (UnsafeEnvoyBuffer, bool)
+
+	// GetUpstreamHostsAttempted returns the upstream host addresses in attempt order. The buffers
+	// are owned by Envoy and are valid until the current event hook returns.
+	GetUpstreamHostsAttempted() []UnsafeEnvoyBuffer
+
+	// GetUpstreamConnectionIDsAttempted returns the upstream connection IDs in attempt order.
+	GetUpstreamConnectionIDsAttempted() []uint64
 
 	// SetUpstreamOverrideHost sets a host that the upstream load balancer should select first
 	// if it exists in the routed cluster. Useful for sticky sessions or host affinity. When

@@ -42,6 +42,7 @@ envoy_cc_library(
         ":header_parser_lib",
         ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
+        ":path_rewrite_utility_lib",
         ":per_filter_config_lib",
         ":retry_policy_lib",
         ":retry_state_lib",
@@ -156,6 +157,17 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/config:well_known_names",
         "//source/common/http:hash_policy_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "path_rewrite_utility_lib",
+    srcs = ["path_rewrite_utility.cc"],
+    hdrs = ["path_rewrite_utility.h"],
+    deps = [
+        "//source/common/common:regex_lib",
+        "//source/common/http:path_utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

@@ -1,7 +1,10 @@
+#include "envoy/admin/v3/certs.pb.h"
 #include "envoy/admin/v3/memory.pb.h"
 
 #include "source/common/tls/context_config_impl.h"
 
+#include "test/common/tls/test_data/ca_cert_info.h"
+#include "test/common/tls/test_data/fake_ca_cert_info.h"
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
@@ -42,10 +45,60 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 )EOF";
 
   // Validate that cert details are null and /certs handles it correctly.
-  EXPECT_EQ(nullptr, client_ctx->getCaCertInformation());
+  EXPECT_TRUE(client_ctx->getCaCertInformation().empty());
   EXPECT_TRUE(client_ctx->getCertChainInformation().empty());
   EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
   EXPECT_EQ(expected_empty_json, response.toString());
+  server_.sslContextManager().removeContext(client_ctx);
+}
+
+TEST_P(AdminInstanceTest, CertsEndpointWithMultipleCaCerts) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  // Setup a context that has a trusted_ca bundle with two CA certificates.
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+
+  // Read cert data and inline it to avoid filesystem access issues with mock factory context.
+  const std::string cert_chain = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"));
+  const std::string key = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"));
+  const std::string ca_certs = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem"));
+
+  auto* tls_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_inline_bytes(cert_chain);
+  tls_cert->mutable_private_key()->set_inline_bytes(key);
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->mutable_trusted_ca()
+      ->set_inline_bytes(ca_certs);
+
+  auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls_context,
+                                                                                 factory_context);
+  Stats::IsolatedStoreImpl store(server_.serverFactoryContext().serverScope().symbolTable());
+  Envoy::Ssl::ClientContextSharedPtr client_ctx(
+      *server_.sslContextManager().createSslClientContext(*store.rootScope(), *cfg));
+
+  EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
+
+  // Parse the JSON response and verify we get both CA certificates.
+  envoy::admin::v3::Certificates certs_proto;
+  TestUtility::loadFromJson(response.toString(), certs_proto);
+
+  // Find the certificate entry that has ca_cert entries (our context).
+  bool found = false;
+  for (const auto& certificate : certs_proto.certificates()) {
+    if (certificate.ca_cert_size() == 2) {
+      found = true;
+      EXPECT_EQ(certificate.ca_cert(0).serial_number(), TEST_FAKE_CA_CERT_SERIAL);
+      EXPECT_EQ(certificate.ca_cert(1).serial_number(), TEST_CA_CERT_SERIAL);
+    }
+  }
+  EXPECT_TRUE(found) << "Expected a certificate entry with 2 CA certs";
+
   server_.sslContextManager().removeContext(client_ctx);
 }
 

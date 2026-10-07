@@ -28,7 +28,7 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory
   // here. Maybe we'll pass them to the factory function?
   auto pool_iter = active_pools_.find(key);
   if (pool_iter != active_pools_.end()) {
-    return std::ref(*(pool_iter->second));
+    return *pool_iter->second;
   }
   ResourceLimit& connPoolResource = host_->cluster().resourceManager(priority_).connectionPools();
   // We need a new pool. Check if we have room.
@@ -57,7 +57,7 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory
   }
 
   auto inserted = active_pools_.emplace(key, std::move(new_pool));
-  return std::ref(*inserted.first->second);
+  return *inserted.first->second;
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
