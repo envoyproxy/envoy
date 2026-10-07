@@ -208,6 +208,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override;
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override { return options_; }
   bool maybePreconnect(float preconnect_ratio) override;
+  bool hasReadyConnection() const override;
   absl::string_view protocolDescription() const override { return "connection grid"; }
 
   // Returns true if pool is the grid's HTTP/3 connection pool.
