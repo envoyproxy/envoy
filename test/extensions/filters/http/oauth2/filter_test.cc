@@ -26,11 +26,18 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
 using testing::HasSubstr;
 using testing::Key;
+using testing::Not;
+using testing::Pair;
+using testing::SizeIs;
+using testing::StartsWith;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -483,6 +490,95 @@ public:
   std::string decryptTokenForTest(const std::string& ct) const {
     primeActiveConfigForTest();
     return filter_->decryptToken(ct);
+  }
+
+  // Builds a minimal config for the token cookie chunking tests.
+  FilterConfigSharedPtr getChunkingConfig(bool chunk_large_token_cookies,
+                                          bool disable_token_encryption = true,
+                                          const std::string& bearer_token_path = "",
+                                          bool set_cookie_domain = false,
+                                          const std::string& bearer_token_cookie_name = "") {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.set_stat_prefix("my_prefix");
+    p.mutable_use_refresh_token()->set_value(true);
+    p.set_disable_token_encryption(disable_token_encryption);
+    p.set_chunk_large_token_cookies(chunk_large_token_cookies);
+    if (!bearer_token_path.empty()) {
+      p.mutable_cookie_configs()->mutable_bearer_token_cookie_config()->set_path(bearer_token_path);
+    }
+
+    auto* credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+    if (set_cookie_domain) {
+      credentials->set_cookie_domain("example.com");
+    }
+    if (!bearer_token_cookie_name.empty()) {
+      credentials->mutable_cookie_names()->set_bearer_token(bearer_token_cookie_name);
+    }
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+    return makeFilterConfig(p, std::make_shared<MockSecretReader>()).value();
+  }
+
+  // Like init(), but validates cookies with the production validator instead of the mock.
+  void initWithRealValidator(FilterConfigSharedPtr config) {
+    init(config);
+    filter_->validator_factory_ = [](TimeSource& time_source, const FilterConfig& config) {
+      return std::make_shared<OAuth2CookieValidator>(time_source, config.cookieNames(),
+                                                     config.cookieDomain());
+    };
+  }
+
+  // Processes the request cookies as decodeHeaders() does before a token flow completes.
+  void startTokenFlowForTest(Http::RequestHeaderMap& headers) {
+    primeActiveConfigForTest();
+    filter_->host_ = std::string(headers.getHostValue());
+    filter_->request_headers_ = &headers;
+    filter_->decryptAndUpdateOAuthTokenCookies(headers);
+  }
+
+  // Completes a login with the given tokens and returns the redirect response.
+  Http::TestResponseHeaderMapImpl loginForTest(Http::RequestHeaderMap& request_headers,
+                                               const std::string& access_token,
+                                               const std::string& id_token = "") {
+    startTokenFlowForTest(request_headers);
+    Http::TestResponseHeaderMapImpl response;
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+        .WillOnce(Invoke(
+            [&response](Http::ResponseHeaderMap& headers, bool) { response.copyFrom(headers); }));
+    filter_->onGetAccessTokenSuccess(access_token, id_token, "", std::chrono::seconds(600));
+    return response;
+  }
+
+  static std::vector<std::string> setCookies(const Http::ResponseHeaderMap& headers) {
+    std::vector<std::string> values;
+    const auto entries = headers.get(Http::Headers::get().SetCookie);
+    for (size_t i = 0; i < entries.size(); ++i) {
+      values.emplace_back(entries[i]->value().getStringView());
+    }
+    return values;
+  }
+
+  // The Cookie header a browser sends after storing the response's Set-Cookie headers.
+  static std::string cookieHeaderFromSetCookies(const Http::ResponseHeaderMap& headers) {
+    std::vector<std::string> cookies;
+    for (const std::string& set_cookie : setCookies(headers)) {
+      const std::string name_value = std::vector<std::string>(absl::StrSplit(set_cookie, ';'))[0];
+      if (!absl::EndsWith(name_value, "=deleted")) {
+        cookies.push_back(name_value);
+      }
+    }
+    return absl::StrJoin(cookies, "; ");
   }
 
   // Validates the behavior of the cookie validator.
@@ -7155,6 +7251,298 @@ TEST_F(OAuth2Test, PostMigrationConfigRejectsCbcCiphertext) {
   // Rejection path (no marker + compat off) must not tick the legacy CBC counter: nothing was
   // decrypted, just refused.
   EXPECT_EQ(0, config_->stats().oauth_legacy_cbc_decrypt_.value());
+}
+
+// The Set-Cookie tail of a bearer token cookie with the default settings and a 600s lifetime.
+static const std::string TEST_BEARER_COOKIE_TAIL = ";path=/;Max-Age=600;secure;HttpOnly";
+
+// A token too large for one cookie is written as chunks and a chunk count, each one a cookie the
+// browser stores.
+TEST_F(OAuth2Test, LargeTokenCookieIsChunked) {
+  init(getChunkingConfig(true));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"}};
+  const std::string token(9000, 't');
+
+  const auto response = loginForTest(request_headers, token);
+
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken_chunks"), "3");
+  EXPECT_EQ(absl::StrCat(Http::Utility::parseSetCookieValue(response, "BearerToken_0"),
+                         Http::Utility::parseSetCookieValue(response, "BearerToken_1"),
+                         Http::Utility::parseSetCookieValue(response, "BearerToken_2")),
+            token);
+  EXPECT_THAT(setCookies(response), Not(Contains(StartsWith("BearerToken="))));
+  for (const std::string& set_cookie : setCookies(response)) {
+    EXPECT_LE(set_cookie.size(), MaxCookieSize);
+  }
+  EXPECT_EQ(config_->stats().oauth_token_cookie_chunked_.value(), 1);
+}
+
+// Without chunk_large_token_cookies a large token is still written as one cookie.
+TEST_F(OAuth2Test, LargeTokenCookieIsNotChunkedWhenDisabled) {
+  init(getChunkingConfig(false));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"}};
+  const std::string token(9000, 't');
+
+  const auto response = loginForTest(request_headers, token);
+
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken"), token);
+  EXPECT_THAT(setCookies(response), Not(Contains(StartsWith("BearerToken_"))));
+  EXPECT_EQ(config_->stats().oauth_token_cookie_chunked_.value(), 0);
+}
+
+// A token cookie of exactly MaxCookieSize bytes is written as one cookie, one byte more is chunked.
+TEST_F(OAuth2Test, TokenCookieChunkingThreshold) {
+  const size_t largest_single_token =
+      MaxCookieSize - std::string("BearerToken=").size() - TEST_BEARER_COOKIE_TAIL.size();
+  {
+    init(getChunkingConfig(true));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "a.example.com"}};
+    const std::string token(largest_single_token, 't');
+    const auto response = loginForTest(request_headers, token);
+    EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken"), token);
+    EXPECT_THAT(setCookies(response),
+                Contains(absl::StrCat("BearerToken=", token, TEST_BEARER_COOKIE_TAIL)));
+    EXPECT_THAT(setCookies(response), Contains(SizeIs(MaxCookieSize)));
+  }
+  {
+    init(getChunkingConfig(true));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "a.example.com"}};
+    const auto response = loginForTest(request_headers, std::string(largest_single_token + 1, 't'));
+    EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken_chunks"), "2");
+  }
+}
+
+// A token that does not fit in MaxChunksPerToken chunks is refused before any cookie is written.
+TEST_F(OAuth2Test, OversizedTokenIsRefused) {
+  struct TestCase {
+    std::string bearer_token_path;
+    size_t token_size;
+  };
+  const std::vector<TestCase> test_cases{
+      // More data than all chunks hold.
+      {"", MaxChunksPerToken * MaxCookieSize},
+      // A cookie path so long that a chunk has no room for data.
+      {absl::StrCat("/", std::string(MaxCookieSize, 'p')), 10},
+  };
+  for (const auto& test_case : test_cases) {
+    init(getChunkingConfig(true, true, test_case.bearer_token_path));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "a.example.com"}};
+    startTokenFlowForTest(request_headers);
+
+    // The local reply is the only response, and it sets no cookies.
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false))
+        .WillOnce(Invoke([](Http::ResponseHeaderMap& headers, bool) {
+          EXPECT_EQ(headers.getStatusValue(), "503");
+          EXPECT_THAT(setCookies(headers), testing::IsEmpty());
+        }));
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Http::Code::ServiceUnavailable, "Service Unavailable", _, _,
+                               "OAuth token exceeds the cookie chunk limit"));
+    filter_->onGetAccessTokenSuccess(std::string(test_case.token_size, 't'), "", "",
+                                     std::chrono::seconds(600));
+  }
+  EXPECT_EQ(config_->stats().oauth_token_cookie_oversized_.value(), 2);
+}
+
+// A refresh that returns an oversized token is refused rather than forwarded upstream.
+TEST_F(OAuth2Test, OversizedTokenIsRefusedOnRefresh) {
+  init(getChunkingConfig(true));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=refresh"}};
+  startTokenFlowForTest(request_headers);
+  filter_->updateTokens(std::string(MaxChunksPerToken * MaxCookieSize, 't'), "", "",
+                        std::chrono::seconds(600));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::ServiceUnavailable, "Service Unavailable", _, _,
+                             "OAuth token exceeds the cookie chunk limit"));
+  filter_->finishRefreshAccessTokenFlow();
+  EXPECT_EQ(config_->stats().oauth_token_cookie_oversized_.value(), 1);
+}
+
+// Chunks are rejoined and decrypted before the cookies are validated and forwarded, also when
+// chunk_large_token_cookies is off, so turning it off keeps existing sessions.
+TEST_F(OAuth2Test, ChunkedTokenCookieIsRejoinedAndDecrypted) {
+  init(getChunkingConfig(false, false));
+  const std::string token(6000, 't');
+  const std::string encrypted = encryptTokenForTest(token);
+  const size_t half = encrypted.size() / 2;
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Path.get(), "/resource"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), "BearerToken_1=" + encrypted.substr(half)},
+      {Http::Headers::get().Cookie.get(), "BearerToken_0=" + encrypted.substr(0, half)},
+      {Http::Headers::get().Cookie.get(), "BearerToken_chunks=2"},
+      {Http::Headers::get().Cookie.get(), "Other=1"},
+  };
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_THAT(Http::Utility::parseCookies(request_headers),
+              UnorderedElementsAre(Pair("BearerToken", token), Pair("Other", "1")));
+  EXPECT_EQ(config_->stats().oauth_token_cookie_reassembled_.value(), 1);
+}
+
+// A malformed chunk set is dropped and the single cookie, if any, is used instead.
+TEST_F(OAuth2Test, MalformedChunkedTokenCookieFallsBackToSingleCookie) {
+  const std::vector<std::vector<std::string>> malformed_chunk_sets{
+      // A count below 2 is never written.
+      {"BearerToken_chunks=1", "BearerToken_0=chunk"},
+      // A count above MaxChunksPerToken is never written.
+      {"BearerToken_chunks=9", "BearerToken_0=chunk"},
+      {"BearerToken_chunks=two", "BearerToken_0=chunk"},
+      // A counted chunk is missing.
+      {"BearerToken_chunks=2", "BearerToken_0=chunk"},
+      // The chunks are empty.
+      {"BearerToken_chunks=2", "BearerToken_0=", "BearerToken_1="},
+  };
+  for (const auto& chunk_set : malformed_chunk_sets) {
+    init(getChunkingConfig(false));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "a.example.com"},
+        {Http::Headers::get().Path.get(), "/resource"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+        {Http::Headers::get().Cookie.get(), "BearerToken=single"},
+    };
+    for (const std::string& cookie : chunk_set) {
+      request_headers.addCopy(Http::Headers::get().Cookie, cookie);
+    }
+    EXPECT_CALL(*validator_, setParams(_, _));
+    EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+    EXPECT_THAT(Http::Utility::parseCookies(request_headers),
+                UnorderedElementsAre(Pair("BearerToken", "single")));
+  }
+  EXPECT_EQ(config_->stats().oauth_token_cookie_malformed_chunks_.value(),
+            malformed_chunk_sets.size());
+  EXPECT_EQ(config_->stats().oauth_token_cookie_reassembled_.value(), 0);
+}
+
+// Sign out deletes every chunk a token cookie may have, with the domain and Secure attributes the
+// browser needs to accept the deletion.
+TEST_F(OAuth2Test, SignOutDeletesChunkedTokenCookies) {
+  init(getChunkingConfig(false, true, "", true, "__Secure-BearerToken"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "__Secure-BearerToken_0=a"},
+      {Http::Headers::get().Cookie.get(), "__Secure-BearerToken_1=b"},
+      {Http::Headers::get().Cookie.get(), "__Secure-BearerToken_chunks=2"},
+      // A malformed count leaves every chunk index to delete.
+      {Http::Headers::get().Cookie.get(), "IdToken_chunks=malformed"},
+  };
+  std::vector<std::string> set_cookies;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&set_cookies](Http::ResponseHeaderMap& headers, bool) {
+        set_cookies = setCookies(headers);
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  const std::string deleted =
+      "=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;domain=example.com";
+  for (const std::string name : {"__Secure-BearerToken", "__Secure-BearerToken_0",
+                                 "__Secure-BearerToken_1", "__Secure-BearerToken_chunks"}) {
+    EXPECT_THAT(set_cookies, Contains(absl::StrCat(name, deleted, "; Secure")));
+  }
+  EXPECT_THAT(set_cookies, Not(Contains(StartsWith("__Secure-BearerToken_2="))));
+  for (size_t index = 0; index < MaxChunksPerToken; ++index) {
+    EXPECT_THAT(set_cookies, Contains(absl::StrCat("IdToken_", index, deleted)));
+  }
+  EXPECT_THAT(set_cookies, Contains(absl::StrCat("IdToken_chunks", deleted)));
+  EXPECT_THAT(set_cookies, Not(Contains(StartsWith(absl::StrCat("IdToken_", MaxChunksPerToken)))));
+}
+
+// On refresh, each token cookie replaces the form the client has: stale chunks and a single
+// cookie superseded by chunks are deleted, and a rejoined refresh token is kept as one cookie.
+TEST_F(OAuth2Test, RefreshReplacesTokenCookieForms) {
+  init(getChunkingConfig(true));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Cookie.get(), "BearerToken_0=a"},
+      {Http::Headers::get().Cookie.get(), "BearerToken_1=b"},
+      {Http::Headers::get().Cookie.get(), "BearerToken_2=c"},
+      {Http::Headers::get().Cookie.get(), "BearerToken_chunks=3"},
+      {Http::Headers::get().Cookie.get(), "IdToken=id"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken_0=refresh"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken_1=-token"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken_chunks=2"},
+  };
+  startTokenFlowForTest(request_headers);
+  // The provider returns no new refresh token, so the client's one is kept.
+  filter_->updateTokens(std::string(5000, 'a'), std::string(5000, 'i'), "",
+                        std::chrono::seconds(600));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  filter_->finishRefreshAccessTokenFlow();
+
+  Http::TestResponseHeaderMapImpl response;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response, false));
+
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken_chunks"), "2");
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken_2"), "deleted");
+  EXPECT_THAT(setCookies(response), Not(Contains(StartsWith("BearerToken="))));
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "IdToken_chunks"), "2");
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "IdToken"), "deleted");
+  EXPECT_THAT(setCookies(response), Contains(StartsWith("RefreshToken=refresh-token;")));
+  for (const std::string name : {"RefreshToken_0", "RefreshToken_1", "RefreshToken_chunks"}) {
+    EXPECT_EQ(Http::Utility::parseSetCookieValue(response, name), "deleted");
+  }
+}
+
+// A token the provider no longer returns has every form of its cookie deleted.
+TEST_F(OAuth2Test, MissingTokenDeletesItsChunkedCookies) {
+  init(getChunkingConfig(true));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Cookie.get(), "IdToken=id"},
+      {Http::Headers::get().Cookie.get(), "IdToken_0=a"},
+      {Http::Headers::get().Cookie.get(), "IdToken_1=b"},
+      {Http::Headers::get().Cookie.get(), "IdToken_chunks=2"},
+  };
+
+  const auto response = loginForTest(request_headers, "access", /*id_token=*/"");
+
+  for (const std::string name : {"IdToken", "IdToken_0", "IdToken_1", "IdToken_chunks"}) {
+    EXPECT_EQ(Http::Utility::parseSetCookieValue(response, name), "deleted");
+  }
+}
+
+// Chunked cookies written at login pass HMAC validation when the browser sends them back.
+TEST_F(OAuth2Test, ChunkedTokenCookiesRoundTripThroughValidator) {
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  const FilterConfigSharedPtr config = getChunkingConfig(true, false);
+  const std::string access_token(6000, 'a');
+  initWithRealValidator(config);
+  Http::TestRequestHeaderMapImpl login_headers{{Http::Headers::get().Host.get(), "a.example.com"}};
+  const auto login_response = loginForTest(login_headers, access_token, std::string(6000, 'i'));
+  EXPECT_EQ(config->stats().oauth_token_cookie_chunked_.value(), 2);
+
+  initWithRealValidator(config);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Path.get(), "/resource"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), cookieHeaderFromSetCookies(login_response)},
+  };
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::Utility::parseCookieValue(request_headers, "BearerToken"), access_token);
+  EXPECT_EQ(config->stats().oauth_token_cookie_reassembled_.value(), 2);
 }
 
 } // namespace Oauth2

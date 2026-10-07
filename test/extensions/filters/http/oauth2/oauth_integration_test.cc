@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
+
 #include "source/common/common/base64.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/utility.h"
@@ -373,7 +375,7 @@ typed_config:
         false);
 
     envoy::extensions::http_filters::oauth2::OAuthResponse oauth_response;
-    oauth_response.mutable_access_token()->set_value("bar");
+    oauth_response.mutable_access_token()->set_value(access_token_value_);
     oauth_response.mutable_refresh_token()->set_value("foo");
     oauth_response.mutable_expires_in()->set_value(DateUtil::nowToSeconds(api_->timeSource()) + 10);
 
@@ -496,6 +498,9 @@ typed_config:
 
     cleanup();
   }
+
+  // The access token the fake authorization server returns.
+  std::string access_token_value_{"bar"};
 
   const CookieNames default_cookie_names_{"BearerToken",  "OauthHMAC",  "OauthExpires", "IdToken",
                                           "RefreshToken", "OauthNonce", "CodeVerifier"};
@@ -999,6 +1004,88 @@ TEST_P(OauthIntegrationTest, LegacyCbcCodeVerifierAcceptedByDefault) {
   // Passing a CBC ciphertext here proves the default-on compat fallback succeeds end-to-end.
   doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
                        TEST_ENCRYPTED_CODE_VERIFIER);
+}
+
+class OauthChunkedCookieIntegrationTest : public OauthIntegrationTest {
+public:
+  void setOauthConfig() override {
+    OauthIntegrationTest::setOauthConfig();
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* filter = hcm.mutable_http_filters(0);
+          envoy::extensions::filters::http::oauth2::v3::OAuth2 oauth2;
+          ASSERT_TRUE(filter->typed_config().UnpackTo(&oauth2));
+          oauth2.mutable_config()->set_chunk_large_token_cookies(true);
+          std::ignore = filter->mutable_typed_config()->PackFrom(oauth2);
+        });
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthChunkedCookieIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS_WITH_GCM_FLAG,
+                         OauthIntegrationTest::oauthIntegrationParamsToString);
+
+// A token too large for one cookie is chunked at login, and the chunks the browser sends back are
+// rejoined into a session that passes HMAC validation.
+TEST_P(OauthChunkedCookieIntegrationTest, LargeAccessTokenIsChunkedAndRejoined) {
+  access_token_value_ = std::string(6000, 'a');
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", absl::StrCat("/callback?code=foo&state=", TEST_ENCODED_STATE)},
+      {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
+      {":authority", "authority"},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, ".", TEST_FLOW_ID, "=",
+                              TEST_STATE_CSRF_TOKEN)},
+      {"cookie", absl::StrCat(default_cookie_names_.code_verifier_, ".", TEST_FLOW_ID, "=",
+                              TEST_ENCRYPTED_CODE_VERIFIER)}};
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  waitForOAuth2Response("token_secret");
+  response->waitForHeaders();
+  EXPECT_EQ("302", response->headers().getStatusValue());
+
+  // Send back every cookie the browser stores, as name=value pairs.
+  Http::TestRequestHeaderMapImpl replay{
+      {":method", "GET"},
+      {":path", absl::StrCat("/callback?code=foo&state=", TEST_ENCODED_STATE)},
+      {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
+      {":authority", "authority"},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, ".", TEST_FLOW_ID, "=",
+                              TEST_STATE_CSRF_TOKEN)}};
+  const auto set_cookies = response->headers().get(Http::Headers::get().SetCookie);
+  for (size_t i = 0; i < set_cookies.size(); ++i) {
+    const absl::string_view set_cookie = set_cookies[i]->value().getStringView();
+    EXPECT_LE(set_cookie.size(), MaxCookieSize);
+    const absl::string_view name_value = set_cookie.substr(0, set_cookie.find(';'));
+    if (!absl::EndsWith(name_value, "=deleted")) {
+      replay.addCopy(Http::Headers::get().Cookie, name_value);
+    }
+  }
+  EXPECT_EQ("2",
+            Http::Utility::parseSetCookieValue(
+                response->headers(), absl::StrCat(default_cookie_names_.bearer_token_, "_chunks")));
+  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
+  cleanup();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto replay_response = codec_client_->makeHeaderOnlyRequest(replay);
+  replay_response->waitForHeaders();
+  // A logged-in callback redirects to the original URL instead of starting a new token exchange.
+  EXPECT_EQ("302", replay_response->headers().getStatusValue());
+  EXPECT_EQ("http://traffic.example.com/not/_oauth", replay_response->headers().getLocationValue());
+  RELEASE_ASSERT(replay_response->waitForEndStream(), "unexpected timeout");
+  cleanup();
 }
 
 } // namespace

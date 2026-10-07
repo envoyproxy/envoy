@@ -50,6 +50,11 @@ using OAuth2Headers = ConstSingleton<OAuth2HeaderValues>;
 
 class OAuth2Client;
 
+// The largest cookie, counting its name, value and attributes, that browsers store.
+constexpr size_t MaxCookieSize = 4096;
+// The most cookies a token cookie is split into. A larger chunk count is treated as malformed.
+constexpr size_t MaxChunksPerToken = 8;
+
 // Entry names used when ``token_secret`` is supplied as a multi-entry generic secret. This form is
 // only used with the ``PRIVATE_KEY_JWT`` auth type, where it allows the key ID to be distributed
 // together with the signing key so the two do not drift apart.
@@ -123,13 +128,29 @@ private:
   COUNTER(oauth_refreshtoken_success)                                                              \
   COUNTER(oauth_refreshtoken_failure)                                                              \
   COUNTER(oauth_allow_failed_passthrough)                                                          \
-  COUNTER(oauth_legacy_cbc_decrypt)
+  COUNTER(oauth_legacy_cbc_decrypt)                                                                \
+  COUNTER(oauth_token_cookie_chunked)                                                              \
+  COUNTER(oauth_token_cookie_reassembled)                                                          \
+  COUNTER(oauth_token_cookie_malformed_chunks)                                                     \
+  COUNTER(oauth_token_cookie_oversized)
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h
  */
 struct FilterStats {
   ALL_OAUTH_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+// The forms of a token cookie a request carries.
+struct TokenCookieState {
+  // The token is present as a single cookie.
+  bool single_{false};
+  // The chunk count cookie is present.
+  bool chunks_{false};
+  // The chunk count is invalid, a counted chunk is missing, or the chunks are all empty.
+  bool malformed_{false};
+  // The chunk count from a valid chunk count cookie, 0 when it is missing or malformed.
+  size_t count_{0};
 };
 
 /**
@@ -293,6 +314,7 @@ public:
     return code_verifier_cookie_settings_;
   }
   bool disableTokenEncryption() const { return disable_token_encryption_; }
+  bool chunkLargeTokenCookies() const { return chunk_large_token_cookies_; }
   const std::string& jwtSigningAlgorithm() const { return jwt_signing_algorithm_; }
   std::chrono::seconds jwtAssertionLifetime() const { return jwt_assertion_lifetime_; }
   const std::string& jwtAssertionAudience() const { return jwt_assertion_audience_; }
@@ -341,6 +363,7 @@ private:
   const bool disable_refresh_token_set_cookie_ : 1;
   const bool disable_token_encryption_ : 1;
   const bool use_access_token_expiry_for_id_token_cookie_ : 1;
+  const bool chunk_large_token_cookies_ : 1;
   // The upstream header used to forward the OIDC ID token. Empty when ID token forwarding is
   // disabled.
   const Http::LowerCaseString forward_id_token_header_;
@@ -482,6 +505,11 @@ private:
   std::string host_;
   std::string original_request_url_;
   std::string flow_id_;
+  // The forms of each token cookie found on the request, so the response deletes the ones the
+  // new value does not overwrite.
+  TokenCookieState bearer_token_cookie_state_;
+  TokenCookieState id_token_cookie_state_;
+  TokenCookieState refresh_token_cookie_state_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   // Whether the request path is the OAuth callback path. Computed once in decodeHeaders() so the
   // path matcher does not have to run again on the failure paths.
@@ -516,6 +544,19 @@ private:
                               absl::string_view expires_time) const;
   void setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
                                const std::string& encoded_token) const;
+  // Whether every token fits in the cookies the filter may write for it.
+  bool tokenCookiesFit() const;
+  // Writes the token as a single cookie or as chunks, or deletes the request's cookies for it when
+  // the token is empty.
+  void setTokenCookie(Http::ResponseHeaderMap& headers, absl::string_view cookie_name,
+                      const TokenCookieState& state, absl::string_view token,
+                      const FilterConfig::CookieSettings& settings,
+                      absl::string_view expires_time) const;
+  // Deletes the forms of a token cookie found on the request that a new value written as
+  // new_cookie_count cookies does not overwrite. new_cookie_count is 0 when there is no new value.
+  void deleteStaleTokenCookies(Http::ResponseHeaderMap& headers, absl::string_view cookie_name,
+                               const TokenCookieState& state, size_t new_cookie_count,
+                               absl::string_view cookie_path) const;
   void addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers,
                                     absl::string_view flow_id) const;
   const std::string& bearerPrefix() const;
@@ -525,9 +566,9 @@ private:
                                          const absl::string_view state) const;
   bool validateCsrfToken(const Http::RequestHeaderMap& headers, const std::string& csrf_token,
                          absl::string_view flow_id) const;
-  void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
-  std::string encryptToken(const std::string& token) const;
-  std::string decryptToken(const std::string& encrypted_token) const;
+  void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers);
+  std::string encryptToken(absl::string_view token) const;
+  std::string decryptToken(absl::string_view encrypted_token) const;
   void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
   absl::StatusOr<std::string> getClientCredential();
   void removeOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
@@ -538,7 +579,7 @@ private:
   // talk to the token endpoint, so the client is not created for them.
   OAuth2Client& oauthClient();
   void sendUnauthorizedResponse(const std::string& details);
-  void sendSecretsNotReadyResponse(const std::string& details);
+  void sendServiceUnavailableResponse(absl::string_view details);
 };
 
 struct DecryptResult {
