@@ -73,7 +73,9 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_tx_bytes_total, Counter, Total sent connection bytes
   upstream_cx_tx_bytes_buffered, Gauge, Send connection bytes currently buffered
   upstream_cx_pool_overflow, Counter, Total times that the cluster's connection pool circuit breaker overflowed
+  upstream_cx_preconnect_blocked, Counter, Total times an anticipatory connection was not opened because the connection pool refused it (see :ref:`eager_preconnect_floor <envoy_v3_api_field_config.cluster.v3.Cluster.eager_preconnect_floor>`)
   upstream_cx_preconnect_skipped, Counter, Total anticipatory connections not opened because the host was ineligible for preconnect
+  upstream_cx_preconnect_started, Counter, Total anticipatory connections opened
   upstream_cx_protocol_error, Counter, Total connection protocol errors
   upstream_cx_max_requests, Counter, Total connections closed due to maximum requests
   upstream_cx_none_healthy, Counter, Total times connection not established due to no healthy hosts
@@ -368,6 +370,8 @@ the following statistics:
   lb_local_cluster_not_ok, Counter, Local host set is not set or it is panic mode for local cluster
   lb_zone_no_capacity_left, Counter, Total number of times ended with random zone selection due to rounding error
   original_dst_host_invalid, Counter, Total number of invalid hosts passed to original destination load balancer
+  lb_connection_aware_selected_cold, Counter, Total connection-aware selections that fell back to a host without a ready connection
+  lb_connection_aware_skipped_cold, Counter, Total candidate hosts skipped during connection-aware selection because they lacked a ready connection
 
 .. _config_cluster_manager_cluster_stats_subset_lb:
 

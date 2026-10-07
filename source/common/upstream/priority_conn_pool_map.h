@@ -68,6 +68,12 @@ public:
   void drainConnectionsIf(Envoy::ConnectionPool::DrainConnectionsPoolPredicate predicate,
                           Envoy::ConnectionPool::DrainBehavior drain_behavior);
 
+  /**
+   * @return true if any pool across any priority has at least one connection ready to accept
+   * a new stream.
+   */
+  bool hasReadyConnection() const;
+
 private:
   size_t getPriorityIndex(ResourcePriority priority) const;
 

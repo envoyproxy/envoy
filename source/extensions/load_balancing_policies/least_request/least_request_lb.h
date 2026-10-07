@@ -30,11 +30,13 @@ public:
       Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
       const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest&
           least_request_config,
-      TimeSource& time_source)
+      TimeSource& time_source, ConnectionStateProvider* connection_state_provider = nullptr)
       : EdfLoadBalancerBase(
             priority_set, local_priority_set, stats, runtime, random, healthy_panic_threshold,
             LoadBalancerConfigHelper::localityLbConfigFromProto(least_request_config),
-            LoadBalancerConfigHelper::slowStartConfigFromProto(least_request_config), time_source),
+            LoadBalancerConfigHelper::slowStartConfigFromProto(least_request_config),
+            LoadBalancerConfigHelper::connectionAwareLbConfigFromProto(least_request_config),
+            time_source, connection_state_provider),
         choice_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, choice_count, 2)),
         active_request_bias_runtime_(
             least_request_config.has_active_request_bias()
