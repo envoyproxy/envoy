@@ -2215,6 +2215,8 @@ TEST_P(ProtocolIntegrationTest, BasicDynamicMaxStreamDuration) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  // x-envoy-upstream-stream-duration-ms is only honored for internal requests.
+  default_request_headers_.setForwardedFor("10.0.0.1");
   default_request_headers_.setEnvoyUpstreamStreamDurationMs(500);
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
