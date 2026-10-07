@@ -50,7 +50,7 @@ lowerCasedHeaderSet(const Protobuf::RepeatedPtrField<std::string>& headers) {
 // clear_headers. A header mutation clears it when clear_headers is empty, or when a mutated header
 // name is one of clear_headers. Headers added via headers_to_add are not considered, matching the
 // existing clear condition.
-bool routeCacheShouldClear(const absl::flat_hash_set<std::string>& clear_headers,
+bool shouldClearRouteCache(const absl::flat_hash_set<std::string>& clear_headers,
                            const Filters::Common::ExtAuthz::Response& response) {
   if (!response.query_parameters_to_set.empty() || !response.query_parameters_to_remove.empty()) {
     return true;
@@ -815,7 +815,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // routed. If we are changing the headers we also need to clear the route
     // cache.
     if (config_->clearRouteCache() &&
-        routeCacheShouldClear(config_->clearRouteCacheHeaders(), *response)) {
+        shouldClearRouteCache(config_->clearRouteCacheHeaders(), *response)) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *decoder_callbacks_);
       decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
