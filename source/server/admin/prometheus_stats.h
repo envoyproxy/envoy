@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/server/admin.h"
 #include "envoy/stats/custom_stat_namespaces.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
@@ -18,6 +19,21 @@ namespace Server {
  */
 class PrometheusStatsFormatter {
 public:
+  // Creates an incremental text response, capturing metric values and query filtering decisions
+  // before returning. Worker threads can update values during capture, so this is not an atomic
+  // store snapshot. Subsequent chunks serialize only captured values; metric references retain
+  // immutable names and tags for the request's lifetime.
+  static Admin::RequestPtr
+  makeTextRequest(const std::vector<Stats::CounterSharedPtr>& counters,
+                  const std::vector<Stats::GaugeSharedPtr>& gauges,
+                  const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+                  const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
+                  const Stats::CustomStatNamespaces& custom_namespaces,
+                  uint64_t chunk_size = 64 * 1024);
+
+  static bool useProtobufFormat(const StatsParams& params, const Http::RequestHeaderMap& headers);
+
   // Responsible for converting groups of metrics into the raw output format (such as prometheus
   // text exposition format or prometheus protobuf exposition format).
   class OutputFormat {

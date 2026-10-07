@@ -83,7 +83,8 @@ public:
    * @param url the admin endpoint to query.
    * @return the Http Code and the response body as a string.
    */
-  CodeResponse handlerStats(absl::string_view url) {
+  CodeResponse handlerStats(absl::string_view url, bool prometheus = false,
+                            bool buffered_prometheus = false) {
     NiceMock<MockInstance> instance;
     EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
     EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
@@ -94,10 +95,14 @@ public:
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
     request_headers_.setPath(url);
-    Admin::RequestPtr request = handler.makeRequest(admin_stream_);
     Http::TestResponseHeaderMapImpl response_headers;
-    Http::Code code = request->start(response_headers);
     Buffer::OwnedImpl data;
+    if (buffered_prometheus) {
+      const Http::Code code = handler.handlerPrometheusStats(response_headers, data, admin_stream_);
+      return std::make_pair(code, data.toString());
+    }
+    Admin::RequestPtr request = handler.makeRequest(admin_stream_, prometheus);
+    Http::Code code = request->start(response_headers);
     while (request->nextChunk(data)) {
     }
     return std::make_pair(code, data.toString());
@@ -1472,6 +1477,130 @@ TEST_F(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
   const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
   EXPECT_THAT(code_response.second, HasSubstr("Invalid re2 regex"));
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, DedicatedEndpointPreservesOptionsAndErrors) {
+  createTestStats();
+  for (const auto query :
+       {"", "&usedonly", "&text_readouts", "&filter=active", "&filter=nomatch", "&hidden=include",
+        "&type=gauges", "&histogram_buckets=summary", "&histogram_buckets=disjoint",
+        "&filter=(+invalid)", "&hidden=invalid", "&invert_filter&filter=active", "&prom_protobuf",
+        "&prom_protobuf&histogram_buckets=prometheusnative", "&invert_filter",
+        "&native_histogram_max_buckets=0"}) {
+    SCOPED_TRACE(query);
+    const auto expected = handlerStats(absl::StrCat("/stats?format=prometheus", query));
+    const auto actual = handlerStats(absl::StrCat("/stats/prometheus?format=text", query), true);
+    EXPECT_EQ(expected, actual);
+    EXPECT_EQ(actual,
+              handlerStats(absl::StrCat("/stats/prometheus?format=text", query), true, true));
+  }
+  EXPECT_EQ(handlerStats("/stats/prometheus?format=invalid", true),
+            handlerStats("/stats/prometheus?format=invalid", true, true));
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, FlushesOnceBeforeCollectingMetrics) {
+  uint32_t request_id = 0;
+  for (const bool dedicated : {false, true}) {
+    for (const bool protobuf : {false, true}) {
+      for (const bool flush : {false, true}) {
+        for (const auto invalid_query : {"", "&histogram_buckets=disjoint", "&filter=("}) {
+          const bool valid = absl::string_view(invalid_query).empty();
+          const std::string metric = fmt::format("flushed_{}", request_id++);
+          const std::string url =
+              absl::StrCat(dedicated ? "/stats/prometheus?" : "/stats?format=prometheus",
+                           protobuf ? "&prom_protobuf" : "", invalid_query);
+          SCOPED_TRACE(url);
+          SCOPED_TRACE(flush);
+          NiceMock<MockInstance> instance;
+          bool flushed = false;
+          EXPECT_CALL(instance, flushStats()).Times(valid && flush ? 1 : 0).WillRepeatedly([&]() {
+            flushed = true;
+            store_->rootScope()->counterFromStatName(makeStat(metric)).inc();
+          });
+          EXPECT_CALL(instance, stats())
+              .Times(valid ? testing::AtLeast(1) : testing::Exactly(0))
+              .WillRepeatedly([&]() -> Stats::Store& {
+                EXPECT_EQ(flush, flushed);
+                return *store_;
+              });
+          ON_CALL(instance, statsConfig()).WillByDefault(ReturnRef(stats_config_));
+          EXPECT_CALL(stats_config_, flushOnAdmin())
+              .Times(valid ? 1 : 0)
+              .WillRepeatedly(Return(flush));
+          ON_CALL(instance, clusterManager()).WillByDefault(ReturnRef(endpoints_helper_.cm_));
+          ON_CALL(instance, api()).WillByDefault(ReturnRef(api_));
+          ON_CALL(api_, customStatNamespaces()).WillByDefault(ReturnRef(custom_namespaces_));
+          EXPECT_CALL(admin_stream_, getRequestHeaders())
+              .WillRepeatedly(ReturnRef(request_headers_));
+          request_headers_.setPath(url);
+          StatsHandler handler(instance);
+          auto request = handler.makeRequest(admin_stream_, dedicated);
+          Http::TestResponseHeaderMapImpl headers;
+          EXPECT_EQ(valid ? Http::Code::OK : Http::Code::BadRequest, request->start(headers));
+          Buffer::OwnedImpl output;
+          while (request->nextChunk(output)) {
+          }
+          if (valid && flush) {
+            EXPECT_THAT(output.toString(), HasSubstr("envoy_" + metric));
+          }
+          if (valid && protobuf) {
+            EXPECT_EQ("application/vnd.google.protobuf; "
+                      "proto=io.prometheus.client.MetricFamily; encoding=delimited",
+                      headers.getContentTypeValue());
+          }
+          EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&stats_config_));
+        }
+      }
+    }
+  }
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, BothRoutesProduceBoundedChunks) {
+  for (uint32_t i = 0; i < 1000; ++i) {
+    const Stats::StatNameTagVector tags{
+        {makeStat("caller"), makeStat(fmt::format("{}{}", i, std::string(128, 'x')))}};
+    store_->rootScope()
+        ->counterFromTaggedName(makeStat("requests"), Stats::StatNameTagSpan(tags), {})
+        .inc();
+  }
+  for (const bool dedicated : {false, true}) {
+    NiceMock<MockInstance> instance;
+    ON_CALL(instance, stats()).WillByDefault(ReturnRef(*store_));
+    ON_CALL(instance, statsConfig()).WillByDefault(ReturnRef(stats_config_));
+    EXPECT_CALL(stats_config_, flushOnAdmin()).WillOnce(Return(false));
+    ON_CALL(instance, clusterManager()).WillByDefault(ReturnRef(endpoints_helper_.cm_));
+    ON_CALL(instance, api()).WillByDefault(ReturnRef(api_));
+    ON_CALL(api_, customStatNamespaces()).WillByDefault(ReturnRef(custom_namespaces_));
+    EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
+    request_headers_.setPath(dedicated ? "/stats/prometheus" : "/stats?format=prometheus");
+    StatsHandler handler(instance);
+    auto request = handler.makeRequest(admin_stream_, dedicated);
+    Http::TestResponseHeaderMapImpl headers;
+    ASSERT_EQ(Http::Code::OK, request->start(headers));
+    Buffer::OwnedImpl first;
+    EXPECT_TRUE(request->nextChunk(first));
+    EXPECT_EQ(64 * 1024, first.length());
+    EXPECT_THAT(first.toString(), testing::StartsWith("# TYPE envoy_requests counter\n"));
+  }
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, StreamingRoutesPreserveContentNegotiation) {
+  createTestStats();
+  for (const auto accept : {"text/plain", "application/vnd.google.protobuf",
+                            "application/vnd.google.protobuf, text/plain",
+                            "text/plain, application/vnd.google.protobuf"}) {
+    SCOPED_TRACE(accept);
+    request_headers_.setCopy(Http::LowerCaseString("accept"), accept);
+    const auto generic = handlerStats("/stats?format=prometheus");
+    const auto dedicated = handlerStats("/stats/prometheus", true);
+    EXPECT_EQ(generic, dedicated);
+    EXPECT_EQ(Http::Code::OK, generic.first);
+    if (absl::StartsWith(accept, "text/plain")) {
+      EXPECT_THAT(generic.second, testing::StartsWith("# TYPE "));
+    } else {
+      EXPECT_THAT(generic.second, testing::Not(testing::StartsWith("# TYPE ")));
+    }
+  }
 }
 
 TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusDefaultHistogramEmission) {

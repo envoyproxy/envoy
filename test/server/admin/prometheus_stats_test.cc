@@ -1,4 +1,5 @@
 #include <cmath>
+#include <limits>
 #include <map>
 #include <regex>
 #include <string>
@@ -32,6 +33,55 @@ using testing::Key;
 
 namespace Envoy {
 namespace Server {
+
+namespace {
+
+std::string drainRequest(Admin::Request& request, uint64_t chunk_size) {
+  std::string output;
+  bool more;
+  do {
+    Buffer::OwnedImpl chunk;
+    more = request.nextChunk(chunk);
+    EXPECT_LE(chunk.length(), chunk_size);
+    output.append(chunk.toString());
+  } while (more);
+  Buffer::OwnedImpl after_end;
+  EXPECT_FALSE(request.nextChunk(after_end));
+  EXPECT_EQ(0, after_end.length());
+  return output;
+}
+
+// Exercise the existing text golden cases through both formatters, with deliberately small
+// chunks that split labels, TYPE annotations, and histogram bucket lines.
+uint64_t statsAsPrometheusText(const std::vector<Stats::CounterSharedPtr>& counters,
+                               const std::vector<Stats::GaugeSharedPtr>& gauges,
+                               const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                               const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+                               const Upstream::ClusterManager& cluster_manager,
+                               Buffer::Instance& response, const StatsParams& params,
+                               const Stats::CustomStatNamespaces& custom_namespaces) {
+  Buffer::OwnedImpl expected;
+  const uint64_t families = PrometheusStatsFormatter::statsAsPrometheusText(
+      counters, gauges, histograms, text_readouts, cluster_manager, expected, params,
+      custom_namespaces);
+  auto request = PrometheusStatsFormatter::makeTextRequest(
+      counters, gauges, histograms, text_readouts, cluster_manager, params, custom_namespaces, 17);
+  Http::TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(Http::Code::OK, request->start(headers));
+  std::string output;
+  bool more;
+  do {
+    Buffer::OwnedImpl chunk;
+    more = request->nextChunk(chunk);
+    EXPECT_LE(chunk.length(), 17);
+    output.append(chunk.toString());
+  } while (more);
+  EXPECT_EQ(expected.toString(), output);
+  response.add(output);
+  return families;
+}
+
+} // namespace
 
 class HistogramWrapper {
 public:
@@ -149,6 +199,262 @@ protected:
   std::vector<std::unique_ptr<Stats::TagVector>> endpoints_tags_;
 };
 
+TEST_F(PrometheusStatsFormatterTest, LargeFamilySpansChunks) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  std::string expected = "# TYPE envoy_requests counter\n";
+  for (uint32_t i = 0; i < 256; ++i) {
+    const std::string caller = fmt::format("{:04d}-{}", i, std::string(256, 'x'));
+    addCounter("requests", {{makeStat("caller"), makeStat(caller)}});
+    counters_.back()->add(i);
+    absl::StrAppend(&expected, fmt::format("envoy_requests{{caller=\"{}\"}} {}\n", caller, i));
+  }
+  ASSERT_GT(expected.size(), 64 * 1024);
+  for (const uint64_t chunk_size : {7, 64 * 1024}) {
+    auto request = PrometheusStatsFormatter::makeTextRequest(
+        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, StatsParams(),
+        custom_namespaces, chunk_size);
+    Http::TestResponseHeaderMapImpl headers;
+    EXPECT_EQ(Http::Code::OK, request->start(headers));
+    Buffer::OwnedImpl first;
+    ASSERT_TRUE(request->nextChunk(first));
+    EXPECT_EQ(chunk_size, first.length());
+    EXPECT_EQ(expected, first.toString() + drainRequest(*request, chunk_size));
+  }
+}
+
+TEST_F(PrometheusStatsFormatterTest, MembershipAndOwnershipSurviveChangesBetweenChunks) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  Stats::ThreadLocalStoreImpl store(alloc_);
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  store.setTagProducer(Stats::TagProducerImpl::createTagProducer(stats_config, {}).value());
+  auto scope_a = store.rootScope()->createScope("cluster.a");
+  auto scope_z = store.rootScope()->createScope("cluster.z");
+  const auto name = makeStat("upstream_cx_total");
+  scope_a->counterFromStatName(name).add(10);
+  scope_z->counterFromStatName(name).add(20);
+  auto request = PrometheusStatsFormatter::makeTextRequest(
+      store.counters(), {}, {}, {}, endpoints_helper_->cm_, StatsParams(), custom_namespaces, 1);
+  Http::TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(Http::Code::OK, request->start(headers));
+  Buffer::OwnedImpl first;
+  ASSERT_TRUE(request->nextChunk(first));
+
+  // Release the scopes that owned the original metrics, then add another member of the
+  // same family. The in-flight request must retain the old members and exclude the new one.
+  scope_a.reset();
+  scope_z.reset();
+  auto scope_new = store.rootScope()->createScope("cluster.new");
+  scope_new->counterFromStatName(name).add(30);
+  const std::string expected = "# TYPE envoy_cluster_upstream_cx_total counter\n"
+                               "envoy_cluster_upstream_cx_total{envoy_cluster_name=\"a\"} 10\n"
+                               "envoy_cluster_upstream_cx_total{envoy_cluster_name=\"z\"} 20\n";
+  EXPECT_EQ(expected, first.toString() + drainRequest(*request, 1));
+}
+
+TEST_F(PrometheusStatsFormatterTest, HistogramSerializedOnceAcrossChunks) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  HistogramWrapper values;
+  values.setHistogramValues({10, 20});
+  Stats::HistogramStatisticsImpl statistics(values.getHistogram());
+  auto histogram = makeHistogram("latency", {});
+  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(statistics));
+  addHistogram(histogram);
+  Buffer::OwnedImpl expected;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, expected, StatsParams(),
+                                                  custom_namespaces);
+  EXPECT_CALL(*histogram, cumulativeStatistics()).Times(2).WillRepeatedly(ReturnRef(statistics));
+  auto request = PrometheusStatsFormatter::makeTextRequest(counters_, gauges_, histograms_,
+                                                           textReadouts_, endpoints_helper_->cm_,
+                                                           StatsParams(), custom_namespaces, 64);
+  Http::TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(Http::Code::OK, request->start(headers));
+  Buffer::OwnedImpl first;
+  ASSERT_TRUE(request->nextChunk(first));
+  ASSERT_EQ(64, first.length());
+  // Simulate a merge between chunks after the first bucket has already been serialized.
+  values.setHistogramValues({1000});
+  statistics.refresh(values.getHistogram());
+  EXPECT_EQ(expected.toString(), first.toString() + drainRequest(*request, 64));
+}
+
+TEST_F(PrometheusStatsFormatterTest, ValuesAreCapturedBeforeFirstChunk) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("requests", {{makeStat("caller"), makeStat("a")}});
+  addCounter("requests", {{makeStat("caller"), makeStat("z")}});
+  counters_[0]->add(10);
+  addGauge("active", {});
+  addTextReadout("status", "old", {});
+  auto request = PrometheusStatsFormatter::makeTextRequest(counters_, gauges_, histograms_,
+                                                           textReadouts_, endpoints_helper_->cm_,
+                                                           StatsParams(), custom_namespaces, 1);
+  Http::TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(Http::Code::OK, request->start(headers));
+  counters_[0]->add(1);
+  counters_[1]->add(1);
+  gauges_[0]->set(1);
+  textReadouts_[0]->set("before first chunk");
+  Buffer::OwnedImpl first;
+  ASSERT_TRUE(request->nextChunk(first));
+  ASSERT_EQ(1, first.length());
+
+  // Neither changes before the first chunk nor changes between chunks affect sampled values.
+  counters_[0]->add(89);
+  counters_[1]->add(20);
+  gauges_[0]->set(30);
+  textReadouts_[0]->set("new");
+  const std::string expected = "# TYPE envoy_requests counter\n"
+                               "envoy_requests{caller=\"a\"} 10\n"
+                               "envoy_requests{caller=\"z\"} 0\n"
+                               "# TYPE envoy_active gauge\nenvoy_active{} 0\n"
+                               "# TYPE envoy_status gauge\nenvoy_status{text_value=\"old\"} 0\n";
+  EXPECT_EQ(expected, first.toString() + drainRequest(*request, 1));
+}
+
+TEST_F(PrometheusStatsFormatterTest, HistogramSnapshotsSurviveMergesBeforeAndBetweenChunks) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  // Different bucket counts exercise offsets in the shared value array. Both summaries and
+  // classic histograms must preserve every metric, not just the one in the pending chunk.
+  for (const auto mode :
+       {Utility::HistogramBucketsMode::Cumulative, Utility::HistogramBucketsMode::Summary}) {
+    histograms_.clear();
+    HistogramWrapper values_a;
+    HistogramWrapper values_z;
+    values_a.setHistogramValues({1, 5});
+    values_z.setHistogramValues({2, 8, 32});
+    const std::vector<double> bounds_a{1, 5, 10};
+    const std::vector<double> bounds_z{2, 4, 8, 16, 32};
+    Stats::HistogramStatisticsImpl stats_a(values_a.getHistogram(),
+                                           Stats::Histogram::Unit::Unspecified, bounds_a);
+    Stats::HistogramStatisticsImpl stats_z(values_z.getHistogram(),
+                                           Stats::Histogram::Unit::Unspecified, bounds_z);
+    auto a = makeHistogram("latency", {{makeStat("caller"), makeStat("a")}});
+    auto z = makeHistogram("latency", {{makeStat("caller"), makeStat("z")}});
+    ON_CALL(*a, cumulativeStatistics()).WillByDefault(ReturnRef(stats_a));
+    ON_CALL(*z, cumulativeStatistics()).WillByDefault(ReturnRef(stats_z));
+    ON_CALL(*a, intervalStatistics()).WillByDefault(ReturnRef(stats_a));
+    ON_CALL(*z, intervalStatistics()).WillByDefault(ReturnRef(stats_z));
+    addHistogram(a);
+    addHistogram(z);
+    StatsParams params;
+    params.histogram_buckets_mode_ = mode;
+    if (mode == Utility::HistogramBucketsMode::Summary) {
+      EXPECT_CALL(*a, cumulativeStatistics()).Times(0);
+      EXPECT_CALL(*z, cumulativeStatistics()).Times(0);
+    } else {
+      EXPECT_CALL(*a, intervalStatistics()).Times(0);
+      EXPECT_CALL(*z, intervalStatistics()).Times(0);
+    }
+    Buffer::OwnedImpl expected;
+    PrometheusStatsFormatter::statsAsPrometheusText({}, {}, histograms_, {}, endpoints_helper_->cm_,
+                                                    expected, params, custom_namespaces);
+    auto request = PrometheusStatsFormatter::makeTextRequest(
+        {}, {}, histograms_, {}, endpoints_helper_->cm_, params, custom_namespaces, 1);
+    // All mutable histogram reads must be finished before the first chunk is requested.
+    EXPECT_CALL(*a, cumulativeStatistics()).Times(0);
+    EXPECT_CALL(*z, cumulativeStatistics()).Times(0);
+    EXPECT_CALL(*a, intervalStatistics()).Times(0);
+    EXPECT_CALL(*z, intervalStatistics()).Times(0);
+    values_a.setHistogramValues({1000});
+    stats_a.refresh(values_a.getHistogram());
+    values_z.setHistogramValues({2000});
+    stats_z.refresh(values_z.getHistogram());
+    Http::TestResponseHeaderMapImpl headers;
+    EXPECT_EQ(Http::Code::OK, request->start(headers));
+    Buffer::OwnedImpl first;
+    ASSERT_TRUE(request->nextChunk(first));
+    values_z.setHistogramValues({3000});
+    stats_z.refresh(values_z.getHistogram());
+    EXPECT_EQ(expected.toString(), first.toString() + drainRequest(*request, 1));
+  }
+}
+
+TEST_F(PrometheusStatsFormatterTest, UsedOnlyInclusionIsCapturedWithValues) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("requests", {{makeStat("caller"), makeStat("a")}});
+  addCounter("requests", {{makeStat("caller"), makeStat("z")}});
+  counters_[0]->add(10);
+  addGauge("active", {});
+  gauges_[0]->set(1);
+  StatsParams params;
+  params.used_only_ = true;
+  auto request = PrometheusStatsFormatter::makeTextRequest(
+      counters_, gauges_, {}, {}, endpoints_helper_->cm_, params, custom_namespaces, 1);
+  counters_[0]->markUnused();
+  gauges_[0]->markUnused();
+  counters_[1]->inc();
+  Http::TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(Http::Code::OK, request->start(headers));
+  EXPECT_EQ("# TYPE envoy_requests counter\nenvoy_requests{caller=\"a\"} 10\n"
+            "# TYPE envoy_active gauge\nenvoy_active{} 1\n",
+            drainRequest(*request, 1));
+}
+
+TEST_F(PrometheusStatsFormatterTest, HostValuesAndMembershipAreCapturedBeforeFirstChunk) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("requests", {});
+  addClusterEndpoints("test", 1, {});
+  Buffer::OwnedImpl expected;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, {}, {}, {}, endpoints_helper_->cm_,
+                                                  expected, StatsParams(), custom_namespaces);
+  auto request = PrometheusStatsFormatter::makeTextRequest(
+      counters_, {}, {}, {}, endpoints_helper_->cm_, StatsParams(), custom_namespaces, 1);
+  for (auto& counter : endpoints_helper_->counters_) {
+    counter.add(1000);
+  }
+  for (auto& gauge : endpoints_helper_->gauges_) {
+    gauge.set(2000);
+  }
+  endpoints_helper_->cluster_info_maps_.active_clusters_.clear();
+  Http::TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(Http::Code::OK, request->start(headers));
+  EXPECT_EQ(expected.toString(), drainRequest(*request, 1));
+}
+
+TEST_F(PrometheusStatsFormatterTest, RequestsOwnIndependentTextAndNumericValues) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("requests", {});
+  addTextReadout("status", std::string(256, 'a') + "\n\"\\", {});
+  Buffer::OwnedImpl expected;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, {}, {}, textReadouts_,
+                                                  endpoints_helper_->cm_, expected, StatsParams(),
+                                                  custom_namespaces);
+  auto first = PrometheusStatsFormatter::makeTextRequest(counters_, {}, {}, textReadouts_,
+                                                         endpoints_helper_->cm_, StatsParams(),
+                                                         custom_namespaces, 1);
+  counters_[0]->add(100);
+  textReadouts_[0]->set(std::string(512, 'z'));
+  Buffer::OwnedImpl updated;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, {}, {}, textReadouts_,
+                                                  endpoints_helper_->cm_, updated, StatsParams(),
+                                                  custom_namespaces);
+  auto second = PrometheusStatsFormatter::makeTextRequest(counters_, {}, {}, textReadouts_,
+                                                          endpoints_helper_->cm_, StatsParams(),
+                                                          custom_namespaces, 7);
+  Http::TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(Http::Code::OK, first->start(headers));
+  EXPECT_EQ(Http::Code::OK, second->start(headers));
+  EXPECT_EQ(updated.toString(), drainRequest(*second, 7));
+  EXPECT_EQ(expected.toString(), drainRequest(*first, 1));
+}
+
+TEST_F(PrometheusStatsFormatterTest, NumericSnapshotsPreserveFullIntegerPrecision) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("requests", {});
+  addGauge("active", {});
+  counters_[0]->add(std::numeric_limits<uint64_t>::max());
+  gauges_[0]->set(std::numeric_limits<uint64_t>::max());
+  auto request = PrometheusStatsFormatter::makeTextRequest(
+      counters_, gauges_, {}, {}, endpoints_helper_->cm_, StatsParams(), custom_namespaces, 1);
+  counters_[0]->reset();
+  gauges_[0]->set(0);
+  Http::TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(Http::Code::OK, request->start(headers));
+  EXPECT_EQ("# TYPE envoy_requests counter\nenvoy_requests{} 18446744073709551615\n"
+            "# TYPE envoy_active gauge\nenvoy_active{} 18446744073709551615\n",
+            drainRequest(*request, 1));
+}
+
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
   std::string raw = "vulture.eats-liver";
@@ -156,6 +462,40 @@ TEST_F(PrometheusStatsFormatterTest, MetricName) {
   auto actual = PrometheusStatsFormatter::metricName(std::move(raw), custom_namespaces);
   EXPECT_TRUE(actual.has_value());
   EXPECT_EQ(expected, actual.value());
+}
+
+TEST_F(PrometheusStatsFormatterTest, EmptyAndFilteredStreamingRequests) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  for (const auto query : {"/stats/prometheus", "/stats/prometheus?filter=nomatch"}) {
+    StatsParams params;
+    Buffer::OwnedImpl error;
+    ASSERT_EQ(Http::Code::OK, params.parse(query, error));
+    auto request = PrometheusStatsFormatter::makeTextRequest(counters_, gauges_, histograms_,
+                                                             textReadouts_, endpoints_helper_->cm_,
+                                                             params, custom_namespaces, 7);
+    Http::TestResponseHeaderMapImpl headers;
+    EXPECT_EQ(Http::Code::OK, request->start(headers));
+    EXPECT_EQ("", drainRequest(*request, 7));
+    if (counters_.empty()) {
+      addCounter("requests", {});
+    }
+  }
+}
+
+TEST_F(PrometheusStatsFormatterTest, ChunkBudgetIsAdditionalBytes) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("requests", {});
+  const std::string expected = "# TYPE envoy_requests counter\nenvoy_requests{} 0\n";
+  auto request = PrometheusStatsFormatter::makeTextRequest(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, StatsParams(),
+      custom_namespaces, expected.size());
+  Http::TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(Http::Code::OK, request->start(headers));
+  Buffer::OwnedImpl output;
+  output.add("prefix");
+  EXPECT_TRUE(request->nextChunk(output));
+  EXPECT_EQ("prefix" + expected, output.toString());
+  EXPECT_EQ("", drainRequest(*request, expected.size()));
 }
 
 TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
@@ -225,9 +565,9 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
-      StatsParams(), custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, StatsParams(), custom_namespaces);
   EXPECT_EQ(2UL, size);
 }
 
@@ -248,9 +588,9 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
-      StatsParams(), custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, StatsParams(), custom_namespaces);
   EXPECT_EQ(4UL, size);
 }
 
@@ -266,9 +606,9 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
-      StatsParams(), custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -311,9 +651,9 @@ TEST_F(PrometheusStatsFormatterTest, SummaryWithNoValuesAndNoTags) {
   StatsParams params = StatsParams();
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
-      custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, params, custom_namespaces);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 summary
@@ -361,22 +701,10 @@ envoy_cluster_default_total_match_count{envoy_cluster_name="a"} 0
 envoy_cluster_default_total_match_count{envoy_cluster_name="x"} 0
 )EOF";
 
-  // Note: in the version of prometheus_stats_test.cc that works with the
-  // streaming GroupedStatsRequest, the test code is slightly different;
-  // it's based on the local 'store' object rather than being based on
-  // the counters_ member variable.
-  //    StatsParams params;
-  //    params.type_ = StatsType::Counters;
-  //    params.format_ = StatsFormat::Prometheus;
-  //    auto request = std::make_unique<GroupedStatsRequest>(store, params, custom_namespaces_);
-  //    EXPECT_EQ(expected_output, response(*request));
-  // This code is left here so that we can verify the bug is fixed if we decide to
-  // re-try the streaming Prometheus implementation.
-
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
-      StatsParams(), custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, StatsParams(), custom_namespaces);
   EXPECT_EQ(1, size);
   EXPECT_EQ(expected_output, response.toString());
 }
@@ -395,9 +723,9 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
-      StatsParams(), custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -435,9 +763,9 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
-      StatsParams(), custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -470,9 +798,9 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
-      StatsParams(), custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -532,12 +860,14 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
                                                         {makeStat("key2"), makeStat("value2")}});
   histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   addHistogram(histogram1);
-  EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  EXPECT_CALL(*histogram1, cumulativeStatistics())
+      .Times(3)
+      .WillRepeatedly(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
-      StatsParams(), custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, StatsParams(), custom_namespaces);
   EXPECT_EQ(12UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
@@ -613,9 +943,9 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithTextReadoutsInGaugeFormat) {
                   {makeStat("tag3"), makeStat(R"(")")}});
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
-      StatsParams(), custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, StatsParams(), custom_namespaces);
   EXPECT_EQ(4UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_upstream_cx_total_count counter
@@ -657,14 +987,15 @@ TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
       histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
       addHistogram(histogram1);
       EXPECT_CALL(*histogram1, cumulativeStatistics())
-          .WillOnce(ReturnRef(h1_cumulative_statistics));
+          .Times(3)
+          .WillRepeatedly(ReturnRef(h1_cumulative_statistics));
     }
   }
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
-      StatsParams(), custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, StatsParams(), custom_namespaces);
   EXPECT_EQ(6UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_upstream_cx_connect_fail counter
@@ -843,14 +1174,16 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
                                                         {makeStat("key2"), makeStat("value2")}});
   histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   addHistogram(histogram1);
-  EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  EXPECT_CALL(*histogram1, cumulativeStatistics())
+      .Times(3)
+      .WillRepeatedly(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   StatsParams params;
   params.used_only_ = true;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
-      custom_namespaces);
+  const uint64_t size =
+      statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_,
+                            response, params, custom_namespaces);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_rq_time histogram
@@ -895,9 +1228,9 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithHiddenGauge) {
   {
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::Exclude;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
-        custom_namespaces);
+    const uint64_t size =
+        statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                              endpoints_helper_->cm_, response, params, custom_namespaces);
     const std::string expected_output =
         R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
 envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
@@ -908,9 +1241,9 @@ envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3
   {
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::ShowOnly;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
-        custom_namespaces);
+    const uint64_t size =
+        statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                              endpoints_helper_->cm_, response, params, custom_namespaces);
     const std::string expected_output =
         R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
 envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
@@ -921,9 +1254,9 @@ envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4
   {
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::Include;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
-        custom_namespaces);
+    const uint64_t size =
+        statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                              endpoints_helper_->cm_, response, params, custom_namespaces);
     const std::string expected_output =
         R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
 envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
@@ -954,20 +1287,22 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
     EXPECT_CALL(*histogram1, cumulativeStatistics()).Times(0);
 
     Buffer::OwnedImpl response;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
-        custom_namespaces);
+    const uint64_t size =
+        statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                              endpoints_helper_->cm_, response, params, custom_namespaces);
     EXPECT_EQ(0UL, size);
   }
 
   {
     params.used_only_ = false;
-    EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+    EXPECT_CALL(*histogram1, cumulativeStatistics())
+        .Times(3)
+        .WillRepeatedly(ReturnRef(h1_cumulative_statistics));
 
     Buffer::OwnedImpl response;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
-        custom_namespaces);
+    const uint64_t size =
+        statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                              endpoints_helper_->cm_, response, params, custom_namespaces);
     EXPECT_EQ(1UL, size);
   }
 }
@@ -1004,9 +1339,9 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     StatsParams params;
     ASSERT_EQ(Http::Code::OK,
               params.parse("/stats?filter=cluster.test_1.upstream_cx_total", response));
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
-        custom_namespaces);
+    const uint64_t size =
+        statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                              endpoints_helper_->cm_, response, params, custom_namespaces);
     EXPECT_EQ(1UL, size);
     EXPECT_EQ(expected_output, response.toString());
   }
@@ -1016,9 +1351,9 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     StatsParams params;
     ASSERT_EQ(Http::Code::OK,
               params.parse("/stats?filter=cluster.test_1.upstream_cx_total&safe", response));
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
-        custom_namespaces);
+    const uint64_t size =
+        statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                              endpoints_helper_->cm_, response, params, custom_namespaces);
     EXPECT_EQ(1UL, size);
     EXPECT_EQ(expected_output, response.toString());
   }
@@ -1028,9 +1363,9 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     Buffer::OwnedImpl response;
     StatsParams params;
     ASSERT_EQ(Http::Code::OK, params.parse("/stats?filter=cluster.test_1.endpoint.*c1", response));
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
-        custom_namespaces);
+    const uint64_t size =
+        statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                              endpoints_helper_->cm_, response, params, custom_namespaces);
     const std::string expected =
         R"EOF(# TYPE envoy_cluster_endpoint_c1 counter
 envoy_cluster_endpoint_c1{a_tag_name="a.tag-value",envoy_cluster_name="test_1",envoy_endpoint_address="127.0.0.1:80"} 11
@@ -1762,6 +2097,46 @@ public:
   Stats::CustomStatNamespacesImpl custom_namespaces_;
   std::unique_ptr<Upstream::PerEndpointMetricsTestHelper> endpoints_helper_;
 };
+
+TEST_F(RealHistogramNativePrometheusTest, StreamingSnapshotsRemainIndependentAcrossMerges) {
+  setHistogramBucketsForPrefix("snapshot.", {1, 10, 100});
+  for (const auto mode :
+       {Utility::HistogramBucketsMode::Cumulative, Utility::HistogramBucketsMode::Summary}) {
+    const std::string name =
+        mode == Utility::HistogramBucketsMode::Summary ? "snapshot.summary" : "snapshot.histogram";
+    auto& histogram = makeHistogram(name, Stats::Histogram::Unit::Unspecified);
+    recordValue(histogram, 10);
+    recordValue(histogram, 20);
+    mergeHistograms();
+    const std::vector<Stats::ParentHistogramSharedPtr> histograms{getParentHistogram(name)};
+    ASSERT_NE(nullptr, histograms.front());
+    StatsParams params;
+    params.histogram_buckets_mode_ = mode;
+    Buffer::OwnedImpl expected_first;
+    PrometheusStatsFormatter::statsAsPrometheusText({}, {}, histograms, {}, endpoints_helper_->cm_,
+                                                    expected_first, params, custom_namespaces_);
+    auto first = PrometheusStatsFormatter::makeTextRequest(
+        {}, {}, histograms, {}, endpoints_helper_->cm_, params, custom_namespaces_, 1);
+    recordValue(histogram, 30);
+    mergeHistograms();
+    // Interval summaries now differ from cumulative histograms as well as the first snapshot.
+    Buffer::OwnedImpl expected_second;
+    PrometheusStatsFormatter::statsAsPrometheusText({}, {}, histograms, {}, endpoints_helper_->cm_,
+                                                    expected_second, params, custom_namespaces_);
+    EXPECT_NE(expected_first.toString(), expected_second.toString());
+    auto second = PrometheusStatsFormatter::makeTextRequest(
+        {}, {}, histograms, {}, endpoints_helper_->cm_, params, custom_namespaces_, 1);
+    recordValue(histogram, 40);
+    mergeHistograms();
+    Http::TestResponseHeaderMapImpl second_headers;
+    EXPECT_EQ(Http::Code::OK, second->start(second_headers));
+    EXPECT_EQ(expected_second.toString(), drainRequest(*second, 1));
+
+    Http::TestResponseHeaderMapImpl first_headers;
+    EXPECT_EQ(Http::Code::OK, first->start(first_headers));
+    EXPECT_EQ(expected_first.toString(), drainRequest(*first, 1));
+  }
+}
 
 // Test native histogram with only zero values using real histogram implementation.
 // All samples should go to the zero bucket, with no positive buckets.

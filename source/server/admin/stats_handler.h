@@ -95,7 +95,7 @@ public:
   static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
                                        const Upstream::ClusterManager& cm,
                                        StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
-  Admin::RequestPtr makeRequest(AdminStream&);
+  Admin::RequestPtr makeRequest(AdminStream&, bool prometheus = false);
 };
 
 } // namespace Server
