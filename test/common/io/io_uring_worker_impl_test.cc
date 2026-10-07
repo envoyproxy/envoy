@@ -54,6 +54,62 @@ public:
   void submitForTest() { submit(); }
 };
 
+class IoUringSubmitRetryTest : public testing::TestWithParam<bool> {};
+
+TEST_P(IoUringSubmitRetryTest, RetainsRequestWhenSubmissionQueueIsFull) {
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto io_uring_instance = std::make_unique<testing::StrictMock<MockIoUring>>();
+  auto& mock_io_uring = *io_uring_instance;
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  testing::StrictMock<MockIoUringSocket> socket;
+  EXPECT_CALL(socket, fd()).WillRepeatedly(Return(11));
+  const Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  Request* first_attempt = nullptr;
+  const bool multishot = GetParam();
+  {
+    testing::InSequence sequence;
+    if (multishot) {
+      EXPECT_CALL(mock_io_uring, prepareReadMultishot(11, _))
+          .WillOnce(DoAll(SaveArg<1>(&first_attempt), Return(IoUringResult::Failed)));
+    } else {
+      EXPECT_CALL(mock_io_uring, prepareConnect(11, address, _))
+          .WillOnce(DoAll(SaveArg<2>(&first_attempt), Return(IoUringResult::Failed)));
+    }
+    // Flush the full submission queue before retrying the same operation and request.
+    EXPECT_CALL(mock_io_uring, submit()).WillOnce(Return(IoUringResult::Ok));
+    if (multishot) {
+      EXPECT_CALL(mock_io_uring, prepareReadMultishot(11, _))
+          .WillOnce(Invoke([&](os_fd_t, Request* request) {
+            EXPECT_EQ(first_attempt, request);
+            return IoUringResult::Ok;
+          }));
+    } else {
+      EXPECT_CALL(mock_io_uring, prepareConnect(11, address, _))
+          .WillOnce(Invoke(
+              [&](os_fd_t, const Network::Address::InstanceConstSharedPtr&, Request* request) {
+                EXPECT_EQ(first_attempt, request);
+                return IoUringResult::Ok;
+              }));
+    }
+    EXPECT_CALL(mock_io_uring, submit()).WillOnce(Return(IoUringResult::Ok));
+  }
+  std::unique_ptr<Request> request(multishot ? worker.submitReadMultishotRequest(socket)
+                                             : worker.submitConnectRequest(socket, address));
+  ASSERT_NE(nullptr, request);
+  EXPECT_EQ(first_attempt, request.get());
+  EXPECT_EQ(multishot ? Request::RequestType::Read : Request::RequestType::Connect,
+            request->type());
+  EXPECT_EQ(&socket, &request->socket());
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
+
+INSTANTIATE_TEST_SUITE_P(ConnectAndMultishot, IoUringSubmitRetryTest, testing::Values(false, true));
+
 // TODO (soulxu): This is only for test coverage, we suppose to have correct
 // implementation to handle the request submit failed.
 TEST(IoUringWorkerImplTest, SubmitRequestsFailed) {
@@ -513,7 +569,8 @@ TEST_P(IoUringWorkerShutdownTest, CancelsPendingOperationWithoutRunningDispatche
     // Fail deterministically on the original code, without hanging the test in its drain loop.
     EXPECT_NE(cancel_req, nullptr);
     if (partial_write && cancel_req != nullptr) {
-      // The cancel CQE can arrive before a positive completion that won the cancellation race.
+      // The cancel completion can arrive before a positive completion that won the cancellation
+      // race.
       cb(cancel_req, -ENOENT, false);
     }
     cb(pending_req, partial_write ? 1 : -ECANCELED, false);
