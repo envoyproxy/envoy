@@ -1,8 +1,17 @@
+load("//tools/base:yaml.bzl", "yaml_sorted_mapping")
+
 licenses(["notice"])  # Apache 2
 
 exports_files([
     "changelogs.yaml",
 ])
+
+yaml_sorted_mapping(
+    name = "sort_areas",
+    src = "changelogs.yaml",
+    mapping = "areas",
+    visibility = ["//visibility:public"],
+)
 
 filegroup(
     name = "changelogs",
