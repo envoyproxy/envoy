@@ -41,6 +41,7 @@
 #include "source/common/upstream/host_utility.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Router {
@@ -260,7 +261,8 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
   const absl::string_view per_try_timeout_entry =
       request_headers.getEnvoyUpstreamRequestPerTryTimeoutMsValue();
   if (!per_try_timeout_entry.empty()) {
-    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout)) {
+    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout) &&
+        header_timeout <= static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -323,7 +325,8 @@ void FilterUtility::setTimeoutHeaders(uint64_t elapsed_time, const TimeoutData& 
 std::optional<std::chrono::milliseconds>
 FilterUtility::tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry) {
   uint64_t header_timeout;
-  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout)) {
+  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout) &&
+      header_timeout <= static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
     return std::chrono::milliseconds(header_timeout);
   }
   return std::nullopt;

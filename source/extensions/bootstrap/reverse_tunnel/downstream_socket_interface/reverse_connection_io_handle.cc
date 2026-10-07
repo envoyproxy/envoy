@@ -1143,6 +1143,19 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
     return false;
   }
 
+  // Reject EnvoyInternal remote clusters before dialing: the user-space I/O handle cannot be
+  // duplicated for the accepted tunnel, which aborts in debug builds and drops a tunnel in release.
+  if (host != nullptr && host->address() != nullptr &&
+      host->address()->type() == Network::Address::Type::EnvoyInternal) {
+    ENVOY_LOG(
+        error,
+        "reverse_tunnel: EnvoyInternal remote cluster addresses are not supported for host {}",
+        host_address);
+    updateConnectionState(host_address, cluster_name, temp_connection_key,
+                          ReverseConnectionState::CannotConnect);
+    return false;
+  }
+
   ENVOY_LOG(debug,
             "reverse_tunnel: Initiating one reverse connection to host {} of cluster "
             "'{}', source node '{}'",
@@ -1172,25 +1185,9 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   ENVOY_LOG(debug, "reverse_tunnel: Cluster '{}' found with type {} and {} hosts", cluster_name,
             static_cast<int>(cluster_info->type()), host_count);
 
-  // Normalize host key for internal addresses to ensure consistent map lookups.
-  std::string normalized_host_key = host_address;
-  if (absl::StartsWith(host_address, "envoy://")) {
-    normalized_host_key = host_address; // already canonical for internal addresses
-  }
-
-  // Validate that we have hosts available for internal addresses.
-  if (absl::StartsWith(host_address, "envoy://") && host_count == 0) {
-    ENVOY_LOG(error, "reverse_tunnel: No hosts available in cluster '{}' for internal address '{}'",
-              cluster_name, host_address);
-    updateConnectionState(host_address, cluster_name, temp_connection_key,
-                          ReverseConnectionState::CannotConnect);
-    return false;
-  }
-
   // Create load balancer context and validate it.
-  ReverseConnectionLoadBalancerContext lb_context(normalized_host_key);
-  ENVOY_LOG(debug, "reverse_tunnel: Created load balancer context for host key: {}",
-            normalized_host_key);
+  ReverseConnectionLoadBalancerContext lb_context(host_address);
+  ENVOY_LOG(debug, "reverse_tunnel: Created load balancer context for host key: {}", host_address);
 
   // Get connection from cluster manager with defensive error handling.
   Upstream::Host::CreateConnectionData conn_data;
@@ -1221,7 +1218,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   // Stamp the episode initiation time on the first dial of an establishment episode, and reuse it
   // for subsequent handshake retries. It is cleared on handshake success (see onConnectionDone()),
   // so a redial after a live connection drops begins a fresh episode with a new timestamp.
-  auto& host_info = host_to_conn_info_map_[normalized_host_key];
+  auto& host_info = host_to_conn_info_map_[host_address];
   if (!host_info.episode_initiation_time_ms.has_value()) {
     host_info.episode_initiation_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                                getTimeSource().systemTime().time_since_epoch())
@@ -1232,7 +1229,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   // Publish wrapper ownership before dialing. A handshake that fails synchronously calls
   // onConnectionDone() from within connect(), which looks the wrapper up here, so it must already
   // be registered or the failure would leak it.
-  conn_wrapper_to_host_map_[wrapper_ptr] = normalized_host_key;
+  conn_wrapper_to_host_map_[wrapper_ptr] = host_address;
   connection_wrappers_.push_back(std::move(wrapper));
 
   // Send the reverse connection handshake over the TCP connection.
@@ -1257,7 +1254,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
             host_address, connection_key);
 
   {
-    // Safely log address information without assuming IP is present (internal addresses possible).
+    // Log the resolved address without assuming an IP is present, since pipe hosts expose none.
     const auto& addr = host->address();
     std::string addr_str = addr ? addr->asString() : std::string("<unknown>");
     std::optional<uint16_t> port_opt;
@@ -1278,7 +1275,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   }
   // Backoff is reset only on verified handshake success in onConnectionDone(), so a dial that is
   // merely in flight does not clear prior failures.
-  updateConnectionState(normalized_host_key, cluster_name, connection_key,
+  updateConnectionState(host_address, cluster_name, connection_key,
                         ReverseConnectionState::Connecting);
   return true;
 }

@@ -2037,32 +2037,6 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccessTriggerWriteFailure
   EXPECT_EQ(getEstablishedConnectionsSize(), 1);
 }
 
-// Internal address with zero hosts should early fail and update CannotConnect state.
-TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionInternalAddressNoHosts) {
-  setupThreadLocalSlot();
-
-  auto config = createDefaultTestConfig();
-  io_handle_ = createTestIOHandle(config);
-  EXPECT_NE(io_handle_, nullptr);
-
-  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
-      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
-
-  // Provide non-null info and an empty host set to yield host_count == 0.
-  auto mock_cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(*mock_thread_local_cluster, info()).WillRepeatedly(Return(mock_cluster_info));
-  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
-  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
-      .WillRepeatedly(ReturnRef(*mock_priority_set));
-  std::vector<Upstream::HostSetPtr> host_sets; // empty
-  EXPECT_CALL(*mock_priority_set, hostSetsPerPriority()).WillRepeatedly(ReturnRef(host_sets));
-
-  auto mock_host = createMockPipeHost("/tmp/rev.sock");
-  bool ok = initiateOneReverseConnection("test-cluster", "envoy://internal", mock_host);
-  EXPECT_FALSE(ok);
-}
-
 // Pipe address host exercises the log branch that prints address without a port.
 TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionLogsWithoutPort) {
   setupThreadLocalSlot();
@@ -3904,6 +3878,32 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsDrainsEstablishedQueue) {
   io_handle_->resetFileEvents();
 
   EXPECT_EQ(getEstablishedConnectionsSize(), 0);
+}
+
+// An EnvoyInternal remote cluster address is rejected before dialing, since the user-space I/O
+// handle cannot be duplicated for the accepted tunnel. The rejection happens before any cluster
+// lookup and moves the host into the CannotConnect state.
+TEST_F(ReverseConnectionIOHandleTest, InitiateRejectsEnvoyInternalHost) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // The host is rejected before the cluster is ever resolved.
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  auto internal_address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener", "endpoint_id");
+  EXPECT_CALL(*mock_host, address()).WillRepeatedly(Return(internal_address));
+
+  EXPECT_FALSE(
+      initiateOneReverseConnection("test-cluster", "envoy://internal_listener", mock_host));
+
+  auto stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(
+      stat_map["test_scope.reverse_connections.host.envoy://internal_listener.cannot_connect"], 1);
 }
 
 } // namespace ReverseConnection
