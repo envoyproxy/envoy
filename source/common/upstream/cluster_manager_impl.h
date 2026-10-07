@@ -1000,9 +1000,9 @@ private:
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
-  // Per-cluster CDS pause handles. Each warming cluster that can block CDS holds one handle here.
-  // CDS stays paused as long as any handle is live. Clusters with a zero-timeout SDS dependency
-  // are excluded so a missing secret never deadlocks ADS for unrelated clusters.
+  // Per-cluster CDS pause handles. Each warming cluster that has not opted out of CDS gating
+  // holds one handle here. CDS stays paused as long as any handle is live. Clusters with
+  // wait_for_warm_on_init: false do not acquire a handle.
   absl::flat_hash_map<std::string, Config::ScopedResume> cds_pauses_;
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined.

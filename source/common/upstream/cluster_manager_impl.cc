@@ -1014,9 +1014,11 @@ void ClusterManagerImpl::updateClusterCounts() {
   // on it. This can improve incidence of HTTP 503 responses from Envoy when a route is used before
   // it's supporting cluster is ready.
   //
-  // We achieve that by leaving CDS in the paused state as long as there is at least
-  // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
-  // Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS, providing a
+  // We achieve that by leaving CDS in the paused state as long as there is at
+  // least one warming cluster that has not opted out of CDS gating. Clusters
+  // with wait_for_warm_on_init: false remain in warming_clusters_ but do not hold
+  // a pause handle, so they do not block the CDS ACK. Once all blocking clusters
+  // are warmed up, CDS is resumed, and ACK is sent to ADS, providing a
   // signal to ADS to proceed with RDS updates.
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   const bool all_clusters_initialized =
