@@ -39,6 +39,7 @@ envoy_cc_library(
     ],
     deps = [
         ":trace_exporter",
+        ":span_context_lib",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/config:utility_lib",
         "//source/common/http:http_service_headers_lib",

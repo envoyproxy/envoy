@@ -3548,21 +3548,23 @@ TEST_F(McpFilterTest, TraceContextReparentActiveSpan) {
           testing::Invoke([&buffer](std::function<void(Buffer::Instance&)> cb) { cb(buffer); }));
   EXPECT_CALL(decoder_callbacks_.active_span_, getSpanId())
       .WillOnce(Return(std::string(kSpanIdHex)));
-  EXPECT_CALL(decoder_callbacks_.active_span_, setTraceId("4bf92f3577b34da6a3ce929d0e0e4736"));
-  EXPECT_CALL(decoder_callbacks_.active_span_, setParentId("00f067aa0ba902b7"));
-  EXPECT_CALL(decoder_callbacks_.active_span_, setSampled(true));
-  EXPECT_CALL(decoder_callbacks_.active_span_, setTracestate("rojo=00f067aa0ba902b7"));
+  EXPECT_CALL(decoder_callbacks_.active_span_, updateParent(_));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
-  EXPECT_EQ(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kSpanIdHex, "-01"),
-            headers.get_("traceparent"));
+  // It's not the McpFilter's job to rewrite the traceparent header with the new
+  // parent ID. In the case of the OpenTelemetry tracer, that happens in
+  // `Span::injectContext()`.
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", headers.get_("traceparent"))
+      << "The traceparent header should not have been rewritten by McpFilter.";
+
   EXPECT_EQ("rojo=00f067aa0ba902b7", headers.get_("tracestate"));
 
   // The request's traceparent should have been rewritten such that the parent
   // ID is equal to the active span's ID.
   EXPECT_THAT(buffer.toString(),
-              HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kSpanIdHex, "-01")));
+              HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kSpanIdHex, "-01")))
+      << "The request body's traceparent should have been rewritten with a new parent ID";
 }
 
 TEST_F(McpFilterTest, TraceContextEnabledValidParentAndState) {

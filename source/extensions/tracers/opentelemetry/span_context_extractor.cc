@@ -46,6 +46,9 @@ bool isAllZeros(const absl::string_view& input) {
 SpanContextExtractor::SpanContextExtractor(Tracing::TraceContext& trace_context)
     : trace_context_(trace_context) {}
 
+SpanContextExtractor::SpanContextExtractor(const Tracing::TraceContext& trace_context)
+    : trace_context_(trace_context) {}
+
 SpanContextExtractor::~SpanContextExtractor() = default;
 
 bool SpanContextExtractor::propagationHeaderPresent() {

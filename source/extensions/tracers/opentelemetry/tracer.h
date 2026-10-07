@@ -101,6 +101,7 @@ public:
                      const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
+  void updateParent(const Tracing::TraceContext& trace_context) override;
 
   /**
    * Set the span's sampled flag.
@@ -132,7 +133,7 @@ public:
   /**
    * Sets the span's trace id attribute.
    */
-  void setTraceId(absl::string_view trace_id_hex) override {
+  void setTraceId(absl::string_view trace_id_hex) {
     span_.set_trace_id(absl::HexStringToBytes(trace_id_hex));
   }
 
@@ -159,7 +160,7 @@ public:
   /**
    * Sets the span's parent id.
    */
-  void setParentId(absl::string_view parent_span_id_hex) override {
+  void setParentId(absl::string_view parent_span_id_hex) {
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
   }
 
@@ -174,8 +175,12 @@ public:
   /**
    * Sets the span's tracestate.
    */
-  void setTracestate(absl::string_view tracestate) override {
+  void setTracestate(absl::string_view tracestate) {
     span_.set_trace_state(std::string{tracestate});
+  }
+
+  absl::string_view getTracestate() const {
+    return span_.trace_state();
   }
 
   /**

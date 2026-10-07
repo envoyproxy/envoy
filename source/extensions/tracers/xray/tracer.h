@@ -49,7 +49,7 @@ public:
   /**
    * Sets the Span's trace ID.
    */
-  void setTraceId(absl::string_view trace_id) override { trace_id_ = std::string(trace_id); };
+  void setTraceId(absl::string_view trace_id) { trace_id_ = std::string(trace_id); };
 
   /**
    * Gets the Span's trace ID.
@@ -102,11 +102,9 @@ public:
    * For more information see:
    * https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html#xray-concepts-tracingheader
    */
-  void setParentId(absl::string_view parent_segment_id) override {
+  void setParentId(absl::string_view parent_segment_id) {
     parent_segment_id_ = std::string(parent_segment_id);
   }
-
-  void setTracestate(absl::string_view) override {}
 
   /**
    * Sets the type of the Span. In X-Ray, an independent subsegment has a type of "subsegment".

@@ -50,10 +50,8 @@ public:
   MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value));
   MOCK_METHOD(std::string, getBaggage, (absl::string_view key));
   MOCK_METHOD(std::string, getTraceId, (), (const));
-  MOCK_METHOD(void, setTraceId, (absl::string_view trace_id));
   MOCK_METHOD(std::string, getSpanId, (), (const));
-  MOCK_METHOD(void, setParentId, (absl::string_view parent_id));
-  MOCK_METHOD(void, setTracestate, (absl::string_view tracestate));
+  MOCK_METHOD(void, updateParent, (const TraceContext&), (override));
 
   SpanPtr spawnChild(const Config& config, const std::string& name,
                      SystemTime start_time) override {

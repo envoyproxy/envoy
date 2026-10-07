@@ -27,6 +27,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/tracing/tracing_validation.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
@@ -136,21 +137,14 @@ const Http::LowerCaseString& baggageHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "baggage");
 }
 
-void injectTraceContext(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
-                        const RewriteTraceContextResult* absl_nullable rewrite_result,
-                        Http::RequestHeaderMap& headers,
-                        Envoy::Tracing::Span* absl_nullable active_span) {
-  absl::string_view tp;
-  if (rewrite_result != nullptr) {
-    tp = rewrite_result->rewritten_traceparent;
-  } else {
-    const auto& tp_it = meta_fields.find("traceparent");
-    if (tp_it == meta_fields.end() || tp_it->second.kind_case() != Protobuf::Value::kStringValue) {
-      return;
-    }
-    tp = tp_it->second.string_value();
+void injectTraceContextIntoHeaders(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
+                                   Http::RequestHeaderMap& headers) {
+  const auto& tp_it = meta_fields.find("traceparent");
+  if (tp_it == meta_fields.end() || tp_it->second.kind_case() != Protobuf::Value::kStringValue) {
+    return;
   }
 
+  const std::string& tp = tp_it->second.string_value();
   if (!Envoy::Tracing::isValidTraceParent(tp)) {
     return;
   }
@@ -165,20 +159,7 @@ void injectTraceContext(const Protobuf::Map<std::string, Protobuf::Value>& meta_
     const std::string& ts = ts_it->second.string_value();
     if (Envoy::Tracing::isValidTraceState(ts)) {
       headers.setCopy(tracestateHeader(), ts);
-      if (active_span != nullptr) {
-        // When the OpenTelemetry tracer is configured, it sets the tracestate
-        // header based on the active span. Update the active span so it doesn't
-        // set the header based on the default empty tracestate that was created
-        // before the span was reparented.
-        active_span->setTracestate(ts);
-      }
     }
-  }
-
-  if (active_span != nullptr && rewrite_result != nullptr) {
-    active_span->setTraceId(rewrite_result->parsed_traceparent.traceId());
-    active_span->setParentId(rewrite_result->original_parent_id);
-    active_span->setSampled(rewrite_result->parsed_traceparent.sampled());
   }
 }
 
@@ -1073,6 +1054,8 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
     if (meta_value != nullptr && meta_value->has_struct_value() && headers.has_value()) {
       const auto& meta_fields = meta_value->struct_value().fields();
       if (config_->propagateTraceContext().has_value()) {
+        injectTraceContextIntoHeaders(meta_fields, *headers);
+
         if (config_->propagateTraceContext()->reparent_active_span()) {
           // MCP version 2026-07-28 puts the traceparent in the body instead of
           // a header. If the traceparent was not duplicated in a header, the
@@ -1083,44 +1066,30 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
           //
           // To ensure the distributed trace is coherent, we will reparent the
           // active span below the body's traceparent. We also must rewrite the
-          // body so upstream spans are a child of the active span. To this end,
-          // we'll perform the following steps:
-          //
-          // 1. Rewrite the request body's traceparent, setting its parent ID
-          //    to the active span's ID (a convenient, fresh ID).
-          // 2. Rewrite the request's "traceparent" header to match the body.
-          // 3. Set the active span's trace ID and parent ID to the values in
-          //    the body's traceparent.
-          // 4. Relatedly, we should also set the active span's sampled bit
-          //    based on the request body.
+          // body so upstream spans are a child of the active span.
+
+          Tracing::HttpTraceContext trace_context(*headers);
           Tracing::Span& active_span = decoder_callbacks_->activeSpan();
-          std::string new_parent_id(active_span.getSpanId());
-          if (new_parent_id.empty()) {
-            ENVOY_LOG(warn, "Active span's ID is empty");
+          active_span.updateParent(trace_context);
+
+          decoder_callbacks_->addDecodedData(data, /*streaming_filter=*/true);
+
+          Buffer::Instance* decoding_buffer = nullptr;
+          decoder_callbacks_->modifyDecodingBuffer(
+              [&decoding_buffer](Buffer::Instance& b) { decoding_buffer = &b; });
+          ASSERT(decoding_buffer != nullptr);
+
+          const std::string new_parent_id = active_span.getSpanId();
+          absl::StatusOr<std::string> rewritten_body =
+              rewriteBodyWithNewTraceparent(*decoding_buffer, new_parent_id);
+          if (!rewritten_body.ok()) {
+            ENVOY_LOG_EVERY_POW_2(warn, "MCP filter failed to rewrite traceparent: {}",
+                                  rewritten_body.status().ToString());
           } else {
-            decoder_callbacks_->addDecodedData(data, /*streaming_filter=*/true);
-
-            Buffer::Instance* decoding_buffer = nullptr;
-            decoder_callbacks_->modifyDecodingBuffer(
-                [&decoding_buffer](Buffer::Instance& b) { decoding_buffer = &b; });
-            ASSERT(decoding_buffer != nullptr);
-
-            absl::StatusOr<RewriteTraceContextResult> rewrite_result =
-                rewriteBodyWithNewTraceparent(*decoding_buffer, new_parent_id);
-            if (!rewrite_result.ok()) {
-              ENVOY_LOG_EVERY_POW_2(warn, "MCP filter failed to rewrite traceparent: {}",
-                                    rewrite_result.status().ToString());
-            } else {
-              decoding_buffer->drain(decoding_buffer->length());
-              decoding_buffer->add(rewrite_result->rewritten_body);
-              headers->setContentLength(decoding_buffer->length());
-
-              injectTraceContext(meta_fields, &rewrite_result.value(), *headers, &active_span);
-            }
+            decoding_buffer->drain(decoding_buffer->length());
+            decoding_buffer->add(*rewritten_body);
+            headers->setContentLength(decoding_buffer->length());
           }
-        } else {
-          injectTraceContext(meta_fields, /*rewrite_result=*/nullptr, *headers,
-                             /*active_span=*/nullptr);
         }
       }
       if (config_->propagateBaggage().has_value()) {

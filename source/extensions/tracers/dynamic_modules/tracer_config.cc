@@ -224,8 +224,6 @@ std::string DynamicModuleSpan::getTraceId() const {
   return {};
 }
 
-void DynamicModuleSpan::setTraceId(absl::string_view) {}
-
 std::string DynamicModuleSpan::getSpanId() const {
   envoy_dynamic_module_type_module_buffer value_out = {.ptr = nullptr, .length = 0};
   if (config_->on_span_get_span_id_(in_module_span_, &value_out) && value_out.ptr != nullptr) {
@@ -234,9 +232,6 @@ std::string DynamicModuleSpan::getSpanId() const {
   }
   return {};
 }
-
-void DynamicModuleSpan::setParentId(absl::string_view) {}
-void DynamicModuleSpan::setTracestate(absl::string_view) {}
 
 // =============================================================================
 // DynamicModuleDriver

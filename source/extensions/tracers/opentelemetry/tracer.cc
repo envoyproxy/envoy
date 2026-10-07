@@ -13,6 +13,7 @@
 #include "source/common/tracing/trace_context_impl.h"
 #include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
 #include "absl/strings/numbers.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
@@ -84,6 +85,27 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
                            std::string(tracestate()), /*is_remote=*/false);
   return parent_tracer_.startSpan(name, stream_info_, start_time, span_context, {},
                                   ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+}
+
+void Span::updateParent(const Tracing::TraceContext& trace_context) {
+  SpanContextExtractor extractor(trace_context);
+  absl::StatusOr<SpanContext> context = extractor.extractSpanContext();
+  if (!context.ok()) {
+    return;
+  }
+  setTraceId(context->traceId());
+  setParentId(context->spanId());
+
+  if (!context->tracestate().empty()) {
+    // TODO: Determine whether to merge into the current tracestate.
+    if (!getTracestate().empty()) {
+      ENVOY_LOG_EVERY_POW_2(warn, "Overwriting non-empty tracestate");
+    }
+    setTracestate(context->tracestate());
+  }
+
+  // TODO: Disable this by default but add a config knob to enable it?
+  setSampled(context->sampled());
 }
 
 void Span::finishSpan() {

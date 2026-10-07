@@ -47,6 +47,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:tracing_validation_lib",
+        "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/mcp:constants_lib",
         "//source/extensions/filters/common/mcp:filter_state_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

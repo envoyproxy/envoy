@@ -33,6 +33,7 @@ using OpenTelemetryConstants = ConstSingleton<OpenTelemetryConstantValues>;
 class SpanContextExtractor {
 public:
   SpanContextExtractor(Tracing::TraceContext& trace_context);
+  SpanContextExtractor(const Tracing::TraceContext& trace_context);
   ~SpanContextExtractor();
   absl::StatusOr<SpanContext> extractSpanContext();
   bool propagationHeaderPresent();
