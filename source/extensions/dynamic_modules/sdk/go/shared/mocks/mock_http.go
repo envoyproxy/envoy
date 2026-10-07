@@ -1175,6 +1175,20 @@ func (mr *MockHttpFilterHandleMockRecorder) GetWorkerIndex() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkerIndex", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetWorkerIndex))
 }
 
+// HasFilterState mocks base method.
+func (m *MockHttpFilterHandle) HasFilterState(key string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasFilterState", key)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// HasFilterState indicates an expected call of HasFilterState.
+func (mr *MockHttpFilterHandleMockRecorder) HasFilterState(key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasFilterState", reflect.TypeOf((*MockHttpFilterHandle)(nil).HasFilterState), key)
+}
+
 // HttpCallout mocks base method.
 func (m *MockHttpFilterHandle) HttpCallout(cluster string, headers [][2]string, body []byte, timeoutMs uint64, cb shared.HttpCalloutCallback) (shared.HttpCalloutInitResult, uint64) {
 	m.ctrl.T.Helper()

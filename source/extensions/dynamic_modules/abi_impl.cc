@@ -3144,6 +3144,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_filter_state_typed, false
           envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
           envoy_dynamic_module_type_envoy_buffer*)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_has_filter_state, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_http_set_filter_state_object, false,
           envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
           envoy_dynamic_module_type_filter_state_object_module_ptr,

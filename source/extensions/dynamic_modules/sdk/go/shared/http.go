@@ -274,6 +274,10 @@ type HttpFilterHandle interface {
 	// need to keep it past the current callback.
 	GetFilterStateTyped(key string) (UnsafeEnvoyBuffer, bool)
 
+	// HasFilterState checks whether a filter state entry with the given key exists, regardless of
+	// its type. Unlike the getter methods, this does not read or serialize the stored object.
+	HasFilterState(key string) bool
+
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
 	// Returns data value if found, otherwise nil.

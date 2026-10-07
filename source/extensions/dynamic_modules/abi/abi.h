@@ -2785,6 +2785,21 @@ bool envoy_dynamic_module_callback_http_get_filter_state_typed(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
+/**
+ * envoy_dynamic_module_callback_http_has_filter_state is called by the module to check whether a
+ * filter state entry with the given key exists, regardless of its type. Unlike the getter
+ * callbacks, this does not read or serialize the stored object.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @return true if the key exists in the filter state, false if the stream info is not available or
+ * the key does not exist.
+ */
+bool envoy_dynamic_module_callback_http_has_filter_state(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
 // Lifespan of a filter state entry. Mirrors StreamInfo::FilterState::LifeSpan. Entries at Request
 // or Connection lifespan are carried into the new stream on recreate_stream; FilterChain entries
 // are not.

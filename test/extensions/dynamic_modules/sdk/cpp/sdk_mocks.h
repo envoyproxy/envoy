@@ -166,6 +166,7 @@ public:
               (override));
   MOCK_METHOD(bool, setFilterStateTyped, (std::string_view key, std::string_view value),
               (override));
+  MOCK_METHOD(bool, hasFilterState, (std::string_view key), (override));
   MOCK_METHOD(uint32_t, getWorkerIndex, (), (override));
   MOCK_METHOD(bool, setSocketOptionInt,
               (int64_t level, int64_t name, SocketOptionState state, SocketDirection direction,
