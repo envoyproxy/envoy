@@ -1,4 +1,5 @@
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -638,6 +639,123 @@ TEST_F(FilterManagerTest, FilterNullPropagationFails) {
         EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInvalidArgument));
       },
       "cannot propagate null AiRequestPtr");
+}
+
+// Rewrites the request path, as a transcoder does.
+class TestPathRewriteFilter : public AiFilter {
+public:
+  explicit TestPathRewriteFilter(Http::RequestHeaderMap& headers) : headers_(headers) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    headers_.setPath("/v1/messages");
+    co_return co_await std::move(propagate_request)(std::move(req));
+  }
+
+private:
+  Http::RequestHeaderMap& headers_;
+};
+
+TEST_F(FilterManagerTest, OnFiltersDoneRunsBeforeTheBodyIsWritten) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_unique<TestPathRewriteFilter>(headers));
+  FilterManager manager(std::move(filters));
+
+  absl::Status status;
+  bool completed = false;
+  bool filters_done = false;
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&status, &completed](absl::Status s) {
+        status = std::move(s);
+        completed = true;
+      },
+      &headers, /*local_reply_fn=*/nullptr, /*always_serialize=*/true, LLMProtocol::Unspecified,
+      [&](uint8_t route_actions) {
+        filters_done = true;
+        EXPECT_EQ(route_actions, 0);
+        EXPECT_EQ(headers.getPathValue(), "/v1/messages");
+        EXPECT_EQ(bridge_.injected_.length(), 0);
+        EXPECT_FALSE(completed);
+      });
+
+  drain();
+  EXPECT_TRUE(filters_done);
+  EXPECT_TRUE(completed);
+  ASSERT_OK(status);
+  EXPECT_GT(bridge_.injected_.length(), 0);
+}
+
+TEST_F(FilterManagerTest, OnFiltersDoneSkippedOnLocalReply) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_unique<TestLocalReplyFilter>());
+  FilterManager manager(std::move(filters));
+
+  bool completed = false;
+  bool filters_done = false;
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&completed](absl::Status) { completed = true; }, /*request_headers=*/nullptr,
+      [](Http::Code, std::string) {}, /*always_serialize=*/true, LLMProtocol::Unspecified,
+      [&filters_done](uint8_t) { filters_done = true; });
+
+  drain();
+  EXPECT_TRUE(completed);
+  EXPECT_FALSE(filters_done);
+}
+
+// Asks for a cluster refresh, then passes the request on.
+class TestRouteActionFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    req->requestRouteAction(AiRouteAction::RefreshCluster);
+    co_return co_await std::move(propagate_request)(std::move(req));
+  }
+};
+
+// Propagates a new request in place of the one it received.
+class TestReplacingFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    JsonWithExtBuf doc;
+    doc.setJson(req->json());
+    co_return co_await std::move(propagate_request)(std::make_unique<AiRequest>(std::move(doc)));
+  }
+};
+
+// A filter that propagates a new request cannot withdraw an earlier filter's action.
+TEST_F(FilterManagerTest, OnFiltersDoneKeepsRouteActionsOfAReplacedRequest) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_unique<TestRouteActionFilter>());
+  filters.push_back(std::make_unique<TestReplacingFilter>());
+  FilterManager manager(std::move(filters));
+
+  std::optional<uint8_t> route_actions;
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_, [](absl::Status) {},
+      /*request_headers=*/nullptr, /*local_reply_fn=*/nullptr, /*always_serialize=*/true,
+      LLMProtocol::Unspecified, [&route_actions](uint8_t actions) { route_actions = actions; });
+
+  drain();
+  EXPECT_EQ(route_actions, static_cast<uint8_t>(AiRouteAction::RefreshCluster));
 }
 
 TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeaders) {

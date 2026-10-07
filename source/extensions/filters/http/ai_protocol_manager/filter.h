@@ -214,6 +214,9 @@ private:
   // Sets endStream on decode_manager_ and executes the AI filter chain or replays the body.
   void finalizeDecode(bool has_trailers);
 
+  // Applies the AiRouteAction bits the AI filters requested, once they are all done.
+  void applyRouteActions(uint8_t route_actions);
+
   // Invoked when the SSE response filter pipeline completes or fails.
   void onEncodeComplete(absl::Status status);
 

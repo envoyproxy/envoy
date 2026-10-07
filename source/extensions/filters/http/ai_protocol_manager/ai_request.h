@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <utility>
 
@@ -12,6 +13,14 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
+
+// What the AI Protocol Manager does with the matched route once the AI filters are done; bit flags.
+enum class AiRouteAction : uint8_t {
+  None = 0,
+  // Pick the route's cluster again where its cluster specifier supports it, such as the matcher
+  // plugin; the route is not matched again.
+  RefreshCluster = 1 << 0,
+};
 
 // AiRequest represents the structured request payload presented to an AiFilter.
 // It wraps a JsonWithExtBuf document as the request payload index.
@@ -43,12 +52,18 @@ public:
   LLMProtocol protocol() const { return protocol_; }
   void setProtocol(LLMProtocol protocol) { protocol_ = protocol; }
 
+  // Asks the AI Protocol Manager for `action`; set it before propagating. Requests only add.
+  void requestRouteAction(AiRouteAction action) { route_actions_ |= static_cast<uint8_t>(action); }
+  // The AiRouteAction bits requested on this request.
+  uint8_t routeActions() const { return route_actions_; }
+
   // TODO(penguingao): Implement field streaming (AiRequest::stream, FieldStreamingSpec,
   // and FieldStreamingSession).
 
 private:
   JsonWithExtBuf request_index_;
   LLMProtocol protocol_;
+  uint8_t route_actions_{0};
 };
 
 using AiRequestPtr = std::unique_ptr<AiRequest>;
