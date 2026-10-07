@@ -372,6 +372,26 @@ std::array<EndpointKey, 4> getEndpointLookupKeys(absl::string_view host, absl::s
   }};
 }
 
+absl::StatusOr<ToolListCacheConfig> parseToolListCacheConfig(
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolsListLocal&
+        tool_list_local) {
+  ToolListCacheConfig result;
+  if (!tool_list_local.has_cache_config()) {
+    return result;
+  }
+  const auto& cache_config = tool_list_local.cache_config();
+  if (cache_config.has_ttl()) {
+    absl::StatusOr<uint64_t> ttl_ms =
+        DurationUtil::durationToMillisecondsNoThrow(cache_config.ttl());
+    if (!ttl_ms.ok()) {
+      return ttl_ms.status();
+    }
+    result.ttl_ms = *ttl_ms;
+  }
+  result.scope = cacheScopeToString(cache_config.cache_scope());
+  return result;
+}
+
 } // namespace
 
 absl::StatusOr<std::shared_ptr<McpJsonRestBridgeFilterConfig>>
@@ -436,7 +456,15 @@ absl::Status McpJsonRestBridgeFilterConfig::initialize() {
     }
     endpoint_config.tool_list_http_rule = rule;
   }
-  endpoint_config.tool_list_local = tool_config.has_tool_list_local();
+  if (tool_config.has_tool_list_local()) {
+    endpoint_config.tool_list_local = true;
+    absl::StatusOr<ToolListCacheConfig> cache_config =
+        parseToolListCacheConfig(tool_config.tool_list_local());
+    if (!cache_config.ok()) {
+      return cache_config.status();
+    }
+    endpoint_config.tool_list_cache_config = *cache_config;
+  }
 
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge config: {}", proto_config_.DebugString());
   return absl::OkStatus();
@@ -518,6 +546,18 @@ bool McpJsonRestBridgeFilterConfig::toolListLocal(absl::string_view host,
   return false;
 }
 
+ToolListCacheConfig
+McpJsonRestBridgeFilterConfig::toolListLocalCacheConfig(absl::string_view host,
+                                                        absl::string_view path) const {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end() && it->second.tool_list_local) {
+      return it->second.tool_list_cache_config;
+    }
+  }
+  return {};
+}
+
 bool McpJsonRestBridgeFilterConfig::hasEndpoint(absl::string_view host,
                                                 absl::string_view path) const {
   for (const auto& key : getEndpointLookupKeys(host, path)) {
@@ -582,7 +622,15 @@ absl::Status McpJsonRestBridgePerRouteConfig::initialize() {
         }
       }
       if (tool_config.has_tool_list_local()) {
-        endpoint_config.tool_list_local = true;
+        absl::StatusOr<ToolListCacheConfig> cache_config =
+            parseToolListCacheConfig(tool_config.tool_list_local());
+        if (!cache_config.ok()) {
+          return cache_config.status();
+        }
+        if (!endpoint_config.tool_list_local) {
+          endpoint_config.tool_list_local = true;
+          endpoint_config.tool_list_cache_config = *cache_config;
+        }
       }
     }
   }
@@ -665,6 +713,18 @@ bool McpJsonRestBridgePerRouteConfig::toolListLocal(absl::string_view host,
     }
   }
   return false;
+}
+
+ToolListCacheConfig
+McpJsonRestBridgePerRouteConfig::toolListLocalCacheConfig(absl::string_view host,
+                                                          absl::string_view path) const {
+  for (const auto& key : getEndpointLookupKeys(host, path)) {
+    auto it = endpoint_configs_.find(key);
+    if (it != endpoint_configs_.end() && it->second.tool_list_local) {
+      return it->second.tool_list_cache_config;
+    }
+  }
+  return {};
 }
 
 bool McpJsonRestBridgePerRouteConfig::hasEndpoint(absl::string_view host,
@@ -1000,7 +1060,8 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
 void McpJsonRestBridgeFilter::serveToolsListLocal(
     const nlohmann::json& json_rpc,
     const std::vector<
-        const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools) {
+        const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools,
+    const ToolListCacheConfig& cache_config) {
   std::string request_id_json = "null";
   if (json_rpc.contains("id")) {
     request_id_json = json_rpc["id"].dump();
@@ -1015,7 +1076,10 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
   response_fragments.emplace_back(request_id_json);
 
   if (is_stateless_request_) {
-    response_fragments.emplace_back(",\"result\":{\"resultType\":\"complete\",\"tools\":[");
+    response_fragments.emplace_back(
+        *owned_response_fragments.emplace_back(std::make_unique<std::string>(absl::StrCat(
+            ",\"result\":{\"cacheScope\":\"", cache_config.scope,
+            "\",\"ttlMs\":", cache_config.ttl_ms, ",\"resultType\":\"complete\",\"tools\":["))));
   } else {
     response_fragments.emplace_back(",\"result\":{\"tools\":[");
   }
@@ -1232,7 +1296,11 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
                                  : per_route_config->toolListLocal(server_name_, path_);
       if (tool_list_local) {
         mcp_operation_ = McpOperation::ToolsListLocal;
-        serveToolsListLocal(json_rpc, tool_list_local_tools);
+        const ToolListCacheConfig cache_config =
+            (per_route_config == nullptr)
+                ? config_->toolListLocalCacheConfig(server_name_, path_)
+                : per_route_config->toolListLocalCacheConfig(server_name_, path_);
+        serveToolsListLocal(json_rpc, tool_list_local_tools, cache_config);
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                        ? json_rpc[McpConstants::PARAMS_FIELD]
                                        : json::object());

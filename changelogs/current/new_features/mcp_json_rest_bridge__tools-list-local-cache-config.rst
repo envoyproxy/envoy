@@ -1,0 +1,1 @@
+Added support for configurable cache metadata (``ttlMs`` and ``cacheScope``) in locally-generated stateless ``tools/list`` responses via :ref:`cache_config <envoy_v3_api_field_extensions.filters.http.mcp_json_rest_bridge.v3.ToolsListLocal.cache_config>`.
