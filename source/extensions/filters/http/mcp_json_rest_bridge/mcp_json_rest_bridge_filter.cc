@@ -385,8 +385,9 @@ McpRequestHeader getRequestMcpParamHeader(Http::RequestHeaderMapOptConstRef requ
 
 // Returns whether a raw Mcp-Param header value only contains characters that the MCP value encoding
 // allows in a plain header value: visible ASCII (0x21-0x7E), space (0x20) and horizontal tab
-// (0x09). Values with other characters must be sent Base64-encoded, so this applies to the raw
-// value, never to a decoded Base64 value.
+// (0x09). Envoy's generic header validation also allows obs-text (0x80-0xFF), for example
+// the UTF-8 bytes 0xC3 0xA9 for U+00E9. MCP requires such non-ASCII values to be
+// Base64-encoded.
 bool isValidMcpParamRawValue(absl::string_view value) {
   return absl::c_all_of(value, [](char c) {
     const auto byte = static_cast<unsigned char>(c);

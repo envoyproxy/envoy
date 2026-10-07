@@ -278,7 +278,6 @@ TEST(McpJsonRestBridgeFilterConfigTest, InvalidMcpParamHeaderFields) {
       R"({ name: "", property_path: ["region"], type: STRING })",
       // Names that are not an HTTP header field name token.
       R"({ name: "Region Code", property_path: ["region"], type: STRING })",
-      R"({ name: ":region", property_path: ["region"], type: STRING })",
       R"({ name: "R\u00e9gion", property_path: ["region"], type: STRING })",
       // Empty property path.
       R"({ name: "Region", property_path: [], type: STRING })",

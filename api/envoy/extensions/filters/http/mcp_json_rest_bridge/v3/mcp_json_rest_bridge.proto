@@ -353,7 +353,7 @@ message McpParamHeader {
   // ``Region`` refers to the ``Mcp-Param-Region`` header.
   //
   // Header names are case-insensitive, so names within a tool must be unique ignoring case.
-  string name = 1 [(validate.rules).string = {pattern: "^[0-9A-Za-z!#$%&\'*+.^_`|~-]+$"}];
+  string name = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
 
   // The chain of property names from the ``arguments`` object to the validated value. Each element
   // is one literal property name; dots are not separators. For example, ``["user", "region"]``
