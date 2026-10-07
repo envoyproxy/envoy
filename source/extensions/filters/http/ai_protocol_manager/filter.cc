@@ -472,21 +472,23 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
                                              "ai_protocol_manager_filter_rejected");
         },
         config_->alwaysSerializeRequest(), request_protocol_,
-        [this](uint8_t route_actions) { applyRouteActions(route_actions); });
+        [this](bool refresh_route_cluster) {
+          if (refresh_route_cluster) {
+            refreshRouteCluster();
+          }
+        });
   } else {
     decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
   }
 }
 
-void AiProtocolManagerFilter::applyRouteActions(uint8_t route_actions) {
-  if ((route_actions & static_cast<uint8_t>(AiRouteAction::RefreshCluster)) == 0) {
-    return;
-  }
+void AiProtocolManagerFilter::refreshRouteCluster() {
   OptRef<Http::DownstreamStreamFilterCallbacks> downstream =
       decoder_callbacks_->downstreamCallbacks();
   if (!downstream.has_value()) {
-    ENVOY_LOG(debug, "ai_protocol_manager: ignoring route action: no downstream filter chain");
-    config_->stats().route_action_unsupported_.inc();
+    ENVOY_LOG(debug,
+              "ai_protocol_manager: ignoring route cluster refresh: no downstream filter chain");
+    config_->stats().route_cluster_refresh_ignored_.inc();
     return;
   }
   downstream->refreshRouteCluster();

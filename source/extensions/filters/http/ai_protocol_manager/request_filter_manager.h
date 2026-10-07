@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -35,8 +34,8 @@ public:
   using LocalReplyFn = absl::AnyInvocable<void(Http::Code code, std::string details)>;
   using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
   // Runs once every filter has propagated the request and before the sink writes it out, while the
-  // request headers are still held. Receives the AiRouteAction bits the filters requested.
-  using OnFiltersDoneFn = absl::AnyInvocable<void(uint8_t route_actions)>;
+  // request headers are still held. Told whether any filter requested a route cluster refresh.
+  using OnFiltersDoneFn = absl::AnyInvocable<void(bool refresh_route_cluster)>;
 
   RequestFilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
                        BufferManager* buffer_manager, Event::Dispatcher& dispatcher,

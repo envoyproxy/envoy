@@ -148,8 +148,10 @@ private:
       co_return absl::InvalidArgumentError("cannot propagate null AiRequestPtr");
     }
     filter_handoff_status_[index].propagated = true;
-    // Folded here so a filter that propagates a new request cannot withdraw an earlier action.
-    route_actions_ |= req->routeActions();
+    // Recorded here so a filter that propagates a new AiRequest cannot withdraw an earlier refresh.
+    if (req->routeActionRequested(AiRouteAction::RefreshCluster)) {
+      refresh_route_cluster_ = true;
+    }
     co_return co_await pipeline_.propagate(index, std::move(req));
   }
 
@@ -163,7 +165,7 @@ private:
     ASSERT(final_req_ != nullptr);
 
     if (OnFiltersDoneFn on_filters_done = std::move(on_filters_done_)) {
-      on_filters_done(route_actions_);
+      on_filters_done(refresh_route_cluster_);
     }
 
     if (always_serialize_) {
@@ -299,8 +301,8 @@ private:
   const bool always_serialize_{true};
   const LLMProtocol request_protocol_;
   OnFiltersDoneFn on_filters_done_;
-  // The AiRouteAction bits requested by every filter that propagated the request.
-  uint8_t route_actions_{0};
+  // Whether any filter that propagated the request asked for a route cluster refresh.
+  bool refresh_route_cluster_{false};
   AiRequestPtr final_req_;
   std::vector<FilterHandoffStatus> filter_handoff_status_;
 };

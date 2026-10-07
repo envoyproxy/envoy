@@ -58,6 +58,15 @@ TEST(AiRequestTest, TakeRequestIndexHandsOverTheDocument) {
   EXPECT_EQ(taken.json()["model"], "gpt-4");
 }
 
+TEST(AiRequestTest, RouteActionStaysRequested) {
+  AiRequest request(JsonWithExtBuf{});
+  EXPECT_FALSE(request.routeActionRequested(AiRouteAction::RefreshCluster));
+
+  request.requestRouteAction(AiRouteAction::RefreshCluster);
+  request.requestRouteAction(AiRouteAction::RefreshCluster);
+  EXPECT_TRUE(request.routeActionRequested(AiRouteAction::RefreshCluster));
+}
+
 // Offloaded values reach a filter as reference nodes, not as bytes.
 TEST(AiRequestTest, ExternalRefsSurviveTheWrapper) {
   const JsonWithExtBuf::ExternalRef ref{/*offset=*/64, /*length=*/4096};

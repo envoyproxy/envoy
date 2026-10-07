@@ -1526,7 +1526,7 @@ TEST_F(AiProtocolManagerFilterTest, KeepsRouteClusterWhenALaterAiFilterRejects) 
 }
 
 // Without downstream callbacks, as in an upstream filter chain, there is no route to act on.
-TEST_F(AiProtocolManagerFilterTest, DropsRouteActionsWithoutDownstreamCallbacks) {
+TEST_F(AiProtocolManagerFilterTest, IgnoresRouteClusterRefreshWithoutDownstreamCallbacks) {
   ON_CALL(callbacks_, downstreamCallbacks())
       .WillByDefault(testing::Return(OptRef<Http::DownstreamStreamFilterCallbacks>{}));
   bool route_actions_supported = true;
@@ -1543,7 +1543,7 @@ TEST_F(AiProtocolManagerFilterTest, DropsRouteActionsWithoutDownstreamCallbacks)
   EXPECT_FALSE(route_actions_supported);
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(counterValue("route_cluster_refreshed"), 0);
-  EXPECT_EQ(counterValue("route_action_unsupported"), 1);
+  EXPECT_EQ(counterValue("route_cluster_refresh_ignored"), 1);
 }
 
 class AiProtocolManagerFilterStateTest : public AiProtocolManagerFilterTest {

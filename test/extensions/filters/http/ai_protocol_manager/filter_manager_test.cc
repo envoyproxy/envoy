@@ -677,9 +677,9 @@ TEST_F(FilterManagerTest, OnFiltersDoneRunsBeforeTheBodyIsWritten) {
         completed = true;
       },
       &headers, /*local_reply_fn=*/nullptr, /*always_serialize=*/true, LLMProtocol::Unspecified,
-      [this, &filters_done, &headers, &completed](uint8_t route_actions) {
+      [this, &filters_done, &headers, &completed](bool refresh_route_cluster) {
         filters_done = true;
-        EXPECT_EQ(route_actions, 0);
+        EXPECT_FALSE(refresh_route_cluster);
         EXPECT_EQ(headers.getPathValue(), "/v1/messages");
         EXPECT_EQ(bridge_.injected_.length(), 0);
         EXPECT_FALSE(completed);
@@ -706,15 +706,15 @@ TEST_F(FilterManagerTest, OnFiltersDoneSkippedOnLocalReply) {
       std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
       [&completed](absl::Status) { completed = true; }, /*request_headers=*/nullptr,
       [](Http::Code, std::string) {}, /*always_serialize=*/true, LLMProtocol::Unspecified,
-      [&filters_done](uint8_t) { filters_done = true; });
+      [&filters_done](bool) { filters_done = true; });
 
   drain();
   EXPECT_TRUE(completed);
   EXPECT_FALSE(filters_done);
 }
 
-// Asks for a cluster refresh, then passes the request on.
-class TestRouteActionFilter : public AiFilter {
+// Asks for a route cluster refresh, then passes the request on.
+class TestClusterRefreshFilter : public AiFilter {
 public:
   Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
                                        AiRequestPropagator propagate_request,
@@ -738,24 +738,25 @@ public:
   }
 };
 
-// A filter that propagates a new request cannot withdraw an earlier filter's action.
-TEST_F(FilterManagerTest, OnFiltersDoneKeepsRouteActionsOfAReplacedRequest) {
+// A filter that propagates a new request cannot withdraw an earlier filter's refresh request.
+TEST_F(FilterManagerTest, OnFiltersDoneKeepsARefreshRequestedBeforeTheRequestIsReplaced) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
 
   std::vector<AiFilterSharedPtr> filters;
-  filters.push_back(std::make_unique<TestRouteActionFilter>());
+  filters.push_back(std::make_unique<TestClusterRefreshFilter>());
   filters.push_back(std::make_unique<TestReplacingFilter>());
   FilterManager manager(std::move(filters));
 
-  std::optional<uint8_t> route_actions;
+  std::optional<bool> refresh_route_cluster;
   manager.startRequest(
       std::move(doc), &buffer_manager_, *dispatcher_, stream_info_, [](absl::Status) {},
       /*request_headers=*/nullptr, /*local_reply_fn=*/nullptr, /*always_serialize=*/true,
-      LLMProtocol::Unspecified, [&route_actions](uint8_t actions) { route_actions = actions; });
+      LLMProtocol::Unspecified,
+      [&refresh_route_cluster](bool refresh) { refresh_route_cluster = refresh; });
 
   drain();
-  EXPECT_EQ(route_actions, static_cast<uint8_t>(AiRouteAction::RefreshCluster));
+  EXPECT_EQ(refresh_route_cluster, true);
 }
 
 TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeaders) {
