@@ -34,7 +34,6 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "filter_unit_test",
-    size = "large",
     srcs = ["filter_unit_test.cc"],
     extension_names = ["envoy.filters.network.reverse_tunnel"],
     rbe_pool = "linux_x64_small",
