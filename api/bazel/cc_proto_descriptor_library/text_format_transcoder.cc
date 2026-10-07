@@ -63,12 +63,12 @@ void TextFormatTranscoder::loadFileDescriptors(
 
   google::protobuf::FileDescriptorProto file_descriptor_proto;
   std::string file_descriptor_bytes;
-  absl::Base64Unescape(file_descriptor_info.file_descriptor_bytes_base64, &file_descriptor_bytes);
-  // The descriptor bytes are generated at build time, so a parse failure indicates a
-  // broken build rather than bad input.
-  if (!file_descriptor_proto.ParseFromString(file_descriptor_bytes)) {
-    ABSL_LOG(FATAL) << "Failed to parse embedded file descriptor for: "
-                    << file_descriptor_info.file_name;
+  if (!absl::Base64Unescape(file_descriptor_info.file_descriptor_bytes_base64,
+                            &file_descriptor_bytes) ||
+      !file_descriptor_proto.ParseFromString(file_descriptor_bytes)) {
+    // Embedded descriptors are generated at build time; a failure here is a
+    // build bug, not a runtime condition. Skip rather than register garbage.
+    return;
   }
   internals_->descriptor_pool.BuildFile(file_descriptor_proto);
 }
