@@ -69,8 +69,7 @@ jobs:
             - run: |
                 IMAGES=(
                     envoy:dev
-                    envoy-contrib:contrib-dev
-                    envoy-google-vrp:google-vrp-dev)
+                    envoy-contrib:contrib-dev)
                 RUNNER_TEMP="%{{ runner.temp }}"
                 . ./.github/workflows/docker_utils.sh
                 skopeo_copy "${IMAGES[*]}"
