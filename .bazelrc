@@ -82,6 +82,7 @@ build --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-deprecated-declarations
 build --per_file_copt=external/c-ares.*@-Wno-unused-function
 build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
 build --per_file_copt=external/libprotobuf-mutator.*@-Wno-unused-result
+build --per_file_copt=external/librdkafka.*@-Wno-unused-variable,-Wno-unused-but-set-variable,-Wno-sometimes-uninitialized,-Wno-uninitialized,-Wno-implicit-enum-enum-cast
 build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
 
 
