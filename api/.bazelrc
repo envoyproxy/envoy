@@ -3,7 +3,7 @@ try-import %workspace%/../ci.bazelrc
 try-import %workspace%/../user.bazelrc
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/981341b385942d3bb81b444da9b266a14d29e8c7
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/db0e7414a4adfdd0fee29800e29967a4d92985c9
 
 # Build settings
 build --incompatible_strict_action_env
