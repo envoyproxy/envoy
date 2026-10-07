@@ -479,8 +479,6 @@ private:
       proto_histogram->set_zero_count(zero_count);
       uint64_t prev_cumulative = zero_count;
 
-      const double base = std::pow(2.0, std::pow(2.0, -schema));
-
       // Process needed indices and encode directly to protobuf spans and deltas.
       // We iterate over needed_indices, query cumulative counts, and build the
       // span/delta encoding.
@@ -492,7 +490,11 @@ private:
 
       proto_histogram->mutable_positive_delta()->Reserve(needed_indices.size());
       for (int32_t idx : needed_indices) {
-        const double upper_bound = std::pow(base, idx + 1);
+        // The upper bound of bucket idx is base^idx = 2^(idx * 2^-schema). `ldexp()` is exact and
+        // exp2() of an integer is an exact power of two, so bounds that are powers of two are
+        // exact. std::pow(base, idx) can land just below them, putting a value on the bound in the
+        // next bucket.
+        const double upper_bound = std::exp2(std::ldexp(static_cast<double>(idx), -schema));
         uint64_t cumulative = histogram->cumulativeCountLessThanOrEqualToValue(upper_bound);
         uint64_t bucket_count = cumulative - prev_cumulative;
         prev_cumulative = cumulative;
@@ -579,8 +581,6 @@ private:
       double zero_threshold, absl::optional<uint32_t> max_buckets = absl::nullopt) {
     std::set<int32_t> indices;
 
-    const double log_base = std::log(std::pow(2.0, std::pow(2.0, static_cast<double>(-schema))));
-
     for (const auto& bucket : buckets) {
       ASSERT(bucket.count_ > 0, "unexpected empty bucket");
       const double upper_bound = bucket.lower_bound_ + bucket.width_;
@@ -592,13 +592,13 @@ private:
 
       // Clamp lower bound to zero_threshold to prevent log(0).
       const double effective_lower = std::max(bucket.lower_bound_, zero_threshold);
-      // Use ceil(...) - 1 to find the bucket containing effective_lower.
-      // Prometheus bucket i covers (base^i, base^(i+1)], so value v is in bucket
-      // ceil(log(v)/log(base)) - 1. This correctly handles boundary cases where
-      // v = base^k exactly (it goes in bucket k-1, not k).
+      // Prometheus bucket i covers (base^(i-1), base^i], so value v is in bucket
+      // ceil(log2(v) * 2^schema). log2() of a power of two and the `ldexp()` scaling are both
+      // exact, so a value exactly on a boundary maps to the bucket it is the upper bound of.
       const int32_t lower_index =
-          static_cast<int32_t>(std::ceil(std::log(effective_lower) / log_base)) - 1;
-      const int32_t upper_index = static_cast<int32_t>(std::ceil(std::log(upper_bound) / log_base));
+          static_cast<int32_t>(std::ceil(std::ldexp(std::log2(effective_lower), schema)));
+      const int32_t upper_index =
+          static_cast<int32_t>(std::ceil(std::ldexp(std::log2(upper_bound), schema)));
 
       for (int32_t idx = lower_index; idx <= upper_index; ++idx) {
         indices.insert(idx);
