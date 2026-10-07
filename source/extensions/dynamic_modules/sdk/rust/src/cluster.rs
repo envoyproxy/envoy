@@ -521,7 +521,9 @@ pub trait EnvoyCluster: Send + Sync {
 
   /// Look up a host by its address string across all priorities and return the host pointer.
   ///
-  /// This uses the cross-priority host map internally.
+  /// This uses the cross-priority host map internally, so the lookup is O(1) with the default flat
+  /// host map, or O(log N) if the cluster selected the persistent host map via
+  /// [`EnvoyCluster::use_persistent_host_map`].
   /// The address must match the format "ip:port" (e.g., "10.0.0.1:8080").
   ///
   /// Returns the host pointer if found, or `None` if the address is not in the cluster.
@@ -664,7 +666,9 @@ pub trait EnvoyClusterLoadBalancer: Send {
 
   /// Look up a host by its address string across all priorities in the cluster's priority set.
   ///
-  /// This uses the cross-priority host map internally. The address must match the format
+  /// This uses the cross-priority host map internally, so the lookup is O(1) with the default flat
+  /// host map, or O(log N) if the cluster selected the persistent host map via
+  /// [`EnvoyCluster::use_persistent_host_map`]. The address must match the format
   /// "ip:port" (e.g., "10.0.0.1:8080").
   ///
   /// Unlike [`EnvoyCluster::find_host_by_address`] which operates on the main thread, this is
@@ -703,7 +707,9 @@ pub trait EnvoyClusterLoadBalancer: Send {
   ) -> abi::envoy_dynamic_module_type_host_health;
 
   /// Looks up a host by its address string across all priorities and returns its health status.
-  /// This uses the cross-priority host map internally.
+  /// This uses the cross-priority host map internally, so the lookup is O(1) with the default flat
+  /// host map, or O(log N) if the cluster selected the persistent host map via
+  /// [`EnvoyCluster::use_persistent_host_map`].
   ///
   /// The address must match the format "ip:port" (e.g., "10.0.0.1:8080").
   fn get_host_health_by_address(

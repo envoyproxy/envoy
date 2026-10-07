@@ -658,15 +658,12 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
                           ReverseConnectionState::CannotConnect);
     return;
   }
-  // Retrieve the resolved hosts for a cluster and update the corresponding maps. The hosts are
-  // collected once since they are iterated again below.
+  // Collect the resolved host addresses to refresh the per-host tracking maps. The hosts are
+  // iterated again below via forEach so their entries are not copied into a temporary vector.
   std::vector<std::string> resolved_hosts;
-  std::vector<std::pair<std::string, Upstream::HostSharedPtr>> resolved_host_entries;
   resolved_hosts.reserve(host_map_ptr->size());
-  resolved_host_entries.reserve(host_map_ptr->size());
-  host_map_ptr->forEach([&](absl::string_view address, const Upstream::HostSharedPtr& host) {
+  host_map_ptr->forEach([&](absl::string_view address, const Upstream::HostSharedPtr&) {
     resolved_hosts.emplace_back(address);
-    resolved_host_entries.emplace_back(address, host);
   });
   maybeUpdateHostsMappingsAndConnections(cluster_name, std::move(resolved_hosts));
   // Track successful connections for this cluster.
@@ -675,17 +672,18 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
       host_map_ptr->size() * cluster_config.reverse_connection_count;
 
   // Create connections to each host in the cluster.
-  for (const auto& [host_address, host] : resolved_host_entries) {
+  host_map_ptr->forEach([&](absl::string_view address, const Upstream::HostSharedPtr& host) {
+    const std::string host_address(address);
     ENVOY_LOG(debug, "reverse_tunnel: Checking reverse connection count for host {} of cluster {}",
               host_address, cluster_name);
 
     // Ensure HostConnectionInfo exists for this host, handling internal addresses consistently.
-    const std::string key = host_address;
-    auto host_it = host_to_conn_info_map_.find(key);
+    auto host_it = host_to_conn_info_map_.find(host_address);
     if (host_it == host_to_conn_info_map_.end()) {
-      ENVOY_LOG(debug, "Creating HostConnectionInfo for host {} in cluster {}", key, cluster_name);
-      host_to_conn_info_map_[key] = HostConnectionInfo{
-          key,
+      ENVOY_LOG(debug, "Creating HostConnectionInfo for host {} in cluster {}", host_address,
+                cluster_name);
+      host_to_conn_info_map_[host_address] = HostConnectionInfo{
+          host_address,
           cluster_name,
           {},                                      // connection_keys - empty set initially
           cluster_config.reverse_connection_count, // target_connection_count from config
@@ -698,17 +696,18 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
       };
     }
 
-    host_to_conn_info_map_[key].target_connection_count = cluster_config.reverse_connection_count;
+    host_to_conn_info_map_[host_address].target_connection_count =
+        cluster_config.reverse_connection_count;
 
     // Check if we should attempt connection to this host (backoff logic).
     if (!shouldAttemptConnectionToHost(host_address, cluster_name)) {
       ENVOY_LOG(debug, "reverse_tunnel: Skipping connection attempt to host {} due to backoff",
                 host_address);
-      continue;
+      return;
     }
     // Get current number of successful connections to this host.
-    uint32_t current_connections = host_to_conn_info_map_[key].connection_keys.size();
-    uint32_t pending_connections = host_to_conn_info_map_[key].connecting_count;
+    uint32_t current_connections = host_to_conn_info_map_[host_address].connection_keys.size();
+    uint32_t pending_connections = host_to_conn_info_map_[host_address].connecting_count;
 
     ENVOY_LOG(debug,
               "reverse_tunnel: Number of reverse connections to host {} of cluster {} from source "
@@ -723,7 +722,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
                 "reverse_tunnel: No more reverse connections needed to host {} of cluster {}",
                 host_address, cluster_name);
       total_successful_connections += current_connections;
-      continue;
+      return;
     }
     const uint32_t needed_connections =
         cluster_config.reverse_connection_count - current_connections;
@@ -737,7 +736,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
       ENVOY_LOG(debug, "Initiating reverse connection number {} to host {} of cluster {}", i + 1,
                 host_address, cluster_name);
 
-      bool success = initiateOneReverseConnection(cluster_name, key, host);
+      bool success = initiateOneReverseConnection(cluster_name, host_address, host);
 
       if (success) {
         total_successful_connections++;
@@ -749,7 +748,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
                   i + 1, host_address, cluster_name);
       }
     }
-  }
+  });
   // Update metrics based on overall success for the cluster.
   if (total_successful_connections > 0) {
     ENVOY_LOG(info,

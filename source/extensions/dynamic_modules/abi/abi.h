@@ -10458,7 +10458,9 @@ bool envoy_dynamic_module_callback_cluster_update_host_health(
 /**
  * envoy_dynamic_module_callback_cluster_find_host_by_address looks up a host by its address string
  * across all priorities in the cluster and returns the host pointer. This uses the cross-priority
- * host map internally.
+ * host map internally, so the lookup is O(1) with the default flat host map, or O(log N) if the
+ * cluster selected the persistent host map via
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
  *
  * The address string must match the format ``ip:port`` (e.g., ``10.0.0.1:8080``).
  *
@@ -10640,7 +10642,9 @@ envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_cluster_lb_g
 /**
  * envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address looks up a host by its
  * address string across all priorities and returns the health status. This uses the cross-priority
- * host map internally.
+ * host map internally, so the lookup is O(1) with the default flat host map, or O(log N) if the
+ * cluster selected the persistent host map via
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
  *
  * The address string must match the format ``ip:port`` (e.g., ``10.0.0.1:8080``).
  *
@@ -10656,7 +10660,9 @@ bool envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
 /**
  * envoy_dynamic_module_callback_cluster_lb_find_host_by_address looks up a host by its address
  * string across all priorities in the cluster's priority set and returns the host pointer. This
- * uses the cross-priority host map internally.
+ * uses the cross-priority host map internally, so the lookup is O(1) with the default flat host
+ * map, or O(log N) if the cluster selected the persistent host map via
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
  *
  * Unlike envoy_dynamic_module_callback_cluster_find_host_by_address which operates on the
  * cluster_envoy_ptr (main thread), this operates on the lb_envoy_ptr and is safe to call from
@@ -12009,7 +12015,9 @@ envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_lb_get_host_
 /**
  * envoy_dynamic_module_callback_lb_get_host_health_by_address looks up a host by its address
  * string across all priorities and returns the health status. This uses the cross-priority host
- * map internally instead of requiring the caller to iterate through all hosts by index.
+ * map internally instead of requiring the caller to iterate through all hosts by index. The lookup
+ * is O(1) with the default flat host map, or O(log N) if the cluster selected the persistent host
+ * map via envoy_dynamic_module_callback_cluster_use_persistent_host_map.
  *
  * The address string must match the format returned by host->address()->asStringView(), which is
  * typically "ip:port" (e.g., "10.0.0.1:8080").

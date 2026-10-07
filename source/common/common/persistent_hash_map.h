@@ -58,12 +58,15 @@ public:
    */
   bool insert(Key key, Value value) {
     const uint64_t hash = Hash{}(key);
+    // Probe before mutating so inserting a key that is already present does not copy the shared
+    // path down to it.
+    if (findEntry(hash, key) != nullptr) {
+      return false;
+    }
     if (root_.get() == nullptr) {
       root_ = NodePtr(new Node());
     }
-    if (!insertInNode(root_, hash, 0, Entry{std::move(key), std::move(value)})) {
-      return false;
-    }
+    insertInNode(root_, hash, 0, Entry{std::move(key), std::move(value)});
     ++size_;
     return true;
   }
@@ -74,9 +77,12 @@ public:
    * @return bool true if an entry was removed.
    */
   template <class K> bool erase(const K& key) {
-    if (root_.get() == nullptr || !eraseFromNode(root_, Hash{}(key), 0, key)) {
+    const uint64_t hash = Hash{}(key);
+    // Probe before mutating so erasing an absent key does not copy the shared path.
+    if (findEntry(hash, key) == nullptr) {
       return false;
     }
+    eraseFromNode(root_, hash, 0, key);
     if (--size_ == 0) {
       root_ = NodePtr();
     }
@@ -199,25 +205,18 @@ private:
     return nullptr;
   }
 
-  // Inserts the entry below the node unless its key is present and returns whether it was inserted.
-  static bool insertInNode(NodePtr& node_ptr, uint64_t hash, uint32_t depth, Entry&& entry) {
+  // Inserts the entry below the node. insert() verifies the key is absent with findEntry before
+  // mutating, so the path this copies is always modified rather than copied for a no-op.
+  static void insertInNode(NodePtr& node_ptr, uint64_t hash, uint32_t depth, Entry&& entry) {
     Node& node = mutableNode(node_ptr);
     if (depth == MaxDepth) {
-      for (const Entry& existing : node.entries) {
-        if (Eq{}(existing.key, entry.key)) {
-          return false;
-        }
-      }
       node.entries.push_back(std::move(entry));
-      return true;
+      return;
     }
     const uint32_t bit = fragmentBit(hash, depth);
     if (node.data_map & bit) {
       const size_t slot = index(node.data_map, bit);
       Entry& existing = node.entries[slot];
-      if (Eq{}(existing.key, entry.key)) {
-        return false;
-      }
       // Two different keys share this fragment, so push both down into a new child node.
       const uint64_t existing_hash = Hash{}(existing.key);
       NodePtr child =
@@ -226,15 +225,14 @@ private:
       node.data_map &= ~bit;
       node.node_map |= bit;
       node.children.insert(node.children.begin() + index(node.node_map, bit), std::move(child));
-      return true;
+      return;
     }
     if (node.node_map & bit) {
-      return insertInNode(node.children[index(node.node_map, bit)], hash, depth + 1,
-                          std::move(entry));
+      insertInNode(node.children[index(node.node_map, bit)], hash, depth + 1, std::move(entry));
+      return;
     }
     node.data_map |= bit;
     node.entries.insert(node.entries.begin() + index(node.data_map, bit), std::move(entry));
-    return true;
   }
 
   // Returns a new node holding two entries whose hashes agree on every fragment above this depth.
@@ -264,38 +262,28 @@ private:
     return node;
   }
 
-  // Removes the key from below the node and returns whether it was present. A child left with a
-  // single entry is pulled up into its parent so the tree stays compact.
+  // Removes the key from below the node. erase() verifies the key is present with findEntry before
+  // mutating, so the path this copies is always modified rather than copied for a no-op. A child
+  // left with a single entry is pulled up into its parent so the tree stays compact.
   template <class K>
-  static bool eraseFromNode(NodePtr& node_ptr, uint64_t hash, uint32_t depth, const K& key) {
+  static void eraseFromNode(NodePtr& node_ptr, uint64_t hash, uint32_t depth, const K& key) {
     Node& node = mutableNode(node_ptr);
     if (depth == MaxDepth) {
       const auto it = std::find_if(node.entries.begin(), node.entries.end(),
                                    [&key](const Entry& entry) { return Eq{}(entry.key, key); });
-      if (it == node.entries.end()) {
-        return false;
-      }
       node.entries.erase(it);
-      return true;
+      return;
     }
     const uint32_t bit = fragmentBit(hash, depth);
     if (node.data_map & bit) {
       const size_t slot = index(node.data_map, bit);
-      if (!Eq{}(node.entries[slot].key, key)) {
-        return false;
-      }
       node.entries.erase(node.entries.begin() + slot);
       node.data_map &= ~bit;
-      return true;
-    }
-    if (!(node.node_map & bit)) {
-      return false;
+      return;
     }
     const size_t slot = index(node.node_map, bit);
     NodePtr& child = node.children[slot];
-    if (!eraseFromNode(child, hash, depth + 1, key)) {
-      return false;
-    }
+    eraseFromNode(child, hash, depth + 1, key);
     if (child->node_map == 0 && child->entries.size() == 1) {
       Entry entry = std::move(child->entries.front());
       node.children.erase(node.children.begin() + slot);
@@ -303,7 +291,6 @@ private:
       node.data_map |= bit;
       node.entries.insert(node.entries.begin() + index(node.data_map, bit), std::move(entry));
     }
-    return true;
   }
 
   template <class Callback> static void forEachInNode(const Node& node, Callback& cb) {

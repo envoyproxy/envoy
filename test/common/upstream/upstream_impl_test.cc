@@ -4925,6 +4925,28 @@ TEST_P(MainPrioritySetCrossPriorityHostMapTest, FirstHostWinsAndRemovalIsPriorit
   EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
 }
 
+// The guard protects the real path where a single host object moves to a lower priority. The add
+// at the new priority runs first and updates the host's priority, so the later removal from the
+// old priority must not evict the entry the host now owns.
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, SameHostMovedToLowerPriorityIsNotEvicted) {
+  HostSharedPtr host = makeHost("tcp://127.0.0.1:80", 1);
+  updateHosts(1, {host}, {host}, {});
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(host, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  // updateDynamicHostList moves the same host object to the new priority and re-adds it there
+  // before removing it from the old priority, so mirror that order here.
+  host->priority(0);
+  updateHosts(0, {host}, {host}, {});
+  updateHosts(1, {}, {}, {host});
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(host, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  // Removing the host from the priority it now owns clears the entry.
+  updateHosts(0, {}, {}, {host});
+  EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
+}
+
 // Selecting the persistent backing after a host was added is reported as a bug for both backings
 // and leaves the backing in use unchanged.
 TEST_P(MainPrioritySetCrossPriorityHostMapTest, SelectPersistentBackingAfterHostsAdded) {
