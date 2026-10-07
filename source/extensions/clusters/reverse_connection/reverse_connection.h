@@ -58,8 +58,9 @@ public:
   const std::string& asString() const override { return ipv4_instance_.asString(); }
   absl::string_view asStringView() const override { return ipv4_instance_.asStringView(); }
   const std::string& logicalName() const override { return node_id_; }
-  // Delegate the IP and sockaddr accessors to a real Ipv4Instance so core callers that dereference
-  // ip()->ipv4()->address() or copy sockAddr() operate on a concrete loopback address.
+  // Delegate the IP and sockaddr accessors to a real Ipv4Instance so any caller that inspects
+  // ip()->ipv4() or copies sockAddr() sees a concrete loopback address rather than a partially
+  // populated one.
   const Network::Address::Ip* ip() const override { return ipv4_instance_.ip(); }
   const Network::Address::Pipe* pipe() const override { return nullptr; }
   const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {

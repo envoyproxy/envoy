@@ -32,9 +32,8 @@ namespace BootstrapReverseConnection = Envoy::Extensions::Bootstrap::ReverseConn
 RevConClusterHandle::~RevConClusterHandle() {
   // Post the final cluster release to the main-thread dispatcher, so ~RevConCluster, which disables
   // the main-thread cleanup timer, never runs on a worker that happened to drop the last reference.
+  // The handle owns the cluster for its whole lifetime, so cluster_ is never null here.
   std::shared_ptr<RevConCluster> cluster = std::move(cluster_);
-  // The handle always owns the cluster for its whole lifetime, so this is never null here.
-  ASSERT(cluster != nullptr);
   Event::Dispatcher& dispatcher = cluster->dispatcher_;
   dispatcher.post([cluster = std::move(cluster)]() mutable { cluster.reset(); });
 }

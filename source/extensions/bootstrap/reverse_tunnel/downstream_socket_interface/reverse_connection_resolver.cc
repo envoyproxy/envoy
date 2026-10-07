@@ -117,7 +117,7 @@ ReverseConnectionResolver::extractReverseConnectionConfig(
     return absl::InvalidArgumentError("Remote cluster name cannot be empty");
   }
 
-  // Validate every parsed identifier.
+  // Validate each identifier that becomes a handshake header value.
   for (const auto& [field, value] :
        {std::pair<absl::string_view, absl::string_view>{"source node ID", source_parts[0]},
         {"source cluster ID", source_parts[1]},

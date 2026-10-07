@@ -2,9 +2,7 @@
 
 #include <string>
 
-#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/logger.h"
-#include "source/common/common/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/protobuf/utility.h"
@@ -16,20 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
-
-namespace {
-// IoHandle whose connect() fails immediately with ECONNREFUSED and issues no syscall. The acceptor
-// returns one on a pool miss so ConnectionImpl::connect() takes its immediate-error path and raises
-// RemoteClose, exactly as a refused loopback connect would but without the loopback syscalls.
-class PoolMissIoHandle : public Network::IoSocketHandleImpl {
-public:
-  using Network::IoSocketHandleImpl::IoSocketHandleImpl;
-
-  Api::SysCallIntResult connect(Network::Address::InstanceConstSharedPtr) override {
-    return {-1, ECONNREFUSED};
-  }
-};
-} // namespace
 
 // ReverseTunnelAcceptor implementation
 ReverseTunnelAcceptor::ReverseTunnelAcceptor(Server::Configuration::ServerFactoryContext& context)
@@ -49,9 +33,9 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type, Envoy::Network::Addr
 }
 
 Envoy::Network::IoHandlePtr
-ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type,
+ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
                               const Envoy::Network::Address::InstanceConstSharedPtr addr,
-                              const Envoy::Network::SocketCreationOptions&) const {
+                              const Envoy::Network::SocketCreationOptions& options) const {
   ENVOY_LOG(debug, "reverse_tunnel: socket() called for address: {}, node: {}", addr->asString(),
             addr->logicalName());
 
@@ -78,39 +62,18 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type,
     }
   }
 
-  // No cached reverse tunnel for this node. Record the miss and return a socket whose connect()
-  // fails immediately, so the request fails through the normal refused-connection path without
-  // dialing the synthetic loopback address.
+  // No cached reverse tunnel for this node. Record the miss and fall back to the default socket
+  // interface; the connect to the synthetic loopback address is refused, so the request fails
+  // through the normal connection-failure path and returns a 503.
   ENVOY_LOG(debug,
-            "reverse_tunnel: no available connection for node {}, returning a failing socket",
+            "reverse_tunnel: no available connection for node {}, falling back to standard socket",
             addr->logicalName());
   if (extension_ != nullptr) {
     extension_->incPoolMiss();
   }
-
-  // ConnectionImpl raises IS_ENVOY_BUG on a closed fd, so the returned handle must own an open
-  // socket even though its connect() never issues a syscall. SOCK_NONBLOCK and SOCK_CLOEXEC are not
-  // portable socket() flags, so request them only where supported and set non-blocking explicitly
-  // otherwise, mirroring the default socket interface.
-#if defined(__APPLE__) || defined(WIN32)
-  const int socket_flags = SOCK_STREAM;
-#else
-  const int socket_flags = SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC;
-#endif
-  const Api::SysCallSocketResult socket_result =
-      Api::OsSysCallsSingleton::get().socket(AF_INET, socket_flags, 0);
-  if (SOCKET_INVALID(socket_result.return_value_)) {
-    ENVOY_LOG(error, "reverse_tunnel: failed to create pool-miss socket: {}",
-              errorDetails(socket_result.errno_));
-    return nullptr;
-  }
-  // Record the socket domain so address-family-aware socket options select the IPv4 variant.
-  auto io_handle = std::make_unique<PoolMissIoHandle>(socket_result.return_value_,
-                                                      /*socket_v6only=*/false, /*domain=*/AF_INET);
-#if defined(__APPLE__) || defined(WIN32)
-  io_handle->setBlocking(false);
-#endif
-  return io_handle;
+  return Network::socketInterface(
+             "envoy.extensions.network.socket_interface.default_socket_interface")
+      ->socket(socket_type, addr, options);
 }
 
 bool ReverseTunnelAcceptor::ipFamilySupported(int domain) {

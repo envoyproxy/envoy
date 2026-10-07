@@ -1143,7 +1143,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
     return false;
   }
 
-  // Reject EnvoyInternal remote clusters before dialing: the user-space I/O handle cannot be
+  // Reject EnvoyInternal remote clusters before dialing: the user-space io handle cannot be
   // duplicated for the accepted tunnel, which aborts in debug builds and drops a tunnel in release.
   if (host != nullptr && host->address() != nullptr &&
       host->address()->type() == Network::Address::Type::EnvoyInternal) {
