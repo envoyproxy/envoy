@@ -673,6 +673,11 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   const uint32_t max_size = getMaxRequestBodySize();
   uint32_t bytes_parsed_in_this_call = 0;
   const bool early_terminate = canEarlyTerminate();
+  const bool reparent_active_span = config_->propagateTraceContext()->reparent_active_span();
+
+  if (reparent_active_span && !end_stream) {
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+  }
 
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     const char* start = static_cast<const char*>(slice.mem_);
