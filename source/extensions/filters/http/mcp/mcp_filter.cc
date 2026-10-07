@@ -1100,20 +1100,20 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
           } else {
             decoder_callbacks_->addDecodedData(data, /*streaming_filter=*/true);
 
-            Buffer::Instance* buffer = nullptr;
+            Buffer::Instance* decoding_buffer = nullptr;
             decoder_callbacks_->modifyDecodingBuffer(
-                [&buffer](Buffer::Instance& b) { buffer = &b; });
-            ASSERT(buffer != nullptr);
+                [&decoding_buffer](Buffer::Instance& b) { decoding_buffer = &b; });
+            ASSERT(decoding_buffer != nullptr);
 
             absl::StatusOr<RewriteTraceContextResult> rewrite_result =
-                rewriteBodyWithNewTraceparent(*buffer, new_parent_id);
+                rewriteBodyWithNewTraceparent(*decoding_buffer, new_parent_id);
             if (!rewrite_result.ok()) {
               ENVOY_LOG_EVERY_POW_2(warn, "MCP filter failed to rewrite traceparent: {}",
                                     rewrite_result.status().ToString());
             } else {
-              buffer->drain(buffer->length());
-              buffer->add(rewrite_result->rewritten_body);
-              headers->setContentLength(buffer->length());
+              decoding_buffer->drain(decoding_buffer->length());
+              decoding_buffer->add(rewrite_result->rewritten_body);
+              headers->setContentLength(decoding_buffer->length());
 
               injectTraceContext(meta_fields, &rewrite_result.value(), *headers, &active_span);
             }
