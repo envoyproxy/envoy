@@ -58,18 +58,8 @@ LLVM_LIB_DIR = %r
 LLVM_IS_HOST = %s
 """ % (llvm_version, major, major_minor, llvm_lib_dir, is_host))
 
-def _add_exe_suffix(build):
-    # The BUILD template refers to LLVM tools by their bare names, which on Windows have the .exe
-    # suffix.
-    parts = build.split('"bin/')
-    for i in range(1, len(parts)):
-        name, quote, rest = parts[i].partition('"')
-        if "*" not in name and not name.endswith(".exe"):
-            parts[i] = name + ".exe" + quote + rest
-    return '"bin/'.join(parts)
-
-def _detect_llvm_version(repository_ctx, llvm_root, declared_version, exe_suffix = ""):
-    clang = llvm_root.get_child("bin/clang" + exe_suffix)
+def _detect_llvm_version(repository_ctx, llvm_root, declared_version, clang_name = "bin/clang"):
+    clang = llvm_root.get_child(clang_name)
     result = repository_ctx.execute([str(clang), "--version"])
     if result.return_code != 0:
         fail("Could not run %s --version (exit code %s): %s" % (clang, result.return_code, result.stderr))
@@ -110,47 +100,19 @@ def _detect_llvm_lib_dir(llvm_root, major):
                 return candidate
     fail("Could not find %s under %s in lib, lib64, lib/x86_64-linux-gnu, or lib/aarch64-linux-gnu" % (library_name, llvm_root))
 
-def _host_llvm_path(repository_ctx):
-    # Without an explicit path, discover the host LLVM from the environment. BAZEL_LLVM is also
-    # what the rules_cc Windows toolchain uses to locate clang-cl.
-    path = (
-        repository_ctx.attr.path or
-        repository_ctx.getenv("BAZEL_LLVM_PATH") or
-        repository_ctx.getenv("BAZEL_LLVM")
-    )
-    if not path:
-        fail("envoy_llvm.host() requires a path, or BAZEL_LLVM_PATH or BAZEL_LLVM to be set to the host LLVM installation")
-    return path.replace("\\", "/").rstrip("/")
-
 def _host_llvm_repo_impl(repository_ctx):
-    llvm_root = repository_ctx.path(_host_llvm_path(repository_ctx))
-    is_windows = repository_ctx.os.name.lower().startswith("windows")
-    version = _detect_llvm_version(
-        repository_ctx,
-        llvm_root,
-        repository_ctx.attr.llvm_version,
-        ".exe" if is_windows else "",
-    )
-
-    # Windows LLVM ships no libclang-cpp shared library.
-    lib_dir = "lib" if is_windows else _detect_llvm_lib_dir(llvm_root, version.split(".")[0])
+    llvm_root = repository_ctx.path(repository_ctx.attr.path)
+    version = _detect_llvm_version(repository_ctx, llvm_root, repository_ctx.attr.llvm_version)
+    lib_dir = _detect_llvm_lib_dir(llvm_root, version.split(".")[0])
     for directory in ["bin", "include", "lib", "lib64"]:
         path = llvm_root.get_child(directory)
         if not path.exists and directory in ["bin", "include"]:
             fail("Host LLVM directory does not exist: %s" % path)
-        if not path.exists:
-            continue
-        if is_windows:
-            # Without --windows_enable_symlinks Bazel copies symlinked files, but links directories
-            # as junctions, so link the whole directory.
-            repository_ctx.symlink(path, directory)
-        else:
+        if path.exists:
             _symlink_directory_contents(repository_ctx, path, directory)
-    build = _llvm_repo_build(version)
     repository_ctx.file(
         "BUILD.bazel",
-#        build,
-        _add_exe_suffix(build) if is_windows else build,
+        _llvm_repo_build(version),
     )
     _write_llvm_bzl(repository_ctx, version, lib_dir, True)
 
@@ -159,13 +121,40 @@ _host_llvm_repo = repository_rule(
     local = True,
     attrs = {
         "llvm_version": attr.string(default = ""),
-        "path": attr.string(default = ""),
+        "path": attr.string(mandatory = True),
     },
 )
 
 def _symlink_directory_contents(repository_ctx, source, destination):
     for child in source.readdir():
         repository_ctx.symlink(child, destination + "/" + child.basename)
+
+def _windows_llvm_repo(repository_ctx):
+    # Windows builds use the host clang-cl toolchain, so there is no hermetic LLVM to alias.
+    # Expose the tools Envoy needs from the host LLVM that clang-cl comes from, located the same
+    # way as the rules_cc Windows toolchain does it.
+    llvm_root = repository_ctx.path(
+        (repository_ctx.getenv("BAZEL_LLVM") or "C:/Program Files/LLVM").replace("\\", "/").rstrip("/"),
+    )
+    objcopy = llvm_root.get_child("bin/llvm-objcopy.exe")
+    if not objcopy.exists:
+        fail("Could not find %s. Set BAZEL_LLVM to the host LLVM installation." % objcopy)
+    repository_ctx.symlink(objcopy, "bin/llvm-objcopy.exe")
+    repository_ctx.file(
+        "BUILD.bazel",
+        """
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["llvm.bzl"])
+
+alias(
+    name = "objcopy",
+    actual = "bin/llvm-objcopy.exe",
+)
+""",
+    )
+    version = _detect_llvm_version(repository_ctx, llvm_root, "", "bin/clang.exe")
+    _write_llvm_bzl(repository_ctx, version, "lib", True)
 
 def _llvm_alias_repo_impl(repository_ctx):
     os_name = repository_ctx.os.name.lower()
@@ -178,6 +167,9 @@ def _llvm_alias_repo_impl(repository_ctx):
         arch.startswith("aarch64") or arch.startswith("arm64")
     ):
         llvm_root = repository_ctx.path(repository_ctx.attr.minimal_macos_arm64).dirname
+    elif os_name.startswith("windows"):
+        _windows_llvm_repo(repository_ctx)
+        return
     else:
         fail(
             "Unsupported host platform for llvm_toolchain_llvm: %s %s" %
@@ -211,13 +203,11 @@ def _envoy_llvm_impl(module_ctx):
                 fail("envoy_llvm_extension.host may only be specified once")
             host = tag
 
-    # Windows builds compile with the host clang-cl, so always use the host LLVM there, as if
-    # envoy_llvm.host() was specified without a path.
-    if host or module_ctx.os.name.lower().startswith("windows"):
+    if host:
         _host_llvm_repo(
             name = "llvm_toolchain_llvm",
-            llvm_version = host.llvm_version if host else "",
-            path = host.path if host else "",
+            llvm_version = host.llvm_version,
+            path = host.path,
         )
     else:
         _llvm_alias_repo(
@@ -230,8 +220,7 @@ def _envoy_llvm_impl(module_ctx):
 _host_llvm = tag_class(
     attrs = {
         "llvm_version": attr.string(default = ""),
-        # Defaults to the BAZEL_LLVM_PATH or BAZEL_LLVM environment variable.
-        "path": attr.string(default = ""),
+        "path": attr.string(mandatory = True),
     },
 )
 

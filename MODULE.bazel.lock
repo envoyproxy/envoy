@@ -876,7 +876,7 @@
   "moduleExtensions": {
     "//bazel:extensions.bzl%envoy_build_config_ext": {
       "general": {
-        "bzlTransitiveDigest": "93D9K97MLgCQChG9zSO2IeqrqiZuQVVO+CmMHEyPJZ4=",
+        "bzlTransitiveDigest": "7VgwCbSKrwpr/Tv1zJIyttwyN2QiQIvXAz41PL91ag4=",
         "usagesDigest": "MLWuM137EhOdY1+qM/X+w9CfebbWM2X9iYFKV4d9YnA=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -896,7 +896,7 @@
     },
     "//bazel:extensions.bzl%envoy_llvm_extension": {
       "general": {
-        "bzlTransitiveDigest": "93D9K97MLgCQChG9zSO2IeqrqiZuQVVO+CmMHEyPJZ4=",
+        "bzlTransitiveDigest": "7VgwCbSKrwpr/Tv1zJIyttwyN2QiQIvXAz41PL91ag4=",
         "usagesDigest": "Rby+IbUGH9TRwVnqeu4bivT3LHiCOT/l+NEUifhw6UA=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -904,14 +904,18 @@
           "REPO_MAPPING:,cu +wasm_cargo+cu",
           "REPO_MAPPING:,envoy_toolshed envoy_toolshed+",
           "REPO_MAPPING:,rules_rust rules_rust+",
-          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
+          "REPO_MAPPING:,llvm_minimal_linux_x64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_x64",
+          "REPO_MAPPING:,llvm_minimal_linux_arm64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_arm64",
+          "REPO_MAPPING:,llvm_minimal_macos_arm64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_macos_arm64"
         ],
         "generatedRepoSpecs": {
           "llvm_toolchain_llvm": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_host_llvm_repo",
+            "repoRuleId": "@@//bazel:extensions.bzl%_llvm_alias_repo",
             "attributes": {
-              "llvm_version": "",
-              "path": ""
+              "minimal_linux_x64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_x64//:BUILD.bazel",
+              "minimal_linux_arm64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_arm64//:BUILD.bazel",
+              "minimal_macos_arm64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_macos_arm64//:BUILD.bazel"
             }
           }
         }
@@ -941,7 +945,7 @@
     },
     "//bazel:extensions.bzl%envoy_repo_extension": {
       "general": {
-        "bzlTransitiveDigest": "93D9K97MLgCQChG9zSO2IeqrqiZuQVVO+CmMHEyPJZ4=",
+        "bzlTransitiveDigest": "7VgwCbSKrwpr/Tv1zJIyttwyN2QiQIvXAz41PL91ag4=",
         "usagesDigest": "ev3JwF8T3t1Lzq4LDmr0bcVYncB0jj3HOaH1Ax9SG60=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
