@@ -1221,45 +1221,49 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
     return WasmResult::BadArgument;
   }
   auto type = static_cast<MetricType>(metric_type);
+  Wasm& wasm = *envoyWasm();
+  // Defining the same metric again returns the same id, so that modules that define their metrics
+  // on every request do not grow the host maps.
+  auto& ids = wasm.custom_metric_ids_[metric_type];
+  if (auto it = ids.find(toAbslStringView(name)); it != ids.end()) {
+    *metric_id_ptr = it->second;
+    return WasmResult::Ok;
+  }
   // TODO: Consider rethinking the scoping policy as it does not help in this case.
-  Stats::StatNameManagedStorage storage(toAbslStringView(name), envoyWasm()->scope_->symbolTable());
-  Stats::StatName stat_name = storage.statName();
+  Stats::SymbolTable& symbol_table = wasm.scope_->symbolTable();
+  Stats::StatNameManagedStorage storage(toAbslStringView(name), symbol_table);
   // We prefix the given name with custom_stat_name_ so that these user-defined
   // custom metrics can be distinguished from native Envoy metrics.
+  Stats::SymbolTable::StoragePtr joined =
+      symbol_table.join({wasm.custom_stat_namespace_, storage.statName()});
+  const Stats::StatName stat_name = wasm.stat_name_pool_.add(Stats::StatName(joined.get()));
+  uint32_t id;
   if (type == MetricType::Counter) {
-    auto id = envoyWasm()->nextCounterMetricId();
-    Stats::Counter* c = &Stats::Utility::counterFromElements(
-        *envoyWasm()->scope_, {envoyWasm()->custom_stat_namespace_, stat_name});
-    envoyWasm()->counters_.emplace(id, c);
-    *metric_id_ptr = id;
-    return WasmResult::Ok;
+    id = wasm.nextCounterMetricId();
+    wasm.defineCustomMetric(wasm.counters_[id], stat_name);
+  } else if (type == MetricType::Gauge) {
+    id = wasm.nextGaugeMetricId();
+    wasm.defineCustomMetric(wasm.gauges_[id], stat_name);
+  } else {
+    // (type == MetricType::Histogram)
+    id = wasm.nextHistogramMetricId();
+    wasm.defineCustomMetric(wasm.histograms_[id], stat_name);
   }
-  if (type == MetricType::Gauge) {
-    auto id = envoyWasm()->nextGaugeMetricId();
-    Stats::Gauge* g = &Stats::Utility::gaugeFromStatNames(
-        *envoyWasm()->scope_, {envoyWasm()->custom_stat_namespace_, stat_name},
-        Stats::Gauge::ImportMode::Accumulate);
-    envoyWasm()->gauges_.emplace(id, g);
-    *metric_id_ptr = id;
-    return WasmResult::Ok;
-  }
-  // (type == MetricType::Histogram) {
-  auto id = envoyWasm()->nextHistogramMetricId();
-  Stats::Histogram* h = &Stats::Utility::histogramFromStatNames(
-      *envoyWasm()->scope_, {envoyWasm()->custom_stat_namespace_, stat_name},
-      Stats::Histogram::Unit::Unspecified);
-  envoyWasm()->histograms_.emplace(id, h);
+  ids.emplace(name, id);
   *metric_id_ptr = id;
   return WasmResult::Ok;
 }
 
 WasmResult Context::incrementMetric(uint32_t metric_id, int64_t offset) {
+  Wasm& wasm = *envoyWasm();
   auto type = static_cast<MetricType>(metric_id & Wasm::kMetricTypeMask);
   if (type == MetricType::Counter) {
-    auto it = envoyWasm()->counters_.find(metric_id);
-    if (it != envoyWasm()->counters_.end()) {
+    auto it = wasm.counters_.find(metric_id);
+    if (it != wasm.counters_.end()) {
       if (offset > 0) {
-        it->second->add(offset);
+        if (Stats::Counter* counter = wasm.customMetric(it->second); counter != nullptr) {
+          counter->add(offset);
+        }
         return WasmResult::Ok;
       } else {
         return WasmResult::BadArgument;
@@ -1267,15 +1271,28 @@ WasmResult Context::incrementMetric(uint32_t metric_id, int64_t offset) {
     }
     return WasmResult::NotFound;
   } else if (type == MetricType::Gauge) {
-    auto it = envoyWasm()->gauges_.find(metric_id);
-    if (it != envoyWasm()->gauges_.end()) {
+    auto it = wasm.gauges_.find(metric_id);
+    if (it != wasm.gauges_.end()) {
+      auto& metric = it->second;
+      Stats::Gauge* gauge = wasm.customMetric(metric);
       if (offset > 0) {
-        it->second->add(offset);
-        return WasmResult::Ok;
-      } else {
-        it->second->sub(-offset);
+        if (gauge != nullptr) {
+          gauge->add(offset);
+        } else if (wasm.custom_metrics_evictable_) {
+          metric.discarded_increments += offset;
+        }
         return WasmResult::Ok;
       }
+      // Negate in unsigned arithmetic, as -offset is undefined for INT64_MIN.
+      uint64_t amount = uint64_t{0} - static_cast<uint64_t>(offset);
+      // Skip the part of the decrement that pairs with increments that were discarded.
+      const uint64_t discarded = std::min(metric.discarded_increments, amount);
+      metric.discarded_increments -= discarded;
+      amount -= discarded;
+      if (gauge != nullptr) {
+        gauge->sub(amount);
+      }
+      return WasmResult::Ok;
     }
     return WasmResult::NotFound;
   }
@@ -1283,23 +1300,31 @@ WasmResult Context::incrementMetric(uint32_t metric_id, int64_t offset) {
 }
 
 WasmResult Context::recordMetric(uint32_t metric_id, uint64_t value) {
+  Wasm& wasm = *envoyWasm();
   auto type = static_cast<MetricType>(metric_id & Wasm::kMetricTypeMask);
   if (type == MetricType::Counter) {
-    auto it = envoyWasm()->counters_.find(metric_id);
-    if (it != envoyWasm()->counters_.end()) {
-      it->second->add(value);
+    auto it = wasm.counters_.find(metric_id);
+    if (it != wasm.counters_.end()) {
+      if (Stats::Counter* counter = wasm.customMetric(it->second); counter != nullptr) {
+        counter->add(value);
+      }
       return WasmResult::Ok;
     }
   } else if (type == MetricType::Gauge) {
-    auto it = envoyWasm()->gauges_.find(metric_id);
-    if (it != envoyWasm()->gauges_.end()) {
-      it->second->set(value);
+    auto it = wasm.gauges_.find(metric_id);
+    if (it != wasm.gauges_.end()) {
+      it->second.discarded_increments = 0;
+      if (Stats::Gauge* gauge = wasm.customMetric(it->second); gauge != nullptr) {
+        gauge->set(value);
+      }
       return WasmResult::Ok;
     }
   } else if (type == MetricType::Histogram) {
-    auto it = envoyWasm()->histograms_.find(metric_id);
-    if (it != envoyWasm()->histograms_.end()) {
-      it->second->recordValue(value);
+    auto it = wasm.histograms_.find(metric_id);
+    if (it != wasm.histograms_.end()) {
+      if (Stats::Histogram* histogram = wasm.customMetric(it->second); histogram != nullptr) {
+        histogram->recordValue(value);
+      }
       return WasmResult::Ok;
     }
   }
@@ -1307,18 +1332,19 @@ WasmResult Context::recordMetric(uint32_t metric_id, uint64_t value) {
 }
 
 WasmResult Context::getMetric(uint32_t metric_id, uint64_t* result_uint64_ptr) {
+  Wasm& wasm = *envoyWasm();
   auto type = static_cast<MetricType>(metric_id & Wasm::kMetricTypeMask);
   if (type == MetricType::Counter) {
-    auto it = envoyWasm()->counters_.find(metric_id);
-    if (it != envoyWasm()->counters_.end()) {
-      *result_uint64_ptr = it->second->value();
+    auto it = wasm.counters_.find(metric_id);
+    if (it != wasm.counters_.end()) {
+      *result_uint64_ptr = wasm.customMetricValue(it->second);
       return WasmResult::Ok;
     }
     return WasmResult::NotFound;
   } else if (type == MetricType::Gauge) {
-    auto it = envoyWasm()->gauges_.find(metric_id);
-    if (it != envoyWasm()->gauges_.end()) {
-      *result_uint64_ptr = it->second->value();
+    auto it = wasm.gauges_.find(metric_id);
+    if (it != wasm.gauges_.end()) {
+      *result_uint64_ptr = wasm.customMetricValue(it->second);
       return WasmResult::Ok;
     }
     return WasmResult::NotFound;

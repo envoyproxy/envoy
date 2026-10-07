@@ -64,6 +64,27 @@ inline Wasm* getWasm(WasmHandleSharedPtr& base_wasm_handle) {
   return static_cast<Wasm*>(base_wasm_handle->wasm().get());
 }
 
+// Custom metrics are created in a child scope, so that eviction does not affect the stats that
+// Envoy itself keeps in the Wasm scope.
+Stats::ScopeSharedPtr customMetricsScope(const Stats::ScopeSharedPtr& scope,
+                                         const envoy::extensions::wasm::v3::VmConfig& vm_config) {
+  if (!vm_config.has_custom_metrics()) {
+    return scope;
+  }
+  const auto& config = vm_config.custom_metrics();
+  Stats::ScopeStatsLimitSettings limits;
+  if (config.has_max_counters()) {
+    limits.max_counters = config.max_counters().value();
+  }
+  if (config.has_max_gauges()) {
+    limits.max_gauges = config.max_gauges().value();
+  }
+  if (config.has_max_histograms()) {
+    limits.max_histograms = config.max_histograms().value();
+  }
+  return scope->createScope("", config.enable_eviction(), limits);
+}
+
 } // namespace
 
 Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
@@ -78,7 +99,9 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
       cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
       lifecycle_stats_handler_(LifecycleStatsHandler(scope, config.config().vm_config().runtime(),
-                                                     lookupWasmVmCountGauge(api.rootScope()))) {
+                                                     lookupWasmVmCountGauge(api.rootScope()))),
+      custom_metrics_scope_(customMetricsScope(scope_, config.config().vm_config())),
+      custom_metrics_evictable_(config.config().vm_config().custom_metrics().enable_eviction()) {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmCreated);
   ENVOY_LOG(debug, "Base Wasm created {} now active", lifecycle_stats_handler_.getActiveVmCount());
 }
@@ -95,7 +118,9 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
       custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)),
       cluster_manager_(getWasm(base_wasm_handle)->clusterManager()), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
-      lifecycle_stats_handler_(getWasm(base_wasm_handle)->lifecycle_stats_handler_) {
+      lifecycle_stats_handler_(getWasm(base_wasm_handle)->lifecycle_stats_handler_),
+      custom_metrics_scope_(getWasm(base_wasm_handle)->custom_metrics_scope_),
+      custom_metrics_evictable_(getWasm(base_wasm_handle)->custom_metrics_evictable_) {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmCreated);
   ENVOY_LOG(debug, "Thread-Local Wasm created {} now active",
             lifecycle_stats_handler_.getActiveVmCount());
@@ -383,6 +408,9 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
   *vm_key_config.mutable_environment_variables() = vm_config.environment_variables();
   *vm_key_config.mutable_capability_restriction_config() =
       vm_config.capability_restriction_config();
+  if (vm_config.has_custom_metrics()) {
+    *vm_key_config.mutable_custom_metrics() = vm_config.custom_metrics();
+  }
   const std::string vm_id_with_config =
       absl::StrCat(vm_config.vm_id(), "|", MessageUtil::hash(vm_key_config));
   auto vm_key = proxy_wasm::makeVmKey(
