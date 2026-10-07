@@ -1016,7 +1016,7 @@ public:
           auto* filter = hcm.mutable_http_filters(0);
           envoy::extensions::filters::http::oauth2::v3::OAuth2 oauth2;
           ASSERT_TRUE(filter->typed_config().UnpackTo(&oauth2));
-          oauth2.mutable_config()->set_chunk_large_token_cookies(true);
+          oauth2.mutable_config()->mutable_token_cookie_chunking();
           std::ignore = filter->mutable_typed_config()->PackFrom(oauth2);
         });
   }
@@ -1066,7 +1066,7 @@ TEST_P(OauthChunkedCookieIntegrationTest, LargeAccessTokenIsChunkedAndRejoined) 
   const auto set_cookies = response->headers().get(Http::Headers::get().SetCookie);
   for (size_t i = 0; i < set_cookies.size(); ++i) {
     const absl::string_view set_cookie = set_cookies[i]->value().getStringView();
-    EXPECT_LE(set_cookie.size(), MaxCookieSize);
+    EXPECT_LE(set_cookie.size(), DefaultMaxTokenCookieSize);
     const absl::string_view name_value = set_cookie.substr(0, set_cookie.find(';'));
     if (!absl::EndsWith(name_value, "=deleted")) {
       replay.addCopy(Http::Headers::get().Cookie, name_value);

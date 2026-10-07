@@ -411,8 +411,7 @@ If the attempt to get an access token by using a refresh token fails then the us
 Generally, allowlisting is inadvisable from a security standpoint.
 
 Browsers do not store a cookie larger than 4096 bytes, so an access, ID or refresh token above that size is dropped by the
-client and the user is sent back to the authorization endpoint on every request. Enable
-:ref:`chunk_large_token_cookies <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.chunk_large_token_cookies>`
+client and the user is sent back to the authorization endpoint on every request. Set :ref:`token_cookie_chunking <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.token_cookie_chunking>`
 to split such a token across multiple cookies. Envoy rejoins them on each request before validating the tokens, so the
 upstream still receives each token as a single cookie.
 
@@ -434,4 +433,4 @@ The OAuth2 filter outputs statistics in the ``<stat_prefix>.`` namespace.
   oauth_token_cookie_chunked, Counter, Total token cookies that were split across multiple cookies
   oauth_token_cookie_reassembled, Counter, Total token cookies rejoined from their chunks
   oauth_token_cookie_malformed_chunks, Counter, Total chunked token cookies discarded as malformed
-  oauth_token_cookie_oversized, Counter, Total sessions refused because a token needs more than 8 cookies
+  oauth_token_cookie_oversized, Counter, Total sessions refused because a token needs more than ``max_chunks`` cookies

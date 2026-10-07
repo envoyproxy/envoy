@@ -240,6 +240,29 @@ message PostLogoutRedirectUri {
   }
 }
 
+// Splits OAuth token cookies that are too large for a browser to store.
+//
+// A token that fits in one cookie is written as a single cookie, as without chunking. A larger
+// token is written as ``<name>_0`` to ``<name>_N-1``, plus a ``<name>_chunks`` cookie that holds
+// the count ``N``. If a token needs more than
+// :ref:`max_chunks <envoy_v3_api_field_extensions.filters.http.oauth2.v3.TokenCookieChunking.max_chunks>`
+// cookies, the filter responds with ``503`` instead of setting cookies that the client would drop.
+//
+// Chunked cookies add to the request header size. A session with more than one large token may
+// need a larger :ref:`max_request_headers_kb
+// <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
+message TokenCookieChunking {
+  // The largest cookie Envoy writes for a token, counting its name, value and attributes. A token
+  // whose cookie would be larger is split. Defaults to ``4096``, the limit browsers enforce.
+  google.protobuf.UInt32Value max_cookie_size = 1 [(validate.rules).uint32 = {lte: 4096 gte: 512}];
+
+  // The most cookies a single token is split into. Defaults to ``8``.
+  //
+  // Envoy rejoins up to 16 chunks on requests regardless of this value, so lowering it does not
+  // invalidate existing sessions.
+  google.protobuf.UInt32Value max_chunks = 2 [(validate.rules).uint32 = {lte: 16 gte: 2}];
+}
+
 // OAuth config
 //
 // [#next-free-field: 35]
@@ -474,27 +497,15 @@ message OAuth2Config {
   // is set to ``PRIVATE_KEY_JWT``.
   PrivateKeyJwtConfig private_key_jwt_config = 32;
 
-  // If set to true, an access, ID or refresh token cookie that is larger than the 4096 bytes a
-  // browser stores for a single cookie is split across up to 8 cookies, named ``<name>_0`` to
-  // ``<name>_N-1``, plus a ``<name>_chunks`` cookie that holds the count. A token that fits in a
-  // single cookie is written as a single cookie, as before. If a token does not fit even in 8
-  // cookies, the filter responds with ``503`` instead of setting cookies that the browser would
-  // drop.
+  // If set, an access, ID or refresh token cookie that is larger than
+  // :ref:`max_cookie_size <envoy_v3_api_field_extensions.filters.http.oauth2.v3.TokenCookieChunking.max_cookie_size>`
+  // is split across multiple cookies. If not set, every token is written as a single cookie,
+  // which a browser drops when it is larger than 4096 bytes.
   //
-  // Without this option, a browser silently drops a token cookie larger than 4096 bytes and the
-  // user is sent back to the authorization server on every request.
-  //
-  // Envoy always rejoins chunked token cookies on requests, regardless of this option. In a rolling
-  // upgrade, enable it only after every Envoy that may serve the same client understands chunked
-  // cookies. Disabling it later is safe: chunked cookies are still read and replaced with a
-  // single cookie on the next token refresh.
-  //
-  // Chunked cookies add to the request header size. A session with more than one large token may
-  // need a larger :ref:`max_request_headers_kb
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
-  //
-  // Default is false.
-  bool chunk_large_token_cookies = 34;
+  // Envoy always rejoins chunked token cookies on requests, whether or not this is set, so it can
+  // be removed safely. In a rolling upgrade, set it only after every Envoy that may serve the same
+  // client understands chunked cookies.
+  TokenCookieChunking token_cookie_chunking = 34;
 }
 
 // Per-route OAuth2 config.

@@ -50,10 +50,13 @@ using OAuth2Headers = ConstSingleton<OAuth2HeaderValues>;
 
 class OAuth2Client;
 
-// The largest cookie, counting its name, value and attributes, that browsers store.
-constexpr size_t MaxCookieSize = 4096;
-// The most cookies a token cookie is split into. A larger chunk count is treated as malformed.
-constexpr size_t MaxChunksPerToken = 8;
+// Defaults of the TokenCookieChunking settings. 4096 bytes is the largest cookie, counting its
+// name, value and attributes, that browsers store.
+constexpr size_t DefaultMaxTokenCookieSize = 4096;
+constexpr size_t DefaultMaxTokenCookieChunks = 8;
+// The most chunks the TokenCookieChunking API allows. Requests are read up to this count whatever
+// the configured limit, and a larger count is treated as malformed.
+constexpr size_t MaxTokenCookieChunks = 16;
 
 // Entry names used when ``token_secret`` is supplied as a multi-entry generic secret. This form is
 // only used with the ``PRIVATE_KEY_JWT`` auth type, where it allows the key ID to be distributed
@@ -314,7 +317,14 @@ public:
     return code_verifier_cookie_settings_;
   }
   bool disableTokenEncryption() const { return disable_token_encryption_; }
-  bool chunkLargeTokenCookies() const { return chunk_large_token_cookies_; }
+  struct TokenCookieChunkingSettings {
+    size_t max_cookie_size_;
+    size_t max_chunks_;
+  };
+  // Empty when token cookie chunking is not configured.
+  const std::optional<TokenCookieChunkingSettings>& tokenCookieChunking() const {
+    return token_cookie_chunking_;
+  }
   const std::string& jwtSigningAlgorithm() const { return jwt_signing_algorithm_; }
   std::chrono::seconds jwtAssertionLifetime() const { return jwt_assertion_lifetime_; }
   const std::string& jwtAssertionAudience() const { return jwt_assertion_audience_; }
@@ -363,7 +373,6 @@ private:
   const bool disable_refresh_token_set_cookie_ : 1;
   const bool disable_token_encryption_ : 1;
   const bool use_access_token_expiry_for_id_token_cookie_ : 1;
-  const bool chunk_large_token_cookies_ : 1;
   // The upstream header used to forward the OIDC ID token. Empty when ID token forwarding is
   // disabled.
   const Http::LowerCaseString forward_id_token_header_;
@@ -375,6 +384,7 @@ private:
   const CookieSettings refresh_token_cookie_settings_;
   const CookieSettings nonce_cookie_settings_;
   const CookieSettings code_verifier_cookie_settings_;
+  const std::optional<TokenCookieChunkingSettings> token_cookie_chunking_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
