@@ -57,8 +57,6 @@ template <class F> CAPIStatus envoyGoFilterProcessStateHandlerWrapper(void* s, c
     return CAPIStatus::CAPINotInGo;
   }
   auto req = static_cast<HttpRequestInternal*>(state->req);
-  // lock() the member directly: `auto weak = req->weakFilter()` would copy it and undo the
-  // reference return.
   if (auto filter = req->weakFilter().lock()) {
     return f(filter, *state);
   }

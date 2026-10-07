@@ -215,9 +215,6 @@ public:
   }
 
   void setWeakFilter(std::weak_ptr<Filter> f) { filter_ = f; }
-  // filter_ is assigned once, in initRequest(), before any cgo call. Returning a reference avoids
-  // copying the weak_ptr (an atomic refcount bump) on every Go -> C++ call. Concurrent lock() on
-  // the same weak_ptr is safe.
   const std::weak_ptr<Filter>& weakFilter() const { return filter_; }
 
   DecodingProcessorState& decodingState() { return decoding_state_; }
@@ -456,7 +453,6 @@ struct httpConfigInternal : httpConfig {
   std::weak_ptr<FilterConfig> config_;
   // NOLINTNEXTLINE(readability-identifier-naming)
   httpConfigInternal(std::weak_ptr<FilterConfig> c) { config_ = c; }
-  // config_ is assigned once, in the constructor, before the pointer is handed to Go.
   const std::weak_ptr<FilterConfig>& weakFilterConfig() const { return config_; }
 };
 
