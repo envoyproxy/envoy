@@ -50,7 +50,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/mcp:constants_lib",
         "//source/extensions/filters/common/mcp:filter_state_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//source/extensions/tracers/opentelemetry:span_context_lib",
         "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
