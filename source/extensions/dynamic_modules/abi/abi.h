@@ -12948,6 +12948,208 @@ bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
 
 // =============================================================================
+// ============================ TLS Handshaker =================================
+// =============================================================================
+//
+// This extension enables custom TLS handshakers via dynamic modules. It integrates with Envoy's
+// custom_handshaker in CommonTlsContext, registered under the envoy.tls_handshakers category, and
+// is used for both client and server TLS contexts.
+//
+// The module declares its capabilities and may configure the SSL_CTX during context creation. For
+// each connection the module can optionally drive the handshake on the SSL object and report the
+// outcome, or return RunDefault to let Envoy run the standard handshake step. A module that only
+// configures the SSL_CTX reuses the default handshake.
+
+// =============================================================================
+// TLS Handshaker Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_config_envoy_ptr is a pointer to the
+ * DynamicModuleHandshakerConfig object in Envoy passed to the module during config creation.
+ *
+ * OWNERSHIP: Envoy owns this object. The pointer remains stable until
+ * envoy_dynamic_module_on_tls_handshaker_config_destroy returns for the corresponding in-module
+ * config.
+ */
+typedef void* envoy_dynamic_module_type_tls_handshaker_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_config_module_ptr is a pointer to the in-module
+ * handshaker configuration created and owned by the module. It is shared across all connections
+ * using the handshaker.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_tls_handshaker_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_module_ptr is a pointer to a per-connection in-module
+ * handshaker created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_tls_handshaker_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_ssl_ctx_ptr is an opaque pointer to the BoringSSL
+ * SSL_CTX passed to envoy_dynamic_module_on_tls_handshaker_configure_ssl_context. A module that
+ * uses it must link the same BoringSSL ABI as Envoy. It is valid only for the duration of that
+ * hook.
+ *
+ * OWNERSHIP: Envoy owns this pointer.
+ */
+typedef void* envoy_dynamic_module_type_tls_handshaker_ssl_ctx_ptr;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_ssl_ptr is an opaque pointer to the per-connection
+ * BoringSSL SSL object passed to envoy_dynamic_module_on_tls_handshaker_new. A module that uses it
+ * must link the same BoringSSL ABI as Envoy. It remains valid for the lifetime of the connection
+ * handshaker.
+ *
+ * OWNERSHIP: Envoy owns this pointer.
+ */
+typedef void* envoy_dynamic_module_type_tls_handshaker_ssl_ptr;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_result is returned by
+ * envoy_dynamic_module_on_tls_handshaker_handshake to report the outcome of a handshake step. Envoy
+ * applies the matching Ssl::SocketState transition and the success or failure notification, so the
+ * module does not call back into Envoy to do so.
+ */
+typedef enum envoy_dynamic_module_type_tls_handshaker_result {
+  // The module did not drive the handshake, so Envoy runs the standard handshake step.
+  envoy_dynamic_module_type_tls_handshaker_result_RunDefault = 0,
+  // The handshake completed. Envoy marks it complete and notifies success.
+  envoy_dynamic_module_type_tls_handshaker_result_Complete = 1,
+  // The handshake failed. Envoy notifies failure and closes the connection.
+  envoy_dynamic_module_type_tls_handshaker_result_Failed = 2,
+  // The handshake needs more data from the connection.
+  envoy_dynamic_module_type_tls_handshaker_result_WaitForData = 3,
+  // The handshake is blocked on an Envoy-managed asynchronous operation, such as an asynchronous
+  // private key provider or certificate validation. Envoy re-invokes the handshake hook when the
+  // operation completes.
+  envoy_dynamic_module_type_tls_handshaker_result_Pending = 4,
+} envoy_dynamic_module_type_tls_handshaker_result;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_capabilities declares which TLS behaviors the handshaker
+ * implements itself. This corresponds to Ssl::HandshakerCapabilities. Envoy initializes the struct
+ * with the default capabilities before calling envoy_dynamic_module_on_tls_handshaker_config_new,
+ * and the module overrides the fields it cares about.
+ */
+typedef struct envoy_dynamic_module_type_tls_handshaker_capabilities {
+  // Whether the handshaker provides certificates itself.
+  bool provides_certificates;
+  // Whether the handshaker verifies peer certificates itself.
+  bool verifies_peer_certificates;
+  // Whether the handshaker handles session resumption itself.
+  bool handles_session_resumption;
+  // Whether the handshaker provides its own ciphers and curves.
+  bool provides_ciphers_and_curves;
+  // Whether the handshaker handles ALPN selection.
+  bool handles_alpn_selection;
+  // Whether the handshaker is FIPS compliant. Defaults to true.
+  bool is_fips_compliant;
+  // Whether the handshaker provides its own signature algorithms.
+  bool provides_sigalgs;
+} envoy_dynamic_module_type_tls_handshaker_capabilities;
+
+// =============================================================================
+// TLS Handshaker Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_config_new is called by the main thread when the
+ * handshaker config is loaded. The module returns a config pointer and fills the capabilities
+ * struct.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleHandshakerConfig object for the
+ * corresponding config.
+ * @param name is the name of the handshaker owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
+ * @param capabilities is pre-filled with the default capabilities and may be overridden by the
+ * module. Envoy reads it immediately after this hook returns.
+ * @return envoy_dynamic_module_type_tls_handshaker_config_module_ptr is the pointer to the
+ * in-module handshaker configuration. Returning nullptr indicates a failure to initialize the
+ * module, and the configuration is rejected.
+ */
+envoy_dynamic_module_type_tls_handshaker_config_module_ptr
+envoy_dynamic_module_on_tls_handshaker_config_new(
+    envoy_dynamic_module_type_tls_handshaker_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config,
+    envoy_dynamic_module_type_tls_handshaker_capabilities* capabilities);
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_config_destroy is called when the handshaker configuration
+ * is destroyed in Envoy. The module should release any resources associated with the in-module
+ * configuration. This may run on a worker thread when a draining connection outlives the
+ * configuration, so it must not assume the main thread.
+ *
+ * @param config_module_ptr is the pointer to the in-module handshaker configuration being
+ * destroyed.
+ */
+void envoy_dynamic_module_on_tls_handshaker_config_destroy(
+    envoy_dynamic_module_type_tls_handshaker_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_configure_ssl_context is an optional hook called once per
+ * SSL_CTX during context creation on the main thread. The module may configure the context, for
+ * example to install a PSK callback. If the module does not export this hook, Envoy leaves the
+ * context unchanged.
+ *
+ * @param config_module_ptr is the pointer to the in-module handshaker configuration.
+ * @param ssl_ctx is the opaque BoringSSL SSL_CTX to configure. It is valid only for this call.
+ * @return true if the configuration succeeded. Returning false is logged and the context is used as
+ * is.
+ */
+bool envoy_dynamic_module_on_tls_handshaker_configure_ssl_context(
+    envoy_dynamic_module_type_tls_handshaker_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_tls_handshaker_ssl_ctx_ptr ssl_ctx);
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_new is an optional hook called when a new connection
+ * handshaker is created on that connection's worker thread. If the module does not export this
+ * hook, no per-connection module handshaker is created and the module pointer passed to the
+ * handshake hook is nullptr. If the module exports this hook it must also export
+ * envoy_dynamic_module_on_tls_handshaker_destroy.
+ *
+ * @param config_module_ptr is the pointer to the in-module handshaker configuration.
+ * @param ssl is the opaque BoringSSL SSL object for the connection. It remains valid until
+ * envoy_dynamic_module_on_tls_handshaker_destroy is called.
+ * @return envoy_dynamic_module_type_tls_handshaker_module_ptr is the pointer to the per-connection
+ * in-module handshaker. Returning nullptr indicates a failure, and the connection is closed.
+ */
+envoy_dynamic_module_type_tls_handshaker_module_ptr envoy_dynamic_module_on_tls_handshaker_new(
+    envoy_dynamic_module_type_tls_handshaker_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_tls_handshaker_ssl_ptr ssl);
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_destroy is an optional hook called on the connection's
+ * worker thread when a connection handshaker is destroyed. The module should release any resources
+ * associated with the per-connection in-module handshaker.
+ *
+ * @param handshaker_module_ptr is the pointer to the per-connection in-module handshaker being
+ * destroyed.
+ */
+void envoy_dynamic_module_on_tls_handshaker_destroy(
+    envoy_dynamic_module_type_tls_handshaker_module_ptr handshaker_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_handshake is an optional hook called to advance the TLS
+ * handshake on the connection's worker thread. A module that drives the handshake itself operates
+ * on the SSL object from envoy_dynamic_module_on_tls_handshaker_new and returns the resulting
+ * state. A module that does not drive the handshake returns RunDefault so Envoy runs the standard
+ * step. If the module does not export this hook, Envoy runs the standard handshake directly.
+ *
+ * @param handshaker_module_ptr is the per-connection in-module handshaker, or nullptr if the module
+ * does not export envoy_dynamic_module_on_tls_handshaker_new.
+ * @return envoy_dynamic_module_type_tls_handshaker_result is the outcome of the handshake step.
+ */
+envoy_dynamic_module_type_tls_handshaker_result envoy_dynamic_module_on_tls_handshaker_handshake(
+    envoy_dynamic_module_type_tls_handshaker_module_ptr handshaker_module_ptr);
+
+// =============================================================================
 // =========================== Config Validator ================================
 // =============================================================================
 //
