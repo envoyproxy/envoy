@@ -1047,6 +1047,8 @@ case $CI_TARGET in
                   --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
                   --action_env="CARGO_BAZEL_REPIN=true" \
                   --host_action_env="CARGO_BAZEL_REPIN=true" \
+                  --action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
+                  --host_action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
                   --sandbox_writable_path="${HOME}/.docker/" \
                   --sandbox_writable_path="$HOME" \
                   @envoy-examples//:verify_examples
