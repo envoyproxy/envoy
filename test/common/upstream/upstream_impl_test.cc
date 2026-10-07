@@ -31,6 +31,7 @@
 #include "source/common/queue_policy/fifo_queue_policy.h"
 #include "source/common/queue_policy/queue_policy_base.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/host_lookup_map.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
@@ -4639,7 +4640,8 @@ TEST(PrioritySet, Extend) {
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostMapConstSharedPtr fake_cross_priority_host_map = std::make_shared<HostMap>();
+  HostLookupMapConstSharedPtr fake_cross_priority_host_map =
+      std::make_shared<FlatHostLookupMap>(std::make_shared<HostMap>());
   {
     HostVector hosts_added{hosts->front()};
     HostVector hosts_removed{};
@@ -4798,7 +4800,8 @@ TEST(PrioritySet, MainPrioritySetTest) {
 
   // Mutable host map will be moved to read only host map after `crossPriorityHostMap` is called.
   HostMapSharedPtr host_map = priority_set.mutableHostMapForTest();
-  EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
+  priority_set.crossPriorityHostMap();
+  EXPECT_EQ(host_map.get(), priority_set.constHostMapForTest().get());
   EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
 
   {
@@ -4821,8 +4824,154 @@ TEST(PrioritySet, MainPrioritySetTest) {
   // Again, mutable host map will be moved to read only host map after `crossPriorityHostMap` is
   // called.
   host_map = priority_set.mutableHostMapForTest();
-  EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
+  priority_set.crossPriorityHostMap();
+  EXPECT_EQ(host_map.get(), priority_set.constHostMapForTest().get());
   EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
+}
+
+// Test the cross priority host map of the main thread priority set with both the flat and the
+// persistent backing.
+class MainPrioritySetCrossPriorityHostMapTest : public testing::TestWithParam<bool> {
+protected:
+  MainPrioritySetCrossPriorityHostMapTest() {
+    if (GetParam()) {
+      priority_set_.usePersistentCrossPriorityHostMap();
+    }
+    priority_set_.getOrCreateHostSet(0);
+  }
+
+  HostSharedPtr makeHost(const std::string& url, uint32_t priority = 0) {
+    return makeTestHost(info_, url, 1, priority);
+  }
+
+  void updateHosts(uint32_t priority, const HostVector& hosts, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) {
+    auto hosts_ptr = std::make_shared<const HostVector>(hosts);
+    priority_set_.updateHosts(priority,
+                              updateHostsParams(hosts_ptr, hosts_per_locality_,
+                                                std::make_shared<const HealthyHostVector>(hosts),
+                                                hosts_per_locality_),
+                              {}, hosts_added, hosts_removed, std::nullopt);
+  }
+
+  MainPrioritySetImpl priority_set_;
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  HostsPerLocalitySharedPtr hosts_per_locality_{std::make_shared<HostsPerLocalityImpl>()};
+};
+
+INSTANTIATE_TEST_SUITE_P(PersistentBacking, MainPrioritySetCrossPriorityHostMapTest,
+                         testing::Bool());
+
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, AddRemoveAndSnapshotIsolation) {
+  EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
+
+  HostSharedPtr host_a = makeHost("tcp://127.0.0.1:80");
+  HostSharedPtr host_b = makeHost("tcp://127.0.0.1:81");
+  updateHosts(0, {host_a, host_b}, {host_a, host_b}, {});
+  HostLookupMapConstSharedPtr snapshot = priority_set_.crossPriorityHostMap();
+  EXPECT_EQ(GetParam(), dynamic_cast<const PersistentHostLookupMap*>(snapshot.get()) != nullptr);
+  EXPECT_FALSE(snapshot->empty());
+  EXPECT_EQ(2, snapshot->size());
+  EXPECT_EQ(host_a, snapshot->findHost("127.0.0.1:80"));
+  EXPECT_EQ(host_b, snapshot->findHost("127.0.0.1:81"));
+  EXPECT_EQ(nullptr, snapshot->findHost("127.0.0.1:82"));
+  HostMap visited;
+  snapshot->forEach([&visited](absl::string_view address, const HostSharedPtr& host) {
+    visited.emplace(address, host);
+  });
+  EXPECT_EQ((HostMap{{"127.0.0.1:80", host_a}, {"127.0.0.1:81", host_b}}), visited);
+
+  // A snapshot taken before a removal keeps the removed host.
+  updateHosts(0, {host_b}, {}, {host_a});
+  HostLookupMapConstSharedPtr after_remove = priority_set_.crossPriorityHostMap();
+  EXPECT_EQ(1, after_remove->size());
+  EXPECT_EQ(nullptr, after_remove->findHost("127.0.0.1:80"));
+  EXPECT_EQ(host_b, after_remove->findHost("127.0.0.1:81"));
+  EXPECT_EQ(2, snapshot->size());
+  EXPECT_EQ(host_a, snapshot->findHost("127.0.0.1:80"));
+
+  updateHosts(0, {}, {}, {host_b});
+  EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
+  EXPECT_EQ(1, after_remove->size());
+}
+
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, RemoveAbsentAddressIsNoOp) {
+  HostSharedPtr host_a = makeHost("tcp://127.0.0.1:80");
+  HostSharedPtr host_absent = makeHost("tcp://127.0.0.1:81");
+  updateHosts(0, {host_a}, {host_a}, {});
+  updateHosts(0, {host_a}, {}, {host_absent});
+
+  HostLookupMapConstSharedPtr lookup_map = priority_set_.crossPriorityHostMap();
+  EXPECT_EQ(1, lookup_map->size());
+  EXPECT_EQ(host_a, lookup_map->findHost("127.0.0.1:80"));
+  EXPECT_EQ(nullptr, lookup_map->findHost("127.0.0.1:81"));
+}
+
+// Hosts at different priorities can share an address. The first host added keeps the entry and a
+// removal at another priority must not evict it.
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, FirstHostWinsAndRemovalIsPriorityGuarded) {
+  HostSharedPtr host_p0 = makeHost("tcp://127.0.0.1:80", 0);
+  HostSharedPtr host_p1 = makeHost("tcp://127.0.0.1:80", 1);
+  updateHosts(0, {host_p0}, {host_p0}, {});
+  updateHosts(1, {host_p1}, {host_p1}, {});
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(host_p0, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  updateHosts(1, {}, {}, {host_p1});
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(host_p0, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  updateHosts(0, {}, {}, {host_p0});
+  EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
+}
+
+// Selecting the persistent backing after a host was added is reported as a bug for both backings
+// and leaves the backing in use unchanged.
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, SelectPersistentBackingAfterHostsAdded) {
+  HostSharedPtr host_a = makeHost("tcp://127.0.0.1:80");
+  updateHosts(0, {host_a}, {host_a}, {});
+  HostLookupMapConstSharedPtr lookup_map = priority_set_.crossPriorityHostMap();
+  EXPECT_ENVOY_BUG(priority_set_.usePersistentCrossPriorityHostMap(),
+                   "persistent cross priority host map selected after hosts were added");
+
+  HostSharedPtr host_b = makeHost("tcp://127.0.0.1:81");
+  updateHosts(0, {host_a, host_b}, {host_b}, {});
+  lookup_map = priority_set_.crossPriorityHostMap();
+  EXPECT_EQ(GetParam(), dynamic_cast<const PersistentHostLookupMap*>(lookup_map.get()) != nullptr);
+  EXPECT_EQ(host_a, lookup_map->findHost("127.0.0.1:80"));
+  EXPECT_EQ(host_b, lookup_map->findHost("127.0.0.1:81"));
+}
+
+// Selecting the persistent backing after a host was added is ignored and the flat backing keeps
+// serving the hosts.
+TEST(PrioritySet, UsePersistentCrossPriorityHostMapAfterHostsAdded) {
+  TestMainPrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_removed;
+  priority_set.updateHosts(0,
+                           updateHostsParams(hosts, hosts_per_locality,
+                                             std::make_shared<const HealthyHostVector>(*hosts),
+                                             hosts_per_locality),
+                           {}, *hosts, hosts_removed, std::nullopt);
+
+  // Rejected while the update is still pending in the mutable host map.
+  EXPECT_ENVOY_BUG(priority_set.usePersistentCrossPriorityHostMap(),
+                   "persistent cross priority host map selected after hosts were added");
+  EXPECT_EQ(hosts->front(), priority_set.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  // Rejected after the update was published to the read only host map.
+  EXPECT_ENVOY_BUG(priority_set.usePersistentCrossPriorityHostMap(),
+                   "persistent cross priority host map selected after hosts were added");
+  priority_set.updateHosts(0,
+                           updateHostsParams(hosts, hosts_per_locality,
+                                             std::make_shared<const HealthyHostVector>(*hosts),
+                                             hosts_per_locality),
+                           {}, {}, *hosts, std::nullopt);
+  EXPECT_NE(nullptr, priority_set.mutableHostMapForTest());
+  EXPECT_TRUE(priority_set.crossPriorityHostMap()->empty());
 }
 
 class ClusterInfoImplTest : public testing::Test, public UpstreamImplTestBase {

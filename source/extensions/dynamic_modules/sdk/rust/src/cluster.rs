@@ -423,6 +423,14 @@ pub trait EnvoyCluster: Send + Sync {
   /// routing traffic to this cluster.
   fn pre_init_complete(&self);
 
+  /// Back the cluster's cross-priority host map with a persistent map instead of the default
+  /// flat map, so that each host update costs O(log N) instead of a full copy of the map. In
+  /// exchange a lookup by address costs O(log N) rather than O(1).
+  ///
+  /// This is optional and must be called during [`Cluster::on_init`] before any host is added.
+  /// A call made after a host has been added has no effect and is reported as a bug.
+  fn use_persistent_host_map(&self);
+
   /// Add multiple hosts to the cluster with per-host locality and metadata.
   ///
   /// Each address must be in `ip:port` format (e.g., `127.0.0.1:8080`).
@@ -513,7 +521,7 @@ pub trait EnvoyCluster: Send + Sync {
 
   /// Look up a host by its address string across all priorities and return the host pointer.
   ///
-  /// This provides O(1) lookup by address using the cross-priority host map.
+  /// This uses the cross-priority host map internally.
   /// The address must match the format "ip:port" (e.g., "10.0.0.1:8080").
   ///
   /// Returns the host pointer if found, or `None` if the address is not in the cluster.
@@ -656,8 +664,8 @@ pub trait EnvoyClusterLoadBalancer: Send {
 
   /// Look up a host by its address string across all priorities in the cluster's priority set.
   ///
-  /// This uses the cross-priority host map internally, providing O(1) lookup by address. The
-  /// address must match the format "ip:port" (e.g., "10.0.0.1:8080").
+  /// This uses the cross-priority host map internally. The address must match the format
+  /// "ip:port" (e.g., "10.0.0.1:8080").
   ///
   /// Unlike [`EnvoyCluster::find_host_by_address`] which operates on the main thread, this is
   /// safe to call from worker threads during load balancing decisions.
@@ -695,7 +703,7 @@ pub trait EnvoyClusterLoadBalancer: Send {
   ) -> abi::envoy_dynamic_module_type_host_health;
 
   /// Looks up a host by its address string across all priorities and returns its health status.
-  /// This provides O(1) lookup by address using the cross-priority host map.
+  /// This uses the cross-priority host map internally.
   ///
   /// The address must match the format "ip:port" (e.g., "10.0.0.1:8080").
   fn get_host_health_by_address(
@@ -1368,6 +1376,12 @@ impl EnvoyCluster for EnvoyClusterImpl {
   fn pre_init_complete(&self) {
     unsafe {
       abi::envoy_dynamic_module_callback_cluster_pre_init_complete(self.raw);
+    }
+  }
+
+  fn use_persistent_host_map(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_use_persistent_host_map(self.raw);
     }
   }
 

@@ -43,8 +43,8 @@ pub trait EnvoyLoadBalancer {
   ) -> abi::envoy_dynamic_module_type_host_health;
 
   /// Looks up a host by its address string across all priorities and returns its health status.
-  /// This provides O(1) lookup by address using the cross-priority host map, instead of requiring
-  /// iteration through all hosts by index.
+  /// This uses the cross-priority host map internally instead of requiring iteration through all
+  /// hosts by index.
   ///
   /// The address must match the format "ip:port" (e.g., "10.0.0.1:8080").
   fn get_host_health_by_address(

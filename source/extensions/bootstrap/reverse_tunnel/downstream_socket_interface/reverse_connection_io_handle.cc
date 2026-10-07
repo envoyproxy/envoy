@@ -658,12 +658,16 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
                           ReverseConnectionState::CannotConnect);
     return;
   }
-  // Retrieve the resolved hosts for a cluster and update the corresponding maps.
+  // Retrieve the resolved hosts for a cluster and update the corresponding maps. The hosts are
+  // collected once since they are iterated again below.
   std::vector<std::string> resolved_hosts;
-  for (const auto& host_itr : *host_map_ptr) {
-    const std::string& resolved = host_itr.first;
-    resolved_hosts.emplace_back(resolved);
-  }
+  std::vector<std::pair<std::string, Upstream::HostSharedPtr>> resolved_host_entries;
+  resolved_hosts.reserve(host_map_ptr->size());
+  resolved_host_entries.reserve(host_map_ptr->size());
+  host_map_ptr->forEach([&](absl::string_view address, const Upstream::HostSharedPtr& host) {
+    resolved_hosts.emplace_back(address);
+    resolved_host_entries.emplace_back(address, host);
+  });
   maybeUpdateHostsMappingsAndConnections(cluster_name, std::move(resolved_hosts));
   // Track successful connections for this cluster.
   uint32_t total_successful_connections = 0;
@@ -671,7 +675,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
       host_map_ptr->size() * cluster_config.reverse_connection_count;
 
   // Create connections to each host in the cluster.
-  for (const auto& [host_address, host] : *host_map_ptr) {
+  for (const auto& [host_address, host] : resolved_host_entries) {
     ENVOY_LOG(debug, "reverse_tunnel: Checking reverse connection count for host {} of cluster {}",
               host_address, cluster_name);
 
