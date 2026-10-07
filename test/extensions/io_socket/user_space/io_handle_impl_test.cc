@@ -1259,6 +1259,28 @@ TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseEmitsConnectionReset) {
   EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
 }
 
+TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseBeforeReadEmitsEofThenConnectionReset) {
+  Buffer::OwnedImpl data("hello");
+  io_handle_peer_->write(data);
+  io_handle_peer_->shutdown(ENVOY_SHUT_WR);
+  io_handle_peer_->close();
+
+  // Data and EOF are read before the reset.
+  Buffer::OwnedImpl read_buf;
+  auto data_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(data_res.ok());
+  EXPECT_EQ("hello", read_buf.toString());
+
+  auto eof_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(eof_res.ok());
+  EXPECT_EQ(0, eof_res.return_value_);
+
+  auto reset_res = io_handle_->read(read_buf, 1024);
+  EXPECT_FALSE(reset_res.ok());
+  ASSERT_NE(nullptr, reset_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+}
+
 TEST_F(IoHandleImplTest, ShutdownWriteFollowedByPeerCloseEmitsEof) {
   // This handle half-closes its write side.
   io_handle_->shutdown(ENVOY_SHUT_WR);

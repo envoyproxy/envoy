@@ -83,6 +83,8 @@ void IoHandleImpl::onPeerDestroy() {
           "envoy.reloadable_features.enable_send_rst_on_user_space_socket") &&
       !sent_eof_) {
     receive_data_reset_after_drain_ = true;
+    // Unread EOF from a prior peer shutdown(WR) is reported before the reset.
+    eof_before_reset_ = receive_data_end_stream_ && !eof_read_;
   }
   peer_handle_ = nullptr;
   sent_eof_ = true;
@@ -96,12 +98,14 @@ Api::IoCallUint64Result IoHandleImpl::close() {
                 static_cast<void*>(peer_handle_));
       if (rst_requested_) {
         peer_handle_->setRst();
+        // Notify the peer that we no longer accept data. shutdown(RD).
+        peer_handle_->onPeerDestroy();
       } else {
+        // Notify the peer that we no longer accept data. shutdown(RD). Must precede setEof().
+        peer_handle_->onPeerDestroy();
         // Notify the peer that it will not receive more data. shutdown(WRITE).
         peer_handle_->setEof();
       }
-      // Notify the peer that we no longer accept data. shutdown(RD).
-      peer_handle_->onPeerDestroy();
       peer_handle_ = nullptr;
     } else {
       ENVOY_LOG(trace, "socket {} close after peer closed.", static_cast<void*>(this));
@@ -129,9 +133,11 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
   }
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
-      if (receive_data_reset_after_drain_) {
+      if (receive_data_reset_after_drain_ && !eof_before_reset_) {
         return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
       }
+      eof_before_reset_ = false;
+      eof_read_ = true;
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
@@ -169,9 +175,11 @@ Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
   }
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
-      if (receive_data_reset_after_drain_) {
+      if (receive_data_reset_after_drain_ && !eof_before_reset_) {
         return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
       }
+      eof_before_reset_ = false;
+      eof_read_ = true;
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
@@ -289,9 +297,11 @@ Api::IoCallUint64Result IoHandleImpl::recv(void* buffer, size_t length, int flag
   // No data and the writer closed.
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
-      if (receive_data_reset_after_drain_) {
+      if (receive_data_reset_after_drain_ && !eof_before_reset_) {
         return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
       }
+      eof_before_reset_ = false;
+      eof_read_ = true;
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
