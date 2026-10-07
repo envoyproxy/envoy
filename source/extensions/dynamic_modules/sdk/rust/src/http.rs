@@ -1404,6 +1404,10 @@ pub trait EnvoyHttpFilter {
   /// filter state is not accessible.
   fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
+  /// Check whether a filter state entry with the given key exists, regardless of its type. Unlike
+  /// the getter methods, this does not read or serialize the stored object.
+  fn has_filter_state(&self, key: &[u8]) -> bool;
+
   /// Store an opaque, module-owned object in the filter state under `key`. Envoy never interprets
   /// the object; it calls `destructor` exactly once when the entry is destroyed. Objects stored at
   /// `Request` or `Connection` lifespan survive `recreate_stream`; `FilterChain` objects do not.
@@ -1694,8 +1698,8 @@ pub trait EnvoyHttpFilter {
 
   /// Get a snapshot of the current stream timing information.
   ///
-  /// Unavailable values are -1. The request start time is a Unix timestamp in nanoseconds; all
-  /// other values are durations from the monotonic request start time.
+  /// Unavailable fields are `None` at the current event hook. See [`TimingInfo`] for units and
+  /// offset semantics.
   fn get_timing_info(&self) -> TimingInfo;
 
   /// Send an HTTP callout to the given cluster with the given headers and body.
@@ -3269,6 +3273,15 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
+    }
+  }
+
+  fn has_filter_state(&self, key: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_has_filter_state(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+      )
     }
   }
 

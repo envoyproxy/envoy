@@ -24,6 +24,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_override",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_select_template",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_unknown_decision",
+        "//test/extensions/dynamic_modules/test_data/c:route_specifier_unknown_status",
     ],
     extension_names = ["envoy.router.route_specifiers.dynamic_modules"],
     rbe_pool = "linux_x64_small",

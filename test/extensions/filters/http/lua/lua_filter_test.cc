@@ -5315,6 +5315,100 @@ TEST_F(LuaSharedVmTest, InvalidCodeIsNotRegistered) {
   EXPECT_EQ(0, vmCount());
 }
 
+// Test that handle:metadata() returns metadata under the namespace that is specified by the
+// script rather than the filter config name.
+TEST_F(LuaHttpFilterTest, GetMetadataFromHandleWithNamespace) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:metadata("custom.namespace"):get("foo.bar")["name"])
+      -- The default namespace is still the filter config name.
+      request_handle:logTrace(request_handle:metadata():get("foo.bar")["name"])
+      request_handle:logTrace(request_handle:metadata(nil):get("foo.bar")["prop"])
+      -- The wrappers of different namespaces could be used at the same time.
+      local custom = request_handle:metadata("custom.namespace")
+      local default = request_handle:metadata()
+      request_handle:logTrace(custom:get("foo.bar")["prop"])
+      request_handle:logTrace(default:get("baz.bat")["name"])
+      -- The canonical name is not used as the fallback when the namespace is specified.
+      for _, _ in pairs(request_handle:metadata("unknown.namespace")) do
+        return
+      end
+      request_handle:logTrace("No metadata found")
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+      custom.namespace:
+        foo.bar:
+          name: custom-foo
+          prop: custom-bar
+      envoy.filters.http.lua:
+        foo.bar:
+          name: foo-xxx
+          prop: bar-xxx
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupMetadata(METADATA);
+
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(Return("lua-filter-config-name"));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "custom-foo"},
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                                 {"trace", "custom-bar"},
+                                 {"trace", "baz"},
+                                 {"trace", "No metadata found"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
+// Test that handle:metadata() returns metadata under the specified namespace in the response path.
+TEST_F(LuaHttpFilterTest, GetMetadataFromHandleWithNamespaceInResponse) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      response_handle:logTrace(response_handle:metadata("custom.namespace"):get("foo.bar")["name"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      custom.namespace:
+        foo.bar:
+          name: custom-foo
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  TestUtility::loadFromYaml(METADATA, metadata_);
+  ON_CALL(*encoder_callbacks_.route_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "custom-foo", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters

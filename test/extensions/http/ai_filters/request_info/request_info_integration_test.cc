@@ -183,5 +183,35 @@ TEST_P(RequestInfoIntegrationTest, PublishesEstimatedInputTokens) {
   EXPECT_EQ(captured_.estimated_input_tokens().value(), (payload.size() + 1) / 2);
 }
 
+TEST_P(RequestInfoIntegrationTest, RouterReadsModelFromFilterState) {
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* header = hcm.mutable_route_config()
+                       ->mutable_virtual_hosts(0)
+                       ->mutable_routes(0)
+                       ->add_request_headers_to_add()
+                       ->mutable_header();
+    header->set_key("x-ai-model");
+    header->set_value("%FILTER_STATE(envoy.ai.model.request:PLAIN)%");
+  });
+  initializeWithExtProc();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/v1/chat/completions"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-type", "application/json"}},
+      R"({"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]})");
+
+  waitForNextUpstreamRequest();
+  const auto model = upstream_request_->headers().get(Http::LowerCaseString("x-ai-model"));
+  ASSERT_EQ(model.size(), 1);
+  EXPECT_EQ(model[0]->value().getStringView(), "gpt-4o");
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+}
+
 } // namespace
 } // namespace Envoy

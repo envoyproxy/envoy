@@ -635,6 +635,14 @@ case $CI_TARGET in
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
+
+        # Test execution_context build setting transition
+        echo "Building and testing execution_context_enabled tests..."
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            -c fastbuild \
+            -- //test/common/common:execution_context_enabled_test
+
         if [[ -z "$ENVOY_SKIP_CTO_WAMR" ]]; then
             echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
             bazel_with_collection \
@@ -685,6 +693,7 @@ case $CI_TARGET in
             --define enable_logging=disabled \
             -c fastbuild \
             @envoy//source/exe:envoy-static
+
         collect_build_profile build
         ;;
 
@@ -909,9 +918,17 @@ case $CI_TARGET in
             cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
             exit 0
         fi
+        DOCS_TARGET=//:html
+        if [[ -n "${DOCS_BUILD_RELEASE}" ]]; then
+            DOCS_TARGET=//:html_release
+            BAZEL_BUILD_OPTIONS+=(
+                "--@envoy-docs//:docs_tag=${BUILD_DOCS_TAG}"
+                "--@envoy-docs//:build_sha=${BUILD_DOCS_SHA}"
+            )
+        fi
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
               "${BAZEL_BUILD_OPTIONS[@]}" \
-              --@envoy//tools/tarball:target=//:html \
+              "--@envoy//tools/tarball:target=${DOCS_TARGET}" \
               @envoy//tools/tarball:unpack \
               "$DOCS_OUTPUT_DIR"
         popd

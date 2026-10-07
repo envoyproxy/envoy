@@ -88,28 +88,7 @@ public:
       // Add a dynamic filter chain reference.
       listener_config_.mutable_filter_chains()->Clear();
 
-      const std::string matcher_yaml = R"EOF(
-        matcher_tree:
-          input:
-            name: port
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
-          exact_match_map:
-            map:
-              "10000":
-                action:
-                  name: filter-chain-name
-                  typed_config:
-                    "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: dynamic_filter_chain_1
-        on_no_match:
-          action:
-            name: filter-chain-name
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-              value: dynamic_filter_chain_1
-      )EOF";
-      TestUtility::loadFromYaml(matcher_yaml, *listener_config_.mutable_filter_chain_matcher());
+      TestUtility::loadFromYaml(matcher_yaml_, *listener_config_.mutable_filter_chain_matcher());
 
       if (two_listeners_) {
         listener_config2_ = listener_config_;
@@ -276,6 +255,29 @@ public:
   envoy::config::listener::v3::Listener listener_config2_;
   bool two_listeners_{false};
   std::string listener_name_{"testing-listener-0"};
+  // The filter chain matcher applied to the listener. Defaults to a single dynamic filter chain and
+  // can be overridden before initialize() to reference several chains.
+  std::string matcher_yaml_{R"EOF(
+        matcher_tree:
+          input:
+            name: port
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+          exact_match_map:
+            map:
+              "10000":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: dynamic_filter_chain_1
+        on_no_match:
+          action:
+            name: filter-chain-name
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: dynamic_filter_chain_1
+      )EOF"};
   FakeHttpConnectionPtr lds_connection_;
   FakeHttpConnectionPtr fcds_connection_;
   FakeStreamPtr lds_stream_;
@@ -324,6 +326,95 @@ TEST_P(ListenerFcdsIntegrationTest, BasicFcdsInPlaceUpdate) {
 
   // Assert that the listener was NOT added or created again (meaning no reconstruction).
   // Total added must remain 1.
+  EXPECT_EQ(1, test_server_->counter("listener_manager.listener_added")->value());
+}
+
+// Tests that a single FCDS push warming several filter chains leaves every chain serving traffic,
+// exercising the coalesced thread local update path for a batch of warmed chains.
+TEST_P(ListenerFcdsIntegrationTest, FcdsBatchWarmsMultipleFilterChains) {
+  const std::vector<std::string> chain_names{"dynamic_filter_chain_1", "dynamic_filter_chain_2",
+                                             "dynamic_filter_chain_3", "dynamic_filter_chain_4"};
+  matcher_yaml_ = R"EOF(
+        matcher_tree:
+          input:
+            name: port
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+          exact_match_map:
+            map:
+              "10001":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: dynamic_filter_chain_2
+              "10002":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: dynamic_filter_chain_3
+              "10003":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: dynamic_filter_chain_4
+        on_no_match:
+          action:
+            name: filter-chain-name
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: dynamic_filter_chain_1
+      )EOF";
+
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // Warm every referenced chain in a single FCDS response.
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200),
+                      buildFilterChain("dynamic_filter_chain_2", 201),
+                      buildFilterChain("dynamic_filter_chain_3", 202),
+                      buildFilterChain("dynamic_filter_chain_4", 203)},
+                     "1");
+  };
+  initialize();
+
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Every chain in the batch warms.
+  for (const std::string& name : chain_names) {
+    test_server_->waitForCounter(fmt::format("filter_chain_manager.{}.update_success", name),
+                                 Eq(1));
+  }
+
+  // The on_no_match chain serves live traffic.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  codec_client->close();
+
+  // A second push updates every chain at once.
+  sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404),
+                    buildFilterChain("dynamic_filter_chain_2", 211),
+                    buildFilterChain("dynamic_filter_chain_3", 212),
+                    buildFilterChain("dynamic_filter_chain_4", 213)},
+                   "2");
+  for (const std::string& name : chain_names) {
+    test_server_->waitForCounter(fmt::format("filter_chain_manager.{}.update_success", name),
+                                 Eq(2));
+  }
+
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort(listener_name_));
+  IntegrationStreamDecoderPtr response2 = codec_client2->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("404", response2->headers().getStatusValue());
+  codec_client2->close();
+
+  // The listener is updated in place rather than rebuilt.
   EXPECT_EQ(1, test_server_->counter("listener_manager.listener_added")->value());
 }
 
@@ -852,28 +943,7 @@ public:
       // Add a dynamic filter chain reference.
       listener_config_.mutable_filter_chains()->Clear();
 
-      const std::string matcher_yaml = R"EOF(
-        matcher_tree:
-          input:
-            name: port
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
-          exact_match_map:
-            map:
-              "10000":
-                action:
-                  name: filter-chain-name
-                  typed_config:
-                    "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: dynamic_filter_chain_1
-        on_no_match:
-          action:
-            name: filter-chain-name
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-              value: dynamic_filter_chain_1
-      )EOF";
-      TestUtility::loadFromYaml(matcher_yaml, *listener_config_.mutable_filter_chain_matcher());
+      TestUtility::loadFromYaml(matcher_yaml_, *listener_config_.mutable_filter_chain_matcher());
 
       if (two_listeners_) {
         listener_config2_ = listener_config_;
