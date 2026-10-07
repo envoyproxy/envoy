@@ -1,6 +1,7 @@
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.validate.h"
 #include "envoy/config/xds_manager.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
@@ -1071,6 +1072,8 @@ FcdsSharedFilterChainManager::FcdsSharedFilterChainManager(
               server_context,
               server_context.messageValidationContext().dynamicValidationVisitor())),
       scope_(server_context_.scope().createScope("filter_chain_manager.")),
+      resource_type_helper_(server_context.messageValidationContext().dynamicValidationVisitor(),
+                            "name"),
       tls_update_cb_(server_context.mainThreadDispatcher().createSchedulableCallback(
           [this]() { updateTlsState(); })) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalState>(); });
@@ -1115,9 +1118,9 @@ FcdsSharedFilterChainManager::subscribe(const envoy::config::core::v3::ConfigSou
   // xdstp names.
   if (iter == subscriptions_.end()) {
     absl::Status creation_status;
-    auto api = std::make_unique<FcdsApiImpl>(
-        config_source, filter_chain_name, *this, server_context_.clusterManager(), *scope_,
-        server_context_.messageValidationContext().dynamicValidationVisitor(), creation_status);
+    auto api = std::make_unique<FcdsApiImpl>(config_source, filter_chain_name, *this,
+                                             server_context_.clusterManager(), *scope_,
+                                             resource_type_helper_, creation_status);
     RETURN_IF_NOT_OK(creation_status);
     auto state = std::make_unique<SubscriptionState>();
     state->api_ = std::move(api);
@@ -1224,8 +1227,9 @@ void FcdsSharedFilterChainManager::scheduleTlsUpdate() {
 
 void FcdsSharedFilterChainManager::updateTlsState() {
   auto filter_chains = std::make_shared<ThreadLocalState>();
+  filter_chains->filter_chains_.reserve(subscriptions_.size());
   for (const auto& name_and_state : subscriptions_) {
-    auto active_chain = name_and_state.second->api_->filterChain();
+    const auto& active_chain = name_and_state.second->api_->filterChain();
     if (active_chain != nullptr) {
       filter_chains->filter_chains_[name_and_state.first] = active_chain;
     }
