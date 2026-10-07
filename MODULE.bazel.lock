@@ -923,7 +923,7 @@
     },
     "//bazel:extensions.bzl%envoy_module_graph_extension": {
       "general": {
-        "bzlTransitiveDigest": "MlJhms/ChKc4G+c09CGZ3WVG8RbAwdjKcMXGYd5YCcU=",
+        "bzlTransitiveDigest": "7VgwCbSKrwpr/Tv1zJIyttwyN2QiQIvXAz41PL91ag4=",
         "usagesDigest": "QEMWbIKM//Mp+xCyiZ6VMSO5cBWwkmyOj5c0RVLU65c=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -965,7 +965,7 @@
     },
     "//bazel:extensions.bzl%envoy_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "MlJhms/ChKc4G+c09CGZ3WVG8RbAwdjKcMXGYd5YCcU=",
+        "bzlTransitiveDigest": "7VgwCbSKrwpr/Tv1zJIyttwyN2QiQIvXAz41PL91ag4=",
         "usagesDigest": "b/0RV7ukcWBwz6aM5tK8DEVFn5uk77wUWSuVYT/DDjo=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
