@@ -123,7 +123,6 @@ private:
   std::string system_version_info_;
   Network::DrainableFilterChainSharedPtr filter_chain_;
   bool started_ : 1 {false};
-  bool warming_ : 1 {false};
 };
 
 class FcdsFilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,

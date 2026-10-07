@@ -42,7 +42,6 @@ void FcdsApiImpl::start() {
 
 void FcdsApiImpl::setFilterChain(Network::DrainableFilterChainSharedPtr&& filter_chain) {
   filter_chain_ = std::move(filter_chain);
-  warming_ = false;
   init_target_.ready();
 }
 
@@ -76,29 +75,26 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
     return absl::InvalidArgumentError(
         "Invalid FCDS update: cannot add and remove in the same update");
   }
-  uint64_t new_hash = 0;
   if (updated_or_removed) {
-    new_hash = MessageUtil::hash(*updated_or_removed);
+    const uint64_t new_hash = MessageUtil::hash(*updated_or_removed);
     if (config_hash_ == new_hash) {
       ENVOY_LOG(debug, "fcds: skip update for name {}", filter_chain_name_);
       return absl::OkStatus();
     }
-  }
-  system_version_info_ = system_version_info;
-  if (updated_or_removed) {
     RETURN_IF_NOT_OK(callbacks_.onFilterChainUpdated(*updated_or_removed));
     // Delay readiness until the filter chain runtime instance is constructed.
     config_hash_ = new_hash;
-    warming_ = true;
   } else {
     if (filter_chain_) {
       Network::DrainableFilterChainSharedPtr draining = std::move(filter_chain_);
       callbacks_.onFilterChainRemoved(std::move(draining));
       config_hash_.reset();
-      warming_ = false;
     }
     init_target_.ready();
   }
+  // Record the version only after an update or removal is actually applied, matching the CDS
+  // behavior of advancing the version on applied changes rather than skipped or rejected ones.
+  system_version_info_ = system_version_info;
   return absl::OkStatus();
 }
 
