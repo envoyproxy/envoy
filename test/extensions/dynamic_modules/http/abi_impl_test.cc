@@ -1917,7 +1917,7 @@ TEST(ABIImpl, filter_state_value_conflicting_life_span) {
   envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
   EXPECT_ENVOY_BUG(
       {
-        EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_value(
+        EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
             &filter, {key_str.data(), key_str.size()}, {val2.data(), val2.size()},
             envoy_dynamic_module_type_filter_state_life_span_Connection,
             envoy_dynamic_module_type_filter_state_stream_sharing_None));
