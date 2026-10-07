@@ -3,6 +3,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/utility.h"
@@ -118,13 +119,15 @@ getOdCdsConfig(const ProtoConfig& proto_config) {
 
 } // namespace
 
-OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior)
-    : behavior_(std::move(behavior)) {}
+OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior,
+                                           OptRef<Stats::Scope> scope)
+    : behavior_(std::move(behavior)), scope_(scope.ptr()) {}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    absl::Status& creation_status) {
+    absl::Status& creation_status, OptRef<Stats::Scope> scope)
+    : scope_(scope.ptr()) {
   auto behavior_or =
       createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
@@ -139,6 +142,26 @@ OnDemandFilterConfig::OnDemandFilterConfig(
       createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
   behavior_ = std::move(behavior_or.value());
+}
+
+OptRef<OnDemandCdsStats> OnDemandFilterConfig::cdsStats(absl::string_view cluster_name) {
+  if (scope_ == nullptr) {
+    return {};
+  }
+  absl::MutexLock lock(&stats_mutex_);
+  auto it = cluster_stats_.find(cluster_name);
+  if (it != cluster_stats_.end()) {
+    return it->second->stats_;
+  }
+  Stats::ScopeSharedPtr cluster_scope = scope_->createScopeWithTaggedName(
+      "cluster.on_demand",
+      {Stats::TagStringView{Config::TagNames::get().CLUSTER_NAME, cluster_name}},
+      fmt::format("cluster.{}.on_demand", cluster_name));
+  OnDemandCdsStats stats = generateStats(*cluster_scope);
+  auto [new_it, _] = cluster_stats_.emplace(
+      cluster_name,
+      std::make_unique<ClusterStatsEntry>(ClusterStatsEntry{std::move(cluster_scope), stats}));
+  return new_it->second->stats_;
 }
 
 OnDemandRouteUpdate::OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config)
@@ -198,6 +221,11 @@ void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
     return;
   }
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
+  if (auto stats = config_->cdsStats(cluster_name); stats.has_value()) {
+    cds_stats_ = &stats.ref();
+    cds_stats_->cds_rq_total_.inc();
+    fetch_start_time_ = callbacks_->dispatcher().timeSource().monotonicTime();
+  }
   auto callback = std::make_unique<Upstream::ClusterDiscoveryCallback>(
       [this](Upstream::ClusterDiscoveryStatus cluster_status) {
         onClusterDiscoveryCompletion(cluster_status);
@@ -237,6 +265,8 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 void OnDemandRouteUpdate::onDestroy() {
   route_config_updated_callback_.reset();
   cluster_discovery_handle_.reset();
+  fetch_start_time_.reset();
+  cds_stats_ = nullptr;
 }
 
 // This is the callback which is called when an update requested in requestRouteConfigUpdate()
@@ -286,6 +316,14 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
 
 void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     Upstream::ClusterDiscoveryStatus cluster_status) {
+  if (cds_stats_ != nullptr && fetch_start_time_.has_value()) {
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        callbacks_->dispatcher().timeSource().monotonicTime() - *fetch_start_time_);
+    cds_stats_->cds_rq_time_.recordValue(elapsed.count());
+    fetch_start_time_.reset();
+    cds_stats_ = nullptr;
+  }
+
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_handle_.reset();
 

@@ -391,6 +391,14 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", {}, {});
 
+  auto c = test_server_->counter("cluster.new_cluster.on_demand.cds_rq_total");
+  ASSERT_NE(nullptr, c);
+  EXPECT_EQ(1, c->value());
+  EXPECT_EQ("cluster.on_demand.cds_rq_total", c->tagExtractedName());
+  ASSERT_EQ(1, c->tags().size());
+  EXPECT_EQ(Config::TagNames::get().CLUSTER_NAME, c->tags()[0].name_);
+  EXPECT_EQ("new_cluster", c->tags()[0].value_);
+
   cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
 }
