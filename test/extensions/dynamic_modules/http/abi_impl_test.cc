@@ -1974,6 +1974,38 @@ TEST(ABIImpl, filter_state_typed_non_serializable) {
       &filter, {key_str.data(), key_str.size()}, &result_buffer));
 }
 
+TEST(ABIImpl, has_filter_state) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  const std::string key_str = "key";
+
+  // No stream info.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_has_filter_state(
+      &filter, {key_str.data(), key_str.size()}));
+
+  // With stream info but non existing key.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_has_filter_state(
+      &filter, {key_str.data(), key_str.size()}));
+
+  // After setting a bytes entry, has returns true.
+  const std::string value_str = "value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_bytes(
+      &filter, {key_str.data(), key_str.size()}, {value_str.data(), value_str.size()}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_has_filter_state(
+      &filter, {key_str.data(), key_str.size()}));
+
+  // Non-existing key still returns false.
+  const std::string other_key = "other";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_has_filter_state(
+      &filter, {other_key.data(), other_key.size()}));
+}
+
 // Incremented by filterStateObjectDestructor; reset at the start of each test that uses it.
 int filter_state_object_destructor_calls = 0;
 void filterStateObjectDestructor(void* object) {

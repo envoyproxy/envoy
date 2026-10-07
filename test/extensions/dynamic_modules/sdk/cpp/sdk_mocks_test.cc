@@ -35,6 +35,14 @@ TEST(SdkMocksTest, RefreshRouteClusterIsMockable) {
   handle.refreshRouteCluster();
 }
 
+TEST(SdkMocksTest, HasFilterStateIsMockable) {
+  MockHttpFilterHandle handle;
+  EXPECT_CALL(handle, hasFilterState("existing_key")).WillOnce(testing::Return(true));
+  EXPECT_CALL(handle, hasFilterState("missing_key")).WillOnce(testing::Return(false));
+  EXPECT_TRUE(handle.hasFilterState("existing_key"));
+  EXPECT_FALSE(handle.hasFilterState("missing_key"));
+}
+
 // Verifies that `DYM_LOG` forwards the caller source location to the handle log method.
 TEST(SdkMocksTest, DymLogForwardsCallerSourceLocation) {
   testing::StrictMock<MockHttpFilterHandle> handle;
