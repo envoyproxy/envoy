@@ -677,7 +677,7 @@ TEST_F(FilterManagerTest, OnFiltersDoneRunsBeforeTheBodyIsWritten) {
         completed = true;
       },
       &headers, /*local_reply_fn=*/nullptr, /*always_serialize=*/true, LLMProtocol::Unspecified,
-      [&](uint8_t route_actions) {
+      [this, &filters_done, &headers, &completed](uint8_t route_actions) {
         filters_done = true;
         EXPECT_EQ(route_actions, 0);
         EXPECT_EQ(headers.getPathValue(), "/v1/messages");

@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -137,8 +138,7 @@ typed_config:
     initialize();
   }
 
-  // Returns the index of the upstream that served the request.
-  std::optional<uint64_t> sendChatCompletion() {
+  void expectServedBy(uint64_t upstream_index) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(
         Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -147,14 +147,10 @@ typed_config:
                                        {":authority", "host"},
                                        {"content-type", "application/json"}},
         R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
-    const std::optional<uint64_t> upstream = waitForNextUpstreamRequest({0, 1});
-    if (!upstream.has_value()) {
-      return std::nullopt;
-    }
+    EXPECT_EQ(waitForNextUpstreamRequest({0, 1}), upstream_index);
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    EXPECT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->headers().getStatusValue(), "200");
-    return upstream;
   }
 
   BackendNamingAiFilterFactory factory_;
@@ -167,13 +163,13 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AiFilterRouteClusterIntegrationTest,
 
 TEST_P(AiFilterRouteClusterIntegrationTest, RefreshPicksClusterFromAiFilterState) {
   initializeRoute(/*refresh=*/true);
-  EXPECT_EQ(sendChatCompletion(), 1);
+  expectServedBy(1);
 }
 
 // The cluster was picked when the headers arrived, before the AI filter wrote the filter state.
 TEST_P(AiFilterRouteClusterIntegrationTest, ClusterKeptWhenNotAsked) {
   initializeRoute(/*refresh=*/false);
-  EXPECT_EQ(sendChatCompletion(), 0);
+  expectServedBy(0);
 }
 
 } // namespace
