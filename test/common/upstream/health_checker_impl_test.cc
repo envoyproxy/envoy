@@ -286,6 +286,44 @@ public:
     addCompletionCallback();
   }
 
+  void setupNoServiceValidationHCWithAuto() {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name_matcher:
+        prefix: locations
+      path: /healthcheck
+      codec_client_type: Auto
+    )EOF";
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
+  void setupNoServiceValidationHCWithAutoOneUnhealthy() {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 2
+    http_health_check:
+      service_name_matcher:
+        prefix: locations
+      path: /healthcheck
+      codec_client_type: Auto
+    )EOF";
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
   void setupNoServiceValidationHCAlwaysLogFailure() {
     const std::string yaml = R"EOF(
     timeout: 1s
@@ -1644,10 +1682,11 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
   health_checker_->start();
 }
 
-// A connection that negotiates h2 is health checked over HTTP/2 even though HTTP/1.1 is
-// configured.
-TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedHttp2WithHttp1Configured) {
-  setupNoServiceValidationHC();
+// With `codec_client_type: AUTO`, a connection that negotiates h2 is health checked over HTTP/2.
+TEST_F(HttpHealthCheckerImplTest, AutoNegotiatesHttp2) {
+  setupNoServiceValidationHCWithAuto();
+  // HTTP/1.1 is the codec used when nothing is negotiated.
+  EXPECT_EQ(Http::CodecType::HTTP1, health_checker_->codecClientType());
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1675,10 +1714,10 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedHttp2WithHttp1Configured) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// The mirror image: a connection that negotiates http/1.1 is health checked over HTTP/1.1 even
-// though HTTP/2 is configured.
-TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedHttp1WithHttp2Configured) {
-  setupNoServiceValidationHCWithHttp2();
+// With `codec_client_type: AUTO`, a connection that negotiates http/1.1 is health checked over
+// HTTP/1.1.
+TEST_F(HttpHealthCheckerImplTest, AutoNegotiatesHttp1) {
+  setupNoServiceValidationHCWithAuto();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1706,9 +1745,9 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedHttp1WithHttp2Configured) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// A peer that does not do ALPN falls back to the configured codec.
-TEST_F(HttpHealthCheckerImplTest, AlpnNotNegotiatedFallsBackToConfiguredCodec) {
-  setupNoServiceValidationHCWithHttp2();
+// A peer that does not do ALPN falls back to HTTP/1.1, as the data plane's `auto_config` does.
+TEST_F(HttpHealthCheckerImplTest, AutoNotNegotiatedFallsBackToHttp1) {
+  setupNoServiceValidationHCWithAuto();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1723,7 +1762,7 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNotNegotiatedFallsBackToConfiguredCodec) {
   // The codec cannot be chosen until the handshake completes.
   EXPECT_EQ(nullptr, test_sessions_[0]->codec_client_);
   completeHandshake(0);
-  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
+  EXPECT_EQ(Http::CodecType::HTTP1, test_sessions_[0]->requested_codec_type_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
@@ -1736,9 +1775,9 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNotNegotiatedFallsBackToConfiguredCodec) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// A protocol this health checker cannot speak also falls back to the configured codec.
-TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedUnknownProtocolFallsBackToConfiguredCodec) {
-  setupNoServiceValidationHC();
+// A protocol this health checker cannot speak also falls back to HTTP/1.1.
+TEST_F(HttpHealthCheckerImplTest, AutoNegotiatedUnknownProtocolFallsBackToHttp1) {
+  setupNoServiceValidationHCWithAuto();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1766,10 +1805,11 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedUnknownProtocolFallsBackToConfig
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// A plaintext connection cannot negotiate anything, so the codec client is created up front and
-// the request is sent while the connection is still being established, as it always has been.
-TEST_F(HttpHealthCheckerImplTest, PlaintextConnectionUsesConfiguredCodecUpFront) {
-  setupNoServiceValidationHCWithHttp2();
+// A plaintext connection cannot negotiate anything, so `AUTO` creates an HTTP/1.1 codec client up
+// front and sends the request while the connection is still being established, as a pinned codec
+// always has.
+TEST_F(HttpHealthCheckerImplTest, AutoOverPlaintextUsesHttp1UpFront) {
+  setupNoServiceValidationHCWithAuto();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1784,7 +1824,7 @@ TEST_F(HttpHealthCheckerImplTest, PlaintextConnectionUsesConfiguredCodecUpFront)
 
   // No Connected event was needed.
   ASSERT_NE(nullptr, test_sessions_[0]->codec_client_);
-  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
+  EXPECT_EQ(Http::CodecType::HTTP1, test_sessions_[0]->requested_codec_type_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
@@ -1797,8 +1837,44 @@ TEST_F(HttpHealthCheckerImplTest, PlaintextConnectionUsesConfiguredCodecUpFront)
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// An HTTP/3 health check keeps creating the codec client up front: the QUIC stack picks the ALPN
-// protocol itself.
+// A pinned codec is used as configured no matter what the connection negotiates: a health check
+// configured for HTTP/1.1 does not switch to HTTP/2 because the peer offered h2.
+TEST_F(HttpHealthCheckerImplTest, PinnedHttp1IgnoresNegotiatedH2) {
+  setupNoServiceValidationHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, nextProtocol()).Times(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // No Connected event was needed.
+  ASSERT_NE(nullptr, test_sessions_[0]->codec_client_);
+  EXPECT_EQ(Http::CodecType::HTTP1, test_sessions_[0]->requested_codec_type_);
+}
+
+// The mirror image: a health check configured for HTTP/2 does not fall back to HTTP/1.1 because the
+// peer negotiated it, so it fails on a host that the cluster's HTTP/2 traffic cannot use either.
+TEST_F(HttpHealthCheckerImplTest, PinnedHttp2IgnoresNegotiatedHttp1) {
+  setupNoServiceValidationHCWithHttp2();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectTlsConnection(0, "http/1.1");
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, nextProtocol()).Times(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // No Connected event was needed.
+  ASSERT_NE(nullptr, test_sessions_[0]->codec_client_);
+  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
+}
+
+// An HTTP/3 health check creates the codec client up front: the QUIC stack picks the ALPN protocol
+// itself.
 TEST_F(HttpHealthCheckerImplTest, Http3ConfiguredCreatesCodecClientUpFront) {
   const std::string yaml = R"EOF(
     timeout: 1s
@@ -1826,31 +1902,10 @@ TEST_F(HttpHealthCheckerImplTest, Http3ConfiguredCreatesCodecClientUpFront) {
   EXPECT_EQ(Http::CodecType::HTTP3, test_sessions_[0]->requested_codec_type_);
 }
 
-// When the guard is disabled the negotiated protocol is ignored and the codec client is created up
-// front, as it was before.
-TEST_F(HttpHealthCheckerImplTest, AlpnNegotiationDisabledByRuntimeGuard) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.health_check_use_negotiated_protocol", "false"}});
-
-  setupNoServiceValidationHC();
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-  expectSessionCreate();
-  expectTlsConnection(0, "h2");
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, nextProtocol()).Times(0);
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  ASSERT_NE(nullptr, test_sessions_[0]->codec_client_);
-  EXPECT_EQ(Http::CodecType::HTTP1, test_sessions_[0]->requested_codec_type_);
-}
-
 // A connection that fails to establish is reported as a network failure straight away, rather than
 // waiting for the health check to time out.
 TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionRemoteClose) {
-  setupNoServiceValidationHCOneUnhealthy();
+  setupNoServiceValidationHCWithAutoOneUnhealthy();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
@@ -1879,7 +1934,7 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionRemoteClose) {
 // A handshake that never completes is reported as a timeout, and the connection being established
 // is aborted.
 TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionTimeout) {
-  setupNoServiceValidationHCOneUnhealthy();
+  setupNoServiceValidationHCWithAutoOneUnhealthy();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
@@ -1916,7 +1971,7 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionTimeout) {
 
 // A locally closed negotiating connection is reported as a network failure, same as a remote close.
 TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionLocalClose) {
-  setupNoServiceValidationHCOneUnhealthy();
+  setupNoServiceValidationHCWithAutoOneUnhealthy();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
@@ -1939,7 +1994,7 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionLocalClose) {
 
 // The negotiated codec is decided once per connection: a reused connection does not renegotiate.
 TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedCodecReusedAcrossIntervals) {
-  setupNoServiceValidationHC();
+  setupNoServiceValidationHCWithAuto();
   EXPECT_CALL(*this, onHostStatus(_, _)).Times(testing::AnyNumber());
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1974,7 +2029,7 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedCodecReusedAcrossIntervals) {
 
 // The health checker is destroyed while a handshake is still in flight.
 TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionDeletedWhileConnecting) {
-  setupNoServiceValidationHC();
+  setupNoServiceValidationHCWithAuto();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
@@ -1993,7 +2048,7 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionDeletedWhileConnectin
 // Removing the host from the health check completion callback while the negotiating connection is
 // being torn down must not use freed memory.
 TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionHostRemovedInFailureCallback) {
-  setupNoServiceValidationHCOneUnhealthy();
+  setupNoServiceValidationHCWithAutoOneUnhealthy();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();

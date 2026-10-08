@@ -1094,8 +1094,8 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttpWithBinaryPayloa
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
-// Health checking over TLS, where the codec is selected from the protocol negotiated by ALPN and
-// `codec_client_type` is used only when nothing is negotiated.
+// Health checking over TLS with `codec_client_type: AUTO`, where the codec is selected from the
+// protocol negotiated by ALPN, and with a pinned codec, where it is not.
 class HttpHealthCheckAlpnIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HealthCheckIntegrationTestBase {
@@ -1177,48 +1177,45 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, HttpHealthCheckAlpnIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// The handshake settles on h2, so the health check is sent over HTTP/2 even though HTTP/1.1 is
-// configured. Before the negotiated protocol was honored, Envoy sent HTTP/1.1 here and the HTTP/2
-// upstream never produced a stream.
-TEST_P(HttpHealthCheckAlpnIntegrationTest, NegotiatedHttp2WithHttp1Configured) {
+// The handshake settles on h2, so the health check is sent over HTTP/2. With a pinned HTTP/1.1
+// codec Envoy would send HTTP/1.1 here and the HTTP/2 upstream would never produce a stream.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, AutoNegotiatesHttp2) {
   initTlsHealthCheck(Http::CodecType::HTTP2, {"h2", "http/1.1"}, {},
-                     envoy::type::v3::CodecClientType::HTTP1);
+                     envoy::type::v3::CodecClientType::AUTO);
   expectHealthCheckProbeAndRespond();
 }
 
-// The mirror image: the handshake settles on http/1.1, so the health check is sent over HTTP/1.1
-// even though HTTP/2 is configured.
-TEST_P(HttpHealthCheckAlpnIntegrationTest, NegotiatedHttp1WithHttp2Configured) {
+// The mirror image: the handshake settles on http/1.1, so the health check is sent over HTTP/1.1.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, AutoNegotiatesHttp1) {
   initTlsHealthCheck(Http::CodecType::HTTP1, {"h2", "http/1.1"}, {},
-                     envoy::type::v3::CodecClientType::HTTP2);
+                     envoy::type::v3::CodecClientType::AUTO);
   expectHealthCheckProbeAndRespond();
 }
 
 // `tls_options.alpn_protocols` overrides the cluster's list, so the health check offers only
-// http/1.1 and negotiates it, and the probe follows. This is the configuration from the issue:
-// `codec_client_type: HTTP2` alongside `tls_options.alpn_protocols: ["http/1.1"]`, which used to
-// fail forever.
+// http/1.1 and negotiates it, and the probe follows. This is the setup from the issue, an HTTP/2
+// cluster whose health check endpoint only speaks HTTP/1.1, which `AUTO` handles without pinning
+// the health check to a codec.
 TEST_P(HttpHealthCheckAlpnIntegrationTest, TlsOptionsAlpnOverridesClusterAlpn) {
   initTlsHealthCheck(Http::CodecType::HTTP1, {"h2"}, {"http/1.1"},
-                     envoy::type::v3::CodecClientType::HTTP2);
+                     envoy::type::v3::CodecClientType::AUTO);
   expectHealthCheckProbeAndRespond();
 }
 
 // With no ALPN configured anywhere the health check advertises nothing, nothing is negotiated, and
-// `codec_client_type` is used: Envoy speaks HTTP/1.1 to the HTTP/2 upstream, which never decodes a
-// probe, and the check fails. Were any ALPN added to the connection, h2 would be negotiated and a
-// probe would arrive, so this pins that the change adds none.
-TEST_P(HttpHealthCheckAlpnIntegrationTest, NoAlpnConfiguredUsesCodecClientType) {
-  initTlsHealthCheck(Http::CodecType::HTTP2, {}, {}, envoy::type::v3::CodecClientType::HTTP1,
+// `AUTO` falls back to HTTP/1.1: Envoy speaks HTTP/1.1 to the HTTP/2 upstream, which never decodes
+// a probe, and the check fails. Were any ALPN added to the connection, h2 would be negotiated and a
+// probe would arrive, so this pins that `AUTO` adds none of its own.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, AutoWithoutAlpnFallsBackToHttp1) {
+  initTlsHealthCheck(Http::CodecType::HTTP2, {}, {}, envoy::type::v3::CodecClientType::AUTO,
                      /*timeout_seconds=*/1);
   expectHealthCheckFailureWithoutProbe();
 }
 
-// With the runtime guard disabled the negotiated protocol is ignored: Envoy speaks HTTP/1.1 to an
-// upstream that negotiated h2, which never decodes a probe, and the health check fails.
-TEST_P(HttpHealthCheckAlpnIntegrationTest, RuntimeGuardDisabledIgnoresNegotiatedProtocol) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.health_check_use_negotiated_protocol", "false");
+// A pinned codec ignores the negotiated protocol: Envoy speaks HTTP/1.1 to an upstream that
+// negotiated h2, which never decodes a probe, and the health check fails. This is the same outcome
+// the cluster's HTTP/1.1 data traffic would get on that host.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, PinnedHttp1IgnoresNegotiatedH2) {
   initTlsHealthCheck(Http::CodecType::HTTP2, {"h2", "http/1.1"}, {},
                      envoy::type::v3::CodecClientType::HTTP1, /*timeout_seconds=*/1);
   expectHealthCheckFailureWithoutProbe();

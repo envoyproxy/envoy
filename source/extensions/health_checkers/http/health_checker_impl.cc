@@ -44,21 +44,11 @@ getMethod(const envoy::config::core::v3::RequestMethod config_method) {
   return config_method;
 }
 
-bool useNegotiatedProtocol() {
-  return Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.health_check_use_negotiated_protocol");
-}
-
-// Maps the protocol negotiated by ALPN to a codec type, falling back to `default_codec_type` when
-// nothing was negotiated or the negotiated protocol is not one this health checker can speak.
-Http::CodecType codecTypeFromAlpn(absl::string_view alpn, Http::CodecType default_codec_type) {
-  if (alpn == Http::Utility::AlpnNames::get().Http11) {
-    return Http::CodecType::HTTP1;
-  }
-  if (alpn == Http::Utility::AlpnNames::get().Http2) {
-    return Http::CodecType::HTTP2;
-  }
-  return default_codec_type;
+// Maps the protocol negotiated by ALPN to a codec type. Anything other than `h2`, including
+// nothing negotiated at all, is HTTP/1.1, the same as the data plane's HttpConnPoolImplMixed.
+Http::CodecType codecTypeFromAlpn(absl::string_view alpn) {
+  return alpn == Http::Utility::AlpnNames::get().Http2 ? Http::CodecType::HTTP2
+                                                       : Http::CodecType::HTTP1;
 }
 
 } // namespace
@@ -90,6 +80,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
                            config.http_health_check().retriable_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
+      negotiate_codec_(config.http_health_check().codec_client_type() == envoy::type::v3::AUTO),
       random_generator_(context.api().randomGenerator()) {
   // TODO(boteng): introduce additional validation for the authority and path headers
   // based on the default UHV when it is available.
@@ -222,12 +213,6 @@ Http::Protocol HttpHealthCheckerImpl::configuredProtocol() const {
   return codecClientTypeToProtocol(codec_client_type_);
 }
 
-bool HttpHealthCheckerImpl::negotiateCodec() const {
-  // `codec_client_type: HTTP3` keeps its existing behavior and is never switched to another codec
-  // by what the handshake negotiates.
-  return codec_client_type_ != Http::CodecType::HTTP3 && useNegotiatedProtocol();
-}
-
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),
@@ -318,15 +303,15 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
 
     // Two ways to send the probe, depending on whether the codec is known yet.
     //
-    // Not negotiating (plaintext, non-TLS, or a pinned codec): the codec is fixed, so build the
-    // codec client now and send immediately below; the codec client handles establishing the
-    // connection.
+    // A pinned codec, or `AUTO` over plaintext where there is nothing to negotiate: the codec is
+    // fixed, so build the codec client now and send immediately below; the codec client handles
+    // establishing the connection.
     //
-    // Negotiating over TLS: the codec comes from the ALPN protocol, unknown until the handshake
+    // `AUTO` over TLS: the codec comes from the ALPN protocol, unknown until the handshake
     // completes. So only connect here and return; onNegotiatingConnectionEvent() then chooses the
     // codec and sends the request once Connected arrives.
     const bool select_codec_from_alpn =
-        parent_.negotiateCodec() && conn.connection_->ssl() != nullptr;
+        parent_.negotiate_codec_ && conn.connection_->ssl() != nullptr;
     if (select_codec_from_alpn) {
       expect_reset_ = false;
       reuse_connection_ = parent_.reuse_connection_;
@@ -381,10 +366,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onNegotiatingConnectio
     return;
   }
 
-  // The negotiated protocol - if any - is now known. Anything other than a protocol this health
-  // checker can speak falls back to the configured codec.
   const std::string alpn = negotiating_connection_->nextProtocol();
-  const Http::CodecType codec_type = codecTypeFromAlpn(alpn, parent_.codec_client_type_);
+  const Http::CodecType codec_type = codecTypeFromAlpn(alpn);
   ENVOY_CONN_LOG(debug, "health check negotiated alpn='{}', using {}", *negotiating_connection_,
                  alpn, Http::Utility::getProtocolString(codecClientTypeToProtocol(codec_type)));
 
@@ -614,6 +597,9 @@ HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& t
   case envoy::type::v3::HTTP2:
     return Http::CodecType::HTTP2;
   case envoy::type::v3::HTTP1:
+    return Http::CodecType::HTTP1;
+  case envoy::type::v3::AUTO:
+    // The codec used when the connection does not negotiate one, see `negotiate_codec_`.
     return Http::CodecType::HTTP1;
   }
   PANIC_DUE_TO_CORRUPT_ENUM
