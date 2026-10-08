@@ -486,6 +486,16 @@ public:
   virtual std::optional<bool> getMetadataBool(std::string_view ns, std::string_view key) = 0;
 
   /**
+   * Retrieves the type URL and serialized message payload of typed dynamic metadata.
+   * The returned views are valid until the end of the current event hook unless a setter modifies
+   * the metadata.
+   * @param ns The typed metadata namespace.
+   * @return The type URL and payload if found, otherwise nullopt. Empty fields are valid results.
+   */
+  virtual std::optional<std::pair<std::string_view, std::string_view>>
+  getTypedMetadata(std::string_view ns) = 0;
+
+  /**
    * Retrieves all keys in a metadata namespace.
    * @param ns The metadata namespace.
    * @return Vector of key strings.

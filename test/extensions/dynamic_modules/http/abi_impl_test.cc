@@ -998,9 +998,16 @@ TEST(ABIImpl, SetDynamicMetadataStruct) {
               UnorderedElementsAre(IsStructString("extra", "bar"), IsStructStruct("outer", _)));
 }
 
-TEST(ABIImpl, SetDynamicTypedMetadata) {
+TEST(ABIImpl, DynamicTypedMetadata) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  envoy_dynamic_module_type_envoy_buffer type_url{nullptr, 0};
+  envoy_dynamic_module_type_envoy_buffer value{nullptr, 0};
+  const std::string ns = "foo";
+  // Without callbacks, the metadata source is unavailable.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_typed_metadata(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, &type_url,
+      &value));
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
@@ -1010,7 +1017,10 @@ TEST(ABIImpl, SetDynamicTypedMetadata) {
       .WillRepeatedly(testing::ReturnRef(metadata));
   filter.setDecoderFilterCallbacks(callbacks);
 
-  const std::string ns = "foo";
+  // The metadata source is available, but the requested namespace does not exist.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_typed_metadata(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, &type_url,
+      &value));
 
   // A packed Any round-trips into typed_filter_metadata with its type_url preserved.
   Protobuf::StringValue payload;
@@ -1026,6 +1036,35 @@ TEST(ABIImpl, SetDynamicTypedMetadata) {
   Protobuf::StringValue unpacked;
   ASSERT_TRUE(metadata.typed_filter_metadata().at(ns).UnpackTo(&unpacked));
   EXPECT_EQ(unpacked.value(), "hello");
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_http_get_typed_metadata(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, &type_url,
+      &value));
+  EXPECT_EQ(absl::string_view(type_url.ptr, type_url.length), any.type_url());
+  EXPECT_EQ(absl::string_view(value.ptr, value.length), any.value());
+  const auto& stored = metadata.typed_filter_metadata().at(ns);
+  EXPECT_EQ(type_url.ptr, stored.type_url().data());
+  EXPECT_EQ(value.ptr, stored.value().data());
+
+  // Decode the concrete message directly from the borrowed payload, after checking its type.
+  ASSERT_EQ(absl::string_view(type_url.ptr, type_url.length),
+            "type.googleapis.com/google.protobuf.StringValue");
+  Protobuf::StringValue decoded;
+  ASSERT_TRUE(decoded.ParseFromArray(value.ptr, static_cast<int>(value.length)));
+  EXPECT_EQ(decoded.value(), "hello");
+
+  const std::string absent = "absent";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_typed_metadata(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {absent.data(), absent.size()},
+      &type_url, &value));
+
+  const std::string empty = "empty";
+  (*metadata.mutable_typed_filter_metadata())[empty] = Protobuf::Any();
+  ASSERT_TRUE(envoy_dynamic_module_callback_http_get_typed_metadata(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {empty.data(), empty.size()},
+      &type_url, &value));
+  EXPECT_EQ(type_url.length, 0);
+  EXPECT_EQ(value.length, 0);
 
   // A buffer that does not parse as a google.protobuf.Any is a no-op (wire type 7 is invalid).
   const std::string garbage("\x0f", 1);

@@ -911,6 +911,23 @@ func (h *dymHttpFilterHandle) SetTypedMetadata(metadataNamespace string, seriali
 	runtime.KeepAlive(serializedAny)
 }
 
+func (h *dymHttpFilterHandle) GetTypedMetadata(source shared.MetadataSourceType, metadataNamespace string) (shared.UnsafeEnvoyBuffer, shared.UnsafeEnvoyBuffer, bool) {
+	var typeURLView C.envoy_dynamic_module_type_envoy_buffer
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	found := C.envoy_dynamic_module_callback_http_get_typed_metadata(
+		h.hostPluginPtr,
+		(C.envoy_dynamic_module_type_metadata_source)(source),
+		stringToModuleBuffer(metadataNamespace),
+		&typeURLView,
+		&valueView,
+	)
+	runtime.KeepAlive(metadataNamespace)
+	if !bool(found) {
+		return shared.UnsafeEnvoyBuffer{}, shared.UnsafeEnvoyBuffer{}, false
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(typeURLView), envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
 func (h *dymHttpFilterHandle) GetAttributeNumber(
 	attributeID shared.AttributeID,
 ) (float64, bool) {

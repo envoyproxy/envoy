@@ -3096,6 +3096,11 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_http_set_dynamic_typed_metadata,
                envoy_dynamic_module_type_http_filter_envoy_ptr,
                envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_typed_metadata, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_envoy_buffer*, envoy_dynamic_module_type_envoy_buffer*)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_string, false,
           envoy_dynamic_module_type_http_filter_envoy_ptr,
           envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
