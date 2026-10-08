@@ -88,48 +88,8 @@ jobs:
           version: "${{ inputs.version }}"
         input-format: yaml
         filter: |
-          .version as $version
-          | .dependency as $dependency
-          | .task as $task
-          | (try ($version | validate::sha(40) | .[:7])
-             catch $version) as $version_short
-          | (if $version != "" then "=\($version)" else "" end) as $version_suffix
-          | (if $version_short != "" then $version_short else "latest" end) as $target
-          | if $task == "bazel" then
-              {
-                dependency_name: $dependency,
-                command: "./ci/run_envoy_docker.sh './ci/do_ci.sh deps.update \($dependency)\($version_suffix)'"
-              }
-            elif $task == "registry" then
-              {
-                dependency_name: "bazel-registry",
-                command: "./ci/run_envoy_docker.sh './ci/do_ci.sh registry'"
-              }
-            else
-              {
-                dependency_name: "lockfiles",
-                command: "./ci/run_envoy_docker.sh './ci/do_ci.sh lockfiles'"
-              }
-            end
-          | ("
-          echo \"Updating(\($task)): \(.dependency_name) -> \($target)\"
-          \(.command)
-          if [[ -n \"\($version_short)\" ]]; then
-              OUTPUT=\($version_short)
-          elif [[ \"\($task)\" == \"registry\" ]]; then
-              OUTPUT=$(sed -n -E 's#^common --registry=https://raw\\.githubusercontent\\.com/envoyproxy/bazel-registry/([0-9a-f]+)$#\\1#p' .bazelrc | cut -c1-7)
-          elif [[ \"\($task)\" == \"lockfiles\" ]]; then
-              if [[ -z \"$(git status --porcelain -- ':(glob)**/MODULE.bazel.lock')\" ]]; then
-                  echo 'Lockfiles are in sync, nothing to do'
-                  echo 'changes=false' > \"$GITHUB_OUTPUT\"
-                  OUTPUT=in-sync
-              else
-                  OUTPUT=$(git diff -- ':(glob)**/MODULE.bazel.lock' | sha256sum | cut -c1-7)
-              fi
-          else
-              OUTPUT=$(git diff -U0 -- MODULE.bazel | sed -n -E 's/^\\+bazel_dep\\(name = \"\($dependency)\", version = \"([^\"]+)\".*/\\1/p' | head -n1)
-          fi
-          " | bash::output)
+          "OUTPUT=$(./ci/dependency/update.sh \(.task | @sh) \(.dependency // "" | @sh) \(.version // "" | @sh))"
+          | bash::output
       env:
         ENVOY_DOCKER_CI: 1
         ENVOY_REGISTRY_HASH: ${{ inputs.task == 'registry' && inputs.version || '' }}
@@ -157,7 +117,9 @@ jobs:
           ${{ inputs.pr-message }}
           ${{ inputs.wip && (
               inputs.task == 'registry'
-              && '> ⚠️ **WIP**: registry pin was bumped with `ENVOY_REGISTRY_ALLOW_UNSAFE` and may not be an ancestor of bazel-registry `main`. Do not merge as-is.'
+              && format(
+                  '> ⚠️ **WIP**: registry pin was bumped with `ENVOY_REGISTRY_ALLOW_UNSAFE` {0}',
+                  'and may not be an ancestor of bazel-registry `main`. Do not merge as-is.')
               || '> ⚠️ **WIP**: this PR was opened in draft mode for testing. Do not merge as-is.')
               || '' }}
         branch: >-
