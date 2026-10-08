@@ -22,6 +22,8 @@ load(":envoy_select.bzl", "deprecate_repository")
 
 _APPLE = Label("//bazel:apple")
 _ASAN_BUILD = Label("//bazel:asan_build")
+_TSAN_BUILD = Label("//bazel:tsan_build")
+_MSAN_BUILD = Label("//bazel:msan_build")
 _BENCHMARK_MAIN_LIB = Label("//test/benchmark:main_lib")
 _BENCHMARK_MAIN_SRC = Label("//test/benchmark:main.cc")
 _ENABLE_EXPORTED_SYMBOLS = Label("//bazel:enable_exported_symbols")
@@ -192,6 +194,8 @@ def envoy_cc_fuzz_test(
 def envoy_test_env(env = {}):
     return env | select({
         _ASAN_BUILD: {"ASAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
+        _TSAN_BUILD: {"TSAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
+        _MSAN_BUILD: {"MSAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
         "//conditions:default": {},
     })
 
@@ -230,6 +234,8 @@ def envoy_cc_test(
         srcs = srcs,
         data = data + select({
             _ASAN_BUILD: ["@llvm_toolchain_llvm//:symbolizer"],
+            _TSAN_BUILD: ["@llvm_toolchain_llvm//:symbolizer"],
+            _MSAN_BUILD: ["@llvm_toolchain_llvm//:symbolizer"],
             "//conditions:default": [],
         }),
         copts = envoy_copts(test = True) + copts + envoy_pch_copts(_TEST_PCH),
