@@ -1507,7 +1507,8 @@ TEST(TranscodingEngineTest, ResponseUriPatternRendersTheUpstreamPath) {
 }
 
 // The resolved model replaces the one the request named, wherever the dialect carries it: the
-// body, the path, or both, and it is what the leg reports as the request's model.
+// body, the path, or both. The leg still reports the model the client asked for, which is what
+// the response echoes.
 TEST(TranscodingEngineTest, ResolvedModelReplacesTheRequestedOne) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
@@ -1526,7 +1527,7 @@ TEST(TranscodingEngineTest, ResolvedModelReplacesTheRequestedOne) {
   ctx.response_uri_pattern = &*vertex_claude;
   ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, anthropic), IsOk());
   EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5@20250929");
-  EXPECT_EQ(ctx.ir_model, "claude-sonnet-4-5@20250929");
+  EXPECT_EQ(ctx.ir_model, "claude-sonnet");
   EXPECT_THAT(ctx.rewritten_path,
               testing::Optional(std::string("/v1/projects/p/locations/l/publishers/anthropic/"
                                             "models/claude-sonnet-4-5@20250929:rawPredict")));
@@ -2064,7 +2065,7 @@ TEST(TranscodingEngineTest, TranscodesGeminiStreamToIr) {
                       ctx),
             nlohmann::json::parse(R"([
     {"data": {"id": "resp-1", "object": "chat.completion.chunk", "created": 1700000000,
-              "model": "gemini-2.5-flash",
+              "model": "gemini-2.5-pro",
               "choices": [{"index": 0, "delta": {"role": "assistant", "content": "Hel"},
                            "finish_reason": null}]}},
     {"data": {"id": "resp-1", "object": "chat.completion.chunk", "created": 1700000000,
@@ -2218,7 +2219,7 @@ TEST(TranscodingEngineTest, StreamLegsKeepTextHeldByReference) {
 // ---------------------------------------------------------------------------
 // Rule ops for response and stream legs.
 
-TEST(TranscodeRuleTest, SetConstReplacesWhileSetFromContextOnlyFillsGaps) {
+TEST(TranscodeRuleTest, SetFromContextReplacesTheModelButOnlyFillsInTheTime) {
   nlohmann::json doc =
       nlohmann::json::parse(R"({"object": "chat.completion.chunk", "model": null})");
   ASSERT_THAT(TranscodeRule::setConst("object", "chat.completion").apply(doc), IsOk());
@@ -2250,10 +2251,13 @@ TEST(TranscodeRuleTest, SetConstReplacesWhileSetFromContextOnlyFillsGaps) {
   EXPECT_EQ(doc["model"], "gemini-2.5-flash");
   EXPECT_EQ(doc["created"], 1700000000);
 
-  // A value the payload carries wins.
+  // The client's model replaces one the payload carries; a timestamp the payload carries wins.
   ctx.request_model = "another-model";
+  ctx.now_unix_seconds = 1800000000;
   ASSERT_THAT(model.apply(doc, &ctx), IsOk());
-  EXPECT_EQ(doc["model"], "gemini-2.5-flash");
+  ASSERT_THAT(created.apply(doc, &ctx), IsOk());
+  EXPECT_EQ(doc["model"], "another-model");
+  EXPECT_EQ(doc["created"], 1700000000);
 }
 
 TEST(TranscodeRuleTest, EnumerateNumbersElementsThatCarryNoIndex) {

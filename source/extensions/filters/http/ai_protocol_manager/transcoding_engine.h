@@ -154,8 +154,9 @@ public:
     MergeConsecutiveByKey,
     // Writes `default_value` to `target_path`, replacing whatever is there.
     SetConst,
-    // Writes the caller-supplied `context_field` to `target_path` if `target_path` is absent or
-    // null and the caller supplied a value.
+    // Writes the caller-supplied `context_field` to `target_path`, when the caller supplied a
+    // value. `RequestModel` replaces what is there; `NowUnixSeconds` only fills in an absent or
+    // null `target_path`.
     SetFromContext,
     // Sets `element_key` on each object element of array `target_path` to the element's position,
     // unless the element already carries it. A `prefix` writes the position as a string after it,
@@ -207,7 +208,8 @@ public:
 
   // A value the caller supplies through `TranscodeContext` because the payload does not carry it.
   enum class ContextField {
-    // The model the request named (`TranscodeContext::request_model`).
+    // The model the client asked for (`TranscodeContext::request_model`). A response reports it
+    // in place of any model the backend named: the gateway keeps its choice of backend to itself.
     RequestModel,
     // The current time in seconds since the Unix epoch (`TranscodeContext::now_unix_seconds`).
     NowUnixSeconds,
@@ -321,8 +323,9 @@ public:
   // destination dialect (e.g. OpenAI's `object: "chat.completion"`).
   static TranscodeRule setConst(std::string path, nlohmann::json value);
 
-  // Sets `path` from the caller-supplied `field` if `path` is missing or null. A field the caller
-  // left empty (or zero) writes nothing, so a later `setDefault` can still apply.
+  // Sets `path` from the caller-supplied `field`: `RequestModel` replaces what is there,
+  // `NowUnixSeconds` only fills in a missing or null `path`. A field the caller left empty (or
+  // zero) writes nothing, so a later `setDefault` can still apply.
   static TranscodeRule setFromContext(std::string path, ContextField field);
 
   // Sets `key` on each object element of the array at `array_path` to the element's position,
@@ -549,9 +552,10 @@ struct TranscodeContext {
   const UriPattern* response_uri_pattern{nullptr};
   // The model to send upstream in place of the one the request names. A request `FromIr` leg
   // writes it into the IR `model` before converting, so it reaches the body and the rewritten
-  // path alike.
+  // path alike. The response still echoes the model the client asked for (`ir_model`); which
+  // backend the gateway chose stays with the gateway.
   absl::string_view resolved_model{};
-  // The model the request named, for a response that does not name its own (see
+  // The model the client asked for, which a response reports as its `model` (see
   // `TranscodeRule::ContextField::RequestModel`).
   absl::string_view request_model{};
   // The current time, for a response the IR requires a `created` timestamp on but the dialect
@@ -562,8 +566,9 @@ struct TranscodeContext {
   TranscodeStreamState* stream_state{nullptr};
 
   // Outputs.
-  // Set by request legs to the request's IR `model` (read after a `ToIr` leg and before a
-  // `FromIr` one), so the caller can hand it back as the fallback model on the response legs.
+  // Set by request legs to the model the client asked for: the request's IR `model`, read after a
+  // `ToIr` leg and before a `FromIr` one replaces it with `resolved_model`. The caller hands it
+  // back as `request_model` on the response legs.
   std::string ir_model{};
   // Set by a successful request `FromIr` leg that has a path to render, from `response_uri_pattern`
   // or the dialect's own layout (see `DialectTranscodePack::envelope`): the `:path` the request

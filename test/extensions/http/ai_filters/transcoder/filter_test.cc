@@ -518,7 +518,8 @@ TEST_F(TranscoderFilterTest, UnsetRequestHandlingPassesRequestThroughUntouched) 
 // An OpenAI client, a route that declares Gemini, and a model router that chose Claude on Vertex
 // AI instead: it leaves the backend's dialect, the path Vertex expects, and the resolved model in
 // filter state, and the request goes out as Anthropic Messages to that path, naming that model.
-// The response then comes back through the same instance as Anthropic, not Gemini.
+// The response then comes back through the same instance as Anthropic, not Gemini, and names the
+// model the client asked for, not the one the router chose.
 TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChose) {
   target_protocol_ = LLMProtocol::GeminiGenerateContent;
   request_headers_ =
@@ -547,6 +548,7 @@ TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChos
   EXPECT_EQ(out["messages"][0]["content"], "Hi");
   EXPECT_EQ(counterValue("transcoded"), 1);
 
+  // The backend names the model that ran; the client gets back the one it asked for.
   const std::string wire = runResponse(
       manager,
       R"({"id":"msg_1","type":"message","role":"assistant","model":"claude-sonnet-4-5@20250929",)"
@@ -555,7 +557,7 @@ TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChos
       /*sse=*/false);
   const nlohmann::json response = nlohmann::json::parse(wire);
   EXPECT_EQ(response["object"], "chat.completion");
-  EXPECT_EQ(response["model"], "claude-sonnet-4-5@20250929");
+  EXPECT_EQ(response["model"], "claude-sonnet");
   EXPECT_EQ(response["choices"][0]["message"]["content"], "Hello back!");
   EXPECT_EQ(counterValue("transcoded"), 2);
   EXPECT_EQ(counterValue("failed"), 0);

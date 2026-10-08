@@ -2368,18 +2368,21 @@ absl::Status TranscodeRule::apply(nlohmann::json& json, TranscodeContext* ctx) c
   }
 
   case Op::SetFromContext: {
-    const nlohmann::json* existing = findNodeByPath(json, target_segments_);
-    if (ctx == nullptr || (existing != nullptr && !existing->is_null())) {
+    if (ctx == nullptr) {
       return absl::OkStatus();
     }
+    const nlohmann::json* existing = findNodeByPath(json, target_segments_);
+    const bool unset = existing == nullptr || existing->is_null();
     switch (context_field_) {
     case ContextField::RequestModel:
+      // Replaces a model the backend named too: the client gets back the one it asked for, and
+      // which backend the gateway chose stays with the gateway.
       if (!ctx->request_model.empty()) {
         setNodeByPath(json, target_segments_, std::string(ctx->request_model));
       }
       break;
     case ContextField::NowUnixSeconds:
-      if (ctx->now_unix_seconds > 0) {
+      if (unset && ctx->now_unix_seconds > 0) {
         setNodeByPath(json, target_segments_, ctx->now_unix_seconds);
       }
       break;
@@ -2790,12 +2793,13 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
     return absl::OkStatus();
   }
 
-  // The resolved model replaces the one the request named before the rules run, so it reaches the
-  // body or the path, whichever the dialect carries it in.
+  // What the client asked for is reported back first: the response echoes it, and the gateway
+  // keeps the backend it chose to itself. The resolved model then replaces it before the rules
+  // run, so it reaches the body or the path, whichever the dialect carries it in.
+  ctx.ir_model = irModel(json);
   if (!ctx.resolved_model.empty() && json.is_object()) {
     json["model"] = std::string(ctx.resolved_model);
   }
-  ctx.ir_model = irModel(json);
   if (!is_ir) {
     absl::Status status = pack.request.from_ir.execute(json, &ctx);
     if (!status.ok()) {
