@@ -80,11 +80,27 @@ public:
     stream_info_.filter_state_->setData(kConnectionExecutionContextFilterStateName, context_,
                                         StreamInfo::FilterState::LifeSpan::Connection);
   }
+  void setWithIndexedContext() {
+    context_ = std::make_shared<TestExecutionContext>();
+    stream_info_.filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
+        StreamInfo::FilterState::LifeSpan::Connection);
+    stream_info_.filter_state_->setIndexedData(
+        StreamInfo::FilterStateIndex::ConnectionExecutionContext, context_,
+        StreamInfo::FilterState::LifeSpan::Connection);
+  }
 
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   testing::NiceMock<MockScopeTrackedObject> tracked_object_;
   std::shared_ptr<TestExecutionContext> context_;
 };
+
+TEST_F(ExecutionContextTest, IndexedFilterState) {
+  setWithIndexedContext();
+  EXPECT_TRUE(stream_info_.filter_state_->hasIndexedData(
+      StreamInfo::FilterStateIndex::ConnectionExecutionContext));
+  EXPECT_EQ(ExecutionContext::fromStreamInfo(OptRef<const StreamInfo::StreamInfo>(stream_info_)),
+            context_.get());
+}
 
 TEST_F(ExecutionContextTest, NullContext) {
   {
@@ -156,9 +172,7 @@ TEST_F(ExecutionContextTest, InScopeTrackerScopeState) {
   EXPECT_EQ(context_->activationGenerations(), 1);
 
   setWithoutContext();
-  {
-    ScopeTrackerScopeState scope(&tracked_object_, *dispatcher);
-  }
+  { ScopeTrackerScopeState scope(&tracked_object_, *dispatcher); }
 }
 
 TEST_F(ExecutionContextTest, NoopScope) {
