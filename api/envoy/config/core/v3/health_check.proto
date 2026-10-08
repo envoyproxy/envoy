@@ -154,7 +154,9 @@ message HealthCheck {
 
     // Use specified application protocol for health checks. ``AUTO`` selects the protocol
     // negotiated by ALPN on the health check connection, see :ref:`tls_options
-    // <envoy_v3_api_field_config.core.v3.HealthCheck.tls_options>` for what it advertises.
+    // <envoy_v3_api_field_config.core.v3.HealthCheck.tls_options>` for what it advertises. It
+    // requires a transport socket that supports ALPN and is rejected on a cluster whose transport
+    // sockets do not.
     type.v3.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
 
     // An optional service name parameter which is used to validate the identity of

@@ -85,6 +85,16 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
   // TODO(boteng): introduce additional validation for the authority and path headers
   // based on the default UHV when it is available.
 
+  // `AUTO` needs a transport socket that negotiates ALPN, so reject it on a cluster whose transport
+  // sockets cannot, the same as the cluster's `auto_config` is rejected. Otherwise every probe
+  // would silently fall back to HTTP/1.1.
+  if (negotiate_codec_ && !cluster.info()->transportSocketMatcher().allMatchesSupportAlpn()) {
+    throw EnvoyException(fmt::format(
+        "codec_client_type AUTO configured for the health check of cluster {} which has a "
+        "non-ALPN transport socket",
+        cluster.info()->name()));
+  }
+
   // Process send payload.
   if (config.http_health_check().has_send()) {
     // Validate that the method supports a request body when payload is specified.
@@ -301,18 +311,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       return;
     }
 
-    // Two ways to send the probe, depending on whether the codec is known yet.
-    //
-    // A pinned codec, or `AUTO` over plaintext where there is nothing to negotiate: the codec is
-    // fixed, so build the codec client now and send immediately below; the codec client handles
-    // establishing the connection.
-    //
-    // `AUTO` over TLS: the codec comes from the ALPN protocol, unknown until the handshake
-    // completes. So only connect here and return; onNegotiatingConnectionEvent() then chooses the
-    // codec and sends the request once Connected arrives.
-    const bool select_codec_from_alpn =
-        parent_.negotiate_codec_ && conn.connection_->ssl() != nullptr;
-    if (select_codec_from_alpn) {
+    // With `AUTO` the codec comes from the ALPN protocol, unknown until the handshake completes,
+    // so only connect here; onNegotiatingConnectionEvent() chooses the codec and sends the request
+    // once Connected arrives. A pinned codec builds the codec client now and sends immediately.
+    if (parent_.negotiate_codec_) {
       expect_reset_ = false;
       reuse_connection_ = parent_.reuse_connection_;
       negotiating_connection_ = std::move(conn.connection_);
@@ -322,8 +324,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       // was created up front.
       negotiating_connection_->detectEarlyCloseWhenReadDisabled(false);
       negotiating_connection_->noDelay(true);
-      // The codec is chosen from the negotiated protocol and the request is sent once the
-      // connection is established. See onNegotiatingConnectionEvent().
       negotiating_connection_->connect();
       return;
     }
@@ -355,9 +355,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onNegotiatingConnectio
                    HostUtility::healthFlagsToString(*host_));
     negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
     parent_.dispatcher_.deferredDelete(std::move(negotiating_connection_));
-    if (!expect_reset_) {
-      handleFailure(envoy::data::core::v3::NETWORK);
-    }
+    handleFailure(envoy::data::core::v3::NETWORK);
     return;
   }
 

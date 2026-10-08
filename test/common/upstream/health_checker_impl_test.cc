@@ -286,7 +286,17 @@ public:
     addCompletionCallback();
   }
 
+  // `codec_client_type: AUTO` is only accepted on a cluster whose transport sockets support ALPN.
+  // The mock cluster's default is a raw buffer socket, which does not.
+  void expectAlpnTransportSocket() {
+    auto* matcher =
+        dynamic_cast<MockTransportSocketMatcher*>(cluster_->info_->transport_socket_matcher_.get());
+    ASSERT(matcher != nullptr);
+    ON_CALL(*matcher, allMatchesSupportAlpn()).WillByDefault(Return(true));
+  }
+
   void setupNoServiceValidationHCWithAuto() {
+    expectAlpnTransportSocket();
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -306,6 +316,7 @@ public:
   }
 
   void setupNoServiceValidationHCWithAutoOneUnhealthy() {
+    expectAlpnTransportSocket();
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -1805,36 +1816,27 @@ TEST_F(HttpHealthCheckerImplTest, AutoNegotiatedUnknownProtocolFallsBackToHttp1)
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// A plaintext connection cannot negotiate anything, so `AUTO` creates an HTTP/1.1 codec client up
-// front and sends the request while the connection is still being established, as a pinned codec
-// always has.
-TEST_F(HttpHealthCheckerImplTest, AutoOverPlaintextUsesHttp1UpFront) {
-  setupNoServiceValidationHCWithAuto();
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+// `AUTO` has nothing to negotiate on a cluster whose transport sockets do not support ALPN, so it
+// is rejected at config load rather than silently probing with HTTP/1.1. This is the same check
+// the cluster applies to its own `auto_config`.
+TEST_F(HttpHealthCheckerImplTest, AutoRejectedWithoutAlpnTransportSocket) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      codec_client_type: Auto
+    )EOF";
 
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
-  expectSessionCreate();
-  // No ssl() on the connection, and nextProtocol() is never consulted.
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, nextProtocol()).Times(0);
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
+  // The mock cluster's default transport socket is a raw buffer socket.
+  EXPECT_THROW_WITH_MESSAGE(allocHealthChecker(yaml), EnvoyException,
+                            "codec_client_type AUTO configured for the health check of cluster "
+                            "fake_cluster which has a non-ALPN transport socket");
 
-  // No Connected event was needed.
-  ASSERT_NE(nullptr, test_sessions_[0]->codec_client_);
-  EXPECT_EQ(Http::CodecType::HTTP1, test_sessions_[0]->requested_codec_type_);
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond(0, "200", false, false, true);
-  EXPECT_EQ(Host::Health::Healthy,
-            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+  // A pinned codec on the same cluster is fine.
+  setupNoServiceValidationHC();
 }
 
 // A pinned codec is used as configured no matter what the connection negotiates: a health check

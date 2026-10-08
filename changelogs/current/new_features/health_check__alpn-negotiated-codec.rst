@@ -3,4 +3,5 @@ Added ``AUTO`` to :ref:`codec_client_type
 check configured with it selects its codec from the protocol negotiated by ALPN on the health check
 connection: HTTP/2 when ``h2`` is negotiated, otherwise HTTP/1.1, the same as the cluster's
 :ref:`auto_config <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>`.
-The existing values keep using the configured protocol regardless of what is negotiated.
+Like ``auto_config``, it is rejected on a cluster whose transport sockets do not support ALPN. The
+existing values keep using the configured protocol regardless of what is negotiated.
