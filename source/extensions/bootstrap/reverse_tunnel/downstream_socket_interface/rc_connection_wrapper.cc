@@ -113,7 +113,8 @@ absl::Status RCConnectionWrapper::connect(const std::string& src_tenant_id,
   absl::string_view cluster_id = src_cluster_id;
   absl::string_view node_id = src_node_id;
   // EnvoyInternal remote clusters are rejected before the dial, so the remote address is always a
-  // real network address.
+  // real network address. Bind a reference since `asString()` returns one and the value is only
+  // copied into the handshake header below.
   const std::string& host_value = connection_->connectionInfoProvider().remoteAddress()->asString();
   const Http::LowerCaseString& node_hdr =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelNodeIdHeader();

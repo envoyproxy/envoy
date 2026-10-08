@@ -29,6 +29,15 @@ namespace ReverseConnection {
 
 namespace BootstrapReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
+RevConClusterHandle::~RevConClusterHandle() {
+  // Post the final cluster release to the main-thread dispatcher, so ~RevConCluster, which disables
+  // the main-thread cleanup timer, never runs on a worker that happened to drop the last reference.
+  // The handle owns the cluster for its whole lifetime, so cluster_ is never null here.
+  std::shared_ptr<RevConCluster> cluster = std::move(cluster_);
+  Event::Dispatcher& dispatcher = cluster->dispatcher_;
+  dispatcher.post([cluster = std::move(cluster)]() mutable { cluster.reset(); });
+}
+
 Upstream::HostSelectionResponse
 RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (context == nullptr) {
@@ -58,7 +67,8 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
               "valid if it is a constant.");
   }
 
-  const std::string host_id = parent_->host_id_formatter_->format(formatter_context, stream_info);
+  const std::string host_id =
+      parent_->cluster_->host_id_formatter_->format(formatter_context, stream_info);
 
   // Treat "-" (formatter default for missing) as empty as well.
   if (host_id.empty() || host_id == "-") {
@@ -68,10 +78,10 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
 
   // Check if tenant isolation is enabled and tenant_id_formatter is configured.
   std::string final_host_id = host_id;
-  auto* socket_manager = parent_->getUpstreamSocketManager();
+  auto* socket_manager = parent_->cluster_->getUpstreamSocketManager();
   if (socket_manager != nullptr && socket_manager->tenantIsolationEnabled()) {
     // When tenant isolation is enabled, tenant_id_formatter must be configured.
-    if (parent_->tenant_id_formatter_ == nullptr) {
+    if (parent_->cluster_->tenant_id_formatter_ == nullptr) {
       ENVOY_LOG(error,
                 "reverse_connection: tenant isolation is enabled but tenant_id_format is not "
                 "configured. tenant_id_format is required when tenant isolation is enabled.");
@@ -79,7 +89,7 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
     }
     // Format tenant identifier.
     const std::string tenant_id =
-        parent_->tenant_id_formatter_->format(formatter_context, stream_info);
+        parent_->cluster_->tenant_id_formatter_->format(formatter_context, stream_info);
 
     // Treat "-" (formatter default for missing) as empty as well.
     if (!tenant_id.empty() && tenant_id != "-") {
@@ -102,11 +112,11 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
   ENVOY_LOG(debug, "reverse_connection: using host identifier: {}", final_host_id);
 
   Upstream::HostSharedPtr created_host;
-  auto response = parent_->checkAndCreateHost(final_host_id, created_host);
+  auto response = parent_->cluster_->checkAndCreateHost(final_host_id, created_host);
 
   if (created_host != nullptr) {
-    std::weak_ptr<RevConCluster> weak_parent = parent_;
-    parent_->dispatcher_.post([weak_parent, created_host]() {
+    std::weak_ptr<RevConCluster> weak_parent = parent_->cluster_;
+    parent_->cluster_->dispatcher_.post([weak_parent, created_host]() {
       if (auto parent = weak_parent.lock()) {
         parent->addHostToHostSet(created_host);
       }
@@ -288,8 +298,11 @@ RevConCluster::RevConCluster(
         rev_con_config)
     : ClusterImplBase(config, context, creation_status),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
-      cleanup_interval_(std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(rev_con_config, cleanup_interval, 60000))),
+      // Round up to at least 1ms so a sub-millisecond configured interval does not truncate to 0ms
+      // and spin the main thread.
+      cleanup_interval_(std::max(std::chrono::milliseconds(1),
+                                 std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+                                     rev_con_config, cleanup_interval, 60000)))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })) {
   // Create the host-id formatter from the format string.
   auto formatter_or_error = Envoy::Formatter::FormatterImpl::create(
@@ -350,11 +363,20 @@ RevConClusterFactory::createClusterWithConfig(
                     extension_name));
   }
 
+  // The socket interface factory is always registered, but socket creation and request handling
+  // dereference the instantiated bootstrap extension, so it must be configured. Reject the cluster
+  // here rather than crashing on the first request.
+  auto* extension = upstream_socket_interface->getExtension();
+  if (extension == nullptr) {
+    return absl::InvalidArgumentError(fmt::format(
+        "Reverse connection cluster '{}' requires the upstream reverse tunnel bootstrap extension "
+        "'{}' to be instantiated. Add it to bootstrap_extensions in your bootstrap configuration.",
+        cluster.name(), extension_name));
+  }
+
   // Validate that if tenant isolation is enabled in bootstrap config, tenant_id_format is
   // configured.
-  auto* extension = upstream_socket_interface->getExtension();
-  if (extension != nullptr && extension->enableTenantIsolation() &&
-      proto_config.tenant_id_format().empty()) {
+  if (extension->enableTenantIsolation() && proto_config.tenant_id_format().empty()) {
     return absl::InvalidArgumentError(
         fmt::format("tenant_id_format must be configured for reverse connection cluster '{}' when "
                     "tenant isolation is enabled in the bootstrap configuration. Please configure "
@@ -380,7 +402,11 @@ RevConClusterFactory::createClusterWithConfig(
   auto new_cluster =
       std::make_shared<RevConCluster>(cluster, context, creation_status, proto_config);
   RETURN_IF_NOT_OK(creation_status);
-  auto lb = std::make_unique<RevConCluster::ThreadAwareLoadBalancer>(new_cluster);
+  // Wrap the cluster in a handle so the thread-aware load balancer and its workers release the
+  // cluster back to the main thread. The cluster manager keeps new_cluster as the main-thread
+  // owner.
+  auto handle = std::make_shared<RevConClusterHandle>(new_cluster);
+  auto lb = std::make_unique<RevConCluster::ThreadAwareLoadBalancer>(handle);
   return std::make_pair(new_cluster, std::move(lb));
 }
 

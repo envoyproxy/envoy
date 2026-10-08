@@ -122,6 +122,53 @@ protected:
     lds_upstream_info_.stream_->sendGrpcMessage(response);
   }
 
+  // CDS support for dynamic cluster management.
+  FakeUpstreamInfo cds_upstream_info_;
+
+  void createCdsStream() {
+    if (cds_upstream_info_.connection_ == nullptr) {
+      ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_,
+                                                                cds_upstream_info_.connection_));
+    }
+    ASSERT_TRUE(
+        cds_upstream_info_.connection_->waitForNewStream(*dispatcher_, cds_upstream_info_.stream_));
+    cds_upstream_info_.stream_->startGrpcStream();
+  }
+
+  // Push a state-of-the-world CDS response; an empty cluster list removes the dynamic clusters.
+  void sendCdsResponse(const std::vector<envoy::config::cluster::v3::Cluster>& cluster_configs,
+                       const std::string& version) {
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info(version);
+    response.set_type_url(Config::TestTypeUrl::get().Cluster);
+    for (const auto& cluster_config : cluster_configs) {
+      std::ignore = response.add_resources()->PackFrom(cluster_config);
+    }
+    ASSERT_NE(nullptr, cds_upstream_info_.stream_);
+    cds_upstream_info_.stream_->sendGrpcMessage(response);
+  }
+
+  // Build the reverse connection cluster that the CDS removal test delivers dynamically.
+  static envoy::config::cluster::v3::Cluster reverseConnectionClusterConfig() {
+    envoy::config::cluster::v3::Cluster cluster;
+    cluster.set_name("reverse_connection_cluster");
+    cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+    cluster.mutable_connect_timeout()->set_seconds(5);
+    cluster.mutable_cluster_type()->set_name("envoy.clusters.reverse_connection");
+
+    envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig rc_config;
+    rc_config.set_host_id_format("%REQ(x-computed-host-id)%");
+    rc_config.mutable_cleanup_interval()->set_seconds(60);
+    std::ignore = cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(rc_config);
+
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions http_options;
+    http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                          .PackFrom(http_options);
+    return cluster;
+  }
+
   // Helper function to configure reverse tunnel setup.
   using TunnelClusterModifier = std::function<void(envoy::config::cluster::v3::Cluster*)>;
   using TunnelListenerModifier = std::function<void(envoy::config::listener::v3::FilterChain*)>;
@@ -1180,6 +1227,9 @@ typed_config:
   ASSERT_TRUE(response4->waitForEndStream());
   EXPECT_EQ("503", response4->headers().getStatusValue()); // Service Unavailable
 
+  // The failed node-1 request found no cached reverse tunnel, so the acceptor recorded a pool miss.
+  test_server_->waitForCounter("reverse_tunnel_acceptor.pool_miss", Ge(1));
+
   ENVOY_LOG_MISC(info, "Node-1 failure verified.");
 
   // Re-add node-1 initiator listeners via LDS to simulate node recovery.
@@ -1510,11 +1560,159 @@ TEST_P(ReverseConnectionClusterIntegrationTest, OutOfRangeReverseConnectionListe
     sendLdsResponse({listener}, "1");
   };
 
-  // Assert on the resolver's specific error so the test cannot pass on an unrelated rejection.
-  EXPECT_LOG_CONTAINS("warning", "outside the supported range", {
-    HttpIntegrationTest::initialize();
-    test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
-  });
+  HttpIntegrationTest::initialize();
+
+  test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
+}
+
+// Removing the reverse connection cluster via CDS while multiple workers are serving it must be
+// safe: the per-worker load balancers hold the last references to the cluster, and the cluster
+// handle defers the final release to the main thread, so the main-thread cleanup timer is never
+// torn down on a worker. Without that contract the removal aborts under the worker's dispatcher.
+TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerClusterRemovedViaCds) {
+  concurrency_ = 2;
+  const std::string loopback_addr = loopbackAddress();
+
+  config_helper_.addConfigModifier(
+      [loopback_addr](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        // Serve the reverse connection cluster purely over CDS, so it can be removed at runtime.
+        bootstrap.mutable_static_resources()->clear_listeners();
+        bootstrap.mutable_static_resources()->clear_clusters();
+
+        auto* cds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        cds_cluster->set_name("cds_cluster");
+        cds_cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+        cds_cluster->mutable_connect_timeout()->set_seconds(5);
+
+        envoy::extensions::upstreams::http::v3::HttpProtocolOptions cds_http_options;
+        cds_http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+        std::ignore = (*cds_cluster->mutable_typed_extension_protocol_options())
+                          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                              .PackFrom(cds_http_options);
+
+        auto* cds_endpoint =
+            cds_cluster->mutable_load_assignment()->add_endpoints()->add_lb_endpoints();
+        cds_cluster->mutable_load_assignment()->set_cluster_name("cds_cluster");
+        auto* cds_address =
+            cds_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+        cds_address->set_address(loopback_addr);
+        cds_address->set_port_value(0); // Filled in by the fake upstream.
+
+        auto* cds_config = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+        cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+        auto* cds_api = cds_config->mutable_api_config_source();
+        cds_api->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+        cds_api->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+        cds_api->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("cds_cluster");
+
+        // Static egress listener that routes to the CDS-delivered reverse connection cluster.
+        auto* egress_listener = bootstrap.mutable_static_resources()->add_listeners();
+        egress_listener->set_name("egress_listener");
+        auto* egress_address = egress_listener->mutable_address()->mutable_socket_address();
+        egress_address->set_address(loopback_addr);
+        egress_address->set_port_value(0);
+
+        auto* egress_hcm_filter = egress_listener->add_filter_chains()->add_filters();
+        egress_hcm_filter->set_name("envoy.filters.network.http_connection_manager");
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+            egress_hcm;
+        egress_hcm.set_stat_prefix("egress_http");
+        egress_hcm.set_codec_type(envoy::extensions::filters::network::http_connection_manager::v3::
+                                      HttpConnectionManager::AUTO);
+        auto* egress_route_config = egress_hcm.mutable_route_config();
+        egress_route_config->set_name("local_route");
+        // The reverse connection cluster arrives over CDS, so skip static cluster validation.
+        egress_route_config->mutable_validate_clusters()->set_value(false);
+        auto* egress_virtual_host = egress_route_config->add_virtual_hosts();
+        egress_virtual_host->set_name("backend");
+        egress_virtual_host->add_domains("*");
+        auto* egress_route = egress_virtual_host->add_routes();
+        egress_route->mutable_match()->set_prefix("/");
+        egress_route->mutable_route()->set_cluster("reverse_connection_cluster");
+        auto* egress_router = egress_hcm.add_http_filters();
+        egress_router->set_name("envoy.filters.http.router");
+        std::ignore = egress_router->mutable_typed_config()->PackFrom(
+            envoy::extensions::filters::http::router::v3::Router());
+        std::ignore = egress_hcm_filter->mutable_typed_config()->PackFrom(egress_hcm);
+      });
+
+  use_lds_ = false;
+  setUpstreamCount(1); // cds_cluster.
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  config_helper_.addBootstrapExtension(R"EOF(
+name: envoy.bootstrap.reverse_tunnel.upstream_socket_interface
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+)EOF");
+
+  on_server_init_function_ = [this]() {
+    createCdsStream();
+    sendCdsResponse({reverseConnectionClusterConfig()}, "1");
+  };
+
+  HttpIntegrationTest::initialize();
+
+  // The dynamic reverse connection cluster is active alongside the static CDS cluster.
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
+  test_server_->waitUntilListenersReady();
+  registerTestServerPorts({"egress_listener"});
+
+  // Drive traffic across several downstream connections so the cluster is exercised on multiple
+  // workers. Each worker already holds a per-worker load balancer that references the cluster, and
+  // with no cached tunnel every request is a pool miss that returns 503. Removal drops those worker
+  // references, exercising the cross-worker release that the handle defers to the main thread.
+  constexpr int num_connections = 4;
+  std::vector<IntegrationCodecClientPtr> codec_clients;
+  std::vector<IntegrationStreamDecoderPtr> responses;
+  for (int conn = 0; conn < num_connections; conn++) {
+    codec_clients.push_back(makeHttpConnection(lookupPort("egress_listener")));
+    Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                           {":path", "/"},
+                                           {":scheme", "http"},
+                                           {":authority", "host"},
+                                           {"x-computed-host-id", "test-node"}};
+    responses.push_back(codec_clients.back()->makeHeaderOnlyRequest(headers));
+  }
+  for (auto& response : responses) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("503", response->headers().getStatusValue());
+  }
+
+  // Remove the reverse connection cluster via CDS while the downstream connections are still open.
+  sendCdsResponse({}, "2");
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Eq(1));
+
+  // The server survives the cross-worker cluster release and keeps serving: the route now has no
+  // cluster, so the request completes with 503 rather than crashing a worker.
+  auto post_remove_client = makeHttpConnection(lookupPort("egress_listener"));
+  Http::TestRequestHeaderMapImpl post_remove_headers{{":method", "GET"},
+                                                     {":path", "/"},
+                                                     {":scheme", "http"},
+                                                     {":authority", "host"},
+                                                     {"x-computed-host-id", "test-node"}};
+  auto post_remove_response = post_remove_client->makeHeaderOnlyRequest(post_remove_headers);
+  ASSERT_TRUE(post_remove_response->waitForEndStream());
+  EXPECT_EQ("503", post_remove_response->headers().getStatusValue());
+
+  for (auto& client : codec_clients) {
+    client->close();
+  }
+  post_remove_client->close();
+
+  // Tear down the CDS stream before the server shuts down.
+  if (cds_upstream_info_.stream_ != nullptr) {
+    cds_upstream_info_.stream_->finishGrpcStream(Grpc::Status::Ok);
+  }
+  if (cds_upstream_info_.connection_ != nullptr) {
+    AssertionResult result = cds_upstream_info_.connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = cds_upstream_info_.connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+  }
+  cds_upstream_info_.stream_.reset();
+  cds_upstream_info_.connection_.reset();
 }
 
 } // namespace

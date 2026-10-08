@@ -181,12 +181,12 @@ TEST_F(TestReverseTunnelAcceptor, SocketWithAddressNoThreadLocal) {
   Network::SocketCreationOptions options;
   auto io_handle = socket_interface_->socket(Network::Socket::Type::Stream, address, options);
   EXPECT_NE(io_handle, nullptr);
+  // The pool miss falls back to the default socket interface rather than a reverse tunnel handle.
   EXPECT_EQ(dynamic_cast<UpstreamReverseConnectionIOHandle*>(io_handle.get()), nullptr);
 
-  // Verify fallback counter increments for diagnostics.
-  // Counter name is "<scope>.<stat_prefix>.fallback_no_reverse_socket".
+  // Verify the pool_miss counter increments when no cached reverse tunnel is available.
   auto& scope = extension_->getStatsScope();
-  std::string counter_name = absl::StrCat(extension_->statPrefix(), ".fallback_no_reverse_socket");
+  std::string counter_name = absl::StrCat(extension_->statPrefix(), ".pool_miss");
   Stats::StatNameManagedStorage counter_name_storage(counter_name, scope.symbolTable());
   auto& counter = scope.counterFromStatName(counter_name_storage.statName());
   EXPECT_EQ(counter.value(), 1);

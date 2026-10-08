@@ -198,6 +198,16 @@ public:
   bool enableTenantIsolation() const { return enable_tenant_isolation_; }
 
   /**
+   * Increment the pre-created pool_miss counter, recorded when a request finds no cached reverse
+   * tunnel for the requested node. Pre-created so the hot path does not format a stat name.
+   */
+  void incPoolMiss() const {
+    if (pool_miss_counter_ != nullptr) {
+      pool_miss_counter_->inc();
+    }
+  }
+
+  /**
    * @return the configured maximum number of concurrently accepted reverse connections per node.
    */
   uint32_t maxConnectionsPerNode() const { return max_connections_per_node_; }
@@ -310,6 +320,8 @@ private:
   const uint32_t max_connections_per_node_{0};
   AccessLog::InstanceSharedPtrVector access_logs_;
   ReverseTunnelReporterPtr reporter_{nullptr};
+  // Pre-created counter incremented on a pool miss, owned by the stats scope.
+  Stats::Counter* pool_miss_counter_{nullptr};
 
   /**
    * Update per-worker aggregate metrics (total_clusters and total_nodes).

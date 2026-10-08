@@ -62,16 +62,14 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
     }
   }
 
-  // No sockets available, fallback to standard socket interface.
-  ENVOY_LOG(debug, "reverse_tunnel: no available connection, falling back to standard socket");
-  // Emit a counter to aid diagnostics in NAT scenarios where direct connect will fail.
-  if (extension_) {
-    auto& scope = extension_->getStatsScope();
-    std::string counter_name =
-        fmt::format("{}.fallback_no_reverse_socket", extension_->statPrefix());
-    Stats::StatNameManagedStorage counter_name_storage(counter_name, scope.symbolTable());
-    auto& counter = scope.counterFromStatName(counter_name_storage.statName());
-    counter.inc();
+  // No cached reverse tunnel for this node. Record the miss and fall back to the default socket
+  // interface; the connect to the synthetic loopback address is refused, so the request fails
+  // through the normal connection-failure path and returns a 503.
+  ENVOY_LOG(debug,
+            "reverse_tunnel: no available connection for node {}, falling back to standard socket",
+            addr->logicalName());
+  if (extension_ != nullptr) {
+    extension_->incPoolMiss();
   }
   return Network::socketInterface(
              "envoy.extensions.network.socket_interface.default_socket_interface")

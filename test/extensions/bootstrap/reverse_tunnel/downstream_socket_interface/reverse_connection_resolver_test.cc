@@ -221,7 +221,7 @@ TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigIdentifierIn
 }
 
 // The lower bound of the supported connection count range is accepted.
-TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigCountMin) {
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigCountOne) {
   auto socket_address = createSocketAddress(
       createReverseConnectionAddress("node", "cluster", "tenant", "remote-cluster", 1));
 

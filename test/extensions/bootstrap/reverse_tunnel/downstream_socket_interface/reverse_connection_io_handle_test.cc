@@ -3904,9 +3904,9 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsDrainsEstablishedQueue) {
   EXPECT_EQ(getEstablishedConnectionsSize(), 0);
 }
 
-// An EnvoyInternal remote cluster address is rejected before dialing, since the user-space I/O
-// handle cannot be duplicated for the accepted tunnel. The rejection happens before any cluster
-// lookup and moves the host into the CannotConnect state.
+// An EnvoyInternal remote cluster address is rejected before dialing, since the user-space handle
+// cannot be duplicated for the accepted tunnel. The rejection happens before any cluster lookup and
+// moves the host into the CannotConnect state.
 TEST_F(ReverseConnectionIOHandleTest, InitiateRejectsEnvoyInternalHost) {
   setupThreadLocalSlot();
 
