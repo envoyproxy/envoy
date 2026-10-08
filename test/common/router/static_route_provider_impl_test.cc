@@ -407,6 +407,8 @@ vhds:
         vhds_callbacks = &callbacks;
         return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
       }));
+  // On-demand virtual hosts under the route configuration are accepted first.
+  EXPECT_CALL(*subscription_ptr, accept(absl::flat_hash_set<std::string>{"foo/*"}));
   EXPECT_CALL(*subscription_ptr, start(_));
 
   StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,
@@ -488,6 +490,8 @@ vhds:
           vhds_callbacks_ = &callbacks;
           return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
         }));
+    // On-demand virtual hosts under the route configuration are accepted first.
+    EXPECT_CALL(*subscription_, accept(absl::flat_hash_set<std::string>{"foo/*"}));
     EXPECT_CALL(*subscription_, start(_));
 
     provider_ = std::make_unique<StaticRouteConfigProviderImpl>(
