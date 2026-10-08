@@ -4,6 +4,7 @@
 #include "envoy/config/xds_resources_delegate.h"
 
 #include "source/common/config/custom_config_validators_impl.h"
+#include "source/common/config/dependent_type_pausing_subscription.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
@@ -18,13 +19,25 @@ namespace Config {
 SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Api::Api& api, const Server::Instance& server,
+    Api::Api& api, const Server::Instance& server, XdsManager& xds_manager,
     XdsResourcesDelegateOptRef xds_resources_delegate, XdsConfigTrackerOptRef xds_config_tracker)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
       validation_visitor_(validation_visitor), api_(api), server_(server),
-      xds_resources_delegate_(xds_resources_delegate), xds_config_tracker_(xds_config_tracker) {}
+      xds_manager_(xds_manager), xds_resources_delegate_(xds_resources_delegate),
+      xds_config_tracker_(xds_config_tracker) {}
 
 absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigSource(
+    const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
+    Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
+  return DependentTypePausingSubscription::create(
+      xds_manager_, type_url, callbacks, [&](SubscriptionCallbacks& subscription_callbacks) {
+        return subscriptionFromConfigSourceImpl(config, type_url, scope, subscription_callbacks,
+                                                resource_decoder, options);
+      });
+}
+
+absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigSourceImpl(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
@@ -129,6 +142,17 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpc
     GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
     absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
+  return DependentTypePausingSubscription::create(
+      xds_manager_, type_url, callbacks, [&](SubscriptionCallbacks& subscription_callbacks) {
+        return subscriptionOverAdsGrpcMuxImpl(ads_grpc_mux, config, type_url, scope,
+                                              subscription_callbacks, resource_decoder, options);
+      });
+}
+
+absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpcMuxImpl(
+    GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
+    absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
   RETURN_IF_NOT_OK(Config::Utility::checkLocalInfo(type_url, local_info_));
 
   ConfigSubscriptionFactory::SubscriptionData data{local_info_,
@@ -160,6 +184,19 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpc
 }
 
 absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
+    const xds::core::v3::ResourceLocator& collection_locator,
+    const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
+    Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoderSharedPtr resource_decoder) {
+  return DependentTypePausingSubscription::create(
+      xds_manager_, TypeUtil::descriptorFullNameToTypeUrl(resource_type), callbacks,
+      [&](SubscriptionCallbacks& subscription_callbacks) {
+        return collectionSubscriptionFromUrlImpl(collection_locator, config, resource_type, scope,
+                                                 subscription_callbacks, resource_decoder);
+      });
+}
+
+absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionFromUrlImpl(
     const xds::core::v3::ResourceLocator& collection_locator,
     const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,

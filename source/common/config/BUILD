@@ -94,6 +94,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dependent_type_pausing_subscription_lib",
+    srcs = ["dependent_type_pausing_subscription.cc"],
+    hdrs = ["dependent_type_pausing_subscription.h"],
+    deps = [
+        ":dependent_type_urls_lib",
+        "//envoy/common:exception_lib",
+        "//envoy/config:subscription_interface",
+        "//envoy/config:xds_manager_interface",
+        "@abseil-cpp//absl/functional:function_ref",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
+)
+
+envoy_cc_library(
     name = "ttl_lib",
     srcs = ["ttl.cc"],
     hdrs = ["ttl.h"],
@@ -205,12 +220,14 @@ envoy_cc_library(
     hdrs = ["subscription_factory_impl.h"],
     deps = [
         ":custom_config_validators_lib",
+        ":dependent_type_pausing_subscription_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",
         ":xds_resource_lib",
         "//envoy/config:subscription_factory_interface",
         "//envoy/config:subscription_interface",
         "//envoy/config:xds_config_tracker_interface",
+        "//envoy/config:xds_manager_interface",
         "//envoy/config:xds_resources_delegate_interface",
         "//envoy/server:instance_interface",
         "//envoy/upstream:cluster_manager_interface",

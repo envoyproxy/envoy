@@ -7,6 +7,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_manager.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/server/instance.h"
 #include "envoy/stats/scope.h"
@@ -22,7 +23,7 @@ public:
   SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                           Upstream::ClusterManager& cm,
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                          const Server::Instance& server,
+                          const Server::Instance& server, XdsManager& xds_manager,
                           XdsResourcesDelegateOptRef xds_resources_delegate,
                           XdsConfigTrackerOptRef xds_config_tracker);
 
@@ -43,12 +44,28 @@ public:
                                 OpaqueResourceDecoderSharedPtr resource_decoder) override;
 
 private:
+  absl::StatusOr<SubscriptionPtr> subscriptionFromConfigSourceImpl(
+      const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
+      Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options);
+  absl::StatusOr<SubscriptionPtr> subscriptionOverAdsGrpcMuxImpl(
+      GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
+      absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options);
+  absl::StatusOr<SubscriptionPtr>
+  collectionSubscriptionFromUrlImpl(const xds::core::v3::ResourceLocator& collection_locator,
+                                    const envoy::config::core::v3::ConfigSource& config,
+                                    absl::string_view resource_type, Stats::Scope& scope,
+                                    SubscriptionCallbacks& callbacks,
+                                    OpaqueResourceDecoderSharedPtr resource_decoder);
+
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
   Upstream::ClusterManager& cm_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
   const Server::Instance& server_;
+  XdsManager& xds_manager_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   XdsConfigTrackerOptRef xds_config_tracker_;
 };
