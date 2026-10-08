@@ -19,7 +19,7 @@ protobuf<7.36.0
 ply
 pygithub
 pyjwt[crypto]>=2.15.1
-cryptography>49.0.0
+cryptography>=50.0.2
 pyopenssl>=26.3.0
 pyyaml
 setuptools>=84.0.0
