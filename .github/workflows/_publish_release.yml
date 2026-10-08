@@ -14,7 +14,6 @@ on:
       ENVOY_CI_PUBLISH_APP_KEY:
       gcp-docs-archive-key:
         required: false
-      gcp-key:
       gpg-key:
         required: true
       gpg-key-password:
