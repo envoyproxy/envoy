@@ -168,7 +168,7 @@ _registry_check_mod() {
     workspace_bazel_run "$module_dir" update_registry.check "$@" -- \
         "--json-out=${status_path}" \
         "--markdown-out=${markdown_path}" \
-        "--sha-out=${sha_path}"
+        "--sha-out=${sha_path}" || return
 
     sha="$(cat "${sha_path}")"
     tags="$(jq -r '.tags | join(" ")' "${status_path}")"
@@ -214,7 +214,7 @@ _deps_report_mod() {
     workspace_bazel_run "$module_dir" update_module -- \
         --report \
         "--json-out=${report_path}" \
-        "--markdown-out=${markdown_path}"
+        "--markdown-out=${markdown_path}" || return
 
     echo "== ${workspace} =="
     cat "${markdown_path}"
