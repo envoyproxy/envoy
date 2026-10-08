@@ -209,10 +209,11 @@ private:
   const HttpStatusChecker http_status_checker_;
 
 protected:
-  // The codec from `codec_client_type`, used when `negotiate_codec_` is false.
+  // The codec from `codec_client_type`: used as is when `negotiate_codec_` is false, and as the
+  // fallback when ALPN settles on neither h2 nor http/1.1.
   const Http::CodecType codec_client_type_;
-  // `use_alpn_negotiated_protocol`: select the codec from the protocol the health check connection
-  // negotiates via ALPN.
+  // `use_alpn_protocol`: select the codec from the protocol the health check connection negotiates
+  // via ALPN.
   const bool negotiate_codec_;
   Random::RandomGenerator& random_generator_;
 };

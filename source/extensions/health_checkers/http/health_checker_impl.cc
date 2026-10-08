@@ -44,11 +44,17 @@ getMethod(const envoy::config::core::v3::RequestMethod config_method) {
   return config_method;
 }
 
-// Maps the protocol negotiated by ALPN to a codec type. Anything other than `h2`, including
-// nothing negotiated at all, is HTTP/1.1, the same as the data plane's HttpConnPoolImplMixed.
-Http::CodecType codecTypeFromAlpn(absl::string_view alpn) {
-  return alpn == Http::Utility::AlpnNames::get().Http2 ? Http::CodecType::HTTP2
-                                                       : Http::CodecType::HTTP1;
+// Maps the protocol negotiated by ALPN to a codec type: `h2` is HTTP/2 and `http/1.1` is HTTP/1.1.
+// Anything else, including nothing negotiated at all, is `fallback`; with the default HTTP/1.1
+// that is the same mapping as the data plane's HttpConnPoolImplMixed.
+Http::CodecType codecTypeFromAlpn(absl::string_view alpn, Http::CodecType fallback) {
+  if (alpn == Http::Utility::AlpnNames::get().Http2) {
+    return Http::CodecType::HTTP2;
+  }
+  if (alpn == Http::Utility::AlpnNames::get().Http11) {
+    return Http::CodecType::HTTP1;
+  }
+  return fallback;
 }
 
 } // namespace
@@ -80,27 +86,25 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
                            config.http_health_check().retriable_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
-      negotiate_codec_(config.http_health_check().use_alpn_negotiated_protocol()),
+      negotiate_codec_(config.http_health_check().use_alpn_protocol()),
       random_generator_(context.api().randomGenerator()) {
   // TODO(boteng): introduce additional validation for the authority and path headers
   // based on the default UHV when it is available.
 
   if (negotiate_codec_) {
-    // The negotiated protocol replaces `codec_client_type`, so a pinned codec next to it is a
-    // contradiction rather than something to silently ignore.
-    if (config.http_health_check().codec_client_type() != envoy::type::v3::HTTP1) {
-      throw EnvoyException(fmt::format(
-          "use_alpn_negotiated_protocol cannot be combined with codec_client_type {} for the "
-          "health check of cluster {}",
-          envoy::type::v3::CodecClientType_Name(config.http_health_check().codec_client_type()),
-          cluster.info()->name()));
+    // The negotiating connection is TCP, so HTTP/3 is neither negotiable nor a usable fallback.
+    if (codec_client_type_ == Http::CodecType::HTTP3) {
+      throw EnvoyException(
+          fmt::format("use_alpn_protocol cannot be combined with codec_client_type HTTP3 for the "
+                      "health check of cluster {}",
+                      cluster.info()->name()));
     }
     // ALPN needs a transport socket that negotiates it, so reject a cluster whose transport
     // sockets cannot, the same as the cluster's `auto_config` is rejected. Otherwise every probe
     // would silently fall back to HTTP/1.1.
     if (!cluster.info()->transportSocketMatcher().allMatchesSupportAlpn()) {
       throw EnvoyException(
-          fmt::format("use_alpn_negotiated_protocol configured for the health check of cluster {} "
+          fmt::format("use_alpn_protocol configured for the health check of cluster {} "
                       "which has a non-ALPN transport socket",
                       cluster.info()->name()));
     }
@@ -322,9 +326,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       return;
     }
 
-    // With `use_alpn_negotiated_protocol` the codec is unknown until the handshake completes,
-    // so only connect here; onNegotiatingConnectionEvent() chooses the codec and sends the request
-    // once Connected arrives. A pinned codec builds the codec client now and sends immediately.
+    // With `use_alpn_protocol` the codec is unknown until the handshake completes, so only connect
+    // here; onNegotiatingConnectionEvent() chooses the codec and sends the request once Connected
+    // arrives. A pinned codec builds the codec client now and sends immediately.
     if (parent_.negotiate_codec_) {
       expect_reset_ = false;
       reuse_connection_ = parent_.reuse_connection_;
@@ -376,7 +380,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onNegotiatingConnectio
   }
 
   const std::string alpn = negotiating_connection_->nextProtocol();
-  const Http::CodecType codec_type = codecTypeFromAlpn(alpn);
+  const Http::CodecType codec_type = codecTypeFromAlpn(alpn, parent_.codec_client_type_);
   ENVOY_CONN_LOG(debug, "health check negotiated alpn='{}', using {}", *negotiating_connection_,
                  alpn, Http::Utility::getProtocolString(codecClientTypeToProtocol(codec_type)));
 

@@ -286,7 +286,7 @@ public:
     addCompletionCallback();
   }
 
-  // `use_alpn_negotiated_protocol` is only accepted on a cluster whose transport sockets support
+  // `use_alpn_protocol` is only accepted on a cluster whose transport sockets support
   // ALPN.
   // The mock cluster's default is a raw buffer socket, which does not.
   void expectAlpnTransportSocket() {
@@ -309,7 +309,29 @@ public:
       service_name_matcher:
         prefix: locations
       path: /healthcheck
-      use_alpn_negotiated_protocol: true
+      use_alpn_protocol: true
+    )EOF";
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
+  // `use_alpn_protocol` with a pinned HTTP/2 fallback for when ALPN settles on nothing.
+  void setupNoServiceValidationHCWithAutoHttp2Fallback() {
+    expectAlpnTransportSocket();
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name_matcher:
+        prefix: locations
+      path: /healthcheck
+      codec_client_type: Http2
+      use_alpn_protocol: true
     )EOF";
 
     allocHealthChecker(yaml);
@@ -329,7 +351,7 @@ public:
       service_name_matcher:
         prefix: locations
       path: /healthcheck
-      use_alpn_negotiated_protocol: true
+      use_alpn_protocol: true
     )EOF";
 
     allocHealthChecker(yaml);
@@ -1694,7 +1716,7 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
   health_checker_->start();
 }
 
-// With `use_alpn_negotiated_protocol`, a connection that negotiates h2 is health checked over
+// With `use_alpn_protocol`, a connection that negotiates h2 is health checked over
 // HTTP/2.
 TEST_F(HttpHealthCheckerImplTest, AutoNegotiatesHttp2) {
   setupNoServiceValidationHCWithAuto();
@@ -1727,7 +1749,7 @@ TEST_F(HttpHealthCheckerImplTest, AutoNegotiatesHttp2) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// With `use_alpn_negotiated_protocol`, a connection that negotiates http/1.1 is health checked over
+// With `use_alpn_protocol`, a connection that negotiates http/1.1 is health checked over
 // HTTP/1.1.
 TEST_F(HttpHealthCheckerImplTest, AutoNegotiatesHttp1) {
   setupNoServiceValidationHCWithAuto();
@@ -1758,7 +1780,8 @@ TEST_F(HttpHealthCheckerImplTest, AutoNegotiatesHttp1) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// A peer that does not do ALPN falls back to HTTP/1.1, as the data plane's `auto_config` does.
+// A peer that does not do ALPN falls back to `codec_client_type`, HTTP/1.1 by default, as the data
+// plane's `auto_config` does.
 TEST_F(HttpHealthCheckerImplTest, AutoNotNegotiatedFallsBackToHttp1) {
   setupNoServiceValidationHCWithAuto();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
@@ -1818,7 +1841,7 @@ TEST_F(HttpHealthCheckerImplTest, AutoNegotiatedUnknownProtocolFallsBackToHttp1)
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// `use_alpn_negotiated_protocol` has nothing to negotiate on a cluster whose transport sockets do
+// `use_alpn_protocol` has nothing to negotiate on a cluster whose transport sockets do
 // not support ALPN, so it is rejected at config load rather than silently probing with HTTP/1.1.
 // This is the same check the cluster applies to its own `auto_config`.
 TEST_F(HttpHealthCheckerImplTest, AlpnNegotiationRejectedWithoutAlpnTransportSocket) {
@@ -1829,21 +1852,79 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiationRejectedWithoutAlpnTransportSoc
     healthy_threshold: 2
     http_health_check:
       path: /healthcheck
-      use_alpn_negotiated_protocol: true
+      use_alpn_protocol: true
     )EOF";
 
   // The mock cluster's default transport socket is a raw buffer socket.
   EXPECT_THROW_WITH_MESSAGE(allocHealthChecker(yaml), EnvoyException,
-                            "use_alpn_negotiated_protocol configured for the health check of "
+                            "use_alpn_protocol configured for the health check of "
                             "cluster fake_cluster which has a non-ALPN transport socket");
 
   // A pinned codec on the same cluster is fine.
   setupNoServiceValidationHC();
 }
 
-// The negotiated protocol replaces `codec_client_type`, so pinning a codec alongside it is
-// rejected. The default HTTP1 is the only value that may accompany it.
-TEST_F(HttpHealthCheckerImplTest, AlpnNegotiationRejectedWithPinnedCodec) {
+// With `codec_client_type` set, a peer that does not do ALPN falls back to that codec instead of
+// HTTP/1.1.
+TEST_F(HttpHealthCheckerImplTest, AutoNotNegotiatedFallsBackToCodecClientType) {
+  setupNoServiceValidationHCWithAutoHttp2Fallback();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectTlsConnection(0, "");
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_EQ(nullptr, test_sessions_[0]->codec_client_);
+  completeHandshake(0);
+  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+// A negotiated http/1.1 wins over the `codec_client_type` fallback: the fallback only applies when
+// ALPN settles on nothing Envoy recognizes.
+TEST_F(HttpHealthCheckerImplTest, AutoNegotiatedHttp1OverridesCodecClientTypeFallback) {
+  setupNoServiceValidationHCWithAutoHttp2Fallback();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectTlsConnection(0, Http::Utility::AlpnNames::get().Http11);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  completeHandshake(0);
+  EXPECT_EQ(Http::CodecType::HTTP1, test_sessions_[0]->requested_codec_type_);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+// HTTP/3 is neither negotiable on the TCP health check connection nor a usable fallback.
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiationRejectedWithHttp3) {
   expectAlpnTransportSocket();
   const std::string yaml = R"EOF(
     timeout: 1s
@@ -1852,13 +1933,13 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiationRejectedWithPinnedCodec) {
     healthy_threshold: 2
     http_health_check:
       path: /healthcheck
-      codec_client_type: Http2
-      use_alpn_negotiated_protocol: true
+      codec_client_type: Http3
+      use_alpn_protocol: true
     )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(allocHealthChecker(yaml), EnvoyException,
-                            "use_alpn_negotiated_protocol cannot be combined with "
-                            "codec_client_type HTTP2 for the health check of cluster fake_cluster");
+                            "use_alpn_protocol cannot be combined with codec_client_type HTTP3 "
+                            "for the health check of cluster fake_cluster");
 }
 
 // A pinned codec is used as configured no matter what the connection negotiates: a health check
