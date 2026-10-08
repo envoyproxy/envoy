@@ -101,8 +101,10 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
     }
     // ALPN needs a transport socket that negotiates it, so reject a cluster whose transport
     // sockets cannot, the same as the cluster's `auto_config` is rejected. Otherwise every probe
-    // would silently fall back to HTTP/1.1.
-    if (!cluster.info()->transportSocketMatcher().allMatchesSupportAlpn()) {
+    // would silently fall back to HTTP/1.1. The same runtime key that lets `auto_config` load on
+    // such a cluster applies here too, for a non-ALPN match that data connections never select.
+    if (!cluster.info()->transportSocketMatcher().allMatchesSupportAlpn() &&
+        !runtime_.snapshot().featureEnabled("config.do_not_validate_alpn_support", 0)) {
       throw EnvoyException(
           fmt::format("use_alpn_protocol configured for the health check of cluster {} "
                       "which has a non-ALPN transport socket",

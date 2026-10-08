@@ -1864,6 +1864,25 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiationRejectedWithoutAlpnTransportSoc
   setupNoServiceValidationHC();
 }
 
+// The runtime key that lets `auto_config` load on a cluster with a non-ALPN transport socket match
+// applies to `use_alpn_protocol` too, so that a cluster already relying on it can enable the
+// feature.
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiationAllowedWithoutAlpnTransportSocketByRuntime) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      use_alpn_protocol: true
+    )EOF";
+
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("config.do_not_validate_alpn_support", 0))
+      .WillOnce(Return(true));
+  allocHealthChecker(yaml);
+}
+
 // With `codec_client_type` set, a peer that does not do ALPN falls back to that codec instead of
 // HTTP/1.1.
 TEST_F(HttpHealthCheckerImplTest, AutoNotNegotiatedFallsBackToCodecClientType) {

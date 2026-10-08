@@ -163,8 +163,9 @@ message HealthCheck {
     // its default this is the same mapping as the cluster's :ref:`auto_config
     // <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>`. Like
     // ``auto_config``, it requires a transport socket that supports ALPN such as TLS and is
-    // rejected on a cluster whose transport sockets do not. It cannot be combined with
-    // ``codec_client_type`` ``HTTP3``. See :ref:`tls_options
+    // rejected on a cluster whose transport sockets do not, unless the
+    // ``config.do_not_validate_alpn_support`` runtime key is set, as for ``auto_config``. It
+    // cannot be combined with ``codec_client_type`` ``HTTP3``. See :ref:`tls_options
     // <envoy_v3_api_field_config.core.v3.HealthCheck.tls_options>` for what the connection
     // advertises.
     bool use_alpn_protocol = 15;
