@@ -637,6 +637,8 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutStartsAfterActiveStreamComplet
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
   startRequest(true, "hello");
 
+  Event::MockTimer* proactive_drain_timer = setUpTimer();
+  EXPECT_CALL(*proactive_drain_timer, enableTimer(_, _));
   filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
       test_time_.timeSystem().monotonicTime(), Server::DrainStrategy::Gradual});
   EXPECT_EQ(0U, stats_.named_.downstream_cx_drain_close_.value());

@@ -7,6 +7,24 @@ use crate::{
   NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+
+/// The kind of active resource to enumerate with
+/// [`EnvoyBootstrapExtensionConfig::active_resource_names`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActiveResourceKind {
+  /// The named filter chains of the active listeners: inline chains, the default filter chain,
+  /// and FCDS chains that an active listener's matcher references and that are committed.
+  FilterChain,
+  /// The names of the active clusters.
+  Cluster,
+  /// The transport socket match names present in every active cluster that has matches. Clusters
+  /// with no matches do not constrain the result.
+  TransportSocketMatch,
+  /// The names of the delivered dynamic (SDS) secrets: TLS certificates, certificate validation
+  /// contexts, session ticket keys and generic secrets.
+  Secret,
+}
 
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
@@ -246,6 +264,10 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// This should be called at most once. Subsequent calls are no-ops and return `false`.
   fn enable_listener_lifecycle(&self) -> bool;
+
+  /// Returns the names of the currently active resources of the given kind, each at most once. See
+  /// [`ActiveResourceKind`] for what each kind reports. This must be called on the main thread.
+  fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String>;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -1162,6 +1184,44 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
       abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(self.raw)
     }
   }
+
+  fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String> {
+    extern "C" fn name_trampoline(
+      name: abi::envoy_dynamic_module_type_envoy_buffer,
+      user_data: *mut std::ffi::c_void,
+    ) {
+      let names = unsafe { &mut *(user_data as *mut Vec<String>) };
+      let name_slice =
+        unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
+      names.push(std::str::from_utf8(name_slice).unwrap_or("").to_owned());
+    }
+
+    let abi_kind = match kind {
+      ActiveResourceKind::FilterChain => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::FilterChain
+      },
+      ActiveResourceKind::Cluster => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::Cluster
+      },
+      ActiveResourceKind::TransportSocketMatch => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::TransportSocketMatch
+      },
+      ActiveResourceKind::Secret => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::Secret
+      },
+    };
+
+    let mut names: Vec<String> = Vec::new();
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+        self.raw,
+        abi_kind,
+        Some(name_trampoline),
+        &mut names as *mut _ as *mut std::ffi::c_void,
+      );
+    }
+    names
+  }
 }
 
 // Implementation of EnvoyBootstrapExtension
@@ -1246,11 +1306,18 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
       let name_slice =
         unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
       let name_str = std::str::from_utf8(name_slice).unwrap_or("");
-      if (wrapper.callback)(name_str, value) {
-        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
-      } else {
-        wrapper.stopped = true;
-        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      // Catch panics so a panicking visitor never unwinds across the C boundary and aborts Envoy.
+      match catch_unwind(AssertUnwindSafe(|| (wrapper.callback)(name_str, value))) {
+        Ok(true) => abi::envoy_dynamic_module_type_stats_iteration_action::Continue,
+        Ok(false) => {
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
+        Err(panic) => {
+          crate::log_ffi_panic("bootstrap_extension_iterate_counters", panic);
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
       }
     }
 
@@ -1286,11 +1353,18 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
       let name_slice =
         unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
       let name_str = std::str::from_utf8(name_slice).unwrap_or("");
-      if (wrapper.callback)(name_str, value) {
-        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
-      } else {
-        wrapper.stopped = true;
-        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      // Catch panics so a panicking visitor never unwinds across the C boundary and aborts Envoy.
+      match catch_unwind(AssertUnwindSafe(|| (wrapper.callback)(name_str, value))) {
+        Ok(true) => abi::envoy_dynamic_module_type_stats_iteration_action::Continue,
+        Ok(false) => {
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
+        Err(panic) => {
+          crate::log_ffi_panic("bootstrap_extension_iterate_gauges", panic);
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
       }
     }
 

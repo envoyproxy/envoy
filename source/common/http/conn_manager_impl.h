@@ -331,6 +331,7 @@ private:
     OptRef<const Router::Route> route(const Router::RouteCallback& cb) override;
     Router::RouteConstSharedPtr routeSharedPtr(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
+    void refreshRouteConfigSnapshot() override;
     void refreshRouteCluster() override;
     void recreateClusterInfo() override;
     void requestRouteConfigUpdate(
@@ -627,6 +628,12 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
+  // Called when the drain sequence the connection was notified of (see onDrain()) is about to end
+  // and the connection has to be drained without waiting for a response to decide on.
+  void onProactiveDrainTimeout();
+  // Resets the upgraded and CONNECT streams of a drained connection. Unlike ordinary requests they
+  // are not expected to complete on their own before the end of the drain sequence.
+  void resetTunnelingStreams();
   Tracing::Tracer& tracer() { return *config_->tracer(); }
   void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
                             StreamInfo::CoreResponseFlag response_flag);
@@ -658,13 +665,17 @@ private:
   ConnectionManagerConfigSharedPtr config_;
   ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on
                                   // the config in the hot path.
+  // Route resolution histograms, created only when recordRouteResolutionStats is enabled so the
+  // default stat set is unchanged.
+  OptRef<Stats::Histogram> route_resolution_time_us_histogram_;
+  OptRef<Stats::Histogram> route_resolutions_histogram_;
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;
   const Network::DrainDecision& drain_close_;
   // Set when the connection is notified of a drain sequence via onDrain(). Carries the drain start
   // time and strategy so the drain-close decision can be computed at the connection level (see
-  // shouldDrainClose()).
+  // shouldDrainClose()). Only set when use_connection_event_drain_ is enabled.
   std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
@@ -676,6 +687,11 @@ private:
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
   Event::TimerPtr drain_no_codec_close_timer_;
+  // Armed for active streams that may not send another response before the drain window ends.
+  Event::TimerPtr proactive_drain_timer_;
+  // Set once proactive_drain_timer_ has fired. From then on tunneling streams are reset as soon as
+  // the connection is closing, see resetTunnelingStreams().
+  bool proactive_drain_{false};
   // When set to true, add Connection:close response header to nudge downstream client to reconnect.
   bool soft_drain_http1_{false};
   Random::RandomGenerator& random_generator_;

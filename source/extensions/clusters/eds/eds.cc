@@ -104,7 +104,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 
   // Get the map of all the latest existing hosts, which is used to filter out the existing
   // hosts in the process of updating cluster memberships.
-  HostMapConstSharedPtr all_hosts = parent_.prioritySet().crossPriorityHostMap();
+  HostLookupMapConstSharedPtr all_hosts = parent_.prioritySet().crossPriorityHostMap();
   ASSERT(all_hosts != nullptr);
 
   const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -209,7 +209,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
     return absl::InvalidArgumentError(msg);
   }
 
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
+  const auto& cluster_load_assignment =
       Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources[0].get().resource());
   if (cluster_load_assignment.cluster_name() != edsServiceName()) {
@@ -257,7 +257,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
   Config::ScopedResume resume_leds =
       transport_factory_context_->serverFactoryContext().xdsManager().pause(type_url);
 
-  update(std::move(cluster_load_assignment));
+  update(cluster_load_assignment);
   // If previously used a cached version, remove the subscription from the cache's
   // callbacks.
   if (using_cached_resource_) {
@@ -268,7 +268,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
 }
 
 void EdsClusterImpl::update(
-    envoy::config::endpoint::v3::ClusterLoadAssignment&& cluster_load_assignment) {
+    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
   // Drop overload configuration parsing.
   THROW_IF_NOT_OK(parseDropOverloadConfig(cluster_load_assignment));
 
@@ -292,8 +292,9 @@ void EdsClusterImpl::update(
 
   const envoy::config::endpoint::v3::ClusterLoadAssignment* used_load_assignment;
   if (!cla_leds_configs.empty() || eds_resources_cache_.has_value()) {
-    cluster_load_assignment_ = std::make_unique<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        std::move(cluster_load_assignment));
+    cluster_load_assignment_ =
+        ArenaWrappedProto<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+            cluster_load_assignment);
     used_load_assignment = cluster_load_assignment_.get();
   } else {
     cluster_load_assignment_ = nullptr;
@@ -411,7 +412,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
     const uint32_t priority, bool weighted_priority_health, const uint32_t overprovisioning_factor,
     const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
     LocalityWeightsMap& new_locality_weights_map, PriorityStateManager& priority_state_manager,
-    const HostMap& all_hosts, const absl::flat_hash_set<std::string>& all_new_hosts) {
+    const HostLookupMap& all_hosts, const absl::flat_hash_set<std::string>& all_new_hosts) {
   const auto& host_set = priority_set_.getOrCreateHostSet(priority, overprovisioning_factor);
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
@@ -429,8 +430,10 @@ bool EdsClusterImpl::updateHostsPerLocality(
   // performance implications, since this has the knock on effect that we rebuild the load balancers
   // and locality scheduler. See the comment in BaseDynamicClusterImpl::updateDynamicHostList
   // about this. In the future we may need to do better here.
-  const bool hosts_updated = updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added,
-                                                   hosts_removed, all_hosts, all_new_hosts);
+  const bool hosts_updated = updateDynamicHostList(
+      new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
+      [&all_hosts](const std::string& address) { return all_hosts.findHost(address); },
+      all_new_hosts);
   if (hosts_updated || host_set.weightedPriorityHealth() != weighted_priority_health ||
       host_set.overprovisioningFactor() != overprovisioning_factor ||
       locality_weights_map != new_locality_weights_map) {
@@ -465,12 +468,9 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
           debug,
           "Did not receive EDS response on time, using cached ClusterLoadAssignment for cluster {}",
           edsServiceName());
-      envoy::config::endpoint::v3::ClusterLoadAssignment cached_load_assignment =
-          Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-              *cached_resource);
       info_->configUpdateStats().assignment_use_cached_.inc();
       using_cached_resource_ = true;
-      update(std::move(cached_load_assignment));
+      update(*cached_resource);
       return;
     }
   }

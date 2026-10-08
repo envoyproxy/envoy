@@ -105,6 +105,13 @@ namespace {
 // carried by an 'envoy.http_conn_manager_prefix' tag.
 constexpr absl::string_view HttpBaseStatPrefix = "http";
 
+// Fraction of the drain time over which the probability of drain-closing on a response ramps up
+// to one. Every response sent later in the drain sequence drains the connection.
+constexpr double DrainCloseRampFactor = 0.5;
+// Fraction of the drain time after which the connections that are still not draining start to
+// be drained proactively, see ConnectionManagerImpl::onDrain().
+constexpr double ProactiveDrainWindowStart = 2.0 / 3.0;
+
 std::string httpFlatStatPrefix(absl::string_view stat_prefix) {
   return absl::StrCat(HttpBaseStatPrefix, ".", stat_prefix, ".");
 }
@@ -244,6 +251,17 @@ ConnectionManagerImpl::ConnectionManagerImpl(
       trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
       "found. Is it configured?");
+  if (config_->recordRouteResolutionStats()) {
+    Stats::SymbolTable& symbol_table = stats_.scope_.symbolTable();
+    Stats::StatNameManagedStorage route_resolution_time_us_stat_name(
+        "downstream_rq_route_resolution_time_us", symbol_table);
+    route_resolution_time_us_histogram_ = stats_.scope_.histogramFromStatName(
+        route_resolution_time_us_stat_name.statName(), Stats::Histogram::Unit::Microseconds);
+    Stats::StatNameManagedStorage route_resolutions_stat_name("downstream_rq_route_resolutions",
+                                                              symbol_table);
+    route_resolutions_histogram_ = stats_.scope_.histogramFromStatName(
+        route_resolutions_stat_name.statName(), Stats::Histogram::Unit::Unspecified);
+  }
 }
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -748,6 +766,16 @@ void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
     return;
   }
   connection_drain_event_ = drain_event;
+  if (!streams_.empty() && !connection_close_started_ && use_connection_event_drain_) {
+    // Active streams may not produce another response on which to make a drain decision.
+    const std::chrono::milliseconds delay = Network::proactiveDrainDelay(
+        server_context_, drain_event, config_->drainTimeout(), ProactiveDrainWindowStart);
+    if (delay.count() > 0) {
+      proactive_drain_timer_ =
+          dispatcher_->createTimer([this]() -> void { onProactiveDrainTimeout(); });
+      proactive_drain_timer_->enableTimer(delay);
+    }
+  }
   if (!streams_.empty() || connection_close_started_) {
     return;
   }
@@ -775,7 +803,8 @@ bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
     return drain_close_.drainClose(scope);
   }
 
-  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
+  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_,
+                                   DrainCloseRampFactor);
 }
 
 void ConnectionManagerImpl::doConnectionClose(
@@ -801,6 +830,11 @@ void ConnectionManagerImpl::doConnectionClose(
   if (drain_no_codec_close_timer_) {
     drain_no_codec_close_timer_->disableTimer();
     drain_no_codec_close_timer_.reset();
+  }
+
+  if (proactive_drain_timer_) {
+    proactive_drain_timer_->disableTimer();
+    proactive_drain_timer_.reset();
   }
 
   if (!streams_.empty()) {
@@ -950,6 +984,60 @@ void ConnectionManagerImpl::onDrainTimeout() {
   codec_->goAway();
   drain_state_ = DrainState::Closing;
   checkForDeferredClose(false);
+  // Only once the end of the drain window is near: a drain sequence started earlier (e.g. by a
+  // response) must not cut the tunneling streams short while other traffic on the connection can
+  // still complete normally.
+  if (proactive_drain_) {
+    resetTunnelingStreams();
+  }
+}
+
+void ConnectionManagerImpl::onProactiveDrainTimeout() {
+  ENVOY_CONN_LOG(debug, "drain deadline approaching, draining connection",
+                 read_callbacks_->connection());
+  proactive_drain_ = true;
+  if (!codec_) {
+    // Nothing was ever received on this connection, so there is no peer to drain gracefully.
+    stats_.named_.downstream_cx_drain_close_.inc();
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, std::nullopt,
+                      StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection);
+  } else if (drain_state_ == DrainState::NotDraining) {
+    // Start the drain sequence. The tunneling streams still active when it completes are reset in
+    // onDrainTimeout().
+    stats_.named_.downstream_cx_drain_close_.inc();
+    startDrainSequence();
+  } else if (drain_state_ == DrainState::Closing) {
+    // The connection is only kept open by its remaining streams. On HTTP/1 this is the case for
+    // every WebSocket or CONNECT tunnel, as establishing it marks the connection as closing.
+    // On HTTP/2 and HTTP/3 it happens when a drain sequence started earlier, e.g.
+    // by the response of an ordinary stream, completed while a tunneling stream was still active.
+    // Either way nothing else will end the tunneling streams, so reset them now.
+    stats_.named_.downstream_cx_drain_close_.inc();
+    resetTunnelingStreams();
+  }
+  // Otherwise the drain sequence is already running and onDrainTimeout() resets the tunneling
+  // streams when it completes.
+}
+
+void ConnectionManagerImpl::resetTunnelingStreams() {
+  ASSERT(drain_state_ == DrainState::Closing);
+  // Upgraded and CONNECT streams cannot be told to go away (no "Connection: close" can be sent on
+  // them anymore, and a GOAWAY does not end them), and they would otherwise all be terminated at
+  // the same moment at the end of the drain sequence. Reset them now: this happens at a different
+  // time for every connection, which spreads out the reconnects. Ordinary requests are left to
+  // complete.
+  for (auto it = streams_.begin(); it != streams_.end();) {
+    // Resetting the stream removes it from the list, so advance first.
+
+    auto stream = (it++)->get();
+    if (!stream->state_.is_tunneling_ || stream->state_.is_zombie_stream_) {
+      continue;
+    }
+    ENVOY_STREAM_LOG(debug, "resetting tunneling stream of drained connection", *stream);
+    stream->filter_manager_.streamInfo().setResponseCodeDetails(
+        StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection);
+    stream->resetStream();
+  }
 }
 
 void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
@@ -1176,6 +1264,15 @@ void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
 
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
+
+  if (connection_manager_.route_resolution_time_us_histogram_.has_value()) {
+    const StreamInfo::StreamInfo& stream_info = filter_manager_.streamInfo();
+    connection_manager_.route_resolution_time_us_histogram_->recordValue(
+        std::chrono::duration_cast<std::chrono::microseconds>(stream_info.routeResolutionTime())
+            .count());
+    connection_manager_.route_resolutions_histogram_->recordValue(
+        stream_info.routeResolutionCount());
+  }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   if (filter_manager_.streamInfo().healthCheck()) {
@@ -1595,12 +1692,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   // Apply header sanity checks.
-  std::optional<std::reference_wrapper<const absl::string_view>> error =
-      HeaderUtility::requestHeadersValid(*request_headers_);
+  OptRef<const absl::string_view> error = HeaderUtility::requestHeadersValid(*request_headers_);
   if (error != std::nullopt) {
-    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt, error.value().get());
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt, *error);
     if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-      connection_manager_.handleCodecError(error.value().get());
+      connection_manager_.handleCodecError(*error);
     }
     return;
   }
@@ -1973,8 +2069,13 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
+      // Measure the wall time of the route resolution.
+      const MonotonicTime start = connection_manager_.timeSource().monotonicTime();
       route_result = snapped_route_config_->route(cb, *request_headers_,
                                                   filter_manager_.streamInfo(), stream_id_);
+      filter_manager_.streamInfo().addRouteResolutionTime(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              connection_manager_.timeSource().monotonicTime() - start));
     }
   }
 
@@ -2137,9 +2238,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     }
   }
 
-  // If we are destroying a stream before remote is complete and the connection does not support
-  // multiplexing, we should disconnect since we don't want to wait around for the request to
-  // finish.
+  // If the response headers are sent before the request is complete and the connection does not
+  // support multiplexing, the connection has to be closed once this stream ends: the rest of the
+  // request cannot be skipped to get to the next one.
+  // Besides early responses (e.g. rejecting a large upload), this covers every HTTP/1 upgrade and
+  // CONNECT, as their request "body" is the tunneled payload, so such a connection is Closing from
+  // the moment the tunnel is established and closes as soon as the tunnel ends.
   if (!filter_manager_.hasLastDownstreamByteReceived()) {
     if (connection_manager_.codec_->protocol() < Protocol::Http2) {
       connection_manager_.drain_state_ = DrainState::Closing;
@@ -2621,6 +2725,17 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
 
   setCachedRoute({});
   cached_cluster_info_ = std::optional<Upstream::ClusterInfoConstSharedPtr>();
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshRouteConfigSnapshot() {
+  if (connection_manager_.config_->routeConfigProvider() != nullptr) {
+    snapped_route_config_ = connection_manager_.config_->routeConfigProvider()->configCast();
+  } else if (connection_manager_.config_->scopedRouteConfigProvider() != nullptr &&
+             connection_manager_.config_->scopeKeyBuilder().has_value() &&
+             request_headers_ != nullptr) {
+    snapped_scoped_routes_config_ =
+        connection_manager_.config_->scopedRouteConfigProvider()->config<Router::ScopedConfig>();
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {

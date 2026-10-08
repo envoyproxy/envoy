@@ -532,8 +532,10 @@ TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
 
   const std::string& type_url = Config::TestTypeUrl::get().VirtualHost;
   SubscriptionOptions options;
-  options.use_namespace_matching_ = true;
-  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, options);
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, options);
+  // Register a suffix-glob watch so resources named "prefix/<id>" are routed here, without
+  // subscribing to the glob on the wire (mirrors VHDS).
+  watch->accept({"prefix/*"});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -569,8 +571,8 @@ TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
 
   const std::string& type_url = Config::TestTypeUrl::get().VirtualHost;
   SubscriptionOptions options;
-  options.use_namespace_matching_ = true;
-  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, options);
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, options);
+  watch->accept({"prefix/*"});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -690,10 +692,12 @@ TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
   expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}});
   grpc_mux_->start();
 
+  // Additionally add "z" to the watch: it is both subscribed on the wire and routed to this watch.
   expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"z"}});
-  grpc_mux_->requestOnDemandUpdate("foo", {"z"});
+  foo_sub->append({"z"});
 
-  expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}});
+  // On watch removal all of its resources -- including the on-demand "z" -- are unsubscribed.
+  expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"x", "y", "z"}});
 }
 
 TEST_P(NewGrpcMuxImplTest, Shutdown) {

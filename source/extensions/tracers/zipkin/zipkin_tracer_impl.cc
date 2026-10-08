@@ -9,6 +9,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/tracers/zipkin/span_context_extractor.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
@@ -154,6 +155,12 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   END_TRY catch (const ExtractorException& e) { return std::make_unique<Tracing::NullSpan>(); }
 
   new_zipkin_span->setUseLocalDecision(use_local_decision);
+  // Propagate the context in the same B3 format that the downstream used.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.zipkin_preserve_b3_single_header_format") &&
+      extractor.b3SingleFormatUsed()) {
+    new_zipkin_span->setUseB3SingleFormat(true);
+  }
   // Return the active Zipkin span.
   return new_zipkin_span;
 }
@@ -220,7 +227,7 @@ void ReporterImpl::flushSpans() {
 
     if (collector_cluster_.threadLocalCluster().has_value()) {
       Http::AsyncClient::Request* request =
-          collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+          collector_cluster_.threadLocalCluster()->httpAsyncClient().send(
               std::move(message), *this,
               Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
       if (request) {

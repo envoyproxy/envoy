@@ -170,6 +170,50 @@ well. A route which selects a script by :ref:`name
 script at all, runs in a VM belonging to the filter and already has the filter-level patterns; its
 own patterns are unused.
 
+.. _config_http_filters_lua_shared_vm_id:
+
+Sharing Lua VMs between configurations
+--------------------------------------
+
+Every configured script gets its own set of Lua VMs: one per worker thread plus one on the main
+thread. A deployment that repeats the same script across many listeners, filter chains or routes
+therefore pays for the same code many times over. Setting :ref:`shared_vm_id
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.shared_vm_id>` opts a configuration into
+sharing those VMs with every other Lua configuration that sets the same id:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.lua
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      shared_vm_id: my_scripts
+      default_source_code:
+        filename: /etc/envoy/lua/common.lua
+
+Sharing is decided per script rather than per configuration. Two configurations that agree on the
+id share a VM only for the scripts whose contents match and whose :ref:`package_paths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>` and :ref:`package_cpaths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_cpaths>` match, since a script that
+resolves its ``require`` calls elsewhere does not produce an equivalent VM. The id applies to every
+script the configuration defines: the default script, the deprecated ``inline_code``, and each
+entry of :ref:`source_codes <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
+Routes draw from the same pool, so a route setting :ref:`LuaPerRoute.shared_vm_id
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.shared_vm_id>` can reuse a VM a
+filter configuration already built, and the other way around.
+
+.. attention::
+
+  A Lua VM is not only an amount of memory, it is also a set of Lua globals that outlive a
+  request. Scripts sharing a VM see each other's globals, exactly as separate requests through one
+  configuration already do. Only share VMs between configurations whose scripts are prepared for
+  that.
+
+A shared VM lives for as long as at least one configuration using it is alive. Once the last one is
+drained the VM is torn down, and the next configuration asking for that id and script builds a
+fresh one. Leaving the field unset, which is the default, keeps every configuration's scripts in
+VMs of their own.
+
 Upstream Filter
 ---------------
 
@@ -196,7 +240,8 @@ individual filter instance/script can be tracked by providing a per-filter
 In addition, a single process-wide ``lua.lua_vm_count`` gauge (not affected by ``stat_prefix``) tracks
 the total number of active Lua VMs across every filter-config-level and route-level Lua script
 configured in the process. Each configured script accounts for ``concurrency + 1`` VMs (one per
-worker thread, plus the main thread).
+worker thread, plus the main thread), except that scripts sharing VMs through :ref:`shared_vm_id
+<config_http_filters_lua_shared_vm_id>` are counted once between them.
 
 Script examples
 ---------------
@@ -559,6 +604,7 @@ body. May be nil.
 .. code-block:: lua
 
   local metadata = handle:metadata()
+  local metadata = handle:metadata(ns)
 
 Returns the current route entry metadata. Note that the metadata should be specified
 under the :ref:`filter config name
@@ -566,6 +612,10 @@ under the :ref:`filter config name
 If no entry could be found by the filter config name, then the filter canonical name
 i.e. ``envoy.filters.http.lua`` will be used as an alternative. Note that this downgrade will be
 deprecated in the future.
+
+``ns`` is an optional string that supplies the namespace, i.e. the key in the ``filter_metadata``
+of the route entry, to get the metadata from. If it is set, only the metadata under the given
+namespace is returned and neither the filter config name nor the filter canonical name is used.
 
 .. note::
 
@@ -1933,10 +1983,15 @@ Route object API
 .. code-block:: lua
 
   local metadata = route:metadata()
+  local metadata = route:metadata(ns)
 
 Returns the route metadata. Note that the metadata should be specified
 under the :ref:`filter config name
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+
+``ns`` is an optional string that supplies the namespace, i.e. the key in the ``filter_metadata``
+of the route entry, to get the metadata from. If it is set, the metadata under the given
+namespace is returned rather than the metadata under the filter config name.
 
 Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
@@ -1994,8 +2049,8 @@ histogram()
 
 Returns a :ref:`histogram object <config_http_filters_lua_histogram_wrapper>`
 with the given name and unit. The second argument specifies the unit and must be
-one of: ``"unspecified"``, ``"bytes"``, ``"microseconds"``, ``"milliseconds"``, or ``"ms"``
-(shorthand for milliseconds).
+one of: ``"unspecified"``, ``"bytes"``, ``"nanoseconds"``, ``"microseconds"``, ``"milliseconds"``,
+or ``"ms"`` (shorthand for milliseconds).
 
 .. _config_http_filters_lua_counter_wrapper:
 

@@ -63,6 +63,242 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectBody) {
   encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(data2, true);
 }
 
+// Filter stops headers iteration, then injects headers later.
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeaders) {
+  setup();
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  // Kick off the incoming request.
+  startRequest(false);
+
+  // Filter 0 now injects headers to the rest of the filter chain.
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(false);
+
+  // Subsequent data is processed normally.
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  Buffer::OwnedImpl data("hello");
+  decoder_->decodeData(data, true);
+
+  // Clean up stream by sending response.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+}
+
+// Filter stops headers iteration for a header-only request, then injects headers with end_stream.
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeadersEndStream) {
+  setup();
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  startRequest(true);
+
+  // Filter 0 now injects headers with end_stream to the rest of the filter chain.
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(true);
+
+  // Clean up stream by sending response.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+}
+
+// Filter calls injectDecodedHeadersToFilterChain a second time, which should be a no-op.
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeadersCalledTwiceNoOp) {
+  setup();
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  startRequest(false);
+
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .Times(1)
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(false);
+  // Second call does not trigger decodeHeaders on decoder_filters_[1] again.
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(false);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  Buffer::OwnedImpl data("hello");
+  decoder_->decodeData(data, true);
+
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+}
+
+// Encoder filter stops headers iteration, then injects encoded headers later.
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeaders) {
+  setup();
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  startRequest(true);
+
+  // Encoder filter 1 stops headers iteration.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
+
+  // Encoder filter 1 now injects encoded headers to the rest of the filter chain.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+
+  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(false);
+
+  // Subsequent response data is processed normally.
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  expectOnDestroy();
+
+  Buffer::OwnedImpl data("response body");
+  decoder_filters_[1]->callbacks_->encodeData(data, true);
+}
+
+// Encoder filter stops headers iteration for a header-only response, then injects headers with
+// end_stream.
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeadersEndStream) {
+  setup();
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  startRequest(true);
+
+  // Encoder filter 1 stops headers iteration.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(true);
+}
+
+// Encoder filter calls injectEncodedHeadersToFilterChain a second time, which should be a no-op.
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeadersCalledTwiceNoOp) {
+  setup();
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  startRequest(true);
+
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .Times(1)
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+
+  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(false);
+  // Second call does not trigger encodeHeaders again.
+  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(false);
+
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  expectOnDestroy();
+
+  Buffer::OwnedImpl data("response body");
+  decoder_filters_[1]->callbacks_->encodeData(data, true);
+}
+
 // Filter continues headers iteration without ending the stream, then injects a body later.
 TEST_F(HttpConnectionManagerImplTest, FilterContinueDontEndStreamInjectBody) {
   setup();
@@ -3394,6 +3630,333 @@ TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteCluster) {
 
   Buffer::OwnedImpl response_data("ok");
   filter->callbacks_->encodeData(response_data, true);
+}
+
+// A connection without a codec closes after the drain timeout, even with a Gradual strategy.
+TEST_F(HttpConnectionManagerImplTest, DrainNoCodecImmediatelyOnNotification) {
+  // Not used in the test.
+  delete codec_;
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(600)));
+  setup();
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(drain_timeout_, _));
+  filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+      factory_context_.server_factory_context_.timeSource().monotonicTime(),
+      Server::DrainStrategy::Gradual});
+
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec));
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
+}
+
+// An idle connection starts the HTTP drain sequence immediately, even with a Gradual strategy.
+TEST_F(HttpConnectionManagerImplTest, DrainIdleConnectionImmediatelyOnNotification) {
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(600)));
+  setup();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(Http::okStatus()));
+  Buffer::OwnedImpl input;
+  conn_manager_->onData(input, false);
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  EXPECT_CALL(*codec_, shutdownNotice());
+  filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+      factory_context_.server_factory_context_.timeSource().monotonicTime(),
+      Server::DrainStrategy::Gradual});
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
+
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->invokeCallback();
+}
+
+// An ordinary request that is still in flight when the connection is proactively drained is left
+// to complete: only the drain sequence runs, and the connection closes with the response.
+TEST_F(HttpConnectionManagerImplTest, ProactiveDrainLeavesActiveRequest) {
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(600)));
+  setup();
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+  EXPECT_CALL(*filter, decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::StopIteration));
+  startRequest(true);
+
+  Event::MockTimer* proactive_drain_timer = setUpTimer();
+  EXPECT_CALL(*proactive_drain_timer, enableTimer(_, _));
+  filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+      factory_context_.server_factory_context_.timeSource().monotonicTime(),
+      Server::DrainStrategy::Gradual});
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  EXPECT_CALL(*codec_, shutdownNotice());
+  proactive_drain_timer->invokeCallback();
+
+  // The drain sequence completes while the request is still active. The request is not reset and
+  // the connection stays open.
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(response_encoder_.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+  drain_timer->invokeCallback();
+  testing::Mock::VerifyAndClearExpectations(&response_encoder_.stream_);
+  testing::Mock::VerifyAndClearExpectations(&filter_callbacks_.connection_);
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("close", headers.getConnectionValue());
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
+  EXPECT_CALL(*proactive_drain_timer, disableTimer());
+  EXPECT_CALL(*drain_timer, disableTimer());
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
+// An upgraded stream sends no further response and cannot be told to go away. On HTTP/1 its
+// connection is already closing, as it cannot be reused, so the stream is reset as soon as the
+// connection is proactively drained instead of being left until the listener is torn down.
+TEST_F(HttpConnectionManagerImplTest, ProactiveDrainResetsUpgradedStream) {
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(600)));
+  setup(SetupOpts().setTracing(false));
+
+  // Establish an upgraded stream before the drain notification.
+  auto* filter = new NiceMock<MockStreamFilter>();
+  EXPECT_CALL(*filter, decodeHeaders(_, false))
+      .WillRepeatedly(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter, encodeHeaders(_, false))
+      .WillRepeatedly(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
+      .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                 FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
+        return true;
+      }));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                             {":method", "GET"},
+                                                             {":path", "/"},
+                                                             {"connection", "Upgrade"},
+                                                             {"upgrade", "foo"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+
+    filter->decoder_callbacks_->streamInfo().setResponseCodeDetails("");
+    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{
+        {":status", "101"}, {"Connection", "upgrade"}, {"upgrade", "foo"}}};
+    filter->decoder_callbacks_->encodeHeaders(std::move(response_headers), false, "details");
+
+    data.drain(4);
+    return Http::okStatus();
+  }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  Event::MockTimer* proactive_drain_timer = setUpTimer();
+  EXPECT_CALL(*proactive_drain_timer, enableTimer(_, _));
+  filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+      factory_context_.server_factory_context_.timeSource().monotonicTime(),
+      Server::DrainStrategy::Gradual});
+
+  EXPECT_CALL(response_encoder_.stream_, resetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(*filter, onStreamComplete());
+  EXPECT_CALL(*filter, onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
+  EXPECT_CALL(*proactive_drain_timer, disableTimer());
+  proactive_drain_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_tx_reset_.value());
+}
+
+// On HTTP/2 the connection of an upgraded stream is first drained gracefully, and the stream is
+// reset once the drain sequence completes.
+TEST_F(HttpConnectionManagerImplTest, ProactiveDrainResetsUpgradedStreamAfterDrainTimeoutHttp2) {
+  codec_->protocol_ = Protocol::Http2;
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(600)));
+  setup(SetupOpts().setTracing(false));
+
+  // Establish an upgraded stream before the drain notification.
+  auto* filter = new NiceMock<MockStreamFilter>();
+  EXPECT_CALL(*filter, decodeHeaders(_, false))
+      .WillRepeatedly(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter, encodeHeaders(_, false))
+      .WillRepeatedly(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
+      .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                 FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
+        return true;
+      }));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                             {":method", "GET"},
+                                                             {":path", "/"},
+                                                             {"connection", "Upgrade"},
+                                                             {"upgrade", "foo"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+
+    filter->decoder_callbacks_->streamInfo().setResponseCodeDetails("");
+    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{
+        {":status", "101"}, {"Connection", "upgrade"}, {"upgrade", "foo"}}};
+    filter->decoder_callbacks_->encodeHeaders(std::move(response_headers), false, "details");
+
+    data.drain(4);
+    return Http::okStatus();
+  }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  Event::MockTimer* proactive_drain_timer = setUpTimer();
+  EXPECT_CALL(*proactive_drain_timer, enableTimer(_, _));
+  filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+      factory_context_.server_factory_context_.timeSource().monotonicTime(),
+      Server::DrainStrategy::Gradual});
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  EXPECT_CALL(*codec_, shutdownNotice());
+  proactive_drain_timer->invokeCallback();
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
+
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(response_encoder_.stream_, resetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(*filter, onStreamComplete());
+  EXPECT_CALL(*filter, onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
+  EXPECT_CALL(*proactive_drain_timer, disableTimer());
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_tx_reset_.value());
+}
+
+// A connection drained by a response (here right away, with the Immediate strategy) keeps its
+// upgraded stream when that drain sequence completes: the stream is only reset when the end of the
+// drain window is near, i.e. when the connection is drained proactively as well.
+TEST_F(HttpConnectionManagerImplTest, ResponseDrainKeepsUpgradedStreamHttp2) {
+  codec_->protocol_ = Protocol::Http2;
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(600)));
+  setup(SetupOpts().setTracing(false));
+
+  Event::MockTimer* proactive_drain_timer = setUpTimer();
+  EXPECT_CALL(*proactive_drain_timer, enableTimer(_, _));
+
+  // Establish an upgraded stream before notifying the connection of the drain.
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  EXPECT_CALL(*codec_, shutdownNotice());
+  auto* filter = new NiceMock<MockStreamFilter>();
+  EXPECT_CALL(*filter, decodeHeaders(_, false))
+      .WillRepeatedly(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter, encodeHeaders(_, false))
+      .WillRepeatedly(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
+      .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                 FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
+        return true;
+      }));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                             {":method", "GET"},
+                                                             {":path", "/"},
+                                                             {"connection", "Upgrade"},
+                                                             {"upgrade", "foo"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+
+    filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+        factory_context_.server_factory_context_.timeSource().monotonicTime(),
+        Server::DrainStrategy::Immediate});
+
+    filter->decoder_callbacks_->streamInfo().setResponseCodeDetails("");
+    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{
+        {":status", "101"}, {"Connection", "upgrade"}, {"upgrade", "foo"}}};
+    filter->decoder_callbacks_->encodeHeaders(std::move(response_headers), false, "details");
+
+    data.drain(4);
+    return Http::okStatus();
+  }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
+
+  // The drain sequence completes with the upgraded stream still active: it is not reset.
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(response_encoder_.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+  drain_timer->invokeCallback();
+  testing::Mock::VerifyAndClearExpectations(&response_encoder_.stream_);
+  testing::Mock::VerifyAndClearExpectations(&filter_callbacks_.connection_);
+
+  // Only the proactive drain resets it.
+  EXPECT_CALL(response_encoder_.stream_, resetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(*filter, onStreamComplete());
+  EXPECT_CALL(*filter, onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
+  EXPECT_CALL(*proactive_drain_timer, disableTimer());
+  EXPECT_CALL(*drain_timer, disableTimer());
+  proactive_drain_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_tx_reset_.value());
+}
+
+// The legacy drain path does not schedule a proactive timer, but still closes a no-codec
+// connection after the drain timeout.
+TEST_F(HttpConnectionManagerImplTest, NoProactiveDrainOnLegacyDrainPath) {
+  // Not used in the test.
+  delete codec_;
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  setup();
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(drain_timeout_, _));
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Gradual});
+}
+
+// Even a connection accepted late in the drain window closes after its own no-codec wait.
+TEST_F(HttpConnectionManagerImplTest, NoCodecDrainForConnectionAcceptedLate) {
+  // Not used in the test.
+  delete codec_;
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(600)));
+  setup();
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(drain_timeout_, _));
+  filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+      factory_context_.server_factory_context_.timeSource().monotonicTime() -
+          std::chrono::seconds(500),
+      Server::DrainStrategy::Gradual});
 }
 
 } // namespace Http

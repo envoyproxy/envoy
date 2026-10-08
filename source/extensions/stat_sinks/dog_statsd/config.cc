@@ -29,8 +29,9 @@ DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
   if (sink_config.has_max_bytes_per_datagram()) {
     max_bytes = sink_config.max_bytes_per_datagram().value();
   }
-  return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
-                                                         true, sink_config.prefix(), max_bytes);
+  return std::make_unique<Common::Statsd::UdpStatsdSink>(
+      server.threadLocal(), std::move(address), true, sink_config.prefix(), max_bytes,
+      Common::Statsd::getDefaultTagFormat(), sink_config.scale_histogram_units_to_milliseconds());
 }
 
 ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {

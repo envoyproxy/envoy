@@ -279,6 +279,7 @@ struct LocalCloseReasonValues {
   const std::string DeferredCloseOnDrainedConnection = "deferred_close_on_drained_connection";
   const std::string DrainedConnectionWithoutCodec = "drained_connection_without_codec";
   const std::string IdleTimeoutOnConnection = "on_idle_timeout";
+  const std::string DrainDeadlineOnConnection = "on_drain_deadline";
   const std::string CloseForConnectRequestOrTcpTunneling =
       "close_for_connect_request_or_tcp_tunneling";
   const std::string Http2PingTimeout = "http2_ping_timeout";
@@ -987,6 +988,22 @@ public:
    * extended to allow a caller to extend or transfer ownership.
    */
   virtual Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
+
+  /**
+   * Records the wall time of one route resolution, adding to the total time and the count.
+   * @param duration the wall time the resolution took.
+   */
+  virtual void addRouteResolutionTime(std::chrono::nanoseconds duration) PURE;
+
+  /**
+   * @return the total wall time spent resolving the route of this stream.
+   */
+  virtual std::chrono::nanoseconds routeResolutionTime() const PURE;
+
+  /**
+   * @return how many times the route of this stream was resolved.
+   */
+  virtual uint32_t routeResolutionCount() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this

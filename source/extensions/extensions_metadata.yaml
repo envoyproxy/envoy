@@ -1573,6 +1573,13 @@ envoy.router.cluster_specifier_plugin.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier
+envoy.router.route_specifiers.dynamic_modules:
+  categories:
+  - envoy.router.route_specifiers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier
 envoy.router.cluster_specifier_plugin.lua:
   categories:
   - envoy.router.cluster_specifier_plugin
@@ -1587,6 +1594,13 @@ envoy.router.cluster_specifier_plugin.matcher:
   status: alpha
   type_urls:
   - envoy.extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier
+envoy.router.cluster_specifier_plugin.priority_group:
+  categories:
+  - envoy.router.cluster_specifier_plugin
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier
 envoy.stat_sinks.dog_statsd:
   categories:
   - envoy.stats_sinks
@@ -1660,6 +1674,13 @@ envoy.tls.cert_validator.spiffe:
   - envoy.tls.cert_validator
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tls.handshakers.dynamic_modules:
+  categories:
+  - envoy.tls_handshakers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.tls.handshakers.dynamic_modules.v3.DynamicModuleTlsHandshaker
 envoy.tracers.dynamic_modules:
   categories:
   - envoy.tracers
@@ -2241,7 +2262,7 @@ envoy.load_balancing_policies.load_aware_locality:
   categories:
   - envoy.load_balancing_policies
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality
 envoy.load_balancing_policies.random:
@@ -2389,6 +2410,20 @@ envoy.http.ai_filters.request_info:
   status: alpha
   type_urls:
   - envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+envoy.http.ai_filters.schema_validation:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.ai_filters.schema_validation.v3.SchemaValidation
+envoy.http.ai_filters.transcoder:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
 envoy.config_subscription.rest:
   categories:
   - envoy.config_subscription
