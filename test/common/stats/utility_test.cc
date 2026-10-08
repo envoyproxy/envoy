@@ -427,6 +427,21 @@ TEST_P(StatsUtilityTest, LiteScopeHelperWithStatNames) {
   }
 }
 
+// A helper created from a pre-encoded StatName prefix without tags: the flat prefix argument is
+// ignored and the base prefix drives both forms. The names are referenced rather than copied, so
+// the pool owning them (here the fixture's pool_) must outlive the helper.
+TEST_P(StatsUtilityTest, LiteScopeHelperStatNamePrefixOnly) {
+  const StatName base = pool_.add("prefix");
+  LiteScopeHelper helper(*scope_, base, {}, pool_.add("ignored"));
+  EXPECT_EQ(base, helper.basePrefix());
+  EXPECT_EQ(base, helper.prefix());
+  EXPECT_TRUE(helper.tags().empty());
+
+  Counter& c = helper.counterFromStatName(pool_.add("requests"));
+  EXPECT_EQ("scope.prefix.requests", c.name());
+  EXPECT_EQ(&c, &scope_->counterFromString("prefix.requests"));
+}
+
 } // namespace
 } // namespace Stats
 } // namespace Envoy

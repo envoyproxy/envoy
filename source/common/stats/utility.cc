@@ -66,26 +66,6 @@ TaggedStatName::TaggedStatName(SymbolTable& symbol_table, absl::string_view base
   }
 }
 
-TaggedStatName::TaggedStatName(SymbolTable& symbol_table, StatName base_name, StatNameTagSpan tags,
-                               StatName name)
-    : tag_pool_(symbol_table) {
-  tag_pool_.reserve(tags.size() * 2 + 2);
-
-  base_name_ = tag_pool_.add(base_name);
-  if (tags.empty()) {
-    name_ = base_name_;
-  } else {
-    ASSERT(!name.empty(), "When tags are supplied, the caller must supply the tagged name with the "
-                          "tag values interleaved.");
-    name_ = tag_pool_.add(name);
-  }
-
-  tags_.reserve(tags.size());
-  for (const StatNameTag& tag : tags) {
-    tags_.push_back({tag_pool_.add(tag.first), tag_pool_.add(tag.second)});
-  }
-}
-
 LiteScopeHelper::FullNameJoiner::FullNameJoiner(const LiteScopeHelper& helper, StatName name) {
   const SymbolTable& symbol_table = helper.scope_.constSymbolTable();
   base_name_.join({helper.basePrefix(), name}, symbol_table);

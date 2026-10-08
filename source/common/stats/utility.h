@@ -2,11 +2,13 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "envoy/common/optref.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/thread.h"
 #include "source/common/stats/symbol_table.h"
 
@@ -83,13 +85,6 @@ public:
   TaggedStatName(SymbolTable& symbol_table, absl::string_view base_name, TagStringViewSpan tags,
                  absl::string_view name);
 
-  /**
-   * As above, but for names and tags that are already encoded, which avoids encoding them again.
-   * They are still copied into the private pool.
-   */
-  TaggedStatName(SymbolTable& symbol_table, StatName base_name, StatNameTagSpan tags,
-                 StatName name);
-
   StatName name() const { return name_; }
   StatName baseName() const { return base_name_; }
   StatNameTagSpan tags() const { return tags_; }
@@ -120,28 +115,47 @@ private:
  * and the base prefix is used for both forms.
  *
  * NOTE: the helper is designed to live on the stack for the duration of creating a batch of
- * stats. It references the scope, which must outlive it. The names and tags are copied, so they
- * do not need to outlive the constructor.
+ * stats. It references the scope, which must outlive it. The string-based constructor copies the
+ * names and tags, so they only need to outlive the constructor; the StatName-based constructor
+ * references them, so they must outlive the helper.
  */
 class LiteScopeHelper {
 public:
   /**
    * Creates a helper that adds nothing; it behaves like the scope itself.
    */
-  explicit LiteScopeHelper(Scope& scope) : LiteScopeHelper(scope, StatName()) {}
+  explicit LiteScopeHelper(Scope& scope) : scope_(scope) {}
 
   /**
    * @param scope The scope in which the stats are created.
    * @param base_prefix The tag-extracted prefix to add to the stat names.
    * @param tags The tags to add to the stats.
    * @param prefix The flat prefix with the tag values interleaved. Ignored if tags is empty.
+   *
+   * The names and tags are encoded into, and owned by, a private pool.
    */
   LiteScopeHelper(Scope& scope, absl::string_view base_prefix, TagStringViewSpan tags = {},
                   absl::string_view prefix = {})
-      : scope_(scope), prefix_(scope.symbolTable(), base_prefix, tags, prefix) {}
+      : scope_(scope), owned_prefix_(std::in_place, scope.symbolTable(), base_prefix, tags, prefix),
+        base_prefix_(owned_prefix_->baseName()), prefix_(owned_prefix_->name()),
+        tags_(owned_prefix_->tags()) {}
+
+  /**
+   * As above, but for a prefix and tags that are already encoded. They are referenced, not
+   * copied, so the caller must keep them (and their backing storage) alive for the lifetime of
+   * the helper.
+   *
+   * TODO(wbpcode): if a caller ever needs the helper to outlive the supplied names, add an
+   * overload that copies them into a private pool instead of referencing them.
+   */
   LiteScopeHelper(Scope& scope, StatName base_prefix, StatNameTagSpan tags = {},
                   StatName prefix = StatName())
-      : scope_(scope), prefix_(scope.symbolTable(), base_prefix, tags, prefix) {}
+      : scope_(scope), base_prefix_(base_prefix), prefix_(tags.empty() ? base_prefix : prefix),
+        tags_(tags) {
+    ASSERT(tags.empty() || !prefix.empty(),
+           "When tags are supplied, the caller must supply the tagged prefix with the tag values "
+           "interleaved.");
+  }
 
   // The subset of the Scope stat creation methods used by the stats macros. The name is the
   // stat's leaf name, to which the helper's prefix and tags are added.
@@ -161,15 +175,15 @@ public:
   /**
    * @return the tag-extracted prefix of this helper, excluding the scope's own prefix.
    */
-  StatName basePrefix() const { return prefix_.baseName(); }
+  StatName basePrefix() const { return base_prefix_; }
   /**
    * @return the flat prefix of this helper, excluding the scope's own prefix.
    */
-  StatName prefix() const { return prefix_.name(); }
+  StatName prefix() const { return prefix_; }
   /**
    * @return the tags of this helper, excluding the scope's own tags.
    */
-  StatNameTagSpan tags() const { return prefix_.tags(); }
+  StatNameTagSpan tags() const { return tags_; }
 
 private:
   // The names of a single stat: the helper's prefixes joined with the stat's leaf name.
@@ -188,7 +202,13 @@ private:
   };
 
   Scope& scope_;
-  const TaggedStatName prefix_;
+  // Owns the encoded prefix and tags for the string-based constructor; the view members below
+  // point into it. Unset for the StatName-based constructors, whose views reference caller-owned
+  // storage.
+  const std::optional<TaggedStatName> owned_prefix_;
+  const StatName base_prefix_;
+  const StatName prefix_;
+  const StatNameTagSpan tags_;
 };
 
 /**
