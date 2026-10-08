@@ -1062,6 +1062,15 @@ func (h *dymHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool
 	return bool(ret)
 }
 
+func (h *dymHttpFilterHandle) HasFilterState(key string) bool {
+	ret := C.envoy_dynamic_module_callback_http_has_filter_state(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+	)
+	runtime.KeepAlive(key)
+	return bool(ret)
+}
+
 func (h *dymHttpFilterHandle) GetData(key string) any {
 	buf, found := h.GetMetadataString(shared.MetadataSourceTypeDynamic,
 		"composer.shared_data", key)

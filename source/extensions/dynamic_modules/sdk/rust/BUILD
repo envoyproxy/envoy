@@ -13,6 +13,14 @@ envoy_extension_package()
 
 exports_files(["Cargo.toml"])
 
+# abi/abi.h is a symlink, which git may check out as a plain text file on Windows.
+# Point the build script at the original header instead.
+_WINDOWS_ENV = {
+    "ENVOY_ABI_HEADER": "$(location //source/extensions/dynamic_modules/abi:abi.h)",
+}
+
+_WINDOWS_DATA = ["//source/extensions/dynamic_modules/abi:abi.h"]
+
 cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],
@@ -25,6 +33,7 @@ cargo_build_script(
             "ENVOY_SYSROOT_AMD64_ANCHOR": "$(location @sysroot_linux_amd64//:usr/include/stdio.h)",
             "ENVOY_SYSROOT_ARM64_ANCHOR": "$(location @sysroot_linux_arm64//:usr/include/stdio.h)",
         },
+        "@platforms//os:windows": _WINDOWS_ENV,
         "//conditions:default": {},
     }),
     data = [
@@ -37,6 +46,7 @@ cargo_build_script(
             "@sysroot_linux_amd64//:usr/include/stdio.h",
             "@sysroot_linux_arm64//:usr/include/stdio.h",
         ],
+        "@platforms//os:windows": _WINDOWS_DATA,
         "//conditions:default": [],
     }) + select({
         # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
