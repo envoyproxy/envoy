@@ -267,10 +267,10 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   auto found_counter = scope_.findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
-  EXPECT_EQ(&c1, &found_counter->get());
-  EXPECT_EQ(100, found_counter->get().value());
+  EXPECT_EQ(&c1, &found_counter.ref());
+  EXPECT_EQ(100, found_counter->value());
   c1.add(100);
-  EXPECT_EQ(200, found_counter->get().value());
+  EXPECT_EQ(200, found_counter->value());
 
   Gauge& g1 = scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&g1, &scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate));
@@ -279,10 +279,10 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   auto found_gauge = scope_.findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
-  EXPECT_EQ(&g1, &found_gauge->get());
-  EXPECT_EQ(100, found_gauge->get().value());
+  EXPECT_EQ(&g1, &found_gauge.ref());
+  EXPECT_EQ(100, found_gauge->value());
   g1.set(0);
-  EXPECT_EQ(0, found_gauge->get().value());
+  EXPECT_EQ(0, found_gauge->value());
 
   Histogram& h1 = scope_.histogramFromString("h1", Histogram::Unit::Unspecified);
   EXPECT_EQ(&h1, &scope_.histogramFromString("h1", Histogram::Unit::Unspecified));
@@ -290,13 +290,13 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   auto found_histogram = scope_.findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
-  EXPECT_EQ(&h1, &found_histogram->get());
+  EXPECT_EQ(&h1, &found_histogram.ref());
   TextReadout& t1 = scope_.textReadoutFromString("t1");
   EXPECT_EQ(&t1, &scope_.textReadoutFromString("t1"));
 
   auto found_text_readout = scope_.findTextReadout(t1.statName());
   ASSERT_TRUE(found_text_readout.has_value());
-  EXPECT_EQ(&t1, &found_text_readout->get());
+  EXPECT_EQ(&t1, &found_text_readout.ref());
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
@@ -325,10 +325,10 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   c1.add(100);
   auto found_counter = scope_.findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
-  EXPECT_EQ(&c1, &found_counter->get());
-  EXPECT_EQ(100, found_counter->get().value());
+  EXPECT_EQ(&c1, &found_counter.ref());
+  EXPECT_EQ(100, found_counter->value());
   c1.add(100);
-  EXPECT_EQ(200, found_counter->get().value());
+  EXPECT_EQ(200, found_counter->value());
 
   Gauge& g1 = scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&g1, &scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate));
@@ -336,17 +336,17 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   g1.set(100);
   auto found_gauge = scope_.findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
-  EXPECT_EQ(&g1, &found_gauge->get());
-  EXPECT_EQ(100, found_gauge->get().value());
+  EXPECT_EQ(&g1, &found_gauge.ref());
+  EXPECT_EQ(100, found_gauge->value());
   g1.set(0);
-  EXPECT_EQ(0, found_gauge->get().value());
+  EXPECT_EQ(0, found_gauge->value());
 
   Histogram& h1 = scope_.histogramFromString("h1", Histogram::Unit::Unspecified);
   EXPECT_EQ(&h1, &scope_.histogramFromString("h1", Histogram::Unit::Unspecified));
   StatNameManagedStorage h1_name("h1", symbol_table_);
   auto found_histogram = scope_.findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
-  EXPECT_EQ(&h1, &found_histogram->get());
+  EXPECT_EQ(&h1, &found_histogram.ref());
 
   TextReadout& t1 = scope_.textReadoutFromString("t1");
   EXPECT_EQ(&t1, &scope_.textReadoutFromString("t1"));
@@ -377,6 +377,52 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(2L, store_->textReadouts().front().use_count());
 }
 
+// counterFromMergedStatName/gaugeFromMergedStatName honor fully-resolved components on the
+// legacy scope: the flat name is the cache key, and the supplied tag metadata is retained
+// rather than re-derived from the name. Without tags they fall back to name-derived creation.
+TEST_F(StatsThreadLocalStoreTest, MergedStatNameHonorsSuppliedTags) {
+  StatNamePool pool(symbol_table_);
+  const StatNameTagVector tags{{pool.add("source"), pool.add("svc-a")}};
+  Counter& counter =
+      scope_.counterFromMergedStatName(pool.add("custom.requests_total.source.svc-a"),
+                                       pool.add("custom.requests_total"), StatNameTagSpan(tags));
+  EXPECT_EQ("custom.requests_total.source.svc-a", counter.name());
+  EXPECT_EQ("custom.requests_total", counter.tagExtractedName());
+  ASSERT_EQ(1, counter.tags().size());
+  EXPECT_EQ("source", counter.tags()[0].name_);
+  EXPECT_EQ("svc-a", counter.tags()[0].value_);
+  // Merged re-creation counts as programmatic tags, so a subsequent hot restart (this process
+  // becoming the parent) still exports the tag metadata.
+  EXPECT_TRUE(counter.noTagExtraction());
+
+  Gauge& gauge = scope_.gaugeFromMergedStatName(pool.add("custom.active.source.svc-a"),
+                                                pool.add("custom.active"), StatNameTagSpan(tags),
+                                                Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("custom.active.source.svc-a", gauge.name());
+  EXPECT_EQ("custom.active", gauge.tagExtractedName());
+  ASSERT_EQ(1, gauge.tags().size());
+  EXPECT_TRUE(gauge.noTagExtraction());
+
+  // A caller creating the same stat with programmatic tags resolves to the same object: the
+  // flat names (cache keys) match.
+  const StatNameTagVector tags2{{pool.add("source"), pool.add("svc-a")}};
+  Counter& tagged = scope_.counterFromStatNameWithTags(pool.add("custom.requests_total"), tags2);
+  EXPECT_EQ(&tagged, &counter);
+
+  // Without tags, creation falls back to the name-derived path keyed by the flat name.
+  Counter& untagged = scope_.counterFromMergedStatName(pool.add("plain.counter"),
+                                                       pool.add("plain.counter"), std::nullopt);
+  EXPECT_EQ("plain.counter", untagged.name());
+  EXPECT_TRUE(untagged.tags().empty());
+  EXPECT_FALSE(untagged.noTagExtraction());
+  Gauge& untagged_gauge =
+      scope_.gaugeFromMergedStatName(pool.add("plain.gauge"), pool.add("plain.gauge"), std::nullopt,
+                                     Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("plain.gauge", untagged_gauge.name());
+  EXPECT_TRUE(untagged_gauge.tags().empty());
+  EXPECT_FALSE(untagged_gauge.noTagExtraction());
+}
+
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -389,11 +435,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   StatNameManagedStorage c1_name("c1", symbol_table_);
   auto found_counter = scope_.findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
-  EXPECT_EQ(&c1, &found_counter->get());
+  EXPECT_EQ(&c1, &found_counter.ref());
   StatNameManagedStorage c2_name("scope1.c2", symbol_table_);
   auto found_counter2 = scope1->findCounter(c2_name.statName());
   ASSERT_TRUE(found_counter2.has_value());
-  EXPECT_EQ(&c2, &found_counter2->get());
+  EXPECT_EQ(&c2, &found_counter2.ref());
 
   Gauge& g1 = scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromString("g2", Gauge::ImportMode::Accumulate);
@@ -402,11 +448,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   StatNameManagedStorage g1_name("g1", symbol_table_);
   auto found_gauge = scope_.findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
-  EXPECT_EQ(&g1, &found_gauge->get());
+  EXPECT_EQ(&g1, &found_gauge.ref());
   StatNameManagedStorage g2_name("scope1.g2", symbol_table_);
   auto found_gauge2 = scope1->findGauge(g2_name.statName());
   ASSERT_TRUE(found_gauge2.has_value());
-  EXPECT_EQ(&g2, &found_gauge2->get());
+  EXPECT_EQ(&g2, &found_gauge2.ref());
 
   Histogram& h1 = scope_.histogramFromString("h1", Histogram::Unit::Unspecified);
   Histogram& h2 = scope1->histogramFromString("h2", Histogram::Unit::Unspecified);
@@ -419,11 +465,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   StatNameManagedStorage h1_name("h1", symbol_table_);
   auto found_histogram = scope_.findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
-  EXPECT_EQ(&h1, &found_histogram->get());
+  EXPECT_EQ(&h1, &found_histogram.ref());
   StatNameManagedStorage h2_name("scope1.h2", symbol_table_);
   auto found_histogram2 = scope1->findHistogram(h2_name.statName());
   ASSERT_TRUE(found_histogram2.has_value());
-  EXPECT_EQ(&h2, &found_histogram2->get());
+  EXPECT_EQ(&h2, &found_histogram2.ref());
 
   TextReadout& t1 = scope_.textReadoutFromString("t1");
   TextReadout& t2 = scope1->textReadoutFromString("t2");
@@ -918,7 +964,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   StatNameManagedStorage c1_name("scope1.foo.bar", symbol_table_);
   auto found_counter = scope1->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
-  EXPECT_EQ(&c1, &found_counter->get());
+  EXPECT_EQ(&c1, &found_counter.ref());
 
   ScopeSharedPtr scope2 = scope1->createScope("foo.");
   Counter& c2 = scope2->counterFromString("bar");
@@ -2057,6 +2103,30 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, HistogramDestructionShutdownRace) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  {
+    ScopeSharedPtr scope1 = store_->createScope("scope1.");
+    scope1->histogramFromString("h1", Histogram::Unit::Unspecified);
+  }
+
+  // Execute posted tasks to run clearScopesFromCaches on the main thread.
+  // This will destroy scope1 and in turn destroy the histogram h1 (since there are no other
+  // references). Destroying the histogram will call releaseHistogramCrossThread and post
+  // clearHistogramsFromCaches to the dispatcher.
+  main_thread_dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+
+  // Now, without executing the newly posted clearHistogramsFromCaches task, we initiate shutdown.
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+
+  // ThreadLocalStore should destruct cleanly without any histograms_to_cleanup_.empty() assert
+  // failure.
+  tls_.shutdownThread();
+}
+
 TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   SymbolTableImpl symbol_table;
   Api::ApiPtr api = Api::createApiForTest();
@@ -2758,7 +2828,7 @@ TEST_F(ThreadLocalStoreExplicitTagsTest, CounterNameAndNameTags) {
   // The flat name is the cache key: looking it up returns the same counter.
   CounterOptConstRef found = scope_.findCounter(c.statName());
   ASSERT_TRUE(found.has_value());
-  EXPECT_EQ(&c, &found->get());
+  EXPECT_EQ(&c, &found.ref());
 }
 
 // A child scope created with name_tags + an explicit tagged_name propagates the tag to child stats
@@ -2806,6 +2876,39 @@ TEST_F(ThreadLocalStoreExplicitTagsTest, CreateScopeWithTagStringViews) {
   ASSERT_EQ(1, c.tags().size());
   EXPECT_EQ("cluster_name", c.tags()[0].name_);
   EXPECT_EQ("foo", c.tags()[0].value_);
+}
+
+// The merged-stat creation methods on a tag-aware scope route through the tag-aware API and
+// retain the supplied metadata, including the explicit flat name as the cache key.
+TEST_F(ThreadLocalStoreExplicitTagsTest, MergedStatNameHonorsSuppliedTags) {
+  StatNameTagVector tags{{makeStatName("source"), makeStatName("svc-a")}};
+  Counter& counter = scope_.counterFromMergedStatName(
+      makeStatName("custom.rq.source.svc-a"), makeStatName("custom.rq"), StatNameTagSpan(tags));
+  EXPECT_EQ("custom.rq.source.svc-a", counter.name());
+  EXPECT_EQ("custom.rq", counter.tagExtractedName());
+  ASSERT_EQ(1, counter.tags().size());
+  EXPECT_EQ("source", counter.tags()[0].name_);
+  EXPECT_EQ("svc-a", counter.tags()[0].value_);
+  EXPECT_TRUE(counter.noTagExtraction());
+
+  Gauge& gauge = scope_.gaugeFromMergedStatName(
+      makeStatName("custom.active.source.svc-a"), makeStatName("custom.active"),
+      StatNameTagSpan(tags), Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("custom.active.source.svc-a", gauge.name());
+  EXPECT_EQ("custom.active", gauge.tagExtractedName());
+  ASSERT_EQ(1, gauge.tags().size());
+  EXPECT_TRUE(gauge.noTagExtraction());
+
+  // Empty tags fall back to name-derived creation keyed by the flat name.
+  Counter& untagged = scope_.counterFromMergedStatName(makeStatName("plain.counter"),
+                                                       makeStatName("plain.counter"), std::nullopt);
+  EXPECT_EQ("plain.counter", untagged.name());
+  EXPECT_TRUE(untagged.tags().empty());
+  EXPECT_FALSE(untagged.noTagExtraction());
+  Gauge& untagged_gauge =
+      scope_.gaugeFromMergedStatName(makeStatName("plain.gauge"), makeStatName("plain.gauge"),
+                                     std::nullopt, Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("plain.gauge", untagged_gauge.name());
 }
 
 // Covers histogramFromStatName and textReadoutFromStatName in explicit-tags mode when the scope

@@ -14,7 +14,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 
-FilterFactoryCreator::FilterFactoryCreator() : ExceptionFreeFactoryBase(kFilterName) {}
+FilterFactoryCreator::FilterFactoryCreator() : UnifiedFactoryBase(kFilterName) {}
 
 absl::StatusOr<Envoy::Http::FilterFactoryCb> FilterFactoryCreator::createFilterFactory(
     const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
@@ -31,20 +31,12 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> FilterFactoryCreator::createFilterF
 }
 
 absl::StatusOr<Envoy::Http::FilterFactoryCb>
-FilterFactoryCreator::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
-        proto_config,
-    const std::string&, Envoy::Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, context.serverFactoryContext(), context.scope());
-}
-
-absl::StatusOr<Envoy::Http::FilterFactoryCb>
 FilterFactoryCreator::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
         proto_config,
     Envoy::Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext&) {
-  return createFilterFactory(proto_config, context, context.scope());
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactory(proto_config, context, extra_context.scopeOr(context));
 }
 
 REGISTER_FACTORY(FilterFactoryCreator, Envoy::Server::Configuration::NamedHttpFilterConfigFactory);

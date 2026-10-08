@@ -12,6 +12,8 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -62,11 +64,10 @@ public:
    *        implementation.
    * @param context ResourceMonitorFactoryContext& supplies the resource monitor's context.
    * @return ResourceMonitorPtr the resource monitor instance. Should not be nullptr.
-   * @throw EnvoyException if the implementation is unable to produce an instance with
-   *        the provided parameters.
    */
-  virtual ResourceMonitorPtr createResourceMonitor(const Protobuf::Message& config,
-                                                   ResourceMonitorFactoryContext& context) PURE;
+  virtual absl::StatusOr<ResourceMonitorPtr>
+  createResourceMonitor(const Protobuf::Message& config,
+                        ResourceMonitorFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.resource_monitors"; }
 };

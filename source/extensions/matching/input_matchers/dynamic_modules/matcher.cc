@@ -9,18 +9,12 @@ namespace DynamicModules {
 using ::Envoy::Extensions::Matching::Http::DynamicModules::DynamicModuleMatchData;
 using ::Envoy::Matcher::MatchResult;
 
-DynamicModuleInputMatcher::DynamicModuleInputMatcher(
-    DynamicModuleSharedPtr module, OnMatcherConfigDestroyType on_config_destroy,
-    OnMatcherMatchType on_match,
-    envoy_dynamic_module_type_matcher_config_module_ptr in_module_config)
-    : module_(std::move(module)), on_config_destroy_(on_config_destroy), on_match_(on_match),
-      in_module_config_(in_module_config) {}
-
-DynamicModuleInputMatcher::~DynamicModuleInputMatcher() {
-  if (in_module_config_ != nullptr && on_config_destroy_ != nullptr) {
-    on_config_destroy_(in_module_config_);
-  }
-}
+DynamicModuleInputMatcher::DynamicModuleInputMatcher(DynamicModuleSharedPtr module,
+                                                     OnMatcherMatchType on_match,
+                                                     std::shared_ptr<const void> in_module_config,
+                                                     MatchResult on_error_result)
+    : module_(std::move(module)), on_match_(on_match),
+      in_module_config_(std::move(in_module_config)), on_error_result_(on_error_result) {}
 
 MatchResult DynamicModuleInputMatcher::match(const ::Envoy::Matcher::DataInputGetResult& input) {
   if (auto dynamic_module_data = input.customData<DynamicModuleMatchData>(); dynamic_module_data) {
@@ -30,7 +24,13 @@ MatchResult DynamicModuleInputMatcher::match(const ::Envoy::Matcher::DataInputGe
     context.response_headers = dynamic_module_data->response_headers_;
     context.response_trailers = dynamic_module_data->response_trailers_;
 
-    if (on_match_(in_module_config_, static_cast<void*>(&context))) {
+    const bool matched = on_match_(in_module_config_.get(), static_cast<void*>(&context));
+    // The panic barrier reports an evaluation it could not complete through module_error. Apply the
+    // configured on_error policy in that case rather than trusting the fail value it returned.
+    if (context.module_error) {
+      return on_error_result_;
+    }
+    if (matched) {
       return MatchResult::Matched;
     }
   }

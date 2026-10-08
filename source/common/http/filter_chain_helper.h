@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
+#include "envoy/server/filter_config.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
@@ -144,7 +145,8 @@ private:
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, server_context_.messageValidationVisitor(), *factory);
     absl::StatusOr<Http::FilterFactoryCb> callback_or_error =
-        factory->createFilterFactoryFromProto(*message, stats_prefix_, factory_context_);
+        Server::Configuration::createHttpFilterFactory(*factory, *message, stats_prefix_,
+                                                       factory_context_);
     if (!callback_or_error.status().ok()) {
       return callback_or_error.status();
     }

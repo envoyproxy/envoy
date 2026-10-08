@@ -35,6 +35,7 @@
 #include "source/common/common/perf_tracing.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/exception.h"
@@ -46,6 +47,7 @@
 #include "source/common/http/path_utility.h"
 #include "source/common/http/status.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/drain_close_util.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -97,22 +99,102 @@ upstreamOperationNameFormatter(const Http::TracingConnectionManagerConfig& hcm_c
   return formatter != nullptr ? formatter : hcm_config.upstream_operation_.get();
 }
 
-ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
-                                                            Stats::Scope& scope) {
-  return ConnectionManagerStats(
-      {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
-                               POOL_HISTOGRAM_PREFIX(scope, prefix))},
-      prefix, scope);
+namespace {
+// The stats of an HTTP connection manager are namespaced 'http.(<stat_prefix>.)*': the flat prefix
+// is 'http.<stat_prefix>.' and 'http' alone is the tag-extracted prefix, with the stat prefix
+// carried by an 'envoy.http_conn_manager_prefix' tag.
+constexpr absl::string_view HttpBaseStatPrefix = "http";
+
+// Fraction of the drain time over which the probability of drain-closing on a response ramps up
+// to one. Every response sent later in the drain sequence drains the connection.
+constexpr double DrainCloseRampFactor = 0.5;
+// Fraction of the drain time after which the connections that are still not draining start to
+// be drained proactively, see ConnectionManagerImpl::onDrain().
+constexpr double ProactiveDrainWindowStart = 2.0 / 3.0;
+
+std::string httpFlatStatPrefix(absl::string_view stat_prefix) {
+  return absl::StrCat(HttpBaseStatPrefix, ".", stat_prefix, ".");
 }
 
-ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
-                                                                          Stats::Scope& scope) {
-  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(scope, prefix + "tracing."))};
+Stats::TagStringView httpStatPrefixTag(absl::string_view stat_prefix) {
+  return {Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX, stat_prefix};
+}
+
+// Creates a 'downstream_rq_<class>xx' counter carrying the response code class as an explicit
+// 'envoy.response_code_class' tag, so it does not depend on the class being recovered from the
+// stat name by a tag extractor.
+//
+// `name` is the complete stat name, 'downstream_rq_<class>xx'. The class is the digit before the
+// trailing 'xx', which is exactly what the '_rq_((\d))xx$' extraction rule pulls out, and the
+// tag-extracted name is the same name with that digit removed.
+//
+// `base_prefix`, `prefix_tags` and `prefix` describe an enclosing prefix that is part of the stat
+// name rather than of the scope, as is the case for the listener stats. They are all empty when
+// the scope itself carries the prefix.
+Stats::Counter& responseCodeClassCounter(Stats::Scope& scope, Stats::StatName base_prefix,
+                                         Stats::StatNameTagSpan prefix_tags, Stats::StatName prefix,
+                                         absl::string_view name) {
+  ASSERT(absl::StartsWith(name, "downstream_rq_"));
+  ASSERT(absl::EndsWith(name, "xx"));
+  ASSERT(absl::ascii_isdigit(name[name.size() - 3]));
+  const absl::string_view response_code_class = name.substr(name.size() - 3, 1);
+
+  Stats::SymbolTable& symbol_table = scope.symbolTable();
+  Stats::StatNamePool pool(symbol_table);
+  const Stats::StatName base_leaf = pool.add(absl::StrCat(name.substr(0, name.size() - 3), "xx"));
+  const Stats::StatName leaf = pool.add(name);
+
+  Stats::StatNameTagVec tags(prefix_tags.begin(), prefix_tags.end());
+  tags.emplace_back(pool.add(Config::TagNames::get().RESPONSE_CODE_CLASS),
+                    pool.add(response_code_class));
+
+  const Stats::SymbolTable::StoragePtr base_name = symbol_table.join({base_prefix, base_leaf});
+  const Stats::SymbolTable::StoragePtr tagged_name = symbol_table.join({prefix, leaf});
+  return scope.counterFromTaggedName(Stats::StatName(base_name.get()), tags,
+                                     Stats::StatName(tagged_name.get()));
+}
+
+// Completes a POOL_COUNTER_RESPONSE_CODE_CLASS() invocation, in the style of the POOL_* macros in
+// stats_macros.h.
+#define FINISH_RESPONSE_CODE_CLASS_DECL_(X) #X),
+
+// Creates the response code class counters of a stats list. BASE_PREFIX, TAGS and PREFIX describe
+// an enclosing prefix that is part of the stat name rather than of the scope, and are all empty
+// when the scope itself carries the prefix.
+#define POOL_COUNTER_RESPONSE_CODE_CLASS(SCOPE, BASE_PREFIX, TAGS, PREFIX)                         \
+  responseCodeClassCounter(SCOPE, BASE_PREFIX, TAGS, PREFIX, FINISH_RESPONSE_CODE_CLASS_DECL_
+
+} // namespace
+
+ConnectionManagerStats ConnectionManagerImpl::generateStats(Stats::Scope& scope) {
+  // The scope already carries the 'http.<stat_prefix>.' prefix, so the response code class
+  // counters need no prefix of their own.
+  return ConnectionManagerStats(
+      {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope),
+                               POOL_COUNTER_RESPONSE_CODE_CLASS(scope, {}, {}, {}))},
+      scope);
+}
+
+ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(Stats::Scope& scope) {
+  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(scope, "tracing."))};
+}
+
+Stats::ScopeSharedPtr ConnectionManagerImpl::createStatsScope(Stats::Scope& scope,
+                                                              absl::string_view stat_prefix) {
+  return scope.createScopeWithTaggedName(HttpBaseStatPrefix, {httpStatPrefixTag(stat_prefix)},
+                                         httpFlatStatPrefix(stat_prefix));
 }
 
 ConnectionManagerListenerStats
-ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::Scope& scope) {
-  return {CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+ConnectionManagerImpl::generateListenerStats(absl::string_view stat_prefix, Stats::Scope& scope) {
+  // These live in the listener's scope, so the 'http.<stat_prefix>.' prefix is part of the stat
+  // name rather than of the scope and has to be supplied to every stat.
+  const Stats::TaggedStatName prefix(scope.symbolTable(), HttpBaseStatPrefix,
+                                     {httpStatPrefixTag(stat_prefix)},
+                                     httpFlatStatPrefix(stat_prefix));
+  return {CONN_MAN_LISTENER_STATS(
+      POOL_COUNTER_TAGGED(scope, prefix),
+      POOL_COUNTER_RESPONSE_CODE_CLASS(scope, prefix.baseName(), prefix.tags(), prefix.name()))};
 }
 
 ConnectionManagerImpl::ConnectionManagerImpl(
@@ -120,7 +202,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(
     Random::RandomGenerator& random_generator, Http::Context& http_context,
     Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
     Upstream::ClusterManager& cluster_manager, Server::OverloadManager& overload_manager,
-    TimeSource& time_source, envoy::config::core::v3::TrafficDirection direction)
+    TimeSource& time_source, envoy::config::core::v3::TrafficDirection direction,
+    Server::Configuration::ServerFactoryContext& server_context)
     : config_(std::move(config)), stats_(config_->stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
@@ -147,7 +230,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(
                                      /*proxy_status_config=*/config_->proxyStatusConfig())),
       max_requests_during_dispatch_(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
-      direction_(direction),
+      direction_(direction), server_context_(server_context),
+      use_connection_event_drain_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")),
       allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
       close_connection_on_zombie_stream_complete_(Runtime::runtimeFeatureEnabled(
@@ -166,6 +251,17 @@ ConnectionManagerImpl::ConnectionManagerImpl(
       trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
       "found. Is it configured?");
+  if (config_->recordRouteResolutionStats()) {
+    Stats::SymbolTable& symbol_table = stats_.scope_.symbolTable();
+    Stats::StatNameManagedStorage route_resolution_time_us_stat_name(
+        "downstream_rq_route_resolution_time_us", symbol_table);
+    route_resolution_time_us_histogram_ = stats_.scope_.histogramFromStatName(
+        route_resolution_time_us_stat_name.statName(), Stats::Histogram::Unit::Microseconds);
+    Stats::StatNameManagedStorage route_resolutions_stat_name("downstream_rq_route_resolutions",
+                                                              symbol_table);
+    route_resolutions_histogram_ = stats_.scope_.histogramFromStatName(
+        route_resolutions_stat_name.statName(), Stats::Histogram::Unit::Unspecified);
+  }
 }
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -189,6 +285,9 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     stats_.named_.downstream_cx_ssl_active_.inc();
   }
 
+  // Captured once here rather than plumbed through the filter factory: the drain type belongs to
+  // the listener that accepted this connection, and is reachable from the connection itself.
+  drain_type_ = Network::listenerDrainType(read_callbacks_->connection());
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_->addProxyProtocolConnectionState() &&
@@ -368,9 +467,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
       // There was a downstream reset, log immediately.
       !stream.filter_manager_.sawDownstreamReset() &&
       // On recreate stream, log immediately.
-      stream.response_encoder_ != nullptr &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_defer_logging_to_ack_listener")) {
+      stream.response_encoder_ != nullptr) {
     stream.deferHeadersAndTrailers();
   } else {
     // For HTTP/1 and HTTP/2, log here as usual.
@@ -649,6 +746,38 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
   }
 }
 
+void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
+  // The legacy path polls the DrainDecision instead and never looks at the event.
+  if (!use_connection_event_drain_ || connection_drain_event_.has_value()) {
+    return;
+  }
+  connection_drain_event_ = drain_event;
+
+  // The drain-close decision is otherwise only made when a response is encoded, so a connection
+  // that is idle, has a low request rate or only carries long-lived streams would stay open until
+  // the end of the drain sequence and then be closed without notice, together with every other
+  // connection like it. Arrange for the connection to drain itself in the last part of the drain
+  // window instead, early enough for the drain sequence (drainTimeout()) to complete. A connection
+  // accepted after that part of the window has begun is not drained proactively.
+  const std::chrono::milliseconds delay = Network::proactiveDrainDelay(
+      server_context_, drain_event, config_->drainTimeout(), ProactiveDrainWindowStart);
+  if (delay.count() == 0) {
+    return;
+  }
+  proactive_drain_timer_ =
+      dispatcher_->createTimer([this]() -> void { onProactiveDrainTimeout(); });
+  proactive_drain_timer_->enableTimer(delay);
+}
+
+bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
+  if (!use_connection_event_drain_) {
+    return drain_close_.drainClose(scope);
+  }
+
+  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_,
+                                   DrainCloseRampFactor);
+}
+
 void ConnectionManagerImpl::doConnectionClose(
     std::optional<Network::ConnectionCloseType> close_type,
     std::optional<StreamInfo::CoreResponseFlag> response_flag, absl::string_view details) {
@@ -665,6 +794,11 @@ void ConnectionManagerImpl::doConnectionClose(
   if (drain_timer_) {
     drain_timer_->disableTimer();
     drain_timer_.reset();
+  }
+
+  if (proactive_drain_timer_) {
+    proactive_drain_timer_->disableTimer();
+    proactive_drain_timer_.reset();
   }
 
   if (!streams_.empty()) {
@@ -814,6 +948,60 @@ void ConnectionManagerImpl::onDrainTimeout() {
   codec_->goAway();
   drain_state_ = DrainState::Closing;
   checkForDeferredClose(false);
+  // Only once the end of the drain window is near: a drain sequence started earlier (e.g. by a
+  // response) must not cut the tunneling streams short while other traffic on the connection can
+  // still complete normally.
+  if (proactive_drain_) {
+    resetTunnelingStreams();
+  }
+}
+
+void ConnectionManagerImpl::onProactiveDrainTimeout() {
+  ENVOY_CONN_LOG(debug, "drain deadline approaching, draining connection",
+                 read_callbacks_->connection());
+  proactive_drain_ = true;
+  if (!codec_) {
+    // Nothing was ever received on this connection, so there is no peer to drain gracefully.
+    stats_.named_.downstream_cx_drain_close_.inc();
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, std::nullopt,
+                      StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection);
+  } else if (drain_state_ == DrainState::NotDraining) {
+    // Start the drain sequence. The tunneling streams still active when it completes are reset in
+    // onDrainTimeout().
+    stats_.named_.downstream_cx_drain_close_.inc();
+    startDrainSequence();
+  } else if (drain_state_ == DrainState::Closing) {
+    // The connection is only kept open by its remaining streams. On HTTP/1 this is the case for
+    // every WebSocket or CONNECT tunnel, as establishing it marks the connection as closing.
+    // On HTTP/2 and HTTP/3 it happens when a drain sequence started earlier, e.g.
+    // by the response of an ordinary stream, completed while a tunneling stream was still active.
+    // Either way nothing else will end the tunneling streams, so reset them now.
+    stats_.named_.downstream_cx_drain_close_.inc();
+    resetTunnelingStreams();
+  }
+  // Otherwise the drain sequence is already running and onDrainTimeout() resets the tunneling
+  // streams when it completes.
+}
+
+void ConnectionManagerImpl::resetTunnelingStreams() {
+  ASSERT(drain_state_ == DrainState::Closing);
+  // Upgraded and CONNECT streams cannot be told to go away (no "Connection: close" can be sent on
+  // them anymore, and a GOAWAY does not end them), and they would otherwise all be terminated at
+  // the same moment at the end of the drain sequence. Reset them now: this happens at a different
+  // time for every connection, which spreads out the reconnects. Ordinary requests are left to
+  // complete.
+  for (auto it = streams_.begin(); it != streams_.end();) {
+    // Resetting the stream removes it from the list, so advance first.
+
+    auto stream = (it++)->get();
+    if (!stream->state_.is_tunneling_ || stream->state_.is_zombie_stream_) {
+      continue;
+    }
+    ENVOY_STREAM_LOG(debug, "resetting tunneling stream of drained connection", *stream);
+    stream->filter_manager_.streamInfo().setResponseCodeDetails(
+        StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection);
+    stream->resetStream();
+  }
 }
 
 void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
@@ -1024,9 +1212,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 }
 
 void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
-  const Formatter::Context log_context{
+  Formatter::Context log_context{
       request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, type,
       active_span_.get()};
+  if (request_trailers_ != nullptr) {
+    log_context.setRequestTrailers(*request_trailers_);
+  }
 
   filter_manager_.log(log_context);
 
@@ -1037,6 +1228,15 @@ void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
 
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
+
+  if (connection_manager_.route_resolution_time_us_histogram_.has_value()) {
+    const StreamInfo::StreamInfo& stream_info = filter_manager_.streamInfo();
+    connection_manager_.route_resolution_time_us_histogram_->recordValue(
+        std::chrono::duration_cast<std::chrono::microseconds>(stream_info.routeResolutionTime())
+            .count());
+    connection_manager_.route_resolutions_histogram_->recordValue(
+        stream_info.routeResolutionCount());
+  }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   if (filter_manager_.streamInfo().healthCheck()) {
@@ -1446,7 +1646,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   connection_manager_.user_agent_.initializeFromHeaders(*request_headers_,
-                                                        connection_manager_.stats_.prefixStatName(),
                                                         connection_manager_.stats_.scope_);
 
   if (!request_headers_->Host()) {
@@ -1457,12 +1656,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   // Apply header sanity checks.
-  std::optional<std::reference_wrapper<const absl::string_view>> error =
-      HeaderUtility::requestHeadersValid(*request_headers_);
+  OptRef<const absl::string_view> error = HeaderUtility::requestHeadersValid(*request_headers_);
   if (error != std::nullopt) {
-    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt, error.value().get());
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt, *error);
     if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-      connection_manager_.handleCodecError(error.value().get());
+      connection_manager_.handleCodecError(*error);
     }
     return;
   }
@@ -1491,6 +1689,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Code::NotFound, "", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().AbsolutePath);
+    return;
+  }
+
+  // RFC 10008 Section 2: "Servers MUST fail the request if the Content-Type request field is
+  // missing or is inconsistent with the request content." Only the missing case is enforced here;
+  // whether the media type is consistent with, supported by, or processable for the request
+  // content is a decision only the origin server can make. An empty field value is as absent as a
+  // missing one. Section 2.1 calls for "a 4xx status code such as 400".
+  if (HeaderUtility::isQuery(*request_headers_) &&
+      request_headers_->getContentTypeValue().empty()) {
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().QueryMissingContentType);
     return;
   }
 
@@ -1823,8 +2033,13 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
+      // Measure the wall time of the route resolution.
+      const MonotonicTime start = connection_manager_.timeSource().monotonicTime();
       route_result = snapped_route_config_->route(cb, *request_headers_,
                                                   filter_manager_.streamInfo(), stream_id_);
+      filter_manager_.streamInfo().addRouteResolutionTime(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              connection_manager_.timeSource().monotonicTime() - start));
     }
   }
 
@@ -1952,8 +2167,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // header block. Only drain if the drain direction is not inbound only or the connection is
   // inbound.
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      (connection_manager_.drain_close_.drainClose(drain_scope) ||
-       drain_connection_due_to_overload)) {
+      (drain_connection_due_to_overload || connection_manager_.shouldDrainClose(drain_scope))) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
     // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to
@@ -1988,9 +2202,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     }
   }
 
-  // If we are destroying a stream before remote is complete and the connection does not support
-  // multiplexing, we should disconnect since we don't want to wait around for the request to
-  // finish.
+  // If the response headers are sent before the request is complete and the connection does not
+  // support multiplexing, the connection has to be closed once this stream ends: the rest of the
+  // request cannot be skipped to get to the next one.
+  // Besides early responses (e.g. rejecting a large upload), this covers every HTTP/1 upgrade and
+  // CONNECT, as their request "body" is the tunneled payload, so such a connection is Closing from
+  // the moment the tunnel is established and closes as soon as the tunnel ends.
   if (!filter_manager_.hasLastDownstreamByteReceived()) {
     if (connection_manager_.codec_->protocol() < Protocol::Http2) {
       connection_manager_.drain_state_ = DrainState::Closing;
@@ -2223,9 +2440,12 @@ void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span,
   ASSERT(connection_manager_tracing_config_.has_value());
 
   const Tracing::HttpTraceContext trace_context(*request_headers_);
-  const Formatter::Context formatter_context{
+  Formatter::Context formatter_context{
       request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, {},
       active_span_.get()};
+  if (request_trailers_ != nullptr) {
+    formatter_context.setRequestTrailers(*request_trailers_);
+  }
   const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo(),
                                       formatter_context};
 
@@ -2469,6 +2689,17 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
 
   setCachedRoute({});
   cached_cluster_info_ = std::optional<Upstream::ClusterInfoConstSharedPtr>();
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshRouteConfigSnapshot() {
+  if (connection_manager_.config_->routeConfigProvider() != nullptr) {
+    snapped_route_config_ = connection_manager_.config_->routeConfigProvider()->configCast();
+  } else if (connection_manager_.config_->scopedRouteConfigProvider() != nullptr &&
+             connection_manager_.config_->scopeKeyBuilder().has_value() &&
+             request_headers_ != nullptr) {
+    snapped_scoped_routes_config_ =
+        connection_manager_.config_->scopedRouteConfigProvider()->config<Router::ScopedConfig>();
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {

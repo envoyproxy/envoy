@@ -1,20 +1,29 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
 
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/router/router.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/stats/scope.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
+#include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
+#include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
+#include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,42 +33,88 @@ namespace AiProtocolManager {
 using PerRouteProto =
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute;
 
-// Filter-level configuration, shared by every stream on the chain.
-class FilterConfig {
-public:
-  explicit FilterConfig(
-      const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto)
-      : best_effort_parsing_(proto.best_effort_parsing()) {}
-
-  bool bestEffortParsing() const { return best_effort_parsing_; }
-
-private:
-  const bool best_effort_parsing_;
-};
+class FilterConfig;
 using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 
-// Per-route configuration. Its presence declares the route an AI endpoint: the
-// payload is parsed strictly, validated against schema(), and transcoded to the
-// canonical schema when normalize() is set.
+class FilterConfig {
+public:
+  FilterConfig(
+      const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
+      Stats::Scope& scope, AiFilterFactories ai_filter_factories);
+
+  static absl::StatusOr<FilterConfigSharedPtr>
+  create(const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
+         Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
+
+  bool requestHandlingEnabled() const { return request_handling_enabled_; }
+  const AiFilterFactories& aiFilterFactories() const { return ai_filter_factories_; }
+  bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
+  bool alwaysSerializeRequest() const { return always_serialize_request_; }
+  uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
+  bool tokenUsageEnabled() const { return token_usage_enabled_; }
+  bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
+  LLMProtocol defaultLLMProtocol() const { return default_llm_protocol_; }
+  const std::string& metadataNamespace() const { return metadata_namespace_; }
+  bool synthesizeUsageTrailers() const { return synthesize_usage_trailers_; }
+  uint32_t maxSseEventSize() const { return max_sse_event_size_; }
+  uint32_t maxJsonBodySize() const { return max_json_body_size_; }
+  uint32_t maxParsedSseEvents() const { return max_parsed_sse_events_; }
+  AiProtocolManagerStats& stats() const { return stats_; }
+
+private:
+  // Counters are thread-safe to increment; mutable so a shared const config
+  // serves them.
+  mutable AiProtocolManagerStats stats_;
+  const bool request_handling_enabled_ = false;
+  const bool parse_unconfigured_routes_ = false;
+  const bool always_serialize_request_ = true;
+  const uint32_t inline_string_threshold_bytes_ = 0;
+  const bool token_usage_enabled_ = false;
+  const bool include_unconfigured_routes_ = false;
+  const LLMProtocol default_llm_protocol_ = LLMProtocol::Unspecified;
+  const std::string metadata_namespace_;
+  const bool synthesize_usage_trailers_ = false;
+  const uint32_t max_sse_event_size_ = 0;
+  const uint32_t max_json_body_size_ = 0;
+  const uint32_t max_parsed_sse_events_ = 0;
+  const AiFilterFactories ai_filter_factories_;
+};
+
+// Per-route configuration. Its presence declares the route an AI endpoint.
+// The request and response wire APIs are declared separately (protocol
+// translation can make them differ); either may be Unspecified when the
+// route left it undeclared.
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
   explicit RouteConfig(const PerRouteProto& proto)
-      : schema_(proto.schema()), normalize_(proto.normalize()) {}
+      : has_request_(proto.has_request()),
+        request_protocol_(protocolFromProto(proto.request().llm_protocol())),
+        response_protocol_(protocolFromProto(proto.response().llm_protocol())) {}
 
-  PerRouteProto::Schema schema() const { return schema_; }
-  bool normalize() const { return normalize_; }
+  // Whether the route hands its request payload to the filter to hold and
+  // validate.
+  bool hasRequest() const { return has_request_; }
+  LLMProtocol requestProtocol() const { return request_protocol_; }
+  LLMProtocol responseProtocol() const { return response_protocol_; }
+
+  // The wire API for response extraction on this route: the declared response
+  // API, falling back to the declared request API.
+  LLMProtocol effectiveResponseProtocol() const {
+    return response_protocol_ != LLMProtocol::Unspecified ? response_protocol_ : request_protocol_;
+  }
 
 private:
-  const PerRouteProto::Schema schema_;
-  const bool normalize_;
+  const bool has_request_ = false;
+  const LLMProtocol request_protocol_ = LLMProtocol::Unspecified;
+  const LLMProtocol response_protocol_ = LLMProtocol::Unspecified;
 };
 
 // AI Protocol Manager HTTP filter (alpha).
 //
-// The filter manages AI endpoint traffic: it holds a request payload, validates
-// it against the schema the endpoint serves, and normalizes it to a canonical
-// schema -- which is what lets routing, admission and policy act on a payload
-// the proxy understands rather than on opaque bytes.
+// The filter manages AI endpoint traffic: it holds a request payload and
+// parses it against the wire API the endpoint declares -- which is what lets
+// routing, admission and policy act on a payload the proxy understands rather
+// than on opaque bytes.
 //
 // As the body arrives the filter offloads it into an ExternalBuffer -- keeping
 // a large payload out of the connection manager's buffers -- and parses and
@@ -89,15 +144,29 @@ private:
 // Feeding first also fails a malformed payload the moment the bad byte arrives,
 // not after the whole upload.
 //
-// A route carrying a RouteConfig is a declared AI endpoint, and its payload is
-// the filter's to manage: parsed strictly, with a malformed one rejected so
-// Envoy and the backend cannot read the same body differently. A route without
-// one is parsed only if the filter was configured for best effort -- offered for
-// compatibility with chains that want a parsed body on ordinary routes, never a
-// reason to fail a request -- and is otherwise untouched.
+// A route carrying a per-route request declaration is a declared AI endpoint,
+// and its payload is the filter's to manage: parsed strictly, with a malformed
+// one rejected so Envoy and the backend cannot read the same body differently.
+// A route without one is parsed only if the filter opted into
+// parse_unconfigured_routes -- offered for compatibility with chains that want
+// a parsed body on ordinary routes, never a reason to fail a request -- and is
+// otherwise untouched. That opt-in covers routes that never asked for it, so it
+// takes only a request it can hold to end of stream without stalling it, which
+// rules out gRPC and Connect streaming, upgrades, and CONNECT. A declared
+// endpoint carries no such gate.
 //
-// The schema is not acted on yet: validation against it and transcoding to the
-// canonical schema when the route asks to normalize both come later.
+// At end of payload the configured AI filters run over the parsed document
+// (filter_manager.h); payload schema validation is one of them. Normalization
+// comes later.
+//
+// Encode (response) path: observe-only token-usage extraction. When
+// response_handling.token_usage is configured, 2xx SSE/JSON responses on
+// configured routes (or on all routes with include_unconfigured_routes) are
+// teed into a ResponseHandler; at end of stream the normalized usage is
+// published as dynamic metadata on the downstream StreamInfo, from downstream
+// and upstream installations alike. The filter never stops iteration or
+// mutates the response; extraction works on bounded side state, synchronously
+// on the encode callbacks, and no handler failure can affect the stream.
 class AiProtocolManagerFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -113,6 +182,12 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
+  // Http::StreamEncoderFilter
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
+
 private:
   // Feeds one body frame to the parser in place. Returns false only if the
   // payload was rejected, in which case the caller must not offload or replay
@@ -122,26 +197,48 @@ private:
   // Terminates the stream with a 400 for a payload that failed to parse.
   void rejectInvalidPayload(const absl::Status& status);
 
-  // Whether the route declared itself an AI endpoint, which is also what makes a
-  // parse failure fatal.
-  bool isAiEndpoint() const { return schema_ != PerRouteProto::UNSPECIFIED; }
+  // Whether the route handed its request payload to the filter, which is also
+  // what makes a parse failure fatal.
+  bool isAiEndpoint() const { return route_has_request_; }
+
+  // The inline-string threshold for this stream: the route's payload schema
+  // when it pins one, otherwise the filter's configured default.
+  uint32_t inlineStringThresholdBytes() const;
+
+  // Publish the accumulated token usage as dynamic metadata and account stats.
+  // Called exactly once, at response end of stream (data or trailers).
+  // Returns whether a record was published for this stream.
+  bool finalizeResponseHandling();
+
+  // Finalizes the decode path when the full request body (and optional trailers) has been received.
+  // Sets endStream on decode_manager_ and executes the AI filter chain or replays the body.
+  void finalizeDecode(bool has_trailers);
+
+  // Invoked when the SSE response filter pipeline completes or fails.
+  void onEncodeComplete(absl::Status status);
 
   ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
+
+  // Declared before decode_manager_, encode_manager_, and filter_manager_ so they outlive the
+  // managers and coroutines that reference them.
+  FilterChainBridgePtr decode_bridge_;
 
   // Non-null exactly when decodeHeaders() decided to inspect this stream, so it
   // doubles as the engaged flag. Outlives request_parser_, which is released as
   // soon as parsing is done with.
   BufferManagerPtr decode_manager_;
 
+  FilterChainBridgePtr encode_bridge_;
+  BufferManagerPtr encode_manager_;
+
   // Copied out of the route configuration rather than held by pointer: the route
   // can be re-resolved mid-stream, which would leave a cached pointer dangling,
-  // and these are two scalars.
-  PerRouteProto::Schema schema_{PerRouteProto::UNSPECIFIED};
-  bool normalize_{false};
+  // and these are scalars.
+  bool route_has_request_{false};
+  LLMProtocol request_protocol_{LLMProtocol::Unspecified};
+  LLMProtocol route_response_protocol_{LLMProtocol::Unspecified};
 
-  // The parsed payload. Populated once the body has been fully received and
-  // parsed; nothing consumes it yet.
   JsonWithExtBuf request_json_;
   // Cleared once parsing is done with, whether it completed, was abandoned, or
   // failed the request.
@@ -149,6 +246,19 @@ private:
 
   // Once set, later frames on the dying stream are dropped, not offloaded.
   bool payload_rejected_{false};
+
+  // Request headers for this stream. Held by pointer during decode path.
+  Http::RequestHeaderMap* request_headers_{nullptr};
+
+  // FilterManager orchestrating the AI filter chain.
+  std::unique_ptr<FilterManager> filter_manager_;
+
+  // Encode-path state.
+  ResponseHandlerPtr response_handler_;
+  bool response_finalized_{false};
+  bool encode_input_ended_{false};
+  bool encode_has_trailers_{false};
+  bool encode_rejected_{false};
 };
 
 } // namespace AiProtocolManager

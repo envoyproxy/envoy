@@ -199,7 +199,7 @@ If a JWT is valid, you can add some of its claims of type (string, integer, bool
 
 The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.claim_to_headers>` is a repeat of message :ref:`JWTClaimToHeader <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JWTClaimToHeader>` which has these fields:
 
-* Field ``header_name`` specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value.
+* Field ``header_name`` specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value. The filter strips every configured ``forward_payload_header`` and ``claim_to_headers`` header name from the request before applying rules, including on paths that bypass JWT verification (empty ``requires``, per-route ``disabled``, or CORS preflight bypass), so client-supplied values cannot be forwarded as authenticated identity.
 * Field ``claim_name`` specifies the claim from the verified JWT, split on ``.`` to address nested
   claims: ``nested.claim.key`` resolves to ``key`` inside ``claim`` inside ``nested``.
 * Field ``claim_path`` specifies the same thing as an explicit list of segments, for claims whose

@@ -137,6 +137,93 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_P(UdpListenerImplTest, SendEmptyDatagramUnconnected) {
+  setup();
+
+  bool timed_out = false;
+  Event::TimerPtr timeout_timer = dispatcher_->createTimer([&]() {
+    timed_out = true;
+    dispatcher_->exit();
+  });
+  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
+  const std::string follow_up("follow-up");
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        ASSERT_NE(nullptr, data.addresses_.local_);
+        EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
+        ASSERT_NE(nullptr, data.addresses_.peer_);
+        EXPECT_EQ(client_.localAddress()->asString(), data.addresses_.peer_->asString());
+        EXPECT_EQ(0, data.buffer_->length());
+      }))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        ASSERT_NE(nullptr, data.addresses_.local_);
+        EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
+        ASSERT_NE(nullptr, data.addresses_.peer_);
+        EXPECT_EQ(client_.localAddress()->asString(), data.addresses_.peer_->asString());
+        EXPECT_EQ(follow_up, data.buffer_->toString());
+        timeout_timer->disableTimer();
+        dispatcher_->exit();
+      }));
+
+  client_.write("", *send_to_addr_);
+  client_.write(follow_up, *send_to_addr_);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(timed_out);
+}
+
+TEST_P(UdpListenerImplTest, SendEmptyDatagramConnected) {
+  setup();
+
+  SocketSharedPtr connected_client = createServerSocket(true);
+  ASSERT_EQ(0, connected_client->ioHandle().connect(send_to_addr_).return_value_);
+  const Address::InstanceConstSharedPtr connected_client_address =
+      connected_client->connectionInfoProvider().localAddress();
+
+  bool timed_out = false;
+  Event::TimerPtr timeout_timer = dispatcher_->createTimer([&]() {
+    timed_out = true;
+    dispatcher_->exit();
+  });
+  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
+  const std::string follow_up("follow-up");
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        ASSERT_NE(nullptr, data.addresses_.local_);
+        EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
+        ASSERT_NE(nullptr, data.addresses_.peer_);
+        EXPECT_EQ(connected_client_address->asString(), data.addresses_.peer_->asString());
+        EXPECT_EQ(0, data.buffer_->length());
+      }))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        ASSERT_NE(nullptr, data.addresses_.local_);
+        EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
+        ASSERT_NE(nullptr, data.addresses_.peer_);
+        EXPECT_EQ(connected_client_address->asString(), data.addresses_.peer_->asString());
+        EXPECT_EQ(follow_up, data.buffer_->toString());
+        timeout_timer->disableTimer();
+        dispatcher_->exit();
+      }));
+
+  Buffer::OwnedImpl empty_buffer;
+  Api::IoCallUint64Result send_result =
+      Utility::writeToSocket(connected_client->ioHandle(), empty_buffer, nullptr, *send_to_addr_);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(0, send_result.return_value_);
+
+  Buffer::OwnedImpl follow_up_buffer(follow_up);
+  send_result = Utility::writeToSocket(connected_client->ioHandle(), follow_up_buffer, nullptr,
+                                       *send_to_addr_);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(follow_up.length(), send_result.return_value_);
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(timed_out);
+}
+
 // Test a large datagram that gets dropped using recvmsg or recvmmsg if supported.
 TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
   setup();

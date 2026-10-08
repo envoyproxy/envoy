@@ -76,12 +76,24 @@ ClientContextImpl::ClientContextImpl(
     return;
   }
 
-  // This should be guaranteed during configuration ingestion for client contexts. If this
-  // invariant ever changes, getTlsContext() must be updated to handle multiple TLS contexts.
-  if (tls_contexts_.size() != 1) {
+  // If a custom TLS certificate selector is used and maxSessionKeys is set to 0
+  // then allow multiple certificates.
+  //
+  // newSSL() installs a cached session before certificate selection callback,
+  // and is only keyed by SNI, so it's possible that a session created for
+  // cert A can be resumed by a connection that would choose cert B. Therefore
+  // to prevent incorrect TLS session resumption, maxSessionKeys should be 0.
+  if (!(config.tlsCertificateSelectorFactory() && config.maxSessionKeys() == 0) &&
+      tls_contexts_.size() != 1) {
     creation_status =
         absl::InvalidArgumentError("Client TLS context supports only a single certificate");
     return;
+  }
+
+  if (tls_contexts_[0].tls_params_.has_value()) {
+    ENVOY_LOG(warn, "tls_params on a client TlsCertificate is not supported; "
+                    "use context-level tls_params instead");
+    tls_contexts_[0].tls_params_.reset();
   }
 
   if (!parsed_alpn_protocols_.empty()) {

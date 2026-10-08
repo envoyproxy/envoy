@@ -15,15 +15,16 @@ namespace TestRead {
  * Config registration for the TestRead filter. @see NamedHttpFilterConfigFactory.
  */
 class TestReadFilterFactory
-    : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
+    : public Envoy::Extensions::HttpFilters::Common::UnifiedFactoryBase<
           envoymobile::test::integration::filters::http::test_read::TestRead> {
 public:
-  TestReadFilterFactory() : FactoryBase("test_read") {}
+  TestReadFilterFactory() : UnifiedFactoryBase("test_read") {}
 
 private:
-  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<::Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoymobile::test::integration::filters::http::test_read::TestRead& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 DECLARE_FACTORY(TestReadFilterFactory);

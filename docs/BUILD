@@ -1,13 +1,69 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load("@envoy_toolshed//dependency:macros.bzl", "module_deps_json", "module_updater")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("//bazel:sphinx_html.bzl", "sphinx_html")
 
 licenses(["notice"])  # Apache 2
 
+# Emit `foo` rather than `foo.html` links. Off by default so PR previews,
+# local builds and anything rendered straight from a file/object store keep
+# working. envoy-website turns it on and serves `/foo` from `foo.html`.
+bool_flag(
+    name = "pretty_links",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "sphinx_args",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "build_sha",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "docs_tag",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "with_pretty_links",
+    flag_values = {":pretty_links": "True"},
+)
+
+_LINK_SUFFIX_ENV = select({
+    ":with_pretty_links": "export ENVOY_DOCS_LINK_SUFFIX=''; ",
+    "//conditions:default": "",
+})
+
 exports_files([
+    ".bazelrc",
+    "MODULE.bazel",
+    "MODULE.bazel.lock",
     "v2_mapping.json",
     "empty_extensions.json",
     "redirects.txt",
 ])
+
+module_deps_json(
+    name = "module_deps",
+    lockfile = "//:MODULE.bazel.lock",
+    module_file = "//:MODULE.bazel",
+)
+
+module_updater(
+    name = "update_module",
+    bazelrc = "@envoy//:.bazelrc",
+    dependencies = ":module_deps",
+    module_file = "//:MODULE.bazel",
+)
 
 filegroup(
     name = "configs",
@@ -20,12 +76,12 @@ filegroup(
             "root/**/envoy-dynamic-filesystem-demo.yaml",
             "root/operations/_include/traffic_tapping_*.yaml",
             "root/configuration/http/http_filters/_include/checksum_filter.yaml",
+            "root/configuration/http/http_filters/_include/client_cert_filter.yaml",
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/configuration/http/http_filters/_include/geoip-filter.yaml",
             "root/configuration/listeners/network_filters/_include/geoip-network-filter.yaml",
             "root/configuration/http/http_filters/_include/http-cache-configuration-fs.yaml",
             "root/configuration/http/http_filters/_include/http-cache-v2-configuration-fs.yaml",
-            "root/configuration/other_features/_include/dlb.yaml",
             "root/configuration/other_features/_include/hyperscan_matcher.yaml",
             "root/configuration/other_features/_include/hyperscan_matcher_multiple.yaml",
             "root/configuration/other_features/_include/hyperscan_regex_engine.yaml",
@@ -51,6 +107,7 @@ filegroup(
     name = "contrib_configs",
     srcs = [
         "root/configuration/http/http_filters/_include/checksum_filter.yaml",
+        "root/configuration/http/http_filters/_include/client_cert_filter.yaml",
         "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
     ] + select({
         "@envoy//bazel:windows_x86_64": [],
@@ -158,6 +215,7 @@ pkg_files(
     name = "sphinx_root",
     srcs = glob([
         "root/**/*.css",
+        "root/**/*.html",
         "root/**/*.ico",
         "root/**/*.jpeg",
         "root/**/*.jpg",
@@ -195,14 +253,6 @@ genrule(
         "@envoy//changelogs",
         "@envoy//changelogs:changelogs.yaml",
     ],
-)
-
-# TODO(phlax): this appears unused, fix or remove
-pkg_files(
-    name = "google_vrp_config",
-    srcs = ["@envoy//configs:google-vrp/envoy-edge.yaml"],
-    prefix = "config/best_practices",
-    strip_prefix = "/configs",
 )
 
 pkg_files(
@@ -243,55 +293,31 @@ pkg_tar(
     ],
 )
 
-# TODO(phlax): Add `envoy_sphinx` rule to encapsulate these and above targets
-genrule(
+sphinx_html(
     name = "html_release",
-    outs = ["html_release.tar.gz"],
-    # BUILD_SHA must be set in release builds
-    # The Envoy workspace will provide this on stamped builds. For external builds
-    # you must either pass an env var or pass it through the workspace's status.
-    cmd = """
-    . $(location @envoy//bazel:volatile_env) \
-    && _BUILD_SHA=$${BUILD_DOCS_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${{BUILD_SCM_REVISION}}} \
-    && $(location //tools:sphinx_runner) \
-         $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$$_BUILD_SHA" \
-         --docs_tag="$${BUILD_DOCS_TAG:-}" \
-         --version_file=$(location @envoy//:VERSION.txt) \
-         --descriptor_path=$(location @envoy_api//:v3_proto_set) \
-         $(location rst) \
-         $@
-    """,
+    out = "html_release.tar.gz",
+    descriptor_path = "@envoy_api//:v3_proto_set",
+    link_suffix_env = _LINK_SUFFIX_ENV,
+    # Build sha/tag may be supplied with --@envoy-docs//:build_sha=<sha> and
+    # --@envoy-docs//:docs_tag=<tag>. When unset, stamped builds fall back to workspace status
+    # (ENVOY_BUILD_SCM_REVISION), BUILD_DOCS_SHA, and BUILD_DOCS_TAG environment variables.
+    rst = ":rst",
+    sphinx_runner = "//tools:sphinx_runner",
     stamp = 1,
-    tools = [
-        ":rst",
-        "//tools:sphinx_runner",
-        "@envoy//:VERSION.txt",
-        "@envoy//bazel:volatile_env",
-        "@envoy_api//:v3_proto_set",
-    ],
+    version_file = "@envoy//:VERSION.txt",
     visibility = ["//visibility:public"],
+    volatile_env = "@envoy//bazel:volatile_env",
 )
 
 # No git stamping, speeds up local dev switching branches
-genrule(
+sphinx_html(
     name = "html",
-    outs = ["html.tar.gz"],
-    cmd = """
-    $(location //tools:sphinx_runner) \
-         $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$${BUILD_DOCS_SHA:-}" \
-         --version_file=$(location @envoy//:VERSION.txt) \
-         --descriptor_path=$(location @envoy_api//:v3_proto_set) \
-         $(location :rst) \
-         $@
-    """,
-    tools = [
-        ":rst",
-        "//tools:sphinx_runner",
-        "@envoy//:VERSION.txt",
-        "@envoy_api//:v3_proto_set",
-    ],
+    out = "html.tar.gz",
+    descriptor_path = "@envoy_api//:v3_proto_set",
+    link_suffix_env = _LINK_SUFFIX_ENV,
+    rst = ":rst",
+    sphinx_runner = "//tools:sphinx_runner",
+    version_file = "@envoy//:VERSION.txt",
     visibility = ["//visibility:public"],
 )
 

@@ -1,3 +1,5 @@
+#include <format>
+
 #include "test/integration/http_integration.h"
 
 namespace Envoy {
@@ -21,7 +23,7 @@ typed_config:
   default_language: {}
   supported_languages: {}
 )EOF";
-    config_helper_.prependFilter(fmt::format(yaml, default_language, supported_languages));
+    config_helper_.prependFilter(std::format(yaml, default_language, supported_languages));
   }
 };
 

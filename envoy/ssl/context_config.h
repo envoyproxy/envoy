@@ -61,6 +61,14 @@ public:
   virtual const CertificateValidationContextConfig* certificateValidationContext() const PURE;
 
   /**
+   * @return true if a certificate validation context is configured. Unlike
+   * certificateValidationContext(), which is null until a validation context delivered over SDS
+   * has been downloaded, this reflects the configuration itself and never changes, so it is safe
+   * to read from any thread.
+   */
+  virtual bool validationContextConfigured() const PURE;
+
+  /**
    * @return The minimum TLS protocol version to negotiate.
    */
   virtual unsigned minProtocolVersion() const PURE;

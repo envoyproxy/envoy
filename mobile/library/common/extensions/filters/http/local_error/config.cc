@@ -7,9 +7,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace LocalError {
 
-Http::FilterFactoryCb LocalErrorFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoymobile::extensions::filters::http::local_error::LocalError&, const std::string&,
-    Server::Configuration::FactoryContext&) {
+absl::StatusOr<Http::FilterFactoryCb>
+LocalErrorFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoymobile::extensions::filters::http::local_error::LocalError&,
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
 
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<LocalErrorFilter>());

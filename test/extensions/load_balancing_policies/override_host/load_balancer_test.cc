@@ -19,6 +19,7 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -152,6 +153,30 @@ protected:
     return config;
   }
 
+  // Builds a config whose selected_host_key path has more than one segment, so the
+  // selected endpoint is written into a nested struct. This exercises the
+  // intermediate-segment walk in addSelectedHostKey (path_[i].key_).
+  OverrideHost makeDefaultConfigWithNestedSelectedHostKey(absl::string_view outer_key,
+                                                          absl::string_view inner_key) {
+    OverrideHost config;
+
+    OverrideHost::OverrideHostSource* host_source = config.add_override_host_sources();
+    host_source->mutable_metadata()->set_key("envoy.lb");
+    host_source->mutable_metadata()->add_path()->set_key("x-gateway-destination-endpoint");
+
+    auto* metadata_key = config.mutable_selected_host_key();
+    metadata_key->set_key("envoy.lb");
+    metadata_key->add_path()->set_key(outer_key);
+    metadata_key->add_path()->set_key(inner_key);
+
+    Config locality_picker_config;
+    auto* typed_extension_config =
+        config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
+    return config;
+  }
+
   void setSelectedEndpointsMetadata(absl::string_view key,
                                     absl::string_view selected_endpoints_text_proto) {
     Envoy::Protobuf::Struct selected_endpoints;
@@ -167,7 +192,8 @@ protected:
         host_map->insert({host->address()->asString(), host});
       }
     }
-    thread_local_priority_set_.cross_priority_host_map_ = host_map;
+    thread_local_priority_set_.cross_priority_host_map_ =
+        std::make_shared<Envoy::Upstream::FlatHostLookupMap>(host_map);
   }
 
   Locality makeLocality(absl::string_view region, absl::string_view zone) {
@@ -219,6 +245,32 @@ TEST_F(OverrideHostLoadBalancerTest, NoMetadataOrHeaders) {
   EXPECT_FALSE(load_balancer_->selectExistingConnection(&load_balancer_context_, *host, out_value)
                    .has_value());
   EXPECT_EQ(load_balancer_->peekAnotherHost(&load_balancer_context_), nullptr);
+}
+
+TEST_F(OverrideHostLoadBalancerTest, FindHostTraceLogsCandidateAddresses) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfig());
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "127.0.0.1:80" }
+    }
+  )pb");
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+
+  // With trace logging enabled, findHost logs all the addresses of the cross priority host map.
+  EXPECT_LOG_CONTAINS("trace", "Looking up 127.0.0.1:80 in 127.0.0.1:80", {
+    HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+    EXPECT_EQ(host->address()->asString(), "127.0.0.1:80");
+  });
 }
 
 TEST_F(OverrideHostLoadBalancerTest, NullptrHeaders) {
@@ -764,6 +816,40 @@ TEST_F(OverrideHostLoadBalancerTest, SelectedHostStoredInMetadata) {
       &metadata, "envoy.lb", "x-gateway-destination-endpoint-served");
 
   EXPECT_EQ(metadata_value.string_value(), "1.2.3.4:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, SelectedHostStoredInNestedMetadata) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  // A two-segment selected_host_key path forces addSelectedHostKey to walk an
+  // intermediate struct segment before writing the leaf.
+  createLoadBalancer(makeDefaultConfigWithNestedSelectedHostKey("selected", "endpoint"));
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "1.2.3.4:80" }
+    }
+  )pb");
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "1.2.3.4:80");
+
+  // The selected address is written at envoy.lb -> selected -> endpoint.
+  const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
+  const Protobuf::Value& nested = ::Envoy::Config::Metadata::metadataValue(
+      &metadata, "envoy.lb", std::vector<std::string>{"selected", "endpoint"});
+  EXPECT_EQ(nested.string_value(), "1.2.3.4:80");
 }
 
 TEST_F(OverrideHostLoadBalancerTest, SelectedHostMetadataMultipleHostsChosen) {

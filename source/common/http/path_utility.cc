@@ -1,8 +1,10 @@
 #include "source/common/http/path_utility.h"
 
 #include <optional>
+#include <string>
 
 #include "source/common/common/logger.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -30,6 +32,10 @@ std::optional<std::string> canonicalizePath(absl::string_view original_path) {
 /* static */
 bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.strip_dotdot_segments_with_parameters")) {
+    stripParametersFromDotSegments(headers);
+  }
   const auto original_path = headers.getPathValue();
   // canonicalPath is supposed to apply on path component in URL instead of :path header
   const auto query_pos = original_path.find('?');
@@ -71,6 +77,31 @@ void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
                                path_suffix, query));
 }
 
+void PathUtil::stripParametersFromDotSegments(RequestHeaderMap& headers) {
+  ASSERT(headers.Path());
+  const auto original_path = headers.getPathValue();
+  const absl::string_view::size_type query_or_fragment = original_path.find_first_of("?#");
+  absl::string_view path = original_path.substr(0, query_or_fragment);
+  if (path.find(".;") == absl::string_view::npos) {
+    return;
+  }
+  const absl::string_view query_and_fragment = query_or_fragment == absl::string_view::npos
+                                                   ? absl::string_view{}
+                                                   : original_path.substr(query_or_fragment);
+
+  // Remove parameters from dot and dotdot segments so the subsequent path canonicalization
+  // can correctly collapse them.
+  std::vector<absl::string_view> segments = absl::StrSplit(path, '/');
+  for (auto& segment : segments) {
+    if (absl::StartsWith(segment, "..;")) {
+      segment = "..";
+    } else if (absl::StartsWith(segment, ".;")) {
+      segment = ".";
+    }
+  }
+  headers.setPath(absl::StrCat(absl::StrJoin(segments, "/"), query_and_fragment));
+}
+
 PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
   const auto original_path = headers.getPathValue();
@@ -105,6 +136,41 @@ absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path)
     ret.remove_suffix(ret.length() - offset);
   }
   return ret;
+}
+
+std::optional<std::string> PathUtil::removePathParameters(const RequestHeaderMap& headers) {
+  return removePathParameters(headers.getPathValue());
+}
+
+std::optional<std::string> PathUtil::removePathParameters(const absl::string_view path) {
+  const size_t query_or_fragment_pos = path.find_first_of("?#");
+  const absl::string_view path_portion = path.substr(0, query_or_fragment_pos);
+
+  if (path_portion.find(';') == absl::string_view::npos) {
+    return std::nullopt;
+  }
+
+  const absl::string_view query_and_fragment = (query_or_fragment_pos != absl::string_view::npos)
+                                                   ? path.substr(query_or_fragment_pos)
+                                                   : absl::string_view{};
+
+  std::string result;
+  result.reserve(path.size());
+
+  bool in_parameter = false;
+  for (char c : path_portion) {
+    if (c == '/') {
+      in_parameter = false;
+      result.push_back(c);
+    } else if (c == ';') {
+      in_parameter = true;
+    } else if (!in_parameter) {
+      result.push_back(c);
+    }
+  }
+
+  result.append(query_and_fragment.data(), query_and_fragment.size());
+  return result;
 }
 
 } // namespace Http

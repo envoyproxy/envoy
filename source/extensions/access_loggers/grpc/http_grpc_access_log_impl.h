@@ -49,7 +49,7 @@ private:
   void emitLog(const Formatter::Context& context, const StreamInfo::StreamInfo& info) override;
 
   const HttpGrpcAccessLogConfigConstSharedPtr config_;
-  const ThreadLocal::SlotPtr tls_slot_;
+  const ThreadLocal::SlotSharedPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;
   std::vector<Http::LowerCaseString> response_headers_to_log_;

@@ -50,6 +50,10 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context&,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context&,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
   std::optional<std::string>
@@ -61,6 +65,8 @@ private:
   std::vector<std::string> path_;
   std::optional<size_t> max_length_;
   GetMetadataFunction get_func_;
+  // Latched at construction to keep the runtime lookup off the formatting path.
+  const bool only_truncate_string_ = false;
 };
 
 /**
@@ -110,6 +116,10 @@ public:
   // StreamInfoFormatterProvider
   std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const Context&,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   FilterStateFormatter(absl::string_view key, std::optional<size_t> max_length,
@@ -138,6 +148,10 @@ public:
   // StreamInfoFormatterProvider
   std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const Context&,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
   static const absl::flat_hash_map<absl::string_view, TimePointGetter> KnownTimePointGetters;
 
@@ -316,6 +330,8 @@ public:
   // StreamInfoFormatterProvider
   std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const Context&, const StreamInfo::StreamInfo&) const override;
+  void formatValueTo(ValueSink& sink, const Context&, const StreamInfo::StreamInfo&) const override;
 
 private:
   Protobuf::Value str_;
@@ -343,6 +359,8 @@ public:
   // StreamInfoFormatterProvider
   std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const Context&, const StreamInfo::StreamInfo&) const override;
+  void formatValueTo(ValueSink& sink, const Context&, const StreamInfo::StreamInfo&) const override;
 
   std::optional<std::string> getHostFromHeaders(const StreamInfo::StreamInfo& stream_info) const;
   std::optional<std::string> getSNIFromStreamInfo(const StreamInfo::StreamInfo& stream_info) const;

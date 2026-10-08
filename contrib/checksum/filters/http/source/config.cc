@@ -12,11 +12,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ChecksumFilter {
 
-absl::StatusOr<Http::FilterFactoryCb> ChecksumFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> ChecksumFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-  ChecksumFilterConfigSharedPtr filter_config(
-      new ChecksumFilterConfig(proto_config, context.serverFactoryContext()));
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
+  ChecksumFilterConfigSharedPtr filter_config(new ChecksumFilterConfig(proto_config, context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<ChecksumFilter>(filter_config));
   };

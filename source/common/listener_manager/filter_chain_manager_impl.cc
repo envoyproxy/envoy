@@ -1,12 +1,15 @@
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.validate.h"
+#include "envoy/config/xds_manager.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
-#include "envoy/singleton/manager.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
 #include "source/common/listener_manager/fcds_api.h"
 #include "source/common/matcher/matcher.h"
@@ -27,9 +30,6 @@
 
 namespace Envoy {
 namespace Server {
-
-SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
-
 namespace FilterChain {
 
 // Return a fake address for use when either the source or destination is unix domain socket.
@@ -84,7 +84,12 @@ public:
       auto handle_or_error = fcds_manager->subscribe(
           context.fcds_config_source_, name, context.fcds_callbacks_, context.init_manager_);
       THROW_IF_NOT_OK(handle_or_error.status());
-      return std::make_shared<DynamicFilterChainAction>(std::move(handle_or_error).value());
+      auto handle = std::move(handle_or_error).value();
+      // Record the handle so the owning manager can report this listener's routable FCDS chains.
+      if (context.fcds_handles_sink_ != nullptr) {
+        context.fcds_handles_sink_->push_back(handle);
+      }
+      return std::make_shared<DynamicFilterChainAction>(std::move(handle));
     }
     return std::make_shared<NoopFilterChainAction>();
   }
@@ -343,6 +348,7 @@ absl::Status FilterChainManagerImpl::maybeConstructMatcher(
   // Discover FCDS filter chain names by filtering inlined names from the actions.
   if (filter_chain_matcher) {
     filter_chains_by_name_ = std::move(filter_chains_by_name);
+    fcds_handles_.clear();
     FilterChain::FilterChainNameActionValidationVisitor validation_visitor;
     FilterChainActionFactoryContext action_factory_context{
         .server_ = parent_context.serverFactoryContext(),
@@ -352,6 +358,7 @@ absl::Status FilterChainManagerImpl::maybeConstructMatcher(
         .fcds_callbacks_ = fcds_callbacks,
         .fcds_config_source_ = fcds_config_source,
         .init_manager_ = init_manager_,
+        .fcds_handles_sink_ = &fcds_handles_,
     };
     // MatchTreeFactory::create doesn't have an exception-free variant.
     TRY_NEEDS_AUDIT {
@@ -617,6 +624,28 @@ makeCidrListEntry(const std::string& cidr, const T& data, absl::Status& creation
 }
 
 }; // namespace
+
+std::vector<absl::string_view> FilterChainManagerImpl::filterChainNames() const {
+  std::vector<absl::string_view> names;
+  names.reserve(fc_contexts_.size() + fcds_handles_.size() + 1);
+  for (const auto& [proto, chain] : fc_contexts_) {
+    if (!chain->name().empty()) {
+      names.push_back(chain->name());
+    }
+  }
+  if (default_filter_chain_ != nullptr && !default_filter_chain_->name().empty()) {
+    names.push_back(default_filter_chain_->name());
+  }
+  // FCDS chains this listener's matcher references. Report a name only when its subscription is
+  // committed (active): the chain is then both routable via this listener and active, matching the
+  // inline-chain invariant so a pod is not observed ready before its netns routing is installed.
+  for (const auto& handle : fcds_handles_) {
+    if (handle->isActive()) {
+      names.push_back(handle->filterChainName());
+    }
+  }
+  return names;
+}
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket,
@@ -1042,7 +1071,11 @@ FcdsSharedFilterChainManager::FcdsSharedFilterChainManager(
           std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
               server_context,
               server_context.messageValidationContext().dynamicValidationVisitor())),
-      scope_(server_context_.scope().createScope("filter_chain_manager.")) {
+      scope_(server_context_.scope().createScope("filter_chain_manager.")),
+      resource_type_helper_(server_context.messageValidationContext().dynamicValidationVisitor(),
+                            "name"),
+      tls_update_cb_(server_context.mainThreadDispatcher().createSchedulableCallback(
+          [this]() { updateTlsState(); })) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalState>(); });
 }
 
@@ -1055,6 +1088,12 @@ public:
 
   const Network::FilterChain* filterChain() override {
     return shared_manager_->findThreadLocalFilterChain(filter_chain_name_);
+  }
+
+  absl::string_view filterChainName() const override { return filter_chain_name_; }
+
+  bool isActive() const override {
+    return shared_manager_->isFilterChainActive(filter_chain_name_);
   }
 
   ~FcdsSubscriptionHandleImpl() override {
@@ -1079,9 +1118,9 @@ FcdsSharedFilterChainManager::subscribe(const envoy::config::core::v3::ConfigSou
   // xdstp names.
   if (iter == subscriptions_.end()) {
     absl::Status creation_status;
-    auto api = std::make_unique<FcdsApiImpl>(
-        config_source, filter_chain_name, *this, server_context_.clusterManager(), *scope_,
-        server_context_.messageValidationContext().dynamicValidationVisitor(), creation_status);
+    auto api = std::make_unique<FcdsApiImpl>(config_source, filter_chain_name, *this,
+                                             server_context_.clusterManager(), *scope_,
+                                             resource_type_helper_, creation_status);
     RETURN_IF_NOT_OK(creation_status);
     auto state = std::make_unique<SubscriptionState>();
     state->api_ = std::move(api);
@@ -1150,7 +1189,7 @@ void FcdsSharedFilterChainManager::onFilterChainWarmed(
   ENVOY_LOG(debug, "FCDS: updating warmed shared filter chain name={}", filter_chain->name());
 
   state.api_->setFilterChain(std::move(filter_chain));
-  updateTlsState();
+  scheduleTlsUpdate();
 
   if (draining) {
     for (auto* handle : state.handles_) {
@@ -1169,22 +1208,42 @@ void FcdsSharedFilterChainManager::onFilterChainRemoved(
   SubscriptionState& state = *state_iter->second;
   ENVOY_LOG(debug, "FCDS: removing shared filter chain name={}", draining->name());
 
-  updateTlsState();
+  scheduleTlsUpdate();
 
   for (auto* handle : state.handles_) {
     handle->callbacks().drainFilterChain(draining);
   }
 }
 
+void FcdsSharedFilterChainManager::scheduleTlsUpdate() {
+  // Skip rearming when a publish is already queued for this iteration.
+  if (!tls_update_cb_->enabled()) {
+    // Pause filter chain discovery until the coalesced publish is posted to workers.
+    xds_pause_ = server_context_.xdsManager().pause(
+        Config::getTypeUrl<envoy::config::listener::v3::FilterChain>());
+    tls_update_cb_->scheduleCallbackCurrentIteration();
+  }
+}
+
 void FcdsSharedFilterChainManager::updateTlsState() {
   auto filter_chains = std::make_shared<ThreadLocalState>();
+  filter_chains->filter_chains_.reserve(subscriptions_.size());
   for (const auto& name_and_state : subscriptions_) {
-    auto active_chain = name_and_state.second->api_->filterChain();
+    const auto& active_chain = name_and_state.second->api_->filterChain();
     if (active_chain != nullptr) {
       filter_chains->filter_chains_[name_and_state.first] = active_chain;
     }
   }
   tls_slot_->set([filter_chains](Event::Dispatcher&) { return filter_chains; });
+  // Resume filter chain discovery now that the update is posted to workers.
+  xds_pause_.reset();
+}
+
+bool FcdsSharedFilterChainManager::isFilterChainActive(const std::string& filter_chain_name) const {
+  // A subscription's committed chain is non-null exactly when it is active (same test
+  // updateTlsState() uses to publish the active set to workers).
+  auto it = subscriptions_.find(filter_chain_name);
+  return it != subscriptions_.end() && it->second->api_->filterChain() != nullptr;
 }
 
 } // namespace Server

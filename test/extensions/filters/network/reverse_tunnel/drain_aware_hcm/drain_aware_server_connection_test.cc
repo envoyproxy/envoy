@@ -5,7 +5,9 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -24,8 +26,9 @@ namespace {
 class DrainAwareServerConnectionTest : public testing::Test {
 protected:
   DrainAwareServerConnectionTest() {
-    // MockTimer(dispatcher) registers itself as the next timer returned by createTimer_.
-    timer_ = new Event::MockTimer(&dispatcher_);
+    // MockTimer(dispatcher) registers itself as the next timer returned by createTimer_. The
+    // wrapper creates its timer from the connection's dispatcher.
+    timer_ = new Event::MockTimer(&connection_.dispatcher_);
     inner_ = std::make_unique<NiceMock<Http::MockServerConnection>>();
     inner_ptr_ = inner_.get();
     ON_CALL(*inner_ptr_, protocol()).WillByDefault(Return(Http::Protocol::Http2));
@@ -34,8 +37,14 @@ protected:
   // Creates the connection, consuming inner_. Expects the 100ms timer arm from the constructor.
   std::unique_ptr<DrainAwareServerConnection> makeConnection() {
     EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(100), _));
-    return std::make_unique<DrainAwareServerConnection>(std::move(inner_), dispatcher_,
-                                                        drain_decision_);
+    return std::make_unique<DrainAwareServerConnection>(std::move(inner_), connection_,
+                                                        drain_decision_, server_context_);
+  }
+
+  // Delivers a connection-level drain notification to the wrapper's registered callbacks.
+  void raiseConnectionDrain(Server::DrainStrategy strategy = Server::DrainStrategy::Immediate) {
+    connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+        connection_.dispatcher_.timeSource().monotonicTime(), strategy});
   }
 
   // Destroy conn cleanly, satisfying the disableTimer() call from the destructor.
@@ -44,8 +53,9 @@ protected:
     conn.reset();
   }
 
-  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Network::MockConnection> connection_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Event::MockTimer* timer_{nullptr};
   std::unique_ptr<NiceMock<Http::MockServerConnection>> inner_;
   NiceMock<Http::MockServerConnection>* inner_ptr_{nullptr};
@@ -127,7 +137,10 @@ TEST_F(DrainAwareServerConnectionTest, TimerFiresNoDrain) {
 }
 
 // Timer fires when the listener is draining: sends GOAWAY once, stops re-arming.
+// Legacy path: drain is detected by polling the DrainDecision.
 TEST_F(DrainAwareServerConnectionTest, TimerFiresDrainDetected) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto conn = makeConnection();
   ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
   EXPECT_CALL(*inner_ptr_, goAway());
@@ -136,8 +149,24 @@ TEST_F(DrainAwareServerConnectionTest, TimerFiresDrainDetected) {
   destroyConnection(conn);
 }
 
+// Equivalent using the connection-level drain path: the connection is notified via onDrain() and
+// the timer detects the drain from that event (not by polling the DrainDecision).
+TEST_F(DrainAwareServerConnectionTest, TimerFiresDrainDetectedViaConnectionDrain) {
+  auto conn = makeConnection();
+  // Notify the connection it is draining (Immediate strategy => drain right away). The
+  // DrainDecision must not be consulted on this path.
+  EXPECT_CALL(drain_decision_, drainClose(_)).Times(0);
+  raiseConnectionDrain();
+  EXPECT_CALL(*inner_ptr_, goAway());
+  EXPECT_CALL(*timer_, enableTimer(_, _)).Times(0);
+  timer_->invokeCallback();
+  destroyConnection(conn);
+}
+
 // After GOAWAY is sent, subsequent timer fires are complete no-ops.
 TEST_F(DrainAwareServerConnectionTest, TimerFiresAfterGoAwaySentIsNoop) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto conn = makeConnection();
   // First fire: drain detected, GOAWAY sent. enabled_ is now false (no re-arm).
   ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
@@ -159,8 +188,9 @@ TEST_F(DrainAwareServerConnectionTest,
        ShutdownNoticeWithLocalDrainFiresCallbackAndSuppressesInner) {
   bool fired = false;
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(100), _));
-  auto conn = std::make_unique<DrainAwareServerConnection>(
-      std::move(inner_), dispatcher_, drain_decision_, [&fired]() { fired = true; });
+  auto conn =
+      std::make_unique<DrainAwareServerConnection>(std::move(inner_), connection_, drain_decision_,
+                                                   server_context_, [&fired]() { fired = true; });
   EXPECT_CALL(*inner_ptr_, shutdownNotice()).Times(0);
   conn->shutdownNotice();
   EXPECT_TRUE(fired);
@@ -169,10 +199,12 @@ TEST_F(DrainAwareServerConnectionTest,
 
 // on_local_drain fires at most once across shutdownNotice() and the drain timer.
 TEST_F(DrainAwareServerConnectionTest, LocalDrainFiresAtMostOnce) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   int fired = 0;
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(100), _));
   auto conn = std::make_unique<DrainAwareServerConnection>(
-      std::move(inner_), dispatcher_, drain_decision_, [&fired]() { ++fired; });
+      std::move(inner_), connection_, drain_decision_, server_context_, [&fired]() { ++fired; });
   conn->shutdownNotice();
   EXPECT_EQ(1, fired);
 

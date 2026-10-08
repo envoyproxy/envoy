@@ -41,6 +41,7 @@
 #include "source/common/upstream/host_utility.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Router {
@@ -65,7 +66,8 @@ constexpr uint64_t TimeoutPrecisionFactor = 100;
 } // namespace
 
 absl::StatusOr<std::unique_ptr<FilterConfig>>
-FilterConfig::create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+FilterConfig::create(Stats::StatName stat_prefix,
+                     Server::Configuration::GenericFactoryContext& context,
                      ShadowWriterPtr&& shadow_writer,
                      const envoy::extensions::filters::http::router::v3::Router& config) {
   absl::Status creation_status = absl::OkStatus();
@@ -76,7 +78,7 @@ FilterConfig::create(Stats::StatName stat_prefix, Server::Configuration::Factory
 }
 
 FilterConfig::FilterConfig(Stats::StatName stat_prefix,
-                           Server::Configuration::FactoryContext& context,
+                           Server::Configuration::GenericFactoryContext& context,
                            ShadowWriterPtr&& shadow_writer,
                            const envoy::extensions::filters::http::router::v3::Router& config,
                            absl::Status& creation_status)
@@ -120,7 +122,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     std::string prefix = Runtime::runtimeFeatureEnabled(
                              "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
                              ? context.scope().symbolTable().toString(stat_prefix)
-                             : context.scope().symbolTable().toString(context.scope().prefix());
+                             : "";
     upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
@@ -259,7 +261,8 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
   const absl::string_view per_try_timeout_entry =
       request_headers.getEnvoyUpstreamRequestPerTryTimeoutMsValue();
   if (!per_try_timeout_entry.empty()) {
-    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout)) {
+    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout) &&
+        header_timeout <= static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -322,7 +325,8 @@ void FilterUtility::setTimeoutHeaders(uint64_t elapsed_time, const TimeoutData& 
 std::optional<std::chrono::milliseconds>
 FilterUtility::tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry) {
   uint64_t header_timeout;
-  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout)) {
+  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout) &&
+      header_timeout <= static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
     return std::chrono::milliseconds(header_timeout);
   }
   return std::nullopt;
@@ -1592,7 +1596,7 @@ void Filter::onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag response_flags,
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -2173,7 +2177,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 
   Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
   if (tb_stats.has_value()) {
-    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 

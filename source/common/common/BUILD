@@ -23,6 +23,7 @@ envoy_cc_library(
     hdrs = ["assert.h"],
     deps = [
         ":minimal_logger_lib",
+        "//envoy/common:logger",
         "@abseil-cpp//absl/base",
         "@abseil-cpp//absl/debugging:stacktrace",
         "@abseil-cpp//absl/debugging:symbolize",
@@ -242,6 +243,7 @@ envoy_cc_library(
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
+        "//envoy/common:logger",
         "//source/common/protobuf",
         # Depend on the header-only interface, not the implementation lib, so that every commit to
         # main does not invalidate the build cache of minimal_logger_lib (and everything that
@@ -595,6 +597,14 @@ envoy_cc_library(
         "//bazel:enable_perf_tracing": ["@perfetto"],
         "//conditions:default": [],
     }),
+)
+
+envoy_cc_library(
+    name = "persistent_hash_map_lib",
+    hdrs = ["persistent_hash_map.h"],
+    deps = [
+        "@abseil-cpp//absl/hash",
+    ],
 )
 
 envoy_cc_library(

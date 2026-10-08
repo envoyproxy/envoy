@@ -15,6 +15,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
@@ -28,6 +29,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
@@ -46,6 +48,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/stats/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
@@ -69,15 +72,21 @@ public:
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager& overload_manager, TimeSource& time_system,
-                        envoy::config::core::v3::TrafficDirection direction);
+                        envoy::config::core::v3::TrafficDirection direction,
+                        Server::Configuration::ServerFactoryContext& server_context);
   ~ConnectionManagerImpl() override;
 
-  static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
-  static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
-                                                            Stats::Scope& scope);
+  // The scope is expected to be one created by createStatsScope() below, which already carries the
+  // 'http.<stat_prefix>.' prefix, so no prefix is prepended to the stat names.
+  static ConnectionManagerStats generateStats(Stats::Scope& scope);
+  static ConnectionManagerTracingStats generateTracingStats(Stats::Scope& scope);
   static void chargeTracingStats(const Tracing::Reason& tracing_reason,
                                  ConnectionManagerTracingStats& tracing_stats);
-  static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
+  // Creates the 'http.<stat_prefix>.' scope in which an HTTP connection manager creates the stats.
+  static Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view stat_prefix);
+  // Creates the listener stats of an HTTP connection manager, which live in the specified
+  // listener's scope.
+  static ConnectionManagerListenerStats generateListenerStats(absl::string_view stat_prefix,
                                                               Stats::Scope& scope);
   static const ResponseHeaderMap& continueHeader();
 
@@ -118,6 +127,7 @@ public:
       codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
     }
   }
+  void onDrain(Network::ConnectionDrainEvent drain_event) override;
 
   TimeSource& timeSource() { return time_source_; }
 
@@ -321,6 +331,7 @@ private:
     OptRef<const Router::Route> route(const Router::RouteCallback& cb) override;
     Router::RouteConstSharedPtr routeSharedPtr(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
+    void refreshRouteConfigSnapshot() override;
     void refreshRouteCluster() override;
     void recreateClusterInfo() override;
     void requestRouteConfigUpdate(
@@ -617,6 +628,12 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
+  // Called when the drain sequence the connection was notified of (see onDrain()) is about to end
+  // and the connection has to be drained without waiting for a response to decide on.
+  void onProactiveDrainTimeout();
+  // Resets the upgraded and CONNECT streams of a drained connection. Unlike ordinary requests they
+  // are not expected to complete on their own before the end of the drain sequence.
+  void resetTunnelingStreams();
   Tracing::Tracer& tracer() { return *config_->tracer(); }
   void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
                             StreamInfo::CoreResponseFlag response_flag);
@@ -640,15 +657,26 @@ private:
   bool shouldDeferRequestProxyingToNextIoCycle();
   void onDeferredRequestProcessing();
 
+  // Returns true if the connection should now be drain-closed.
+  bool shouldDrainClose(Network::DrainDirection scope);
+
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfigSharedPtr config_;
   ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on
                                   // the config in the hot path.
+  // Route resolution histograms, created only when recordRouteResolutionStats is enabled so the
+  // default stat set is unchanged.
+  OptRef<Stats::Histogram> route_resolution_time_us_histogram_;
+  OptRef<Stats::Histogram> route_resolutions_histogram_;
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;
   const Network::DrainDecision& drain_close_;
+  // Set when the connection is notified of a drain sequence via onDrain(). Carries the drain start
+  // time and strategy so the drain-close decision can be computed at the connection level (see
+  // shouldDrainClose()). Only set when use_connection_event_drain_ is enabled.
+  std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
   // An idle timer for the connection. This is only armed when there are no streams on the
@@ -658,6 +686,12 @@ private:
   // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
+  // Armed in onDrain() to fire at a random point near the end of the drain sequence, so that a
+  // connection that sent no response in the meantime is still drained before it is torn down.
+  Event::TimerPtr proactive_drain_timer_;
+  // Set once proactive_drain_timer_ has fired. From then on tunneling streams are reset as soon as
+  // the connection is closing, see resetTunnelingStreams().
+  bool proactive_drain_{false};
   // When set to true, add Connection:close response header to nudge downstream client to reconnect.
   bool soft_drain_http1_{false};
   Random::RandomGenerator& random_generator_;
@@ -696,6 +730,14 @@ private:
   const uint32_t max_requests_during_dispatch_{UINT32_MAX};
   Event::SchedulableCallbackPtr deferred_request_processing_callback_;
   const envoy::config::core::v3::TrafficDirection direction_;
+  Server::Configuration::ServerFactoryContext& server_context_;
+  // The drain type of the listener owning this connection, used to decide whether
+  // /healthcheck/fail should drain-close it.
+  envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  // Latched when the connection manager is created so it is not re-read on every response. See
+  // shouldDrainClose().
+  const bool use_connection_event_drain_ = false;
 
   // If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3
   // protocols the stream is destroyed after both request and response are complete i.e. reach their

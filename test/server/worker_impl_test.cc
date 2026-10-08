@@ -162,23 +162,24 @@ TEST_F(WorkerImplTest, DrainPostsToWorkerThread) {
 
   // onListenerDrain posts to the worker dispatcher and invokes handler->onListenerDrain on
   // the worker thread.
-  EXPECT_CALL(*handler_, onListenerDrain(7UL))
+  EXPECT_CALL(*handler_, onListenerDrain(7UL, _))
       .WillOnce(InvokeWithoutArgs([current_thread_id, &ci]() {
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
         ci.setReady();
       }));
-  worker_.onListenerDrain(listener);
+  worker_.onListenerDrain(7UL, Network::ConnectionDrainEvent{});
   ci.waitReady();
 
   // onFilterChainDrain likewise posts and forwards on the worker thread.
   const std::list<const Network::FilterChain*> filter_chains;
-  EXPECT_CALL(*handler_, onFilterChainDrain(7UL, _))
+  EXPECT_CALL(*handler_, onFilterChainDrain(7UL, _, _))
       .WillOnce(
-          Invoke([current_thread_id, &ci](uint64_t, const std::list<const Network::FilterChain*>&) {
+          Invoke([current_thread_id, &ci](uint64_t, const std::list<const Network::FilterChain*>&,
+                                          Network::ConnectionDrainEvent) {
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
             ci.setReady();
           }));
-  worker_.onFilterChainDrain(7UL, filter_chains);
+  worker_.onFilterChainDrain(7UL, filter_chains, Network::ConnectionDrainEvent{});
   ci.waitReady();
 
   worker_.stop();

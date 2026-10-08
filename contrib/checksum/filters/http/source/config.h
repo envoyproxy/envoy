@@ -14,15 +14,16 @@ namespace ChecksumFilter {
  * Config registration for the checksum filter.
  */
 class ChecksumFilterFactory
-    : public Common::ExceptionFreeFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig> {
 public:
-  ChecksumFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.checksum") {}
+  ChecksumFilterFactory() : UnifiedFactoryBase("envoy.filters.http.checksum") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 using UpstreamChecksumFilterFactory = ChecksumFilterFactory;

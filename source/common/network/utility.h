@@ -379,8 +379,12 @@ public:
       -> absl::StatusOr<typename std::invoke_result_t<Func>> {
     Api::OsSysCalls& posix = Api::OsSysCallsSingleton().get();
 
-    // Open the original netns fd, so that we can return to it.
-    constexpr auto curr_netns_file = "/proc/self/ns/net";
+    // Open the original netns fd, so that we can return to it. Switching the network namespace
+    // applies to the calling thread only and /proc/self refers to the thread group leader, so
+    // /proc/self/ns/net is the main thread's namespace, which may be a different one while the main
+    // thread is itself inside execInNetworkNamespace (e.g. creating a listener or a health check
+    // connection). /proc/thread-self/ns/net is the calling thread's own namespace.
+    constexpr auto curr_netns_file = "/proc/thread-self/ns/net";
     auto og_netns_fd_result = posix.open(curr_netns_file, O_RDONLY);
     int og_netns_fd = og_netns_fd_result.return_value_;
     if (og_netns_fd_result.errno_ != 0) {
@@ -420,6 +424,17 @@ public:
 
     return result;
   }
+
+  /**
+   * Validates that a network namespace referenced by a filepath can be entered, i.e. that the file
+   * exists and can be opened. This is intended to be used at config-admission time so that a
+   * misconfigured (e.g. non-existent) network namespace is rejected rather than causing a failure
+   * deep in the connection/socket creation path.
+   *
+   * @param netns filepath referencing the network namespace to validate.
+   * @return OkStatus if the namespace file can be opened, an error status otherwise.
+   */
+  static absl::Status validateNetworkNamespace(absl::string_view netns);
 #endif
 
 private:

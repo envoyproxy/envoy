@@ -98,11 +98,18 @@ def dockerhub_envoy_role(
     return [pnode], []
 
 
+def _blank_permalink_icon(app):
+    # sphinx_rtd_theme overwrites this with a Font Awesome glyph when it loads,
+    # after conf.py has run; the stylesheet draws the `#` itself.
+    app.config.html_permalinks_icon = ''
+
+
 def setup(app):
     app.add_config_value('release_level', '', 'env')
     app.add_config_value('substitutions', [], 'html')
     app.add_directive('substitution-code-block', SubstitutionCodeBlock)
     app.add_role('dockerhub_envoy', dockerhub_envoy_role)
+    app.connect('builder-inited', _blank_permalink_icon)
 
 
 missing_config = (
@@ -237,6 +244,7 @@ exclude_patterns = [
     '_venv',
     'Thumbs.db',
     '.DS_Store',
+    '**/._*',
 ]
 
 # The reST default role (used for this markup: `text`) to use for all
@@ -278,6 +286,11 @@ html_theme = 'sphinx_rtd_theme'
 html_theme_options = {
     'logo_only': True,
     'includehidden': False,
+    'collapse_navigation': True,
+    'sticky_navigation': True,
+    'navigation_depth': 4,
+    'titles_only': True,
+    'style_external_links': True,
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
@@ -304,7 +317,33 @@ html_favicon = 'favicon.ico'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+# envoy.css carries the design tokens and must load first; the component
+# modules below are listed separately so each is a parallel <link> rather than
+# an @import waterfall. See docs/root/_static/css/envoy/.
 html_style = 'css/envoy.css'
+
+html_css_files = [
+    'css/envoy/base.css',
+    'css/envoy/topbar.css',
+    'css/envoy/sidebar.css',
+    'css/envoy/content.css',
+    'css/envoy/code.css',
+    'css/envoy/admonitions.css',
+    'css/envoy/tables.css',
+    'css/envoy/toc.css',
+    'css/envoy/proto.css',
+    'css/envoy/lists.css',
+    'css/envoy/search.css',
+    # loaded last so its overrides win without extra specificity
+    'css/envoy/responsive.css',
+]
+
+# envoy-theme.js is a classic script so the stored theme applies before the
+# first paint; everything else is a deferred module. See _static/js/envoy/.
+html_js_files = [
+    'js/envoy-theme.js',
+    ('js/envoy.js', {'type': 'module'}),
+]
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied
@@ -352,6 +391,12 @@ html_style = 'css/envoy.css'
 
 # This is the file name suffix for HTML files (e.g. ".xhtml").
 #html_file_suffix = None
+
+# `.html` by default so builds render straight from disk or an object store
+# (PR previews, local dev). envoy-website builds with
+# `--@envoy-docs//:pretty_links`, which exports an empty suffix, and serves
+# `/foo` from `foo.html` itself.
+html_link_suffix = os.environ.get("ENVOY_DOCS_LINK_SUFFIX", ".html")
 
 # Language to be used for generating the HTML full-text search index.
 # Sphinx supports the following languages:

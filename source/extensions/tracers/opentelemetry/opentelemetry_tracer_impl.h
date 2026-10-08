@@ -47,7 +47,7 @@ private:
   };
 
   const envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config_;
-  ThreadLocal::SlotPtr tls_slot_ptr_;
+  ThreadLocal::SlotSharedPtr tls_slot_ptr_;
   OpenTelemetryTracerStats tracing_stats_;
 };
 

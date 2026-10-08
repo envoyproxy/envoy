@@ -1,17 +1,21 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "sampler_test",
     srcs = ["sampler_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.tracers.opentelemetry"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",

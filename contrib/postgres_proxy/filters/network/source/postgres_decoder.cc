@@ -211,8 +211,9 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
 
   // In Init state the minimum size of the message sufficient for parsing is 4 bytes.
   if (data.length() < 4) {
-    // not enough data in the buffer.
-    return Decoder::Result::NeedMoreData;
+    // Not enough data in the buffer. Stop to avoid forwarding partial
+    // initial message to the next filter.
+    return Decoder::Result::Stopped;
   }
 
   // Validate the message before processing.
@@ -230,7 +231,9 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
   Message::ValidationResult validationResult = msgParser->validate(data, 4, message_len_ - 4);
 
   if (validationResult == Message::ValidationNeedMoreData) {
-    return Decoder::Result::NeedMoreData;
+    // Incomplete message. Stop to avoid forwarding partial initial message
+    // to the next filter.
+    return Decoder::Result::Stopped;
   }
 
   if (validationResult == Message::ValidationFailed) {

@@ -1,0 +1,3017 @@
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event.h"
+#include "source/extensions/filters/http/ai_protocol_manager/transcoding_engine.h"
+
+#include "test/test_common/status_utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace AiProtocolManager {
+namespace {
+
+using StatusHelpers::IsOk;
+
+// Runs a request leg of `dialect` in `direction` on `json`, with no request path. A `ToIr` leg
+// then has no path to lift what the dialect names there from, and a `FromIr` leg moves it out of
+// the body into `rewritten_path`, which is returned through `rewritten_path` when non-null.
+absl::Status transcodeRequestLeg(const TranscodingEngine& engine, TranscodeDirection direction,
+                                 LLMProtocol dialect, nlohmann::json& json,
+                                 std::optional<std::string>* rewritten_path = nullptr) {
+  TranscodeContext ctx;
+  absl::Status status = engine.transcode({PayloadKind::Request, direction, dialect}, ctx, json);
+  if (rewritten_path != nullptr) {
+    *rewritten_path = ctx.rewritten_path;
+  }
+  return status;
+}
+
+absl::Status requestToIr(const TranscodingEngine& engine, LLMProtocol source,
+                         nlohmann::json& json) {
+  return transcodeRequestLeg(engine, TranscodeDirection::ToIr, source, json);
+}
+absl::Status requestToIr(const TranscodingEngine& engine, LLMProtocol source,
+                         JsonWithExtBuf& payload) {
+  return requestToIr(engine, source, payload.json());
+}
+
+absl::Status requestFromIr(const TranscodingEngine& engine, LLMProtocol target,
+                           nlohmann::json& json,
+                           std::optional<std::string>* rewritten_path = nullptr) {
+  return transcodeRequestLeg(engine, TranscodeDirection::FromIr, target, json, rewritten_path);
+}
+absl::Status requestFromIr(const TranscodingEngine& engine, LLMProtocol target,
+                           JsonWithExtBuf& payload,
+                           std::optional<std::string>* rewritten_path = nullptr) {
+  return requestFromIr(engine, target, payload.json(), rewritten_path);
+}
+
+TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_AnthropicSchema) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5",
+    "max_completion_tokens": 2048,
+    "stop": ["STOP_HERE"],
+    "messages": [
+      {"role": "system", "content": "Be concise."},
+      {"role": "user", "content": "Hello!"},
+      {"role": "user", "content": "Follow-up question."}
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "description": "Get weather for city",
+          "parameters": {"type": "object"}
+        }
+      }
+    ]
+  })");
+
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
+
+  // System message extracted to top-level `system`
+  EXPECT_EQ(payload["system"], "Be concise.");
+  // Consecutive `user` messages merged into one `user` message with 2 text blocks
+  ASSERT_EQ(payload["messages"].size(), 1);
+  EXPECT_EQ(payload["messages"][0]["role"], "user");
+  ASSERT_TRUE(payload["messages"][0]["content"].is_array());
+  EXPECT_EQ(payload["messages"][0]["content"].size(), 2);
+  EXPECT_EQ(payload["messages"][0]["content"][0]["text"], "Hello!");
+  EXPECT_EQ(payload["messages"][0]["content"][1]["text"], "Follow-up question.");
+
+  // Token cap and stop sequences mapped
+  EXPECT_EQ(payload["max_tokens"], 2048);
+  EXPECT_FALSE(payload.contains("max_completion_tokens"));
+  EXPECT_EQ(payload["stop_sequences"], nlohmann::json::array({"STOP_HERE"}));
+
+  // Tools mapped to Anthropic shape
+  ASSERT_EQ(payload["tools"].size(), 1);
+  EXPECT_EQ(payload["tools"][0]["name"], "get_weather");
+  EXPECT_EQ(payload["tools"][0]["description"], "Get weather for city");
+  EXPECT_EQ(payload["tools"][0]["input_schema"], nlohmann::json::parse(R"({"type": "object"})"));
+
+  // Validate the transcoded payload against Anthropic's RequestSchema!
+  const PayloadSchema* anthropic_schema =
+      AdapterRegistry::get(LLMProtocol::AnthropicMessages).schema();
+  ASSERT_NE(anthropic_schema, nullptr);
+  EXPECT_THAT(anthropic_schema->validateRequest(payload), IsOk());
+}
+
+TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_To_GeminiSchema) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-pro",
+    "stream": true,
+    "temperature": 0.5,
+    "max_completion_tokens": 1024,
+    "messages": [
+      {"role": "system", "content": "You are helpful."},
+      {"role": "user", "content": "placeholder"},
+      {"role": "assistant", "content": "Prior reply."}
+    ]
+  })");
+
+  // Replace the user message content with an offloaded 50 KB ExternalRef binary node.
+  const JsonWithExtBuf::ExternalRef expected_ref{/*offset=*/128, /*length=*/50000};
+  payload["messages"][1]["content"] = JsonWithExtBuf::makeExternalRef(expected_ref);
+
+  std::optional<std::string> rewritten_path;
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload, &rewritten_path),
+              IsOk());
+
+  // `model` and `stream` move out of the body into the request path, where Gemini carries them.
+  EXPECT_EQ(rewritten_path, "/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse");
+  EXPECT_FALSE(payload.contains("model"));
+  EXPECT_FALSE(payload.contains("stream"));
+
+  // `systemInstruction` created with `parts`
+  EXPECT_EQ(payload["systemInstruction"]["parts"][0]["text"], "You are helpful.");
+
+  // `contents` holds the 2 non-system messages, role `"assistant"` mapped to `"model"`
+  ASSERT_EQ(payload["contents"].size(), 2);
+  EXPECT_EQ(payload["contents"][0]["role"], "user");
+  EXPECT_EQ(payload["contents"][1]["role"], "model");
+  EXPECT_EQ(payload["contents"][1]["parts"][0]["text"], "Prior reply.");
+
+  // Verify the 50 KB ExternalRef node was moved in O(1) without materializing or losing offset!
+  const nlohmann::json& moved_part_text = payload["contents"][0]["parts"][0]["text"];
+  ASSERT_TRUE(JsonWithExtBuf::isExternalRef(moved_part_text));
+  auto actual_ref = JsonWithExtBuf::externalRef(moved_part_text);
+  ASSERT_THAT(actual_ref.status(), IsOk());
+  EXPECT_EQ(*actual_ref, expected_ref);
+
+  // Generation parameters nested in `generationConfig`
+  EXPECT_EQ(payload["generationConfig"]["maxOutputTokens"], 1024);
+  EXPECT_EQ(payload["generationConfig"]["temperature"], 0.5);
+
+  // Validate against Gemini's RequestSchema!
+  const PayloadSchema* gemini_schema =
+      AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).schema();
+  ASSERT_NE(gemini_schema, nullptr);
+  EXPECT_THAT(gemini_schema->validateRequest(payload), IsOk());
+}
+
+TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_PassthroughIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gpt-4o",
+    "stream": true,
+    "temperature": 0.8,
+    "max_completion_tokens": 1024,
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "placeholder"}
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "search",
+          "description": "Search docs",
+          "parameters": {"type": "object"}
+        }
+      }
+    ]
+  })");
+
+  // Attach an offloaded ExternalRef binary node to verify it is untouched during passthrough.
+  const JsonWithExtBuf::ExternalRef expected_ref{/*offset=*/64, /*length=*/32768};
+  payload["messages"][1]["content"] = JsonWithExtBuf::makeExternalRef(expected_ref);
+  const nlohmann::json original_snapshot = payload;
+
+  // Step 1: To IR (OpenAI -> IR)
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::OpenAiChatCompletions, payload), IsOk());
+  EXPECT_EQ(payload, original_snapshot);
+
+  // Step 2: From IR (IR -> OpenAI)
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::OpenAiChatCompletions, payload), IsOk());
+  EXPECT_EQ(payload, original_snapshot);
+
+  // Validate against OpenAI Chat Completions RequestSchema
+  const PayloadSchema* openai_schema =
+      AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
+  ASSERT_NE(openai_schema, nullptr);
+  EXPECT_THAT(openai_schema->validateRequest(payload), IsOk());
+}
+
+TEST(TranscodingEngineTest, TranscodingEngineMaps_AnthropicSchema_RoundTripViaIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json anthropic_payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5",
+    "system": "You are a helpful coding assistant.",
+    "max_tokens": 1500,
+    "stop_sequences": ["END"],
+    "messages": [
+      {"role": "user", "content": "Write a unit test."}
+    ],
+    "tools": [
+      {
+        "name": "run_bazel_test",
+        "description": "Runs a bazel test target",
+        "input_schema": {"type": "object"}
+      }
+    ]
+  })");
+
+  // 1. To IR (`to_ir`): Anthropic -> OpenAI Chat Completions
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::AnthropicMessages, anthropic_payload), IsOk());
+  EXPECT_FALSE(anthropic_payload.contains("system"));
+  ASSERT_EQ(anthropic_payload["messages"].size(), 2);
+  EXPECT_EQ(anthropic_payload["messages"][0]["role"], "system");
+  EXPECT_EQ(anthropic_payload["messages"][0]["content"], "You are a helpful coding assistant.");
+  EXPECT_EQ(anthropic_payload["messages"][1]["role"], "user");
+  EXPECT_EQ(anthropic_payload["messages"][1]["content"], "Write a unit test.");
+  EXPECT_EQ(anthropic_payload["max_completion_tokens"], 1500);
+  EXPECT_EQ(anthropic_payload["stop"], nlohmann::json::array({"END"}));
+  ASSERT_EQ(anthropic_payload["tools"].size(), 1);
+  EXPECT_EQ(anthropic_payload["tools"][0]["type"], "function");
+  EXPECT_EQ(anthropic_payload["tools"][0]["function"]["name"], "run_bazel_test");
+
+  const PayloadSchema* openai_schema =
+      AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
+  ASSERT_NE(openai_schema, nullptr);
+  EXPECT_THAT(openai_schema->validateRequest(anthropic_payload), IsOk());
+
+  // 2. From IR (`from_ir`): OpenAI Chat Completions -> Anthropic Messages
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, anthropic_payload), IsOk());
+
+  EXPECT_EQ(anthropic_payload["system"], "You are a helpful coding assistant.");
+  EXPECT_EQ(anthropic_payload["max_tokens"], 1500);
+  EXPECT_EQ(anthropic_payload["stop_sequences"], nlohmann::json::array({"END"}));
+  ASSERT_EQ(anthropic_payload["messages"].size(), 1);
+  EXPECT_EQ(anthropic_payload["messages"][0]["role"], "user");
+  EXPECT_EQ(anthropic_payload["messages"][0]["content"], "Write a unit test.");
+
+  const PayloadSchema* anthropic_schema =
+      AdapterRegistry::get(LLMProtocol::AnthropicMessages).schema();
+  ASSERT_NE(anthropic_schema, nullptr);
+  EXPECT_THAT(anthropic_schema->validateRequest(anthropic_payload), IsOk());
+}
+
+TEST(TranscodingEngineTest, TranscodingEngineMaps_GeminiSchema_To_OpenAiSchema) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gpt-4o",
+    "systemInstruction": {
+      "parts": [{"text": "You are an expert engineer."}]
+    },
+    "contents": [
+      {"role": "user", "parts": [{"text": "Hello"}]},
+      {"role": "model", "parts": [{"text": "Welcome!"}]}
+    ],
+    "generationConfig": {
+      "maxOutputTokens": 400,
+      "temperature": 0.6,
+      "topP": 0.9,
+      "stopSequences": ["STOP"]
+    }
+  })");
+
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
+
+  EXPECT_FALSE(payload.contains("systemInstruction"));
+  EXPECT_FALSE(payload.contains("contents"));
+  EXPECT_FALSE(payload.contains("generationConfig"));
+  EXPECT_EQ(payload["max_completion_tokens"], 400);
+  EXPECT_EQ(payload["temperature"], 0.6);
+  EXPECT_EQ(payload["top_p"], 0.9);
+  EXPECT_EQ(payload["stop"], nlohmann::json::array({"STOP"}));
+  ASSERT_EQ(payload["messages"].size(), 3);
+  EXPECT_EQ(payload["messages"][0]["role"], "system");
+  EXPECT_EQ(payload["messages"][0]["content"], "You are an expert engineer.");
+  EXPECT_EQ(payload["messages"][1]["role"], "user");
+  EXPECT_EQ(payload["messages"][1]["content"], "Hello");
+  EXPECT_EQ(payload["messages"][2]["role"], "assistant");
+  EXPECT_EQ(payload["messages"][2]["content"], "Welcome!");
+
+  // Back out of the IR, every field returns to where Gemini carries it.
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  EXPECT_EQ(payload["systemInstruction"]["parts"][0]["text"], "You are an expert engineer.");
+  EXPECT_EQ(payload["generationConfig"]["maxOutputTokens"], 400);
+  EXPECT_EQ(payload["generationConfig"]["temperature"], 0.6);
+  ASSERT_EQ(payload["contents"].size(), 2);
+  EXPECT_EQ(payload["contents"][1]["role"], "model");
+  EXPECT_EQ(payload["contents"][1]["parts"][0]["text"], "Welcome!");
+}
+
+TEST(TranscodingEngineTest, CustomInboundAndOutboundConfiguration) {
+  TranscodingEngine engine;
+
+  DialectTranscodePack custom_pack{
+      .protocol = LLMProtocol::OpenAiResponses,
+      .request =
+          {
+              .to_ir = TranscodeRuleSet(
+                  LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+                  {
+                      TranscodeRule::move("input", "messages"),
+                      TranscodeRule::forEach(
+                          "messages",
+                          {
+                              TranscodeRule::valueMap("role", {{"bot", "assistant"}}),
+                          }),
+                      TranscodeRule::move("max_output_tokens", "max_completion_tokens"),
+                  }),
+              .from_ir = TranscodeRuleSet(
+                  TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiResponses,
+                  {
+                      TranscodeRule::forEach(
+                          "messages",
+                          {
+                              TranscodeRule::valueMap("role", {{"assistant", "bot"}}),
+                          }),
+                      TranscodeRule::move("messages", "input"),
+                      TranscodeRule::firstOf({"max_completion_tokens", "max_tokens"},
+                                             "max_output_tokens"),
+                      TranscodeRule::setDefault("max_output_tokens", 1024),
+                  }),
+          },
+  };
+
+  ASSERT_THAT(engine.registerPack(std::move(custom_pack)), IsOk());
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "custom-model-v1",
+    "max_output_tokens": 300,
+    "input": [
+      {"role": "user", "content": "Hi"},
+      {"role": "bot", "content": "Hello there"}
+    ]
+  })");
+
+  // Test custom `to_ir` configuration
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::OpenAiResponses, payload), IsOk());
+  EXPECT_EQ(payload["max_completion_tokens"], 300);
+  ASSERT_EQ(payload["messages"].size(), 2);
+  EXPECT_EQ(payload["messages"][1]["role"], "assistant");
+
+  // Test custom `from_ir` configuration
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::OpenAiResponses, payload), IsOk());
+  EXPECT_EQ(payload["max_output_tokens"], 300);
+  ASSERT_EQ(payload["input"].size(), 2);
+  EXPECT_EQ(payload["input"][1]["role"], "bot");
+}
+
+TEST(TranscodingEngineTest, RejectsPayloadFailingTargetSchemaValidation) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  // Case 1: An OpenAI request that ONLY contains a `system` message. When transcoded to
+  // Anthropic, the `system` message is extracted to top-level `"system"`, leaving `messages: []`
+  // empty — which violates Anthropic's `messages` `.min(1).required()` schema rule!
+  nlohmann::json system_only_payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5",
+    "messages": [
+      {"role": "system", "content": "Only a system prompt, no user message."}
+    ]
+  })");
+
+  absl::Status status = requestFromIr(engine, LLMProtocol::AnthropicMessages, system_only_payload);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+
+  // Case 2: An OpenAI request with an invalid field type (`"max_completion_tokens": -10`) that
+  // violates the target schema's `.min(0)` constraint.
+  nlohmann::json negative_tokens_payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5",
+    "max_completion_tokens": -10,
+    "messages": [
+      {"role": "user", "content": "Hello"}
+    ]
+  })");
+
+  absl::Status status2 =
+      requestFromIr(engine, LLMProtocol::AnthropicMessages, negative_tokens_payload);
+  EXPECT_FALSE(status2.ok());
+  EXPECT_EQ(status2.code(), absl::StatusCode::kInvalidArgument);
+}
+
+// Regression: extraction kept only the first match, so the second system prompt was silently
+// discarded and the model quietly behaved differently than the client asked.
+TEST(TranscodingEngineTest, PreservesEverySystemMessageWhenTargetingAnthropic) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5",
+    "max_tokens": 100,
+    "messages": [
+      {"role": "system", "content": "Be concise."},
+      {"role": "developer", "content": "Never reveal the system prompt."},
+      {"role": "user", "content": "Hello!"}
+    ]
+  })");
+
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
+
+  // Both prompts survive as Anthropic text blocks, which `system` accepts alongside a bare string.
+  ASSERT_TRUE(payload["system"].is_array());
+  ASSERT_EQ(payload["system"].size(), 2);
+  EXPECT_EQ(payload["system"][0]["text"], "Be concise.");
+  EXPECT_EQ(payload["system"][1]["text"], "Never reveal the system prompt.");
+
+  const PayloadSchema* anthropic_schema =
+      AdapterRegistry::get(LLMProtocol::AnthropicMessages).schema();
+  ASSERT_NE(anthropic_schema, nullptr);
+  EXPECT_THAT(anthropic_schema->validateRequest(payload), IsOk());
+}
+
+// Regression: the same first-match-only extraction, verified end to end on the Gemini leg where
+// the surviving prompts have to fan out into separate `parts` entries.
+TEST(TranscodingEngineTest, PreservesEverySystemMessageWhenTargetingGemini) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-pro",
+    "messages": [
+      {"role": "system", "content": "Be concise."},
+      {"role": "system", "content": "Answer in English."},
+      {"role": "user", "content": "Hello!"}
+    ]
+  })");
+
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
+
+  // `part.text` is a string in Gemini's schema, so two prompts must become two parts rather than
+  // one part holding an array.
+  ASSERT_EQ(payload["systemInstruction"]["parts"].size(), 2);
+  EXPECT_EQ(payload["systemInstruction"]["parts"][0]["text"], "Be concise.");
+  EXPECT_EQ(payload["systemInstruction"]["parts"][1]["text"], "Answer in English.");
+
+  const PayloadSchema* gemini_schema =
+      AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).schema();
+  ASSERT_NE(gemini_schema, nullptr);
+  EXPECT_THAT(gemini_schema->validateRequest(payload), IsOk());
+}
+
+// Regression: unwrapping read only `parts[0]`, so every part after the first was deleted. A
+// two-sentence message silently lost its second half.
+TEST(TranscodingEngineTest, PreservesEveryGeminiMessagePart) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "contents": [
+      {"role": "user", "parts": [{"text": "First half."}, {"text": "Second half."}]}
+    ]
+  })");
+
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
+
+  ASSERT_EQ(payload["messages"].size(), 1);
+  ASSERT_TRUE(payload["messages"][0]["content"].is_array());
+  ASSERT_EQ(payload["messages"][0]["content"].size(), 2);
+  EXPECT_EQ(payload["messages"][0]["content"][0]["text"], "First half.");
+  EXPECT_EQ(payload["messages"][0]["content"][1]["text"], "Second half.");
+}
+
+// Regression: an image part has no `text` field, so the old code produced a message with no
+// content at all and still passed validation, because OpenAI's `content` is not `.required()`.
+// Silently stripping a user's attached image is worse than refusing the request.
+TEST(TranscodingEngineTest, RejectsGeminiPartThatCarriesNoText) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "contents": [
+      {
+        "role": "user",
+        "parts": [
+          {"text": "What is in this picture?"},
+          {"inlineData": {"mimeType": "image/png", "data": "aW1hZ2UtYnl0ZXM="}}
+        ]
+      }
+    ]
+  })");
+
+  absl::Status status = requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+}
+
+// Regression: merging used `operator[]`, which inserts a null member for a missing key in
+// nlohmann::json. An assistant message with no `content` (a pure tool call) produced a fabricated
+// `{"type": "text", "text": null}` block that the upstream would reject.
+TEST(TranscodingEngineTest, MergeDoesNotFabricateContentForMessageWithoutContent) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5",
+    "max_tokens": 100,
+    "messages": [
+      {"role": "user", "content": "Call the tool."},
+      {"role": "user"}
+    ]
+  })");
+
+  // The content-less message is left alone rather than merged, so no `null` text block is
+  // invented. Anthropic's schema then rejects it on its own terms (`content` is `.required()`).
+  absl::Status status = requestFromIr(engine, LLMProtocol::AnthropicMessages, payload);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+
+  ASSERT_EQ(payload["messages"].size(), 2);
+  EXPECT_EQ(payload["messages"][0]["content"], "Call the tool.");
+  EXPECT_FALSE(payload["messages"][1].contains("content"));
+}
+
+// Verify that a request `FromIr` leg validates against the target dialect schema even when the
+// target protocol is the IR protocol itself (`OpenAiChatCompletions`).
+TEST(TranscodingEngineTest, TranscodeFromIrValidatesAgainstIrTargetSchema) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  // `temperature` is range-constrained in the OpenAI Chat Completions schema.
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gpt-4o",
+    "temperature": 99,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  absl::Status status = requestFromIr(engine, LLMProtocol::OpenAiChatCompletions, payload);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+}
+
+// Regression: OpenAI allows `stop` to be a bare string, but both `stop_sequences` and
+// `stopSequences` are array-only, so moving the scalar straight across produced a payload the
+// destination schema rejects.
+TEST(TranscodingEngineTest, NormalizesScalarStopToArray) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  for (const auto& [dialect, stop_pointer] : std::vector<std::pair<LLMProtocol, std::string>>{
+           {LLMProtocol::AnthropicMessages, "/stop_sequences"},
+           {LLMProtocol::GeminiGenerateContent, "/generationConfig/stopSequences"},
+       }) {
+    SCOPED_TRACE(stop_pointer);
+    nlohmann::json payload = nlohmann::json::parse(R"({
+      "model": "test-model",
+      "stop": "END",
+      "messages": [{"role": "user", "content": "Hi"}]
+    })");
+    ASSERT_THAT(requestFromIr(engine, dialect, payload), IsOk());
+    EXPECT_FALSE(payload.contains("stop"));
+    EXPECT_EQ(payload.at(nlohmann::json::json_pointer(stop_pointer)),
+              nlohmann::json::array({"END"}));
+  }
+}
+
+TEST(TranscodingEngineTest, DoesNotMaterializeStopSequencesWhenStopIsAbsent) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4",
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
+  EXPECT_FALSE(payload.contains("stop"));
+  EXPECT_FALSE(payload.contains("stop_sequences"));
+}
+
+// Regression: `tool_choice` was mapped in neither direction. OpenAI spells the unconstrained
+// cases as a bare string and Anthropic always uses an object, so every request that set the
+// field was rejected by Anthropic's schema on the way out. Envoy's Gemini schema accepts unknown
+// root fields, so an unmapped `tool_choice` was forwarded, and Gemini refused the whole request for
+// naming a field it does not know.
+TEST(TranscodingEngineTest, MapsToolChoiceOutOfTheIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  struct Case {
+    LLMProtocol dialect;
+    const char* ir_tool_choice;
+    // Where the dialect carries the choice, and what it says there.
+    const char* pointer;
+    const char* expected;
+  };
+  const char* const pinned = R"({"type": "function", "function": {"name": "lookup_doc"}})";
+  for (const Case& c : std::vector<Case>{
+           {LLMProtocol::AnthropicMessages, R"("required")", "/tool_choice", R"({"type": "any"})"},
+           {LLMProtocol::AnthropicMessages, pinned, "/tool_choice",
+            R"({"type": "tool", "name": "lookup_doc"})"},
+           {LLMProtocol::GeminiGenerateContent, R"("none")", "/toolConfig/functionCallingConfig",
+            R"({"mode": "NONE"})"},
+           {LLMProtocol::GeminiGenerateContent, pinned, "/toolConfig/functionCallingConfig",
+            R"({"mode": "ANY", "allowedFunctionNames": ["lookup_doc"]})"},
+       }) {
+    SCOPED_TRACE(c.expected);
+    nlohmann::json payload = nlohmann::json::parse(R"({
+      "model": "test-model",
+      "messages": [{"role": "user", "content": "Hi"}]
+    })");
+    payload["tool_choice"] = nlohmann::json::parse(c.ir_tool_choice);
+    ASSERT_THAT(requestFromIr(engine, c.dialect, payload), IsOk());
+    EXPECT_EQ(payload.at(nlohmann::json::json_pointer(c.pointer)),
+              nlohmann::json::parse(c.expected));
+    if (std::string(c.pointer) != "/tool_choice") {
+      EXPECT_FALSE(payload.contains("tool_choice"));
+    }
+  }
+}
+
+TEST(TranscodingEngineTest, MapsAnthropicToolChoiceIntoTheIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  for (const auto& [anthropic, ir] : std::vector<std::pair<const char*, const char*>>{
+           {R"({"type": "auto"})", R"("auto")"},
+           {R"({"type": "tool", "name": "lookup_doc"})",
+            R"({"type": "function", "function": {"name": "lookup_doc"}})"},
+       }) {
+    SCOPED_TRACE(anthropic);
+    nlohmann::json payload = nlohmann::json::parse(R"({
+      "model": "test-model",
+      "max_tokens": 16,
+      "messages": [{"role": "user", "content": "Hi"}]
+    })");
+    payload["tool_choice"] = nlohmann::json::parse(anthropic);
+    ASSERT_THAT(requestToIr(engine, LLMProtocol::AnthropicMessages, payload), IsOk());
+    EXPECT_EQ(payload["tool_choice"], nlohmann::json::parse(ir));
+  }
+}
+
+// Gemini refused a root `seed` as an unknown field: it takes the seed in `generationConfig`, where
+// a Gemini client may also quote it, as ProtoJSON allows.
+TEST(TranscodingEngineTest, MapsSeedBetweenTheIrAndGemini) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json ir = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-flash", "seed": 42, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, ir), IsOk());
+  EXPECT_FALSE(ir.contains("seed"));
+  EXPECT_EQ(ir["generationConfig"], nlohmann::json::parse(R"({"seed": 42})"));
+  EXPECT_THAT(
+      AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).schema()->validateRequest(ir),
+      IsOk());
+
+  for (const char* gemini_request : {
+           R"({"contents": [{"parts": [{"text": "Hi"}]}], "generationConfig": {"seed": "42"}})",
+           R"({"contents": [{"parts": [{"text": "Hi"}]}], "generation_config": {"seed": 42}})",
+       }) {
+    nlohmann::json gemini = nlohmann::json::parse(gemini_request);
+    ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, gemini), IsOk());
+    EXPECT_TRUE(gemini["seed"].is_number_integer()) << gemini_request;
+    EXPECT_EQ(gemini["seed"], 42) << gemini_request;
+  }
+}
+
+// Gemini refused `response_format` as an unknown field. It spells JSON mode as a response MIME
+// type, with the schema beside it when there is one; plain text is its default.
+TEST(TranscodingEngineTest, MapsResponseFormatToGeminiJsonMode) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const PayloadSchema* gemini_schema =
+      AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).schema();
+  const auto transcoded = [&](const char* response_format) {
+    nlohmann::json payload = nlohmann::json::parse(R"({
+      "model": "gemini-2.5-flash", "messages": [{"role": "user", "content": "List two colors."}]
+    })");
+    payload["response_format"] = nlohmann::json::parse(response_format);
+    EXPECT_THAT(requestFromIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
+    EXPECT_THAT(gemini_schema->validateRequest(payload), IsOk());
+    EXPECT_FALSE(payload.contains("response_format"));
+    return payload.value("generationConfig", nlohmann::json());
+  };
+
+  EXPECT_EQ(transcoded(R"({"type": "json_object"})"),
+            nlohmann::json::parse(R"({"responseMimeType": "application/json"})"));
+  EXPECT_EQ(transcoded(R"({"type": "json_schema", "json_schema": {
+              "name": "colors", "strict": true,
+              "schema": {"type": "object", "properties": {"colors": {"type": "array"}},
+                         "required": ["colors"], "additionalProperties": false}}})"),
+            nlohmann::json::parse(R"({
+              "responseMimeType": "application/json",
+              "responseJsonSchema": {"type": "object", "properties": {"colors": {"type": "array"}},
+                                     "required": ["colors"], "additionalProperties": false}
+            })"));
+  EXPECT_EQ(transcoded(R"({"type": "json_schema", "json_schema": {"name": "anything"}})"),
+            nlohmann::json::parse(R"({"responseMimeType": "application/json"})"));
+  EXPECT_TRUE(transcoded(R"({"type": "text"})").is_null());
+}
+
+// Regression: Gemini renders proto numbers through ProtoJSON, so these fields can arrive quoted.
+// `firstOf` preserves the JSON type, so the string landed in an IR field declared numeric.
+TEST(TranscodingEngineTest, CoercesQuotedGeminiNumbersWhenEnteringTheIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gpt-4o",
+    "contents": [{"role": "user", "parts": [{"text": "Hello"}]}],
+    "generationConfig": {
+      "maxOutputTokens": "256",
+      "temperature": "0.5",
+      "topP": "0.9"
+    }
+  })");
+
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  EXPECT_TRUE(payload["max_completion_tokens"].is_number_integer());
+  EXPECT_EQ(payload["max_completion_tokens"], 256);
+  EXPECT_TRUE(payload["temperature"].is_number());
+  EXPECT_EQ(payload["temperature"], 0.5);
+  EXPECT_TRUE(payload["top_p"].is_number());
+  EXPECT_EQ(payload["top_p"], 0.9);
+
+  // Also verify that the coerced IR payload passes the OpenAI Chat Completions schema validation.
+  const PayloadSchema* openai_schema =
+      AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
+  ASSERT_NE(openai_schema, nullptr);
+  EXPECT_THAT(openai_schema->validateRequest(payload), IsOk());
+}
+
+// Regression: Gemini leaves `role` optional (Vertex defaults it to `user`) while both other
+// dialects require it, so a valid Gemini request failed the destination's role check.
+TEST(TranscodingEngineTest, AppliesGeminiRoleDefaultForMessagesThatOmitIt) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "model": "gpt-4o",
+    "contents": [{"parts": [{"text": "Hello"}]}]
+  })");
+
+  ASSERT_THAT(requestToIr(engine, LLMProtocol::GeminiGenerateContent, payload), IsOk());
+  ASSERT_EQ(payload["messages"].size(), 1);
+  EXPECT_EQ(payload["messages"][0]["role"], "user");
+  EXPECT_EQ(payload["messages"][0]["content"], "Hello");
+
+  const PayloadSchema* openai_schema =
+      AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
+  ASSERT_NE(openai_schema, nullptr);
+  EXPECT_THAT(openai_schema->validateRequest(payload), IsOk());
+}
+
+// Regression: `registerPack` unconditionally overwrote the pack's schema pointers with its
+// arguments, so a pack that arrived with its schemas already set was silently cleared and the
+// from-IR validation it expected never ran.
+TEST(TranscodingEngineTest, RegisterPackKeepsSchemasAlreadySetOnThePack) {
+  TranscodingEngine engine;
+  const PayloadSchema* anthropic_schema =
+      AdapterRegistry::get(LLMProtocol::AnthropicMessages).schema();
+  ASSERT_NE(anthropic_schema, nullptr);
+
+  DialectTranscodePack pack{
+      .protocol = LLMProtocol::AnthropicMessages,
+      .request =
+          {
+              .to_ir = TranscodeRuleSet(LLMProtocol::AnthropicMessages,
+                                        TranscodingEngine::kIrProtocol, {}),
+              .from_ir = TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                          LLMProtocol::AnthropicMessages, {}),
+          },
+      .dialect_schema = anthropic_schema,
+      .ir_schema = nullptr,
+  };
+
+  // No schemas are passed as arguments, so the pack's own `dialect_schema` must survive.
+  ASSERT_THAT(engine.registerPack(std::move(pack)), IsOk());
+
+  // `model` is `.required()` in Anthropic's schema. If the pack's schema had been cleared, this
+  // payload would transcode without complaint.
+  nlohmann::json payload = nlohmann::json::parse(R"({
+    "max_tokens": 10,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  absl::Status status = requestFromIr(engine, LLMProtocol::AnthropicMessages, payload);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+}
+
+// Regression: the startup verifier previously checked `ValueMap` target paths against the
+// original schema without tracking earlier structural rules. Moving `messages` to `turns` before
+// running `ValueMap` on `turns[].content` bypassed the startup check even though
+// `messages[].content` is offloadable.
+TEST(TranscodingEngineTest, VerifierTracksOffloadableFieldProvenanceAcrossMoveAndUnwrap) {
+  const PayloadSchema* openai_schema =
+      AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
+  ASSERT_NE(openai_schema, nullptr);
+
+  TranscodeRuleSet moved_array_plan(
+      LLMProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol,
+      {
+          TranscodeRule::move("messages", "turns"),
+          TranscodeRule::forEach("turns",
+                                 {
+                                     TranscodeRule::valueMap("content", {{"foo", "bar"}}),
+                                 }),
+      });
+
+  absl::Status moved_status =
+      TranscodingEngine::validateRulesAgainstSchema(moved_array_plan, openai_schema);
+  EXPECT_FALSE(moved_status.ok());
+  EXPECT_EQ(moved_status.code(), absl::StatusCode::kInvalidArgument);
+
+  const PayloadSchema* gemini_schema =
+      AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).schema();
+  ASSERT_NE(gemini_schema, nullptr);
+
+  TranscodeRuleSet unwrapped_part_plan(
+      LLMProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
+      {
+          TranscodeRule::move("contents", "messages"),
+          TranscodeRule::forEach("messages",
+                                 {
+                                     TranscodeRule::unwrapArrayObject("parts", "text", "content"),
+                                     TranscodeRule::valueMap("content", {{"foo", "bar"}}),
+                                 }),
+      });
+
+  absl::Status unwrapped_status =
+      TranscodingEngine::validateRulesAgainstSchema(unwrapped_part_plan, gemini_schema);
+  EXPECT_FALSE(unwrapped_status.ok());
+  EXPECT_EQ(unwrapped_status.code(), absl::StatusCode::kInvalidArgument);
+
+  TranscodeRuleSet unwrapped_multi_part_plan(
+      LLMProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
+      {
+          TranscodeRule::move("contents", "messages"),
+          TranscodeRule::forEach(
+              "messages",
+              {
+                  TranscodeRule::unwrapArrayObject("parts", "text", "content"),
+                  TranscodeRule::forEach("content",
+                                         {
+                                             TranscodeRule::valueMap("text", {{"foo", "bar"}}),
+                                         }),
+              }),
+      });
+
+  absl::Status unwrapped_multi_status =
+      TranscodingEngine::validateRulesAgainstSchema(unwrapped_multi_part_plan, gemini_schema);
+  EXPECT_FALSE(unwrapped_multi_status.ok());
+  EXPECT_EQ(unwrapped_multi_status.code(), absl::StatusCode::kInvalidArgument);
+}
+
+TEST(TranscodingEngineTest, CoversAllRuleAndEngineEdgeCases) {
+  // 1. Exercise `TranscodeRule` introspection accessors and `std::vector<TranscodeRule>` rule set.
+  TranscodeRule rule = TranscodeRule::valueMap("role", {{"bot", "assistant"}},
+                                               TranscodeRule::UnknownValuePolicy::Drop);
+  EXPECT_EQ(rule.op(), TranscodeRule::Op::ValueMap);
+  EXPECT_EQ(rule.targetPath(), "role");
+  EXPECT_EQ(rule.unknownValuePolicy(), TranscodeRule::UnknownValuePolicy::Drop);
+  EXPECT_EQ(rule.valueMappings().size(), 1);
+
+  TranscodeRule def_rule = TranscodeRule::setDefault("temperature", 0.7);
+  EXPECT_EQ(def_rule.defaultValue(), 0.7);
+
+  TranscodeRule ext_rule =
+      TranscodeRule::extractFromArray("messages", "role", {"system"}, "content", "system");
+  EXPECT_EQ(ext_rule.predicateField(), "role");
+  EXPECT_EQ(ext_rule.extractSubpath(), "content");
+  EXPECT_EQ(ext_rule.matchValues().size(), 1);
+
+  std::vector<TranscodeRule> rule_vec = {rule};
+  TranscodeRuleSet vec_rule_set(LLMProtocol::OpenAiResponses, LLMProtocol::OpenAiChatCompletions,
+                                std::move(rule_vec));
+  EXPECT_EQ(vec_rule_set.sourceProtocol(), LLMProtocol::OpenAiResponses);
+  EXPECT_EQ(vec_rule_set.targetProtocol(), LLMProtocol::OpenAiChatCompletions);
+
+  // 2. Exercise the `JsonWithExtBuf` wrapper overload on `TranscodeRuleSet`, then run request legs
+  // on the payload it holds.
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& default_engine = *engine_or;
+
+  JsonWithExtBuf ext_payload;
+  ext_payload.json() = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5",
+    "role": "unknown_role",
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(vec_rule_set.execute(ext_payload), IsOk());
+  EXPECT_FALSE(ext_payload.json().contains("role"));
+
+  ASSERT_THAT(requestToIr(default_engine, LLMProtocol::OpenAiChatCompletions, ext_payload), IsOk());
+  ASSERT_THAT(requestFromIr(default_engine, LLMProtocol::AnthropicMessages, ext_payload), IsOk());
+
+  // 3. Non-object root payload is rejected by `TranscodeRule::apply`.
+  nlohmann::json non_obj = nlohmann::json::array({1, 2, 3});
+  EXPECT_FALSE(TranscodeRule::drop("a").apply(non_obj).ok());
+
+  // 4. Empty path, self-move (`source_path == target_path`), and intermediate non-object paths.
+  nlohmann::json edge_doc = nlohmann::json::parse(R"({
+    "a": "scalar",
+    "single_other": {"other": 123},
+    "bad_int": "not_an_int",
+    "bad_num": "not_a_float",
+    "non_str": 42,
+    "arr_with_scalar": [123, {"k": "v"}],
+    "scalar_blocks": ["hello"],
+    "bad_blocks": [{"no_text": 1}],
+    "non_obj_parts": [123],
+    "multi_sys": [
+      {"role": "system", "content": [{"type": "text", "text": "sys1"}]},
+      {"role": "system", "content": "sys2"}
+    ]
+  })");
+  EXPECT_THAT(TranscodeRule::move("", "").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::move("a", "a").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::move("a.b.c", "x.y").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::setDefault("", nlohmann::json::object()).apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::unwrapSingleKeyObject("single_other", "type").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::toInteger("bad_int").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::toNumber("bad_num").apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::valueMap("non_str", {{"a", "b"}}).apply(edge_doc), IsOk());
+  EXPECT_THAT(TranscodeRule::forEach("arr_with_scalar", {TranscodeRule::drop("k")}).apply(edge_doc),
+              IsOk());
+  EXPECT_THAT(TranscodeRule::extractFromArray("missing_arr", "role", {"system"}, "content", "sys")
+                  .apply(edge_doc),
+              IsOk());
+  EXPECT_THAT(TranscodeRule::extractFromArray("multi_sys", "role", {"system"}, "content", "sys_out")
+                  .apply(edge_doc),
+              IsOk());
+  EXPECT_THAT(
+      TranscodeRule::prependToArray("bad_int", "new_messages_arr", "role", "system", "content")
+          .apply(edge_doc),
+      IsOk());
+  EXPECT_THAT(
+      TranscodeRule::wrapInArrayObject("scalar_blocks", "wrapped_scalars", "text").apply(edge_doc),
+      IsOk());
+  EXPECT_FALSE(
+      TranscodeRule::wrapInArrayObject("bad_blocks", "wrapped_bad", "text").apply(edge_doc).ok());
+  EXPECT_FALSE(
+      TranscodeRule::unwrapArrayObject("non_obj_parts", "text", "out").apply(edge_doc).ok());
+
+  // 5. Runtime `ExternalRef` protection on `ValueMap` and `registerPack` / request `FromIr` leg
+  // error
+  //    propagation.
+  nlohmann::json ext_ref_doc = nlohmann::json::object();
+  ext_ref_doc["field"] = JsonWithExtBuf::makeExternalRef({0, 16});
+  EXPECT_FALSE(TranscodeRule::valueMap("field", {{"a", "b"}}).apply(ext_ref_doc).ok());
+
+  const PayloadSchema* openai_schema =
+      AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).schema();
+  TranscodingEngine custom_engine;
+  DialectTranscodePack bad_to_ir_pack{
+      .protocol = LLMProtocol::OpenAiChatCompletions,
+      .request =
+          {
+              .to_ir = TranscodeRuleSet(
+                  LLMProtocol::OpenAiChatCompletions, TranscodingEngine::kIrProtocol,
+                  {TranscodeRule::forEach("messages",
+                                          {TranscodeRule::valueMap("content", {{"a", "b"}})})}),
+              .from_ir = TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                          LLMProtocol::OpenAiChatCompletions, {}),
+          },
+  };
+  EXPECT_FALSE(
+      custom_engine.registerPack(std::move(bad_to_ir_pack), openai_schema, openai_schema).ok());
+
+  DialectTranscodePack bad_from_ir_pack{
+      .protocol = LLMProtocol::OpenAiChatCompletions,
+      .request =
+          {
+              .to_ir = TranscodeRuleSet(LLMProtocol::OpenAiChatCompletions,
+                                        TranscodingEngine::kIrProtocol, {}),
+              .from_ir = TranscodeRuleSet(
+                  TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiChatCompletions,
+                  {TranscodeRule::forEach("messages",
+                                          {TranscodeRule::valueMap("content", {{"a", "b"}})})}),
+          },
+  };
+  EXPECT_FALSE(
+      custom_engine.registerPack(std::move(bad_from_ir_pack), openai_schema, openai_schema).ok());
+
+  DialectTranscodePack strict_from_ir_pack{
+      .protocol = LLMProtocol::OpenAiResponses,
+      .request =
+          {
+              .to_ir = TranscodeRuleSet(LLMProtocol::OpenAiResponses,
+                                        TranscodingEngine::kIrProtocol, {}),
+              .from_ir = TranscodeRuleSet(
+                  TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiResponses,
+                  {TranscodeRule::valueMap("mode", {{"ok", "yes"}},
+                                           TranscodeRule::UnknownValuePolicy::Reject)}),
+          },
+  };
+  ASSERT_THAT(custom_engine.registerPack(std::move(strict_from_ir_pack)), IsOk());
+  nlohmann::json bad_mode = nlohmann::json::parse(R"({"mode": "invalid"})");
+  EXPECT_FALSE(requestFromIr(custom_engine, LLMProtocol::OpenAiResponses, bad_mode).ok());
+}
+
+// A response leg runs on a copy, so a rule that fails part way through leaves the caller's
+// document exactly as it was, and the caller can still forward it untranslated.
+TEST(TranscodingEngineTest, TranscodeResponseLegIsAllOrNothing) {
+  TranscodingEngine engine;
+  DialectTranscodePack pack{
+      .protocol = LLMProtocol::OpenAiResponses,
+      .request = {.to_ir = TranscodeRuleSet(LLMProtocol::OpenAiResponses,
+                                            TranscodingEngine::kIrProtocol, {}),
+                  .from_ir = TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                              LLMProtocol::OpenAiResponses, {})},
+      .response = {.to_ir = TranscodeRuleSet(
+                       LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+                       {
+                           TranscodeRule::move("output", "choices"),
+                           TranscodeRule::valueMap("status", {{"completed", "stop"}},
+                                                   TranscodeRule::UnknownValuePolicy::Reject),
+                       }),
+                   .from_ir = TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                               LLMProtocol::OpenAiResponses,
+                                               {TranscodeRule::move("choices", "output")})},
+  };
+  ASSERT_THAT(engine.registerPack(std::move(pack)), IsOk());
+  const TranscodeLeg to_ir{PayloadKind::Response, TranscodeDirection::ToIr,
+                           LLMProtocol::OpenAiResponses};
+  const TranscodeLeg from_ir{PayloadKind::Response, TranscodeDirection::FromIr,
+                             LLMProtocol::OpenAiResponses};
+
+  // The `move` succeeds before the `valueMap` rejects, so an in-place run would leave `choices`.
+  const nlohmann::json original =
+      nlohmann::json::parse(R"({"output": [{"text": "Hi"}], "status": "incomplete"})");
+  nlohmann::json doc = original;
+  TranscodeContext ctx;
+  EXPECT_EQ(engine.transcode(to_ir, ctx, doc).code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(doc, original);
+
+  doc["status"] = "completed";
+  ASSERT_THAT(engine.transcode(to_ir, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({"choices": [{"text": "Hi"}], "status": "stop"})"));
+
+  ASSERT_THAT(engine.transcode(from_ir, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({"output": [{"text": "Hi"}], "status": "stop"})"));
+}
+
+// A response already in the IR needs no conversion either way.
+TEST(TranscodingEngineTest, TranscodeResponseLegForTheIrIsTheIdentity) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const nlohmann::json original = nlohmann::json::parse(R"({
+    "id": "chatcmpl-1",
+    "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hi"}}]
+  })");
+  for (TranscodeDirection direction : {TranscodeDirection::ToIr, TranscodeDirection::FromIr}) {
+    nlohmann::json doc = original;
+    TranscodeContext ctx;
+    ASSERT_THAT(engine.transcode({PayloadKind::Response, direction, TranscodingEngine::kIrProtocol},
+                                 ctx, doc),
+                IsOk());
+    EXPECT_EQ(doc, original);
+  }
+}
+
+TEST(TranscodingEngineTest, TranscodeRejectsStreamEventAndUnregisteredLegs) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const nlohmann::json original = nlohmann::json::parse(R"({"choices": []})");
+  nlohmann::json doc = original;
+  TranscodeContext ctx;
+  EXPECT_EQ(engine
+                .transcode({PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                            LLMProtocol::GeminiGenerateContent},
+                           ctx, doc)
+                .code(),
+            absl::StatusCode::kInvalidArgument);
+
+  absl::Status status = engine.transcode(
+      {PayloadKind::Response, TranscodeDirection::ToIr, LLMProtocol::OpenAiResponses}, ctx, doc);
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(status.message(), testing::HasSubstr("no transcoding pack registered"));
+
+  // A leg must name a dialect.
+  EXPECT_FALSE(
+      engine
+          .transcode({PayloadKind::Request, TranscodeDirection::ToIr, LLMProtocol::Unspecified},
+                     ctx, doc)
+          .ok());
+  EXPECT_EQ(doc, original);
+}
+
+// ---------------------------------------------------------------------------
+// Request envelopes: what a dialect names in the request path rather than the body.
+
+constexpr TranscodeLeg kGeminiRequestToIr{PayloadKind::Request, TranscodeDirection::ToIr,
+                                          LLMProtocol::GeminiGenerateContent};
+constexpr TranscodeLeg kIrRequestToGemini{PayloadKind::Request, TranscodeDirection::FromIr,
+                                          LLMProtocol::GeminiGenerateContent};
+
+// A Gemini request names its model and streaming mode in the path, and the IR needs both in the
+// body. What the body names itself wins.
+TEST(TranscodingEngineTest, GeminiRequestToIrLiftsTheModelAndStreamFromThePath) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const nlohmann::json body =
+      nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
+
+  nlohmann::json streamed = body;
+  TranscodeContext ctx;
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, streamed), IsOk());
+  EXPECT_EQ(streamed["model"], "gemini-2.5-flash");
+  EXPECT_EQ(streamed["stream"], true);
+  EXPECT_EQ(streamed["messages"][0]["content"], "Hi");
+  EXPECT_EQ(ctx.ir_model, "gemini-2.5-flash");
+
+  // Vertex AI nests the same methods under a project and a location.
+  nlohmann::json unary = body;
+  ctx.request_path = "/v1/projects/p/locations/us-central1/publishers/google/models/"
+                     "gemini-2.5-pro:generateContent";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, unary), IsOk());
+  EXPECT_EQ(unary["model"], "gemini-2.5-pro");
+  EXPECT_FALSE(unary.contains("stream"));
+
+  nlohmann::json named = body;
+  named["model"] = "gemini-named-in-body";
+  named["stream"] = false;
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:streamGenerateContent";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, named), IsOk());
+  EXPECT_EQ(named["model"], "gemini-named-in-body");
+  EXPECT_EQ(named["stream"], false);
+}
+
+// Only Gemini's model methods name anything, and a dialect that names nothing in the path reads
+// nothing from it.
+TEST(TranscodingEngineTest, RequestToIrLiftsNothingFromAnyOtherPath) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const nlohmann::json body =
+      nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
+
+  for (const char* path : {
+           "",
+           "/v1/chat/completions",
+           "/v1beta/models/gemini-2.5-flash",
+           "/v1beta/models/gemini-2.5-flash:countTokens",
+           "/v1beta/models/:generateContent",
+           "/v1beta/models/a:b:generateContent",
+           "/v1beta/tunedModels/t:generateContent",
+           "gemini-2.5-flash:generateContent",
+       }) {
+    nlohmann::json doc = body;
+    TranscodeContext ctx;
+    ctx.request_path = path;
+    ctx.ir_model = "stale";
+    ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, doc), IsOk());
+    EXPECT_FALSE(doc.contains("model")) << path;
+    EXPECT_FALSE(doc.contains("stream")) << path;
+    // With no model in the body or the path there is none to report, and nothing stale survives.
+    EXPECT_EQ(ctx.ir_model, "") << path;
+  }
+
+  nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5", "max_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext ctx;
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:streamGenerateContent";
+  ASSERT_THAT(engine.transcode(
+                  {PayloadKind::Request, TranscodeDirection::ToIr, LLMProtocol::AnthropicMessages},
+                  ctx, anthropic),
+              IsOk());
+  EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
+  EXPECT_FALSE(anthropic.contains("stream"));
+}
+
+// Gemini and Anthropic always report a stream's usage, while an IR upstream does only when asked,
+// so a streaming request bound for the IR asks. A unary one has no stream to ask about.
+TEST(TranscodingEngineTest, StreamingRequestsToIrAskForTheUsage) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const nlohmann::json include_usage = nlohmann::json::parse(R"({"include_usage": true})");
+
+  nlohmann::json gemini =
+      nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
+  nlohmann::json gemini_unary = gemini;
+  TranscodeContext ctx;
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, gemini), IsOk());
+  EXPECT_EQ(gemini["stream_options"], include_usage);
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:generateContent";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, gemini_unary), IsOk());
+  EXPECT_FALSE(gemini_unary.contains("stream_options"));
+
+  const TranscodeLeg anthropic_to_ir{PayloadKind::Request, TranscodeDirection::ToIr,
+                                     LLMProtocol::AnthropicMessages};
+  nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5", "max_tokens": 16, "stream": true,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  nlohmann::json anthropic_unary = anthropic;
+  anthropic_unary["stream"] = false;
+  ASSERT_THAT(engine.transcode(anthropic_to_ir, ctx, anthropic), IsOk());
+  EXPECT_EQ(anthropic["stream_options"], include_usage);
+  ASSERT_THAT(engine.transcode(anthropic_to_ir, ctx, anthropic_unary), IsOk());
+  EXPECT_FALSE(anthropic_unary.contains("stream_options"));
+}
+
+// Bound for Gemini, the IR's model and streaming mode move into the path: Gemini rejects both, and
+// `stream_options`, as unknown fields in the body.
+TEST(TranscodingEngineTest, IrRequestToGeminiMovesTheModelAndStreamIntoThePath) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json streamed = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-flash", "stream": true, "stream_options": {"include_usage": true},
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext ctx;
+  ASSERT_THAT(engine.transcode(kIrRequestToGemini, ctx, streamed), IsOk());
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(
+                  std::string("/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse")));
+  EXPECT_EQ(ctx.ir_model, "gemini-2.5-flash");
+  EXPECT_EQ(streamed, nlohmann::json::parse(
+                          R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})"));
+
+  nlohmann::json unary = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-flash", "stream": false,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(engine.transcode(kIrRequestToGemini, ctx, unary), IsOk());
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(std::string("/v1beta/models/gemini-2.5-flash:generateContent")));
+  EXPECT_FALSE(unary.contains("model"));
+  EXPECT_FALSE(unary.contains("stream"));
+
+  // Anthropic names its model in the body, so there is no path to rewrite, and none survives from
+  // an earlier leg. It rejects `stream_options` too, and reports usage in every stream anyway.
+  nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5", "stream": true, "stream_options": {"include_usage": true},
+    "max_completion_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(engine.transcode({PayloadKind::Request, TranscodeDirection::FromIr,
+                                LLMProtocol::AnthropicMessages},
+                               ctx, anthropic),
+              IsOk());
+  EXPECT_FALSE(ctx.rewritten_path.has_value());
+  EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
+  EXPECT_EQ(anthropic["stream"], true);
+  EXPECT_FALSE(anthropic.contains("stream_options"));
+}
+
+// The model becomes a path segment, so one that could escape it is refused, and no path is
+// rewritten.
+TEST(TranscodingEngineTest, IrRequestToGeminiRefusesAModelThatIsNotAModelId) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  for (const char* model : {R"("../gemini-2.5-flash:generateContent?key=x#")",
+                            R"("models/gemini-2.5-flash")", R"("")", "42", "null"}) {
+    nlohmann::json doc =
+        nlohmann::json::parse(R"({"messages": [{"role": "user", "content": "Hi"}]})");
+    doc["model"] = nlohmann::json::parse(model);
+    TranscodeContext ctx;
+    const absl::Status status = engine.transcode(kIrRequestToGemini, ctx, doc);
+    EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument) << model;
+    EXPECT_THAT(status.message(), testing::HasSubstr("model id")) << model;
+    EXPECT_FALSE(ctx.rewritten_path.has_value()) << model;
+  }
+
+  nlohmann::json no_model =
+      nlohmann::json::parse(R"({"messages": [{"role": "user", "content": "Hi"}]})");
+  TranscodeContext ctx;
+  EXPECT_EQ(engine.transcode(kIrRequestToGemini, ctx, no_model).code(),
+            absl::StatusCode::kInvalidArgument);
+}
+
+// The envelope is data in the pack: another dialect that names its model in the path gets the same
+// treatment, with its own layout.
+TEST(TranscodingEngineTest, RequestEnvelopeIsDataInThePack) {
+  TranscodingEngine engine;
+  ASSERT_THAT(engine.registerPack(DialectTranscodePack{
+                  .protocol = LLMProtocol::OpenAiResponses,
+                  .envelope =
+                      PathTemplate{
+                          .prefix = "/v2/engines/",
+                          .unary_method = ":predict",
+                          .stream_method = ":streamPredict?stream=1",
+                      },
+              }),
+              IsOk());
+  const TranscodeLeg to_ir{PayloadKind::Request, TranscodeDirection::ToIr,
+                           LLMProtocol::OpenAiResponses};
+  const TranscodeLeg from_ir{PayloadKind::Request, TranscodeDirection::FromIr,
+                             LLMProtocol::OpenAiResponses};
+
+  // Only the prefix's last segment has to match, and the query is ignored.
+  nlohmann::json doc = nlohmann::json::parse(R"({"input": "Hi"})");
+  TranscodeContext ctx;
+  ctx.request_path = "/tenants/t/v2/engines/engine-7:streamPredict?alt=json";
+  ASSERT_THAT(engine.transcode(to_ir, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({"input": "Hi", "model": "engine-7", "stream": true})"));
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::OpenAiResponses, ctx.request_path),
+            "engine-7");
+  EXPECT_EQ(
+      engine.modelFromRequestPath(LLMProtocol::OpenAiResponses, "/v2/models/engine-7:predict"), "");
+
+  // A rendered path keeps the method's query.
+  ASSERT_THAT(engine.transcode(from_ir, ctx, doc), IsOk());
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(std::string("/v2/engines/engine-7:streamPredict?stream=1")));
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({"input": "Hi"})"));
+}
+
+TEST(TranscodingEngineTest, ModelFromRequestPathReadsTheDialectsEnvelope) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::GeminiGenerateContent,
+                                        "/v1beta/models/gemini-2.5-pro:generateContent"),
+            "gemini-2.5-pro");
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::GeminiGenerateContent,
+                                        "/v1/projects/p/locations/l/publishers/google/models/"
+                                        "gemini-2.5-flash:streamGenerateContent?alt=sse"),
+            "gemini-2.5-flash");
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::GeminiGenerateContent, "/v1/chat/completions"),
+            "");
+  // Anthropic names its model in the body, and `OpenAiResponses` has no pack at all.
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::AnthropicMessages,
+                                        "/v1beta/models/gemini-2.5-pro:generateContent"),
+            "");
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::OpenAiResponses,
+                                        "/v1beta/models/gemini-2.5-pro:generateContent"),
+            "");
+}
+
+// ---------------------------------------------------------------------------
+// Unary response legs of the default packs.
+
+constexpr TranscodeLeg kGeminiResponseToIr{PayloadKind::Response, TranscodeDirection::ToIr,
+                                           LLMProtocol::GeminiGenerateContent};
+constexpr TranscodeLeg kIrResponseToGemini{PayloadKind::Response, TranscodeDirection::FromIr,
+                                           LLMProtocol::GeminiGenerateContent};
+constexpr TranscodeLeg kAnthropicResponseToIr{PayloadKind::Response, TranscodeDirection::ToIr,
+                                              LLMProtocol::AnthropicMessages};
+constexpr TranscodeLeg kIrResponseToAnthropic{PayloadKind::Response, TranscodeDirection::FromIr,
+                                              LLMProtocol::AnthropicMessages};
+
+// A message carries one answer, so only the first choice survives; the input count excludes the
+// cache buckets again.
+TEST(TranscodingEngineTest, TranscodesIrResponseToAnthropic) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json doc = nlohmann::json::parse(R"({
+    "id": "chatcmpl-1", "object": "chat.completion", "created": 1699999999, "model": "gpt-4o",
+    "system_fingerprint": "fp_1",
+    "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hi", "refusal": null},
+                 "logprobs": null, "finish_reason": "length"},
+                {"index": 1, "message": {"role": "assistant", "content": "ignored"},
+                 "finish_reason": "stop"}],
+    "usage": {"prompt_tokens": 100, "completion_tokens": 7, "total_tokens": 107,
+              "prompt_tokens_details": {"cached_tokens": 60}}
+  })");
+  TranscodeContext ctx;
+  ASSERT_THAT(engine.transcode(kIrResponseToAnthropic, ctx, doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({
+    "id": "chatcmpl-1", "type": "message", "role": "assistant", "model": "gpt-4o",
+    "content": [{"type": "text", "text": "Hi"}],
+    "stop_reason": "max_tokens",
+    "usage": {"input_tokens": 40, "output_tokens": 7, "cache_read_input_tokens": 60}
+  })"));
+
+  // What the IR leaves out is defaulted: the model from the request, an unknown finish reason
+  // as an ordinary end of turn.
+  nlohmann::json bare = nlohmann::json::parse(R"({
+    "choices": [{"message": {"role": "assistant", "content": null}, "finish_reason": "weird"}]
+  })");
+  TranscodeContext with_model;
+  with_model.request_model = "claude-sonnet-4-5";
+  ASSERT_THAT(engine.transcode(kIrResponseToAnthropic, with_model, bare), IsOk());
+  EXPECT_EQ(bare, nlohmann::json::parse(R"({
+    "id": "msg_transcoded", "type": "message", "role": "assistant", "model": "claude-sonnet-4-5",
+    "content": [{"type": "text", "text": ""}], "stop_reason": "end_turn"
+  })"));
+}
+
+// The IR requires `model` and `created`; a response that carries neither gets them from the
+// caller, and a placeholder model when the caller has none either.
+TEST(TranscodingEngineTest, ResponseLegsFillTheIrEnvelopeFromTheContext) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const nlohmann::json gemini =
+      nlohmann::json::parse(R"({"candidates": [{"content": {"parts": [{"text": "Hi"}]}}]})");
+  nlohmann::json doc = gemini;
+  TranscodeContext ctx;
+  ctx.request_model = "gemini-2.5-pro";
+  ctx.now_unix_seconds = 1700000000;
+  ASSERT_THAT(engine.transcode(kGeminiResponseToIr, ctx, doc), IsOk());
+  EXPECT_EQ(doc["id"], "chatcmpl-transcoded");
+  EXPECT_EQ(doc["created"], 1700000000);
+  EXPECT_EQ(doc["model"], "gemini-2.5-pro");
+
+  doc = gemini;
+  TranscodeContext no_model;
+  no_model.now_unix_seconds = 1700000000;
+  ASSERT_THAT(engine.transcode(kGeminiResponseToIr, no_model, doc), IsOk());
+  EXPECT_EQ(doc["model"], "transcoded-model");
+
+  nlohmann::json anthropic =
+      nlohmann::json::parse(R"({"content": [{"type": "text", "text": "Hi"}]})");
+  ASSERT_THAT(engine.transcode(kAnthropicResponseToIr, ctx, anthropic), IsOk());
+  EXPECT_EQ(anthropic["id"], "chatcmpl-transcoded");
+  EXPECT_EQ(anthropic["created"], 1700000000);
+  EXPECT_EQ(anthropic["model"], "gemini-2.5-pro");
+  EXPECT_EQ(anthropic["choices"][0]["message"]["role"], "assistant");
+  EXPECT_EQ(anthropic["choices"][0]["finish_reason"], "stop");
+}
+
+// Each leg checks the member its rules depend on, so a payload that is not a response of the
+// dialect (an error body, say) is refused whole rather than half converted.
+TEST(TranscodingEngineTest, ResponseLegsRefuseAPayloadThatIsNotAResponse) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const struct {
+    TranscodeLeg leg;
+    std::string payload;
+    std::string field;
+  } cases[] = {
+      {kGeminiResponseToIr, R"({"promptFeedback": {"blockReason": "SAFETY"}})", "candidates"},
+      {kAnthropicResponseToIr, R"({"type": "error", "error": {"type": "overloaded_error"}})",
+       "content"},
+      {kIrResponseToGemini, R"({"id": "chatcmpl-3", "choices": []})", "choices"},
+      {kIrResponseToAnthropic, R"({"error": {"message": "Rate limit reached"}})", "choices"},
+  };
+  for (const auto& c : cases) {
+    const nlohmann::json original = nlohmann::json::parse(c.payload);
+    nlohmann::json doc = original;
+    TranscodeContext ctx;
+    const absl::Status status = engine.transcode(c.leg, ctx, doc);
+    EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument) << c.payload;
+    EXPECT_THAT(status.message(), testing::HasSubstr(c.field)) << c.payload;
+    EXPECT_EQ(doc, original);
+  }
+
+  nlohmann::json not_an_object = nlohmann::json::array();
+  TranscodeContext ctx;
+  EXPECT_EQ(engine.transcode(kGeminiResponseToIr, ctx, not_an_object).code(),
+            absl::StatusCode::kInvalidArgument);
+}
+
+// A response that goes into the IR and back out to its own dialect keeps its answer, finish
+// reason and token counts.
+TEST(TranscodingEngineTest, ResponseLegsRoundTripThroughTheIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  TranscodeContext ctx;
+  ctx.now_unix_seconds = 1700000000;
+
+  const nlohmann::json gemini = nlohmann::json::parse(R"({
+    "candidates": [{"index": 0, "content": {"role": "model", "parts": [{"text": "Paris"}]},
+                    "finishReason": "MAX_TOKENS"}],
+    "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5, "thoughtsTokenCount": 3,
+                      "cachedContentTokenCount": 4, "totalTokenCount": 18},
+    "modelVersion": "gemini-2.5-flash"
+  })");
+  nlohmann::json doc = gemini;
+  ASSERT_THAT(engine.transcode(kGeminiResponseToIr, ctx, doc), IsOk());
+  ASSERT_THAT(engine.transcode(kIrResponseToGemini, ctx, doc), IsOk());
+  EXPECT_EQ(doc, gemini);
+
+  const nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-sonnet-4-5",
+    "content": [{"type": "text", "text": "Hello!"}], "stop_reason": "max_tokens",
+    "usage": {"input_tokens": 70, "output_tokens": 20, "cache_read_input_tokens": 30,
+              "cache_creation_input_tokens": 10}
+  })");
+  doc = anthropic;
+  ASSERT_THAT(engine.transcode(kAnthropicResponseToIr, ctx, doc), IsOk());
+  ASSERT_THAT(engine.transcode(kIrResponseToAnthropic, ctx, doc), IsOk());
+  EXPECT_EQ(doc, anthropic);
+}
+
+// ---------------------------------------------------------------------------
+// Stream event legs.
+
+constexpr TranscodeLeg kGeminiStreamToIr{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                                         LLMProtocol::GeminiGenerateContent};
+constexpr TranscodeLeg kIrStreamToGemini{PayloadKind::StreamEvent, TranscodeDirection::FromIr,
+                                         LLMProtocol::GeminiGenerateContent};
+constexpr TranscodeLeg kAnthropicStreamToIr{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                                            LLMProtocol::AnthropicMessages};
+constexpr TranscodeLeg kIrStreamToAnthropic{PayloadKind::StreamEvent, TranscodeDirection::FromIr,
+                                            LLMProtocol::AnthropicMessages};
+
+// Builds one SSE event from `spec`, in the shape `describeEvent()` reports: an optional `event`
+// name, and either a JSON `data` payload or a `raw` one.
+SseEventPtr makeEvent(const nlohmann::json& spec) {
+  auto event = std::make_unique<SseEvent>();
+  if (const auto data = spec.find("data"); data != spec.end()) {
+    JsonWithExtBuf payload;
+    payload.setJson(*data);
+    event->set_json(std::move(payload));
+  } else {
+    event->set_raw_data(std::make_unique<Buffer::OwnedImpl>(spec.value("raw", "")));
+  }
+  if (const auto name = spec.find("event"); name != spec.end()) {
+    EXPECT_THAT(event->set_event(name->get<std::string>()), IsOk());
+  }
+  return event;
+}
+
+nlohmann::json describeEvent(SseEvent& event) {
+  nlohmann::json spec = nlohmann::json::object();
+  if (!event.event().empty()) {
+    spec["event"] = std::string(event.event());
+  }
+  if (event.is_json()) {
+    spec["data"] = event.json().json();
+  } else {
+    spec["raw"] = std::string(event.raw_data_as_string());
+  }
+  return spec;
+}
+
+// Runs `events` through `leg` as one stream, ends it, and describes everything that comes out. An
+// event the engine refuses is reported as `{"untranslated": <event>}`: the transcoder filter
+// forwards such an event as it came in, so it must come back untouched.
+nlohmann::json runStream(const TranscodingEngine& engine, const TranscodeLeg& leg,
+                         const nlohmann::json& events, TranscodeContext ctx = TranscodeContext()) {
+  TranscodeStreamState state;
+  ctx.stream_state = &state;
+  nlohmann::json out = nlohmann::json::array();
+  for (const nlohmann::json& spec : events) {
+    SseEventPtr event = makeEvent(spec);
+    absl::StatusOr<std::vector<SseEventPtr>> transcoded =
+        engine.transcodeStreamEvent(leg, ctx, event);
+    if (!transcoded.ok()) {
+      EXPECT_NE(event, nullptr);
+      if (event != nullptr) {
+        out.push_back(nlohmann::json{{"untranslated", describeEvent(*event)}});
+      }
+      continue;
+    }
+    EXPECT_EQ(event, nullptr);
+    for (SseEventPtr& result : *transcoded) {
+      out.push_back(describeEvent(*result));
+    }
+  }
+  absl::StatusOr<std::vector<SseEventPtr>> trailer = engine.finishStream(leg, ctx);
+  EXPECT_THAT(trailer.status(), IsOk());
+  if (trailer.ok()) {
+    for (SseEventPtr& result : *trailer) {
+      out.push_back(describeEvent(*result));
+    }
+  }
+  return out;
+}
+
+// The first case that matches an event decides its fate. `on_terminate` replaces the source's
+// terminator, while `on_source_end` is appended only to a stream that ended without one, and a
+// grammar without cases is the identity.
+TEST(TranscodingEngineTest, StreamGrammarAppliesTheFirstCaseThatMatches) {
+  TranscodingEngine engine;
+  DialectTranscodePack pack{
+      .protocol = LLMProtocol::OpenAiResponses,
+      .stream = {.to_ir =
+                     {
+                         .cases =
+                             {
+                                 {.match = StreamEventMatch::isDone(),
+                                  .disposition = StreamDisposition::Terminate},
+                                 {.match = StreamEventMatch::notJson(),
+                                  .disposition = StreamDisposition::Passthrough},
+                                 {.match = StreamEventMatch::eventType("keepalive"),
+                                  .disposition = StreamDisposition::Drop},
+                                 {.match = StreamEventMatch::eventType("delta"),
+                                  .rules = TranscodeRuleSet(LLMProtocol::OpenAiResponses,
+                                                            TranscodingEngine::kIrProtocol,
+                                                            {TranscodeRule::move("text", "content"),
+                                                             TranscodeRule::drop("type")}),
+                                  .output_event = "chunk"},
+                                 // Never reached by a `delta`: the case above takes those.
+                                 {.match = StreamEventMatch::json(
+                                      TranscodePredicate::fieldIs("text", JsonShape::Text)),
+                                  .disposition = StreamDisposition::Drop},
+                             },
+                         .on_terminate = {{.event = "end",
+                                           .json = nlohmann::json::object({{"type", "end"}})},
+                                          {.raw_data = "bye"}},
+                         .on_source_end = {{.raw_data = "[DONE]"}},
+                     }},
+  };
+  ASSERT_THAT(engine.registerPack(std::move(pack)), IsOk());
+  const TranscodeLeg to_ir{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                           LLMProtocol::OpenAiResponses};
+  const TranscodeLeg from_ir{PayloadKind::StreamEvent, TranscodeDirection::FromIr,
+                             LLMProtocol::OpenAiResponses};
+
+  // A JSON `type` names the event ahead of its SSE `event:` field, which only counts without one.
+  EXPECT_EQ(runStream(engine, to_ir, nlohmann::json::parse(R"([
+    {"event": "delta", "data": {"type": "delta", "text": "Hi"}},
+    {"data": {"type": "keepalive"}},
+    {"event": "keepalive", "data": {"seq": 1}},
+    {"event": "keepalive", "data": {"type": "unknown"}},
+    {"data": {"text": "untyped"}},
+    {"raw": "not json"},
+    {"raw": "[DONE]"}
+  ])")),
+            nlohmann::json::parse(R"([
+    {"event": "chunk", "data": {"content": "Hi"}},
+    {"untranslated": {"event": "keepalive", "data": {"type": "unknown"}}},
+    {"raw": "not json"},
+    {"event": "end", "data": {"type": "end"}},
+    {"raw": "bye"}
+  ])"));
+  EXPECT_EQ(runStream(engine, to_ir, nlohmann::json::parse(R"([{"raw": "not json"}])")),
+            nlohmann::json::parse(R"([{"raw": "not json"}, {"raw": "[DONE]"}])"));
+
+  const nlohmann::json ir_events =
+      nlohmann::json::parse(R"([{"data": {"x": 1}}, {"raw": "[DONE]"}])");
+  EXPECT_EQ(runStream(engine, from_ir, ir_events), ir_events);
+
+  // An event no case matches is an error that names it.
+  TranscodeStreamState state;
+  TranscodeContext ctx;
+  ctx.stream_state = &state;
+  SseEventPtr mystery =
+      makeEvent(nlohmann::json::parse(R"({"event": "mystery", "data": {"seq": 2}})"));
+  const absl::Status status = engine.transcodeStreamEvent(to_ir, ctx, mystery).status();
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(status.message(), testing::HasSubstr("'mystery'"));
+  EXPECT_FALSE(state.terminated);
+}
+
+// A refused event leaves the stream as it was: a case's rules run on copies of the payload and of
+// the stream state, so the rules that ran before the failing one leave no trace.
+TEST(TranscodingEngineTest, StreamEventLegIsAllOrNothing) {
+  TranscodingEngine engine;
+  DialectTranscodePack pack{
+      .protocol = LLMProtocol::OpenAiResponses,
+      .stream =
+          {.to_ir = {.cases = {{
+                         .match = StreamEventMatch::json(),
+                         .rules = TranscodeRuleSet(
+                             LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+                             {
+                                 TranscodeRule::captureToState("id", "id"),
+                                 TranscodeRule::accumulateUsage(LLMProtocol::OpenAiChatCompletions),
+                                 TranscodeRule::move("text", "content"),
+                                 TranscodeRule::valueMap("status", {{"ok", "stop"}},
+                                                         TranscodeRule::UnknownValuePolicy::Reject),
+                             }),
+                         .output_event = "chunk",
+                     }}}},
+  };
+  ASSERT_THAT(engine.registerPack(std::move(pack)), IsOk());
+  const TranscodeLeg leg{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                         LLMProtocol::OpenAiResponses};
+  TranscodeStreamState state;
+  TranscodeContext ctx;
+  ctx.stream_state = &state;
+
+  const nlohmann::json refused = nlohmann::json::parse(R"({
+    "event": "delta",
+    "data": {"id": "r1", "text": "Hi", "status": "bad", "usage": {"prompt_tokens": 3}}
+  })");
+  SseEventPtr event = makeEvent(refused);
+  EXPECT_EQ(engine.transcodeStreamEvent(leg, ctx, event).status().code(),
+            absl::StatusCode::kInvalidArgument);
+  ASSERT_NE(event, nullptr);
+  EXPECT_EQ(describeEvent(*event), refused);
+  EXPECT_TRUE(state.slots.empty());
+  EXPECT_FALSE(state.usage.hasAny());
+
+  event->json().json()["status"] = "ok";
+  absl::StatusOr<std::vector<SseEventPtr>> transcoded =
+      engine.transcodeStreamEvent(leg, ctx, event);
+  ASSERT_THAT(transcoded.status(), IsOk());
+  ASSERT_EQ(transcoded->size(), 1U);
+  EXPECT_EQ(describeEvent(*transcoded->front()), nlohmann::json::parse(R"({
+    "event": "chunk", "data": {"id": "r1", "content": "Hi", "status": "stop"}
+  })"));
+  EXPECT_EQ(state.slots.at("id"), "r1");
+  EXPECT_TRUE(state.usage.hasAny());
+}
+
+// A case with `outputs` writes each output the event reaches, in order: a `once` output for the
+// first event only, the others when their `when` matches, so an event can become several events
+// or none. Only the last output written can carry an offloaded reference, and an event refused
+// for one leaves the stream as it was.
+TEST(TranscodingEngineTest, StreamCaseOutputsWriteSeveralEventsOrNone) {
+  const auto rule_set = [](std::vector<TranscodeRule> rules) {
+    return TranscodeRuleSet(LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+                            std::move(rules));
+  };
+  TranscodingEngine engine;
+  DialectTranscodePack
+      pack{
+          .protocol = LLMProtocol::OpenAiResponses,
+          .stream =
+              {.to_ir =
+                   {
+                       .cases =
+                           {
+                               {.match = StreamEventMatch::isDone(),
+                                .disposition = StreamDisposition::Terminate},
+                               {.match = StreamEventMatch::json(),
+                                .rules = rule_set({TranscodeRule::captureToState("id", "id")}),
+                                .outputs =
+                                    {
+                                        {.event = "open",
+                                         .rules = rule_set({
+                                             TranscodeRule::setConst("type", "open"),
+                                             TranscodeRule::retainOnly("", {"type", "text"}),
+                                         }),
+                                         .once = true},
+                                        {.event = "text",
+                                         .rules = rule_set(
+                                             {TranscodeRule::retainOnly("", {"text"})}),
+                                         .when = TranscodePredicate::fieldIs("text",
+                                                                             JsonShape::Text)},
+                                    }},
+                           },
+                       .on_terminate = {{.event = "end",
+                                         .json = nlohmann::json::object({{"type", "end"}}),
+                                         .rules =
+                                             rule_set({TranscodeRule::setFromState("id", "id")})}},
+                   }},
+      };
+  ASSERT_THAT(engine.registerPack(std::move(pack)), IsOk());
+  const TranscodeLeg leg{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                         LLMProtocol::OpenAiResponses};
+
+  TranscodeStreamState state;
+  TranscodeContext ctx;
+  ctx.stream_state = &state;
+  nlohmann::json offloaded = nlohmann::json::parse(R"({"data": {"id": "a"}})");
+  offloaded["data"]["text"] = JsonWithExtBuf::makeExternalRef({/*offset=*/0, /*length=*/5});
+  SseEventPtr event = makeEvent(offloaded);
+  const absl::Status refused = engine.transcodeStreamEvent(leg, ctx, event).status();
+  EXPECT_THAT(refused.message(), testing::HasSubstr("stream output 'open' carries offloaded"));
+  ASSERT_NE(event, nullptr);
+  EXPECT_EQ(describeEvent(*event), offloaded);
+  EXPECT_TRUE(state.slots.empty());
+  EXPECT_TRUE(state.written_once.empty());
+
+  EXPECT_EQ(runStream(engine, leg, nlohmann::json::parse(R"([
+    {"data": {"id": "a", "text": "Hi"}},
+    {"data": {"id": "b"}},
+    {"data": {"text": "yo"}},
+    {"raw": "[DONE]"}
+  ])")),
+            nlohmann::json::parse(R"([
+    {"event": "open", "data": {"type": "open", "text": "Hi"}},
+    {"event": "text", "data": {"text": "Hi"}},
+    {"event": "text", "data": {"text": "yo"}},
+    {"event": "end", "data": {"type": "end", "id": "b"}}
+  ])"));
+}
+
+// A stream event leg needs a stream kind, per-stream state, a registered dialect and an event, and
+// a refused call consumes nothing.
+TEST(TranscodingEngineTest, StreamEventLegsRefuseWhatTheyCannotRun) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const TranscodeLeg response_leg{PayloadKind::Response, TranscodeDirection::ToIr,
+                                  LLMProtocol::GeminiGenerateContent};
+  const TranscodeLeg responses_stream_to_ir{PayloadKind::StreamEvent, TranscodeDirection::ToIr,
+                                            LLMProtocol::OpenAiResponses};
+
+  TranscodeStreamState state;
+  TranscodeContext with_state;
+  with_state.stream_state = &state;
+  TranscodeContext without_state;
+  SseEventPtr event = makeEvent(nlohmann::json::parse(R"({"data": {"candidates": []}})"));
+
+  EXPECT_EQ(engine.transcodeStreamEvent(response_leg, with_state, event).status().code(),
+            absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(engine.transcodeStreamEvent(kGeminiStreamToIr, without_state, event).status().code(),
+            absl::StatusCode::kFailedPrecondition);
+  const absl::Status unregistered =
+      engine.transcodeStreamEvent(responses_stream_to_ir, with_state, event).status();
+  EXPECT_THAT(unregistered.message(), testing::HasSubstr("no transcoding pack registered"));
+  EXPECT_NE(event, nullptr);
+  SseEventPtr no_event;
+  EXPECT_EQ(engine.transcodeStreamEvent(kGeminiStreamToIr, with_state, no_event).status().code(),
+            absl::StatusCode::kInvalidArgument);
+
+  EXPECT_EQ(engine.finishStream(response_leg, with_state).status().code(),
+            absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(engine.finishStream(kGeminiStreamToIr, without_state).status().code(),
+            absl::StatusCode::kFailedPrecondition);
+  EXPECT_FALSE(state.terminated);
+}
+
+// A stream already in the IR needs no conversion either way, and gains no terminator.
+TEST(TranscodingEngineTest, StreamEventLegForTheIrIsTheIdentity) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const nlohmann::json events = nlohmann::json::parse(R"([
+    {"data": {"id": "c1", "choices": [{"index": 0, "delta": {"content": "Hi"}}]}},
+    {"event": "anything", "data": {"choices": []}},
+    {"raw": "[DONE]"}
+  ])");
+  for (TranscodeDirection direction : {TranscodeDirection::ToIr, TranscodeDirection::FromIr}) {
+    EXPECT_EQ(runStream(engine,
+                        {PayloadKind::StreamEvent, direction, TranscodingEngine::kIrProtocol},
+                        events),
+              events);
+  }
+}
+
+// Each Gemini chunk becomes an IR chunk that carries its answer text, and a chunk that is not a
+// response (an error) goes out as it came. A Gemini stream just ends, so the IR's `[DONE]` is
+// appended.
+TEST(TranscodingEngineTest, TranscodesGeminiStreamToIr) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  TranscodeContext ctx;
+  ctx.request_model = "gemini-2.5-pro";
+  ctx.now_unix_seconds = 1700000000;
+
+  EXPECT_EQ(runStream(*engine_or, kGeminiStreamToIr, nlohmann::json::parse(R"([
+    {"data": {"candidates": [{"content": {"role": "model", "parts": [
+                {"text": "Let me think.", "thought": true}, {"text": "Hel"}]}}],
+              "modelVersion": "gemini-2.5-flash", "responseId": "resp-1"}},
+    {"event": "ignored",
+     "data": {"candidates": [{"content": {"role": "model", "parts": [{"text": "lo"}]},
+                              "finishReason": "MAX_TOKENS"}],
+              "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5,
+                                "thoughtsTokenCount": 3, "totalTokenCount": 18},
+              "responseId": "resp-1"}},
+    {"data": {"candidates": [{"finishReason": "SAFETY"}]}},
+    {"data": {"error": {"code": 429, "message": "Resource exhausted"}}},
+    {"raw": "not json"}
+  ])"),
+                      ctx),
+            nlohmann::json::parse(R"([
+    {"data": {"id": "resp-1", "object": "chat.completion.chunk", "created": 1700000000,
+              "model": "gemini-2.5-flash",
+              "choices": [{"index": 0, "delta": {"role": "assistant", "content": "Hel"},
+                           "finish_reason": null}]}},
+    {"data": {"id": "resp-1", "object": "chat.completion.chunk", "created": 1700000000,
+              "model": "gemini-2.5-pro",
+              "choices": [{"index": 0, "delta": {"role": "assistant", "content": "lo"},
+                           "finish_reason": "length"}],
+              "usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18,
+                        "completion_tokens_details": {"reasoning_tokens": 3}}}},
+    {"data": {"id": "chatcmpl-transcoded", "object": "chat.completion.chunk",
+              "created": 1700000000, "model": "gemini-2.5-pro",
+              "choices": [{"index": 0, "delta": {}, "finish_reason": "content_filter"}]}},
+    {"untranslated": {"data": {"error": {"code": 429, "message": "Resource exhausted"}}}},
+    {"raw": "not json"},
+    {"raw": "[DONE]"}
+  ])"));
+}
+
+// The IR has no message or content block boundaries, so the first IR chunk also opens the
+// Anthropic message and its one text block, each chunk's text becomes a `content_block_delta`, and
+// the IR's `[DONE]` closes both. The finish reason and the usage go in the closing
+// `message_delta`, wherever in the stream they came: with the last text (as from Gemini), or in a
+// chunk of their own (OpenAI's usage-only chunk).
+TEST(TranscodingEngineTest, TranscodesIrStreamToAnthropic) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  TranscodeContext ctx;
+  ctx.request_model = "claude-sonnet-4-5";
+
+  EXPECT_EQ(runStream(*engine_or, kIrStreamToAnthropic, nlohmann::json::parse(R"([
+    {"data": {"id": "c1", "object": "chat.completion.chunk",
+              "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": null}]}},
+    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gpt-4o",
+              "choices": [{"index": 0, "delta": {"content": "Hi"}, "finish_reason": null}]}},
+    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gpt-4o",
+              "choices": [{"index": 0, "delta": {"content": " there"}, "finish_reason": "length"}]}},
+    {"data": {"id": "c1", "object": "chat.completion.chunk", "model": "gpt-4o", "choices": [],
+              "usage": {"prompt_tokens": 100, "completion_tokens": 7, "total_tokens": 107,
+                        "prompt_tokens_details": {"cached_tokens": 60}}}},
+    {"raw": "[DONE]"}
+  ])"),
+                      ctx),
+            nlohmann::json::parse(R"([
+    {"event": "message_start",
+     "data": {"type": "message_start",
+              "message": {"id": "c1", "type": "message", "role": "assistant",
+                          "model": "claude-sonnet-4-5", "content": [], "stop_reason": null,
+                          "stop_sequence": null,
+                          "usage": {"input_tokens": 0, "output_tokens": 0}}}},
+    {"event": "content_block_start",
+     "data": {"type": "content_block_start", "index": 0,
+              "content_block": {"type": "text", "text": ""}}},
+    {"event": "content_block_delta",
+     "data": {"type": "content_block_delta", "index": 0,
+              "delta": {"type": "text_delta", "text": "Hi"}}},
+    {"event": "content_block_delta",
+     "data": {"type": "content_block_delta", "index": 0,
+              "delta": {"type": "text_delta", "text": " there"}}},
+    {"event": "content_block_stop", "data": {"type": "content_block_stop", "index": 0}},
+    {"event": "message_delta",
+     "data": {"type": "message_delta", "delta": {"stop_reason": "max_tokens", "stop_sequence": null},
+              "usage": {"input_tokens": 40, "output_tokens": 7, "cache_read_input_tokens": 60}}},
+    {"event": "message_stop", "data": {"type": "message_stop"}}
+  ])"));
+}
+
+// A stream that carried neither a finish reason nor usage still closes the way Anthropic
+// requires: `end_turn`, and zero output tokens.
+TEST(TranscodingEngineTest, IrStreamToAnthropicClosesWithoutAFinishReasonOrUsage) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+
+  const nlohmann::json out = runStream(*engine_or, kIrStreamToAnthropic, nlohmann::json::parse(R"([
+    {"data": {"choices": [{"index": 0, "delta": {"content": "Hi"}}]}},
+    {"raw": "[DONE]"}
+  ])"));
+  ASSERT_EQ(out.size(), 6U);
+  EXPECT_EQ(out[0]["data"]["message"]["id"], "msg_transcoded");
+  EXPECT_EQ(out[0]["data"]["message"]["model"], "transcoded-model");
+  EXPECT_EQ(out[4], nlohmann::json::parse(R"({"event": "message_delta", "data": {
+    "type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": null},
+    "usage": {"output_tokens": 0}}})"));
+}
+
+// The IR's usage-only chunk, which has no choices to become candidates, becomes a Gemini chunk
+// that carries only the usage.
+TEST(TranscodingEngineTest, IrStreamToGeminiCarriesTheUsageOnlyChunk) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+
+  EXPECT_EQ(runStream(*engine_or, kIrStreamToGemini, nlohmann::json::parse(R"([
+    {"data": {"id": "c1", "model": "gpt-4o", "choices": [],
+              "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}}},
+    {"raw": "[DONE]"}
+  ])")),
+            nlohmann::json::parse(R"([
+    {"data": {"modelVersion": "gpt-4o",
+              "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5,
+                                "totalTokenCount": 15}}}
+  ])"));
+}
+
+// Offloaded text is a reference into the event's own payload, and every stream leg that carries
+// text moves the reference rather than materializing it.
+TEST(TranscodingEngineTest, StreamLegsKeepTextHeldByReference) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const JsonWithExtBuf::ExternalRef ref{/*offset=*/64, /*length=*/40000};
+  // The event carrying the text is the last written: into Anthropic, the first chunk also opens
+  // the message and its text block.
+  const auto transcode_one = [&engine](const TranscodeLeg& leg, nlohmann::json data) {
+    TranscodeStreamState state;
+    TranscodeContext ctx;
+    ctx.stream_state = &state;
+    SseEventPtr event = makeEvent(nlohmann::json{{"data", std::move(data)}});
+    absl::StatusOr<std::vector<SseEventPtr>> transcoded =
+        engine.transcodeStreamEvent(leg, ctx, event);
+    EXPECT_THAT(transcoded.status(), IsOk());
+    return transcoded.ok() && !transcoded->empty() ? transcoded->back()->json().json()
+                                                   : nlohmann::json();
+  };
+  const auto held_ref = [](const nlohmann::json& node) {
+    absl::StatusOr<JsonWithExtBuf::ExternalRef> held = JsonWithExtBuf::externalRef(node);
+    return held.ok() ? *held : JsonWithExtBuf::ExternalRef{};
+  };
+
+  nlohmann::json gemini =
+      nlohmann::json::parse(R"({"candidates": [{"content": {"parts": [{"thought": false}]}}]})");
+  gemini["candidates"][0]["content"]["parts"][0]["text"] = JsonWithExtBuf::makeExternalRef(ref);
+  EXPECT_EQ(held_ref(transcode_one(kGeminiStreamToIr, gemini)["choices"][0]["delta"]["content"]),
+            ref);
+
+  nlohmann::json anthropic = nlohmann::json::parse(
+      R"({"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta"}})");
+  anthropic["delta"]["text"] = JsonWithExtBuf::makeExternalRef(ref);
+  EXPECT_EQ(
+      held_ref(transcode_one(kAnthropicStreamToIr, anthropic)["choices"][0]["delta"]["content"]),
+      ref);
+
+  // Held by reference or not, it is text, so the chunk is still an Anthropic text delta.
+  nlohmann::json ir = nlohmann::json::parse(R"({"choices": [{"index": 0, "delta": {}}]})");
+  ir["choices"][0]["delta"]["content"] = JsonWithExtBuf::makeExternalRef(ref);
+  const nlohmann::json text_delta = transcode_one(kIrStreamToAnthropic, ir);
+  EXPECT_EQ(text_delta["type"], "content_block_delta");
+  EXPECT_EQ(held_ref(text_delta["delta"]["text"]), ref);
+  EXPECT_EQ(held_ref(transcode_one(kIrStreamToGemini,
+                                   ir)["candidates"][0]["content"]["parts"][0]["text"]),
+            ref);
+}
+
+// ---------------------------------------------------------------------------
+// Rule ops for response and stream legs.
+
+TEST(TranscodeRuleTest, SetConstReplacesWhileSetFromContextOnlyFillsGaps) {
+  nlohmann::json doc =
+      nlohmann::json::parse(R"({"object": "chat.completion.chunk", "model": null})");
+  ASSERT_THAT(TranscodeRule::setConst("object", "chat.completion").apply(doc), IsOk());
+  ASSERT_THAT(TranscodeRule::setConst("meta.kind", "fixed").apply(doc), IsOk());
+  EXPECT_EQ(doc["object"], "chat.completion");
+  EXPECT_EQ(doc["meta"]["kind"], "fixed");
+
+  const TranscodeRule model =
+      TranscodeRule::setFromContext("model", TranscodeRule::ContextField::RequestModel);
+  const TranscodeRule created =
+      TranscodeRule::setFromContext("created", TranscodeRule::ContextField::NowUnixSeconds);
+  EXPECT_EQ(created.contextField(), TranscodeRule::ContextField::NowUnixSeconds);
+
+  // Without a context, or with one that leaves the field empty, nothing is written, so a later
+  // `setDefault` still applies.
+  TranscodeContext empty;
+  ASSERT_THAT(model.apply(doc), IsOk());
+  ASSERT_THAT(model.apply(doc, &empty), IsOk());
+  ASSERT_THAT(created.apply(doc, &empty), IsOk());
+  EXPECT_TRUE(doc["model"].is_null());
+  EXPECT_FALSE(doc.contains("created"));
+
+  // A null counts as missing.
+  TranscodeContext ctx;
+  ctx.request_model = "gemini-2.5-flash";
+  ctx.now_unix_seconds = 1700000000;
+  ASSERT_THAT(model.apply(doc, &ctx), IsOk());
+  ASSERT_THAT(created.apply(doc, &ctx), IsOk());
+  EXPECT_EQ(doc["model"], "gemini-2.5-flash");
+  EXPECT_EQ(doc["created"], 1700000000);
+
+  // A value the payload carries wins.
+  ctx.request_model = "another-model";
+  ASSERT_THAT(model.apply(doc, &ctx), IsOk());
+  EXPECT_EQ(doc["model"], "gemini-2.5-flash");
+}
+
+TEST(TranscodeRuleTest, EnumerateNumbersElementsThatCarryNoIndex) {
+  nlohmann::json doc = nlohmann::json::parse(
+      R"({"choices": [{"text": "a"}, {"index": 7}, "scalar", {"index": null}]})");
+  ASSERT_THAT(TranscodeRule::enumerate("choices", "index").apply(doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({"choices": [
+    {"text": "a", "index": 0}, {"index": 7}, "scalar", {"index": 3}
+  ]})"));
+
+  // Anything but an array is left alone.
+  nlohmann::json not_array = nlohmann::json::parse(R"({"choices": {"text": "a"}})");
+  const nlohmann::json before = not_array;
+  ASSERT_THAT(TranscodeRule::enumerate("choices", "index").apply(not_array), IsOk());
+  EXPECT_EQ(not_array, before);
+}
+
+TEST(TranscodeRuleTest, EnumerateWritesAPrefixedPositionAsAString) {
+  const TranscodeRule ids = TranscodeRule::enumerate("tool_calls", "id", "call_");
+  EXPECT_EQ(ids.prefix(), "call_");
+  nlohmann::json doc =
+      nlohmann::json::parse(R"({"tool_calls": [{}, {"id": "call_abc"}, {"id": null}]})");
+  ASSERT_THAT(ids.apply(doc), IsOk());
+  EXPECT_EQ(doc,
+            nlohmann::json::parse(
+                R"({"tool_calls": [{"id": "call_0"}, {"id": "call_abc"}, {"id": "call_2"}]})"));
+}
+
+// A stream's tool calls arrive over several events, and each needs a position and an id of its
+// own across all of them.
+TEST(TranscodeRuleTest, EnumerateAcrossStreamCarriesTheCountBetweenEvents) {
+  const TranscodeRule index =
+      TranscodeRule::enumerateAcrossStream("tool_calls", "index", "tool_call_index");
+  const TranscodeRule id =
+      TranscodeRule::enumerateAcrossStream("tool_calls", "id", "tool_call_id", "call_");
+  EXPECT_EQ(id.slot(), "tool_call_id");
+  EXPECT_EQ(id.prefix(), "call_");
+
+  // Only a stream has somewhere to keep the count.
+  nlohmann::json first =
+      nlohmann::json::parse(R"({"tool_calls": [{"name": "a"}, {"name": "b", "id": "own"}]})");
+  TranscodeContext no_stream;
+  EXPECT_EQ(index.apply(first).code(), absl::StatusCode::kFailedPrecondition);
+  EXPECT_EQ(index.apply(first, &no_stream).code(), absl::StatusCode::kFailedPrecondition);
+
+  TranscodeStreamState state;
+  TranscodeContext ctx;
+  ctx.stream_state = &state;
+  const auto number = [&](nlohmann::json& event) {
+    ASSERT_THAT(index.apply(event, &ctx), IsOk());
+    ASSERT_THAT(id.apply(event, &ctx), IsOk());
+  };
+  // An element that names its own id still counts, so the two counts stay in step.
+  number(first);
+  EXPECT_EQ(first, nlohmann::json::parse(R"({"tool_calls": [
+    {"name": "a", "index": 0, "id": "call_0"}, {"name": "b", "index": 1, "id": "own"}
+  ]})"));
+
+  // An event without the array leaves the count alone.
+  nlohmann::json text = nlohmann::json::parse(R"({"content": "Hi"})");
+  number(text);
+  EXPECT_EQ(text, nlohmann::json::parse(R"({"content": "Hi"})"));
+
+  nlohmann::json second = nlohmann::json::parse(R"({"tool_calls": [{"name": "c"}]})");
+  number(second);
+  EXPECT_EQ(second, nlohmann::json::parse(
+                        R"({"tool_calls": [{"name": "c", "index": 2, "id": "call_2"}]})"));
+  EXPECT_EQ(state.slots.at("tool_call_index"), 3);
+}
+
+TEST(TranscodeRuleTest, LookupEarlierFindsTheEntryAnElementRefersTo) {
+  const TranscodeRule name_results = TranscodeRule::lookupEarlier(
+      "messages", "tool_call_id", "tool_calls", "id", "function.name", "name");
+  EXPECT_EQ(name_results.entryKey(), "id");
+  EXPECT_EQ(name_results.writePath(), "name");
+  nlohmann::json doc = nlohmann::json::parse(R"({"messages": [
+    {"role": "assistant", "tool_calls": [
+      {"id": "call_0", "function": {"name": "get_weather"}},
+      {"id": "call_1", "function": {"name": "get_time"}}
+    ]},
+    {"role": "tool", "tool_call_id": "call_1", "content": "noon"},
+    {"role": "tool", "tool_call_id": "call_0", "content": "sunny"},
+    {"role": "assistant", "tool_calls": [{"id": "call_0", "function": {"name": "get_news"}}]},
+    {"role": "tool", "tool_call_id": "call_0", "content": "none"},
+    {"role": "tool", "tool_call_id": "call_9", "content": "unmatched"},
+    {"role": "tool", "tool_call_id": "call_1", "name": "own", "content": "kept"},
+    {"role": "tool", "tool_call_id": 1, "content": "not a string"},
+    {"role": "assistant", "tool_calls": [{"id": "call_1"}]},
+    {"role": "tool", "tool_call_id": "call_1", "content": "hidden"},
+    {"tool_call_id": "call_2", "tool_calls": [{"id": "call_2", "function": {"name": "own"}}]}
+  ]})");
+  ASSERT_THAT(name_results.apply(doc), IsOk());
+  const nlohmann::json& messages = doc["messages"];
+  EXPECT_EQ(messages[1]["name"], "get_time");
+  EXPECT_EQ(messages[2]["name"], "get_weather");
+  // The nearest earlier entry wins, so a reused id names the latest call.
+  EXPECT_EQ(messages[4]["name"], "get_news");
+  // No earlier entry holds the key, the element already names one, or the key is not a string.
+  EXPECT_FALSE(messages[5].contains("name"));
+  EXPECT_EQ(messages[6]["name"], "own");
+  EXPECT_FALSE(messages[7].contains("name"));
+  // A later entry that reuses the key without a value hides the earlier one.
+  EXPECT_FALSE(messages[9].contains("name"));
+  // An element's own entries are not earlier than it.
+  EXPECT_FALSE(messages[10].contains("name"));
+}
+
+TEST(TranscodeRuleTest, MoveElementsMovesTheMatchingElementsToAnotherArray) {
+  const TranscodeRule move_calls =
+      TranscodeRule::moveElements("parts", "message.tool_calls",
+                                  TranscodePredicate::fieldIs("functionCall", JsonShape::Object));
+  nlohmann::json doc = nlohmann::json::parse(R"({"parts": [
+    {"text": "Let me check."},
+    {"functionCall": {"name": "a"}},
+    "not an object",
+    {"functionCall": {"name": "b"}}
+  ]})");
+  ASSERT_THAT(move_calls.apply(doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({
+    "parts": [{"text": "Let me check."}, "not an object"],
+    "message": {"tool_calls": [{"functionCall": {"name": "a"}}, {"functionCall": {"name": "b"}}]}
+  })"));
+
+  // They go after whatever the destination already holds. A null destination holds nothing.
+  nlohmann::json more = nlohmann::json::parse(
+      R"({"parts": [{"functionCall": {"name": "c"}}], "message": {"tool_calls": [{"id": "x"}]}})");
+  ASSERT_THAT(move_calls.apply(more), IsOk());
+  EXPECT_EQ(more, nlohmann::json::parse(R"({
+    "parts": [], "message": {"tool_calls": [{"id": "x"}, {"functionCall": {"name": "c"}}]}
+  })"));
+  nlohmann::json null_destination = nlohmann::json::parse(
+      R"({"parts": [{"functionCall": {"name": "c"}}], "message": {"tool_calls": null}})");
+  ASSERT_THAT(move_calls.apply(null_destination), IsOk());
+  EXPECT_EQ(null_destination["message"]["tool_calls"],
+            nlohmann::json::parse(R"([{"functionCall": {"name": "c"}}])"));
+
+  // When nothing matches, no destination is made.
+  nlohmann::json text_only = nlohmann::json::parse(R"({"parts": [{"text": "Hi"}]})");
+  ASSERT_THAT(move_calls.apply(text_only), IsOk());
+  EXPECT_EQ(text_only, nlohmann::json::parse(R"({"parts": [{"text": "Hi"}]})"));
+
+  // A destination that is not an array fails before anything moves.
+  nlohmann::json clash = nlohmann::json::parse(
+      R"({"parts": [{"functionCall": {"name": "a"}}], "message": {"tool_calls": "none"}})");
+  const nlohmann::json before_clash = clash;
+  EXPECT_EQ(move_calls.apply(clash).code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(clash, before_clash);
+
+  // The default predicate moves every object. An absent or non-array source is left alone.
+  nlohmann::json all = nlohmann::json::parse(R"({"from": [{"a": 1}, 2, {"b": 3}]})");
+  ASSERT_THAT(TranscodeRule::moveElements("from", "to").apply(all), IsOk());
+  EXPECT_EQ(all, nlohmann::json::parse(R"({"from": [2], "to": [{"a": 1}, {"b": 3}]})"));
+  nlohmann::json not_array = nlohmann::json::parse(R"({"from": {"a": 1}})");
+  ASSERT_THAT(TranscodeRule::moveElements("from", "to").apply(not_array), IsOk());
+  EXPECT_EQ(not_array, nlohmann::json::parse(R"({"from": {"a": 1}})"));
+}
+
+TEST(TranscodeRuleTest, ParseJsonReplacesJsonTextWithItsValue) {
+  const TranscodeRule parse = TranscodeRule::parseJson("function.arguments");
+  nlohmann::json call = nlohmann::json::parse(
+      R"({"function": {"arguments": "{\"city\": \"Paris\", \"days\": [1, 2]}"}})");
+  ASSERT_THAT(parse.apply(call), IsOk());
+  EXPECT_EQ(call, nlohmann::json::parse(
+                      R"({"function": {"arguments": {"city": "Paris", "days": [1, 2]}}})"));
+
+  // Text that is empty or only whitespace says nothing.
+  for (const char* blank : {"", " \n\t"}) {
+    nlohmann::json doc = {{"function", {{"arguments", blank}}}};
+    ASSERT_THAT(parse.apply(doc), IsOk());
+    EXPECT_TRUE(doc["function"]["arguments"].is_null()) << '"' << blank << '"';
+  }
+
+  // Anything but text, or nothing, is left alone.
+  for (const char* other : {R"({"function": {"arguments": {"city": "Paris"}}})",
+                            R"({"function": {"arguments": 7}})", R"({"function": {}})"}) {
+    nlohmann::json doc = nlohmann::json::parse(other);
+    ASSERT_THAT(parse.apply(doc), IsOk());
+    EXPECT_EQ(doc, nlohmann::json::parse(other));
+  }
+
+  // Text that is not JSON is an error, and stays as it was.
+  nlohmann::json bad = {{"function", {{"arguments", R"({"city": )"}}}};
+  const nlohmann::json before_bad = bad;
+  const absl::Status status = parse.apply(bad);
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(status.message(), "field 'function.arguments' does not hold valid JSON text");
+  EXPECT_EQ(bad, before_bad);
+
+  // Offloaded text could only be parsed by materializing it.
+  nlohmann::json offloaded = nlohmann::json::object();
+  offloaded["function"]["arguments"] = JsonWithExtBuf::makeExternalRef({0, 4096});
+  EXPECT_EQ(parse.apply(offloaded).code(), absl::StatusCode::kUnimplemented);
+}
+
+// Parsed text joins the payload, which is written out by recursive walks, so it may nest no
+// deeper than Envoy's own JSON loader allows.
+TEST(TranscodeRuleTest, ParseJsonRefusesTextThatNestsTooDeeply) {
+  const TranscodeRule parse = TranscodeRule::parseJson("args");
+  const auto nested = [](size_t depth) {
+    return std::string(depth, '[') + std::string(depth, ']');
+  };
+  nlohmann::json deepest = {{"args", nested(1000)}};
+  EXPECT_THAT(parse.apply(deepest), IsOk());
+  nlohmann::json too_deep = {{"args", nested(1001)}};
+  const absl::Status status = parse.apply(too_deep);
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(status.message(), "the JSON text in 'args' nests deeper than 1000 levels");
+
+  // Brackets inside strings are text, even after an escaped quote.
+  nlohmann::json in_strings = {
+      {"args", R"({"a": ")" + std::string(1001, '[') + R"(\")" + std::string(1001, '{') + R"("})"}};
+  ASSERT_THAT(parse.apply(in_strings), IsOk());
+  EXPECT_EQ(in_strings["args"]["a"], std::string(1001, '[') + '"' + std::string(1001, '{'));
+}
+
+TEST(TranscodeRuleTest, SerializeJsonWritesAValueAsCompactJsonText) {
+  const TranscodeRule serialize = TranscodeRule::serializeJson("function.arguments");
+  nlohmann::json call =
+      nlohmann::json::parse(R"({"function": {"arguments": {"city": "Paris", "days": [1, 2]}}})");
+  ASSERT_THAT(serialize.apply(call), IsOk());
+  EXPECT_EQ(call["function"]["arguments"], R"({"city":"Paris","days":[1,2]})");
+  // `parseJson` undoes it.
+  ASSERT_THAT(TranscodeRule::parseJson("function.arguments").apply(call), IsOk());
+  EXPECT_EQ(call["function"]["arguments"],
+            nlohmann::json::parse(R"({"city": "Paris", "days": [1, 2]})"));
+
+  // Invalid UTF-8 is replaced rather than thrown on.
+  nlohmann::json bad_utf8 = nlohmann::json::object();
+  bad_utf8["function"]["arguments"]["city"] = std::string("Par\xff") + "is";
+  ASSERT_THAT(serialize.apply(bad_utf8), IsOk());
+  EXPECT_EQ(bad_utf8["function"]["arguments"], "{\"city\":\"Par\xEF\xBF\xBDis\"}");
+
+  // An absent path is left alone.
+  nlohmann::json absent = nlohmann::json::parse(R"({"function": {}})");
+  ASSERT_THAT(serialize.apply(absent), IsOk());
+  EXPECT_EQ(absent, nlohmann::json::parse(R"({"function": {}})"));
+
+  // A value holding an offloaded reference could only be written by materializing it.
+  nlohmann::json offloaded = nlohmann::json::object();
+  offloaded["function"]["arguments"]["text"] = JsonWithExtBuf::makeExternalRef({0, 4096});
+  const nlohmann::json before_offloaded = offloaded;
+  EXPECT_EQ(serialize.apply(offloaded).code(), absl::StatusCode::kUnimplemented);
+  EXPECT_EQ(offloaded, before_offloaded);
+}
+
+TEST(TranscodeRuleTest, RetainOnlyKeepsTheListedMembers) {
+  nlohmann::json doc = nlohmann::json::parse(R"({
+    "id": "1",
+    "extra": true,
+    "choice": {"index": 0, "logprobs": null, "message": {"content": "Hi"}}
+  })");
+  ASSERT_THAT(TranscodeRule::retainOnly("choice", {"index", "message"}).apply(doc), IsOk());
+  ASSERT_THAT(TranscodeRule::retainOnly("", {"id", "choice"}).apply(doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(
+                     R"({"id": "1", "choice": {"index": 0, "message": {"content": "Hi"}}})"));
+
+  // An absent path, or one that holds no object, is left alone.
+  const nlohmann::json before = doc;
+  ASSERT_THAT(TranscodeRule::retainOnly("missing", {"x"}).apply(doc), IsOk());
+  ASSERT_THAT(TranscodeRule::retainOnly("id", {"x"}).apply(doc), IsOk());
+  EXPECT_EQ(doc, before);
+}
+
+TEST(TranscodeRuleTest, TakeFirstReplacesAnArrayWithItsFirstElement) {
+  nlohmann::json doc = nlohmann::json::parse(
+      R"({"choices": [{"message": {"content": "first"}}, {"message": {"content": "second"}}]})");
+  ASSERT_THAT(TranscodeRule::takeFirst("choices", "choice").apply(doc), IsOk());
+  EXPECT_EQ(doc, nlohmann::json::parse(R"({"choice": {"message": {"content": "first"}}})"));
+
+  // An empty array is removed and writes nothing; a non-array is left alone.
+  nlohmann::json empty = nlohmann::json::parse(R"({"choices": [], "other": {"a": 1}})");
+  ASSERT_THAT(TranscodeRule::takeFirst("choices", "choice").apply(empty), IsOk());
+  ASSERT_THAT(TranscodeRule::takeFirst("other", "choice").apply(empty), IsOk());
+  EXPECT_EQ(empty, nlohmann::json::parse(R"({"other": {"a": 1}})"));
+}
+
+TEST(TranscodeRuleTest, CollectTextGathersTheMatchingText) {
+  const TranscodeRule collect = TranscodeRule::collectText(
+      "content", "text", "message.content", TranscodePredicate::fieldEquals("type", "text"));
+
+  // Elements that do not match, are not objects, or hold no text are skipped.
+  nlohmann::json many = nlohmann::json::parse(R"({"content": [
+    {"type": "text", "text": "Hello, "},
+    {"type": "tool_use", "text": "ignored"},
+    {"type": "text", "text": 42},
+    "not an object",
+    {"type": "text", "text": "world"}
+  ]})");
+  ASSERT_THAT(collect.apply(many), IsOk());
+  EXPECT_EQ(many, nlohmann::json::parse(R"({"message": {"content": "Hello, world"}})"));
+
+  nlohmann::json none = nlohmann::json::parse(R"({"content": [{"type": "tool_use"}]})");
+  ASSERT_THAT(collect.apply(none), IsOk());
+  EXPECT_EQ(none, nlohmann::json::parse(R"({"message": {"content": ""}})"));
+
+  // An absent or non-array source is left alone.
+  nlohmann::json not_array = nlohmann::json::parse(R"({"content": "plain"})");
+  ASSERT_THAT(collect.apply(not_array), IsOk());
+  EXPECT_EQ(not_array, nlohmann::json::parse(R"({"content": "plain"})"));
+
+  // `negate` skips Gemini's thought summaries; the default predicate takes every element.
+  nlohmann::json parts = nlohmann::json::parse(
+      R"({"parts": [{"text": "thinking...", "thought": true}, {"text": "answer"}]})");
+  nlohmann::json all_parts = parts;
+  ASSERT_THAT(TranscodeRule::collectText(
+                  "parts", "text", "text",
+                  TranscodePredicate::negate(TranscodePredicate::fieldEquals("thought", true)))
+                  .apply(parts),
+              IsOk());
+  EXPECT_EQ(parts, nlohmann::json::parse(R"({"text": "answer"})"));
+  ASSERT_THAT(TranscodeRule::collectText("parts", "text", "text").apply(all_parts), IsOk());
+  EXPECT_EQ(all_parts, nlohmann::json::parse(R"({"text": "thinking...answer"})"));
+}
+
+// A single match is moved, so offloaded text stays a reference. Several matches that include a
+// reference could only be joined by materializing it.
+TEST(TranscodeRuleTest, CollectTextMovesASingleReferenceButCannotJoinOne) {
+  const JsonWithExtBuf::ExternalRef ref{/*offset=*/256, /*length=*/40000};
+  nlohmann::json ref_part = nlohmann::json::object();
+  ref_part["text"] = JsonWithExtBuf::makeExternalRef(ref);
+
+  nlohmann::json single =
+      nlohmann::json::parse(R"({"parts": [{"text": "thinking...", "thought": true}]})");
+  single["parts"].push_back(ref_part);
+  ASSERT_THAT(TranscodeRule::collectText(
+                  "parts", "text", "text",
+                  TranscodePredicate::negate(TranscodePredicate::fieldEquals("thought", true)))
+                  .apply(single),
+              IsOk());
+  EXPECT_FALSE(single.contains("parts"));
+  auto moved = JsonWithExtBuf::externalRef(single["text"]);
+  ASSERT_THAT(moved.status(), IsOk());
+  EXPECT_EQ(*moved, ref);
+
+  // The failure comes before anything is modified.
+  nlohmann::json mixed = nlohmann::json::parse(R"({"parts": [{"text": "inline"}]})");
+  mixed["parts"].push_back(ref_part);
+  const nlohmann::json before = mixed;
+  const absl::Status status = TranscodeRule::collectText("parts", "text", "text").apply(mixed);
+  EXPECT_EQ(status.code(), absl::StatusCode::kUnimplemented);
+  EXPECT_EQ(mixed, before);
+}
+
+TEST(TranscodeRuleTest, WhenRunsItsRulesOnlyOnMatchingObjects) {
+  const TranscodeRule lift_id = TranscodeRule::when(
+      TranscodePredicate::fieldEquals("type", "message_start"),
+      {TranscodeRule::move("message.id", "id"), TranscodeRule::drop("message")});
+  nlohmann::json start =
+      nlohmann::json::parse(R"({"type": "message_start", "message": {"id": "msg_1"}})");
+  ASSERT_THAT(lift_id.apply(start), IsOk());
+  EXPECT_EQ(start, nlohmann::json::parse(R"({"type": "message_start", "id": "msg_1"})"));
+
+  nlohmann::json ping = nlohmann::json::parse(R"({"type": "ping", "message": {"id": "msg_1"}})");
+  const nlohmann::json before = ping;
+  ASSERT_THAT(lift_id.apply(ping), IsOk());
+  EXPECT_EQ(ping, before);
+
+  // The vector overload, for rule lists built in code. Sub-rules see the caller's context.
+  std::vector<TranscodeRule> rules;
+  rules.push_back(
+      TranscodeRule::setFromContext("model", TranscodeRule::ContextField::RequestModel));
+  const TranscodeRule fill_model = TranscodeRule::when(
+      TranscodePredicate::negate(TranscodePredicate::fieldIs("model", JsonShape::String)),
+      std::move(rules));
+  ASSERT_EQ(fill_model.subRules().size(), 1);
+  TranscodeContext ctx;
+  ctx.request_model = "claude-sonnet-4-5";
+  nlohmann::json missing = nlohmann::json::object();
+  ASSERT_THAT(fill_model.apply(missing, &ctx), IsOk());
+  EXPECT_EQ(missing["model"], "claude-sonnet-4-5");
+}
+
+TEST(TranscodeRuleTest, RequireRejectsAPayloadOfTheWrongShape) {
+  const TranscodeRule require = TranscodeRule::require("choices", JsonShape::NonEmptyArray);
+  nlohmann::json ok = nlohmann::json::parse(R"({"choices": [{}]})");
+  EXPECT_THAT(require.apply(ok), IsOk());
+
+  for (const char* bad : {R"({"choices": []})", R"({"choices": {}})", R"({})"}) {
+    nlohmann::json doc = nlohmann::json::parse(bad);
+    const absl::Status status = require.apply(doc);
+    EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument) << bad;
+    EXPECT_EQ(status.message(), "expected field 'choices' to be a non-empty array") << bad;
+  }
+
+  nlohmann::json candidates = nlohmann::json::parse(R"({"candidates": "none"})");
+  EXPECT_EQ(TranscodeRule::require("candidates", JsonShape::Array).apply(candidates).message(),
+            "expected field 'candidates' to be an array");
+}
+
+TEST(TranscodePredicateTest, MatchesByValueShapeAndNegation) {
+  const nlohmann::json doc = nlohmann::json::parse(R"({
+    "type": "content_block_delta",
+    "choices": [{"delta": {"content": "Hi"}, "finish_reason": null}],
+    "flag": true
+  })");
+  EXPECT_EQ(TranscodePredicate().kind(), TranscodePredicate::Kind::Always);
+  EXPECT_TRUE(TranscodePredicate().matches(doc));
+  EXPECT_TRUE(TranscodePredicate::always().matches(doc));
+
+  EXPECT_TRUE(TranscodePredicate::fieldEquals("type", "content_block_delta").matches(doc));
+  EXPECT_FALSE(TranscodePredicate::fieldEquals("type", "message_stop").matches(doc));
+  EXPECT_TRUE(TranscodePredicate::fieldEquals("flag", true).matches(doc));
+  EXPECT_FALSE(TranscodePredicate::fieldEquals("missing", nullptr).matches(doc));
+
+  // Numeric segments index arrays.
+  EXPECT_TRUE(TranscodePredicate::fieldEquals("choices.0.delta.content", "Hi").matches(doc));
+  EXPECT_TRUE(TranscodePredicate::fieldEquals("choices.0.finish_reason", nullptr).matches(doc));
+  EXPECT_TRUE(TranscodePredicate::fieldIs("choices.0", JsonShape::Object).matches(doc));
+  EXPECT_FALSE(TranscodePredicate::fieldIs("choices.1", JsonShape::Object).matches(doc));
+  EXPECT_FALSE(TranscodePredicate::fieldIs("choices.first", JsonShape::Object).matches(doc));
+  EXPECT_FALSE(TranscodePredicate::fieldIs("type.0", JsonShape::Text).matches(doc));
+
+  EXPECT_TRUE(TranscodePredicate::fieldIs("choices", JsonShape::Array).matches(doc));
+  EXPECT_TRUE(TranscodePredicate::fieldIs("choices", JsonShape::NonEmptyArray).matches(doc));
+  EXPECT_FALSE(TranscodePredicate::fieldIs("choices", JsonShape::Object).matches(doc));
+
+  const TranscodePredicate not_delta =
+      TranscodePredicate::negate(TranscodePredicate::fieldEquals("type", "content_block_delta"));
+  EXPECT_EQ(not_delta.kind(), TranscodePredicate::Kind::Not);
+  ASSERT_EQ(not_delta.operands().size(), 1);
+  EXPECT_EQ(not_delta.operands().front().path(), "type");
+  EXPECT_EQ(not_delta.operands().front().value(), "content_block_delta");
+  EXPECT_FALSE(not_delta.matches(doc));
+
+  // Offloaded text is `Text` but not a `String`, and equals nothing.
+  nlohmann::json offloaded = nlohmann::json::object();
+  offloaded["text"] = JsonWithExtBuf::makeExternalRef({0, 16});
+  EXPECT_TRUE(TranscodePredicate::fieldIs("text", JsonShape::Text).matches(offloaded));
+  EXPECT_FALSE(TranscodePredicate::fieldIs("text", JsonShape::String).matches(offloaded));
+  EXPECT_FALSE(TranscodePredicate::fieldEquals("text", "").matches(offloaded));
+  EXPECT_TRUE(TranscodePredicate::fieldIs("type", JsonShape::Text).matches(doc));
+  EXPECT_TRUE(TranscodePredicate::fieldIs("type", JsonShape::String).matches(doc));
+}
+
+TEST(TranscodeRuleTest, StreamStateRulesCarryValuesBetweenEvents) {
+  const TranscodeRule capture = TranscodeRule::captureToState("message.id", "message_id");
+  const TranscodeRule restore = TranscodeRule::setFromState("id", "message_id");
+  EXPECT_EQ(capture.slot(), "message_id");
+
+  // Both need a stream.
+  nlohmann::json start = nlohmann::json::parse(R"({"message": {"id": "msg_1"}})");
+  TranscodeContext no_stream;
+  EXPECT_EQ(capture.apply(start).code(), absl::StatusCode::kFailedPrecondition);
+  EXPECT_EQ(capture.apply(start, &no_stream).code(), absl::StatusCode::kFailedPrecondition);
+  EXPECT_EQ(restore.apply(start, &no_stream).code(), absl::StatusCode::kFailedPrecondition);
+
+  TranscodeStreamState state;
+  TranscodeContext ctx;
+  ctx.stream_state = &state;
+
+  // Nothing captured yet, so nothing to restore.
+  nlohmann::json early = nlohmann::json::object();
+  ASSERT_THAT(restore.apply(early, &ctx), IsOk());
+  EXPECT_FALSE(early.contains("id"));
+
+  // Captured by copy, then restored into a later event.
+  ASSERT_THAT(capture.apply(start, &ctx), IsOk());
+  EXPECT_EQ(start["message"]["id"], "msg_1");
+  nlohmann::json delta = nlohmann::json::parse(R"({"delta": {"text": "Hi"}})");
+  ASSERT_THAT(restore.apply(delta, &ctx), IsOk());
+  EXPECT_EQ(delta["id"], "msg_1");
+
+  // An event's own value wins, and an event without the source keeps the old slot.
+  nlohmann::json own = nlohmann::json::parse(R"({"id": "own"})");
+  ASSERT_THAT(restore.apply(own, &ctx), IsOk());
+  EXPECT_EQ(own["id"], "own");
+  nlohmann::json without = nlohmann::json::object();
+  ASSERT_THAT(capture.apply(without, &ctx), IsOk());
+  EXPECT_EQ(state.slots.at("message_id"), "msg_1");
+
+  // A reference into the event's buffer must not outlive the event, even inside a captured
+  // object.
+  nlohmann::json offloaded = nlohmann::json::object();
+  offloaded["message"]["id"] = JsonWithExtBuf::makeExternalRef({0, 16});
+  EXPECT_EQ(capture.apply(offloaded, &ctx).code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(TranscodeRule::captureToState("message", "message").apply(offloaded, &ctx).code(),
+            absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(state.slots.at("message_id"), "msg_1");
+  EXPECT_FALSE(state.slots.contains("message"));
+}
+
+// Usage moves between any two dialects through the canonical `TokenUsage`, so each dialect's
+// inclusion rules are undone and redone by its adapter.
+TEST(TranscodeRuleTest, ConvertUsageGoesThroughTheCanonicalContract) {
+  constexpr LLMProtocol kIr = TranscodingEngine::kIrProtocol;
+
+  // Gemini's prompt/candidates counts exclude tool use and thoughts; the IR's include them.
+  nlohmann::json gemini = nlohmann::json::parse(R"({"usageMetadata": {
+    "promptTokenCount": 10, "candidatesTokenCount": 5, "totalTokenCount": 20,
+    "cachedContentTokenCount": 4, "toolUsePromptTokenCount": 2, "thoughtsTokenCount": 3
+  }})");
+  const TranscodeRule gemini_to_ir =
+      TranscodeRule::convertUsage(LLMProtocol::GeminiGenerateContent, kIr);
+  EXPECT_EQ(gemini_to_ir.usageFrom(), LLMProtocol::GeminiGenerateContent);
+  EXPECT_EQ(gemini_to_ir.usageTo(), kIr);
+  ASSERT_THAT(gemini_to_ir.apply(gemini), IsOk());
+  EXPECT_EQ(gemini, nlohmann::json::parse(R"({"usage": {
+    "prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20,
+    "prompt_tokens_details": {"cached_tokens": 4},
+    "completion_tokens_details": {"reasoning_tokens": 3}
+  }})"));
+  // The IR has no tool-use bucket, so going back leaves it inside the prompt count.
+  ASSERT_THAT(TranscodeRule::convertUsage(kIr, LLMProtocol::GeminiGenerateContent).apply(gemini),
+              IsOk());
+  EXPECT_EQ(gemini, nlohmann::json::parse(R"({"usageMetadata": {
+    "promptTokenCount": 12, "candidatesTokenCount": 5, "totalTokenCount": 20,
+    "cachedContentTokenCount": 4, "thoughtsTokenCount": 3
+  }})"));
+
+  // Anthropic's input excludes both cache buckets; the IR's includes them.
+  const std::string anthropic_usage = R"({"usage": {
+    "input_tokens": 70, "output_tokens": 20,
+    "cache_read_input_tokens": 30, "cache_creation_input_tokens": 10
+  }})";
+  nlohmann::json anthropic = nlohmann::json::parse(anthropic_usage);
+  ASSERT_THAT(TranscodeRule::convertUsage(LLMProtocol::AnthropicMessages, kIr).apply(anthropic),
+              IsOk());
+  EXPECT_EQ(anthropic, nlohmann::json::parse(R"({"usage": {
+    "prompt_tokens": 110, "completion_tokens": 20, "total_tokens": 130,
+    "prompt_tokens_details": {"cached_tokens": 30, "cache_write_tokens": 10}
+  }})"));
+  ASSERT_THAT(TranscodeRule::convertUsage(kIr, LLMProtocol::AnthropicMessages).apply(anthropic),
+              IsOk());
+  EXPECT_EQ(anthropic, nlohmann::json::parse(anthropic_usage));
+
+  // No usage writes none; an `Unspecified` target only removes the source's.
+  nlohmann::json bare = nlohmann::json::parse(R"({"id": "x"})");
+  ASSERT_THAT(TranscodeRule::convertUsage(LLMProtocol::AnthropicMessages, kIr).apply(bare), IsOk());
+  EXPECT_EQ(bare, nlohmann::json::parse(R"({"id": "x"})"));
+  nlohmann::json dropped = nlohmann::json::parse(R"({"id": "x", "usage": {"input_tokens": 1}})");
+  ASSERT_THAT(TranscodeRule::convertUsage(LLMProtocol::AnthropicMessages, LLMProtocol::Unspecified)
+                  .apply(dropped),
+              IsOk());
+  EXPECT_EQ(dropped, nlohmann::json::parse(R"({"id": "x"})"));
+}
+
+TEST(TranscodeRuleTest, AccumulateUsageMergesPiecesAcrossEvents) {
+  const TranscodeRule gather = TranscodeRule::accumulateUsage(LLMProtocol::AnthropicMessages);
+  const TranscodeRule gather_and_render = TranscodeRule::accumulateUsage(
+      LLMProtocol::AnthropicMessages, TranscodingEngine::kIrProtocol);
+  nlohmann::json no_stream = nlohmann::json::parse(R"({"usage": {"output_tokens": 1}})");
+  EXPECT_EQ(gather.apply(no_stream).code(), absl::StatusCode::kFailedPrecondition);
+
+  TranscodeStreamState state;
+  TranscodeContext ctx;
+  ctx.stream_state = &state;
+
+  // `message_start` carries the input side, nested in its message, and renders nothing.
+  nlohmann::json start = nlohmann::json::parse(R"({"type": "message_start", "message": {
+    "usage": {"input_tokens": 70, "cache_read_input_tokens": 30, "output_tokens": 1}
+  }})");
+  ASSERT_THAT(gather.apply(start, &ctx), IsOk());
+  EXPECT_FALSE(start.contains("usage"));
+  EXPECT_EQ(state.usage.input_tokens, 70);
+
+  // Each `message_delta` carries the cumulative output; the render covers the whole stream.
+  nlohmann::json delta =
+      nlohmann::json::parse(R"({"type": "message_delta", "usage": {"output_tokens": 15}})");
+  ASSERT_THAT(gather_and_render.apply(delta, &ctx), IsOk());
+  EXPECT_EQ(delta, nlohmann::json::parse(R"({"type": "message_delta", "usage": {
+    "prompt_tokens": 100, "completion_tokens": 15, "total_tokens": 115,
+    "prompt_tokens_details": {"cached_tokens": 30}
+  }})"));
+
+  // The running total stays native, so a later event still merges into it.
+  nlohmann::json last =
+      nlohmann::json::parse(R"({"type": "message_delta", "usage": {"output_tokens": 20}})");
+  ASSERT_THAT(gather_and_render.apply(last, &ctx), IsOk());
+  EXPECT_EQ(last["usage"]["prompt_tokens"], 100);
+  EXPECT_EQ(last["usage"]["completion_tokens"], 20);
+  EXPECT_EQ(state.usage.input_tokens, 70);
+  EXPECT_EQ(state.usage.output_tokens, 20);
+
+  // Before any usage arrives there is nothing to render.
+  TranscodeStreamState fresh;
+  ctx.stream_state = &fresh;
+  nlohmann::json ping = nlohmann::json::parse(R"({"type": "ping"})");
+  ASSERT_THAT(gather_and_render.apply(ping, &ctx), IsOk());
+  EXPECT_EQ(ping, nlohmann::json::parse(R"({"type": "ping"})"));
+}
+
+TEST(TranscodeRuleTest, ValueMapFallbackReplacesUnmappedStrings) {
+  const TranscodeRule finish =
+      TranscodeRule::valueMap("finish_reason", {{"STOP", "stop"}, {"MAX_TOKENS", "length"}},
+                              TranscodeRule::ValueFallback{"stop"});
+  EXPECT_EQ(finish.unknownValuePolicy(), TranscodeRule::UnknownValuePolicy::Fallback);
+  EXPECT_EQ(finish.defaultValue(), "stop");
+
+  nlohmann::json mapped = nlohmann::json::parse(R"({"finish_reason": "MAX_TOKENS"})");
+  nlohmann::json unmapped =
+      nlohmann::json::parse(R"({"finish_reason": "MALFORMED_FUNCTION_CALL"})");
+  nlohmann::json number = nlohmann::json::parse(R"({"finish_reason": 3})");
+  nlohmann::json null_value = nlohmann::json::parse(R"({"finish_reason": null})");
+  for (nlohmann::json* doc : {&mapped, &unmapped, &number, &null_value}) {
+    ASSERT_THAT(finish.apply(*doc), IsOk());
+  }
+  EXPECT_EQ(mapped["finish_reason"], "length");
+  EXPECT_EQ(unmapped["finish_reason"], "stop");
+  // Only strings are mapped; anything else is left for the rules that follow.
+  EXPECT_EQ(number["finish_reason"], 3);
+  EXPECT_TRUE(null_value["finish_reason"].is_null());
+}
+
+// The startup verifier follows offloadable fields through the new structural ops, and rejects
+// the ones that would read, or keep, an offloaded value.
+TEST(TranscodingEngineTest, VerifierFollowsOffloadableFieldsThroughResponseRuleOps) {
+  // `contents[].parts[].text` is offloadable.
+  const PayloadSchema* gemini_schema =
+      AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).schema();
+  ASSERT_NE(gemini_schema, nullptr);
+  const auto verify = [gemini_schema](std::vector<TranscodeRule> rules) {
+    return TranscodingEngine::validateRulesAgainstSchema(
+        TranscodeRuleSet(LLMProtocol::GeminiGenerateContent, TranscodingEngine::kIrProtocol,
+                         std::move(rules)),
+        gemini_schema);
+  };
+  constexpr absl::StatusCode kRejected = absl::StatusCode::kInvalidArgument;
+  const TranscodeRule map_text = TranscodeRule::valueMap("text", {{"a", "b"}});
+  const TranscodeRule map_parts_text = TranscodeRule::forEach("parts", {map_text});
+  EXPECT_EQ(verify({TranscodeRule::forEach("contents", {map_parts_text})}).code(), kRejected);
+
+  // `collectText` relocates the text it gathers...
+  EXPECT_EQ(verify({TranscodeRule::forEach("contents",
+                                           {TranscodeRule::collectText("parts", "text", "content"),
+                                            TranscodeRule::valueMap("content", {{"a", "b"}})})})
+                .code(),
+            kRejected);
+  // ...and its predicate may test the text's shape, but not its value.
+  const auto collect_where = [](TranscodePredicate where) {
+    return TranscodeRule::forEach(
+        "contents", {TranscodeRule::collectText("parts", "text", "content", std::move(where))});
+  };
+  EXPECT_THAT(verify({collect_where(TranscodePredicate::fieldIs("text", JsonShape::Text))}),
+              IsOk());
+  EXPECT_THAT(verify({collect_where(
+                  TranscodePredicate::negate(TranscodePredicate::fieldEquals("thought", true)))}),
+              IsOk());
+  const absl::Status string_test =
+      verify({collect_where(TranscodePredicate::fieldIs("text", JsonShape::String))});
+  EXPECT_EQ(string_test.code(), kRejected);
+  EXPECT_THAT(string_test.message(), testing::HasSubstr("contents[].parts[].text"));
+  EXPECT_EQ(verify({collect_where(
+                       TranscodePredicate::negate(TranscodePredicate::fieldEquals("text", "")))})
+                .code(),
+            kRejected);
+
+  // Predicates on `when` and `require` index arrays with numeric segments.
+  EXPECT_EQ(
+      verify({TranscodeRule::when(TranscodePredicate::fieldEquals("contents.0.parts.0.text", "x"),
+                                  {TranscodeRule::drop("model")})})
+          .code(),
+      kRejected);
+  EXPECT_EQ(verify({TranscodeRule::require("contents.0.parts.0.text", JsonShape::String)}).code(),
+            kRejected);
+  EXPECT_THAT(verify({TranscodeRule::require("contents.0.parts.0.text", JsonShape::Text)}), IsOk());
+
+  // `setConst` overwrites the field and `retainOnly` removes it, so neither leaves it offloadable.
+  EXPECT_THAT(verify({TranscodeRule::forEach(
+                  "contents", {TranscodeRule::forEach(
+                                  "parts", {TranscodeRule::setConst("text", "x"), map_text})})}),
+              IsOk());
+  EXPECT_THAT(
+      verify({TranscodeRule::forEach(
+          "contents", {TranscodeRule::forEach(
+                          "parts", {TranscodeRule::retainOnly("", {"thought"}), map_text})})}),
+      IsOk());
+  EXPECT_THAT(verify({TranscodeRule::retainOnly("", {"model"}),
+                      TranscodeRule::forEach("contents", {map_parts_text})}),
+              IsOk());
+  EXPECT_EQ(verify({TranscodeRule::retainOnly("", {"contents"}),
+                    TranscodeRule::forEach("contents", {map_parts_text})})
+                .code(),
+            kRejected);
+
+  // `takeFirst` relocates the array's elements.
+  EXPECT_EQ(verify({TranscodeRule::takeFirst("contents", "first"),
+                    TranscodeRule::forEach("first.parts", {map_text})})
+                .code(),
+            kRejected);
+  EXPECT_THAT(verify({TranscodeRule::takeFirst("contents", "first"),
+                      TranscodeRule::forEach("contents", {map_parts_text})}),
+              IsOk());
+
+  // A `when` may or may not run, so afterwards a field is offloadable where either path left it.
+  const TranscodeRule maybe_move =
+      TranscodeRule::when(TranscodePredicate::fieldIs("contents", JsonShape::Array),
+                          {TranscodeRule::move("contents", "turns")});
+  EXPECT_EQ(verify({maybe_move, TranscodeRule::forEach("contents", {map_parts_text})}).code(),
+            kRejected);
+  EXPECT_EQ(verify({maybe_move, TranscodeRule::forEach("turns", {map_parts_text})}).code(),
+            kRejected);
+  EXPECT_EQ(verify({TranscodeRule::when(TranscodePredicate(),
+                                        {TranscodeRule::forEach("contents", {map_parts_text})})})
+                .code(),
+            kRejected);
+
+  // A captured value outlives its event, so it may neither be nor hold an offloadable field.
+  const absl::Status capture_text = verify({TranscodeRule::forEach(
+      "contents",
+      {TranscodeRule::forEach("parts", {TranscodeRule::captureToState("text", "slot")})})});
+  EXPECT_EQ(capture_text.code(), kRejected);
+  EXPECT_THAT(capture_text.message(), testing::HasSubstr("capture_to_state"));
+  EXPECT_EQ(verify({TranscodeRule::captureToState("contents", "slot")}).code(), kRejected);
+  EXPECT_THAT(verify({TranscodeRule::captureToState("model", "slot")}), IsOk());
+}
+
+// The verifier follows offloadable fields through the ops that map tool calls.
+TEST(TranscodingEngineTest, VerifierFollowsOffloadableFieldsThroughToolCallRuleOps) {
+  // In the IR, `messages[].content` and `messages[].tool_calls[].function.arguments` are
+  // offloadable.
+  const PayloadSchema* ir_schema = AdapterRegistry::get(TranscodingEngine::kIrProtocol).schema();
+  ASSERT_NE(ir_schema, nullptr);
+  const auto verify = [ir_schema](std::vector<TranscodeRule> rules) {
+    return TranscodingEngine::validateRulesAgainstSchema(
+        TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::GeminiGenerateContent,
+                         std::move(rules)),
+        ir_schema);
+  };
+  constexpr absl::StatusCode kRejected = absl::StatusCode::kInvalidArgument;
+  const TranscodeRule map_arguments = TranscodeRule::valueMap("function.arguments", {{"a", "b"}});
+  const auto for_each_call = [](std::vector<TranscodeRule> rules) {
+    return TranscodeRule::forEach("messages",
+                                  {TranscodeRule::forEach("tool_calls", std::move(rules))});
+  };
+  EXPECT_EQ(verify({for_each_call({map_arguments})}).code(), kRejected);
+
+  // `parseJson` and `serializeJson` either fail on a reference or leave inline text behind.
+  EXPECT_THAT(
+      verify({for_each_call({TranscodeRule::parseJson("function.arguments"), map_arguments})}),
+      IsOk());
+  EXPECT_THAT(
+      verify({for_each_call({TranscodeRule::serializeJson("function.arguments"), map_arguments})}),
+      IsOk());
+
+  // `moveElements` relocates the elements that match and leaves the rest where they were...
+  const TranscodeRule move_calls =
+      TranscodeRule::forEach("messages", {TranscodeRule::moveElements("tool_calls", "parts")});
+  EXPECT_EQ(verify({move_calls, TranscodeRule::forEach("messages", {TranscodeRule::forEach(
+                                                                       "parts", {map_arguments})})})
+                .code(),
+            kRejected);
+  EXPECT_EQ(verify({move_calls, for_each_call({map_arguments})}).code(), kRejected);
+  // ...and its predicate may not read an offloadable value.
+  const auto move_calls_where = [](TranscodePredicate where) {
+    return TranscodeRule::forEach(
+        "messages", {TranscodeRule::moveElements("tool_calls", "parts", std::move(where))});
+  };
+  EXPECT_EQ(verify({move_calls_where(TranscodePredicate::fieldEquals("function.arguments", "{}"))})
+                .code(),
+            kRejected);
+  EXPECT_THAT(verify({move_calls_where(TranscodePredicate::fieldEquals("type", "function"))}),
+              IsOk());
+
+  // `lookupEarlier` compares keys as strings, so it refuses an offloadable key...
+  const absl::Status offloadable_key = verify({TranscodeRule::lookupEarlier(
+      "messages", "content", "tool_calls", "id", "function.name", "name")});
+  EXPECT_EQ(offloadable_key.code(), kRejected);
+  EXPECT_THAT(offloadable_key.message(),
+              testing::HasSubstr(
+                  "lookup_earlier rule cannot compare offloadable field 'messages[].content'"));
+  EXPECT_EQ(verify({TranscodeRule::lookupEarlier("messages", "tool_call_id", "content", "text",
+                                                 "type", "name")})
+                .code(),
+            kRejected);
+  // ...and what it copies may be a reference where it lands.
+  const TranscodeRule copy_arguments = TranscodeRule::lookupEarlier(
+      "messages", "tool_call_id", "tool_calls", "id", "function.arguments", "arguments");
+  EXPECT_THAT(verify({copy_arguments}), IsOk());
+  EXPECT_EQ(verify({copy_arguments,
+                    TranscodeRule::forEach("messages",
+                                           {TranscodeRule::valueMap("arguments", {{"a", "b"}})})})
+                .code(),
+            kRejected);
+}
+
+// Matches a registration the verifier refused, and why.
+auto refusedBecause(absl::string_view why) {
+  return StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                  testing::HasSubstr(std::string(why)));
+}
+
+// A pack whose rules could never run on their leg is refused when it is registered, rather than
+// failing every payload once traffic arrives. Only stream legs have per-stream state, so a request
+// or response rule that needs it is refused, however deeply it is nested.
+TEST(TranscodingEngineTest, RegisterPackRefusesStreamStateOutsideStreamLegs) {
+  const auto nested = [](TranscodeRule rule) {
+    return TranscodeRuleSet(
+        LLMProtocol::OpenAiResponses, TranscodingEngine::kIrProtocol,
+        {TranscodeRule::forEach("items",
+                                {TranscodeRule::when(TranscodePredicate(), {std::move(rule)})})});
+  };
+  const TranscodeRuleSet capture = nested(TranscodeRule::captureToState("id", "id"));
+  const TranscodeRuleSet restore = nested(TranscodeRule::setFromState("id", "id"));
+  const TranscodeRuleSet accumulate =
+      nested(TranscodeRule::accumulateUsage(LLMProtocol::OpenAiChatCompletions));
+  const TranscodeRuleSet enumerate_across =
+      nested(TranscodeRule::enumerateAcrossStream("calls", "index", "call_index"));
+  const auto registered = [](DialectTranscodePack pack) {
+    TranscodingEngine engine;
+    return engine.registerPack(std::move(pack));
+  };
+
+  EXPECT_THAT(registered({.protocol = LLMProtocol::OpenAiResponses, .request = {.to_ir = capture}}),
+              refusedBecause("OPENAI_RESPONSES request to_ir rules cannot use capture_to_state"));
+  EXPECT_THAT(
+      registered({.protocol = LLMProtocol::OpenAiResponses, .request = {.from_ir = restore}}),
+      refusedBecause("OPENAI_RESPONSES request from_ir rules cannot use set_from_state"));
+  EXPECT_THAT(
+      registered({.protocol = LLMProtocol::OpenAiResponses, .response = {.to_ir = accumulate}}),
+      refusedBecause("OPENAI_RESPONSES response to_ir rules cannot use accumulate_usage"));
+  EXPECT_THAT(
+      registered({.protocol = LLMProtocol::OpenAiResponses, .response = {.from_ir = capture}}),
+      refusedBecause("OPENAI_RESPONSES response from_ir rules cannot use capture_to_state"));
+  EXPECT_THAT(
+      registered(
+          {.protocol = LLMProtocol::OpenAiResponses, .response = {.to_ir = enumerate_across}}),
+      refusedBecause("OPENAI_RESPONSES response to_ir rules cannot use enumerate_across_stream"));
+  // Numbering within one payload needs no state.
+  EXPECT_THAT(
+      registered({.protocol = LLMProtocol::OpenAiResponses,
+                  .response = {.to_ir = nested(TranscodeRule::enumerate("calls", "index"))}}),
+      IsOk());
+
+  // Stream legs are what these rules are for.
+  EXPECT_THAT(registered({.protocol = LLMProtocol::OpenAiResponses,
+                          .stream = {.to_ir = {.cases = {{.rules = capture},
+                                                         {.rules = restore},
+                                                         {.rules = accumulate},
+                                                         {.rules = enumerate_across}}}}}),
+              IsOk());
+}
+
+// A stream grammar is refused if a case would transcode events that cannot be transcoded, if an
+// event it writes would break the SSE framing, or if it reads a slot it never writes.
+TEST(TranscodingEngineTest, RegisterPackRefusesStreamGrammarsThatCannotRun) {
+  const auto registered = [](StreamGrammar grammar,
+                             TranscodeDirection direction = TranscodeDirection::FromIr) {
+    DialectTranscodePack pack{.protocol = LLMProtocol::OpenAiResponses};
+    StreamGrammar& leg =
+        direction == TranscodeDirection::ToIr ? pack.stream.to_ir : pack.stream.from_ir;
+    leg = std::move(grammar);
+    TranscodingEngine engine;
+    return engine.registerPack(std::move(pack));
+  };
+
+  // Only a JSON payload can be transcoded. Other events can still be passed through, dropped, or
+  // end the stream.
+  EXPECT_THAT(registered({.cases = {{.match = StreamEventMatch::isDone()}}}),
+              refusedBecause("OPENAI_RESPONSES stream from_ir grammar case 0 transcodes events "
+                             "without a JSON payload"));
+  EXPECT_THAT(
+      registered({.cases = {{.match = StreamEventMatch::notJson()}}}, TranscodeDirection::ToIr),
+      refusedBecause("OPENAI_RESPONSES stream to_ir grammar case 0 transcodes events without a "
+                     "JSON payload"));
+  EXPECT_THAT(registered({.cases = {{.match = StreamEventMatch::isDone(),
+                                     .disposition = StreamDisposition::Terminate},
+                                    {.match = StreamEventMatch::notJson()}}}),
+              refusedBecause("grammar case 1 transcodes events without a JSON payload"));
+  EXPECT_THAT(registered({.cases = {{.match = StreamEventMatch::isDone(),
+                                     .disposition = StreamDisposition::Drop},
+                                    {.match = StreamEventMatch::notJson(),
+                                     .disposition = StreamDisposition::Passthrough},
+                                    {.match = StreamEventMatch::eventType("delta")},
+                                    {.match = StreamEventMatch::json()}}}),
+              IsOk());
+
+  // An SSE event name must not end its line early, and raw data must not carry a CR. A LF in raw
+  // data is fine: each line goes out as a `data:` line of its own.
+  EXPECT_THAT(registered({.cases = {{.output_event = "chunk\ndata: forged"}}}),
+              refusedBecause(R"(grammar writes SSE event name 'chunk\ndata: forged')"));
+  EXPECT_THAT(registered({.on_terminate = {{.event = "end\r"}}}),
+              refusedBecause(R"(grammar writes SSE event name 'end\r')"));
+  EXPECT_THAT(registered({.on_source_end = {{.raw_data = "[DONE]\r"}}}),
+              refusedBecause("grammar writes raw SSE data that contains a CR"));
+  EXPECT_THAT(registered({.on_source_end = {{.raw_data = "one\ntwo"}}}), IsOk());
+
+  // A slot must be written somewhere in the grammar that reads it, however deeply nested either
+  // rule is.
+  const auto event_case = [](std::vector<TranscodeRule> rules) {
+    return StreamEventCase{.rules =
+                               TranscodeRuleSet(TranscodingEngine::kIrProtocol,
+                                                LLMProtocol::OpenAiResponses, std::move(rules))};
+  };
+  const TranscodeRule restore = TranscodeRule::when(
+      TranscodePredicate(), {TranscodeRule::setFromState("message.id", "message_id")});
+  const TranscodeRule capture =
+      TranscodeRule::forEach("items", {TranscodeRule::captureToState("id", "message_id")});
+  EXPECT_THAT(registered({.cases = {event_case({restore})}}),
+              refusedBecause("OPENAI_RESPONSES stream from_ir set_from_state reads slot "
+                             "'message_id', which no capture_to_state in the grammar writes"));
+  EXPECT_THAT(registered({.cases = {event_case({restore}), event_case({capture})}}), IsOk());
+
+  // A case's outputs and the events the grammar writes itself count too, both as readers and as
+  // writers.
+  const auto rule_set = [](std::vector<TranscodeRule> rules) {
+    return TranscodeRuleSet(TranscodingEngine::kIrProtocol, LLMProtocol::OpenAiResponses,
+                            std::move(rules));
+  };
+  EXPECT_THAT(registered({.on_terminate = {{.event = "end",
+                                            .json = nlohmann::json::object(),
+                                            .rules = rule_set({restore})}}}),
+              refusedBecause("set_from_state reads slot 'message_id'"));
+  EXPECT_THAT(registered({.cases = {{.outputs = {{.event = "open", .rules = rule_set({capture})}}}},
+                          .on_terminate = {{.event = "end",
+                                            .json = nlohmann::json::object(),
+                                            .rules = rule_set({restore})}}}),
+              IsOk());
+  EXPECT_THAT(registered({.cases = {{.outputs = {{.event = "open\n"}}}}}),
+              refusedBecause(R"(grammar writes SSE event name 'open\n')"));
+  // Only a case that transcodes writes its outputs.
+  EXPECT_THAT(registered({.cases = {{.match = StreamEventMatch::json(),
+                                     .disposition = StreamDisposition::Drop,
+                                     .outputs = {{.event = "open"}}}}}),
+              refusedBecause("grammar case 0 has outputs but does not transcode"));
+
+  // The pack's other grammar is another stream, so a slot it writes does not count.
+  TranscodingEngine engine;
+  EXPECT_THAT(engine.registerPack(
+                  DialectTranscodePack{.protocol = LLMProtocol::OpenAiResponses,
+                                       .stream = {.to_ir = {.cases = {event_case({capture})}},
+                                                  .from_ir = {.cases = {event_case({restore})}}}}),
+              refusedBecause("stream from_ir set_from_state reads slot 'message_id'"));
+}
+
+} // namespace
+} // namespace AiProtocolManager
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

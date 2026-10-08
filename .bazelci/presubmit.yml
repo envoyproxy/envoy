@@ -8,9 +8,8 @@ tasks:
     - "//test/integration/..."
     - "//test/exe/..."
     test_flags:
-    - "--config=clang"
     - "--config=remote-ci"
-    - "--define=wasm=disabled"
+    - "--@proxy-wasm-cpp-host//bazel:engine=disabled"
     - "--jobs=75"
   coverage:
     name: "Coverage"
@@ -23,7 +22,6 @@ tasks:
     - "//test/exe/..."
     test_flags:
     - "--config=coverage"
-    - "--config=clang"
 # Re-enable after fixing https://github.com/envoyproxy/envoy/issues/16542
 #   fuzz_coverage:
 #     name: "Fuzz-Coverage"

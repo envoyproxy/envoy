@@ -4,16 +4,16 @@ build-image:
   repo: docker.io/envoyproxy/envoy-build
   repo-gcr: gcr.io/envoy-ci/envoy-build
   # default ci caching (ci)
-  sha: eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663
-  sha-ci: eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663
-  sha-devtools: f1af63ebb1aa49a4ccd2bb4ae3bf94c5bc3221139538e21b365c9bea7575f702
-  sha-docker: 6deb8633c65ec8d25364beae1cefe1fbc6ec2f330292f9157ed91fdb3ae20b0c
-  sha-gcc: d4ca56020e17aa36d6baad8e172d09c8a08e47ed0a911b779400c645957fa220
-  sha-mobile: d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2
-  sha-worker: 7d3c99085fa5f1cff6b7293de256cc6c93ce61cd7ccb63432113a1f8fbf12a43
+  sha: 0ec8c3295229234f5a5663b858d9e217fd409e2eba22afe7a9c6e4f634bd7ea8
+  sha-ci: 0ec8c3295229234f5a5663b858d9e217fd409e2eba22afe7a9c6e4f634bd7ea8
+  sha-devtools: c7f99061218bdd4ab3da8548826fccd20596545e62f2e825d031b935abfd965a
+  sha-docker: dfdbc6de8a85d0e7269073475a94936a2a690ceff2e48d550fe2cbdd58ad7a2b
+  sha-gcc: 66e7359c8dcc148ce12d0828e9547d7f29900b788b22b4c804dab664f724ad35
+  sha-mobile: ab4cb76a32f7fae2e3bfdfe1f1fd632897baa952334a5f9805107ed5f1233687
+  sha-worker: c531dd07f0755d990167f6d495f6b199ad399f8ca660887785b022da2d5b3031
   # TODO: remove this dupe (currently used by ci request handler)
-  mobile-sha: d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2
-  tag: v0.2.2
+  mobile-sha: ab4cb76a32f7fae2e3bfdfe1f1fd632897baa952334a5f9805107ed5f1233687
+  tag: v0.2.4
 
 config:
   envoy:
@@ -196,6 +196,7 @@ run:
     - bazel/**/*
     - .bazelrc
     - ci/do_ci.sh
+    - ci/bazel_fun.sh
   check-coverage:
     paths:
     - "**/*"
@@ -214,7 +215,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - source/common/**/*
@@ -225,7 +225,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - source/common/**/*
@@ -237,7 +236,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -247,8 +245,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repositories.bzl
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -259,8 +255,6 @@ run:
     - .github/config.yml
     - api/**/*
     - bazel/external/quiche.BUILD
-    - bazel/repositories.bzl
-    - bazel/repository_locations.bzl
     - envoy/**/*
     - mobile/.bazelrc
     - mobile/**/*
@@ -275,8 +269,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repositories.bzl
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - test/run_envoy_bazel_coverage.sh
@@ -288,7 +280,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -298,7 +289,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - source/common/**/*
@@ -309,7 +299,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - source/common/**/*
@@ -321,7 +310,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -331,7 +319,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -342,8 +329,6 @@ run:
     - .github/config.yml
     - .github/workflows/mobile-python.yml
     - bazel/external/quiche.BUILD
-    - bazel/repositories.bzl
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -353,7 +338,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -363,8 +347,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repositories.bzl
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -374,8 +356,15 @@ run:
     - .bazelversion
     - .github/config.yml
     - .github/dependabot.yml
+    - .github/workflows/_precheck_deps.yml
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
+    - VERSION.txt
     - bazel/BUILD
     - tools/dependency/*
+    - "**/.bazelrc"
+    - "**/MODULE.bazel"
+    - "**/MODULE.bazel.lock"
     - "**/*.bzl"
     - "**/requirements.txt"
     - "**/go.mod"

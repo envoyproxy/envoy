@@ -98,7 +98,7 @@ private:
   void onFetchComplete() override {}
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   std::unique_ptr<Network::Address::IpList> ip_allowlist_;
   GlobalStats stats_;
 };

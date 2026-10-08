@@ -15,8 +15,8 @@ envoy_cc_library(
     hdrs = ["lb_config.h"],
     deps = [
         "//envoy/stats:stats_interface",
-        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
     ],
 )
 
@@ -37,6 +37,7 @@ envoy_cc_library(
     deps = [
         ":load_balancer_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
 )

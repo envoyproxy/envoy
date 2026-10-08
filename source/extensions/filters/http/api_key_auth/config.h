@@ -12,20 +12,17 @@ namespace HttpFilters {
 namespace ApiKeyAuth {
 
 class ApiKeyAuthFilterFactory
-    : public Common::ExceptionFreeFactoryBase<ApiKeyAuthProto, ApiKeyAuthPerRouteProto> {
+    : public Common::UnifiedFactoryBase<ApiKeyAuthProto, ApiKeyAuthPerRouteProto> {
 public:
-  ApiKeyAuthFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.api_key_auth") {}
+  ApiKeyAuthFilterFactory() : UnifiedFactoryBase("envoy.filters.http.api_key_auth") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const ApiKeyAuthProto& config, const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) override;
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const ApiKeyAuthProto& config, Server::Configuration::ServerFactoryContext& context,
       Server::Configuration::ExtraFactoryContext& extra_context) override;
 
-  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
-  // (ServerFactoryContext) paths. Stats are scoped to the given scope.
+  // Shared factory creation used by the listener/cluster and route/vhost-level paths. Stats are
+  // scoped to the given scope.
   static absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const ApiKeyAuthProto& proto_config, const std::string& stats_prefix,
                       Stats::Scope& scope);

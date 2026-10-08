@@ -17,7 +17,7 @@ envoy_proto_library(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":config_cc_proto",
         "//envoy/http:header_validator_factory_interface",
@@ -25,6 +25,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/upstreams/http:config",
+        "//test/common/http:header_formatter_test_lib",
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:registry_lib",

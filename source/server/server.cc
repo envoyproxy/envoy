@@ -160,6 +160,16 @@ void InstanceBase::drainListeners(OptRef<const Network::ExtraShutdownListenerOpt
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
                                    options.has_value() ? *options
                                                        : Network::ExtraShutdownListenerOptions{});
+  // Notify the connections of every listener that draining has begun, so connection-level drain
+  // logic can react. Server-wide drains notify from their entry
+  // point rather than from DrainManagerImpl, whose per-listener children must not fan out. The
+  // start time and strategy are captured once here so every notified connection shares a single,
+  // consistent drain timeline.
+  listener_manager_->onServerDrainStart(
+      Network::DrainDirection::All,
+      Network::ConnectionDrainEvent{api().timeSource().monotonicTime(),
+                                    InstanceBase::options().drainStrategy()});
+
   drain_manager_->startDrainSequence(Network::DrainDirection::All, [] {});
 }
 
@@ -398,27 +408,12 @@ absl::Status InstanceUtil::loadBootstrapConfig(
 }
 
 void InstanceUtil::raiseFileLimits() {
-  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
-    return;
-  }
-  struct rlimit rlim;
-  if (const auto result = Api::OsSysCallsSingleton::get().getrlimit(RLIMIT_NOFILE, &rlim);
+  if (const auto result = Api::OsSysCallsSingleton::get().raiseFileLimits();
       result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Failed to read file descriptor limit, error {}.", errorDetails(result.errno_));
-    return;
-  }
-  const auto old = rlim.rlim_cur;
-  if (old == rlim.rlim_max) {
-    return;
-  }
-  rlim.rlim_cur = rlim.rlim_max;
-  if (const auto result = Api::OsSysCallsSingleton::get().setrlimit(RLIMIT_NOFILE, &rlim);
-      result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Failed to raise file descriptor limit to maximum, error {}.",
+    ENVOY_LOG(warn, "Failed to raise file descriptor limit, error {}.",
               errorDetails(result.errno_));
     return;
   }
-  ENVOY_LOG(info, "Raised file descriptor limits from {} to {}.", old, rlim.rlim_max);
 }
 
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,
@@ -496,6 +491,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     if (stats_config.stats_tags().empty() && use_all_default_tags &&
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stats_explicit_tags")) {
       stats_store_.setUseExplicitTags(true);
+      http_context_.setUseExplicitTags(true);
     }
   }
 
@@ -861,6 +857,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // cluster_manager_factory_ is available.
   RETURN_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
 
+  // All the bootstrap (static) resources have been loaded at this point, so the default message
+  // validation visitor switches to the dynamic one.
+  bootstrap_config_loaded_.store(true);
+
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config() ||
@@ -1101,8 +1101,6 @@ void InstanceBase::run() {
     watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
                                                       "main_thread", *dispatcher_);
   }
-
-  main_dispatch_loop_started_.store(true);
 
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
