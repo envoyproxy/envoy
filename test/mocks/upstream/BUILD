@@ -160,6 +160,7 @@ envoy_cc_mock(
     hdrs = ["priority_set.h"],
     deps = [
         "//envoy/upstream:upstream_interface",
+        "//source/common/upstream:host_lookup_map_lib",
         "//test/mocks/upstream:host_set_mocks",
     ],
 )

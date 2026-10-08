@@ -43,8 +43,8 @@ pub trait EnvoyLoadBalancer {
   ) -> abi::envoy_dynamic_module_type_host_health;
 
   /// Looks up a host by its address string across all priorities and returns its health status.
-  /// This provides O(1) lookup by address using the cross-priority host map, instead of requiring
-  /// iteration through all hosts by index.
+  /// This uses the cross-priority host map internally instead of requiring iteration through all
+  /// hosts by index.
   ///
   /// The address must match the format "ip:port" (e.g., "10.0.0.1:8080").
   fn get_host_health_by_address(
@@ -619,24 +619,15 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     if self.context_ptr.is_null() {
       return Vec::default();
     }
-    let size = self.context_get_downstream_headers_size();
-    if size == 0 {
-      return Vec::default();
-    }
-    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(size);
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers(
-        self.context_ptr,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-      )
-    };
-    if !success {
-      return Vec::default();
-    }
-    unsafe {
-      headers.set_len(size);
-    }
-    headers
+    crate::utility::collect_headers(
+      || self.context_get_downstream_headers_size(),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+          self.context_ptr,
+          headers,
+        )
+      },
+    )
   }
 
   fn context_get_downstream_header(

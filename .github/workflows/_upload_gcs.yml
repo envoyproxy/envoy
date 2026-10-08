@@ -13,6 +13,21 @@ on:
         description: JSON array of artifacts to upload to GCS
         type: string
         required: true
+      bucket:
+        description: Destination bucket override
+        type: string
+      layout:
+        description: >-
+          Upload layout (sha or version). For `version` the artifact is synced to
+          `<bucket>/<prefix>/<version>`.
+        type: string
+        default: sha
+      prefix:
+        description: >-
+          Object prefix within the bucket for `layout: version`, eg `envoy/docs` gives
+          `gs://<bucket>/envoy/docs/<version>`.
+        type: string
+        default: envoy/docs
       request:
         type: string
         required: true
@@ -35,7 +50,7 @@ jobs:
       with:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact }}
-    - uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: metadata
       with:
         input: ${{ matrix.artifact }}/gcs-metadata.json
@@ -44,15 +59,12 @@ jobs:
         rm -rf "${ARTIFACT}/gcs-metadata.json"
       env:
         ARTIFACT: ${{ matrix.artifact }}
-    # The downloaded artifact - including its `gcs-metadata.json` - may have been created
-    # by a job that ran untrusted (PR) code, and nothing in it can be trusted (see POLICY.md).
-    # The upload destination (bucket/sha/redirect) is therefore validated against
-    # workflow-resolved config and the trusted `request` here, before any credential
-    # is loaded or used. The sync step below uses only the workflow-resolved values.
+    # Nothing in the downloaded artifact is trusted (see POLICY.md). Destination components
+    # are cross-checked against workflow-resolved values before any credential is loaded.
     - name: Validate upload metadata
       env:
         BUCKET: ${{ fromJSON(steps.metadata.outputs.value).bucket }}
-        BUCKET_EXPECTED: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
+        BUCKET_EXPECTED: ${{ inputs.bucket || (inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE) }}
         SHA: ${{ fromJSON(steps.metadata.outputs.value).sha }}
         SHA_EXPECTED: ${{ fromJSON(inputs.request).request.sha }}
         REDIRECT: ${{ fromJSON(steps.metadata.outputs.value).redirect }}
@@ -60,7 +72,24 @@ jobs:
           ${{ vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
           }}${{ fromJSON(inputs.request).request.pr
                 || fromJSON(inputs.request).request.target-branch }}
+        LAYOUT: ${{ inputs.layout }}
+        VERSION: ${{ fromJSON(steps.metadata.outputs.value).version }}
+        VERSION_EXPECTED: >-
+          ${{ format(
+              'v{0}.{1}.{2}',
+              fromJSON(inputs.request).request.version.major,
+              fromJSON(inputs.request).request.version.minor,
+              fromJSON(inputs.request).request.version.patch
+          ) }}
+        VERSION_DEV: ${{ fromJSON(inputs.request).request.version.dev }}
+        PREFIX: ${{ inputs.prefix }}
       run: |
+        VERSION_REGEX='^v[0-9]+\.[0-9]+\.[0-9]+$'
+        PATH_REGEX='^[a-zA-Z0-9][a-zA-Z0-9_.-]*(/[a-zA-Z0-9][a-zA-Z0-9_.-]*)*$'
+        if [[ "$LAYOUT" != "sha" && "$LAYOUT" != "version" ]]; then
+            echo "::error::Unsupported upload layout (${LAYOUT})"
+            exit 1
+        fi
         if [[ -z "$BUCKET_EXPECTED" ]]; then
             echo "::error::Expected bucket is empty"
             exit 1
@@ -77,20 +106,40 @@ jobs:
             echo "::error::SHA (${SHA}) does not match expected sha (${SHA_EXPECTED})"
             exit 1
         fi
-        if [[ -z "$REDIRECT_EXPECTED" ]] || ! [[ "$REDIRECT_EXPECTED" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*(/[a-zA-Z0-9][a-zA-Z0-9_.-]*)*$ ]]; then
-            echo "::error::Expected redirect (${REDIRECT_EXPECTED}) is not a valid redirect path"
-            exit 1
+        if [[ "$LAYOUT" == "version" ]]; then
+            if [[ "$VERSION_DEV" == "true" ]]; then
+                echo "::error::Versioned docs cannot be uploaded for a dev request"
+                exit 1
+            fi
+            if ! [[ "$VERSION_EXPECTED" =~ $VERSION_REGEX ]] || ! [[ "$VERSION" =~ $VERSION_REGEX ]]; then
+                echo "::error::Version (${VERSION}) is not a valid release version"
+                exit 1
+            fi
+            if [[ "$VERSION" != "$VERSION_EXPECTED" ]]; then
+                echo "::error::Version (${VERSION}) does not match expected release version (${VERSION_EXPECTED})"
+                exit 1
+            fi
+            if ! [[ "$PREFIX" =~ $PATH_REGEX ]]; then
+                echo "::error::Upload prefix (${PREFIX}) is not a valid object prefix"
+                exit 1
+            fi
+        else
+            if [[ -z "$REDIRECT_EXPECTED" ]] || ! [[ "$REDIRECT_EXPECTED" =~ $PATH_REGEX ]]; then
+                echo "::error::Expected redirect (${REDIRECT_EXPECTED}) is not a valid redirect path"
+                exit 1
+            fi
+            if [[ "$REDIRECT" != "$REDIRECT_EXPECTED" ]]; then
+                echo "::error::Redirect (${REDIRECT}) does not match expected redirect (${REDIRECT_EXPECTED})"
+                exit 1
+            fi
         fi
-        if [[ "$REDIRECT" != "$REDIRECT_EXPECTED" ]]; then
-            echo "::error::Redirect (${REDIRECT}) does not match expected redirect (${REDIRECT_EXPECTED})"
-            exit 1
-        fi
-    - uses: envoyproxy/toolshed/actions/gcp/setup@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/gcp/setup@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         key: ${{ secrets.gcp-key }}
-    - uses: envoyproxy/toolshed/actions/gcs/artefact/sync@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - if: ${{ inputs.layout == 'sha' }}
+      uses: envoyproxy/toolshed/actions/gcs/artefact/sync@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
-        bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
+        bucket: ${{ inputs.bucket || (inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE) }}
         path: ${{ matrix.artifact }}
         path-upload: ${{ matrix.artifact }}
         sha: ${{ fromJSON(inputs.request).request.sha }}
@@ -98,3 +147,13 @@ jobs:
           ${{ vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
           }}${{ fromJSON(inputs.request).request.pr
                 || fromJSON(inputs.request).request.target-branch }}
+    - if: ${{ inputs.layout == 'version' }}
+      name: Sync versioned artifact
+      env:
+        ARTIFACT: ${{ matrix.artifact }}
+        BUCKET: ${{ inputs.bucket || (inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE) }}
+        VERSION: ${{ fromJSON(steps.metadata.outputs.value).version }}
+        PREFIX: ${{ inputs.prefix }}
+      run: |
+        gcloud storage rsync --delete-unmatched-destination-objects -r \
+          "$ARTIFACT" "gs://${BUCKET}/${PREFIX}/${VERSION}"

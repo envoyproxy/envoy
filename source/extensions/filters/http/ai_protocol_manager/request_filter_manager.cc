@@ -7,6 +7,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/coroutine/status_macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_pipeline.h"
+#include "source/extensions/filters/http/ai_protocol_manager/replay_awaitable.h"
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
 #include "source/extensions/filters/http/ai_protocol_manager/task_group.h"
 
@@ -23,12 +24,14 @@ public:
   AsyncState(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
              BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
              StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
-             Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn)
+             Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn,
+             bool always_serialize, LLMProtocol request_protocol)
       : TaskGroup(dispatcher), filters_(std::move(filters)),
         payload_index_(std::move(payload_index)), pipeline_(filters_.size()),
         buffer_manager_(buffer_manager), stream_info_(stream_info),
         on_complete_(std::move(on_complete)), request_headers_(request_headers),
-        local_reply_fn_(std::move(local_reply_fn)), filter_handoff_status_(filters_.size()) {}
+        local_reply_fn_(std::move(local_reply_fn)), always_serialize_(always_serialize),
+        request_protocol_(request_protocol), filter_handoff_status_(filters_.size()) {}
 
   ~AsyncState() override { cancel(); }
 
@@ -42,8 +45,8 @@ public:
     if (terminated()) {
       return;
     }
-    bool payload_index_pushed =
-        pipeline_.stage(0)->tryPush(std::make_unique<AiRequest>(std::move(payload_index_)));
+    bool payload_index_pushed = pipeline_.stage(0)->tryPush(
+        std::make_unique<AiRequest>(std::move(payload_index_), request_protocol_));
     ASSERT(payload_index_pushed);
   }
 
@@ -155,27 +158,11 @@ private:
     final_req_ = std::move(*res);
     ASSERT(final_req_ != nullptr);
 
-    ASSIGN_OR_CO_RETURN(
-        Serializer::SerializedOffsets serialized_offsets,
-        co_await Serializer::calculateSerializedOffsets(final_req_->request_index()));
-
-    if (stream_info_.filterState() != nullptr) {
-      stream_info_.filterState()->setData(
-          APMRequestPayloadIndex::kFilterStateKey,
-          std::make_shared<APMRequestPayloadIndex>(std::move(serialized_offsets.doc)),
-          StreamInfo::FilterState::LifeSpan::Request);
+    if (always_serialize_) {
+      CO_RETURN_IF_ERROR(co_await serializeFinalRequest());
+    } else {
+      CO_RETURN_IF_ERROR(co_await forwardReceivedBody());
     }
-
-    if (request_headers_ != nullptr && request_headers_->ContentLength() != nullptr) {
-      request_headers_->setContentLength(serialized_offsets.total_size);
-    }
-
-    // TODO(penguingao): condition the serialization on config. If we want to
-    // normalize the json payload / protocol or the payload is modified, we
-    // re-serialize, if not, we just passthrough the original body.
-    ASSIGN_OR_CO_RETURN(std::ignore,
-                        co_await Serializer::serialize(final_req_->request_index(), buffer_manager_,
-                                                       buffer_manager_));
 
     auto self = shared_from_this();
     markTerminated();
@@ -183,6 +170,41 @@ private:
       on_complete(absl::OkStatus());
     }
     co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> serializeFinalRequest() {
+    ASSIGN_OR_CO_RETURN(
+        Serializer::SerializedOffsets serialized_offsets,
+        co_await Serializer::calculateSerializedOffsets(final_req_->request_index()));
+    publishPayloadIndex(std::move(serialized_offsets.doc));
+    setContentLength(serialized_offsets.total_size);
+    ASSIGN_OR_CO_RETURN(std::ignore,
+                        co_await Serializer::serialize(final_req_->request_index(), buffer_manager_,
+                                                       buffer_manager_));
+    co_return absl::OkStatus();
+  }
+
+  // The request's own index already locates its external references in the received body.
+  Coroutine::Task<absl::Status> forwardReceivedBody() {
+    const uint64_t length = buffer_manager_->length();
+    publishPayloadIndex(final_req_->takeRequestIndex());
+    setContentLength(length);
+    co_return co_await ReplayAwaitable(*buffer_manager_, 0, length);
+  }
+
+  void publishPayloadIndex(JsonWithExtBuf index) {
+    if (stream_info_.filterState() != nullptr) {
+      stream_info_.filterState()->setData(
+          APMRequestPayloadIndex::kFilterStateKey,
+          std::make_shared<APMRequestPayloadIndex>(std::move(index)),
+          StreamInfo::FilterState::LifeSpan::Request);
+    }
+  }
+
+  void setContentLength(uint64_t length) {
+    if (request_headers_ != nullptr && request_headers_->ContentLength() != nullptr) {
+      request_headers_->setContentLength(length);
+    }
   }
 
   void onFilterCompletion(size_t index, absl::Status status) {
@@ -266,6 +288,8 @@ private:
   OnCompleteFn on_complete_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   LocalReplyFn local_reply_fn_;
+  const bool always_serialize_{true};
+  const LLMProtocol request_protocol_;
   AiRequestPtr final_req_;
   std::vector<FilterHandoffStatus> filter_handoff_status_;
 };
@@ -274,10 +298,12 @@ RequestFilterManager::RequestFilterManager(
     std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
     BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
     StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
-    Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn)
+    Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn, bool always_serialize,
+    LLMProtocol request_protocol)
     : async_state_(std::make_shared<AsyncState>(
           std::move(filters), std::move(payload_index), buffer_manager, dispatcher, stream_info,
-          std::move(on_complete), request_headers, std::move(local_reply_fn))) {}
+          std::move(on_complete), request_headers, std::move(local_reply_fn), always_serialize,
+          request_protocol)) {}
 
 RequestFilterManager::~RequestFilterManager() { cancel(); }
 

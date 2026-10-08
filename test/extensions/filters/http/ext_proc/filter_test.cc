@@ -6503,6 +6503,29 @@ TEST_F(HttpFilterTest, ClusterMissingLoggingInfo) {
   EXPECT_EQ(logging_info->destination(), "ext_proc_server");
 }
 
+TEST_F(HttpFilterTest, LoggingInfoWithoutUpstreamInfo) {
+  initializeTestSendAll();
+
+  // Start the stream so that logStreamInfo() uses the async client stream's StreamInfo.
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Simulate an async client stream whose StreamInfo carries no upstream info. The const
+  // upstreamInfo() accessor then returns an empty OptRef (has_value() == false).
+  async_client_stream_info_.upstream_info_.reset();
+
+  // Should not crash even though there is no upstream info to read the upstream host from.
+  filter_->logStreamInfo();
+
+  ASSERT_TRUE(stream_info_.filterState()->hasData<ExtProcLoggingInfo>(filter_config_name));
+  auto logging_info =
+      stream_info_.filterState()->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name);
+  // No upstream host should have been recorded because upstream info was absent.
+  EXPECT_EQ(logging_info->upstreamHost(), nullptr);
+  EXPECT_EQ(logging_info->destination(), "ext_proc_server");
+
+  filter_->onDestroy();
+}
+
 TEST_F(HttpFilterTest, GoogleGrpcMissingLoggingInfo) {
   do_start_option_ = OnGrpcError;
   initializeTestGoogleGrpc();

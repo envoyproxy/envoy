@@ -1,6 +1,6 @@
 use crate::{
   abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
-  wrap_into_c_void_ptr, NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
+  wrap_into_c_void_ptr, EnvoyBuffer, NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
 };
 use mockall::*;
 
@@ -79,8 +79,10 @@ pub trait EnvoyUpstreamHttpTcpBridge: Send {
   /// Get the number of request headers.
   fn get_request_headers_size(&self) -> usize;
 
-  /// Get all request headers as key-value pairs.
-  fn get_request_headers(&self) -> Vec<(Vec<u8>, Vec<u8>)>;
+  /// Get all request headers as key-value [`EnvoyBuffer`] pairs.
+  ///
+  /// Returns an empty vector if there are no headers or the header map is not available.
+  fn get_request_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Get the current request buffer contents as a contiguous byte vector.
   fn get_request_buffer(&self) -> Vec<u8>;
@@ -217,40 +219,15 @@ impl EnvoyUpstreamHttpTcpBridge for EnvoyUpstreamHttpTcpBridgeImpl {
     }
   }
 
-  fn get_request_headers(&self) -> Vec<(Vec<u8>, Vec<u8>)> {
-    let size = self.get_request_headers_size();
-    if size == 0 {
-      return Vec::new();
-    }
-    let mut headers: Vec<abi::envoy_dynamic_module_type_envoy_http_header> = vec![
-      abi::envoy_dynamic_module_type_envoy_http_header {
-        key_ptr: std::ptr::null_mut(),
-        key_length: 0,
-        value_ptr: std::ptr::null_mut(),
-        value_length: 0,
-      };
-      size
-    ];
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
-        self.raw,
-        headers.as_mut_ptr(),
-      )
-    };
-    if !ok {
-      return Vec::new();
-    }
-    headers
-      .iter()
-      .map(|h| unsafe {
-        (
-          crate::ffi_helpers::slice_from_raw_or_empty(h.key_ptr as *const u8, h.key_length)
-            .to_vec(),
-          crate::ffi_helpers::slice_from_raw_or_empty(h.value_ptr as *const u8, h.value_length)
-            .to_vec(),
+  fn get_request_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    crate::utility::collect_headers(
+      || self.get_request_headers_size(),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
+          self.raw, headers,
         )
-      })
-      .collect()
+      },
+    )
   }
 
   fn get_request_buffer(&self) -> Vec<u8> {

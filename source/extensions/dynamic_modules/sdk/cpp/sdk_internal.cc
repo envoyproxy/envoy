@@ -97,9 +97,12 @@ public:
     }
 
     std::vector<HeaderView> result_headers(header_count);
-    envoy_dynamic_module_callback_http_get_headers(
-        host_plugin_ptr_, Type,
-        reinterpret_cast<envoy_dynamic_module_type_envoy_http_header*>(result_headers.data()));
+    if (!envoy_dynamic_module_callback_http_get_headers(
+            host_plugin_ptr_, Type,
+            reinterpret_cast<envoy_dynamic_module_type_envoy_http_header*>(
+                result_headers.data()))) {
+      return {};
+    }
     return result_headers;
   }
 
@@ -368,6 +371,21 @@ public:
     return value.toStringView();
   }
 
+  std::optional<std::pair<std::string_view, std::string_view>>
+  getTypedMetadata(std::string_view ns) override {
+    BufferView type_url{nullptr, 0};
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_get_typed_metadata(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&type_url),
+        reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    if (!found) {
+      return {};
+    }
+    return std::make_pair(type_url.toStringView(), value.toStringView());
+  }
+
   std::optional<double> getMetadataNumber(std::string_view ns, std::string_view key) override {
     double value = 0.0;
     const bool ret = envoy_dynamic_module_callback_http_get_metadata_number(
@@ -572,6 +590,11 @@ public:
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
+  bool hasFilterState(std::string_view key) override {
+    return envoy_dynamic_module_callback_http_has_filter_state(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()});
+  }
+
   std::optional<std::string_view> getAttributeString(AttributeID id) override {
     BufferView value{nullptr, 0};
 
@@ -605,6 +628,39 @@ public:
       return {};
     }
     return value;
+  }
+
+  TimingInfo getTimingInfo() override {
+    envoy_dynamic_module_type_timing_info_v2 info{};
+    envoy_dynamic_module_callback_http_get_timing_info(host_plugin_ptr_, &info);
+    const auto available = [](int64_t value, bool has_value) -> std::optional<int64_t> {
+      return has_value ? std::optional<int64_t>(value) : std::nullopt;
+    };
+    return TimingInfo{
+        available(info.start_time_unix_ns, info.has_start_time),
+        available(info.downstream_connection_begin_ns, info.has_downstream_connection_begin),
+        available(info.downstream_handshake_start_ns, info.has_downstream_handshake_start),
+        available(info.downstream_handshake_complete_ns, info.has_downstream_handshake_complete),
+        available(info.last_downstream_header_rx_byte_received_ns,
+                  info.has_last_downstream_header_rx_byte_received),
+        available(info.last_downstream_rx_byte_received_ns,
+                  info.has_last_downstream_rx_byte_received),
+        available(info.upstream_connect_start_ns, info.has_upstream_connect_start),
+        available(info.upstream_connect_complete_ns, info.has_upstream_connect_complete),
+        available(info.upstream_handshake_complete_ns, info.has_upstream_handshake_complete),
+        available(info.first_upstream_tx_byte_sent_ns, info.has_first_upstream_tx_byte_sent),
+        available(info.last_upstream_tx_byte_sent_ns, info.has_last_upstream_tx_byte_sent),
+        available(info.first_upstream_rx_byte_received_ns,
+                  info.has_first_upstream_rx_byte_received),
+        available(info.first_upstream_rx_body_byte_received_ns,
+                  info.has_first_upstream_rx_body_byte_received),
+        available(info.last_upstream_rx_byte_received_ns, info.has_last_upstream_rx_byte_received),
+        available(info.first_downstream_tx_byte_sent_ns, info.has_first_downstream_tx_byte_sent),
+        available(info.last_downstream_tx_byte_sent_ns, info.has_last_downstream_tx_byte_sent),
+        available(info.last_downstream_ack_received_ns, info.has_last_downstream_ack_received),
+        available(info.request_complete_duration_ns, info.has_request_complete),
+        available(info.downstream_connection_end_ns, info.has_downstream_connection_end),
+    };
   }
 
   void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
@@ -741,6 +797,47 @@ public:
     }
     return ClusterHostCounts{static_cast<uint64_t>(total), static_cast<uint64_t>(healthy),
                              static_cast<uint64_t>(degraded)};
+  }
+
+  std::optional<std::string_view> getUpstreamRemoteAddress() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_get_upstream_remote_address(
+        host_plugin_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  std::vector<std::string_view> getUpstreamHostsAttempted() override {
+    const size_t count =
+        envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(host_plugin_ptr_);
+    if (count == 0) {
+      return {};
+    }
+    std::vector<envoy_dynamic_module_type_envoy_buffer> buffers(count);
+    if (!envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(host_plugin_ptr_,
+                                                                         buffers.data())) {
+      return {};
+    }
+    std::vector<std::string_view> hosts;
+    hosts.reserve(count);
+    for (const auto& buffer : buffers) {
+      hosts.emplace_back(buffer.ptr, buffer.length);
+    }
+    return hosts;
+  }
+
+  std::vector<uint64_t> getUpstreamConnectionIdsAttempted() override {
+    const size_t count =
+        envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+            host_plugin_ptr_);
+    if (count == 0) {
+      return {};
+    }
+    std::vector<uint64_t> connection_ids(count);
+    if (!envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+            host_plugin_ptr_, connection_ids.data())) {
+      return {};
+    }
+    return connection_ids;
   }
 
   bool setUpstreamOverrideHost(std::string_view host, bool strict) override {

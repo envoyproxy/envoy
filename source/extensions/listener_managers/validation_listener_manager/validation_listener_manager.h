@@ -8,7 +8,13 @@ namespace Server {
 
 class ValidationListenerComponentFactory : public ListenerComponentFactory {
 public:
-  ValidationListenerComponentFactory(Instance& parent) : parent_(parent) {}
+  ValidationListenerComponentFactory(Instance& parent)
+      : parent_(parent), network_config_provider_manager_(
+                             std::make_shared<Filter::NetworkFilterConfigProviderManagerImpl>()),
+        tcp_listener_config_provider_manager_(
+            std::make_shared<Filter::TcpListenerFilterConfigProviderManagerImpl>()),
+        quic_listener_config_provider_manager_(
+            std::make_shared<Filter::QuicListenerFilterConfigProviderManagerImpl>()) {}
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
@@ -22,13 +28,13 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
     return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-        filters, filter_chain_factory_context, network_config_provider_manager_);
+        filters, filter_chain_factory_context, *network_config_provider_manager_);
   }
   absl::StatusOr<Filter::ListenerFilterFactoriesList> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
-        filters, context, tcp_listener_config_provider_manager_);
+        filters, context, *tcp_listener_config_provider_manager_);
   }
   absl::StatusOr<std::vector<Network::UdpListenerFilterFactoryCb>>
   createUdpListenerFilterFactoryList(
@@ -40,7 +46,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
-        filters, context, quic_listener_config_provider_manager_);
+        filters, context, *quic_listener_config_provider_manager_);
   }
   absl::StatusOr<Network::SocketSharedPtr>
   createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
@@ -58,14 +64,16 @@ public:
   uint64_t nextListenerTag() override { return 0; }
   Filter::TcpListenerFilterConfigProviderManagerImpl*
   getTcpListenerConfigProviderManager() override {
-    return &tcp_listener_config_provider_manager_;
+    return tcp_listener_config_provider_manager_.get();
   }
 
 private:
-  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
-  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
-  Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;
   Instance& parent_;
+  std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
+  std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
+  std::shared_ptr<Filter::QuicListenerFilterConfigProviderManagerImpl>
+      quic_listener_config_provider_manager_;
 };
 
 class ValidationListenerManagerFactoryImpl : public ListenerManagerFactory {

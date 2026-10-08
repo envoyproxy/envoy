@@ -172,7 +172,7 @@ public:
 
   std::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override { return ca_file_path_; };
-  Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> getCaCertInformation() const override;
 
   // Utility functions.
   Envoy::Ssl::ClientValidationStatus
@@ -231,7 +231,6 @@ private:
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;
   Server::Configuration::CommonFactoryContext& context_;
-  bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;

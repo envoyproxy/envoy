@@ -1,5 +1,6 @@
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 
+#include <chrono>
 #include <functional>
 #include <optional>
 #include <string>
@@ -22,6 +23,17 @@ namespace Extensions {
 namespace DynamicModules {
 
 namespace {
+
+int64_t monotonicTimeToNanos(const std::optional<MonotonicTime>& time,
+                             const MonotonicTime& start_time, bool* has_time = nullptr) {
+  if (has_time != nullptr) {
+    *has_time = time.has_value();
+  }
+  if (!time.has_value()) {
+    return -1;
+  }
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() - start_time).count();
+}
 
 // Extract a downstream SSL string attribute from the stream info.
 bool getDownstreamSslAttribute(
@@ -622,6 +634,119 @@ bool ContextAccessor::getAttributeBool(const StreamInfo::StreamInfo& stream_info
     break;
   }
   return ok;
+}
+
+void ContextAccessor::getTimingInfo(const StreamInfo::StreamInfo* stream_info,
+                                    envoy_dynamic_module_type_timing_info* timing_out) {
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  getTimingInfoV2(stream_info, &timing);
+  *timing_out = {timing.start_time_unix_ns,
+                 timing.request_complete_duration_ns,
+                 timing.first_upstream_tx_byte_sent_ns,
+                 timing.last_upstream_tx_byte_sent_ns,
+                 timing.first_upstream_rx_byte_received_ns,
+                 timing.last_upstream_rx_byte_received_ns,
+                 timing.first_downstream_tx_byte_sent_ns,
+                 timing.last_downstream_tx_byte_sent_ns};
+}
+
+void ContextAccessor::getTimingInfoV2(const StreamInfo::StreamInfo* stream_info,
+                                      envoy_dynamic_module_type_timing_info_v2* timing_out) {
+  *timing_out = {};
+  timing_out->start_time_unix_ns = -1;
+  timing_out->downstream_connection_begin_ns = -1;
+  timing_out->downstream_handshake_start_ns = -1;
+  timing_out->downstream_handshake_complete_ns = -1;
+  timing_out->last_downstream_header_rx_byte_received_ns = -1;
+  timing_out->last_downstream_rx_byte_received_ns = -1;
+  timing_out->upstream_connect_start_ns = -1;
+  timing_out->upstream_connect_complete_ns = -1;
+  timing_out->upstream_handshake_complete_ns = -1;
+  timing_out->first_upstream_tx_byte_sent_ns = -1;
+  timing_out->last_upstream_tx_byte_sent_ns = -1;
+  timing_out->first_upstream_rx_byte_received_ns = -1;
+  timing_out->first_upstream_rx_body_byte_received_ns = -1;
+  timing_out->last_upstream_rx_byte_received_ns = -1;
+  timing_out->first_downstream_tx_byte_sent_ns = -1;
+  timing_out->last_downstream_tx_byte_sent_ns = -1;
+  timing_out->last_downstream_ack_received_ns = -1;
+  timing_out->request_complete_duration_ns = -1;
+  timing_out->downstream_connection_end_ns = -1;
+  if (stream_info == nullptr) {
+    return;
+  }
+
+  const MonotonicTime start_time = stream_info->startTimeMonotonic();
+  timing_out->start_time_unix_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                       stream_info->startTime().time_since_epoch())
+                                       .count();
+  timing_out->has_start_time = true;
+
+  const auto request_complete = stream_info->requestComplete();
+  if (request_complete.has_value()) {
+    timing_out->request_complete_duration_ns = request_complete->count();
+    timing_out->has_request_complete = true;
+  }
+
+  const auto downstream = stream_info->downstreamTiming();
+  if (downstream.has_value()) {
+    timing_out->first_downstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(downstream->firstDownstreamTxByteSent(), start_time,
+                             &timing_out->has_first_downstream_tx_byte_sent);
+    timing_out->last_downstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(downstream->lastDownstreamTxByteSent(), start_time,
+                             &timing_out->has_last_downstream_tx_byte_sent);
+    timing_out->downstream_connection_begin_ns =
+        monotonicTimeToNanos(downstream->downstreamConnectionBegin(), start_time,
+                             &timing_out->has_downstream_connection_begin);
+    timing_out->downstream_handshake_start_ns =
+        monotonicTimeToNanos(downstream->downstreamHandshakeStart(), start_time,
+                             &timing_out->has_downstream_handshake_start);
+    timing_out->downstream_handshake_complete_ns =
+        monotonicTimeToNanos(downstream->downstreamHandshakeComplete(), start_time,
+                             &timing_out->has_downstream_handshake_complete);
+    timing_out->last_downstream_header_rx_byte_received_ns =
+        monotonicTimeToNanos(downstream->lastDownstreamHeaderRxByteReceived(), start_time,
+                             &timing_out->has_last_downstream_header_rx_byte_received);
+    timing_out->last_downstream_rx_byte_received_ns =
+        monotonicTimeToNanos(downstream->lastDownstreamRxByteReceived(), start_time,
+                             &timing_out->has_last_downstream_rx_byte_received);
+    timing_out->last_downstream_ack_received_ns =
+        monotonicTimeToNanos(downstream->lastDownstreamAckReceived(), start_time,
+                             &timing_out->has_last_downstream_ack_received);
+    timing_out->downstream_connection_end_ns =
+        monotonicTimeToNanos(downstream->downstreamConnectionEnd(), start_time,
+                             &timing_out->has_downstream_connection_end);
+  }
+
+  const auto upstream = stream_info->upstreamInfo();
+  if (upstream.has_value()) {
+    const auto& upstream_timing = upstream->upstreamTiming();
+    timing_out->first_upstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(upstream_timing.first_upstream_tx_byte_sent_, start_time,
+                             &timing_out->has_first_upstream_tx_byte_sent);
+    timing_out->last_upstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(upstream_timing.last_upstream_tx_byte_sent_, start_time,
+                             &timing_out->has_last_upstream_tx_byte_sent);
+    timing_out->first_upstream_rx_byte_received_ns =
+        monotonicTimeToNanos(upstream_timing.first_upstream_rx_byte_received_, start_time,
+                             &timing_out->has_first_upstream_rx_byte_received);
+    timing_out->last_upstream_rx_byte_received_ns =
+        monotonicTimeToNanos(upstream_timing.last_upstream_rx_byte_received_, start_time,
+                             &timing_out->has_last_upstream_rx_byte_received);
+    timing_out->upstream_connect_start_ns =
+        monotonicTimeToNanos(upstream_timing.upstream_connect_start_, start_time,
+                             &timing_out->has_upstream_connect_start);
+    timing_out->upstream_connect_complete_ns =
+        monotonicTimeToNanos(upstream_timing.upstream_connect_complete_, start_time,
+                             &timing_out->has_upstream_connect_complete);
+    timing_out->upstream_handshake_complete_ns =
+        monotonicTimeToNanos(upstream_timing.upstream_handshake_complete_, start_time,
+                             &timing_out->has_upstream_handshake_complete);
+    timing_out->first_upstream_rx_body_byte_received_ns =
+        monotonicTimeToNanos(upstream_timing.first_upstream_rx_body_byte_received_, start_time,
+                             &timing_out->has_first_upstream_rx_body_byte_received);
+  }
 }
 
 bool ContextAccessor::getDynamicMetadata(const StreamInfo::StreamInfo& stream_info,

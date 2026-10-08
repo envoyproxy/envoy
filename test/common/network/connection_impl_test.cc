@@ -4847,6 +4847,28 @@ TEST_P(ConnectionImplTest, TestConstSocketAccess) {
   disconnect(true);
 }
 
+TEST_P(ConnectionImplTest, InitialLocalCloseReasonPreserved) {
+  ConnectionMocks mocks = createConnectionMocks(false);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
+  Network::ConnectionPtr connection = std::make_unique<Network::ServerConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_);
+
+  EXPECT_TRUE(connection->initialLocalCloseReason().empty());
+  EXPECT_TRUE(connection->localCloseReason().empty());
+
+  // Close with an initial reason (e.g. FlushWriteAndDelay with codec error).
+  connection->close(ConnectionCloseType::FlushWriteAndDelay, "first_reason");
+  EXPECT_EQ(connection->initialLocalCloseReason(), "first_reason");
+  EXPECT_EQ(connection->localCloseReason(), "first_reason");
+
+  // Subsequent close updates localCloseReason, but preserves initialLocalCloseReason.
+  connection->close(ConnectionCloseType::NoFlush, "second_reason");
+  EXPECT_EQ(connection->initialLocalCloseReason(), "first_reason");
+  EXPECT_EQ(connection->localCloseReason(), "second_reason");
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy
