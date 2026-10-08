@@ -1,4 +1,4 @@
-#module(name = "envoy_external")
+module(name = "envoy_external")
 
 bazel_dep(name = "envoy", version = "1.40.0-dev")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
