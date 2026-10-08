@@ -129,14 +129,15 @@ jobs:
       && inputs.trusted
       && github.repository == 'envoyproxy/envoy'
       && ((fromJSON(inputs.request).request.version.dev
-           && needs.release.result != 'failure')
-          || needs.release.result == 'success')
+           && needs.github.result != 'failure')
+          || needs.github.result == 'success')
       && needs.docs-archive.result != 'failure'
     permissions:
       contents: read
     needs:
     - docs-archive
     - container
+    - github
     - sign
     runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
     steps:

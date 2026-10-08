@@ -132,7 +132,9 @@ jobs:
     - name: Generate manifest configuration (release)
       uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: release-config
-      if: ! inputs.dev || inputs.target-branch != 'main'
+      if: >-
+        ! inputs.dev
+        || inputs.target-branch != 'main'
       with:
         input-format: yaml
         filter: >-
