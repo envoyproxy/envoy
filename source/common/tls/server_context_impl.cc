@@ -68,6 +68,29 @@ Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs) {
   return cnsv;
 }
 
+namespace {
+
+// RFC 8446 section 4.2.1 allows a TLS 1.2 client to send supported_versions without 0x0304.
+bool supportedVersionsIncludesTls13(const uint8_t* data, size_t len) {
+  CBS ext, versions;
+  CBS_init(&ext, data, len);
+  if (!CBS_get_u8_length_prefixed(&ext, &versions) || CBS_len(&ext) != 0) {
+    return false;
+  }
+  while (CBS_len(&versions) > 0) {
+    uint16_t version;
+    if (!CBS_get_u16(&versions, &version)) {
+      return false;
+    }
+    if (version == TLS1_3_VERSION) {
+      return true;
+    }
+  }
+  return false;
+}
+
+} // namespace
+
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
                                           const unsigned char* in, unsigned int inlen) {
   // Currently this uses the standard selection algorithm in priority order.
@@ -434,12 +457,15 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
   // We just need to look at signature algorithms.
   const uint16_t client_version = ssl_client_hello.version;
   if (client_version == TLS1_2_VERSION && tls_max_version_ == TLS1_3_VERSION) {
-    // If the supported_versions extension is found then we assume that the client is competent
-    // enough that just checking the signature_algorithms is sufficient.
+    // If the supported_versions extension lists TLS 1.3, the client can negotiate it and just
+    // checking the signature_algorithms is sufficient.
     const uint8_t* supported_versions_data;
     size_t supported_versions_len;
     if (SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_supported_versions,
-                                             &supported_versions_data, &supported_versions_len)) {
+                                             &supported_versions_data, &supported_versions_len) &&
+        (!Runtime::runtimeFeatureEnabled(
+             "envoy.reloadable_features.tls_ecdsa_selection_check_supported_versions") ||
+         supportedVersionsIncludesTls13(supported_versions_data, supported_versions_len))) {
       const uint8_t* signature_algorithms_data;
       size_t signature_algorithms_len;
       if (SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_signature_algorithms,
