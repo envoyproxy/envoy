@@ -28,6 +28,21 @@ upstreams and control plane xDS clusters.
   active_clusters, Gauge, Number of currently active (warmed) clusters
   warming_clusters, Gauge, Number of currently warming (not active) clusters
 
+.. _config_cluster_manager_odcds_stats:
+
+On-demand CDS
+-------------
+
+When :ref:`on-demand cluster discovery <config_http_filters_on_demand>` is configured, its config
+sources emit, next to the usual :ref:`subscription statistics <subscription_statistics>`, the
+following statistics rooted at *cluster_manager.odcds.*.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  known_missing_answers, Counter, Total on-demand cluster discovery requests answered immediately from a remembered "cluster doesn't exist" answer
+
 
 In addition to the cluster manager stats, there are per worker thread local
 cluster manager statistics tree rooted at

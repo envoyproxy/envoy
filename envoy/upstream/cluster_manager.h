@@ -220,7 +220,11 @@ public:
 
   // Whether the config source behind this instance has answered an earlier on-demand request for
   // the cluster with "doesn't exist", and no later update has delivered the cluster.
-  virtual bool isKnownMissing(absl::string_view /*cluster_name*/) const { return false; }
+  virtual bool isKnownMissing(absl::string_view cluster_name) const PURE;
+
+  // Called when the cluster manager answers an on-demand request from this instance's remembered
+  // "doesn't exist" answer, so the implementation can record the event in its stats.
+  virtual void recordKnownMissingAnswer() PURE;
 };
 
 using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;

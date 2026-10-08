@@ -959,7 +959,6 @@ private:
                                   std::chrono::milliseconds timeout);
 
   void notifyClusterDiscoveryStatus(absl::string_view name, ClusterDiscoveryStatus status);
-  void resolveClusterDiscovery(absl::string_view name, ClusterDiscoveryStatus status);
 
 protected:
   ClusterInitializationMap cluster_initialization_map_;

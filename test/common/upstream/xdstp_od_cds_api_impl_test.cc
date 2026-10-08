@@ -408,6 +408,15 @@ TEST_F(XdstpOdCdsApiImplTest, RegistrationFailureIsNotKnownMissing) {
   EXPECT_FALSE(odcds_->isKnownMissing(cluster_name));
 }
 
+// Check that answers served from the remembered answer are recorded in the
+// cluster_manager.odcds.known_missing_answers counter.
+TEST_F(XdstpOdCdsApiImplTest, RecordKnownMissingAnswerIncrementsStat) {
+  odcds_->recordKnownMissingAnswer();
+  EXPECT_EQ(
+      1UL,
+      TestUtility::findCounter(store_, "cluster_manager.odcds.known_missing_answers")->value());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

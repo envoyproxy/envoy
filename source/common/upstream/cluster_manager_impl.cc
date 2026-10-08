@@ -1769,12 +1769,21 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t config_source_key, 
     }
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.odcds_missing_cluster_cache") &&
         !warming_clusters_.contains(name) && odcds->isKnownMissing(name)) {
-      ENVOY_LOG(debug, "cm odcds: the requested cluster {} is already known to be missing", name);
+      ENVOY_LOG(debug,
+                "cm odcds: the requested cluster {} is already known to be missing, posting the "
+                "answer back to {}",
+                name, worker_dispatcher.name());
       // The config source behind this handle has already answered that the cluster doesn't
       // exist. A cluster that is warming (delivered by another config source meanwhile) is
       // deliberately not answered from the remembered answer: the cluster lifecycle callbacks
       // resolve the request with Available once the warm-up completes.
-      resolveClusterDiscovery(name, ClusterDiscoveryStatus::Missing);
+      //
+      // Nothing is left pending on the main thread, so only the requesting worker is answered;
+      // any other worker that asks posts here and gets its own answer.
+      odcds->recordKnownMissingAnswer();
+      worker_dispatcher.post([invoker = std::move(invoker)] {
+        invoker.invokeAllCallbacks(ClusterDiscoveryStatus::Missing);
+      });
       return;
     }
     // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
@@ -1814,20 +1823,15 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
     // notifies the cluster manager about it.
     return;
   }
-  resolveClusterDiscovery(name, status);
-}
-
-void ClusterManagerImpl::resolveClusterDiscovery(absl::string_view name,
-                                                 ClusterDiscoveryStatus status) {
-  // Let all the worker threads know the result of the discovery, so each of them resolves every
-  // callback it has queued for the name.
-  tls_.runOnAllThreads([name = std::string(name),
-                        status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-    ENVOY_LOG(trace,
-              "cm cdm: starting processing cluster name {} (status {}) from the main thread in {}",
-              name, enumToInt(status), cluster_manager->thread_local_dispatcher_.name());
-    cluster_manager->cdm_.processClusterName(name, status);
-  });
+  // Let all the worker threads know that the discovery timed out.
+  tls_.runOnAllThreads(
+      [name = std::string(name), status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        ENVOY_LOG(
+            trace,
+            "cm cdm: starting processing cluster name {} (status {}) from the expired timer in {}",
+            name, enumToInt(status), cluster_manager->thread_local_dispatcher_.name());
+        cluster_manager->cdm_.processClusterName(name, status);
+      });
 }
 
 Config::EdsResourcesCacheOptRef ClusterManagerImpl::edsResourcesCache() {

@@ -131,10 +131,6 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth2_client_retries_respect_user_retry
 // false once their cookie TTL has elapsed and no legacy cookies remain in circulation.
 // TODO: flip the default to false and remove the flag once the migration window has elapsed.
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_legacy_cbc_decrypt_compat);
-// When an on-demand cluster discovery asks for a cluster its config source has already answered
-// as missing, answer the request immediately from that remembered answer instead of starting
-// another discovery and waiting for the response or the discovery timeout.
-RUNTIME_GUARD(envoy_reloadable_features_odcds_missing_cluster_cache);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_cluster_no_recreate_stream);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_vhds_no_recreate_stream);
 RUNTIME_GUARD(envoy_reloadable_features_orca_accept_unpadded_base64);
@@ -338,6 +334,13 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli
 // DnsFilter created resolver on the worker thread which could lead to race when sharing resolvers
 // Do not turn this on if DnsFilter is used or until the race is fixed
 FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
+
+// When an on-demand cluster discovery asks for a cluster its config source has already answered
+// as missing, answer the request immediately from that remembered answer instead of starting
+// another discovery and waiting for the response or the discovery timeout.
+// TODO(wbpcode): flip to true after deployments have had a few releases to adopt the behavior
+// change.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_odcds_missing_cluster_cache);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

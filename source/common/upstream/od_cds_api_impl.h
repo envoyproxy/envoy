@@ -10,6 +10,7 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/config/resource_type_helper.h"
@@ -47,6 +48,7 @@ public:
   bool isKnownMissing(absl::string_view cluster_name) const override {
     return missing_names_.contains(cluster_name);
   }
+  void recordKnownMissingAnswer() override { known_missing_answers_.inc(); }
 
 private:
   // Config::SubscriptionCallbacks
@@ -69,6 +71,7 @@ private:
   CdsApiHelper helper_;
   MissingClusterNotifier& notifier_;
   Stats::ScopeSharedPtr scope_;
+  Stats::Counter& known_missing_answers_;
   StartStatus status_{StartStatus::NotStarted};
   absl::flat_hash_set<std::string> awaiting_names_;
   // The names requested on demand through this instance. The delta subscription keeps the same
@@ -97,6 +100,7 @@ public:
   // Upstream::OdCdsApi
   void updateOnDemand(std::string cluster_name) override;
   bool isKnownMissing(absl::string_view cluster_name) const override;
+  void recordKnownMissingAnswer() override;
 
 private:
   class XdstpOdcdsSubscriptionsManager;
