@@ -50,7 +50,7 @@ jobs:
       with:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact }}
-    - uses: envoyproxy/toolshed/actions/jq@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
+    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: metadata
       with:
         input: ${{ matrix.artifact }}/gcs-metadata.json
@@ -133,11 +133,11 @@ jobs:
                 exit 1
             fi
         fi
-    - uses: envoyproxy/toolshed/actions/gcp/setup@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
+    - uses: envoyproxy/toolshed/actions/gcp/setup@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         key: ${{ secrets.gcp-key }}
     - if: ${{ inputs.layout == 'sha' }}
-      uses: envoyproxy/toolshed/actions/gcs/artefact/sync@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
+      uses: envoyproxy/toolshed/actions/gcs/artefact/sync@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         bucket: ${{ inputs.bucket || (inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE) }}
         path: ${{ matrix.artifact }}
