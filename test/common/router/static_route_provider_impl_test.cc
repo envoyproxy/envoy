@@ -374,90 +374,6 @@ vhds:
       Http::TestRequestHeaderMapImpl{{":authority", "example2.com"}}));
 }
 
-// A repeated on-demand request for a domain the server has already answered is answered from the
-// published route configuration without another VHDS round trip.
-TEST_F(StaticRouteConfigProviderImplTest, OnDemandRequestForAnsweredAliasIsAnsweredLocally) {
-  const std::string config_yaml = R"EOF(
-name: foo
-vhds:
-  config_source:
-    api_config_source:
-      api_type: DELTA_GRPC
-      grpc_services:
-        envoy_grpc:
-          cluster_name: xds_cluster
-)EOF";
-
-  envoy::config::route::v3::RouteConfiguration route_config;
-  TestUtility::loadFromYaml(config_yaml, route_config);
-
-  NiceMock<Envoy::Config::MockSubscriptionFactory> subscription_factory;
-  ON_CALL(server_factory_context_.cluster_manager_, subscriptionFactory())
-      .WillByDefault(ReturnRef(subscription_factory));
-
-  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = nullptr;
-  auto subscription = std::make_unique<Envoy::Config::MockSubscription>();
-  Envoy::Config::MockSubscription* subscription_ptr = subscription.get();
-  EXPECT_CALL(subscription_factory, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(Invoke([&vhds_callbacks, &subscription](
-                           const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                           Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                           Envoy::Config::OpaqueResourceDecoderSharedPtr,
-                           const Envoy::Config::SubscriptionOptions&) {
-        vhds_callbacks = &callbacks;
-        return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
-      }));
-  // On-demand virtual hosts under the route configuration are accepted first.
-  EXPECT_CALL(*subscription_ptr, accept(absl::flat_hash_set<std::string>{"foo/*"}));
-  EXPECT_CALL(*subscription_ptr, start(_));
-
-  StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,
-                                         init_manager_, rds_manager_);
-
-  // The initial fetch resolves the alias of 'example.com' and publishes the route configuration.
-  envoy::config::route::v3::VirtualHost vhost;
-  vhost.set_name("example_vhost");
-  vhost.add_domains("example.com");
-  auto* route = vhost.add_routes();
-  route->mutable_match()->set_prefix("/");
-  route->mutable_route()->set_cluster("baz");
-
-  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-
-  // All posts, to the main thread and back to the worker, run inline.
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-      .WillRepeatedly(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
-
-  // The first request for 'example.com' goes to the server and is queued.
-  bool cb_called = false;
-  auto cb = std::make_shared<Http::RouteConfigUpdatedCallback>([&cb_called](bool exists) {
-    cb_called = true;
-    EXPECT_TRUE(exists);
-  });
-  EXPECT_CALL(*subscription_ptr,
-              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo/example.com"}));
-  provider.requestVirtualHostsUpdate("example.com", server_factory_context_.dispatcher_, cb);
-  EXPECT_FALSE(cb_called);
-
-  // The server resolves the alias, which publishes the route configuration and answers the
-  // queued request.
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
-  auto* resource = resources.Add();
-  resource->set_name("foo/example.com");
-  std::ignore = resource->mutable_resource()->PackFrom(vhost);
-  auto decoded_resources =
-      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(resources, "name");
-  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
-  EXPECT_TRUE(cb_called);
-
-  // A repeated request for the answered alias doesn't go back to the server and is answered with
-  // the existence of the virtual host in the published configuration.
-  cb_called = false;
-  EXPECT_CALL(*subscription_ptr, requestOnDemandUpdate(_)).Times(0);
-  provider.requestVirtualHostsUpdate("example.com", server_factory_context_.dispatcher_, cb);
-  EXPECT_TRUE(cb_called);
-}
-
 class StaticVhdsOnDemandTest : public StaticRouteConfigProviderImplTest {
 public:
   // Creates a provider whose route configuration 'foo' uses VHDS, capturing the VHDS subscription
@@ -530,6 +446,36 @@ vhds:
   std::shared_ptr<Http::RouteConfigUpdatedCallback> callback_holder_{
       std::make_shared<Http::RouteConfigUpdatedCallback>(mock_callback_.AsStdFunction())};
 };
+
+// A repeated on-demand request for a domain the server has already answered is answered from the
+// published route configuration without another VHDS round trip.
+TEST_F(StaticVhdsOnDemandTest, OnDemandRequestForAnsweredAliasIsAnsweredLocally) {
+  setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks_);
+
+  // The first request for 'example.com' goes to the server and is queued.
+  EXPECT_CALL(*subscription_,
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo/example.com"}));
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  provider_->requestVirtualHostsUpdate("example.com", server_factory_context_.dispatcher_,
+                                       callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // The server resolves the alias, which publishes the route configuration and answers the
+  // queued request.
+  EXPECT_CALL(mock_callback_, Call(true));
+  const auto answer = TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+      vhdsResource("example_vhost", "example.com"), "name");
+  EXPECT_OK(vhds_callbacks_->onConfigUpdate(answer.refvec_, {}, "1"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // A repeated request for the answered alias doesn't go back to the server and is answered with
+  // the existence of the virtual host in the published configuration.
+  EXPECT_CALL(*subscription_, requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(true));
+  provider_->requestVirtualHostsUpdate("example.com", server_factory_context_.dispatcher_,
+                                       callback_holder_);
+}
 
 TEST_F(StaticVhdsOnDemandTest, QueuedCallbackForAnsweredAliasResolvesOnNextPublish) {
   TestScopedRuntime scoped_runtime;

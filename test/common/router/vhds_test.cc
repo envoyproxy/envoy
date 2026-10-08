@@ -511,6 +511,14 @@ TEST_F(VhdsTest, VhdsAnsweredResourceIdsSurviveRdsUpdateThatKeepsTheSubscription
   rds_vhost->add_domains("vhost.rds.first");
   EXPECT_OK(config_update_info->onRdsUpdate(updated_route_config, "2"));
   EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+
+  // The published configuration still carries the answered virtual host, merged with the new RDS
+  // virtual host, so the locally served answer stays correct.
+  std::vector<std::string> vhost_names;
+  for (const auto& vhost : config_update_info->protobufConfigurationCast().virtual_hosts()) {
+    vhost_names.push_back(vhost.name());
+  }
+  EXPECT_THAT(vhost_names, ::testing::UnorderedElementsAre("vhost_rds1", "vhost1"));
 }
 
 } // namespace
