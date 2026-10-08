@@ -25,6 +25,9 @@ using testing::Throw;
 using testing::UnorderedElementsAre;
 using testing::UnorderedElementsAreArray;
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Config {
 namespace {
@@ -662,9 +665,8 @@ TEST_P(DeltaSubscriptionStateTest, NewPushDoesntAddUntrackedResources) {
     EXPECT_THAT(cur_request->resource_names_subscribe(),
                 UnorderedElementsAre("name4", "name5", "name6"));
     EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
-    ASSERT_EQ(cur_request->initial_resource_versions().size(), 1);
-    EXPECT_TRUE(cur_request->initial_resource_versions().contains("name6"));
-    EXPECT_EQ(cur_request->initial_resource_versions().at("name6"), "version6A");
+    EXPECT_THAT(cur_request->initial_resource_versions(),
+                UnorderedElementsAre(Pair("name6", "version6A")));
   }
 }
 

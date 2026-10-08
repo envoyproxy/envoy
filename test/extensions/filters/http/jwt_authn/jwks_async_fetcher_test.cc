@@ -37,7 +37,8 @@ public:
 
   // init manager is used in is_slow_listener mode
   bool initManagerUsed() const {
-    return config_.has_async_fetch() && !config_.async_fetch().fast_listener();
+    return init_manager_provided_ && config_.has_async_fetch() &&
+           !config_.async_fetch().fast_listener();
   }
 
   void setupAsyncFetcher(const std::string& config_str) {
@@ -54,6 +55,8 @@ public:
           .WillOnce(Invoke([this](const Init::Target& target) {
             init_target_handle_ = target.createHandle("test");
           }));
+    } else {
+      EXPECT_CALL(context_.init_manager_, add(_)).Times(0);
     }
 
     // if async_fetch is enabled, timer is created
@@ -76,7 +79,9 @@ public:
     }
 
     async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
-        config_, std::move(retry_policy), context_,
+        config_, std::move(retry_policy), context_.server_factory_context_,
+        init_manager_provided_ ? makeOptRef<Init::Manager>(context_.init_manager_)
+                               : OptRef<Init::Manager>{},
         [this](Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr, const RemoteJwks&) {
           return std::make_unique<MockJwksFetcher>(
               [this](Common::JwksFetcher::JwksReceiver& receiver) {
@@ -97,6 +102,10 @@ public:
   JwtAuthnFilterStats stats_;
   std::vector<Common::JwksFetcher::JwksReceiver*> fetch_receiver_array_;
   std::vector<Envoy::JwtVerify::JwksPtr> out_jwks_array_;
+
+  // Whether an init manager is handed to the fetcher. Route level or embedded filter
+  // configurations have no init manager to register with.
+  bool init_manager_provided_{true};
 
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
@@ -152,6 +161,32 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetch) {
   // Output 1 jwks.
   EXPECT_EQ(out_jwks_array_.size(), 1);
 
+  EXPECT_EQ(1U, stats_.jwks_fetch_success_.value());
+  EXPECT_EQ(0U, stats_.jwks_fetch_failed_.value());
+}
+
+// Without an init manager the fetch is started right away and no init target is registered,
+// so the listener or route is never blocked on the fetch.
+TEST_P(JwksAsyncFetcherTest, TestGoodFetchWithoutInitManager) {
+  const char config[] = R"(
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+      async_fetch: {}
+)";
+
+  init_manager_provided_ = false;
+  setupAsyncFetcher(config);
+
+  // Fetch is started in the constructor even though fast_listener may not be set.
+  EXPECT_EQ(fetch_receiver_array_.size(), 1);
+  EXPECT_EQ(out_jwks_array_.size(), 0);
+
+  // Trigger the Jwks response
+  auto jwks = Envoy::JwtVerify::Jwks::createFrom(PublicKey, Envoy::JwtVerify::Jwks::JWKS);
+  fetch_receiver_array_[0]->onJwksSuccess(std::move(jwks));
+
+  EXPECT_EQ(out_jwks_array_.size(), 1);
   EXPECT_EQ(1U, stats_.jwks_fetch_success_.value());
   EXPECT_EQ(0U, stats_.jwks_fetch_failed_.value());
 }

@@ -46,23 +46,18 @@ CredentialInjectorFilterFactory::createFilterFactoryFromProtoHelper(
 }
 
 absl::StatusOr<Envoy::Http::FilterFactoryCb>
-CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
-        proto_config,
-    const std::string& stats_prefix, DualInfo dual_info,
-    Server::Configuration::ServerFactoryContext& context) {
-  return createFilterFactoryFromProtoHelper(proto_config, stats_prefix, context, dual_info.scope,
-                                            dual_info.init_manager);
-}
-
-absl::StatusOr<Envoy::Http::FilterFactoryCb>
 CredentialInjectorFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
         proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
+  // The credential injector registers an init target to warm up its credential source, so fall
+  // back to the server's init manager for the contexts that do not carry one of their own.
+  Init::Manager& init_manager = extra_context.init_manager.has_value()
+                                    ? extra_context.init_manager.ref()
+                                    : context.initManager();
   return createFilterFactoryFromProtoHelper(proto_config, extra_context.stats_prefix, context,
-                                            context.scope(), context.initManager());
+                                            extra_context.scopeOr(context), init_manager);
 }
 
 REGISTER_FACTORY(CredentialInjectorFilterFactory,

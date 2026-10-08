@@ -16,6 +16,7 @@
 #pragma once
 
 #include <array>
+#include <format>
 #include <functional>
 
 #include "envoy/stats/scope.h"
@@ -73,8 +74,8 @@ using RichResponseMetricsSharedPtr = std::shared_ptr<RichResponseMetrics>;
 class RichResponseMetricsImpl: public RichResponseMetrics {
 public:
   RichResponseMetricsImpl(Stats::Scope& scope, std::string stat_prefix): metrics_({
-    KAFKA_RESPONSE_METRICS(POOL_COUNTER_PREFIX(scope, fmt::format("kafka.{}.response.",
-      stat_prefix)), POOL_HISTOGRAM_PREFIX(scope, fmt::format("kafka.{}.response.", stat_prefix)))})
+    KAFKA_RESPONSE_METRICS(POOL_COUNTER_PREFIX(scope, std::format("kafka.{}.response.",
+      stat_prefix)), POOL_HISTOGRAM_PREFIX(scope, std::format("kafka.{}.response.", stat_prefix)))})
   {};
 
   void onResponse(const int16_t api_key, const long long duration) override {

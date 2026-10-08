@@ -23,7 +23,9 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -109,13 +111,13 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
   SystemTime time1(std::chrono::milliseconds(1234567891234));
   timeSystem().setSystemTime(time1);
 
-  EXPECT_TRUE(config_update_->onRdsUpdate(response1, "1"));
+  EXPECT_OK(config_update_->onRdsUpdate(response1, "1"));
   EXPECT_EQ(nullptr, route("foo"));
   EXPECT_TRUE(config_update_->configInfo().has_value());
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
   EXPECT_EQ(time1, config_update_->lastUpdated());
 
-  EXPECT_FALSE(config_update_->onRdsUpdate(response1, "2"));
+  EXPECT_OK(config_update_->onRdsUpdate(response1, "2"));
   EXPECT_EQ(nullptr, route("foo"));
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
 
@@ -142,7 +144,7 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
   SystemTime time2(std::chrono::milliseconds(1234567891235));
   timeSystem().setSystemTime(time2);
 
-  EXPECT_TRUE(config_update_->onRdsUpdate(response2, "2"));
+  EXPECT_OK(config_update_->onRdsUpdate(response2, "2"));
   EXPECT_EQ("foo", *route("foo"));
   EXPECT_TRUE(config_update_->configInfo().has_value());
   EXPECT_EQ("2", config_update_->configInfo().value().version_);
@@ -292,8 +294,9 @@ class WarmingTestConfig : public TestConfig {
 public:
   WarmingTestConfig(const envoy::config::route::v3::RouteConfiguration& rc,
                     Server::Configuration::ServerFactoryContext& context,
-                    Init::Manager& init_manager, bool ready_synchronously)
-      : TestConfig(rc, context, false),
+                    Init::Manager& init_manager, bool ready_synchronously,
+                    bool ready_on_destruction = false)
+      : TestConfig(rc, context, false), ready_on_destruction_(ready_on_destruction),
         target_(fmt::format("warming target {}", rc.name()), [this, ready_synchronously]() {
           initializing_ = true;
           // The resource is already available, so it signals readiness from within the
@@ -306,6 +309,15 @@ public:
     init_manager.add(target_);
   }
 
+  ~WarmingTestConfig() override {
+    // Some resources give up and signal readiness when they are destroyed rather than leaving
+    // whatever waits for them warming forever. The VHDS subscription of a route configuration is
+    // one of them.
+    if (ready_on_destruction_) {
+      target_.ready();
+    }
+  }
+
   // Simulates the resource that is owned by this route configuration becoming ready.
   void ready() { target_.ready(); }
 
@@ -314,6 +326,7 @@ public:
   bool initializing_{false};
 
 private:
+  const bool ready_on_destruction_;
   Init::TargetImpl target_;
 };
 
@@ -335,8 +348,8 @@ public:
     }
     // The created configurations are kept alive so that a test can complete the warming of an
     // update that has already been superseded by a newer one.
-    configs_.push_back(std::make_shared<WarmingTestConfig>(route_config, context, init_manager,
-                                                           ready_synchronously_));
+    configs_.push_back(std::make_shared<WarmingTestConfig>(
+        route_config, context, init_manager, ready_synchronously_, ready_on_destruction_));
     return configs_.back();
   }
 
@@ -344,6 +357,8 @@ public:
   bool warming_{true};
   // Whether that resource is ready as soon as it is asked to initialize.
   bool ready_synchronously_{false};
+  // Whether that resource signals readiness when it is destroyed.
+  bool ready_on_destruction_{false};
   mutable std::vector<std::shared_ptr<WarmingTestConfig>> configs_;
 };
 
@@ -358,6 +373,24 @@ public:
   }
 
   absl::Status publish_status_;
+};
+
+// Subscription that can be told to fail the hooks that a derived subscription uses to react to a
+// warmed up route configuration being published.
+class TestRdsRouteConfigSubscription : public RdsRouteConfigSubscription {
+public:
+  // The constructor of the base class is protected, so it can't just be inherited with a
+  // using-declaration: an inherited constructor keeps the access of the base one.
+  template <typename... Args>
+  TestRdsRouteConfigSubscription(Args&&... args)
+      : RdsRouteConfigSubscription(std::forward<Args>(args)...) {}
+
+  absl::Status before_provider_update_status_;
+  absl::Status after_provider_update_status_;
+
+private:
+  absl::Status beforeProviderUpdate() override { return before_provider_update_status_; }
+  absl::Status afterProviderUpdate() override { return after_provider_update_status_; }
 };
 
 class RdsWarmingTest : public RdsTestBase {
@@ -379,12 +412,13 @@ public:
               envoy::config::route::v3::RouteConfiguration>>(
               server_factory_context_.messageValidationContext().dynamicValidationVisitor(),
               "name");
-          auto subscription = THROW_OR_RETURN_VALUE(
-              RdsRouteConfigSubscription::create(
+          absl::Status creation_status = absl::OkStatus();
+          RdsRouteConfigSubscriptionSharedPtr subscription =
+              std::make_shared<TestRdsRouteConfigSubscription>(
                   std::move(config_update), std::move(resource_decoder), rds.config_source(),
                   rds.route_config_name(), manager_identifier, server_factory_context_,
-                  "test_listener.trds.", "TRDS", provider_manager_),
-              std::unique_ptr<RdsRouteConfigSubscription>);
+                  "test_listener.", "TRDS", provider_manager_, creation_status);
+          RETURN_IF_NOT_OK(creation_status);
           auto provider = std::make_shared<TestRouteConfigProviderImpl>(std::move(subscription),
                                                                         server_factory_context_);
           return std::make_pair(provider, &provider->subscription().initTarget());
@@ -412,6 +446,10 @@ public:
   }
 
   RouteConfigUpdateReceiver& receiver() { return *provider().subscription().routeConfigUpdate(); }
+
+  TestRdsRouteConfigSubscription& subscription() {
+    return static_cast<TestRdsRouteConfigSubscription&>(provider().subscription());
+  }
 
   uint64_t configReloads() {
     return scope_.counter("test_listener.trds.test_route.config_reload").value();
@@ -574,6 +612,30 @@ resources: []
   EXPECT_NE(nullptr, publishedRoute("foo"));
 }
 
+// Destroying everything while an update is still warming up must not publish that update, even
+// though the resource it warms up signals readiness as it is destroyed. By then the subscription
+// that would publish it is being destroyed itself.
+TEST_F(RdsWarmingTest, DestructionWhileWarmingDoesNotPublishTheWarmingUpdate) {
+  config_traits_.ready_on_destruction_ = true;
+  createProvider();
+
+  init_watcher_.expectReady().Times(0);
+  EXPECT_TRUE(pushUpdate(routeConfig("1", "foo")).ok());
+  ASSERT_EQ(1, config_traits_.configs_.size());
+  EXPECT_TRUE(receiver().configWarming());
+  EXPECT_EQ(0, configReloads());
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  // Hand the only remaining reference to the route configuration over to the receiver, so that the
+  // resource that is warming up is destroyed together with it.
+  config_traits_.configs_.clear();
+
+  // The subscription signals readiness as it is destroyed, so that nothing keeps warming with it.
+  init_watcher_.expectReady();
+  provider_.reset();
+  EXPECT_EQ(0, configReloads());
+}
+
 // A failure to publish a route configuration that was warmed up asynchronously can't be reported to
 // the xDS layer anymore, and the subscription stays unready.
 TEST_F(RdsWarmingTest, FailureToPublishAWarmedUpUpdate) {
@@ -582,31 +644,58 @@ TEST_F(RdsWarmingTest, FailureToPublishAWarmedUpUpdate) {
   init_watcher_.expectReady().Times(0);
   EXPECT_TRUE(pushUpdate(routeConfig("1", "foo")).ok());
   ASSERT_EQ(1, config_traits_.configs_.size());
-
-  provider().publish_status_ = absl::InvalidArgumentError("publishing failed");
-  config_traits_.configs_[0]->ready();
-  EXPECT_EQ(nullptr, publishedRoute("foo"));
-
-  // The subscription only signals readiness when it is destroyed.
   ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  // Warming completes but publishing fails. Nothing is published and the failure is only logged,
+  // but readiness is signalled all the same.
   init_watcher_.expectReady();
+  provider().publish_status_ = absl::InvalidArgumentError("publishing failed");
+  EXPECT_LOG_CONTAINS("warn",
+                      "rds: onConfigUpdate() failed for route config 'test_route': publishing "
+                      "failed",
+                      config_traits_.configs_[0]->ready());
+  EXPECT_EQ(nullptr, publishedRoute("foo"));
 }
 
-// A failure to publish a route configuration that had nothing to warm up is reported back to the
-// xDS layer as a rejection of the update.
+// A failure to publish a route configuration that had nothing to warm up behaves the same way,
+// even though the publishing happens synchronously inside the xDS update: the update is still
+// accepted and readiness is still signalled.
 TEST_F(RdsWarmingTest, FailureToPublishAnUpdateWithNothingToWarmUp) {
   config_traits_.warming_ = false;
   createProvider();
 
-  init_watcher_.expectReady().Times(0);
-  provider().publish_status_ = absl::InvalidArgumentError("publishing failed");
-  EXPECT_EQ("publishing failed", pushUpdate(routeConfig("1", "foo")).message());
-  EXPECT_EQ(nullptr, publishedRoute("foo"));
-
-  // The subscription only signals readiness when it is destroyed. In production the xDS layer
-  // rejects the update and calls onConfigUpdateFailed(), which signals readiness.
-  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
   init_watcher_.expectReady();
+  provider().publish_status_ = absl::InvalidArgumentError("publishing failed");
+  EXPECT_LOG_CONTAINS("warn",
+                      "rds: onConfigUpdate() failed for route config 'test_route': publishing "
+                      "failed",
+                      EXPECT_TRUE(pushUpdate(routeConfig("1", "foo")).ok()));
+  EXPECT_EQ(nullptr, publishedRoute("foo"));
+}
+
+// A failure of the hooks that a derived subscription uses to react to a published route
+// configuration can't be reported to the xDS layer either. Both are only logged, and neither
+// stops the route configuration from being published.
+TEST_F(RdsWarmingTest, FailureOfTheProviderUpdateHooks) {
+  createProvider();
+  subscription().before_provider_update_status_ = absl::InvalidArgumentError("before failed");
+  subscription().after_provider_update_status_ = absl::InvalidArgumentError("after failed");
+
+  init_watcher_.expectReady().Times(0);
+  EXPECT_TRUE(pushUpdate(routeConfig("1", "foo")).ok());
+  ASSERT_EQ(1, config_traits_.configs_.size());
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  init_watcher_.expectReady();
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"warn", "rds: beforeProviderUpdate() failed for route config 'test_route': before "
+                    "failed"},
+           {"warn",
+            "rds: afterProviderUpdate() failed for route config 'test_route': after failed"}}),
+      config_traits_.configs_[0]->ready());
+  EXPECT_NE(nullptr, publishedRoute("foo"));
+  EXPECT_EQ(1, configReloads());
 }
 
 } // namespace

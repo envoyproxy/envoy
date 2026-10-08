@@ -13,6 +13,7 @@
 
 using testing::_;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -826,6 +827,137 @@ TEST_F(LocalRateLimiterDescriptorImplTest, IsNegativeRefillsTokens) {
   EXPECT_TRUE(result.allowed);
   // 1 + 1 (refill) = 2 tokens remaining.
   EXPECT_EQ(result.token_bucket_context->remainingTokens(), 2);
+}
+
+// Verify shadow mode descriptor failure does not short-circuit enforced descriptor check.
+TEST_F(LocalRateLimiterDescriptorImplTest, ShadowDescriptorDoesNotShortCircuitEnforcedDescriptor) {
+  static constexpr absl::string_view shadow_descriptor_yaml = R"(
+  entries:
+  - key: gate
+    value: shadow
+  token_bucket:
+    max_tokens: 1
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  shadow_mode: true
+  )";
+  static constexpr absl::string_view enforced_descriptor_yaml = R"(
+  entries:
+  - key: gate
+    value: enforced
+  token_bucket:
+    max_tokens: 2
+    tokens_per_fill: 2
+    fill_interval: 100s
+  )";
+
+  TestUtility::loadFromYaml(std::string(shadow_descriptor_yaml), *descriptors_.Add());
+  TestUtility::loadFromYaml(std::string(enforced_descriptor_yaml), *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(100000), 1000, 1000);
+
+  std::vector<RateLimit::Descriptor> descriptors{
+      {{{"gate", "shadow"}}},
+      {{{"gate", "enforced"}}},
+  };
+
+  // Request 1: shadow (1 -> 0), enforced (2 -> 1). Allowed.
+  auto res1 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_TRUE(res1.allowed);
+
+  // Request 2: shadow bucket exhausted (0 tokens), but enforced bucket still has tokens (1 -> 0).
+  // Request should return not allowed (so shadow stats get captured), but enforced bucket must be
+  // consumed!
+  auto res2 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_FALSE(res2.allowed);
+  EXPECT_TRUE(res2.token_bucket_context->shadowMode());
+
+  // Request 3: shadow bucket empty (0 tokens), enforced bucket empty (0 tokens).
+  // Because enforced bucket is empty, requestAllowed must report allowed = false with enforced
+  // (non-shadow) bucket!
+  auto res3 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_FALSE(res3.allowed);
+  EXPECT_FALSE(res3.token_bucket_context->shadowMode());
+}
+
+TEST_F(LocalRateLimiterDescriptorImplTest, ShadowDescriptorShortCircuitWithRuntimeGuardDisabled) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_ratelimit_shadow_mode_no_short_circuit", "false"}});
+
+  static constexpr absl::string_view shadow_descriptor_yaml = R"(
+  entries:
+  - key: gate
+    value: shadow
+  token_bucket:
+    max_tokens: 1
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  shadow_mode: true
+  )";
+  static constexpr absl::string_view enforced_descriptor_yaml = R"(
+  entries:
+  - key: gate
+    value: enforced
+  token_bucket:
+    max_tokens: 2
+    tokens_per_fill: 2
+    fill_interval: 100s
+  )";
+
+  TestUtility::loadFromYaml(std::string(shadow_descriptor_yaml), *descriptors_.Add());
+  TestUtility::loadFromYaml(std::string(enforced_descriptor_yaml), *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(100000), 1000, 1000);
+
+  std::vector<RateLimit::Descriptor> descriptors{
+      {{{"gate", "shadow"}}},
+      {{{"gate", "enforced"}}},
+  };
+
+  // Request 1: shadow (1 -> 0), enforced (2 -> 1). Allowed.
+  auto res1 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_TRUE(res1.allowed);
+
+  // Request 2 and 3: the exhausted shadow descriptor short-circuits the evaluation, so the
+  // enforced descriptor is never consumed and the shadow bucket is always returned.
+  for (int i = 0; i < 2; i++) {
+    auto res = rate_limiter_->requestAllowed(descriptors);
+    EXPECT_FALSE(res.allowed);
+    EXPECT_TRUE(res.token_bucket_context->shadowMode());
+  }
+}
+
+// The share provider manager releases its cluster membership callback handle inline when it is
+// destroyed on the main thread, which also covers destruction during main dispatcher teardown where
+// a post would never run, and posts the handle to the main thread otherwise.
+TEST(ShareProviderManagerTest, ReleasesCallbackHandleOnMainThread) {
+  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  Singleton::ManagerImpl manager;
+
+  NiceMock<Upstream::MockPrioritySet> priority_set;
+  cm.local_cluster_name_ = "local_cluster";
+  cm.initializeClusters({"local_cluster"}, {});
+
+  const auto* mock_local_cluster = cm.active_clusters_.at("local_cluster").get();
+  EXPECT_CALL(*mock_local_cluster, prioritySet()).WillRepeatedly(ReturnRef(priority_set));
+
+  // Destroyed on the main thread: nothing is posted.
+  {
+    ShareProviderManagerSharedPtr share_provider_manager =
+        ShareProviderManager::singleton(dispatcher, cm, manager);
+    ASSERT_NE(share_provider_manager, nullptr);
+    EXPECT_CALL(dispatcher, post(_)).Times(0);
+  }
+  testing::Mock::VerifyAndClearExpectations(&dispatcher);
+
+  // Destroyed off the main thread: the handle is posted to the main dispatcher.
+  {
+    ShareProviderManagerSharedPtr share_provider_manager =
+        ShareProviderManager::singleton(dispatcher, cm, manager);
+    ASSERT_NE(share_provider_manager, nullptr);
+    EXPECT_CALL(dispatcher, isThreadSafe()).WillOnce(Return(false));
+    EXPECT_CALL(dispatcher, post(_)).WillOnce([](Event::PostCb callback) { callback(); });
+  }
 }
 
 } // Namespace LocalRateLimit

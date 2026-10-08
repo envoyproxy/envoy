@@ -32,6 +32,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",

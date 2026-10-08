@@ -11,33 +11,16 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 
 absl::StatusOr<Http::FilterFactoryCb>
-McpJsonRestBridgeFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-        proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  // This filter does not use the factory context, so delegate to the server-context variant.
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           stats_prefix};
-  return createHttpFilterFactoryFromProtoTyped(proto_config, context.serverFactoryContext(),
-                                               extra_context);
-}
-
-absl::StatusOr<Http::FilterFactoryCb>
 McpJsonRestBridgeFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
         proto_config,
     Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
 
-  if (proto_config.tool_config().has_tool_list_http_rule()) {
-    const auto& rule = proto_config.tool_config().tool_list_http_rule();
-    if (rule.get().empty() || !rule.put().empty() || !rule.post().empty() ||
-        !rule.delete_().empty() || !rule.patch().empty() || !rule.body().empty()) {
-      return absl::InvalidArgumentError(
-          "tool_list_http_rule must be a GET request with an empty body");
-    }
+  auto config_or = McpJsonRestBridgeFilterConfig::create(proto_config);
+  if (!config_or.ok()) {
+    return config_or.status();
   }
-
-  auto config = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  auto config = config_or.value();
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<McpJsonRestBridgeFilter>(config));
@@ -49,7 +32,11 @@ McpJsonRestBridgeFilterConfigFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
         proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<McpJsonRestBridgePerRouteConfig>(proto_config);
+  auto config_or = McpJsonRestBridgePerRouteConfig::create(proto_config);
+  if (!config_or.ok()) {
+    return config_or.status();
+  }
+  return config_or.value();
 }
 
 /**

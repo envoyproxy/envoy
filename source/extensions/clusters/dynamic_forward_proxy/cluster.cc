@@ -588,12 +588,10 @@ void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::In
                                                  std::vector<uint8_t>& hash_key,
                                                  const Network::Connection& connection) {
   const LookupKey key = {hash_key, *connection.connectionInfoProvider().remoteAddress()};
-  connection_info_map_[key].erase(
-      std::remove_if(connection_info_map_[key].begin(), connection_info_map_[key].end(),
-                     [&pool, &connection](const ConnectionInfo& info) {
-                       return (info.pool_ == &pool && info.connection_ == &connection);
-                     }),
-      connection_info_map_[key].end());
+
+  std::erase_if(connection_info_map_[key], [&pool, &connection](const ConnectionInfo& info) {
+    return (info.pool_ == &pool && info.connection_ == &connection);
+  });
 }
 
 absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>

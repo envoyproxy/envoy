@@ -8,10 +8,13 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <source_location>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "sdk_common.h"
 
 namespace Envoy {
 namespace DynamicModules {
@@ -246,7 +249,10 @@ enum class AttributeID : uint32_t {
   XdsVirtualHostMetadata,
   XdsUpstreamHostMetadata,
   XdsFilterChainName,
-  HealthCheck
+  HealthCheck,
+  UpstreamRequestedServerName,
+  XdsVirtualClusterName,
+  UpstreamProtocol
 };
 
 enum class LogLevel : uint32_t { Trace, Debug, Info, Warn, Error, Critical, Off };
@@ -348,13 +354,48 @@ struct ClusterHostCounts {
   uint64_t degraded;
 };
 
+/**
+ * Stream timing from Envoy. start_time_unix_ns is a Unix timestamp in nanoseconds; all other fields
+ * are nanosecond offsets from the monotonic request start. Unavailable values are std::nullopt;
+ * zero is valid. Connection and handshake offsets can be negative when the connection predates the
+ * request.
+ */
+struct TimingInfo {
+  std::optional<int64_t> start_time_unix_ns;
+  std::optional<int64_t> downstream_connection_begin_ns;
+  std::optional<int64_t> downstream_handshake_start_ns;
+  std::optional<int64_t> downstream_handshake_complete_ns;
+  std::optional<int64_t> last_downstream_header_rx_byte_received_ns;
+  std::optional<int64_t> last_downstream_rx_byte_received_ns;
+  std::optional<int64_t> upstream_connect_start_ns;
+  std::optional<int64_t> upstream_connect_complete_ns;
+  std::optional<int64_t> upstream_handshake_complete_ns;
+  std::optional<int64_t> first_upstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_upstream_tx_byte_sent_ns;
+  std::optional<int64_t> first_upstream_rx_byte_received_ns;
+  std::optional<int64_t> first_upstream_rx_body_byte_received_ns;
+  std::optional<int64_t> last_upstream_rx_byte_received_ns;
+  std::optional<int64_t> first_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_downstream_ack_received_ns;
+  std::optional<int64_t> request_complete_duration_ns;
+  std::optional<int64_t> downstream_connection_end_ns;
+};
+
 class ChildSpan;
 
+/**
+ * A tracing span for the current HTTP stream. The active span is owned by Envoy and must not be
+ * finished by the module. A span may be stored and used in a later event hook on the same worker
+ * thread. Do not use a span after the stream has ended or move it to another thread.
+ */
 class Span {
 public:
   virtual ~Span() = default;
 
   virtual void setTag(std::string_view key, std::string_view value) = 0;
+  virtual void
+  setTags(std::initializer_list<std::pair<std::string_view, std::string_view>> tags) = 0;
   virtual void setOperation(std::string_view operation) = 0;
   virtual void log(std::string_view event) = 0;
   virtual void setSampled(bool sampled) = 0;
@@ -365,6 +406,11 @@ public:
   virtual std::unique_ptr<ChildSpan> spawnChild(std::string_view operation) = 0;
 };
 
+/**
+ * A tracing span owned by the module. Call finish when done. A child span may be stored and
+ * finished in a later event hook on the same worker thread, for example to cover off-thread work
+ * that resumes in a scheduled callback.
+ */
 class ChildSpan : public Span {
 public:
   virtual void finish() = 0;
@@ -616,6 +662,11 @@ public:
   virtual std::optional<bool> getAttributeBool(AttributeID id) = 0;
 
   /**
+   * Returns a snapshot of the current stream timing information.
+   */
+  virtual TimingInfo getTimingInfo() = 0;
+
+  /**
    * Sends a local response with status code, body, and detail.
    * @param status The HTTP status code.
    * @param body The response body.
@@ -702,6 +753,14 @@ public:
   virtual bool setFilterStateTyped(std::string_view key, std::string_view value) = 0;
 
   /**
+   * Checks whether a filter state entry with the given key exists, regardless of its type. Unlike
+   * the getter methods, this does not read or serialize the stored object.
+   * @param key The filter state key.
+   * @return true if the key exists.
+   */
+  virtual bool hasFilterState(std::string_view key) = 0;
+
+  /**
    * Returns the worker index assigned to the current filter instance.
    */
   virtual uint32_t getWorkerIndex() = 0;
@@ -733,7 +792,8 @@ public:
                                                                SocketDirection direction) = 0;
 
   /**
-   * Retrieves the active tracing span for the current stream.
+   * Retrieves the active tracing span for the current stream. The returned span may be stored and
+   * used in a later event hook on the same worker thread.
    */
   virtual std::unique_ptr<Span> getActiveSpan() = 0;
 
@@ -746,6 +806,22 @@ public:
    * Retrieves host counts for the selected upstream cluster at the given priority.
    */
   virtual std::optional<ClusterHostCounts> getClusterHostCounts(uint32_t priority) = 0;
+
+  /**
+   * Retrieves the remote address of the connected upstream socket, including the port. This can
+   * differ from AttributeId::UpstreamAddress, which exposes the selected upstream host address.
+   */
+  virtual std::optional<std::string_view> getUpstreamRemoteAddress() = 0;
+
+  /**
+   * Retrieves the upstream host addresses attempted for the current request in attempt order.
+   */
+  virtual std::vector<std::string_view> getUpstreamHostsAttempted() = 0;
+
+  /**
+   * Retrieves the upstream connection IDs attempted for the current request in attempt order.
+   */
+  virtual std::vector<uint64_t> getUpstreamConnectionIdsAttempted() = 0;
 
   /**
    * Sets an upstream override host for the selected cluster.
@@ -997,13 +1073,15 @@ public:
    * Logs a message at the specified log level.
    * @param level The log level.
    * @param message The message to log.
+   * @param location The source location of the log statement, defaulted to the caller.
    */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
-class HttpFilterConfigHandle {
+class HttpFilterConfigHandle : public CommonHandle {
 public:
-  virtual ~HttpFilterConfigHandle();
+  ~HttpFilterConfigHandle() override;
 
   /**
    * Defines a histogram metric with a name and optional tag keys.
@@ -1139,8 +1217,10 @@ public:
    * Logs a message at the specified log level.
    * @param level The log level.
    * @param message The message to log.
+   * @param location The source location of the log statement, defaulted to the caller.
    */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 
   /**
    * Initiates a one-shot HTTP callout to a cluster. The response will be delivered via
@@ -1402,7 +1482,8 @@ private:
 #define DYM_LOG(HANDLE, LEVEL, FORMAT_STRING, ...)                                                 \
   do {                                                                                             \
     if (HANDLE.logEnabled(LEVEL)) {                                                                \
-      HANDLE.log(LEVEL, std::format(FORMAT_STRING, ##__VA_ARGS__));                                \
+      HANDLE.log(LEVEL, std::format(FORMAT_STRING, ##__VA_ARGS__),                                 \
+                 std::source_location::current());                                                 \
     }                                                                                              \
   } while (0)
 

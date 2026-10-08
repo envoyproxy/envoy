@@ -99,7 +99,7 @@ public:
         tls_context, factory_context_);
     return Network::UpstreamTransportSocketFactoryPtr{
         *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-            std::move(config), context_manager_, *client_stats_store_.rootScope())};
+            std::move(config), context_manager_, server_factory_context_.serverScope())};
   }
 
   // Attempts an mTLS handshake to the named listener with the given client factory and returns
@@ -133,7 +133,6 @@ public:
 
   const std::string listener_a_{"crl_listener_a"};
   const std::string listener_b_{"crl_listener_b"};
-  Stats::TestIsolatedStoreImpl client_stats_store_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 

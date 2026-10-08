@@ -293,6 +293,8 @@ type NetworkFilterHandle interface {
 }
 
 type NetworkFilterConfigHandle interface {
+	CommonHandle
+
 	// Log writes a formatted message through Envoy's logging subsystem.
 	Log(level LogLevel, format string, args ...any)
 

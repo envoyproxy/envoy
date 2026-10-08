@@ -121,11 +121,9 @@ MockClusterInfo::MockClusterInfo()
           Invoke([this]() -> TransportSocketMatcher& { return *transport_socket_matcher_; }));
   ON_CALL(*this, loadReportStats()).WillByDefault(ReturnRef(load_report_stats_));
   ON_CALL(*this, requestResponseSizeStats())
-      .WillByDefault(Return(
-          std::reference_wrapper<ClusterRequestResponseSizeStats>(*request_response_size_stats_)));
+      .WillByDefault(Return(ClusterRequestResponseSizeStatsOptRef(*request_response_size_stats_)));
   ON_CALL(*this, timeoutBudgetStats())
-      .WillByDefault(
-          Return(std::reference_wrapper<ClusterTimeoutBudgetStats>(*timeout_budget_stats_)));
+      .WillByDefault(Return(ClusterTimeoutBudgetStatsOptRef(*timeout_budget_stats_)));
   ON_CALL(*this, getUpstreamLocalAddressSelector())
       .WillByDefault(Return(upstream_local_address_selector_));
   ON_CALL(*this, resourceManager(_))
@@ -148,6 +146,11 @@ MockClusterInfo::MockClusterInfo()
               std::make_unique<Config::TypedMetadataImpl<ClusterTypedMetadataFactory>>(metadata_);
         }
         return *typed_metadata_;
+      }));
+  ON_CALL(*this, pendingRqQueuePolicy())
+      .WillByDefault(Invoke([this]() -> OptRef<const ClusterInfo::PendingRqQueuePolicy> {
+        return makeOptRefFromPtr<const ClusterInfo::PendingRqQueuePolicy>(
+            pending_rq_queue_policy_.get());
       }));
   ON_CALL(*this, clusterType())
       .WillByDefault(

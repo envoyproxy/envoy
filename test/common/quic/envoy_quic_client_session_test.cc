@@ -965,5 +965,34 @@ TEST_P(EnvoyQuicClientSessionTest, SconeStateInitialization) {
   auto scone_state = filter_state->getDataReadOnly<SconeState>(SconeStateKey);
   EXPECT_FALSE(scone_state->scone_max_kbps.has_value());
 }
+
+TEST_P(EnvoyQuicClientSessionTest, ScopedIpv6PortMigrationCrash) {
+  // Create a local address with scope ID 1.
+  sockaddr_in6 sa6_local;
+  memset(&sa6_local, 0, sizeof(sa6_local));
+  sa6_local.sin6_family = AF_INET6;
+  sa6_local.sin6_port = htons(54321);
+  sa6_local.sin6_scope_id = 1;
+  inet_pton(AF_INET6, "fe80::1", &sa6_local.sin6_addr);
+  auto scoped_v6_local_addr = std::make_shared<Network::Address::Ipv6Instance>(sa6_local);
+
+  // Create an IPv6 remote address.
+  sockaddr_in6 sa6_remote;
+  memset(&sa6_remote, 0, sizeof(sa6_remote));
+  sa6_remote.sin6_family = AF_INET6;
+  sa6_remote.sin6_port = htons(80);
+  inet_pton(AF_INET6, "2001:db8::1", &sa6_remote.sin6_addr);
+  auto v6_remote_addr = std::make_shared<Network::Address::Ipv6Instance>(sa6_remote);
+
+  quic_connection_->connectionSocket()->connectionInfoProvider().setLocalAddress(
+      scoped_v6_local_addr);
+  quic_connection_->connectionSocket()->connectionInfoProvider().setRemoteAddress(v6_remote_addr);
+
+  // SPELLCHECKER(off)
+  // Trigger port migration. Under the vulnerable implementation, this will throw an EnvoyException
+  // (invalid ipv6 address 'fe80::1%1') and fail the test.
+  // SPELLCHECKER(on)
+  EXPECT_NO_THROW(quic_connection_->OnPathDegradingDetected());
+}
 } // namespace Quic
 } // namespace Envoy

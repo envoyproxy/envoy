@@ -44,8 +44,8 @@ Network::ClientConnectionPtr SslSPIFFECertValidatorIntegrationTest::makeSslClien
   modified_options.setCustomCertValidatorConfig(client_validator_config_);
 
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
-  auto client_transport_socket_factory_ptr =
-      createClientSslTransportSocketFactory(modified_options, *context_manager_, *api_);
+  auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
+      modified_options, *context_manager_, *api_, &server_factory_context_.serverScope());
   Network::TransportSocketOptionsConstSharedPtr socket_options;
   if (workload_trust_domain) {
     StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);

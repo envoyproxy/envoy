@@ -31,6 +31,8 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -204,6 +206,10 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
+  const absl::flat_hash_set<std::string>& clearRouteCacheHeaders() const {
+    return clear_route_cache_headers_;
+  }
+
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   uint32_t maxDeniedResponseBodyBytes() const { return max_denied_response_body_bytes_; }
@@ -289,6 +295,8 @@ public:
     return disallowed_headers_matcher_;
   }
 
+  bool emitClientSpan() const { return emit_client_span_; }
+
 private:
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
@@ -319,6 +327,9 @@ private:
   const bool failure_mode_allow_header_add_;
   const bool shadow_mode_;
   const bool clear_route_cache_;
+  // Lower cased request header names the routes match on. Empty means clear the route cache on any
+  // request mutation.
+  const absl::flat_hash_set<std::string> clear_route_cache_headers_;
   const uint32_t max_request_bytes_;
   const uint32_t max_denied_response_body_bytes_;
   const bool pack_as_bytes_;
@@ -350,6 +361,7 @@ private:
   const bool include_peer_certificate_;
   const bool include_tls_session_;
   const bool charge_cluster_response_stats_;
+  const bool emit_client_span_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
@@ -392,7 +404,11 @@ public:
                           : std::nullopt),
         http_service_(config.has_check_settings() && config.check_settings().has_http_service()
                           ? std::make_optional(config.check_settings().http_service())
-                          : std::nullopt) {
+                          : std::nullopt),
+        emit_client_span_(
+            config.has_check_settings() && config.check_settings().has_emit_client_span()
+                ? std::make_optional(config.check_settings().emit_client_span().value())
+                : std::nullopt) {
     if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
         config.check_settings().has_with_request_body()) {
       creation_status = absl::InvalidArgumentError(
@@ -438,6 +454,11 @@ public:
     return http_service_;
   }
 
+  /**
+   * @return The emit_client_span override for this route, if any.
+   */
+  const std::optional<bool>& emitClientSpan() const { return emit_client_span_; }
+
 private:
   // We save the context extensions as a protobuf map instead of a std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
@@ -447,6 +468,7 @@ private:
   const std::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
   const std::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>
       http_service_;
+  std::optional<bool> emit_client_span_;
 };
 
 /**

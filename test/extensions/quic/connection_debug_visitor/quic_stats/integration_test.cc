@@ -91,11 +91,12 @@ TEST_P(QuicStatsIntegrationTest, Basic) {
 // Test that `cx_tx_amplification_throttling_total` is incremented when the certificate chain is
 // long enough to hit the amplification throttling limit.
 TEST_P(QuicStatsIntegrationTest, CertChainTooLong) {
-  // Configure the server to use a certificate that is roughly 9kb long. QUIC limits the server to
-  // sending at most 3 times as much data as it received from the client, before validating that the
-  // client is not spoofing it's source address. The client typically sends one MTU of data in the
-  // first packet, with a minimum size of 1280 bytes, meaning the server can send roughly 3800 bytes
-  // in the initial response before requiring an additional roundtrip to validate the client.
+  // Configure the server to use a certificate chain that is roughly 18kb long. QUIC limits the
+  // server to sending at most 3 times as much data as it received from the client, before
+  // validating that the client is not spoofing it's source address. The client may send a
+  // ClientHello spanning two Initial packets (for example when a PQC hybrid key_share is offered),
+  // which raises the pre-validation send budget to roughly 7-8kb, so the chain is made more than
+  // twice that large to reliably trip the amplification throttle.
   config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* ts = bootstrap.mutable_static_resources()
                    ->mutable_listeners(0)
@@ -111,7 +112,7 @@ TEST_P(QuicStatsIntegrationTest, CertChainTooLong) {
     common_tls->clear_tls_certificates();
     auto* cert = common_tls->add_tls_certificates();
     cert->mutable_certificate_chain()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/long_servercert.pem"));
+        TestEnvironment::runfilesPath("test/config/integration/certs/long_server_chain.pem"));
     cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/long_serverkey.pem"));
 

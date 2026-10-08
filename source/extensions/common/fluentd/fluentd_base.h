@@ -181,7 +181,7 @@ protected:
 
   Upstream::ClusterManager& cluster_manager_;
   Stats::ScopeSharedPtr stats_scope_;
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::SlotSharedPtr tls_slot_;
 };
 
 } // namespace Fluentd

@@ -9,9 +9,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace PeakEwma {
 
-Http::FilterFactoryCb PeakEwmaFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::peak_ewma::v3alpha::PeakEwmaConfig&, const std::string&,
-    Server::Configuration::FactoryContext&) {
+absl::StatusOr<Http::FilterFactoryCb>
+PeakEwmaFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::peak_ewma::v3alpha::PeakEwmaConfig&,
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<PeakEwmaRttFilter>());
   };

@@ -139,9 +139,9 @@ impl DnsResolverConfig for HickoryDnsResolverConfigImpl {
   fn new_resolver(
     &self,
     envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
-  ) -> Box<dyn DnsResolverInstance> {
-    let resolver = HickoryDnsResolverImpl::new(&self.config, envoy_callback);
-    Box::new(resolver)
+  ) -> Option<Box<dyn DnsResolverInstance>> {
+    let resolver = HickoryDnsResolverImpl::new(&self.config, envoy_callback)?;
+    Some(Box::new(resolver))
   }
 }
 
@@ -186,28 +186,45 @@ impl Drop for HickoryDnsResolverImpl {
 }
 
 impl HickoryDnsResolverImpl {
-  fn new(config: &HickoryConfig, envoy_callback: Arc<dyn EnvoyDnsResolverCallback>) -> Self {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
+  fn new(
+    config: &HickoryConfig,
+    envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
+  ) -> Option<Self> {
+    // A runtime or resolver build failure is recoverable, for example under resource exhaustion, so
+    // return None and let Envoy reject the configuration rather than aborting the whole process.
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
       .worker_threads(config.effective_num_threads())
       .thread_name("hickory-dns")
       .enable_all()
       .build()
-      .expect("failed to create Tokio runtime for Hickory DNS");
+    {
+      Ok(runtime) => runtime,
+      Err(e) => {
+        envoy_log_error!("hickory DNS: failed to create Tokio runtime: {e}");
+        return None;
+      },
+    };
 
-    let resolver = runtime.block_on(async { build_resolver(config) });
+    let resolver = match runtime.block_on(async { build_resolver(config) }) {
+      Ok(resolver) => resolver,
+      Err(e) => {
+        envoy_log_error!("hickory DNS: {e}");
+        return None;
+      },
+    };
 
-    HickoryDnsResolverImpl {
+    Some(HickoryDnsResolverImpl {
       runtime: Some(runtime),
       shared: Arc::new(SharedResolverState {
         resolver,
         envoy_callback,
         shutting_down: AtomicBool::new(false),
       }),
-    }
+    })
   }
 }
 
-fn build_resolver(config: &HickoryConfig) -> TokioResolver {
+fn build_resolver(config: &HickoryConfig) -> Result<TokioResolver, String> {
   use hickory_resolver::config::*;
 
   let mut resolver_config = if config.should_use_system_config() {
@@ -290,7 +307,7 @@ fn build_resolver(config: &HickoryConfig) -> TokioResolver {
   *builder.options_mut() = opts;
   builder
     .build()
-    .unwrap_or_else(|e| panic!("failed to build DNS resolver: {e}"))
+    .map_err(|e| format!("failed to build DNS resolver: {e}"))
 }
 
 impl DnsResolverInstance for HickoryDnsResolverImpl {

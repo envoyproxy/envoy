@@ -22,11 +22,14 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
+// Resolve the aws-c-auth-testdata testdata directory via the runfiles library.
+// The data target @aws-c-auth-testdata//:sigv4a_tests is declared in the BUILD target,
+// so the runfiles library handles the apparent→canonical repo name mapping automatically.
 std::vector<std::string> directoryListing() {
   std::vector<std::string> directories;
-  for (auto const& entry : std::filesystem::directory_iterator(
-           TestEnvironment::runfilesDirectory("aws-c-auth-testdata") +
-           "/tests/aws-signing-test-suite/v4a")) {
+  const std::string path =
+      TestEnvironment::runfilesPath("tests/aws-signing-test-suite/v4a", "aws-c-auth-testdata");
+  for (auto const& entry : std::filesystem::directory_iterator(path)) {
     directories.push_back(entry.path().string());
   }
   return directories;
@@ -174,7 +177,7 @@ public:
                                std::string calculated_signature) {
     std::vector<uint8_t> signature;
     auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-    auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
+    auto hash = crypto_util.getSha256Digest(string_to_sign);
     auto sigv4a_key_derivation = std::make_unique<SigV4AKeyDerivation>();
 
     auto ec_key_or =

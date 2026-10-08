@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <optional>
 #include <string>
@@ -634,7 +635,7 @@ CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint6
   // against onDestroy() so the worker thread cannot tear down the parent stream (and free the
   // header map) while this off-thread Go caller is mid-dereference. See has_destroyed_ comment
   // in the header for the full lifetime invariant.
-  Thread::LockGuard lock(mutex_);
+  Thread::OptionalLockGuard lock(offThreadMutex());
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -694,7 +695,7 @@ CAPIStatus Filter::copyHeaders(ProcessorState& state, GoString* go_strs, char* g
   // serialises against onDestroy() so the worker thread cannot tear down the parent stream
   // (and free the header map) while this off-thread Go caller is mid-iteration. See
   // has_destroyed_ comment in the header for the full lifetime invariant.
-  Thread::LockGuard lock(mutex_);
+  Thread::OptionalLockGuard lock(offThreadMutex());
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -884,7 +885,7 @@ CAPIStatus Filter::copyTrailers(ProcessorState& state, GoString* go_strs, char* 
   // serialises against onDestroy() so the worker thread cannot tear down the parent stream
   // (and free the trailer map) while this off-thread Go caller is mid-iteration. See
   // has_destroyed_ comment in the header for the full lifetime invariant.
-  Thread::LockGuard lock(mutex_);
+  Thread::OptionalLockGuard lock(offThreadMutex());
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1082,7 +1083,7 @@ CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
   // below: it serialises against onDestroy() so the worker thread cannot tear down the parent
   // stream (and free StreamInfo) while this off-thread Go caller is mid-dereference. See
   // has_destroyed_ comment in the header for the full lifetime invariant.
-  Thread::LockGuard lock(mutex_);
+  Thread::OptionalLockGuard lock(offThreadMutex());
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1180,7 +1181,7 @@ CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) 
   //      stalling onDestroy() so the worker thread cannot tear down the parent stream (and
   //      free StreamInfo) while this off-thread Go caller is mid-read.
   // See has_destroyed_ comment in the header for the full lifetime invariant.
-  Thread::LockGuard lock(mutex_);
+  Thread::OptionalLockGuard lock(offThreadMutex());
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1370,7 +1371,7 @@ CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) 
 CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, uint64_t* buf_data,
                                       int* buf_len) {
   // mutex_ serializes writes to req_->strValue across off-thread Go callers.
-  Thread::LockGuard lock(mutex_);
+  Thread::OptionalLockGuard lock(offThreadMutex());
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1479,7 +1480,7 @@ CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view
 CAPIStatus Filter::getStringFilterState(absl::string_view key, uint64_t* value_data,
                                         int* value_len) {
   // mutex_ serializes writes to req_->strValue across off-thread Go callers.
-  Thread::LockGuard lock(mutex_);
+  Thread::OptionalLockGuard lock(offThreadMutex());
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1517,7 +1518,7 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, uint64_t* value_d
 CAPIStatus Filter::getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
                                      int* rc) {
   // mutex_ serializes writes to req_->strValue across off-thread Go callers.
-  Thread::LockGuard lock(mutex_);
+  Thread::OptionalLockGuard lock(offThreadMutex());
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1716,7 +1717,7 @@ void Filter::deferredDeleteRequest(HttpRequestInternal* req) {
 
 CAPIStatus Filter::getSecret(const absl::string_view name, uint64_t* value_data, int* value_len) {
   // mutex_ serializes writes to req_->strValue across off-thread Go callers.
-  Thread::LockGuard lock(mutex_);
+  Thread::OptionalLockGuard lock(offThreadMutex());
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1760,7 +1761,7 @@ CAPIStatus Filter::setDrainConnectionUponCompletion() {
   // onDestroy() so the worker thread cannot tear down the parent stream (and free StreamInfo)
   // while this off-thread Go caller is mid-write. See has_destroyed_ comment in the header for
   // the full lifetime invariant.
-  Thread::LockGuard lock(mutex_);
+  Thread::OptionalLockGuard lock(offThreadMutex());
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1791,15 +1792,19 @@ uint64_t Filter::getMergedConfigId() {
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
     Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context)
+    Server::Configuration::GenericFactoryContext& context)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
-      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))),
+      // The metrics that the Go plugin defines itself are named by the plugin alone and are not
+      // related to the stat prefix of this filter, so they live in a scope of their own that is
+      // created from the server's scope rather than from the scope of this context.
+      metric_store_(
+          std::make_shared<MetricStore>(context.serverFactoryContext().scope().createScope(""))),
       secret_reader_(std::make_shared<SecretReader>(proto_config, context)) {};
 
-void FilterConfig::newGoPluginConfig() {
+absl::Status FilterConfig::newGoPluginConfig() {
   ENVOY_LOG(debug, "initializing golang filter config");
   std::string buf;
   auto res = plugin_config_.SerializeToString(&buf);
@@ -1818,11 +1823,12 @@ void FilterConfig::newGoPluginConfig() {
   config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
 
   if (config_id_ == 0) {
-    throw EnvoyException(
-        fmt::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
+    return absl::InvalidArgumentError(
+        std::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
   }
 
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
+  return absl::OkStatus();
 }
 
 FilterConfig::~FilterConfig() {
@@ -1975,7 +1981,7 @@ RoutePluginConfig::RoutePluginConfig(
   config_id_ = getConfigId();
   if (config_id_ == 0) {
     throw EnvoyException(
-        fmt::format("golang filter failed to parse plugin config: {}", plugin_name_));
+        std::format("golang filter failed to parse plugin config: {}", plugin_name_));
   }
   ENVOY_LOG(debug, "golang filter new per route '{}' plugin config, id: {}", plugin_name_,
             config_id_);
@@ -2059,7 +2065,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return server_context.secretManager().findOrCreateGenericSecretProvider(
-        config.sds_config(), config.name(), server_context, init_manager);
+        config.sds_config(), config.name(), server_context, init_manager, true);
   } else {
     return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
@@ -2068,12 +2074,13 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 
 SecretReader::SecretReader(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::GenericFactoryContext& context) {
   if (proto_config.generic_secrets_size() > 0) {
     auto& server_context = context.serverFactoryContext();
     auto& init_manager = context.initManager();
     auto& tls = server_context.threadLocal();
     auto& api = server_context.api();
+    auto& main_dispatcher = server_context.mainThreadDispatcher();
     for (auto& secret : proto_config.generic_secrets()) {
       // Check here to avoid creating unecessary sds provider
       if (secrets_.contains(secret.name())) {
@@ -2083,9 +2090,9 @@ SecretReader::SecretReader(
       if (secret_provider == nullptr) {
         throw EnvoyException(absl::StrCat("no secret provider found for ", secret.name()));
       }
-      auto tlsp = THROW_OR_RETURN_VALUE(
-          Secret::ThreadLocalGenericSecretProvider::create(std::move(secret_provider), tls, api),
-          std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>);
+      auto tlsp = THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                            std::move(secret_provider), tls, api, main_dispatcher),
+                                        Secret::ThreadLocalGenericSecretProviderPtr);
       secrets_.emplace(secret.name(), std::move(tlsp));
     }
   }

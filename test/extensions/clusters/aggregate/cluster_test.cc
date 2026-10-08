@@ -438,6 +438,25 @@ TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
   lb_->chooseHost(&lb_context);
 }
 
+// A worker may call the factory after a CDS update has already destroyed the Cluster.
+TEST_F(AggregateClusterTest, LoadBalancerFactoryOutlivesCluster) {
+  initialize(default_yaml_config_);
+
+  lb_.reset();
+  thread_aware_lb_.reset();
+  cluster_.reset();
+
+  lb_ = lb_factory_->create(lb_params_);
+  ASSERT_NE(nullptr, lb_);
+
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+    return Upstream::HostSelectionResponse{host};
+  }));
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
+  EXPECT_EQ(host.get(), lb_->chooseHost(nullptr).host.get());
+}
+
 } // namespace Aggregate
 } // namespace Clusters
 } // namespace Extensions

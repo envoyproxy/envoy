@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -23,6 +22,8 @@ envoy_extension_cc_test(
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_address_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
@@ -32,15 +33,18 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "reverse_tunnel_initiator_extension_test",
     size = "medium",
     srcs = ["reverse_tunnel_initiator_extension_test.cc"],
+    extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
         "//source/extensions/formatter/file_content:config",
         "//test/common/formatter:command_extension_lib",
         "//test/mocks/access_log:access_log_mocks",
@@ -59,19 +63,27 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "reverse_connection_io_handle_test",
     size = "large",
     srcs = ["reverse_connection_io_handle_test.cc"],
+    extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     deps = [
+        "//envoy/common:base_includes",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
         "//test/common/tls:mock_ssl_handshaker_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
@@ -80,15 +92,19 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "downstream_reverse_connection_io_handle_test",
     size = "medium",
     srcs = ["downstream_reverse_connection_io_handle_test.cc"],
+    extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
@@ -99,10 +115,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "reverse_connection_address_test",
     size = "medium",
     srcs = ["reverse_connection_address_test.cc"],
+    extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
@@ -115,10 +132,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "reverse_connection_resolver_test",
     size = "medium",
     srcs = ["reverse_connection_resolver_test.cc"],
+    extension_names = ["envoy.resolvers.reverse_connection"],
     deps = [
         "//source/common/network:address_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
@@ -129,10 +147,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "rc_connection_wrapper_test",
     size = "large",
     srcs = ["rc_connection_wrapper_test.cc"],
+    extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/formatter:substitution_formatter_lib",
@@ -140,6 +159,8 @@ envoy_cc_test(
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
         "//test/common/formatter:command_extension_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",

@@ -103,7 +103,7 @@ struct SupportedCommands {
   static const CommandSubcommandMap& commandSubcommandValidationMap() {
     CONSTRUCT_ON_FIRST_USE(CommandSubcommandMap,
                            // Command name - Sub commands that are allowed
-                           {{"cluster", {"info", "slots", "keyslot", "nodes"}}});
+                           {{"cluster", {"info", "slots", "keyslot", "nodes", "shards"}}});
     // Add other commands with restricted subcommands here:
   }
 

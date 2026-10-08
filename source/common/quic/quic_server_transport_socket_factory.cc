@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/runtime/runtime_features.h"
@@ -16,23 +17,44 @@ absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
-  auto quic_transport = MessageUtil::downcastAndValidate<
+  auto& quic_transport = MessageUtil::downcastAndValidate<
       const envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport&>(
       config, context.messageValidationVisitor());
+
   absl::StatusOr<std::unique_ptr<Extensions::TransportSockets::Tls::ServerContextConfigImpl>>
       server_config_or_error = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
           quic_transport.downstream_tls_context(), context, server_names, true);
   RETURN_IF_NOT_OK(server_config_or_error.status());
   auto server_config = std::move(server_config_or_error.value());
-  // TODO(RyanTheOptimist): support TLS client authentication.
+  // Requiring a client certificate is gated by a runtime guard, and needs a validation context to
+  // validate the presented chain against.
   if (server_config->requireClientCertificate()) {
-    return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_mtls_server_enabled")) {
+      return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
+    }
+
+    // Only the presence of a validation context can be checked here, because its contents may come
+    // from SDS and are not resolved yet. createSslServerContext() checks the trusted_ca once they
+    // are.
+    if (!server_config->validationContextConfigured()) {
+      return absl::InvalidArgumentError(
+          "QUIC downstream TLS context sets require_client_certificate but configures no "
+          "validation context.");
+    }
   }
 
+  // QUIC does not re-validate the client certificate on session resumption. A resumed connection
+  // reuses the verdict of the original handshake until the ticket expires. Resumption and early
+  // data therefore default to off on filter chains that validate a client certificate. Operators
+  // can still opt into resumption explicitly.
+  const bool default_resumption =
+      !(server_config->certificateValidationContext() != nullptr &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_mtls_resumption_disabled_by_default"));
   const bool enable_early_data =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true);
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, default_resumption);
   const bool enable_resumption =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_resumption, true);
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_resumption, default_resumption);
 
   if (!enable_resumption && enable_early_data) {
     return absl::InvalidArgumentError(
@@ -48,6 +70,25 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
 }
 
 namespace {
+
+bool canValidateClientCertificate(const Envoy::Ssl::ServerContextConfig& config) {
+  if (!config.validationContextConfigured()) {
+    return false;
+  }
+
+  const auto* validation_ctx = config.certificateValidationContext();
+  if (validation_ctx == nullptr) {
+    // The validation context is configured but not yet ready (pending SDS). Ignore this special
+    // case and assume that it will eventually be ready.
+    return true;
+  }
+
+  return !validation_ctx->caCert().empty() || validation_ctx->customValidatorConfig().has_value() ||
+         validation_ctx->trustChainVerification() ==
+             envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+                 ACCEPT_UNTRUSTED;
+}
+
 absl::Status initializeQuicCertAndKey(Ssl::TlsContext& context,
                                       const Ssl::TlsCertificateConfig& /*cert_config*/) {
   // Convert the certificate chain loaded into the context into PEM, as that is what the QUICHE
@@ -136,6 +177,15 @@ QuicServerTransportSocketFactory::~QuicServerTransportSocketFactory() {
 
 absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr>
 QuicServerTransportSocketFactory::createSslServerContext() const {
+  if (config_->requireClientCertificate()) {
+    if (!canValidateClientCertificate(*config_)) {
+      return absl::InvalidArgumentError(
+          "QUIC downstream TLS context sets require_client_certificate but its validation context "
+          "has no trusted_ca and no custom_validator_config, so no client certificate could be "
+          "validated.");
+    }
+  }
+
   auto context_or_error =
       manager_.createSslServerContext(stats_scope_, *config_, initializeQuicCertAndKey);
   RETURN_IF_NOT_OK(context_or_error.status());
@@ -176,9 +226,13 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
   }
   auto ctx =
       std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
+  const Ssl::CurveNIDVector supported_curves =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_support_additional_ecdsa_curves")
+          ? Ssl::CurveNIDVector{NID_X9_62_prime256v1, NID_secp384r1, NID_secp521r1}
+          : Ssl::CurveNIDVector{NID_X9_62_prime256v1};
   auto [tls_context, ocsp_staple_action] =
-      ctx->findTlsContext(sni, Ssl::CurveNIDVector{NID_X9_62_prime256v1} /* TODO: ecdsa_capable */,
-                          false /* TODO: ocsp_capable */, cert_matched_sni);
+      ctx->findTlsContext(sni, supported_curves, false /* TODO: ocsp_capable */, cert_matched_sni);
 
   // Thread safety note: accessing the tls_context requires holding a shared_ptr to the ``ssl_ctx``.
   // Both of these members are themselves reference counted, so it is safe to use them after

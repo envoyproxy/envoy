@@ -7,6 +7,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/quic/scone_state.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/mocks/common/mocks.h"
@@ -1061,6 +1062,61 @@ TEST_P(ClientTest, SaveLatestStreamIntelWithNoSconeData) {
   stream_ptr->saveLatestStreamIntel();
   EXPECT_EQ(stream_ptr->stream_intel_.scone_max_kbps, -1);
   EXPECT_EQ(stream_ptr->stream_intel_.scone_timestamp_ms, -1);
+}
+
+TEST_P(ClientTest, SaveLatestStreamIntelPopulatesSconeFromUpstreamFilterState) {
+  StreamCallbacksCalled callbacks_called;
+  createStream(createDefaultStreamCallbacks(callbacks_called));
+
+  auto scone_state = std::make_shared<Quic::SconeState>();
+  scone_state->scone_max_kbps = 250;
+  scone_state->timestamp_ms = 54321;
+  auto upstream_filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  upstream_filter_state->setData(Quic::SconeStateKey, scone_state,
+                                 StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.upstream_info_->setUpstreamFilterState(upstream_filter_state);
+
+  auto stream_ptr = getDirectStream(stream_);
+  ASSERT_NE(stream_ptr, nullptr);
+
+  stream_ptr->saveLatestStreamIntel();
+
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_max_kbps, 250);
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_timestamp_ms, 54321);
+  EXPECT_TRUE(scone_state->scone_max_kbps.has_value());
+  EXPECT_TRUE(scone_state->timestamp_ms.has_value());
+}
+
+TEST_P(ClientTest, SaveLatestStreamIntelPopulatesSconePrecedence) {
+  StreamCallbacksCalled callbacks_called;
+  createStream(createDefaultStreamCallbacks(callbacks_called));
+
+  // Set downstream filter state.
+  auto downstream_scone = std::make_shared<Quic::SconeState>();
+  downstream_scone->scone_max_kbps = 100;
+  downstream_scone->timestamp_ms = 12345;
+  stream_info_.filter_state_->setData(Quic::SconeStateKey, downstream_scone,
+                                      StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Set upstream filter state with different value.
+  auto upstream_scone = std::make_shared<Quic::SconeState>();
+  upstream_scone->scone_max_kbps = 200;
+  upstream_scone->timestamp_ms = 23456;
+  auto upstream_filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  upstream_filter_state->setData(Quic::SconeStateKey, upstream_scone,
+                                 StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.upstream_info_->setUpstreamFilterState(upstream_filter_state);
+
+  auto stream_ptr = getDirectStream(stream_);
+  ASSERT_NE(stream_ptr, nullptr);
+
+  stream_ptr->saveLatestStreamIntel();
+
+  // Downstream filter state takes precedence if present.
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_max_kbps, 100);
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_timestamp_ms, 12345);
 }
 
 TEST_P(ClientTest, SaveLatestStreamIntelWithZeroSconeValue) {

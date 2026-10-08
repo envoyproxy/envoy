@@ -13,21 +13,16 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 class ExternalProcessingFilterConfig
-    : public Common::DualFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor,
           envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute> {
 
 public:
-  ExternalProcessingFilterConfig() : DualFactoryBase("envoy.filters.http.ext_proc") {}
+  ExternalProcessingFilterConfig() : UnifiedFactoryBase("envoy.filters.http.ext_proc") {}
 
 private:
   static constexpr uint64_t DefaultMessageTimeoutMs = 200;
   static constexpr uint64_t DefaultMaxMessageTimeoutMs = 0;
-
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
-      const std::string& stats_prefix, DualInfo dual_info,
-      Server::Configuration::ServerFactoryContext& context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

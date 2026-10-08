@@ -16,26 +16,7 @@ using Extensions::Common::AsyncFiles::AsyncFileManager;
 using Extensions::Common::AsyncFiles::AsyncFileManagerFactory;
 
 FileSystemBufferFilterFactory::FileSystemBufferFilterFactory()
-    : ExceptionFreeFactoryBase(FileSystemBufferFilter::filterName()) {}
-
-absl::StatusOr<Http::FilterFactoryCb>
-FileSystemBufferFilterFactory::createFilterFactoryFromProtoTyped(
-    const ProtoFileSystemBufferFilterConfig& config,
-    const std::string& stats_prefix ABSL_ATTRIBUTE_UNUSED,
-    Server::Configuration::FactoryContext& context) {
-  auto factory =
-      AsyncFileManagerFactory::singleton(&context.serverFactoryContext().singletonManager());
-  auto manager = config.has_manager_config() ? factory->getAsyncFileManager(config.manager_config())
-                                             : std::shared_ptr<AsyncFileManager>();
-  absl::Status creation_status = absl::OkStatus();
-  auto filter_config = std::make_shared<FileSystemBufferFilterConfig>(
-      std::move(factory), std::move(manager), config, creation_status);
-  RETURN_IF_NOT_OK_REF(creation_status);
-  return [filter_config =
-              std::move(filter_config)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<FileSystemBufferFilter>(filter_config));
-  };
-}
+    : UnifiedFactoryBase(FileSystemBufferFilter::filterName()) {}
 
 absl::StatusOr<Http::FilterFactoryCb>
 FileSystemBufferFilterFactory::createHttpFilterFactoryFromProtoTyped(

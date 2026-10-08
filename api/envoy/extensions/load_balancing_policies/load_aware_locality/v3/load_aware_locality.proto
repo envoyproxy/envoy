@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.load_balancing_policies.load_aware_locality.v3;
 
 import "envoy/config/cluster/v3/cluster.proto";
+import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -21,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the load_aware_locality LB policy which uses ORCA utilization data
 // to route traffic between localities based on available headroom.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message LoadAwareLocality {
   // The child LB policy to create for endpoint-picking within each locality.
   config.cluster.v3.LoadBalancingPolicy endpoint_picking_policy = 1
@@ -95,4 +96,9 @@ message LoadAwareLocality {
   // server may not provide reports as frequently as the client requests.
   // Used only when enable_oob_load_report is true. Default is 10 seconds.
   google.protobuf.Duration oob_reporting_period = 9;
+
+  // Optional overrides for the OOB reporting connection (alternative port,
+  // ``:authority``, transport socket selection). Honored only when
+  // ``enable_oob_load_report`` is true.
+  common.v3.OrcaOobReportingConfig oob_reporting_config = 10;
 }

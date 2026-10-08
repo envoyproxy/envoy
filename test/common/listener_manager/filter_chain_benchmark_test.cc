@@ -11,8 +11,12 @@
 #include "source/common/network/socket_impl.h"
 
 #include "test/benchmark/main.h"
+#include "test/mocks/config/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/listener_component_factory.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -96,6 +100,7 @@ public:
   const Network::IoHandle& ioHandle() const override { return *io_handle_; }
 
   // Dummy method
+  void setAbortiveClose() override {}
   void close() override {}
   bool isOpen() const override { return false; }
   Network::Socket::Type socketType() const override { return Network::Socket::Type::Stream; }
@@ -316,5 +321,128 @@ FilterChainBenchmarkFixture/FilterChainFindTest/4096            2676478 ns      
 
 clang-format on
 */
+
+// Exposes the private thread local update entry points so the benchmark can compare publishing per
+// filter chain against the coalesced path.
+class FcdsSharedFilterChainManagerPeer {
+public:
+  static void scheduleTlsUpdate(FcdsSharedFilterChainManager& manager) {
+    manager.scheduleTlsUpdate();
+  }
+  static void updateTlsState(FcdsSharedFilterChainManager& manager) { manager.updateTlsState(); }
+  static void setActiveFilterChain(FcdsSharedFilterChainManager& manager, const std::string& name,
+                                   Network::DrainableFilterChainSharedPtr filter_chain) {
+    manager.subscriptions_.at(name)->api_->setFilterChain(std::move(filter_chain));
+  }
+};
+
+// Builds a warmed manager with a configurable number of active filter chains, created in the
+// benchmark body so the gmock objects are made after main() runs and released on return.
+struct FcdsTlsUpdateBenchmarkState {
+  explicit FcdsTlsUpdateBenchmarkState(int64_t chain_count) {
+    ON_CALL(server_context_.cluster_manager_.subscription_factory_,
+            subscriptionFromConfigSource(testing::_, testing::_, testing::_, testing::_, testing::_,
+                                         testing::_))
+        .WillByDefault(testing::Invoke(
+            [](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
+               Config::SubscriptionCallbacks&, Config::OpaqueResourceDecoderSharedPtr,
+               const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+              return std::make_unique<NiceMock<Config::MockSubscription>>();
+            }));
+
+    // The manager owns the returned callback. The raw pointer drives the coalesced publish.
+    tls_update_cb_ = new NiceMock<Event::MockSchedulableCallback>(&server_context_.dispatcher_);
+    manager_ = std::make_shared<FcdsSharedFilterChainManager>(server_context_,
+                                                              listener_component_factory_);
+    for (int64_t i = 0; i < chain_count; i++) {
+      const std::string name = absl::StrCat("dynamic_filter_chain_", i);
+      auto handle = manager_->subscribe(config_source_, name, dummy_fcds_callbacks_, init_manager_);
+      handles_.push_back(std::move(handle).value());
+      FcdsSharedFilterChainManagerPeer::setActiveFilterChain(
+          *manager_, name, std::make_shared<Network::MockFilterChain>());
+    }
+  }
+
+  struct DummyFcdsClientCallbacks : public FcdsClientCallbacks {
+    void drainFilterChain(Network::DrainableFilterChainSharedPtr) override {}
+  };
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+  NiceMock<MockListenerComponentFactory> listener_component_factory_;
+  envoy::config::core::v3::ConfigSource config_source_;
+  DummyFcdsClientCallbacks dummy_fcds_callbacks_;
+  Init::ManagerImpl init_manager_{"fcds_tls_update_benchmark"};
+  Event::MockSchedulableCallback* tls_update_cb_{};
+  std::shared_ptr<FcdsSharedFilterChainManager> manager_;
+  std::vector<FcdsSubscriptionHandleSharedPtr> handles_;
+};
+
+// Publishes the thread local snapshot once per filter chain, matching the behavior before the
+// updates were coalesced.
+void fcdsUncoalescedBatchUpdate(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+  FcdsTlsUpdateBenchmarkState bench(state.range(0));
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    for (int64_t i = 0; i < state.range(0); i++) {
+      FcdsSharedFilterChainManagerPeer::updateTlsState(*bench.manager_);
+    }
+  }
+}
+BENCHMARK(fcdsUncoalescedBatchUpdate)
+    ->Ranges({
+        // Number of filter chains updated in a single batch.
+        {1, 4096},
+    })
+    ->Unit(::benchmark::kMillisecond);
+
+// Coalesces the whole batch into a single publish per event loop iteration.
+void fcdsCoalescedBatchUpdate(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+  FcdsTlsUpdateBenchmarkState bench(state.range(0));
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    for (int64_t i = 0; i < state.range(0); i++) {
+      FcdsSharedFilterChainManagerPeer::scheduleTlsUpdate(*bench.manager_);
+    }
+    bench.tls_update_cb_->invokeCallback();
+  }
+}
+BENCHMARK(fcdsCoalescedBatchUpdate)
+    ->Ranges({
+        // Number of filter chains updated in a single batch.
+        {1, 4096},
+    })
+    ->Unit(::benchmark::kMillisecond);
+
+/*
+clang-format off
+
+Coalescing a batch of filter chain updates reduces the per batch cost from quadratic to linear in
+the number of chains. The debug build timings below illustrate that scaling rather than production
+cost.
+
+------------------------------------------------------------------------------------------
+Benchmark                                Time             CPU   Iterations
+------------------------------------------------------------------------------------------
+fcdsUncoalescedBatchUpdate/1         0.001 ms        0.001 ms       619677
+fcdsUncoalescedBatchUpdate/8         0.154 ms        0.154 ms         4559
+fcdsUncoalescedBatchUpdate/64        10.600 ms       10.500 ms         66
+fcdsUncoalescedBatchUpdate/512     661.000 ms      659.000 ms          1
+fcdsUncoalescedBatchUpdate/4096  44652.000 ms    43876.000 ms          1
+fcdsCoalescedBatchUpdate/1           0.003 ms        0.003 ms       250137
+fcdsCoalescedBatchUpdate/8           0.025 ms        0.025 ms        26838
+fcdsCoalescedBatchUpdate/64          0.201 ms        0.200 ms         3392
+fcdsCoalescedBatchUpdate/512         1.600 ms        1.600 ms         420
+fcdsCoalescedBatchUpdate/4096       13.700 ms       13.700 ms          48
+
+clang-format on
+*/
+
 } // namespace Server
 } // namespace Envoy

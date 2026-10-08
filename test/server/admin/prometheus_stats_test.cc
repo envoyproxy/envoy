@@ -1,6 +1,9 @@
+#include <array>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <regex>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -20,9 +23,15 @@
 #include "test/test_common/stats_utility.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 using testing::NiceMock;
 using testing::Ref;
 using testing::ReturnRef;
+
+using testing::AnyOf;
+using testing::Contains;
+using testing::HasSubstr;
+using testing::Key;
 
 namespace Envoy {
 namespace Server {
@@ -1046,8 +1055,6 @@ struct DecodedNativeHistogram {
   std::vector<DecodedBucket> positive_buckets;
 
   explicit DecodedNativeHistogram(const io::prometheus::client::Histogram& hist) {
-    const double base = std::pow(2.0, std::pow(2.0, -hist.schema()));
-
     // Decode spans and deltas into buckets
     int32_t current_index = 0;
     int64_t current_count = 0;
@@ -1063,8 +1070,9 @@ struct DecodedNativeHistogram {
         if (current_count > 0) {
           DecodedBucket bucket;
           bucket.index = current_index;
-          bucket.lower_bound = std::pow(base, current_index);
-          bucket.upper_bound = std::pow(base, current_index + 1);
+          bucket.lower_bound = std::exp2(std::ldexp(current_index - 1.0, -hist.schema()));
+          bucket.upper_bound =
+              std::exp2(std::ldexp(static_cast<double>(current_index), -hist.schema()));
           bucket.count = static_cast<uint64_t>(current_count);
           positive_buckets.push_back(bucket);
         }
@@ -1094,13 +1102,12 @@ struct DecodedNativeHistogram {
   }
 
   // Compute the expected bucket index for a value given a schema.
-  // Bucket i covers (base^i, base^(i+1)] where base = 2^(2^(-schema)).
+  // Bucket i covers (base^(i-1), base^i] where base = 2^(2^(-schema)).
   static int32_t expectedBucketIndex(int8_t schema, double value) {
     EXPECT_GT(value, 0) << "Only positive values have bucket indices";
-    const double base = std::pow(2.0, std::pow(2.0, -schema));
-    // For value v in (base^i, base^(i+1)], the bucket index is i.
-    // Formula: i = ceil(log(v) / log(base)) - 1
-    return static_cast<int32_t>(std::ceil(std::log(value) / std::log(base))) - 1;
+    // For value v in (base^(i-1), base^i], the bucket index is i.
+    // Formula: i = ceil(log2(v) * 2^schema)
+    return static_cast<int32_t>(std::ceil(std::ldexp(std::log2(value), schema)));
   }
 };
 
@@ -1488,7 +1495,7 @@ TEST_F(PrometheusStatsFormatterTest, ContentNegotiationTextPlainAcceptHeader) {
   EXPECT_TRUE(response_headers.getContentTypeValue().empty());
 
   std::string output = response.toString();
-  EXPECT_TRUE(output.find("# TYPE") != std::string::npos);
+  EXPECT_THAT(output, HasSubstr("# TYPE"));
 }
 
 TEST_F(PrometheusStatsFormatterTest, ContentNegotiationDefaultToText) {
@@ -1506,7 +1513,7 @@ TEST_F(PrometheusStatsFormatterTest, ContentNegotiationDefaultToText) {
 
   // Should default to text format
   std::string output = response.toString();
-  EXPECT_TRUE(output.find("# TYPE") != std::string::npos);
+  EXPECT_THAT(output, HasSubstr("# TYPE"));
 }
 
 TEST_F(PrometheusStatsFormatterTest, QueryParamOverridesAcceptHeader) {
@@ -1757,6 +1764,51 @@ public:
   std::unique_ptr<Upstream::PerEndpointMetricsTestHelper> endpoints_helper_;
 };
 
+TEST_F(RealHistogramNativePrometheusTest, NativeHistogramUsesPrometheusBucketIndices) {
+  Stats::Histogram& histogram = makeHistogram("request_body_size", Stats::Histogram::Unit::Bytes);
+  recordValue(histogram, 4000);
+  mergeHistograms();
+
+  auto parent_histogram = getParentHistogram("request_body_size");
+  ASSERT_NE(nullptr, parent_histogram);
+
+  struct TestCase {
+    uint32_t max_buckets;
+    int32_t schema;
+    int32_t bucket_index;
+  };
+  // Prometheus bucket i has upper bound 2^(i * 2^(-schema)). A 4000-byte sample
+  // belongs to bucket 192 at schema 4 (upper bound 4096), or bucket 2 at schema -3
+  // (upper bound 65536). Assert the wire indices independently of the test decoders.
+  const std::vector<TestCase> test_cases = {{20, 4, 192}, {1, -3, 2}};
+  for (const auto& test_case : test_cases) {
+    SCOPED_TRACE(test_case.schema);
+    StatsParams params;
+    params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
+    params.native_histogram_max_buckets_ = test_case.max_buckets;
+
+    Http::TestResponseHeaderMapImpl response_headers;
+    Buffer::OwnedImpl response;
+    EXPECT_EQ(1, PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+                     {}, {}, {parent_histogram}, {}, endpoints_helper_->cm_, response_headers,
+                     response, params, custom_namespaces_));
+
+    const auto families = parsePrometheusProtobuf(response.toString());
+    ASSERT_EQ(1, families.size());
+    ASSERT_EQ(1, families[0].metric_size());
+    const auto& hist = families[0].metric(0).histogram();
+    EXPECT_EQ(test_case.schema, hist.schema());
+    EXPECT_EQ(1, hist.sample_count());
+    EXPECT_DOUBLE_EQ(parent_histogram->cumulativeStatistics().sampleSum(), hist.sample_sum());
+    EXPECT_EQ(0, hist.zero_count());
+    ASSERT_EQ(1, hist.positive_span_size());
+    EXPECT_EQ(test_case.bucket_index, hist.positive_span(0).offset());
+    EXPECT_EQ(1, hist.positive_span(0).length());
+    ASSERT_EQ(1, hist.positive_delta_size());
+    EXPECT_EQ(1, hist.positive_delta(0));
+  }
+}
+
 // Test native histogram with only zero values using real histogram implementation.
 // All samples should go to the zero bucket, with no positive buckets.
 TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithOnlyZeros) {
@@ -1910,29 +1962,20 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithBoundaryValues) {
 
   const DecodedNativeHistogram decoded(hist);
 
-  // At schema 4, values 1 and 2 are in different buckets:
-  // - base = 2^(2^(-4)) = 2^(1/16) ≈ 1.044
-  // - value 1.0: index = ceil(log(1) / log(base)) - 1 = -1
-  // - value 2.0: Mathematically would be index 15, but base^16 = 2.0 exactly,
-  //   so this is an exact bucket boundary. Due to how circllhist handles
-  //   boundaries during interpolation, the samples end up in bucket 16.
+  // At schema 4, 1 and 2 are the inclusive upper bounds of buckets 0 and 16.
   ASSERT_EQ(2, decoded.positive_buckets.size());
 
   // First bucket should contain value 1
-  EXPECT_EQ(-1, decoded.positive_buckets[0].index);
+  EXPECT_EQ(0, decoded.positive_buckets[0].index);
   EXPECT_EQ(3, decoded.positive_buckets[0].count); // 3 ones
   EXPECT_LT(decoded.positive_buckets[0].lower_bound, 1.0);
-  EXPECT_GE(decoded.positive_buckets[0].upper_bound, 1.0);
+  EXPECT_DOUBLE_EQ(1.0, decoded.positive_buckets[0].upper_bound);
 
   // Second bucket should contain value 2
-  // Note: index is 16 rather than 15 due to boundary handling at base^16 = 2.0.
-  // Bucket 16 covers (base^16, base^17] = (2.0, ~2.088], but circllhist
-  // interpolation places the samples here anyway.
   EXPECT_EQ(16, decoded.positive_buckets[1].index);
   EXPECT_EQ(2, decoded.positive_buckets[1].count); // 2 twos
-  // Use EXPECT_NEAR due to floating-point precision in std::pow(base, 16)
-  EXPECT_NEAR(2.0, decoded.positive_buckets[1].lower_bound, 1e-10);
-  EXPECT_GT(decoded.positive_buckets[1].upper_bound, 2.0);
+  EXPECT_LT(decoded.positive_buckets[1].lower_bound, 2.0);
+  EXPECT_DOUBLE_EQ(2.0, decoded.positive_buckets[1].upper_bound);
 }
 
 // Test native histogram with wide value range to exercise schema selection.
@@ -2096,14 +2139,14 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithPercent) {
 
   // With PercentScale applied, the output bucket bounds should be in 0-3 range.
   // The 8 sparse non-zero values (0.00001 to 3.0) span about 18 doublings.
-  // With default max_buckets=20, schema 2 should be selected (4 buckets per doubling).
-  EXPECT_EQ(2, hist.schema());
+  // With default max_buckets=20, schema 3 should be selected (8 buckets per doubling).
+  EXPECT_EQ(3, hist.schema());
 
   // Verify positive bucket total matches non-zero samples
   EXPECT_EQ(8, decodeTotalCountFromBuckets(hist));
 
   // With 8 sparse values spanning a wide range (0.00001 to 3.0), each value should
-  // fall into a distinct native histogram bucket at schema 2.
+  // fall into a distinct native histogram bucket at schema 3.
   EXPECT_EQ(8, hist.positive_delta_size());
 
   const DecodedNativeHistogram decoded(hist);
@@ -2113,7 +2156,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithPercent) {
 
   // Verify each recorded non-zero value has a corresponding bucket with count 1.
   // Since values are sparse and sorted, they map 1:1 to consecutive decoded buckets.
-  // At schema 2, bucket i covers (base^i, base^(i+1)].
+  // At schema 3, bucket i covers (base^(i-1), base^i].
   const std::vector<double> recorded_values = {0.00001, 0.01, 0.10, 0.50, 0.75, 1.00, 1.50, 3.00};
   for (size_t i = 0; i < recorded_values.size(); ++i) {
     const double value = recorded_values[i];
@@ -2133,9 +2176,9 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithPercent) {
         << "Bucket " << i << " index mismatch for value " << value;
 
     if (value > 1.0) {
-      EXPECT_GE(bucket.index, 0);
+      EXPECT_GT(bucket.index, 0);
     } else {
-      EXPECT_LT(bucket.index, 0);
+      EXPECT_LE(bucket.index, 0);
     }
   }
 }
@@ -2173,27 +2216,23 @@ public:
   }
 
   // Given a schema and value, compute the expected bucket index.
-  // Bucket i covers (base^i, base^(i+1)] where base = 2^(2^(-schema)).
+  // Bucket i covers (base^(i-1), base^i] where base = 2^(2^(-schema)).
   static int32_t expectedBucketIndex(int8_t schema, double value) {
     EXPECT_GT(value, 0) << "Only positive values have bucket indices";
-    double base = std::pow(2.0, std::pow(2.0, -schema));
-    // For value v in (base^i, base^(i+1)], the bucket index is i.
-    // At exact boundaries, v = base^(i+1) is in bucket i.
-    // Formula: i = ceil(log(v) / log(base)) - 1
-    double log_base = std::log(base);
-    return static_cast<int32_t>(std::ceil(std::log(value) / log_base)) - 1;
+    // For value v in (base^(i-1), base^i], the bucket index is i.
+    // At exact boundaries, v = base^i is in bucket i.
+    // Formula: i = ceil(log2(v) * 2^schema)
+    return static_cast<int32_t>(std::ceil(std::ldexp(std::log2(value), schema)));
   }
 
   // Compute the upper bound of a bucket given its index and schema.
   static double bucketUpperBound(int8_t schema, int32_t index) {
-    double base = std::pow(2.0, std::pow(2.0, -schema));
-    return std::pow(base, index + 1);
+    return std::exp2(std::ldexp(static_cast<double>(index), -schema));
   }
 
   // Compute the lower bound of a bucket given its index and schema.
   static double bucketLowerBound(int8_t schema, int32_t index) {
-    double base = std::pow(2.0, std::pow(2.0, -schema));
-    return std::pow(base, index);
+    return std::exp2(std::ldexp(index - 1.0, -schema));
   }
 };
 
@@ -2341,8 +2380,8 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramDenseDataAccuracy) {
         NativeHistogramDecoder::expectedBucketIndex(schema, static_cast<double>(v));
 
     // The bucket should exist
-    EXPECT_TRUE(buckets.count(expected_idx) > 0 || buckets.count(expected_idx - 1) > 0 ||
-                buckets.count(expected_idx + 1) > 0)
+    EXPECT_THAT(buckets, AnyOf(Contains(Key(expected_idx)), Contains(Key(expected_idx - 1)),
+                               Contains(Key(expected_idx + 1))))
         << "Value " << v << " should be in bucket near index " << expected_idx;
   }
 
@@ -2359,26 +2398,17 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramDenseDataAccuracy) {
 TEST_F(RealHistogramNativePrometheusTest, NativeHistogramBucketIndexAccuracy) {
   Stats::Histogram& h1 = makeHistogram("histogram_exact", Stats::Histogram::Unit::Unspecified);
 
-  // At schema 4, base = 2^(2^(-4)) = 2^(1/16) ≈ 1.044274
-  // Bucket i covers (base^i, base^(i+1)]
-  // For value v, bucket index = ceil(log(v)/log(base)) - 1
+  // At schema 4, each doubling adds 16 to the bucket index.
   constexpr int8_t expected_schema = 4;
-  const double base = std::pow(2.0, std::pow(2.0, -expected_schema)); // 2^(1/16)
 
-  // Pre-calculate expected bucket indices for powers of 2
-  // At schema 4, there are 16 buckets per doubling (2^(1/16)^16 = 2)
   struct ValueExpectation {
     uint64_t value;
     int32_t expected_index;
   };
 
-  std::vector<ValueExpectation> test_values;
-  for (uint64_t v : {2, 4, 8, 16, 32}) {
-    // Bucket index formula: ceil(log(v)/log(base)) - 1
-    const int32_t idx =
-        static_cast<int32_t>(std::ceil(std::log(static_cast<double>(v)) / std::log(base))) - 1;
-    test_values.push_back({v, idx});
-    recordValue(h1, v);
+  const std::vector<ValueExpectation> test_values = {{2, 16}, {4, 32}, {8, 48}, {16, 64}, {32, 80}};
+  for (const auto& expected : test_values) {
+    recordValue(h1, expected.value);
   }
   mergeHistograms();
 
@@ -2427,16 +2457,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramBucketIndexAccuracy) {
         << "Value " << expected.value << " should be in bucket " << expected.expected_index;
     EXPECT_EQ(1, bucket.count) << "Bucket for value " << expected.value << " should have count 1";
 
-    // Verify bounds: bucket covers (base^idx, base^(idx+1)]
-    const double expected_lower = std::pow(base, expected.expected_index);
-    const double expected_upper = std::pow(base, expected.expected_index + 1);
-    EXPECT_NEAR(expected_lower, bucket.lower_bound, expected_lower * 1e-10);
-    EXPECT_NEAR(expected_upper, bucket.upper_bound, expected_upper * 1e-10);
-
-    // Value should be within bucket bounds
+    // Each power of two is the inclusive upper bound of its bucket.
     const double value = static_cast<double>(expected.value);
     EXPECT_LT(bucket.lower_bound, value);
-    EXPECT_GE(bucket.upper_bound, value);
+    EXPECT_DOUBLE_EQ(value, bucket.upper_bound);
   }
 }
 
@@ -2635,7 +2659,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramCumulativeAccuracy) {
     double lower = NativeHistogramDecoder::bucketLowerBound(schema, idx);
     double upper = NativeHistogramDecoder::bucketUpperBound(schema, idx);
 
-    // Bucket i covers (base^i, base^(i+1)], i.e., exclusive lower, inclusive upper.
+    // Bucket i covers (base^(i-1), base^i], i.e., exclusive lower, inclusive upper.
     if (lower < 5.0 && upper >= 5.0) {
       count_around_5 += count;
     }
@@ -2840,12 +2864,307 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSchemaFallback) {
   EXPECT_EQ(2, decoded.totalPositiveBucketCount());
 
   // At schema -4, base = 2^16 = 65536
-  // Value 1: bucket index = ceil(log(1)/log(65536)) - 1 = ceil(0) - 1 = -1
-  // Value 1000000000: bucket index = ceil(log(1e9)/log(65536)) - 1 = ceil(1.87) - 1 = 1
-  // So indices should be -1 and 1.
-  EXPECT_EQ(-1, decoded.positive_buckets[0].index) << "Value 1 should be in bucket -1 at schema -4";
-  EXPECT_EQ(1, decoded.positive_buckets[1].index)
-      << "Value 1000000000 should be in bucket 1 at schema -4";
+  // Value 1: bucket index = ceil(log(1)/log(65536)) = 0
+  // Value 1000000000: bucket index = ceil(log(1e9)/log(65536)) = 2
+  // So indices should be 0 and 2.
+  EXPECT_EQ(0, decoded.positive_buckets[0].index) << "Value 1 should be in bucket 0 at schema -4";
+  EXPECT_EQ(2, decoded.positive_buckets[1].index)
+      << "Value 1000000000 should be in bucket 2 at schema -4";
+}
+
+constexpr int8_t kBucketIndexMinSchema = -4;
+constexpr int8_t kBucketIndexMaxSchema = 4;
+constexpr int32_t kZeroBucket = std::numeric_limits<int32_t>::min();
+
+// A recorded value and the Prometheus native histogram bucket it belongs in at each schema.
+struct NativeHistogramBucketIndexCase {
+  uint64_t recorded_value;
+  // Indexed by schema - kBucketIndexMinSchema. kZeroBucket means the zero bucket.
+  std::array<int32_t, kBucketIndexMaxSchema - kBucketIndexMinSchema + 1> expected_index;
+};
+
+// Expected bucket indices for NativeHistogramBucketIndexTest, generated with the Prometheus Go
+// client library: each value is observed into a github.com/prometheus/client_golang native
+// histogram that has the same schema and zero threshold Envoy uses, and the index of the bucket it
+// lands in is read back. The generator also marks the rows whose value is an exact bucket boundary.
+//
+// The values test these boundary cases, at every schema Envoy can select:
+// - The zero threshold: 0 goes in the zero bucket, and the smallest non-zero value doesn't.
+// - Exact bucket boundaries. Bucket i covers (base^(i-1), base^i], so a value equal to base^i
+//   belongs in bucket i, not bucket i+1.
+// - The closest values that can be recorded on either side of a boundary, which belong in the two
+//   buckets that meet there.
+// - Values far from 1 in both directions, which have large positive and negative indices.
+//
+// circllhist limits which values can be tested. It stores values with two significant digits (for
+// example 4096 goes in the bin [4000, 4100)), and Envoy exports all of a bin's samples at the
+// bin's lower bound. A value is therefore only exported as itself if it has at most two
+// significant digits, so every value here does. As a result:
+// - The only exact boundaries that can be recorded are the powers of two from 0.25 to 64. Larger
+//   ones (128, 256, ..., 65536, ...) can't be, so for those the tables use the closest values on
+//   either side. At schemas -3 and -4 (bucket growth factors 256 and 65536), 1 is the only exact
+//   boundary that can be recorded.
+// - The irrational boundaries of positive schemas (2^(k / 2^schema)) can't be hit exactly, only
+//   approached from either side.
+// Envoy also passes recorded values to circllhist as int64_t, so nothing above 2^63 can be tested.
+//
+// Generated with github.com/prometheus/client_golang v1.24.1.
+
+const std::vector<NativeHistogramBucketIndexCase> kIntegerBucketIndexCases = {
+    // Below the zero threshold (0.5), so in the zero bucket.
+    {0,
+     {kZeroBucket, kZeroBucket, kZeroBucket, kZeroBucket, kZeroBucket, kZeroBucket, kZeroBucket,
+      kZeroBucket, kZeroBucket}},
+    // Every integer from 1 to 64. 1 is the smallest non-zero value, just above the zero threshold.
+    // The powers of two are exact bucket boundaries, each belonging in the bucket it is the upper
+    // bound of, and the integers next to them are just inside the neighboring buckets. All other
+    // boundaries in this range are irrational (2^(k / 2^schema) at positive schemas), and the
+    // integers on either side of each are the closest values that can be recorded.
+    {1, {0, 0, 0, 0, 0, 0, 0, 0, 0}},  // Exact boundary at every schema.
+    {2, {1, 1, 1, 1, 1, 2, 4, 8, 16}}, // Exact boundary at schemas >= 0.
+    {3, {1, 1, 1, 1, 2, 4, 7, 13, 26}},
+    {4, {1, 1, 1, 1, 2, 4, 8, 16, 32}}, // Exact boundary at schemas >= -1.
+    {5, {1, 1, 1, 2, 3, 5, 10, 19, 38}},
+    {6, {1, 1, 1, 2, 3, 6, 11, 21, 42}},
+    {7, {1, 1, 1, 2, 3, 6, 12, 23, 45}},
+    {8, {1, 1, 1, 2, 3, 6, 12, 24, 48}}, // Exact boundary at schemas >= 0.
+    {9, {1, 1, 1, 2, 4, 7, 13, 26, 51}},
+    {10, {1, 1, 1, 2, 4, 7, 14, 27, 54}},
+    {11, {1, 1, 1, 2, 4, 7, 14, 28, 56}},
+    {12, {1, 1, 1, 2, 4, 8, 15, 29, 58}},
+    {13, {1, 1, 1, 2, 4, 8, 15, 30, 60}},
+    {14, {1, 1, 1, 2, 4, 8, 16, 31, 61}},
+    {15, {1, 1, 1, 2, 4, 8, 16, 32, 63}},
+    {16, {1, 1, 1, 2, 4, 8, 16, 32, 64}}, // Exact boundary at schemas >= -2.
+    {17, {1, 1, 2, 3, 5, 9, 17, 33, 66}},
+    {18, {1, 1, 2, 3, 5, 9, 17, 34, 67}},
+    {19, {1, 1, 2, 3, 5, 9, 17, 34, 68}},
+    {20, {1, 1, 2, 3, 5, 9, 18, 35, 70}},
+    {21, {1, 1, 2, 3, 5, 9, 18, 36, 71}},
+    {22, {1, 1, 2, 3, 5, 9, 18, 36, 72}},
+    {23, {1, 1, 2, 3, 5, 10, 19, 37, 73}},
+    {24, {1, 1, 2, 3, 5, 10, 19, 37, 74}},
+    {25, {1, 1, 2, 3, 5, 10, 19, 38, 75}},
+    {26, {1, 1, 2, 3, 5, 10, 19, 38, 76}},
+    {27, {1, 1, 2, 3, 5, 10, 20, 39, 77}},
+    {28, {1, 1, 2, 3, 5, 10, 20, 39, 77}},
+    {29, {1, 1, 2, 3, 5, 10, 20, 39, 78}},
+    {30, {1, 1, 2, 3, 5, 10, 20, 40, 79}},
+    {31, {1, 1, 2, 3, 5, 10, 20, 40, 80}},
+    {32, {1, 1, 2, 3, 5, 10, 20, 40, 80}}, // Exact boundary at schemas >= 0.
+    {33, {1, 1, 2, 3, 6, 11, 21, 41, 81}},
+    {34, {1, 1, 2, 3, 6, 11, 21, 41, 82}},
+    {35, {1, 1, 2, 3, 6, 11, 21, 42, 83}},
+    {36, {1, 1, 2, 3, 6, 11, 21, 42, 83}},
+    {37, {1, 1, 2, 3, 6, 11, 21, 42, 84}},
+    {38, {1, 1, 2, 3, 6, 11, 21, 42, 84}},
+    {39, {1, 1, 2, 3, 6, 11, 22, 43, 85}},
+    {40, {1, 1, 2, 3, 6, 11, 22, 43, 86}},
+    {41, {1, 1, 2, 3, 6, 11, 22, 43, 86}},
+    {42, {1, 1, 2, 3, 6, 11, 22, 44, 87}},
+    {43, {1, 1, 2, 3, 6, 11, 22, 44, 87}},
+    {44, {1, 1, 2, 3, 6, 11, 22, 44, 88}},
+    {45, {1, 1, 2, 3, 6, 11, 22, 44, 88}},
+    {46, {1, 1, 2, 3, 6, 12, 23, 45, 89}},
+    {47, {1, 1, 2, 3, 6, 12, 23, 45, 89}},
+    {48, {1, 1, 2, 3, 6, 12, 23, 45, 90}},
+    {49, {1, 1, 2, 3, 6, 12, 23, 45, 90}},
+    {50, {1, 1, 2, 3, 6, 12, 23, 46, 91}},
+    {51, {1, 1, 2, 3, 6, 12, 23, 46, 91}},
+    {52, {1, 1, 2, 3, 6, 12, 23, 46, 92}},
+    {53, {1, 1, 2, 3, 6, 12, 23, 46, 92}},
+    {54, {1, 1, 2, 3, 6, 12, 24, 47, 93}},
+    {55, {1, 1, 2, 3, 6, 12, 24, 47, 93}},
+    {56, {1, 1, 2, 3, 6, 12, 24, 47, 93}},
+    {57, {1, 1, 2, 3, 6, 12, 24, 47, 94}},
+    {58, {1, 1, 2, 3, 6, 12, 24, 47, 94}},
+    {59, {1, 1, 2, 3, 6, 12, 24, 48, 95}},
+    {60, {1, 1, 2, 3, 6, 12, 24, 48, 95}},
+    {61, {1, 1, 2, 3, 6, 12, 24, 48, 95}},
+    {62, {1, 1, 2, 3, 6, 12, 24, 48, 96}},
+    {63, {1, 1, 2, 3, 6, 12, 24, 48, 96}},
+    {64, {1, 1, 2, 3, 6, 12, 24, 48, 96}}, // Exact boundary at schemas >= -1.
+    // Either side of 2^8 = 256, a bucket boundary at schemas >= -3. circllhist can't store 256
+    // exactly.
+    {250, {1, 1, 2, 4, 8, 16, 32, 64, 128}},
+    {260, {1, 2, 3, 5, 9, 17, 33, 65, 129}},
+    // Either side of 2^10 = 1024, a bucket boundary at schemas >= -1. circllhist can't store 1024
+    // exactly.
+    {1000, {1, 2, 3, 5, 10, 20, 40, 80, 160}},
+    {1100, {1, 2, 3, 6, 11, 21, 41, 81, 162}},
+    // Either side of 2^12 = 4096, a bucket boundary at schemas >= -2. circllhist can't store 4096
+    // exactly.
+    {4000, {1, 2, 3, 6, 12, 24, 48, 96, 192}},
+    {4100, {1, 2, 4, 7, 13, 25, 49, 97, 193}},
+    // Either side of 2^16 = 65536, a bucket boundary at every schema. circllhist can't store 65536
+    // exactly.
+    {65000, {1, 2, 4, 8, 16, 32, 64, 128, 256}},
+    {66000, {2, 3, 5, 9, 17, 33, 65, 129, 257}},
+    // Either side of 2^20 = 1048576, a bucket boundary at schemas >= -2. circllhist can't store
+    // 1048576 exactly.
+    {1000000, {2, 3, 5, 10, 20, 40, 80, 160, 319}},
+    {1100000, {2, 3, 6, 11, 21, 41, 81, 161, 322}},
+    // Either side of 2^24 = 16777216, a bucket boundary at schemas >= -3. circllhist can't store
+    // 16777216 exactly.
+    {16000000, {2, 3, 6, 12, 24, 48, 96, 192, 383}},
+    {17000000, {2, 4, 7, 13, 25, 49, 97, 193, 385}},
+    // Either side of 2^32 = 4294967296, a bucket boundary at every schema. circllhist can't store
+    // 4294967296 exactly.
+    {4200000000, {2, 4, 8, 16, 32, 64, 128, 256, 512}},
+    {4300000000, {3, 5, 9, 17, 33, 65, 129, 257, 513}},
+    // Either side of 2^48 = 281474976710656, a bucket boundary at every schema. circllhist can't
+    // store 281474976710656 exactly.
+    {280000000000000, {3, 6, 12, 24, 48, 96, 192, 384, 768}},
+    {290000000000000, {4, 7, 13, 25, 49, 97, 193, 385, 769}},
+    // Just below 2^63, the largest value that can be tested: Envoy passes recorded values to
+    // circllhist as int64_t, so larger values wrap negative.
+    {9200000000000000000, {4, 8, 16, 32, 63, 126, 252, 504, 1008}},
+};
+
+const std::vector<NativeHistogramBucketIndexCase> kPercentBucketIndexCases = {
+    // Below the zero threshold (0.5 / PercentScale), so in the zero bucket.
+    {0,
+     {kZeroBucket, kZeroBucket, kZeroBucket, kZeroBucket, kZeroBucket, kZeroBucket, kZeroBucket,
+      kZeroBucket, kZeroBucket}},
+    // 0.000001, the smallest non-zero percent value.
+    {1, {-1, -2, -4, -9, -19, -39, -79, -159, -318}},
+    // Powers of ten from 0.00001 to 0.1. Besides covering more negative indices, these spread the
+    // values over enough buckets that each coarse schema needs a different number of buckets, so
+    // every schema gets selected for some max_buckets.
+    {10, {-1, -2, -4, -8, -16, -33, -66, -132, -265}},
+    {100, {0, -1, -3, -6, -13, -26, -53, -106, -212}},
+    {1000, {0, -1, -2, -4, -9, -19, -39, -79, -159}},
+    {10000, {0, 0, -1, -3, -6, -13, -26, -53, -106}},
+    {100000, {0, 0, 0, -1, -3, -6, -13, -26, -53}},
+    // 0.25 = 2^-2, and the closest values that can be recorded either side of it.
+    {240000, {0, 0, 0, -1, -2, -4, -8, -16, -32}},
+    {250000, {0, 0, 0, -1, -2, -4, -8, -16, -32}}, // Exact boundary at schemas >= -1.
+    {260000, {0, 0, 0, 0, -1, -3, -7, -15, -31}},
+    // 0.5 = 2^-1, and the closest values that can be recorded either side of it.
+    {490000, {0, 0, 0, 0, -1, -2, -4, -8, -16}},
+    {500000, {0, 0, 0, 0, -1, -2, -4, -8, -16}}, // Exact boundary at schemas >= 0.
+    {510000, {0, 0, 0, 0, 0, -1, -3, -7, -15}},
+    // Either side of 2^(-1/2) ~= 0.7071, a bucket boundary at schemas >= 1.
+    {700000, {0, 0, 0, 0, 0, -1, -2, -4, -8}},
+    {710000, {0, 0, 0, 0, 0, 0, -1, -3, -7}},
+    // Either side of 2^(-1/4) ~= 0.8409, a bucket boundary at schemas >= 2.
+    {840000, {0, 0, 0, 0, 0, 0, -1, -2, -4}},
+    {850000, {0, 0, 0, 0, 0, 0, 0, -1, -3}},
+    // Either side of 2^(-1/8) ~= 0.9170, a bucket boundary at schemas >= 3.
+    {910000, {0, 0, 0, 0, 0, 0, 0, -1, -2}},
+    {920000, {0, 0, 0, 0, 0, 0, 0, 0, -1}},
+    // Either side of 2^(-1/16) ~= 0.9576, a bucket boundary at schema 4.
+    {950000, {0, 0, 0, 0, 0, 0, 0, 0, -1}},
+    {960000, {0, 0, 0, 0, 0, 0, 0, 0, 0}},
+    // 1.0 = 2^0, and the closest values that can be recorded either side of it. circllhist can't
+    // store 1.01, so the next value up is 1.1.
+    {990000, {0, 0, 0, 0, 0, 0, 0, 0, 0}},
+    {1000000, {0, 0, 0, 0, 0, 0, 0, 0, 0}}, // Exact boundary at every schema.
+    {1100000, {1, 1, 1, 1, 1, 1, 1, 2, 3}},
+    // 2.0 = 2^1, and the closest values that can be recorded either side of it.
+    {1900000, {1, 1, 1, 1, 1, 2, 4, 8, 15}},
+    {2000000, {1, 1, 1, 1, 1, 2, 4, 8, 16}}, // Exact boundary at schemas >= 0.
+    {2100000, {1, 1, 1, 1, 2, 3, 5, 9, 18}},
+};
+
+class NativeHistogramBucketIndexTest : public RealHistogramNativePrometheusTest {
+protected:
+  // Records every value in `cases` into one histogram, then raises native_histogram_max_buckets
+  // from 1 until Envoy has selected each schema in turn, checking the exported buckets against the
+  // expected indices at every schema.
+  void verifyBucketIndices(Stats::Histogram::Unit unit,
+                           const std::vector<NativeHistogramBucketIndexCase>& cases) {
+    Stats::Histogram& histogram = makeHistogram("bucket_index", unit);
+    for (const auto& test_case : cases) {
+      recordValue(histogram, test_case.recorded_value);
+    }
+    mergeHistograms();
+    auto parent_histogram = getParentHistogram("bucket_index");
+    ASSERT_NE(nullptr, parent_histogram);
+
+    const double scale =
+        unit == Stats::Histogram::Unit::Percent ? 1.0 / Stats::Histogram::PercentScale : 1.0;
+    std::set<int32_t> verified_schemas;
+    for (uint32_t max_buckets = 1;
+         !verified_schemas.contains(kBucketIndexMaxSchema) && max_buckets <= 10000; ++max_buckets) {
+      StatsParams params;
+      params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
+      params.native_histogram_max_buckets_ = max_buckets;
+      Http::TestResponseHeaderMapImpl response_headers;
+      Buffer::OwnedImpl response;
+      ASSERT_EQ(1, PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+                       {}, {}, {parent_histogram}, {}, endpoints_helper_->cm_, response_headers,
+                       response, params, custom_namespaces_));
+      const auto families = parsePrometheusProtobuf(response.toString());
+      ASSERT_EQ(1, families.size());
+      ASSERT_EQ(1, families[0].metric_size());
+      const auto& hist = families[0].metric(0).histogram();
+      const int32_t schema = hist.schema();
+      if (!verified_schemas.insert(schema).second) {
+        continue;
+      }
+      ASSERT_GE(schema, kBucketIndexMinSchema);
+      ASSERT_LE(schema, kBucketIndexMaxSchema);
+      SCOPED_TRACE(fmt::format("schema {} (max_buckets {})", schema, max_buckets));
+      EXPECT_EQ(cases.size(), hist.sample_count());
+
+      // Bucket index -> the values the reference library puts in that bucket.
+      uint64_t expected_zero_count = 0;
+      std::map<int32_t, std::vector<double>> expected_buckets;
+      for (const auto& test_case : cases) {
+        const int32_t index = test_case.expected_index[schema - kBucketIndexMinSchema];
+        if (index == kZeroBucket) {
+          ++expected_zero_count;
+        } else {
+          expected_buckets[index].push_back(test_case.recorded_value * scale);
+        }
+      }
+      EXPECT_EQ(expected_zero_count, hist.zero_count());
+
+      const std::map<int32_t, uint64_t> actual_buckets =
+          NativeHistogramDecoder::decodePositiveBuckets(hist);
+      std::set<int32_t> indices;
+      for (const auto& [index, values] : expected_buckets) {
+        indices.insert(index);
+      }
+      for (const auto& [index, count] : actual_buckets) {
+        indices.insert(index);
+      }
+      for (const int32_t index : indices) {
+        const auto expected = expected_buckets.find(index);
+        const auto actual = actual_buckets.find(index);
+        std::string expected_values;
+        if (expected != expected_buckets.end()) {
+          for (const double value : expected->second) {
+            expected_values += fmt::format("{}{:g}", expected_values.empty() ? "" : ", ", value);
+          }
+        }
+        EXPECT_EQ(expected == expected_buckets.end() ? 0 : expected->second.size(),
+                  actual == actual_buckets.end() ? 0 : actual->second)
+            << fmt::format("bucket {} ({:g}, {:g}] should contain [{}]", index,
+                           NativeHistogramDecoder::bucketLowerBound(schema, index),
+                           NativeHistogramDecoder::bucketUpperBound(schema, index),
+                           expected_values);
+      }
+    }
+    for (int32_t schema = kBucketIndexMinSchema; schema <= kBucketIndexMaxSchema; ++schema) {
+      EXPECT_TRUE(verified_schemas.contains(schema))
+          << "no max_buckets value made Envoy select schema " << schema;
+    }
+  }
+};
+
+// Integer values must be exported in the bucket the Prometheus client library puts them in, at
+// every schema. Every unit other than Percent records integers as-is, so Unspecified stands in for
+// all of them.
+TEST_F(NativeHistogramBucketIndexTest, IntegerValuesMatchPrometheusClient) {
+  verifyBucketIndices(Stats::Histogram::Unit::Unspecified, kIntegerBucketIndexCases);
+}
+
+// Percent values (stored as value * PercentScale) reach values below 1, which have negative bucket
+// indices.
+TEST_F(NativeHistogramBucketIndexTest, PercentValuesMatchPrometheusClient) {
+  verifyBucketIndices(Stats::Histogram::Unit::Percent, kPercentBucketIndexCases);
 }
 
 } // namespace Server

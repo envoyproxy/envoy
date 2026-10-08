@@ -451,7 +451,7 @@ TEST(QuicLbTest, EmptySecretCallback) {
   factory_context.server_factory_context_.secret_manager_ = std::move(secret_mgr_unique);
   auto secret_provider = std::make_shared<Secret::MockGenericSecretConfigProvider>();
 
-  EXPECT_CALL(*secret_manager, findOrCreateGenericSecretProvider(_, _, _, _))
+  EXPECT_CALL(*secret_manager, findOrCreateGenericSecretProvider(_, _, _, _, _))
       .WillOnce(testing::Return(secret_provider));
 
   EXPECT_CALL(*secret_provider, addValidationCallback(_));

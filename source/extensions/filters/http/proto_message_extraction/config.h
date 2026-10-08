@@ -15,19 +15,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoMessageExtraction {
 
-class FilterFactoryCreator
-    : public Envoy::Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
-          envoy::extensions::filters::http::proto_message_extraction::v3::
-              ProtoMessageExtractionConfig> {
+class FilterFactoryCreator : public Envoy::Extensions::HttpFilters::Common::UnifiedFactoryBase<
+                                 envoy::extensions::filters::http::proto_message_extraction::v3::
+                                     ProtoMessageExtractionConfig> {
 public:
   FilterFactoryCreator();
 
 private:
-  absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::proto_message_extraction::v3::
-          ProtoMessageExtractionConfig& proto_config,
-      const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
-
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::proto_message_extraction::v3::
           ProtoMessageExtractionConfig& proto_config,

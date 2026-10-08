@@ -78,6 +78,7 @@ envoy_cc_library(
         "//source/common/http:request_id_extension_lib",
         "//source/common/network:application_protocol_lib",
         "//source/common/network:cidr_range_lib",
+        "//source/common/network:drain_close_util_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:hash_policy_lib",
         "//source/common/network:proxy_protocol_filter_state_lib",

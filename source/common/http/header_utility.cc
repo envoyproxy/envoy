@@ -10,7 +10,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 
@@ -37,16 +36,8 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
                                  const std::vector<HeaderDataPtr>& config_headers) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
-    for (const HeaderDataPtr& cfg_header_data : config_headers) {
-      if (!cfg_header_data->matchesHeaders(request_headers)) {
-        return false;
-      }
-    }
-    return true;
-  }
   for (const HeaderDataPtr& cfg_header_data : config_headers) {
-    if (!cfg_header_data->matchesHeadersIndividually(request_headers)) {
+    if (!cfg_header_data->matches(request_headers)) {
       return false;
     }
   }
@@ -56,16 +47,8 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
 template <typename PointerType>
 static bool matchAnyHeaderImpl(const HeaderMap& request_headers,
                                const std::vector<PointerType>& config_headers) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
-    for (const PointerType& cfg_header_data : config_headers) {
-      if (cfg_header_data->matchesHeaders(request_headers)) {
-        return true;
-      }
-    }
-    return false;
-  }
   for (const PointerType& cfg_header_data : config_headers) {
-    if (cfg_header_data->matchesHeadersIndividually(request_headers)) {
+    if (cfg_header_data->matches(request_headers)) {
       return true;
     }
   }
@@ -276,6 +259,10 @@ bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
 }
 
+bool HeaderUtility::isQuery(const RequestHeaderMap& headers) {
+  return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Query;
+}
+
 bool HeaderUtility::isConnectUdpRequest(const RequestHeaderMap& headers) {
   return headers.Upgrade() && absl::EqualsIgnoreCase(headers.getUpgradeValue(),
                                                      Http::Headers::get().UpgradeValues.ConnectUdp);
@@ -465,7 +452,7 @@ constexpr bool isInvalidToken(unsigned char c) {
   return true;
 }
 
-std::optional<std::reference_wrapper<const absl::string_view>>
+OptRef<const absl::string_view>
 HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.
   if (headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
@@ -543,8 +530,10 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
   return Http::okStatus();
 }
 
+std::atomic<bool> HeaderUtility::disable_request_header_validation_for_tests_{false};
+
 Http::Status HeaderUtility::checkValidRequestHeaders(const Http::RequestHeaderMap& headers) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")) {
+  if (disable_request_header_validation_for_tests_.load(std::memory_order_relaxed)) {
     return Http::okStatus();
   }
 
