@@ -588,6 +588,12 @@ func (p *dynamicMetadataCallbacksFilter) OnRequestHeaders(headers shared.HeaderM
 	//   12 02 01 02        field 2 (value)    = 0x01 0x02
 	p.handle.SetTypedMetadata("ns_req_header_typed",
 		[]byte{0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02})
+	if typeURL, value, ok := p.handle.GetTypedMetadata(shared.MetadataSourceTypeDynamic, "ns_req_header_typed"); !ok || typeURL.ToUnsafeString() != "t/x" || value.ToUnsafeString() != "\x01\x02" {
+		panic("typed metadata mismatch")
+	}
+	if _, _, ok := p.handle.GetTypedMetadata(shared.MetadataSourceTypeDynamic, "missing"); ok {
+		panic("unexpected typed metadata")
+	}
 
 	// Try getting metadata from router, cluster, and host.
 	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeRoute,

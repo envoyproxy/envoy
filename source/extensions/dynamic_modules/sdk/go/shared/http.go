@@ -180,6 +180,11 @@ type HttpFilterHandle interface {
 	// google.protobuf.Any is a no-op.
 	SetTypedMetadata(metadataNamespace string, serializedAny []byte)
 
+	// GetTypedMetadata retrieves the type URL and serialized message payload from typed metadata.
+	// The returned buffers are owned by Envoy and are valid until the end of the current event hook
+	// unless a setter modifies the metadata. Empty fields are valid results.
+	GetTypedMetadata(source MetadataSourceType, metadataNamespace string) (typeURL, value UnsafeEnvoyBuffer, found bool)
+
 	// GetMetadataKeys retrieves all keys in the given metadata namespace.
 	// Returns list of keys in the namespace, or nil if the namespace does not exist.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should

@@ -1281,6 +1281,16 @@ pub trait EnvoyHttpFilter {
   /// parse as a `google.protobuf.Any` is a no-op.
   fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]);
 
+  /// Get the type URL and serialized message payload of typed metadata from the selected source.
+  /// The returned buffers are valid until the end of the current event hook unless a setter
+  /// modifies the metadata. Empty fields are valid results.
+  /// Returns `None` when the namespace or metadata source is unavailable.
+  fn get_typed_metadata<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+  ) -> Option<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
+
   /// Get the bool-typed metadata value with the given key.
   /// Use the `source` parameter to specify which metadata to use.
   /// If the metadata is not found or is the wrong type, this returns `None`.
@@ -2985,6 +2995,40 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         str_to_module_buffer(namespace),
         bytes_to_module_buffer(serialized_any),
       )
+    }
+  }
+
+  fn get_typed_metadata(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+  ) -> Option<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    let mut type_url = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut value = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_typed_metadata(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        &mut type_url as *mut _,
+        &mut value as *mut _,
+      )
+    };
+    if found {
+      Some(unsafe {
+        (
+          EnvoyBuffer::new_from_raw(type_url.ptr as *const _, type_url.length),
+          EnvoyBuffer::new_from_raw(value.ptr as *const _, value.length),
+        )
+      })
+    } else {
+      None
     }
   }
 

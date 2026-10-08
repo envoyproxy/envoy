@@ -1365,6 +1365,24 @@ void envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
   typed_metadata[std::string(ns.ptr, ns.length)].MergeFrom(typed_value);
 }
 
+bool envoy_dynamic_module_callback_http_get_typed_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_envoy_buffer* type_url,
+    envoy_dynamic_module_type_envoy_buffer* value) {
+  const auto* metadata = getMetadata(filter_envoy_ptr, metadata_source);
+  if (metadata == nullptr) {
+    return false;
+  }
+  const auto it = metadata->typed_filter_metadata().find(absl::string_view(ns.ptr, ns.length));
+  if (it == metadata->typed_filter_metadata().end()) {
+    return false;
+  }
+  *type_url = {it->second.type_url().data(), it->second.type_url().size()};
+  *value = {it->second.value().data(), it->second.value().size()};
+  return true;
+}
+
 bool envoy_dynamic_module_callback_http_get_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,

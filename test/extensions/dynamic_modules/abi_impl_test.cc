@@ -1974,6 +1974,9 @@ WEAK_STUB(HttpSetDynamicMetadataStruct,
 WEAK_STUB(HttpSetDynamicTypedMetadata,
           envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(nullptr, {nullptr, 0},
                                                                         {nullptr, 0}))
+WEAK_STUB(HttpGetTypedMetadata, envoy_dynamic_module_callback_http_get_typed_metadata(
+                                    nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                    {nullptr, 0}, nullptr, nullptr))
 WEAK_STUB(HttpGetMetadataString, envoy_dynamic_module_callback_http_get_metadata_string(
                                      nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                      {nullptr, 0}, {nullptr, 0}, nullptr))
