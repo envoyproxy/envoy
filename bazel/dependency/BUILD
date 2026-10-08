@@ -1,11 +1,6 @@
 load("@envoy_toolshed//dependency:macros.bzl", "module_deps_json", "module_updater", "registry_updater")
 
-licenses(["notice"])
-
-alias(
-    name = "common",
-    actual = "@envoy//source/common/common:assert_lib",
-)
+licenses(["notice"])  # Apache 2
 
 module_deps_json(
     name = "module_deps",
