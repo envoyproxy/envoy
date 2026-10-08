@@ -12,6 +12,7 @@ readonly LOCKFILE_PATHSPEC=':(glob)**/MODULE.bazel.lock'
 readonly -a REGISTRY_BAZELRC_FILES=(
     ".bazelrc"
     "api/.bazelrc"
+    "bazel/tests/codeql/.bazelrc"
     "bazel/tests/external/.bazelrc"
 )
 # shellcheck disable=SC2034
@@ -31,12 +32,10 @@ run_in_mods() {
     }
     for module_dir in "${_mod_dirs[@]}"; do
         status=0
-        # shellcheck disable=SC2164
-        pushd "$module_dir" > /dev/null
+        pushd "$module_dir" > /dev/null || return 1
         "$fn" "$module_dir" "$@" || status=$?
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
-        # shellcheck disable=SC2164
-        popd > /dev/null
+        popd > /dev/null || return 1
         (( status == 0 )) || return "$status"
     done
 }
@@ -87,8 +86,6 @@ workspace_bazel_run() {
     shift 2
 
     target="$(workspace_target "$module_dir" "$target_name")" || return 1
-    # shellcheck disable=SC2046
-    echo "${BAZEL_GLOBAL_OPTIONS[@]}"
     bazel run "${BAZEL_GLOBAL_OPTIONS[@]}" --config=ci "$target" "$@"
 }
 

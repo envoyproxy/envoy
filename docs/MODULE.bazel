@@ -30,6 +30,7 @@ local_path_override(
     module_name = "envoy",
     path = "../",
 )
+
 local_path_override(
     module_name = "envoy_api",
     path = "../api",
