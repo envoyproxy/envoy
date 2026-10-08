@@ -1,12 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_test",
 )
 
@@ -14,9 +13,10 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "bpf_datapath_test",
     srcs = ["bpf_datapath_test.cc"],
+    extension_names = ["envoy.extensions.network.socket_interface.sockmap"],
     deps = [
         "//envoy/common:base_includes",
         "//source/common/network:address_lib",
@@ -24,9 +24,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "io_handle_test",
     srcs = ["io_handle_test.cc"],
+    extension_names = ["envoy.extensions.network.socket_interface.sockmap"],
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/common:base_includes",
@@ -67,9 +68,10 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_benchmark_binary(
+envoy_extension_cc_benchmark_binary(
     name = "sockmap_benchmark",
     srcs = ["sockmap_benchmark.cc"],
+    extension_names = ["envoy.extensions.network.socket_interface.sockmap"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:address_lib",
@@ -78,7 +80,8 @@ envoy_cc_benchmark_binary(
     ],
 )
 
-envoy_benchmark_test(
+envoy_extension_benchmark_test(
     name = "sockmap_benchmark_test",
     benchmark_binary = "sockmap_benchmark",
+    extension_names = ["envoy.extensions.network.socket_interface.sockmap"],
 )

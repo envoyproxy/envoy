@@ -1,5 +1,6 @@
 #![allow(clippy::unnecessary_cast)]
 use crate::*;
+use std::num::NonZero;
 #[cfg(test)]
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize};
 
@@ -2147,7 +2148,7 @@ fn test_get_upstream_connection_id() {
     raw: std::ptr::null_mut(),
   };
 
-  assert_eq!(filter.get_upstream_connection_id(), 54321);
+  assert_eq!(filter.get_upstream_connection_id(), NonZero::new(54321));
 }
 
 #[test]
@@ -2158,7 +2159,7 @@ fn test_get_upstream_connection_id_unavailable() {
     raw: std::ptr::null_mut(),
   };
 
-  assert_eq!(filter.get_upstream_connection_id(), 0);
+  assert_eq!(filter.get_upstream_connection_id(), None);
 }
 
 static MOCK_HTTP_UPSTREAM_CONNECTION_ID: std::sync::atomic::AtomicU64 =
@@ -2179,7 +2180,7 @@ fn test_http_get_upstream_connection_id() {
     raw_ptr: std::ptr::null_mut(),
   };
 
-  assert_eq!(filter.get_upstream_connection_id(), 98765);
+  assert_eq!(filter.get_upstream_connection_id(), NonZero::new(98765));
   MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
 }
 
@@ -2191,24 +2192,54 @@ fn test_http_get_upstream_connection_id_unavailable() {
     raw_ptr: std::ptr::null_mut(),
   };
 
-  assert_eq!(filter.get_upstream_connection_id(), 0);
+  assert_eq!(filter.get_upstream_connection_id(), None);
 }
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_http_get_timing_info(
   _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  timing_out: *mut abi::envoy_dynamic_module_type_timing_info,
+  timing_out: *mut abi::envoy_dynamic_module_type_timing_info_v2,
 ) {
   unsafe {
-    *timing_out = abi::envoy_dynamic_module_type_timing_info {
-      start_time_unix_ns: 1,
-      request_complete_duration_ns: 2,
-      first_upstream_tx_byte_sent_ns: 3,
-      last_upstream_tx_byte_sent_ns: 4,
-      first_upstream_rx_byte_received_ns: 5,
-      last_upstream_rx_byte_received_ns: 6,
-      first_downstream_tx_byte_sent_ns: 7,
-      last_downstream_tx_byte_sent_ns: 8,
+    *timing_out = abi::envoy_dynamic_module_type_timing_info_v2 {
+      start_time_unix_ns: 1_000,
+      downstream_connection_begin_ns: -4,
+      downstream_handshake_start_ns: -3,
+      downstream_handshake_complete_ns: -2,
+      last_downstream_header_rx_byte_received_ns: 0,
+      last_downstream_rx_byte_received_ns: 1,
+      upstream_connect_start_ns: 2,
+      upstream_connect_complete_ns: 3,
+      upstream_handshake_complete_ns: 4,
+      first_upstream_tx_byte_sent_ns: 5,
+      last_upstream_tx_byte_sent_ns: 6,
+      first_upstream_rx_byte_received_ns: 7,
+      first_upstream_rx_body_byte_received_ns: 8,
+      last_upstream_rx_byte_received_ns: 9,
+      first_downstream_tx_byte_sent_ns: 10,
+      last_downstream_tx_byte_sent_ns: 11,
+      last_downstream_ack_received_ns: 12,
+      request_complete_duration_ns: 13,
+      downstream_connection_end_ns: 14,
+      has_start_time: true,
+      has_downstream_connection_begin: true,
+      has_downstream_handshake_start: true,
+      has_downstream_handshake_complete: true,
+      has_last_downstream_header_rx_byte_received: true,
+      has_last_downstream_rx_byte_received: true,
+      has_upstream_connect_start: true,
+      has_upstream_connect_complete: true,
+      has_upstream_handshake_complete: true,
+      has_first_upstream_tx_byte_sent: true,
+      has_last_upstream_tx_byte_sent: true,
+      has_first_upstream_rx_byte_received: true,
+      has_first_upstream_rx_body_byte_received: true,
+      has_last_upstream_rx_byte_received: true,
+      has_first_downstream_tx_byte_sent: true,
+      has_last_downstream_tx_byte_sent: true,
+      has_last_downstream_ack_received: true,
+      has_request_complete: true,
+      has_downstream_connection_end: true,
     };
   }
 }
@@ -2220,14 +2251,161 @@ fn test_http_get_timing_info() {
   };
 
   let timing: access_log::TimingInfo = filter.get_timing_info();
-  assert_eq!(timing.start_time_unix_ns, 1);
-  assert_eq!(timing.request_complete_duration_ns, 2);
-  assert_eq!(timing.first_upstream_tx_byte_sent_ns, 3);
-  assert_eq!(timing.last_upstream_tx_byte_sent_ns, 4);
-  assert_eq!(timing.first_upstream_rx_byte_received_ns, 5);
-  assert_eq!(timing.last_upstream_rx_byte_received_ns, 6);
-  assert_eq!(timing.first_downstream_tx_byte_sent_ns, 7);
-  assert_eq!(timing.last_downstream_tx_byte_sent_ns, 8);
+  assert_eq!(timing.start_time_unix_ns, Some(1_000));
+  assert_eq!(timing.downstream_connection_begin_ns, Some(-4));
+  assert_eq!(timing.downstream_handshake_start_ns, Some(-3));
+  assert_eq!(timing.downstream_handshake_complete_ns, Some(-2));
+  assert_eq!(timing.last_downstream_header_rx_byte_received_ns, Some(0));
+  assert_eq!(timing.last_downstream_rx_byte_received_ns, Some(1));
+  assert_eq!(timing.upstream_connect_start_ns, Some(2));
+  assert_eq!(timing.upstream_connect_complete_ns, Some(3));
+  assert_eq!(timing.upstream_handshake_complete_ns, Some(4));
+  assert_eq!(timing.first_upstream_tx_byte_sent_ns, Some(5));
+  assert_eq!(timing.last_upstream_tx_byte_sent_ns, Some(6));
+  assert_eq!(timing.first_upstream_rx_byte_received_ns, Some(7));
+  assert_eq!(timing.first_upstream_rx_body_byte_received_ns, Some(8));
+  assert_eq!(timing.last_upstream_rx_byte_received_ns, Some(9));
+  assert_eq!(timing.first_downstream_tx_byte_sent_ns, Some(10));
+  assert_eq!(timing.last_downstream_tx_byte_sent_ns, Some(11));
+  assert_eq!(timing.last_downstream_ack_received_ns, Some(12));
+  assert_eq!(timing.request_complete_duration_ns, Some(13));
+  assert_eq!(timing.downstream_connection_end_ns, Some(14));
+}
+
+const HTTP_UPSTREAM_ATTEMPTS_AVAILABLE: usize = 1;
+const HTTP_UPSTREAM_ATTEMPTS_EMPTY: usize = 2;
+const HTTP_UPSTREAM_ATTEMPTS_DATA_FAILURE: usize = 3;
+const HTTP_UPSTREAM_REMOTE_ADDRESS: &[u8] = b"10.0.0.3:9443";
+const HTTP_UPSTREAM_HOSTS_ATTEMPTED: [&[u8]; 2] = [b"10.0.0.1:443", b"10.0.0.2:8443"];
+const HTTP_UPSTREAM_CONNECTION_IDS_ATTEMPTED: [u64; 3] = [10, 20, 30];
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_remote_address(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  if filter_envoy_ptr as usize != HTTP_UPSTREAM_ATTEMPTS_AVAILABLE {
+    return false;
+  }
+  unsafe {
+    *result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: HTTP_UPSTREAM_REMOTE_ADDRESS.as_ptr() as *mut _,
+      length: HTTP_UPSTREAM_REMOTE_ADDRESS.len(),
+    };
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) -> usize {
+  match filter_envoy_ptr as usize {
+    HTTP_UPSTREAM_ATTEMPTS_AVAILABLE | HTTP_UPSTREAM_ATTEMPTS_DATA_FAILURE => {
+      HTTP_UPSTREAM_HOSTS_ATTEMPTED.len()
+    },
+    _ => 0,
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  hosts_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  if filter_envoy_ptr as usize != HTTP_UPSTREAM_ATTEMPTS_AVAILABLE {
+    return false;
+  }
+  for (index, host) in HTTP_UPSTREAM_HOSTS_ATTEMPTED.iter().enumerate() {
+    unsafe {
+      *hosts_out.add(index) = abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: host.as_ptr() as *mut _,
+        length: host.len(),
+      };
+    }
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) -> usize {
+  match filter_envoy_ptr as usize {
+    HTTP_UPSTREAM_ATTEMPTS_AVAILABLE | HTTP_UPSTREAM_ATTEMPTS_DATA_FAILURE => {
+      HTTP_UPSTREAM_CONNECTION_IDS_ATTEMPTED.len()
+    },
+    _ => 0,
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  connection_ids_out: *mut u64,
+) -> bool {
+  if filter_envoy_ptr as usize != HTTP_UPSTREAM_ATTEMPTS_AVAILABLE {
+    return false;
+  }
+  unsafe {
+    connection_ids_out.copy_from_nonoverlapping(
+      HTTP_UPSTREAM_CONNECTION_IDS_ATTEMPTED.as_ptr(),
+      HTTP_UPSTREAM_CONNECTION_IDS_ATTEMPTED.len(),
+    );
+  }
+  true
+}
+
+#[test]
+fn test_http_get_upstream_connection_attempts() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: HTTP_UPSTREAM_ATTEMPTS_AVAILABLE as *mut _,
+  };
+
+  assert_eq!(
+    filter.get_upstream_remote_address().unwrap().as_slice(),
+    HTTP_UPSTREAM_REMOTE_ADDRESS
+  );
+  let hosts = filter.get_upstream_hosts_attempted();
+  assert_eq!(hosts.len(), 2);
+  assert_eq!(hosts[0].as_slice(), HTTP_UPSTREAM_HOSTS_ATTEMPTED[0]);
+  assert_eq!(hosts[1].as_slice(), HTTP_UPSTREAM_HOSTS_ATTEMPTED[1]);
+  assert_eq!(
+    filter.get_upstream_connection_ids_attempted(),
+    HTTP_UPSTREAM_CONNECTION_IDS_ATTEMPTED
+  );
+}
+
+#[test]
+fn test_http_get_upstream_connection_attempts_empty() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: HTTP_UPSTREAM_ATTEMPTS_EMPTY as *mut _,
+  };
+
+  assert!(filter.get_upstream_remote_address().is_none());
+  assert!(filter.get_upstream_hosts_attempted().is_empty());
+  assert!(filter.get_upstream_connection_ids_attempted().is_empty());
+}
+
+#[test]
+fn test_http_get_upstream_connection_attempts_unavailable() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  assert!(filter.get_upstream_remote_address().is_none());
+  assert!(filter.get_upstream_hosts_attempted().is_empty());
+  assert!(filter.get_upstream_connection_ids_attempted().is_empty());
+}
+
+#[test]
+fn test_http_get_upstream_connection_attempts_data_failure() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: HTTP_UPSTREAM_ATTEMPTS_DATA_FAILURE as *mut _,
+  };
+
+  assert!(filter.get_upstream_hosts_attempted().is_empty());
+  assert!(filter.get_upstream_connection_ids_attempted().is_empty());
 }
 
 // Mock storage backing the HTTP header getters so the fast path can be exercised without Envoy.
@@ -3001,6 +3179,15 @@ fn test_bootstrap_iterate_counters_continue_and_stop() {
     false
   });
   assert_eq!(visited, 1);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _kind: abi::envoy_dynamic_module_type_bootstrap_active_resource_kind,
+  _name_fn: abi::envoy_dynamic_module_type_bootstrap_active_resource_name_fn,
+  _user_data: *mut std::os::raw::c_void,
+) {
 }
 
 #[no_mangle]
@@ -7853,7 +8040,13 @@ pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers(
   if !MOCK_MATCHER_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
     return false;
   }
-  for (i, (key, value)) in MOCK_MATCHER_HEADERS.iter().enumerate() {
+  // An empty header map is filled successfully with no entries, as Envoy does.
+  let count = if MOCK_MATCHER_MAP_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    MOCK_MATCHER_HEADERS.len()
+  };
+  for (i, (key, value)) in MOCK_MATCHER_HEADERS.iter().take(count).enumerate() {
     unsafe {
       *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
         key_ptr: key.as_ptr() as *mut _,
@@ -7920,29 +8113,25 @@ fn test_matcher_get_all_headers() {
   // A populated map yields every key-value pair in fill order.
   MOCK_MATCHER_MAP_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
   MOCK_MATCHER_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
-  let headers = ctx
-    .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
-    .expect("header map is available");
-  assert_eq!(
-    headers,
-    vec![
-      (b":path".as_slice(), b"/index".as_slice()),
-      (b"content-type".as_slice(), b"text/plain".as_slice()),
-    ]
-  );
+  let headers = ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader);
+  assert_eq!(2, headers.len());
+  assert_eq!(b":path".as_slice(), headers[0].0.as_slice());
+  assert_eq!(b"/index".as_slice(), headers[0].1.as_slice());
+  assert_eq!(b"content-type".as_slice(), headers[1].0.as_slice());
+  assert_eq!(b"text/plain".as_slice(), headers[1].1.as_slice());
 
-  // An empty map returns None without invoking the fill callback.
+  // An empty map yields an empty vector.
   MOCK_MATCHER_MAP_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
   assert!(ctx
     .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
-    .is_none());
+    .is_empty());
 
-  // A failed fill returns None rather than exposing the uninitialized capacity.
+  // A failed fill yields an empty vector rather than exposing the uninitialized capacity.
   MOCK_MATCHER_MAP_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
   MOCK_MATCHER_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
   assert!(ctx
     .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
-    .is_none());
+    .is_empty());
 }
 
 // =============================================================================
@@ -9989,8 +10178,13 @@ static EHM_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
 static FMT_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
 static FMT_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
 
-fn fill_getter_headers(result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header) {
-  for (i, (key, value)) in GETTER_HEADERS.iter().enumerate() {
+// An empty header map is filled successfully with no entries, as Envoy does.
+fn fill_getter_headers(
+  result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+  empty: bool,
+) {
+  let count = if empty { 0 } else { GETTER_HEADERS.len() };
+  for (i, (key, value)) in GETTER_HEADERS.iter().take(count).enumerate() {
     unsafe {
       *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
         key_ptr: key.as_ptr() as *mut _,
@@ -10021,7 +10215,10 @@ pub extern "C" fn envoy_dynamic_module_callback_early_header_mutation_get_header
   if !EHM_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
     return false;
   }
-  fill_getter_headers(result_headers);
+  fill_getter_headers(
+    result_headers,
+    EHM_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst),
+  );
   true
 }
 
@@ -10046,11 +10243,15 @@ pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers(
   if !FMT_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
     return false;
   }
-  fill_getter_headers(result_headers);
+  fill_getter_headers(
+    result_headers,
+    FMT_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst),
+  );
   true
 }
 
-// The rewritten getters fill the returned pairs in one allocation, so cover the three branches.
+// The getters read the headers through the shared size and fill helper, so cover the three
+// branches.
 #[test]
 fn test_early_header_mutation_get_all_headers_single_allocation() {
   let ctx = unsafe { early_header_mutation::EarlyHeaderMutationContext::new(std::ptr::null_mut()) };
@@ -10113,7 +10314,13 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_request_he
   if !STUB_SPECIFIER_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
     return false;
   }
-  for (i, (key, value)) in STUB_SPECIFIER_HEADERS.iter().enumerate() {
+  // An empty header map is filled successfully with no entries, as Envoy does.
+  let count = if STUB_SPECIFIER_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    STUB_SPECIFIER_HEADERS.len()
+  };
+  for (i, (key, value)) in STUB_SPECIFIER_HEADERS.iter().take(count).enumerate() {
     unsafe {
       *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
         key_ptr: key.as_ptr() as *mut _,
@@ -11083,7 +11290,7 @@ static STUB_ROUTE_DIRECT: AtomicBool = AtomicBool::new(false);
 #[derive(Default)]
 struct StubRouteDecision {
   template_id: Option<String>,
-  chain_status: Option<abi::envoy_dynamic_module_type_route_specifier_chain_status>,
+  decision: Option<abi::envoy_dynamic_module_type_route_specifier_decision>,
   cluster_name: Option<String>,
   timeout_ms: Option<u64>,
   idle_timeout_ms: Option<u64>,
@@ -11099,6 +11306,7 @@ struct StubRouteDecision {
   filter_disabled: Option<(String, bool)>,
   path: Option<String>,
   host: Option<String>,
+  route_name: Option<String>,
   request_headers: Vec<(
     String,
     String,
@@ -11116,7 +11324,7 @@ struct StubRouteDecision {
 static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
   std::sync::Mutex::new(StubRouteDecision {
     template_id: None,
-    chain_status: None,
+    decision: None,
     cluster_name: None,
     timeout_ms: None,
     idle_timeout_ms: None,
@@ -11132,6 +11340,7 @@ static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
     filter_disabled: None,
     path: None,
     host: None,
+    route_name: None,
     request_headers: Vec::new(),
     removed_request_headers: Vec::new(),
     response_headers: Vec::new(),
@@ -11190,6 +11399,19 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_has_route
   name: abi::envoy_dynamic_module_type_module_buffer,
 ) -> bool {
   unsafe { stub_specifier_string(name) == STUB_SPECIFIER_OVERRIDE_NAME }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  unsafe {
+    *result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+  }
 }
 
 #[no_mangle]
@@ -11318,7 +11540,13 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_get_request_head
   if !STUB_ROUTE_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
     return false;
   }
-  for (index, (key, value)) in STUB_ROUTE_HEADERS.iter().enumerate() {
+  // An empty header map is filled successfully with no entries, as Envoy does.
+  let count = if STUB_ROUTE_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    STUB_ROUTE_HEADERS.len()
+  };
+  for (index, (key, value)) in STUB_ROUTE_HEADERS.iter().take(count).enumerate() {
     unsafe {
       *result_headers.add(index) = abi::envoy_dynamic_module_type_envoy_http_header {
         key_ptr: key.as_ptr() as *mut _,
@@ -11621,7 +11849,7 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_get_selected_tem
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_template(
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_template(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
   template_id: abi::envoy_dynamic_module_type_module_buffer,
 ) -> bool {
@@ -11634,11 +11862,25 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_template(
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_chain_status(
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_unset_route_template(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
-  status: abi::envoy_dynamic_module_type_route_specifier_chain_status,
+  template_id: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let template_id = unsafe { stub_specifier_string(template_id) };
+  let mut decision = STUB_ROUTE_DECISION.lock().unwrap();
+  if decision.template_id.as_deref() != Some(template_id.as_str()) {
+    return false;
+  }
+  decision.template_id = None;
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_decision(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  decision: abi::envoy_dynamic_module_type_route_specifier_decision,
 ) {
-  STUB_ROUTE_DECISION.lock().unwrap().chain_status = Some(status);
+  STUB_ROUTE_DECISION.lock().unwrap().decision = Some(decision);
 }
 
 #[no_mangle]
@@ -11719,6 +11961,20 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_overri
     return false;
   }
   STUB_ROUTE_DECISION.lock().unwrap().route_override = Some(name);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_unset_route_override(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let name = unsafe { stub_specifier_string(name) };
+  let mut decision = STUB_ROUTE_DECISION.lock().unwrap();
+  if decision.route_override.as_deref() != Some(name.as_str()) {
+    return false;
+  }
+  decision.route_override = None;
   true
 }
 
@@ -11816,6 +12072,19 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_host(
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_name(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  route_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let route_name = unsafe { stub_specifier_string(route_name) };
+  if route_name.is_empty() {
+    return false;
+  }
+  STUB_ROUTE_DECISION.lock().unwrap().route_name = Some(route_name);
+  true
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_route_specifier_add_request_header(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
   key: abi::envoy_dynamic_module_type_module_buffer,
@@ -11894,8 +12163,8 @@ fn test_envoy_dynamic_module_on_route_specifier_config_new_impl() {
     fn on_route(
       &self,
       _ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
-      route_specifier::RouteDecision::PassThrough
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
     }
   }
 
@@ -11932,8 +12201,8 @@ fn test_envoy_dynamic_module_on_route_specifier_config_destroy() {
     fn on_route(
       &self,
       _ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
-      route_specifier::RouteDecision::PassThrough
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
     }
   }
   impl Drop for TestRouteSpecifierConfig {
@@ -11959,27 +12228,27 @@ fn test_envoy_dynamic_module_on_route_specifier_config_destroy() {
 #[test]
 fn test_envoy_dynamic_module_on_route_specifier_on_route() {
   // Drives the route hook through the FFI entry point so the boxed trait object, the context
-  // wrapper, and the returned decision are all exercised.
+  // wrapper, and the returned status are all exercised.
   static CONFIG_BYTES_SEEN: std::sync::Mutex<Vec<u8>> = std::sync::Mutex::new(Vec::new());
   static RANDOM_VALUE_SEEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
   struct TestRouteSpecifierConfig {
-    decision: route_specifier::RouteDecision,
+    status: route_specifier::OnRouteStatus,
   }
   impl route_specifier::RouteSpecifierConfig for TestRouteSpecifierConfig {
     fn on_route(
       &self,
       ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
+    ) -> route_specifier::OnRouteStatus {
       RANDOM_VALUE_SEEN.store(ctx.get_random_value(), std::sync::atomic::Ordering::SeqCst);
-      self.decision
+      self.status
     }
   }
 
   let new_fn: NewRouteSpecifierConfigFunction = |_, config, _| {
     CONFIG_BYTES_SEEN.lock().unwrap().extend_from_slice(config);
     Some(Box::new(TestRouteSpecifierConfig {
-      decision: route_specifier::RouteDecision::SelectTemplate,
+      status: route_specifier::OnRouteStatus::StopIteration,
     }))
   };
   let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
@@ -11994,15 +12263,15 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route() {
     CONFIG_BYTES_SEEN.lock().unwrap().as_slice()
   );
 
-  let decision = unsafe {
+  let status = unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_on_route(
       config_ptr,
       std::ptr::null_mut(),
     )
   };
   assert_eq!(
-    abi::envoy_dynamic_module_type_route_specifier_decision::SelectTemplate,
-    decision
+    abi::envoy_dynamic_module_type_route_specifier_on_route_status::StopIteration,
+    status
   );
   assert_eq!(
     STUB_ROUTE_RANDOM_VALUE,
@@ -12012,10 +12281,10 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route() {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
   }
 
-  // A config that reports no decision leaves the resolved route in place.
+  // A config that lets the chain carry on maps to the Continue status across the ABI.
   let new_fn: NewRouteSpecifierConfigFunction = |_, _, _| {
     Some(Box::new(TestRouteSpecifierConfig {
-      decision: route_specifier::RouteDecision::PassThrough,
+      status: route_specifier::OnRouteStatus::Continue,
     }))
   };
   let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
@@ -12024,15 +12293,42 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route() {
     b"",
     &new_fn,
   );
-  let decision = unsafe {
+  let status = unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_on_route(
       config_ptr,
       std::ptr::null_mut(),
     )
   };
   assert_eq!(
-    abi::envoy_dynamic_module_type_route_specifier_decision::PassThrough,
-    decision
+    abi::envoy_dynamic_module_type_route_specifier_on_route_status::Continue,
+    status
+  );
+  unsafe {
+    route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
+  }
+
+  // A config that asks matching to carry on maps to the StopIterationAndSkipRoute status across
+  // the ABI.
+  let new_fn: NewRouteSpecifierConfigFunction = |_, _, _| {
+    Some(Box::new(TestRouteSpecifierConfig {
+      status: route_specifier::OnRouteStatus::StopIterationAndSkipRoute,
+    }))
+  };
+  let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
+    std::ptr::null_mut(),
+    "test_route_specifier",
+    b"",
+    &new_fn,
+  );
+  let status = unsafe {
+    route_specifier::envoy_dynamic_module_on_route_specifier_on_route(
+      config_ptr,
+      std::ptr::null_mut(),
+    )
+  };
+  assert_eq!(
+    abi::envoy_dynamic_module_type_route_specifier_on_route_status::StopIterationAndSkipRoute,
+    status
   );
   unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
@@ -12048,22 +12344,29 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route_recovers_from_panic() {
     fn on_route(
       &self,
       _ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
+    ) -> route_specifier::OnRouteStatus {
       panic!("intentional panic in on_route");
     }
   }
 
+  STUB_ROUTE_DECISION.lock().unwrap().decision = None;
   let config: Box<dyn route_specifier::RouteSpecifierConfig> = Box::new(PanicConfig);
   let config_ptr = Box::into_raw(Box::new(config)) as *const std::ffi::c_void;
-  let decision = unsafe {
+  let status = unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_on_route(
       config_ptr,
       std::ptr::null_mut(),
     )
   };
+  // The panic records the Error decision, which Envoy resolves through the failure policy, so
+  // the returned status is not acted on.
   assert_eq!(
-    abi::envoy_dynamic_module_type_route_specifier_decision::Error,
-    decision
+    Some(abi::envoy_dynamic_module_type_route_specifier_decision::Error),
+    STUB_ROUTE_DECISION.lock().unwrap().decision
+  );
+  assert_eq!(
+    abi::envoy_dynamic_module_type_route_specifier_on_route_status::Continue,
+    status
   );
   unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
@@ -12079,7 +12382,9 @@ fn test_route_specifier_context_reads_request_state() {
   STUB_ROUTE_STATE_PRESENT.store(true, std::sync::atomic::Ordering::SeqCst);
 
   assert_eq!(2, ctx.get_request_headers_count());
-  let headers = ctx.get_all_request_headers();
+  let headers = ctx
+    .get_all_request_headers()
+    .expect("request headers present");
   assert_eq!(2, headers.len());
   assert_eq!(b":path".as_slice(), headers[0].0.as_slice());
   assert_eq!(b"/index".as_slice(), headers[0].1.as_slice());
@@ -12127,14 +12432,52 @@ fn test_route_specifier_context_reads_request_state() {
   assert_eq!(4, host_count.healthy);
   assert_eq!(1, host_count.degraded);
 
-  // Envoy reports no request headers when the map is empty, and the fill callback can fail when
-  // the map changes between the size call and the fill call.
+  // An empty header map yields an empty vector, while an absent map yields an error, so a caller
+  // cannot confuse the two.
   STUB_ROUTE_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
-  assert!(ctx.get_all_request_headers().is_empty());
+  assert!(ctx
+    .get_all_request_headers()
+    .expect("empty header map")
+    .is_empty());
   STUB_ROUTE_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
   STUB_ROUTE_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
-  assert!(ctx.get_all_request_headers().is_empty());
+  assert!(ctx.get_all_request_headers().is_err());
   STUB_ROUTE_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+
+  // The view over a caller owned buffer reads the same headers, and the buffer is reused across
+  // calls whatever the previous call left in it.
+  let mut buf = Vec::new();
+  {
+    let view = ctx
+      .get_request_headers_into(&mut buf)
+      .expect("request headers present");
+    assert_eq!(2, view.len());
+    assert!(!view.is_empty());
+    let (key, value) = view.get(0).unwrap();
+    assert_eq!(b":path".as_slice(), key.as_slice());
+    assert_eq!(b"/index".as_slice(), value.as_slice());
+    assert!(view.get(2).is_none());
+    assert_eq!(2, view.iter().count());
+  }
+  STUB_ROUTE_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx
+    .get_request_headers_into(&mut buf)
+    .expect("empty header map")
+    .is_empty());
+  STUB_ROUTE_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  STUB_ROUTE_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert_eq!(
+    Some(route_specifier::FillError::Unavailable),
+    ctx.get_request_headers_into(&mut buf).err()
+  );
+  STUB_ROUTE_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert_eq!(
+    2,
+    ctx
+      .get_request_headers_into(&mut buf)
+      .expect("request headers present")
+      .len()
+  );
 
   // Absent state is reported as such rather than as a default value.
   STUB_ROUTE_STATE_PRESENT.store(false, std::sync::atomic::Ordering::SeqCst);
@@ -12275,7 +12618,12 @@ fn test_route_specifier_context_records_decision() {
 
   assert!(ctx.select_template(STUB_ROUTE_TEMPLATE_ID));
   assert!(!ctx.select_template("unknown"));
-  ctx.set_chain_status(route_specifier::ChainStatus::StopIteration);
+  // Unselecting the selected template reverts it; a second unselect has nothing to match. The
+  // final selection is what the assertions below observe.
+  assert!(ctx.unselect_template(STUB_ROUTE_TEMPLATE_ID));
+  assert!(!ctx.unselect_template(STUB_ROUTE_TEMPLATE_ID));
+  assert!(ctx.select_template(STUB_ROUTE_TEMPLATE_ID));
+  ctx.set_decision(route_specifier::RouteDecision::NoRoute);
   assert!(ctx.set_cluster_name("cluster_a"));
   ctx.set_timeout(std::time::Duration::from_millis(250));
   ctx.set_idle_timeout(std::time::Duration::from_millis(500));
@@ -12286,6 +12634,11 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_cluster_not_found_response_code(99));
   assert!(ctx.set_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
   assert!(!ctx.set_route_override("unknown"));
+  // Unsetting the selected override reverts it; a second unset has nothing to match. The final
+  // selection is what the assertions below observe.
+  assert!(ctx.unset_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
+  assert!(!ctx.unset_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
+  assert!(ctx.set_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
   ctx.set_route_metadata_string("ns", "key", "value");
   ctx.set_route_metadata_number("ns", "num", 1.5);
   ctx.set_route_metadata_bool("ns", "flag", true);
@@ -12296,6 +12649,8 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_path("rewritten"));
   assert!(ctx.set_host("example.com"));
   assert!(!ctx.set_host(""));
+  assert!(ctx.set_route_name("module_route"));
+  assert!(!ctx.set_route_name(""));
   assert!(ctx.add_request_header(
     "x-add",
     "value",
@@ -12327,8 +12682,8 @@ fn test_route_specifier_context_records_decision() {
     decision.template_id
   );
   assert_eq!(
-    Some(abi::envoy_dynamic_module_type_route_specifier_chain_status::StopIteration),
-    decision.chain_status
+    Some(abi::envoy_dynamic_module_type_route_specifier_decision::NoRoute),
+    decision.decision
   );
   assert_eq!(Some("cluster_a".to_string()), decision.cluster_name);
   assert_eq!(Some(250), decision.timeout_ms);
@@ -12363,6 +12718,7 @@ fn test_route_specifier_context_records_decision() {
   assert_eq!(Some(("filter".to_string(), true)), decision.filter_disabled);
   assert_eq!(Some("/rewritten".to_string()), decision.path);
   assert_eq!(Some("example.com".to_string()), decision.host);
+  assert_eq!(Some("module_route".to_string()), decision.route_name);
   assert_eq!(
     vec![(
       "x-add".to_string(),
@@ -12402,8 +12758,8 @@ fn test_envoy_route_specifier_config_impl() {
     fn on_route(
       &self,
       _ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
-      route_specifier::RouteDecision::PassThrough
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
     }
   }
 

@@ -27,6 +27,12 @@ public:
   std::optional<bool> extractSampled();
   std::pair<SpanContext, bool> extractSpanContext(bool is_sampled);
 
+  /**
+   * @return true if the span context was extracted from the B3 single header ("b3"). Only valid
+   * after extractSpanContext() is called.
+   */
+  bool b3SingleFormatUsed() const { return b3_single_format_used_; }
+
 private:
   /*
    * Use to SpanContext extracted from B3 single format Http header
@@ -45,6 +51,7 @@ private:
   bool tryExtractSampledFromB3SingleFormat();
   const Tracing::TraceContext& trace_context_;
   bool w3c_fallback_enabled_;
+  bool b3_single_format_used_{false};
 };
 
 } // namespace Zipkin

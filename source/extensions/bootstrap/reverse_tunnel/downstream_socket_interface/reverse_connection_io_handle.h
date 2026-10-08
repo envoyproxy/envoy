@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/io_handle.h"
@@ -95,6 +96,8 @@ struct ReverseConnectionSocketConfig {
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
   // How often to re-check each host and dial missing tunnels.
   uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
+  // Deadline for receiving the handshake response after a dial opens the connection.
+  uint64_t handshake_timeout_ms{15000};
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -149,8 +152,8 @@ public:
 
   /**
    * Override of accept method for reverse connections.
-   * Returns established reverse connections when they become available. This is woken up using the
-   * trigger pipe when a tcp connection to an upstream cluster is established.
+   * Returns established reverse connections when they become available. maybePushConn() activates a
+   * read event when a tcp connection to an upstream cluster is established.
    * @param addr pointer to store the client address information.
    * @param addrlen pointer to the length of the address structure.
    * @return IoHandlePtr for the accepted reverse connection, or nullptr if none available.
@@ -187,6 +190,15 @@ public:
    * @return IoCallUint64Result indicating the result of the close operation.
    */
   Api::IoCallUint64Result close() override;
+
+  /**
+   * Return a fresh, unstarted reverse connection handle rather than a raw fd dup. The listener
+   * manager duplicates the listen socket per worker under ``reuse_port`` and on every LDS update,
+   * and a raw dup of this handle's fd never dials and can auto-bind an unadvertised port. The copy
+   * shares the configuration and backs its own dial loop once the worker initializes it.
+   * @return a new ReverseConnectionIOHandle over a fresh unbound TCP socket.
+   */
+  Network::IoHandlePtr duplicate() override;
 
   /**
    * Stop reverse-connection maintenance on listener teardown. On the owning worker this also
@@ -397,6 +409,13 @@ public:
     return config_.handshake_headers;
   }
 
+  /**
+   * @return the handshake response deadline applied to each dial attempt.
+   */
+  std::chrono::milliseconds handshakeTimeout() const {
+    return std::chrono::milliseconds(config_.handshake_timeout_ms);
+  }
+
 private:
   /**
    * Get time source for consistent time operations.
@@ -526,6 +545,7 @@ private:
   const ReverseConnectionSocketConfig config_; // Configuration for reverse connections
   Upstream::ClusterManager& cluster_manager_;
   ReverseTunnelInitiatorExtension* extension_;
+  Stats::Scope& scope_; // Stats scope, forwarded to handles created by duplicate().
 
   // Connection wrapper management
   std::vector<std::unique_ptr<RCConnectionWrapper>>
@@ -533,10 +553,17 @@ private:
   // Mapping from wrapper to host. This designates the number of successful connections to a host.
   absl::flat_hash_map<RCConnectionWrapper*, std::string> conn_wrapper_to_host_map_;
 
+  // An established tunnel awaiting accept(), with any bytes the responder coalesced with the
+  // handshake response so accept() can replay them before reading the socket.
+  struct EstablishedConnection {
+    Envoy::Network::ClientConnectionPtr connection;
+    Buffer::InstancePtr residual_bytes;
+  };
+
   // Established tunnels wait here until the listener accepts them. accept() pops the front
   // entry, and maybePushConn() injects a read event so the listener keeps draining the queue
   // without the fd ever being registered for kernel readability.
-  std::queue<Envoy::Network::ClientConnectionPtr> established_connections_;
+  std::queue<EstablishedConnection> established_connections_;
   bool listener_want_read_{false}; // Whether the listener wants to read data.
 
   // Single retry timer for all clusters

@@ -9,6 +9,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/path_rewrite_utility.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
@@ -205,6 +206,12 @@ bool envoy_dynamic_module_callback_route_specifier_config_register_route_templat
     envoy_dynamic_module_type_module_buffer serialized_route) {
   return routeSpecifierConfig(config_envoy_ptr)
       ->registerRouteTemplate(toStringView(template_id), toStringView(serialized_route));
+}
+
+void envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  setEnvoyBuffer(result, routeSpecifierConfig(config_envoy_ptr)->specifierInstanceId());
 }
 
 // ---------------------------------- Metrics ----------------------------------
@@ -520,21 +527,18 @@ bool envoy_dynamic_module_callback_route_specifier_get_cluster_host_count(
 
 // --------------------------------- Input route -------------------------------
 
-bool envoy_dynamic_module_callback_route_specifier_get_input_route(
-    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_route_specifier_input_route* result) {
-  const auto& route = routeSpecifierContext(context_envoy_ptr)->currentRoute();
-  if (route == nullptr) {
-    return false;
-  }
+// Fills the free to read properties of a route into result. Shared by the input route and the
+// previous route getters, which differ only in which route they read.
+void fillInputRoute(const Envoy::Router::Route& route,
+                    envoy_dynamic_module_type_route_specifier_input_route* result) {
   *result = {};
-  const auto* entry = route->routeEntry();
+  const auto* entry = route.routeEntry();
   result->kind = entry != nullptr
                      ? envoy_dynamic_module_type_route_specifier_route_kind_RouteEntry
                      : envoy_dynamic_module_type_route_specifier_route_kind_DirectResponse;
-  setEnvoyBuffer(&result->name, route->routeName());
-  setEnvoyBuffer(&result->virtual_host_name, route->virtualHost().name());
-  const auto& metadata = route->metadata();
+  setEnvoyBuffer(&result->name, route.routeName());
+  setEnvoyBuffer(&result->virtual_host_name, route.virtualHost().name());
+  const auto& metadata = route.metadata();
   result->has_metadata =
       !metadata.filter_metadata().empty() || !metadata.typed_filter_metadata().empty();
   if (entry != nullptr) {
@@ -560,8 +564,46 @@ bool envoy_dynamic_module_callback_route_specifier_get_input_route(
     result->has_rate_limits = !entry->rateLimitPolicy().empty();
     result->request_mirror_policies_count = entry->shadowPolicies().size();
   } else {
-    result->response_code = static_cast<uint32_t>(route->directResponseEntry()->responseCode());
+    result->response_code = static_cast<uint32_t>(route.directResponseEntry()->responseCode());
   }
+}
+
+bool envoy_dynamic_module_callback_route_specifier_get_input_route(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_input_route* result) {
+  const auto& route = routeSpecifierContext(context_envoy_ptr)->currentRoute();
+  if (route == nullptr) {
+    return false;
+  }
+  fillInputRoute(*route, result);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_get_previous_route(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_input_route* result) {
+  const auto previous = routeSpecifierContext(context_envoy_ptr)->stream_info.routeSharedPtr();
+  if (previous == nullptr) {
+    return false;
+  }
+  fillInputRoute(*previous, result);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_get_previous_route_metadata(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto previous = routeSpecifierContext(context_envoy_ptr)->stream_info.routeSharedPtr();
+  if (previous == nullptr) {
+    return false;
+  }
+  const auto& value = Envoy::Config::Metadata::metadataValue(
+      &previous->metadata(), std::string(toStringView(ns)), std::string(toStringView(key)));
+  if (value.kind_case() != Protobuf::Value::kStringValue) {
+    return false;
+  }
+  setEnvoyBuffer(result, value.string_value());
   return true;
 }
 
@@ -698,7 +740,7 @@ bool envoy_dynamic_module_callback_route_specifier_get_selected_template_id(
 
 // ---------------------------------- Decision ---------------------------------
 
-bool envoy_dynamic_module_callback_route_specifier_set_template(
+bool envoy_dynamic_module_callback_route_specifier_set_route_template(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer template_id) {
   auto* context = routeSpecifierContext(context_envoy_ptr);
@@ -706,6 +748,7 @@ bool envoy_dynamic_module_callback_route_specifier_set_template(
   const auto* route_template = context->config.routeTemplate(id);
   if (route_template == nullptr) {
     ENVOY_LOG_MISC(debug, "dynamic module route specifier selected unknown template '{}'", id);
+    context->template_selection_failed = true;
     return false;
   }
   context->selected_template = route_template;
@@ -717,10 +760,31 @@ bool envoy_dynamic_module_callback_route_specifier_set_template(
   return true;
 }
 
-void envoy_dynamic_module_callback_route_specifier_set_chain_status(
+bool envoy_dynamic_module_callback_route_specifier_unset_route_template(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_route_specifier_chain_status status) {
-  routeSpecifierContext(context_envoy_ptr)->chain_status = status;
+    envoy_dynamic_module_type_module_buffer template_id) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  const absl::string_view id = toStringView(template_id);
+  if (context->selected_template == nullptr || context->selected_template->id != id) {
+    return false;
+  }
+  context->selected_template = nullptr;
+  context->selected_route = nullptr;
+  return true;
+}
+
+void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t user_data) {
+  routeSpecifierContext(context_envoy_ptr)->user_data = user_data;
+}
+
+void envoy_dynamic_module_callback_route_specifier_set_decision(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_decision decision) {
+  // The module may pass a value outside the named enumerators, for example from a newer ABI,
+  // which the Sentinel enumerator of the type makes well defined to hold.
+  routeSpecifierContext(context_envoy_ptr)->decision = decision;
 }
 
 bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
@@ -733,6 +797,17 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
     return false;
   }
   context->overrides.cluster_name.assign(name.data(), name.size());
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_set_route_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer route_name) {
+  const absl::string_view value = toStringView(route_name);
+  if (value.empty()) {
+    return false;
+  }
+  routeSpecifierContext(context_envoy_ptr)->overrides.route_name = std::string(value);
   return true;
 }
 
@@ -792,7 +867,39 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_override(
                    toStringView(override_id));
     return false;
   }
+  // Only the selection is recorded here. The path rewrite and the metadata the override carries
+  // are applied when the decision resolves, so unset_route_override can revert the selection
+  // cleanly and the values the module records itself win whatever the call order.
   context->overrides.route_override = entry;
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_unset_route_override(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer override_id) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  const auto* entry = context->config.routeOverride(toStringView(override_id));
+  if (entry == nullptr || context->overrides.route_override != entry) {
+    return false;
+  }
+  context->overrides.route_override = nullptr;
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer matched,
+    envoy_dynamic_module_type_module_buffer replacement) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  // Compute the rewritten path once, so it takes precedence over the rewrites of the route the same
+  // way set_path does. A matched that is not a prefix, or a result over the bound, is rejected.
+  std::optional<std::string> rewritten = Envoy::Router::rewritePathByPrefixOrRegex(
+      context->headers.getPathValue(), toStringView(matched), toStringView(replacement), nullptr,
+      "", context->config.maxRewrittenPathBytes());
+  if (!rewritten.has_value()) {
+    return false;
+  }
+  context->overrides.path = std::move(*rewritten);
   return true;
 }
 

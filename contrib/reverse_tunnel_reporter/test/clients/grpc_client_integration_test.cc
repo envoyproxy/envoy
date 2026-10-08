@@ -239,6 +239,16 @@ protected:
     EXPECT_EQ(state.size(), expected.size());
   }
 
+  // Waits until the event reporter observes `count` active reverse tunnels. A completed handshake
+  // detaches the upstream listener connection, so the reporter's unique-active gauge, not
+  // listener.<name>.downstream_cx_active, reflects the number of established tunnels.
+  void waitForActiveTunnels(
+      int count, std::chrono::milliseconds timeout = std::chrono::milliseconds(sendInterval * 3)) {
+    test_server_->waitForGauge("envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service."
+                               "reporters.event_reporter.reverse_tunnel_unique_active",
+                               testing::Eq(count), timeout);
+  }
+
   absl::flat_hash_map<std::string, ReverseTunnelEvent::Connected>
   getConns(std::vector<std::string> node_ids) {
     absl::flat_hash_map<std::string, ReverseTunnelEvent::Connected> connections;
@@ -387,12 +397,10 @@ TEST_P(GrpcClientIntegrationTest, EventsWhenServerIsDead) {
 
   grpc_server_ = nullptr;
   addListenerLds(getDownstreamListener("node-3", 1));
-  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(3),
-                             std::chrono::milliseconds(sendInterval * 3));
+  waitForActiveTunnels(3);
   removeListenerLds("node-1");
   // Wait for the connections to establish and drain
-  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(2),
-                             std::chrono::milliseconds(sendInterval * 3));
+  waitForActiveTunnels(2);
 
   makeNewServer();
   validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-3", "node-2"}));
@@ -434,8 +442,7 @@ TEST_P(GrpcClientIntegrationTest, ServerLate) {
   addListenerLds(getDownstreamListener("node-1", 1));
   addListenerLds(getDownstreamListener("node-2", 1));
   // Wait for the connections to establish.
-  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(2),
-                             std::chrono::milliseconds(sendInterval * 3));
+  waitForActiveTunnels(2);
 
   makeNewServer();
   validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1", "node-2"}));
@@ -516,7 +523,8 @@ TEST_P(GrpcClientIntegrationTest, ManyTunnelsSingleListenerDrain) {
 
   addListenerLds(getDownstreamListener("node-1", num_tunnels));
 
-  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active",
+  test_server_->waitForGauge("envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service."
+                             "reporters.event_reporter.reverse_tunnel_active",
                              testing::Eq(num_tunnels),
                              std::chrono::milliseconds(sendInterval * 20));
   test_server_->waitForGauge("http.node-1.downstream_cx_active", testing::Eq(num_tunnels),
@@ -537,8 +545,7 @@ TEST_P(GrpcClientIntegrationTest, ListenerDrain) {
   makeNewServer();
 
   addListenerLds(getDownstreamListener("node-1", 1));
-  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(1),
-                             std::chrono::milliseconds(sendInterval * 3));
+  waitForActiveTunnels(1);
   validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
 
   // keep one request open on the downstream listener.
@@ -563,8 +570,7 @@ TEST_P(GrpcClientIntegrationTest, ListenerDrainMaxDuration) {
   makeNewServer();
 
   addListenerLds(getDownstreamListener("node-1", 1, std::chrono::seconds(5)));
-  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(1),
-                             std::chrono::milliseconds(sendInterval * 3));
+  waitForActiveTunnels(1);
   validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
 
   auto client = makeHttpConnection(egressPort);
@@ -586,9 +592,7 @@ TEST_P(GrpcClientIntegrationTest, ListenerDrainMaxDuration) {
       std::chrono::milliseconds(sendInterval +
                                 1000) // with the drain timeout of the hcm to send the goaway.
   );
-  test_server_->waitForGauge("envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service."
-                             "reporters.event_reporter.reverse_tunnel_unique_active",
-                             testing::Eq(1), std::chrono::milliseconds(sendInterval));
+  waitForActiveTunnels(1, std::chrono::milliseconds(sendInterval));
 
   // Now use the new tunnel for a request.
   auto direct_client = makeHttpConnection(egressPort);
@@ -603,8 +607,7 @@ TEST_P(GrpcClientIntegrationTest, ListenerDrainMaxDurationNoActiveRequest) {
   makeNewServer();
 
   addListenerLds(getDownstreamListener("node-1", 1, std::chrono::seconds(5)));
-  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(1),
-                             std::chrono::milliseconds(sendInterval * 3));
+  waitForActiveTunnels(1);
   validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
 
   auto client = makeHttpConnection(egressPort);
@@ -624,9 +627,7 @@ TEST_P(GrpcClientIntegrationTest, ListenerDrainMaxDurationNoActiveRequest) {
       std::chrono::milliseconds(sendInterval +
                                 1000) // with the drain timeout of the hcm to send the goaway.
   );
-  test_server_->waitForGauge("envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service."
-                             "reporters.event_reporter.reverse_tunnel_unique_active",
-                             testing::Eq(1), std::chrono::milliseconds(sendInterval));
+  waitForActiveTunnels(1, std::chrono::milliseconds(sendInterval));
 
   auto new_client = makeHttpConnection(egressPort);
   auto new_resp = makeClientRequest("/direct", new_client);
@@ -638,8 +639,7 @@ TEST_P(GrpcClientIntegrationTest, ListenerDrainNoActiveRequest) {
   makeNewServer();
 
   addListenerLds(getDownstreamListener("node-1", 1));
-  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(1),
-                             std::chrono::milliseconds(sendInterval * 3));
+  waitForActiveTunnels(1);
   validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
 
   auto client = makeHttpConnection(egressPort);

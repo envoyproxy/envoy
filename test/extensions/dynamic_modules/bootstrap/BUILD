@@ -62,6 +62,7 @@ envoy_cc_dyn_module_test(
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:admin_stream_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:listener_manager_mocks",
@@ -124,6 +125,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_admin_handler_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_cluster_lifecycle_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_config_names_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_file_watcher_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_function_registry_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_http_combined_test",
@@ -142,5 +144,7 @@ envoy_cc_dyn_module_test(
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )

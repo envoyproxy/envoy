@@ -471,9 +471,9 @@ dependatool==0.3.1 \
     --hash=sha256:265fc69e8b1605edb8e33872a36d3a2c2cc055743bec8e58d1ed3c72a17a9431 \
     --hash=sha256:6be19ce9fbdffccf639bad0393e454080b7bba8510a98edc78855a6a93895020
     # via -r requirements.in
-envoy-base-utils==0.6.9 \
-    --hash=sha256:664dcc19ee12125398222a7628bdcbb40e265b3846e197e4014434fcd273fd61 \
-    --hash=sha256:b088b7621b5075005c48cdbef5db5675827b7b63550be7d880d395261fdcdb20
+envoy-base-utils==0.6.12 \
+    --hash=sha256:8b860c9d88493f1eb1044cc48fa9ae953cd31d9da77102d05e9c6af65ff14eae \
+    --hash=sha256:d2ab511a1f6f59f7319c6dc6b70088bad139be2165466ed9ce6932b0c96faa02
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -485,9 +485,9 @@ envoy-ci-report==0.1.1 \
     --hash=sha256:481115be4d05941b83ffbbd8fdac241f10e9823c076f850d8bef7f0308aa382d \
     --hash=sha256:a38da2e996b266b32ff80f2f404018d1887f156ad086e3fa8fd4233bb4cd6fe7
     # via -r requirements.in
-envoy-code-check==0.6.7 \
-    --hash=sha256:76b0edf0b95d8a31b5d78481b3a7f5ae4a2925c04d2158e77cc3549653a4213e \
-    --hash=sha256:7b7fbc99c114f663126be738095945d479e0b4c6f71d3d784bc234d9d9098a8d
+envoy-code-check==0.6.9 \
+    --hash=sha256:9a212107476b4a36b3743fb550eacad3ede72b3cdbf825dc944c25e48e4e1eb6 \
+    --hash=sha256:9ded56211e8e81ffc27c97b923e17dd7a6dd60e72454755f07bb1555ca019279
     # via -r requirements.in
 envoy-dependency-check==0.2.1 \
     --hash=sha256:a037ab34b7db9893ecf07247c8e9149481148de26f340f1c27e4adfa7a48e227 \
@@ -703,9 +703,9 @@ gitdb==4.0.11 \
     --hash=sha256:81a3407ddd2ee8df444cbacea00e2d038e40150acfa3001696fe0dcf1d3adfa4 \
     --hash=sha256:bf5421126136d6d0af55bc1e7c1af1c397a34f5b7bd79e776cd3e89785c2b04b
     # via gitpython
-gitpython==3.1.59 \
-    --hash=sha256:0a1475cfdc38a5bfba1a3e9a4a9da52a39749ecec322b772915c019f94e5b7e4 \
-    --hash=sha256:67a82f537384578643624c8b2c531938a9b82be431663e575dcf638526631d4c
+gitpython==3.1.62 \
+    --hash=sha256:1791de66309bc0c7cfca40bf8d2e3de7ca091cbf94e6051be1ad0722c61062af \
+    --hash=sha256:7002251225e10e29d2e1f49e6532613fe5d5d9f0b6f1f02997a52b38fe56899e
     # via -r requirements.in
 humanfriendly==10.0 \
     --hash=sha256:1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477 \
@@ -1190,9 +1190,9 @@ pygithub==2.10.0 \
     --hash=sha256:192ada2a76e4afc7d6b37e500c9bfeba1731e6506697445a5ba1c4af8bf0b924 \
     --hash=sha256:90ff24ef1cd1bd57124c2a3869cafee9d7b066909129ecdaba2c2d1903bc118d
     # via -r requirements.in
-pyjwt[crypto]==2.13.0 \
-    --hash=sha256:41571c89ca91598c79e8ef18a2d07367d4810fbbd6f637794879baf1b7703423 \
-    --hash=sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728
+pyjwt[crypto]==2.15.1 \
+    --hash=sha256:42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193 \
+    --hash=sha256:4f259e80cdfb6b3fc18a7de51fd1ef9ec79652f25019bae68975ca2468a34df8
     # via
     #   -r requirements.in
     #   gidgethub
@@ -1353,9 +1353,9 @@ uritemplate==4.1.1 \
     --hash=sha256:4346edfc5c3b79f694bccd6d6099a322bbeb628dbf2cd86eea55a456ce5124f0 \
     --hash=sha256:830c08b8d99bdd312ea4ead05994a38e8936266f84b9a7878232db50b044e02e
     # via gidgethub
-urllib3==2.7.0 \
-    --hash=sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c \
-    --hash=sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897
+urllib3==2.8.0 \
+    --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3 \
+    --hash=sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63
     # via
     #   pygithub
     #   requests

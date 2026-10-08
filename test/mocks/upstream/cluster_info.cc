@@ -121,11 +121,9 @@ MockClusterInfo::MockClusterInfo()
           Invoke([this]() -> TransportSocketMatcher& { return *transport_socket_matcher_; }));
   ON_CALL(*this, loadReportStats()).WillByDefault(ReturnRef(load_report_stats_));
   ON_CALL(*this, requestResponseSizeStats())
-      .WillByDefault(Return(
-          std::reference_wrapper<ClusterRequestResponseSizeStats>(*request_response_size_stats_)));
+      .WillByDefault(Return(ClusterRequestResponseSizeStatsOptRef(*request_response_size_stats_)));
   ON_CALL(*this, timeoutBudgetStats())
-      .WillByDefault(
-          Return(std::reference_wrapper<ClusterTimeoutBudgetStats>(*timeout_budget_stats_)));
+      .WillByDefault(Return(ClusterTimeoutBudgetStatsOptRef(*timeout_budget_stats_)));
   ON_CALL(*this, getUpstreamLocalAddressSelector())
       .WillByDefault(Return(upstream_local_address_selector_));
   ON_CALL(*this, resourceManager(_))

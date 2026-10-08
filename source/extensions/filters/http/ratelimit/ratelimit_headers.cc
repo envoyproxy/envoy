@@ -32,7 +32,7 @@ bool enableXRateLimitHeaders(const std::vector<Envoy::RateLimit::Descriptor>& de
   return descriptors[index].x_ratelimit_option_ == RateLimit::RateLimitProto::DRAFT_VERSION_03;
 }
 
-void appendQuotaPolicy(std::string& out, size_t unit, size_t w, absl::string_view name) {
+void appendQuotaPolicy(std::string& out, uint64_t unit, uint64_t w, absl::string_view name) {
   // Constructing the quota-policy per RFC
   // https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html#name-ratelimit-limit
   // Example of the result: `, 10;w=1;name="per-ip", 1000;w=3600`
@@ -84,7 +84,11 @@ void XRateLimitHeaderUtils::populateHeaders(
     if (!status.has_current_limit() || !enableXRateLimitHeaders(descriptors, i, enabled)) {
       continue;
     }
-    const uint32_t window = convertRateLimitUnit(status.current_limit().unit());
+    const auto& current_limit = status.current_limit();
+    const uint32_t unit_multiplier =
+        current_limit.has_unit_multiplier() ? current_limit.unit_multiplier().value() : 1;
+    const uint64_t window =
+        convertRateLimitUnit(current_limit.unit()) * std::max(unit_multiplier, 1U);
     if (window == 0) {
       continue;
     }
@@ -137,7 +141,7 @@ void populateRetryAfterHeader(const Filters::Common::RateLimit::DescriptorStatus
   }
 }
 
-uint32_t XRateLimitHeaderUtils::convertRateLimitUnit(
+uint64_t XRateLimitHeaderUtils::convertRateLimitUnit(
     const envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit) {
   switch (unit) {
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::SECOND:

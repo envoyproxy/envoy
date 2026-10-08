@@ -23,8 +23,14 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
       config, context.messageValidationVisitor());
 
   const auto& module_config = proto_config.dynamic_module_config();
-  // Bootstrap extensions do not support remote module sources, so no init manager or async callback
-  // is passed; only the synchronous local-file and by-name paths can succeed here.
+  // Bootstrap extensions are created before the cluster manager exists, so a remote module source
+  // cannot be fetched here. Reject it instead of dereferencing the not yet created cluster manager.
+  // Only the synchronous local-file and by-name paths are supported.
+  if (module_config.has_module() && module_config.module().has_remote()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, proto_config.extension_name(), Extensions::DynamicModules::RemoteFetchErrorStat);
+    throwEnvoyExceptionOrPanic("Bootstrap dynamic module does not support remote module sources");
+  }
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
       module_config, proto_config.extension_name(), context);
   if (!load_result.ok()) {

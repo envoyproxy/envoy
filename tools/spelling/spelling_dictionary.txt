@@ -458,6 +458,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+PSK
 Postgre
 Postgres
 Prereq
@@ -976,6 +977,7 @@ hackery
 hacky
 handoff
 handshaker
+handshakers
 hardcode
 hardcoded
 hardcodes
@@ -1037,6 +1039,7 @@ ints
 invariance
 invariants
 invoker
+Invocable
 iov
 iovcnt
 iovec
@@ -1831,3 +1834,5 @@ PQC
 quantum
 X25519MLKEM768
 cpaths
+SynchronousFeedbackResourceMonitor
+bernoulli

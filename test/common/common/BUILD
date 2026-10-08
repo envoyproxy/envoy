@@ -6,6 +6,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "execution_context_dual_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -727,12 +728,9 @@ envoy_benchmark_test(
     benchmark_binary = "linked_object_speed_test",
 )
 
-envoy_cc_test(
+execution_context_dual_test(
     name = "execution_context_test",
     srcs = ["execution_context_test.cc"],
-    copts = [
-        "-DENVOY_ENABLE_EXECUTION_CONTEXT",
-    ],
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:execution_context",
