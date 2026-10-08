@@ -633,6 +633,25 @@ TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithPost) {
   test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
+TEST_P(UdpTunnelingIntegrationTest, ProxyHostFromClusterMetadataWithPost) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* metadata = bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_metadata();
+    auto* fields = (*metadata->mutable_filter_metadata())["example"].mutable_fields();
+    (*fields)["hostname"].set_string_value("metadata.example.com");
+  });
+
+  const std::string proxy_host = "'%METADATA(CLUSTER:example:hostname)%'";
+  TestConfig config{proxy_host,   "target.com", 1,           30, true,
+                    "/post/path", std::nullopt, std::nullopt};
+  setup(config);
+
+  establishConnection("hello");
+  EXPECT_EQ("metadata.example.com", upstream_request_->headers().getHostValue());
+
+  sendCapsuleDownstream("response", true);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
+}
+
 TEST_P(UdpTunnelingIntegrationTest, TwoConsecutiveDownstreamSessions) {
   TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, std::nullopt};
   setup(config);

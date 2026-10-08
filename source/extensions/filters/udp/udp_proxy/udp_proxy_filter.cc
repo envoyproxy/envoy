@@ -861,6 +861,8 @@ bool UdpProxyFilter::ActiveSession::setClusterInfo() {
     return false;
   }
 
+  udp_session_info_.setUpstreamClusterInfo(cluster_->cluster_info_);
+
   if (!cluster_->cluster_info_->resourceManager(Upstream::ResourcePriority::Default)
            .connections()
            .canCreate()) {
