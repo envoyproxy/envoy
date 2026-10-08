@@ -96,9 +96,17 @@ jobs:
         ENVOY_REGISTRY_ALLOW_UNSAFE: ${{ inputs.task == 'registry' && inputs.wip && '1' || '' }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - id: changes
+      name: Check for changes
+      run: |
+        if [[ -n "$(git status --porcelain)" ]]; then
+            echo "changes=true" > "$GITHUB_OUTPUT"
+        else
+            echo "changes=false" > "$GITHUB_OUTPUT"
+        fi
     - uses: envoyproxy/toolshed/actions/upload/diff@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Upload diff
-      if: ${{ steps.update.outputs.changes != 'false' }}
+      if: ${{ steps.changes.outputs.changes == 'true' }}
       with:
         name: >-
           ${{ (inputs.task == 'bazel' && inputs.dependency
@@ -107,7 +115,7 @@ jobs:
               }}-${{ steps.update.outputs.output }}
     - id: pr
       name: Create a PR
-      if: ${{ inputs.pr && steps.update.outputs.changes != 'false' }}
+      if: ${{ inputs.pr && steps.changes.outputs.changes == 'true' }}
       uses: envoyproxy/toolshed/actions/github/pr@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         base: main
@@ -150,7 +158,7 @@ jobs:
                 steps.update.outputs.output) }}
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
     - name: Mark PR as WIP (draft)
-      if: ${{ inputs.pr && inputs.wip && steps.update.outputs.changes != 'false' }}
+      if: ${{ inputs.pr && inputs.wip && steps.changes.outputs.changes == 'true' }}
       run: |
         pr_number="$(gh pr view "$PR_BRANCH" --json number --jq .number)"
         title="$(gh pr view "$pr_number" --json title --jq .title)"
@@ -186,6 +194,7 @@ jobs:
             # do_ci.sh prints "== workspace ==" headers; promote to markdown
             sed -E 's/^== (.*) ==$/### \1/' "${RUNNER_TEMP}/deps-report.md"
         } >> "$GITHUB_STEP_SUMMARY"
+      shell: bash
       env:
         ENVOY_DOCKER_CI: 1
     - name: Upload dependency report

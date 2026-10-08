@@ -48,17 +48,19 @@ elif [[ "$task" == registry ]]; then
 elif [[ "$task" == lockfiles ]]; then
     if [[ -z "$(git status --porcelain -- ':(glob)**/MODULE.bazel.lock')" ]]; then
         echo 'Lockfiles are in sync, nothing to do' >&2
-        if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-            echo 'changes=false' >> "$GITHUB_OUTPUT"
-        fi
         OUTPUT=in-sync
     else
         OUTPUT=$(git diff -- ':(glob)**/MODULE.bazel.lock' | sha256sum | cut -c1-7)
     fi
 else
-    OUTPUT=$(git diff -U0 -- MODULE.bazel \
+    OUTPUT=$(git diff -U0 -- ':(glob)**/MODULE.bazel' \
         | sed -n -E "s/^\+bazel_dep\(name = \"${dependency}\", version = \"([^\"]+)\".*/\1/p" \
         | head -n1)
+fi
+
+if [[ -z "$OUTPUT" ]]; then
+    echo "::error::Unable to determine updated version for ${dependency_name}" >&2
+    exit 1
 fi
 
 echo "$OUTPUT"
