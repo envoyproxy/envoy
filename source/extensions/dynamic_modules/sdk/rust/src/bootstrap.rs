@@ -6,6 +6,7 @@ use crate::{
   EnvoyHistogramId, EnvoyHistogramVecId, NewBootstrapExtensionConfigFunction,
   NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -28,7 +29,7 @@ pub enum ActiveResourceKind {
 
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyBootstrapExtensionConfig {
   /// Create a new implementation of the [`EnvoyBootstrapExtensionConfigScheduler`] trait.
@@ -548,7 +549,7 @@ pub trait BootstrapExtension: Send + Sync {
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
 /// Envoy bootstrap extension config on the main thread.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyBootstrapExtensionConfigScheduler: Send + Sync {
   /// Commit the scheduled event to the main thread.
   fn commit(&self, event_id: u64);
@@ -603,7 +604,7 @@ impl EnvoyBootstrapExtensionConfigScheduler for Box<dyn EnvoyBootstrapExtensionC
 /// lifetime. This allows modules with multiple timers to identify which timer fired in the
 /// [`BootstrapExtensionConfig::on_timer_fired`] callback by comparing the id of the fired timer
 /// reference against the ids of their stored timer handles.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyBootstrapExtensionTimer: Send + Sync {
   /// Returns a unique opaque identifier for this timer. The identifier is stable for the
   /// lifetime of the timer and can be used to distinguish between multiple timers in the
