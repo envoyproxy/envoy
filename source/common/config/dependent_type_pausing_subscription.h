@@ -49,6 +49,9 @@ public:
   void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) override {
     subscription_->requestOnDemandUpdate(add_these_names);
   }
+  void accept(const absl::flat_hash_set<std::string>& patterns) override {
+    subscription_->accept(patterns);
+  }
 
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
