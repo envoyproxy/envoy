@@ -51,8 +51,8 @@ public:
                         Server::Configuration::HealthCheckerFactoryContext& context,
                         HealthCheckEventLoggerPtr&& event_logger);
 
-  // Returns the HTTP protocol derived from `codec_client_type`, HTTP/1.1 for `AUTO`. Note that a
-  // session whose codec was selected from the ALPN-negotiated protocol may be speaking HTTP/2.
+  // Returns the HTTP protocol derived from `codec_client_type`. Note that a session whose codec was
+  // selected from the ALPN-negotiated protocol may be speaking HTTP/2 regardless.
   Http::Protocol configuredProtocol() const;
 
   /**
@@ -209,9 +209,9 @@ private:
   const HttpStatusChecker http_status_checker_;
 
 protected:
-  // The codec used when `negotiate_codec_` is false or the connection negotiates nothing.
+  // The codec from `codec_client_type`, used when `negotiate_codec_` is false.
   const Http::CodecType codec_client_type_;
-  // `codec_client_type: AUTO`: select the codec from the protocol the health check connection
+  // `use_alpn_negotiated_protocol`: select the codec from the protocol the health check connection
   // negotiates via ALPN.
   const bool negotiate_codec_;
   Random::RandomGenerator& random_generator_;

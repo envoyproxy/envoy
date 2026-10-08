@@ -14,15 +14,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 enum CodecClientType {
   HTTP1 = 0;
-
   HTTP2 = 1;
-
   HTTP3 = 2;
-
-  // Use the protocol negotiated by ALPN: HTTP/2 when ``h2`` is negotiated, otherwise HTTP/1.1,
-  // including when nothing is negotiated. This mirrors the cluster's :ref:`auto_config
-  // <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>` and, like
-  // it, requires a transport socket that supports ALPN such as TLS. Configuring it on a cluster
-  // whose transport sockets do not is rejected.
-  AUTO = 3;
 }

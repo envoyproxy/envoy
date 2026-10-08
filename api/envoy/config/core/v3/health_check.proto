@@ -152,12 +152,21 @@ message HealthCheck {
     // non-200 response will result in the host being marked unhealthy.
     repeated type.v3.Int64Range retriable_statuses = 12;
 
-    // Use specified application protocol for health checks. ``AUTO`` selects the protocol
-    // negotiated by ALPN on the health check connection, see :ref:`tls_options
-    // <envoy_v3_api_field_config.core.v3.HealthCheck.tls_options>` for what it advertises. It
-    // requires a transport socket that supports ALPN and is rejected on a cluster whose transport
-    // sockets do not.
+    // Use specified application protocol for health checks. Leave unset when
+    // :ref:`use_alpn_negotiated_protocol
+    // <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.use_alpn_negotiated_protocol>`
+    // is set.
     type.v3.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
+
+    // Select the codec from the protocol negotiated by ALPN on the health check connection instead
+    // of ``codec_client_type``: HTTP/2 when ``h2`` is negotiated, otherwise HTTP/1.1, including
+    // when nothing is negotiated. This mirrors the cluster's :ref:`auto_config
+    // <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>` and, like
+    // it, requires a transport socket that supports ALPN such as TLS; it is rejected on a cluster
+    // whose transport sockets do not. ``codec_client_type`` must be left at its default. See
+    // :ref:`tls_options <envoy_v3_api_field_config.core.v3.HealthCheck.tls_options>` for what the
+    // connection advertises.
+    bool use_alpn_negotiated_protocol = 15;
 
     // An optional service name parameter which is used to validate the identity of
     // the health checked cluster using a :ref:`StringMatcher
@@ -265,8 +274,8 @@ message HealthCheck {
     // corresponding upstream is using ALPN-based :ref:`FilterChainMatch
     // <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` along with different protocols for health checks
     // versus data connections. If empty, health check connections advertise the ALPN protocols of
-    // the cluster's TLS context, if any. With :ref:`codec_client_type
-    // <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.codec_client_type>` ``AUTO``,
+    // the cluster's TLS context, if any. With :ref:`use_alpn_negotiated_protocol
+    // <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.use_alpn_negotiated_protocol>`,
     // the negotiated protocol selects the health check codec.
     repeated string alpn_protocols = 1;
   }
