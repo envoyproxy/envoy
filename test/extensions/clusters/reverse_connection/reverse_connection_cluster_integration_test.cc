@@ -14,6 +14,7 @@
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -62,8 +63,21 @@ typed_config:
 protected:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
 
-  uint32_t tunnelListenerPort() const {
-    return GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
+  // Loopback ports reserved for reverse tunnel listeners, held open for the test lifetime.
+  std::vector<Network::SocketPtr> reserved_tunnel_sockets_;
+
+  // Reserve a free loopback port and hold the bound socket for the test lifetime. The responder
+  // tunnel listener and the initiator's static tunnel_cluster share this port, and the reservation
+  // keeps the OS from handing it to another test running in parallel. The socket is bound with
+  // SO_REUSEPORT and never listens, so the real listener binds the same port and the reservation
+  // never receives a connection.
+  uint32_t reserveTunnelListenerPort() {
+    auto addr_and_socket =
+        Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream,
+                                            /*reuse_port=*/true);
+    const uint32_t port = addr_and_socket.first->ip()->port();
+    reserved_tunnel_sockets_.push_back(std::move(addr_and_socket.second));
+    return port;
   }
 
   std::string loopbackAddress() const {
@@ -154,7 +168,6 @@ protected:
     // Configure the reverse tunnel filter.
     envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
     rt_config.mutable_ping_interval()->set_seconds(ping_interval_seconds);
-    rt_config.set_auto_close_connections(true);
     rt_config.set_request_path("/reverse_connections/request");
     rt_config.set_request_method(envoy::config::core::v3::GET);
     std::ignore = rt_filter->mutable_typed_config()->PackFrom(rt_config);
@@ -186,6 +199,12 @@ protected:
     auto* egress_route = egress_virtual_host->add_routes();
     egress_route->mutable_match()->set_prefix("/");
     egress_route->mutable_route()->set_cluster("reverse_connection_cluster");
+
+    // Retry transient reverse tunnel checkout failures so data requests are deterministic while a
+    // freshly reconnected tunnel is still being registered.
+    auto* retry_policy = egress_route->mutable_route()->mutable_retry_policy();
+    retry_policy->set_retry_on("5xx,reset,connect-failure,refused-stream");
+    retry_policy->mutable_num_retries()->set_value(3);
 
     // Add Lua filter to compute x-computed-host-id from request headers.
     if (add_lua_host_id_filter) {
@@ -327,7 +346,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseConnectionClusterIntegrationTest,
 TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
   DISABLE_IF_ADMIN_DISABLED; // Test requires admin interface for cleanup.
 
-  const uint32_t tunnel_listener_port = tunnelListenerPort();
+  const uint32_t tunnel_listener_port = reserveTunnelListenerPort();
   const std::string loopback_addr = loopbackAddress();
 
   // Configure the full reverse tunnel flow with cluster using helper.
@@ -389,13 +408,15 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
   EXPECT_EQ(upstream_request_->headers().getPathValue(), "/test/long/url");
   EXPECT_EQ(upstream_request_->headers().getMethodValue(), "GET");
 
-  // Send response back through the tunnel.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
+  // Send a response with a body back through the tunnel.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData("reverse-tunnel-body", true);
 
-  // Verify the response made it back to the client.
+  // Verify the response and its body made it back to the client over the HTTP/2 tunnel.
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("reverse-tunnel-body", response->body());
 
   ENVOY_LOG_MISC(info, "End-to-end request/response through reverse tunnel successful.");
 
@@ -528,7 +549,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
 TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMutualTLS) {
   DISABLE_IF_ADMIN_DISABLED; // Test requires admin interface for cleanup.
 
-  const uint32_t tunnel_listener_port = tunnelListenerPort();
+  const uint32_t tunnel_listener_port = reserveTunnelListenerPort();
   const std::string loopback_addr = loopbackAddress();
 
   const std::string rundir = TestEnvironment::runfilesDirectory();
@@ -560,7 +581,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
           ->mutable_trusted_ca()
           ->set_filename(rundir + "/test/config/integration/certs/cacert.pem");
 
-      tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
+      tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
 
       std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     };
@@ -585,7 +606,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
           ->mutable_trusted_ca()
           ->set_filename(rundir + "/test/config/integration/certs/cacert.pem");
 
-      tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
+      tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
 
       std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     };
@@ -686,7 +707,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
 TEST_P(ReverseConnectionClusterIntegrationTest, MutualTLSSurvivesRpingKeepalive) {
   DISABLE_IF_ADMIN_DISABLED;
 
-  const uint32_t tunnel_listener_port = tunnelListenerPort();
+  const uint32_t tunnel_listener_port = reserveTunnelListenerPort();
   const std::string loopback_addr = loopbackAddress();
   const std::string rundir = TestEnvironment::runfilesDirectory();
 
@@ -707,7 +728,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MutualTLSSurvivesRpingKeepalive)
           ->mutable_validation_context()
           ->mutable_trusted_ca()
           ->set_filename(rundir + "/test/config/integration/certs/cacert.pem");
-      tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
+      tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
       std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     };
 
@@ -725,13 +746,14 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MutualTLSSurvivesRpingKeepalive)
           ->mutable_validation_context()
           ->mutable_trusted_ca()
           ->set_filename(rundir + "/test/config/integration/certs/cacert.pem");
-      tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
+      tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
       std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
     };
 
     // 1s is the smallest usable ping_interval: the filter and socket manager both hold it as
-    // whole seconds, so sub-second values truncate to zero. auto_close_connections is left at its
-    // default (false via configureReverseTunnelSetup) so the idle tunnel is not torn down.
+    // whole seconds, so sub-second values truncate to zero. The reverse_tunnel filter always
+    // detaches the handshake connection after the acceptance response, so the duplicated fd owns
+    // the idle tunnel.
     configureReverseTunnelSetup(bootstrap, loopback_addr, tunnel_listener_port, "test-node-id",
                                 "test-cluster-id", "test-tenant-id", tunnel_cluster_modifier,
                                 tunnel_listener_modifier, /*add_lua_host_id_filter=*/true,
@@ -821,8 +843,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MutualTLSSurvivesRpingKeepalive)
 TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
   DISABLE_IF_ADMIN_DISABLED;
 
-  const uint32_t cloud1_port = GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
-  const uint32_t cloud2_port = GetParam() == Network::Address::IpVersion::v4 ? 15002 : 15003;
+  const uint32_t cloud1_port = reserveTunnelListenerPort();
+  const uint32_t cloud2_port = reserveTunnelListenerPort();
   const std::string loopback_addr =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
 
@@ -930,7 +952,6 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
 
       envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
       rt_config.mutable_ping_interval()->set_seconds(60);
-      rt_config.set_auto_close_connections(true);
       rt_config.set_request_path("/reverse_connections/request");
       rt_config.set_request_method(envoy::config::core::v3::GET);
       std::ignore = rt_filter->mutable_typed_config()->PackFrom(rt_config);
@@ -962,6 +983,12 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
     auto* egress_route = egress_virtual_host->add_routes();
     egress_route->mutable_match()->set_prefix("/");
     egress_route->mutable_route()->set_cluster("reverse_connection_cluster");
+
+    // Retry transient reverse tunnel checkout failures so data requests are deterministic while a
+    // freshly reconnected tunnel is still being registered.
+    auto* retry_policy = egress_route->mutable_route()->mutable_retry_policy();
+    retry_policy->set_retry_on("5xx,reset,connect-failure,refused-stream");
+    retry_policy->mutable_num_retries()->set_value(3);
 
     // Add Lua filter for host ID computation.
     auto* lua_filter = egress_hcm.add_http_filters();
@@ -1253,7 +1280,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   // transparently.
   autonomous_upstream_ = true;
 
-  const uint32_t tunnel_listener_port = tunnelListenerPort();
+  const uint32_t tunnel_listener_port = reserveTunnelListenerPort();
   const std::string loopback_addr = loopbackAddress();
 
   // Configure the reverse tunnel setup. Each worker will initiate its own connection.
@@ -1350,39 +1377,39 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   // This exercises the contract that data is not sent during handshake completion.
   timeSystem().advanceTimeWait(std::chrono::milliseconds(2000));
 
-  ENVOY_LOG_MISC(info, "Sending multiple requests through the multi-worker tunnel.");
+  ENVOY_LOG_MISC(info, "Sending requests across one downstream connection per worker.");
 
-  // Send multiple concurrent requests to verify the multi-worker tunnel handles load.
-  // The autonomous upstream automatically responds with 200, and the retry policy on
-  // the egress route handles any intermittent 503s from the reverse tunnel filter race.
-  codec_client_ = makeHttpConnection(lookupPort("egress_listener"));
+  // Open one downstream connection per worker and send several requests on each, so every worker's
+  // tunnel is exercised on the data path. The egress route retry policy absorbs any transient
+  // reverse tunnel checkout failure, so every request must return 200.
+  constexpr int num_connections = 4;
+  constexpr int requests_per_connection = 3;
+  const int num_requests = num_connections * requests_per_connection;
 
+  std::vector<IntegrationCodecClientPtr> codec_clients;
   std::vector<IntegrationStreamDecoderPtr> responses;
-  const int num_requests = 12; // Send 12 requests to distribute across 4 workers
-
-  for (int i = 0; i < num_requests; i++) {
-    Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
-                                           {":path", fmt::format("/test/path{}", i)},
-                                           {":scheme", "http"},
-                                           {":authority", "host"},
-                                           {"x-computed-host-id", "test-node-id"}};
-    auto encoder_decoder = codec_client_->startRequest(headers);
-    responses.push_back(std::move(encoder_decoder.second));
-    codec_client_->sendData(encoder_decoder.first, 0, true);
+  for (int conn = 0; conn < num_connections; conn++) {
+    codec_clients.push_back(makeHttpConnection(lookupPort("egress_listener")));
+    for (int req = 0; req < requests_per_connection; req++) {
+      Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                             {":path", fmt::format("/test/path{}-{}", conn, req)},
+                                             {":scheme", "http"},
+                                             {":authority", "host"},
+                                             {"x-computed-host-id", "test-node-id"}};
+      auto encoder_decoder = codec_clients.back()->startRequest(headers);
+      responses.push_back(std::move(encoder_decoder.second));
+      codec_clients.back()->sendData(encoder_decoder.first, 0, true);
+    }
   }
 
-  // Wait for all responses.
-  int success_count = 0;
+  // Every request must complete with 200.
   for (auto& response : responses) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
-    if (response->headers().getStatusValue() == "200") {
-      success_count++;
-    }
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
-  ENVOY_LOG_MISC(info, "{} of {} requests returned 200.", success_count, num_requests);
 
-  // Verify cluster stats — all requests were attempted through the tunnel.
+  // Verify cluster stats: all requests were served through the tunnel.
   test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_rq_total",
                                Ge(num_requests));
 
@@ -1391,8 +1418,10 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
 
   ENVOY_LOG_MISC(info, "Multi-worker reverse tunnel test completed successfully!");
 
-  // Close the downstream client connection.
-  codec_client_->close();
+  // Close the downstream client connections.
+  for (auto& client : codec_clients) {
+    client->close();
+  }
 
   // Drain listeners via admin interface to ensure proper cleanup of reverse connection sockets
   // before workers are destroyed.
@@ -1404,6 +1433,88 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   // Wait for listeners to be fully stopped before test cleanup.
   test_server_->waitForCounter("listener_manager.listener_stopped", Eq(3),
                                std::chrono::milliseconds(5000));
+}
+
+// An rc:// initiator listener whose per-host connection count is outside the supported [1, 1024]
+// range is cleanly rejected when it arrives over LDS, rather than loading a listener that can never
+// dial.
+TEST_P(ReverseConnectionClusterIntegrationTest, OutOfRangeReverseConnectionListenerRejectedViaLds) {
+  const std::string loopback_addr = loopbackAddress();
+
+  // Serve dynamic listeners over LDS from a static gRPC cluster. With no static listeners the
+  // server comes up purely from LDS, so the rejected update is observed in isolation.
+  config_helper_.addConfigModifier(
+      [loopback_addr](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        bootstrap.mutable_static_resources()->clear_listeners();
+
+        auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        lds_cluster->set_name("lds_cluster");
+        lds_cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+        lds_cluster->mutable_connect_timeout()->set_seconds(5);
+
+        envoy::extensions::upstreams::http::v3::HttpProtocolOptions lds_http_options;
+        lds_http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+        std::ignore = (*lds_cluster->mutable_typed_extension_protocol_options())
+                          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                              .PackFrom(lds_http_options);
+
+        auto* lds_endpoint =
+            lds_cluster->mutable_load_assignment()->add_endpoints()->add_lb_endpoints();
+        lds_cluster->mutable_load_assignment()->set_cluster_name("lds_cluster");
+        auto* lds_address =
+            lds_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+        lds_address->set_address(loopback_addr);
+        lds_address->set_port_value(0); // Filled in by the fake upstream.
+
+        auto* lds_config = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+        lds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+        auto* lds_api = lds_config->mutable_api_config_source();
+        lds_api->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+        lds_api->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+        lds_api->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("lds_cluster");
+      });
+
+  use_lds_ = false;
+  setUpstreamCount(2); // cluster_0 + lds_cluster.
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  on_server_init_function_ = [this]() {
+    createLdsStream();
+
+    envoy::config::listener::v3::Listener listener;
+    listener.set_name("out_of_range_reverse_conn_listener");
+    listener.set_stat_prefix("out_of_range_reverse_conn_listener");
+
+    // A per-host connection count of 0 is below the supported range, so the resolver rejects the
+    // address and listener creation fails.
+    auto* address = listener.mutable_address()->mutable_socket_address();
+    address->set_address("rc://node:cluster:tenant@remote_cluster:0");
+    address->set_port_value(0);
+    address->set_resolver_name("envoy.resolvers.reverse_connection");
+
+    auto* hcm_filter = listener.add_filter_chains()->add_filters();
+    hcm_filter->set_name("envoy.filters.network.http_connection_manager");
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
+    hcm.set_stat_prefix("out_of_range");
+    auto* virtual_host = hcm.mutable_route_config()->add_virtual_hosts();
+    virtual_host->set_name("backend");
+    virtual_host->add_domains("*");
+    auto* route = virtual_host->add_routes();
+    route->mutable_match()->set_prefix("/");
+    route->mutable_route()->set_cluster("cluster_0");
+    hcm.add_http_filters()->set_name("envoy.filters.http.router");
+    std::ignore = hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::router::v3::Router());
+    std::ignore = hcm_filter->mutable_typed_config()->PackFrom(hcm);
+
+    sendLdsResponse({listener}, "1");
+  };
+
+  // Assert on the resolver's specific error so the test cannot pass on an unrelated rejection.
+  EXPECT_LOG_CONTAINS("warning", "outside the supported range", {
+    HttpIntegrationTest::initialize();
+    test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
+  });
 }
 
 } // namespace

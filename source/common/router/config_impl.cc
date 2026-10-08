@@ -465,6 +465,15 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
   }
 }
 
+absl::StatusOr<std::unique_ptr<RouteTracingImpl>>
+RouteTracingImpl::create(const envoy::config::route::v3::Tracing& tracing) {
+  absl::StatusOr<std::unique_ptr<RouteTracingImpl>> result;
+  TRY_NEEDS_AUDIT { result = std::make_unique<RouteTracingImpl>(tracing); }
+  END_TRY
+  CATCH(const EnvoyException& e, { result = absl::InvalidArgumentError(e.what()); });
+  return result;
+}
+
 const envoy::type::v3::FractionalPercent& RouteTracingImpl::getClientSampling() const {
   return client_sampling_;
 }
@@ -1481,7 +1490,7 @@ bool PrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
                                    const StreamInfo::StreamInfo& stream_info,
                                    uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
     return true;
   }
   return false;
@@ -1515,7 +1524,7 @@ bool PathRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
                                  const StreamInfo::StreamInfo& stream_info,
                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
     return true;
   }
 
@@ -1557,7 +1566,7 @@ bool RegexRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
                                   const StreamInfo::StreamInfo& stream_info,
                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    if (path_matcher_->match(route_match_context.sanitizedPath())) {
+    if (path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
       return true;
     }
   }
@@ -1629,7 +1638,7 @@ bool PathSeparatedPrefixRouteEntryImpl::matches(const RouteMatchContext& route_m
   const absl::string_view sanitized_path = route_match_context.sanitizedPathWithoutQuery();
   const size_t sanitized_size = sanitized_path.size();
   const size_t matcher_size = matcher().size();
-  if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
+  if (sanitized_size >= matcher_size && path_matcher_->matchPathWithoutQuery(sanitized_path) &&
       (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
     return true;
   }
@@ -1889,14 +1898,17 @@ VirtualHostMatchResult VirtualHostImpl::getRouteFromRoutes(
     const bool has_route_specifiers =
         !config_specifiers.empty() || !route_specifiers_.empty() || !route_specifiers.empty();
     if (has_route_specifiers) {
-      OnRouteMatchStatus specifier_match_status = OnRouteMatchStatus::Unspecified;
-      route_entry = applyRouteSpecifiers(std::move(route_entry), config_specifiers,
-                                         route_specifiers_, route_specifiers, headers, stream_info,
-                                         random_value, specifier_match_status);
-      if (specifier_match_status == OnRouteMatchStatus::Continue) {
+      const OnRouteInputStatus input_status = (std::next(route) == routes.end())
+                                                  ? OnRouteInputStatus::NoMoreRoutes
+                                                  : OnRouteInputStatus::HasMoreRoutes;
+      OnRouteResult result =
+          applyRouteSpecifiers(std::move(route_entry), config_specifiers, route_specifiers_,
+                               route_specifiers, headers, stream_info, random_value, input_status);
+      if (result.status == OnRouteStatus::StopIterationAndSkipRoute) {
         // The specifiers turned this route down, carry on with the next one.
         continue;
       }
+      route_entry = std::move(result.route);
       if (route_entry == nullptr) {
         // The specifiers accepted the match and dropped the route, which leaves the request with
         // no route. There is nothing for the callback to look at, and the specifiers of the
@@ -2156,10 +2168,13 @@ VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::Reques
   route_result.route = std::move(match_result.route);
 
   if (!match_result.specifiers_applied) {
-    OnRouteMatchStatus match_status = OnRouteMatchStatus::Unspecified;
+    // This run happens outside the evaluation of a route list: either no virtual host or no
+    // route matched the request, so there is no next route a StopIterationAndSkipRoute could
+    // move on to, and the chain result stands whatever its status.
     route_result.route =
         applyRouteSpecifiers(std::move(route_result.route), config_specifiers, vhost_specifiers, {},
-                             headers, stream_info, random_value, match_status);
+                             headers, stream_info, random_value, OnRouteInputStatus::NoMoreRoutes)
+            .route;
   }
 
   if (route_result.route != nullptr) {

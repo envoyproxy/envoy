@@ -44,7 +44,8 @@ public:
     void drainListeners();
 
     // Network::NonDispatchedUdpPacketHandler
-    void handle(uint32_t worker_index, const Network::UdpRecvData& packet) override;
+    void handle(uint32_t worker_index, const Network::Address::Instance& listener_address,
+                const Network::UdpRecvData& packet) override;
 
   private:
     Server::Instance* const server_{};

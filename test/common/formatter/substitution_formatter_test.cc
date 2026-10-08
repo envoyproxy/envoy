@@ -321,6 +321,37 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
   }
 }
 
+TEST(SubstitutionFormatterTest, routeResolutionFormatters) {
+  Event::SimulatedTimeSystem time_system;
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+
+  // A stream that never resolved a route reports no time and a zero count.
+  {
+    StreamInfoFormatter time_format("ROUTE_RESOLUTION_TIME_US");
+    StreamInfoFormatter count_format("ROUTE_RESOLUTION_COUNT");
+    EXPECT_EQ(std::nullopt, formatForTest(time_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(time_format, {}, stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ("0", formatForTest(count_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(count_format, {}, stream_info),
+                ProtoEq(ValueUtil::numberValue(0.0)));
+  }
+
+  // Two resolutions accumulate the total time in microseconds and the count.
+  {
+    stream_info.addRouteResolutionTime(std::chrono::microseconds(30));
+    stream_info.addRouteResolutionTime(std::chrono::microseconds(70));
+    StreamInfoFormatter time_format("ROUTE_RESOLUTION_TIME_US");
+    StreamInfoFormatter count_format("ROUTE_RESOLUTION_COUNT");
+    EXPECT_EQ("100", formatForTest(time_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(time_format, {}, stream_info),
+                ProtoEq(ValueUtil::numberValue(100.0)));
+    EXPECT_EQ("2", formatForTest(count_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(count_format, {}, stream_info),
+                ProtoEq(ValueUtil::numberValue(2.0)));
+  }
+}
+
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   EXPECT_THAT(StreamInfoFormatter::create("unknown_field"),
               HasStatusCode(absl::StatusCode::kInvalidArgument));

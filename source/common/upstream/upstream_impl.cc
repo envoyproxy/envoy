@@ -1768,15 +1768,15 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
       runtime_(cluster_context.serverFactoryContext().runtime()),
       wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       random_(cluster_context.serverFactoryContext().api().randomGenerator()),
-      local_cluster_(
-          cluster_context.serverFactoryContext().clusterManager().localClusterName().value_or("") ==
-          cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
           cluster_context.serverFactoryContext().singletonManager(),
           cluster_context.serverFactoryContext().mainThreadDispatcher())),
       const_locality_shared_pool_(LocalityPool::getConstLocalitySharedPool(
           cluster_context.serverFactoryContext().singletonManager(),
-          cluster_context.serverFactoryContext().mainThreadDispatcher())) {
+          cluster_context.serverFactoryContext().mainThreadDispatcher())),
+      local_cluster_(
+          cluster_context.serverFactoryContext().clusterManager().localClusterName().value_or("") ==
+          cluster.name()) {
   auto& server_context = cluster_context.serverFactoryContext();
 
   auto stats_scope = generateStatsScope(cluster, server_context);

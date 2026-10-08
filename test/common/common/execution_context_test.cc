@@ -16,6 +16,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
+
 namespace Envoy {
 
 thread_local const Http::FilterContext* current_filter_context = nullptr;
@@ -210,3 +212,16 @@ TEST_F(ExecutionContextTest, FilterManagerCompiles) {
 }
 
 } // namespace Envoy
+
+#else
+
+namespace Envoy {
+
+TEST(ExecutionContextDisabledTest, FeatureIsDisabled) {
+  // Confirm that the test suite runs and succeeds when execution context is disabled.
+  SUCCEED();
+}
+
+} // namespace Envoy
+
+#endif

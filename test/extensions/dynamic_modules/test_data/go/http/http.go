@@ -759,6 +759,12 @@ func (p *filterStateCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 		val.ToUnsafeString() != "typed_value" {
 		panic(fmt.Sprintf("typed filter state mismatch: ok=%v val=%q", ok, val.ToUnsafeString()))
 	}
+	if !p.handle.HasFilterState("envoy.test.http_typed_object_for_rust") {
+		panic("expected HasFilterState to return true for existing key")
+	}
+	if p.handle.HasFilterState("nonexistent_key") {
+		panic("expected HasFilterState to return false for missing key")
+	}
 	return shared.HeadersStatusContinue
 }
 

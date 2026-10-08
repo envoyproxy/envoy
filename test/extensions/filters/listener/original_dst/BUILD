@@ -1,18 +1,22 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "original_dst_fuzz_test",
     srcs = ["original_dst_fuzz_test.cc"],
     corpus = "original_dst_corpus",
+    extension_names = ["envoy.filters.listener.original_dst"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/listener/original_dst:original_dst_lib",
@@ -20,12 +24,13 @@ envoy_cc_fuzz_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "original_dst_integration_test",
     size = "large",
     srcs = [
         "original_dst_integration_test.cc",
     ],
+    extension_names = ["envoy.filters.listener.original_dst"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:header_map_lib",
@@ -42,9 +47,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "original_dst_test",
     srcs = ["original_dst_test.cc"],
+    extension_names = ["envoy.filters.listener.original_dst"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:filter_state_dst_address_lib",

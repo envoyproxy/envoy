@@ -129,7 +129,8 @@ vhds:
         return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
       }));
   // The initial VHDS fetch is started as part of applying the inline route configuration, so that
-  // it warms up with it.
+  // it warms up with it. On-demand virtual hosts under the route configuration are accepted first.
+  EXPECT_CALL(*subscription_ptr, accept(absl::flat_hash_set<std::string>{"foo/*"}));
   EXPECT_CALL(*subscription_ptr, start(_));
 
   StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,
@@ -296,7 +297,8 @@ vhds:
         return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
       }));
   // The initial VHDS fetch is started as part of applying the inline route configuration, so that
-  // it warms up with it.
+  // it warms up with it. On-demand virtual hosts under the route configuration are accepted first.
+  EXPECT_CALL(*subscription_ptr, accept(absl::flat_hash_set<std::string>{"foo/*"}));
   EXPECT_CALL(*subscription_ptr, start(_));
 
   StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,

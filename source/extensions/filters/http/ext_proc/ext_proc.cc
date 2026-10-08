@@ -1503,7 +1503,7 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
       logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
     }
     // Only set upstream host in logging info once.
-    if (logging_info_->upstreamHost() == nullptr) {
+    if (logging_info_->upstreamHost() == nullptr && stream_info->upstreamInfo().has_value()) {
       logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
     }
 

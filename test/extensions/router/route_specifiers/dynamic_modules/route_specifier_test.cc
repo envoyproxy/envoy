@@ -364,7 +364,7 @@ TEST_F(DynamicModuleRouteSpecifierTest, ValidConfigWithTemplatesAndOverrides) {
   EXPECT_EQ("matched_cluster", route.route->routeEntry()->clusterName());
 }
 
-// A module built against a newer ABI could return a decision this build does not know, which is
+// A module built against a newer ABI could record a decision this build does not know, which is
 // handled by the failure policy rather than trusted.
 TEST_F(DynamicModuleRouteSpecifierTest, UnknownDecisionPassesThrough) {
   const auto config = loadConfig(
@@ -387,6 +387,28 @@ TEST_F(DynamicModuleRouteSpecifierTest, UnknownDecisionFailsClosed) {
 
   const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
   EXPECT_EQ(nullptr, route.route);
+}
+
+// A module built against a newer ABI could also return a status this build does not know, which
+// is handled by the failure policy as well.
+TEST_F(DynamicModuleRouteSpecifierTest, UnknownStatusPassesThrough) {
+  const auto config = loadConfig(
+      specifierYaml("route_specifier_unknown_status", "      failure_policy: PASS_THROUGH\n"));
+  ASSERT_TRUE(config.ok());
+
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("matched_cluster", route.route->routeEntry()->clusterName());
+  EXPECT_EQ(
+      1, context_.store_.counter("dynamicmodulescustom.route_specifier.test.failure_module_error")
+             .value());
+  // A status Envoy does not know is not a decision the module recorded.
+  EXPECT_EQ(
+      1,
+      context_.store_.counter("dynamicmodulescustom.route_specifier.test.unknown_status").value());
+  EXPECT_EQ(
+      0,
+      context_.store_.counter("dynamicmodulescustom.route_specifier.test.decision_error").value());
 }
 
 // A virtual host that configures no routes at all is routed entirely by the module, which is how a
@@ -454,6 +476,44 @@ TEST_F(DynamicModuleRouteSpecifierTest, RegexRewriteOverrideLoads) {
         regex_rewrite:
           pattern: {regex: "^/api/(.*)$"}
           substitution: '/internal/\1'
+)EOF"));
+  EXPECT_TRUE(config.ok());
+}
+
+// A route override may carry tracing, built once when the specifier loads.
+TEST_F(DynamicModuleRouteSpecifierTest, TracingOverrideLoads) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      route_overrides:
+      - override_id: traced
+        tracing:
+          client_sampling: {numerator: 10}
+          overall_sampling: {numerator: 50}
+)EOF"));
+  EXPECT_TRUE(config.ok());
+}
+
+// An invalid tracing operation formatter is rejected when the specifier loads rather than throwing.
+TEST_F(DynamicModuleRouteSpecifierTest, InvalidTracingOperationRejected) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      route_overrides:
+      - override_id: traced
+        tracing:
+          operation: "%INVALID_COMMAND_THAT_DOES_NOT_EXIST%"
+)EOF"));
+  EXPECT_FALSE(config.ok());
+}
+
+// A route override may carry metadata, which is a route level property valid on any route.
+TEST_F(DynamicModuleRouteSpecifierTest, MetadataOverrideLoads) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      route_overrides:
+      - override_id: tagged
+        metadata:
+          filter_metadata:
+            envoy.test.override: {group: canary}
 )EOF"));
   EXPECT_TRUE(config.ok());
 }
@@ -529,9 +589,10 @@ TEST_F(DynamicModuleRouteSpecifierTest, RegistersCustomStatNamespace) {
   // The statistics of the specifier are rooted at the configured metrics namespace.
   const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
   ASSERT_NE(nullptr, route.route);
+  // The no-op module records no decision, so the default Unspecified decision is in effect.
   EXPECT_EQ(
       1,
-      context_.store_.counter("custom_metrics.route_specifier.test.decision_pass_through").value());
+      context_.store_.counter("custom_metrics.route_specifier.test.decision_has_override").value());
 }
 
 // A decision that records route entry overrides produces a route entry wrapper. Its rewritten path,
@@ -546,7 +607,8 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteEntryWrapperAccessors) {
   const auto* entry = route.route->routeEntry();
   ASSERT_NE(nullptr, entry);
 
-  // The recorded cluster and path replace those of the route.
+  // The recorded route name, cluster, and path replace those of the route.
+  EXPECT_EQ("module_route_entry", route.route->routeName());
   EXPECT_EQ("canary", entry->clusterName());
   auto headers = requestHeaders();
   Formatter::Context formatter_context(&headers);
@@ -648,6 +710,21 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperMetadataAccessors) {
   static_cast<void>(route.route->typedMetadata());
 }
 
+// A decision that records only a route name produces a route wrapper whose name replaces that of
+// the route, without recording any route entry override.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperRouteName) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_override", R"EOF(      failure_policy: PASS_THROUGH
+      specifier_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: route-name
+)EOF"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("module_route", route.route->routeName());
+}
+
 // A route wrapper that records no metadata delegates both metadata accessors to the route.
 TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperMetadataFallback) {
   const auto config =
@@ -661,9 +738,10 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteWrapperMetadataFallback) {
   ASSERT_NE(nullptr, route.route);
   // The recorded filter override marks the wrapper, confirming it is a route wrapper.
   EXPECT_TRUE(route.route->filterDisabled("envoy.test.disabled").value_or(false));
-  // Only a filter override was recorded, so the metadata accessors fall back to the route, which
-  // carries no envoy.test.route metadata.
+  // Only a filter override was recorded, so the metadata accessors and the route name fall back to
+  // the route, which carries no envoy.test.route metadata and no name.
   EXPECT_FALSE(route.route->metadata().filter_metadata().contains("envoy.test.route"));
+  EXPECT_EQ("", route.route->routeName());
   static_cast<void>(route.route->typedMetadata());
 }
 
@@ -679,8 +757,10 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteEntryWrapperMetadataFallback) {
   const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
   ASSERT_NE(nullptr, route.route);
   EXPECT_EQ("canary", route.route->routeEntry()->clusterName());
-  // Only a cluster override was recorded, so the metadata accessors fall back to the route.
+  // Only a cluster override was recorded, so the metadata accessors and the route name fall back to
+  // the route.
   EXPECT_FALSE(route.route->metadata().filter_metadata().contains("envoy.test.route"));
+  EXPECT_EQ("", route.route->routeName());
   static_cast<void>(route.route->typedMetadata());
 }
 
@@ -715,8 +795,9 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteMetadataRejectionFailsOpen) {
              .value());
 }
 
-// A ContinueMatching decision drops the matched route and lets matching carry on to the next route.
-TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingDecisionSkipsToTheNextRoute) {
+// A StopIterationAndSkipRoute status drops the matched route and lets matching carry on to the
+// next route.
+TEST_F(DynamicModuleRouteSpecifierTest, SkipRouteStatusSkipsToTheNextRoute) {
   const auto config =
       loadRaw(catchAllRouteConfigYaml("route_specifier_continue_matching", "PASS_THROUGH"));
   ASSERT_TRUE(config.ok());
@@ -725,14 +806,14 @@ TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingDecisionSkipsToTheNextRo
   ASSERT_NE(nullptr, route.route);
   ASSERT_NE(nullptr, route.route->routeEntry());
   EXPECT_EQ("specific_cluster", route.route->routeEntry()->clusterName());
-  EXPECT_EQ(1, context_.store_
-                   .counter("dynamicmodulescustom.route_specifier.test.decision_continue_matching")
-                   .value());
+  EXPECT_EQ(
+      1,
+      context_.store_.counter("dynamicmodulescustom.route_specifier.test.route_skipped").value());
 }
 
-// A ContinueMatching decision on the last route that matches yields no route, since there is
-// nothing left to match.
-TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingDecisionOnTheLastRouteYieldsNoRoute) {
+// A StopIterationAndSkipRoute status on the last route that matches yields no route, since there
+// is nothing left to match.
+TEST_F(DynamicModuleRouteSpecifierTest, SkipRouteStatusOnTheLastRouteYieldsNoRoute) {
   const auto config =
       loadRaw(catchAllRouteConfigYaml("route_specifier_continue_matching", "PASS_THROUGH"));
   ASSERT_TRUE(config.ok());
@@ -756,10 +837,58 @@ TEST_F(DynamicModuleRouteSpecifierTest, ContinueMatchingFailurePolicyContinuesOn
   EXPECT_EQ(
       1, context_.store_.counter("dynamicmodulescustom.route_specifier.test.failure_module_error")
              .value());
-  // The failure path does not count as a ContinueMatching decision.
-  EXPECT_EQ(0, context_.store_
-                   .counter("dynamicmodulescustom.route_specifier.test.decision_continue_matching")
-                   .value());
+  // The failure path has its own counters, so the skip it produced is not counted as one the
+  // module asked for.
+  EXPECT_EQ(
+      0,
+      context_.store_.counter("dynamicmodulescustom.route_specifier.test.route_skipped").value());
+}
+
+// A selection that names a template that is not declared cannot be honored, so the failure
+// policy applies rather than silently falling back to the resolved route.
+TEST_F(DynamicModuleRouteSpecifierTest, TemplateNotSelectedPassesThrough) {
+  const auto config = loadConfig(
+      specifierYaml("route_specifier_select_template", "      failure_policy: PASS_THROUGH\n"));
+  ASSERT_TRUE(config.ok());
+
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("matched_cluster", route.route->routeEntry()->clusterName());
+  EXPECT_EQ(1,
+            context_.store_
+                .counter("dynamicmodulescustom.route_specifier.test.failure_template_not_selected")
+                .value());
+}
+
+// The metadata a selected override carries is layered under the metadata the module records
+// itself: the module's value wins for the same key, the override contributes its other keys, and
+// the typed metadata the override carries reaches the produced route.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteOverrideMetadataLayersUnderModuleMetadata) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_override", R"EOF(      failure_policy: PASS_THROUGH
+      specifier_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: select-override
+      route_overrides:
+      - override_id: applied
+        metadata:
+          filter_metadata:
+            envoy.test.override: {group: override, extra: carried}
+          typed_filter_metadata:
+            envoy.test.typed:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: carried
+)EOF"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders(), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+
+  const auto& metadata = route.route->metadata();
+  const auto& fields = metadata.filter_metadata().at("envoy.test.override").fields();
+  // The module recorded group=module, which wins over the group=override the override carries.
+  EXPECT_EQ("module", fields.at("group").string_value());
+  EXPECT_EQ("carried", fields.at("extra").string_value());
+  EXPECT_TRUE(metadata.typed_filter_metadata().contains("envoy.test.typed"));
 }
 
 } // namespace

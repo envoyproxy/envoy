@@ -1689,6 +1689,19 @@ bool envoy_dynamic_module_callback_http_get_filter_state_typed(
   return true;
 }
 
+bool envoy_dynamic_module_callback_http_has_filter_state(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  return stream_info->filterState()->hasDataWithName(absl::string_view(key.ptr, key.length));
+}
+
 bool envoy_dynamic_module_callback_http_set_filter_state_object(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key,
@@ -2107,9 +2120,9 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
 
 void envoy_dynamic_module_callback_http_get_timing_info(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_timing_info* timing_out) {
+    envoy_dynamic_module_type_timing_info_v2* timing_out) {
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  ContextAccessor::getTimingInfo(filter->streamInfo(), timing_out);
+  ContextAccessor::getTimingInfoV2(filter->streamInfo(), timing_out);
 }
 
 void envoy_dynamic_module_callback_http_add_custom_flag(

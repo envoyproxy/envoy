@@ -1,10 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -62,10 +62,11 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "http_inspector_fuzz_test",
     srcs = ["http_inspector_fuzz_test.cc"],
     corpus = "http_inspector_corpus",
+    extension_names = ["envoy.filters.listener.http_inspector"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",

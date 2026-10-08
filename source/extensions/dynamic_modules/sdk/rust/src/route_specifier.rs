@@ -17,16 +17,20 @@ use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// The decision a route specifier returns for a request.
+/// The decision a route specifier records for a request with
+/// [`RouteSpecifierContext::set_decision`]. It selects how Envoy builds the route.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RouteDecision {
-  /// Use the route the specifier was given, unchanged. Recorded overrides are ignored.
+  /// The default behavior, in effect when the module records no decision: Envoy generates a new
+  /// route based on what the setter methods of [`RouteSpecifierContext`] recorded. The base is
+  /// the template recorded with [`RouteSpecifierContext::select_template`], evaluated against
+  /// the request like a configured route, or the route the specifier was given when no template
+  /// was recorded, and the recorded overrides are applied on top of it. With nothing recorded
+  /// the route the specifier was given is used unchanged.
+  Unspecified,
+  /// Use the route the specifier was given, unchanged. The recorded template and overrides are
+  /// ignored.
   PassThrough,
-  /// Use the route the specifier was given with the recorded overrides applied.
-  Override,
-  /// Use the template recorded with [`RouteSpecifierContext::select_template`], evaluated against
-  /// the request like a configured route, with the recorded overrides applied.
-  SelectTemplate,
   /// Use no route, so the request is handled as if nothing had matched.
   NoRoute,
   /// The module could not reach a decision, so Envoy applies the configured failure policy.
@@ -34,44 +38,43 @@ pub enum RouteDecision {
   /// Use the previous route of the stream unchanged, without building a new route. Valid only when
   /// a previous route exists, otherwise Envoy applies the failure policy.
   ReusePrevious,
-  /// Skip the route the specifier was given and let route matching carry on with the next route.
-  /// The recorded overrides and the returned route are ignored.
-  ContinueMatching,
 }
 
 impl RouteDecision {
   fn to_abi(self) -> abi::envoy_dynamic_module_type_route_specifier_decision {
     match self {
+      Self::Unspecified => abi::envoy_dynamic_module_type_route_specifier_decision::Unspecified,
       Self::PassThrough => abi::envoy_dynamic_module_type_route_specifier_decision::PassThrough,
-      Self::Override => abi::envoy_dynamic_module_type_route_specifier_decision::Override,
-      Self::SelectTemplate => {
-        abi::envoy_dynamic_module_type_route_specifier_decision::SelectTemplate
-      },
       Self::NoRoute => abi::envoy_dynamic_module_type_route_specifier_decision::NoRoute,
       Self::Error => abi::envoy_dynamic_module_type_route_specifier_decision::Error,
       Self::ReusePrevious => abi::envoy_dynamic_module_type_route_specifier_decision::ReusePrevious,
-      Self::ContinueMatching => {
-        abi::envoy_dynamic_module_type_route_specifier_decision::ContinueMatching
-      },
     }
   }
 }
 
-/// Whether the route specifiers configured after this one run for the request.
+/// The status a route specifier returns from [`RouteSpecifierConfig::on_route`]: whether the
+/// route specifiers configured after this one run for the request, and whether route matching
+/// accepts the route the decision produced.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChainStatus {
-  /// The chain continues.
+pub enum OnRouteStatus {
+  /// The chain continues: the route the decision produced is handed to the next specifier.
   Continue,
-  /// The chain stops and the result of this specifier is the final route.
+  /// The chain stops and the route the decision produced is the final route.
   StopIteration,
+  /// The chain stops, the route is turned down, and route matching carries on with the next route
+  /// of the list being evaluated. The recorded decision, template and overrides are ignored.
+  StopIterationAndSkipRoute,
 }
 
-impl ChainStatus {
-  fn to_abi(self) -> abi::envoy_dynamic_module_type_route_specifier_chain_status {
+impl OnRouteStatus {
+  fn to_abi(self) -> abi::envoy_dynamic_module_type_route_specifier_on_route_status {
     match self {
-      Self::Continue => abi::envoy_dynamic_module_type_route_specifier_chain_status::Continue,
+      Self::Continue => abi::envoy_dynamic_module_type_route_specifier_on_route_status::Continue,
       Self::StopIteration => {
-        abi::envoy_dynamic_module_type_route_specifier_chain_status::StopIteration
+        abi::envoy_dynamic_module_type_route_specifier_on_route_status::StopIteration
+      },
+      Self::StopIterationAndSkipRoute => {
+        abi::envoy_dynamic_module_type_route_specifier_on_route_status::StopIterationAndSkipRoute
       },
     }
   }
@@ -761,12 +764,32 @@ impl RouteSpecifierContext {
     }
   }
 
-  /// Select the route template the [`RouteDecision::SelectTemplate`] decision uses.
+  /// Select the route template Envoy generates the final route from, in place of the route the
+  /// specifier was given, when the decision is left [`RouteDecision::Unspecified`].
   ///
   /// Returns `false` when the identifier is not declared in the route specifier configuration.
+  /// A failed selection is handled by the failure policy when no template ends up selected and
+  /// the decision is left [`RouteDecision::Unspecified`], rather than silently falling back to
+  /// the route the specifier was given. A module that wants to probe for a template without
+  /// committing checks the configuration getters instead.
   pub fn select_template(&mut self, template_id: &str) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_route_template(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(template_id),
+      )
+    }
+  }
+
+  /// Revert a [`RouteSpecifierContext::select_template`] call with the same identifier, so the
+  /// route the specifier was given becomes the base of the final route again. The recorded
+  /// overrides stay in effect.
+  ///
+  /// Returns `false` when the identifier does not name the selected template, in which case
+  /// nothing changes.
+  pub fn unselect_template(&mut self, template_id: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_unset_route_template(
         self.envoy_ptr,
         crate::str_to_module_buffer(template_id),
       )
@@ -777,8 +800,7 @@ impl RouteSpecifierContext {
   ///
   /// It forces the produced route to be wrapped even with no other override, so that
   /// [`RouteSpecifierConfig::on_route_destroy`] fires for it with this value when the route is
-  /// destroyed. It is effective for the [`RouteDecision::Override`] and
-  /// [`RouteDecision::SelectTemplate`] decisions.
+  /// destroyed. It is effective when the decision is left [`RouteDecision::Unspecified`].
   pub fn set_route_user_data(&mut self, user_data: u64) {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_route_user_data(
@@ -803,12 +825,16 @@ impl RouteSpecifierContext {
     }
   }
 
-  /// Select whether the route specifiers configured after this one run for the request.
-  pub fn set_chain_status(&mut self, status: ChainStatus) {
+  /// Record the decision that tells Envoy how to build the route.
+  ///
+  /// [`RouteDecision::Unspecified`] is in effect when the module records none, under which Envoy
+  /// generates a new route based on what the setter methods of [`RouteSpecifierContext`]
+  /// recorded. A later call replaces the decision of an earlier one.
+  pub fn set_decision(&mut self, decision: RouteDecision) {
     unsafe {
-      abi::envoy_dynamic_module_callback_route_specifier_set_chain_status(
+      abi::envoy_dynamic_module_callback_route_specifier_set_decision(
         self.envoy_ptr,
-        status.to_abi(),
+        decision.to_abi(),
       )
     }
   }
@@ -899,6 +925,21 @@ impl RouteSpecifierContext {
     }
   }
 
+  /// Revert a [`RouteSpecifierContext::set_route_override`] call with the same identifier, so
+  /// nothing of the override applies to the final route. The values the module recorded itself
+  /// stay in effect.
+  ///
+  /// Returns `false` when the identifier does not name the selected override, in which case
+  /// nothing changes.
+  pub fn unset_route_override(&mut self, override_id: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_unset_route_override(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(override_id),
+      )
+    }
+  }
+
   /// Record the string value of a route metadata entry.
   pub fn set_route_metadata_string(&mut self, namespace: &str, key: &str, value: &str) {
     unsafe {
@@ -981,6 +1022,20 @@ impl RouteSpecifierContext {
       abi::envoy_dynamic_module_callback_route_specifier_set_host(
         self.envoy_ptr,
         crate::str_to_module_buffer(host),
+      )
+    }
+  }
+
+  /// Record the name of the route the decision produces. The name is what the `%ROUTE_NAME%` access
+  /// log command operator reports, so a module built route carries an identity of its own in access
+  /// logs and other route name consumers.
+  ///
+  /// Returns `false` when the name is empty.
+  pub fn set_route_name(&mut self, route_name: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_route_name(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(route_name),
       )
     }
   }
@@ -1075,7 +1130,12 @@ pub trait RouteSpecifierConfig: Send + Sync {
   /// This is called while the route is being resolved, and again whenever the route is recomputed,
   /// so it must be able to reach a decision from the request and the stream info alone. The call
   /// is synchronous and cannot be time boxed, so it must not block or perform I/O.
-  fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision;
+  ///
+  /// The decision that tells Envoy how to build the route is recorded with
+  /// [`RouteSpecifierContext::set_decision`], with [`RouteDecision::Unspecified`] in effect when
+  /// none is recorded. The returned status tells Envoy whether the route specifiers configured
+  /// after this one run and whether route matching accepts the produced route.
+  fn on_route(&self, ctx: &mut RouteSpecifierContext) -> OnRouteStatus;
 
   /// Called when a route built with [`RouteSpecifierContext::set_route_user_data`] is destroyed,
   /// with the value recorded on it. It may run on any thread, concurrently with other hooks, and
@@ -1671,14 +1731,23 @@ ffi_export! {
   unsafe fn envoy_dynamic_module_on_route_specifier_on_route(
     config_ptr: abi::envoy_dynamic_module_type_route_specifier_config_module_ptr,
     context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
-  ) -> abi::envoy_dynamic_module_type_route_specifier_decision {
+  ) -> abi::envoy_dynamic_module_type_route_specifier_on_route_status {
     let config = &*(config_ptr as *const Box<dyn RouteSpecifierConfig>);
     let mut ctx = unsafe { RouteSpecifierContext::new(context_envoy_ptr) };
     config.on_route(&mut ctx).to_abi()
   }
-  // A panic during resolution must not look like a decision, so fail closed and let Envoy apply
-  // the configured failure policy.
-  on_panic = abi::envoy_dynamic_module_type_route_specifier_decision::Error
+  // A panic during resolution must not look like a decision, so record the Error decision, which
+  // replaces whatever the module recorded before panicking, and let Envoy apply the configured
+  // failure policy. The returned status is then not acted on.
+  on_panic = {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_decision(
+        context_envoy_ptr,
+        abi::envoy_dynamic_module_type_route_specifier_decision::Error,
+      );
+    }
+    abi::envoy_dynamic_module_type_route_specifier_on_route_status::Continue
+  }
 }
 
 ffi_export! {
