@@ -23,7 +23,9 @@ upstreams and control plane xDS clusters.
   cluster_removed, Counter, Total clusters removed (via CDS)
   cluster_updated, Counter, Total cluster updates
   cluster_updated_via_merge, Counter, Total cluster updates applied as merged updates
+  odcds_attempt, Counter, On-demand cluster discoveries started
   odcds_missing, Counter, On-demand cluster discoveries completed because the requested cluster was missing
+  odcds_success, Counter, On-demand cluster discoveries completed when the requested cluster became available
   odcds_timeout, Counter, On-demand cluster discoveries that timed out
   update_merge_cancelled, Counter, Total merged updates that got cancelled and delivered early
   update_out_of_merge_window, Counter, Total updates which arrived out of a merge window

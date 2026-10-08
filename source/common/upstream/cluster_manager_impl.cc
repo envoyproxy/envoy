@@ -1266,7 +1266,9 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   const bool enable_batch_aware_update =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update");
 
-  pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
+  if (pending_cluster_creations_.erase(cm_cluster.cluster().info()->name()) != 0) {
+    cm_stats_.odcds_success_.inc();
+  }
 
   const UnitFloat drop_overload = cm_cluster.cluster().dropOverload();
   const std::string drop_category = cm_cluster.cluster().dropCategory();
@@ -1769,6 +1771,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t config_source_key, 
     }
     // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
     // invoke the cluster lifecycle callbacks, that will in turn invoke our callback.
+    cm_stats_.odcds_attempt_.inc();
     odcds->updateOnDemand(name);
     // Setup the discovery timeout timer to avoid keeping callbacks indefinitely.
     auto timer = dispatcher_.createTimer([this, name] { notifyExpiredDiscovery(name); });

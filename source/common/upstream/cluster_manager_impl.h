@@ -201,7 +201,9 @@ private:
   COUNTER(cluster_removed)                                                                         \
   COUNTER(cluster_updated)                                                                         \
   COUNTER(cluster_updated_via_merge)                                                               \
+  COUNTER(odcds_attempt)                                                                           \
   COUNTER(odcds_missing)                                                                           \
+  COUNTER(odcds_success)                                                                           \
   COUNTER(odcds_timeout)                                                                           \
   COUNTER(update_merge_cancelled)                                                                  \
   COUNTER(update_out_of_merge_window)                                                              \
