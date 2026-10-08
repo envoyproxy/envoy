@@ -434,7 +434,7 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
 
   NiceMock<ThreadLocal::MockInstance> tls;
   SDSSecretReader secret_reader(std::move(client_secret_provider), std::move(token_secret_provider),
-                                tls, *api);
+                                tls, *api, dispatcher);
   EXPECT_TRUE(secret_reader.clientSecret().empty());
   EXPECT_TRUE(secret_reader.hmacSecret().empty());
 
