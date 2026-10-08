@@ -1607,6 +1607,76 @@ TEST_F(RdsVhdsOnDemandTest, AnsweredAliasCacheDisabled) {
   rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
 }
 
+// A virtual host that answered an alias and was later removed by the server stays answered: the
+// published configuration now answers that the virtual host doesn't exist, so a repeated request
+// is answered locally with 'false' instead of going back to the server.
+TEST_F(RdsVhdsOnDemandTest, RemovedAnsweredVirtualHostIsAnsweredLocallyWithFalse) {
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Land the initial fetch, which is what publishes the route configuration.
+  const auto initial_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_initial", "initial.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(initial_resources.refvec_, {}, "1"));
+
+  // The first request for 'bar.com' goes to the server, which answers it with 'vhost_bar'.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  EXPECT_CALL(mock_callback_, Call(true));
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // The server removes 'vhost_bar' on its own.
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  *removed_resources.Add() = "vhost_bar";
+  const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> nothing_added;
+  const auto decoded_nothing_added =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(nothing_added);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_nothing_added.refvec_, removed_resources, "3"));
+
+  // A repeated request for 'bar.com' is answered locally with 'false': the subscription to the
+  // alias stays, so the server pushes an update on its own if the virtual host comes back.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(false));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+}
+
+// With the runtime guard disabled, a publish whose update carries no resource ids returns before
+// walking the queued callbacks, which is the legacy behavior: a callback whose alias isn't among
+// the resource ids of a subsequent update stays queued.
+TEST_F(RdsVhdsOnDemandTest, AnsweredAliasCacheDisabledPublishWithoutAliasesLeavesCallbacksQueued) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.vhds_answered_alias_cache", "false"}});
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Land the initial fetch, which is what publishes the route configuration.
+  const auto initial_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_initial", "initial.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(initial_resources.refvec_, {}, "1"));
+
+  // A request for 'bar.com' goes to the server and is queued.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+
+  // A removal-only update publishes with no resource ids, so the queued callback stays queued.
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  *removed_resources.Add() = "vhost_initial";
+  const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> nothing_added;
+  const auto decoded_nothing_added =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(nothing_added);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_nothing_added.refvec_, removed_resources, "2"));
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

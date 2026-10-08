@@ -17,7 +17,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/vhds.h"
 
-#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Router {
@@ -74,7 +74,8 @@ public:
   }
   void updateOnDemand(const std::string& alias) override {
     if (vhds_subscription_ != nullptr) {
-      requested_vhds_resource_ids_.insert(alias);
+      // try_emplace keeps the answered state of an id that is requested again.
+      requested_vhds_resource_ids_.try_emplace(alias, false);
       vhds_subscription_->updateOnDemand(alias);
     }
   }
@@ -91,11 +92,13 @@ public:
   bool vhdsResourceIdAnswered(const std::string& resource_id) const override {
     if (configWarming()) {
       // While an update is warming, the published configuration may predate the answer for the
-      // id, so return false to indicate that the resource ID has not been answered yet and the
-      // caller should retry after the configuration has finished warming.
+      // id, so return false. The caller then queues the request, and the publish of the warming
+      // update resolves it.
+      // TODO(wbpcode): consider tracking the ids answered by the warming update separately.
       return false;
     }
-    return answered_vhds_resource_ids_.contains(resource_id);
+    const auto it = requested_vhds_resource_ids_.find(resource_id);
+    return it != requested_vhds_resource_ids_.end() ? it->second : false;
   }
   const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() const override {
     ASSERT(Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::RouteConfiguration>(
@@ -134,10 +137,9 @@ private:
   // vhosts supplied by VHDS, to be merged with RDS vhosts in onRdsUpdate.
   std::unique_ptr<VirtualHostMap> vhds_virtual_hosts_;
   std::set<std::string> resource_ids_in_last_update_;
-  // The resource IDs explicitly requested on demand from the current subscription.
-  absl::flat_hash_set<std::string> requested_vhds_resource_ids_;
-  // The requested VHDS resource IDs that have been answered by the current subscription.
-  absl::flat_hash_set<std::string> answered_vhds_resource_ids_;
+  // The resource IDs explicitly requested on demand from the current subscription, and whether
+  // the server has answered each of them in a published update.
+  absl::flat_hash_map<std::string, bool> requested_vhds_resource_ids_;
 };
 
 } // namespace Router

@@ -487,6 +487,32 @@ TEST_F(VhdsTest, VhdsUnrequestedResourceIdsAreNotAnswered) {
   EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("vhost1"));
 }
 
+// verify that accumulated answers survive an RDS update that changes only the virtual hosts: the
+// VHDS configuration is unchanged, so the subscription that holds the interest in the answered
+// aliases is kept, and the published configuration keeps reflecting the server's answers
+TEST_F(VhdsTest, VhdsAnsweredResourceIdsSurviveRdsUpdateThatKeepsTheSubscription) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  config_update_info->updateOnDemand("vhost1");
+  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, {}, "2"));
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+
+  // An RDS update with the same VHDS config source but different virtual hosts keeps the
+  // subscription.
+  auto updated_route_config = route_config;
+  auto* rds_vhost = updated_route_config.add_virtual_hosts();
+  rds_vhost->set_name("vhost_rds1");
+  rds_vhost->add_domains("vhost.rds.first");
+  EXPECT_OK(config_update_info->onRdsUpdate(updated_route_config, "2"));
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

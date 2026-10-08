@@ -138,16 +138,13 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
   // future if necessary.
   if (new_vhds_subscription != nullptr) {
     vhds_subscription_ = std::move(new_vhds_subscription);
-    // The new subscription starts out subscribed to the route configuration namespace only, so
-    // nothing guarantees any more that the server pushes updates for the ids the old one
-    // requested and answered.
+    // The new subscription holds none of the aliases the old one requested, so nothing
+    // guarantees pushes for them any more.
     requested_vhds_resource_ids_.clear();
-    answered_vhds_resource_ids_.clear();
   } else if (!has_vhds) {
     // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
     vhds_subscription_.reset();
     requested_vhds_resource_ids_.clear();
-    answered_vhds_resource_ids_.clear();
   }
   last_vhds_config_hash_ = new_vhds_config_hash;
   rds_virtual_hosts_ = std::move(rds_virtual_hosts);
@@ -203,9 +200,12 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   // name a resource or attach aliases Envoy never asked for; Envoy holds no subscription
   // interest in those, so nothing guarantees pushes for them after a stream reconnect, and
   // answering them locally later would serve permanently stale data without ever subscribing.
+  // TODO(wbpcode): also take the removed_resources into account for marking requested VHDS resource
+  // IDs as answered.
   for (absl::string_view resource_id : added_resource_ids) {
-    if (requested_vhds_resource_ids_.contains(resource_id)) {
-      answered_vhds_resource_ids_.emplace(resource_id);
+    if (auto it = requested_vhds_resource_ids_.find(resource_id);
+        it != requested_vhds_resource_ids_.end()) {
+      it->second = true;
     }
   }
   resource_ids_in_last_update_ = std::move(added_resource_ids);

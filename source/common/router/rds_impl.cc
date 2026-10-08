@@ -149,6 +149,8 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
         }
         const std::string alias = VhdsSubscription::domainNameToAlias(
             config_update_info_->protobufConfigurationCast().name(), for_domain);
+        // TODO(wbpcode): this local-answer block and the publish loop in onConfigUpdate() are
+        // duplicated and may could be refactored into a shared helper.
         if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache") &&
             config_update_info_->vhdsResourceIdAnswered(alias)) {
           // The server has already answered for this alias and the published route configuration
