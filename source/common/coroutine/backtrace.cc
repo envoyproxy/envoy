@@ -22,5 +22,9 @@ const PromiseBase* Backtrace::getCallersPromise(const PromiseBase& promise) {
 
 const void* Backtrace::getCallerAddress(const PromiseBase& promise) { return promise.caller_; }
 
+void Backtrace::setLogToStderr(bool log_to_stderr) { log_to_stderr_ = log_to_stderr; }
+
+void Backtrace::setSingleLine(bool single_line) { single_line_ = single_line; }
+
 } // namespace Coroutine
 } // namespace Envoy
