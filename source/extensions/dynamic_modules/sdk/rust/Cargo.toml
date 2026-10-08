@@ -7,9 +7,16 @@ description = "Envoy Proxy Dynamic Modules Rust SDK"
 license = "Apache-2.0"
 repository = "https://github.com/envoyproxy/envoy"
 
+[features]
+default = []
+mock = ["dep:mockall"]
+
 [dependencies]
-mockall = "0.13.1"
+mockall = { version = "0.13.1", optional = true }
 smallvec = "1"
+
+[dev-dependencies]
+mockall = "0.13.1"
 
 [build-dependencies]
 bindgen = "0.73.2"

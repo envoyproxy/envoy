@@ -4,12 +4,13 @@ use crate::{
   wrap_into_c_void_ptr, EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId,
   NewUdpListenerFilterConfigFunction, NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 
 /// The trait that represents the Envoy UDP listener filter configuration.
 /// This is used in [`NewUdpListenerFilterConfigFunction`] to pass the Envoy filter configuration
 /// to the dynamic module.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyUdpListenerFilterConfig {
   /// Define a new counter scoped to this filter config with the given name.
   fn define_counter(
@@ -100,7 +101,7 @@ pub trait UdpListenerFilter<ELF: EnvoyUdpListenerFilter> {
 /// The trait that represents the Envoy UDP listener filter.
 /// This is used in [`UdpListenerFilter`] to interact with the underlying Envoy UDP listener filter
 /// object.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyUdpListenerFilter {
   /// Get the current datagram data as chunks.

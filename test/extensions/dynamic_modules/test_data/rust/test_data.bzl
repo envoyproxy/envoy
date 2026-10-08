@@ -61,7 +61,7 @@ def test_program(name):
         crate_root = name + ".rs",
         edition = "2021",
         deps = [
-            "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
+            "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk_mock",
         ],
         tags = [
             # It is a known issue that TSAN detectes a false positive in the test runner of Rust toolchain:

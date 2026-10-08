@@ -10,6 +10,7 @@ use crate::{
   abi, ffi_export, ClusterHostCount, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
   EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::ffi::c_void;
 use std::ptr;
@@ -519,7 +520,7 @@ pub trait ClusterSpecifierConfig: Send + Sync {
 /// config creation and can be recorded at any point during selection.
 ///
 /// Implementations must be `Send + Sync` since they may be accessed from multiple threads.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyClusterSpecifierMetrics: Send + Sync {
   // -------------------------------------------------------------------------
