@@ -484,6 +484,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_cluster_lb_get_member_update_host_
 WEAK_STUB_VOID(envoy_dynamic_module_callback_cluster_pre_init_complete,
                envoy_dynamic_module_type_cluster_envoy_ptr)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_cluster_use_persistent_host_map,
+               envoy_dynamic_module_type_cluster_envoy_ptr)
+
 WEAK_STUB(size_t, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count, 0,
           envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t)
 
