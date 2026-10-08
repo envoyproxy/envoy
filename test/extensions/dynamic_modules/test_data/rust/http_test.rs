@@ -351,9 +351,7 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
       *source == abi::envoy_dynamic_module_type_metadata_source::Dynamic
         && ns == "ns_req_header_typed"
     })
-    .returning(|_, _| {
-      Some((EnvoyBuffer::new(b"t/x"), EnvoyBuffer::new(&[0x01, 0x02])))
-    })
+    .returning(|_, _| Some((EnvoyBuffer::new(b"t/x"), EnvoyBuffer::new(&[0x01, 0x02]))))
     .once();
   envoy_filter
     .expect_get_typed_metadata()

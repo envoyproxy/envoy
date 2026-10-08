@@ -918,11 +918,12 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       .unwrap();
     assert_eq!(type_url.as_slice(), b"t/x");
     assert_eq!(value.as_slice(), &[0x01, 0x02]);
-    assert!(
-      envoy_filter
-        .get_typed_metadata(abi::envoy_dynamic_module_type_metadata_source::Dynamic, "missing")
-        .is_none()
-    );
+    assert!(envoy_filter
+      .get_typed_metadata(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "missing"
+      )
+      .is_none());
 
     // Try getting metadata from rotuer cluster and host.
     let metadata = envoy_filter.get_metadata_string(
