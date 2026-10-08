@@ -97,6 +97,7 @@ checks:
     name: >-
       Envoy/Publish and verify
     on-run:
+    - docs
     - release
     - verify
     required: true
@@ -133,6 +134,10 @@ run:
   check-san:
     paths:
     - "**/*"
+  docs:
+    paths:
+    - "**/*"
+    push: paths
   precheck-deps:
     paths:
     - .bazelrc
