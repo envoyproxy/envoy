@@ -396,6 +396,7 @@
 /*/extensions/load_balancing_policies/override_host @yanavlasov @tonya11en
 /*/extensions/load_balancing_policies/wrr_locality @wbpcode @efimki
 /*/extensions/load_balancing_policies/load_aware_locality @tonya11en @jukie @nezdolik
+/*/extensions/load_balancing_policies/quota_aware @soumya-acharya @yanavlasov
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions
