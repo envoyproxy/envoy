@@ -28,7 +28,9 @@ statistics:
    ``downstream_cx_upgrades_active``, Gauge, Total active upgraded connections. These are also counted as active http1/http2 connections.
    ``downstream_cx_http1_soft_drain``, Gauge, Total active HTTP/1.x connections waiting for another downstream request to safely close the connection.
    ``downstream_cx_http2_active``, Gauge, Total active HTTP/2 connections
+   ``downstream_cx_http2_idle``, Gauge, Total idle HTTP/2 connections
    ``downstream_cx_http3_active``, Gauge, Total active HTTP/3 connections
+   ``downstream_cx_http3_idle``, Gauge, Total idle HTTP/3 connections
    ``downstream_cx_protocol_error``, Counter, Total protocol errors
    ``downstream_cx_length_ms``, Histogram, Connection length milliseconds
    ``downstream_cx_rx_bytes_total``, Counter, Total bytes received

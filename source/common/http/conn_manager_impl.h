@@ -643,6 +643,8 @@ private:
                          std::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
   void sendGoAwayAndClose(bool graceful = false);
+  void incIdleConnectionsStat();
+  void decIdleConnectionsStat();
 
   // Returns true if a RST_STREAM for the given stream is premature. Premature
   // means the RST_STREAM arrived before response headers were sent and than
