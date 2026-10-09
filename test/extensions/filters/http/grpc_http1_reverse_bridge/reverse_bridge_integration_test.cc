@@ -202,6 +202,46 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
+// Verifies that a request with a gRPC content type but a method other than POST is not bridged on
+// an enabled route, and that a local reply for it is plain HTTP rather than a gRPC-style 200.
+// See https://github.com/envoyproxy/envoy/issues/48070.
+TEST_P(ReverseBridgeIntegrationTest, EnabledRouteNonPostRequestNotBridged) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
+                                                  {":method", "GET"},
+                                                  {":authority", "foo"},
+                                                  {":path", "/testing.ExampleService/Print"},
+                                                  {"content-type", "application/grpc"}});
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, "abcdef");
+
+  // The request reaches the upstream untouched: no frame stripping, no content-type rewrite.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ("abcdef", upstream_request_->body().toString());
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
+
+  // Make the upstream fail so that Envoy sends a local reply; it must be plain HTTP.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().ContentType, "text/plain"));
+  EXPECT_EQ(nullptr, response->headers().GrpcStatus());
+  EXPECT_EQ(nullptr, response->headers().GrpcMessage());
+  EXPECT_EQ(response->body(), "upstream connect error or disconnect/reset before headers. reset "
+                              "reason: connection termination");
+
+  codec_client_->close();
+}
+
 // Verifies that we stream the response instead of buffering it, using an upstream-provided header
 // to get the overall message length.
 TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
