@@ -6,3 +6,8 @@ start_year: 2018
 ignored_cves:
 # Patch applied https://github.com/envoyproxy/envoy/pull/44565
 - CVE-2026-27135
+
+# JS-only: type confusion in Maglev/TurboFan inlining of Array.prototype.sort (polymorphic elements_kind feedback).
+# Envoy's wee8 exposes only the Wasm C-API (proxy-wasm-cpp-host src/v8/v8.cc); no JavaScript is parsed or executed,
+# so the JS JIT path and Array builtins are unreachable.
+- CVE-2026-85046
