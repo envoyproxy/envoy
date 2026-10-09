@@ -1,11 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_test",
 )
 
@@ -181,9 +181,10 @@ envoy_extension_cc_test(
     ),
 )
 
-envoy_cc_benchmark_binary(
+envoy_extension_cc_benchmark_binary(
     name = "substitution_formatter_speed_test",
     srcs = ["substitution_formatter_speed_test.cc"],
+    extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
@@ -197,7 +198,8 @@ envoy_cc_benchmark_binary(
     ],
 )
 
-envoy_benchmark_test(
+envoy_extension_benchmark_test(
     name = "substitution_formatter_speed_test_benchmark_test",
     benchmark_binary = "substitution_formatter_speed_test",
+    extension_names = ["envoy.access_loggers.open_telemetry"],
 )

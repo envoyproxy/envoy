@@ -756,6 +756,12 @@ private:
   absl::Status handleStreamingImmediateResponse(
       const envoy::service::ext_proc::v3::StreamedImmediateResponse& response);
 
+  bool emptyDataWithFalseEos(const Buffer::Instance& data, bool end_stream) const {
+    return (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.ext_proc_not_send_empty_data_with_false_eos") &&
+            data.length() == 0 && !end_stream);
+  }
+
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;

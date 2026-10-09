@@ -1918,7 +1918,9 @@ void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
   }
 }
 
-ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection) : connection_(connection) {}
+ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection)
+    : connection_(connection), mask_continuation_flags_(Runtime::runtimeFeatureEnabled(
+                                   "envoy.reloadable_features.http2_mask_continuation_flags")) {}
 
 int64_t ConnectionImpl::Http2Visitor::OnReadyToSend(absl::string_view serialized) {
   return connection_->onSend(reinterpret_cast<const uint8_t*>(serialized.data()),
@@ -1987,7 +1989,14 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
       return false;
     }
     current_frame_.length += length;
-    current_frame_.flags |= flags;
+    if (mask_continuation_flags_) {
+      // Retain only known flags per RFC 9113 §6.10 (only END_HEADERS is defined; all other flags
+      // are reserved and must be ignored per §4.1).
+      static constexpr uint8_t CONTINUATION_END_HEADERS_FLAG = 0x04;
+      current_frame_.flags |= (flags & CONTINUATION_END_HEADERS_FLAG);
+    } else {
+      current_frame_.flags |= flags;
+    }
   } else {
     current_frame_ = {stream_id, length, type, flags};
     padding_length_ = 0;

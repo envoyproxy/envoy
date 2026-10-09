@@ -33,10 +33,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // What Envoy does when the decision of the module cannot be honored.
 //
-// This covers a module that reports an error, which is what the SDK does when the module panics, a
-// decision that selects no template or an unknown one, a template whose ``match`` does not hold for
-// the request, an override of a route that route matching did not resolve, route entry overrides
-// recorded for a direct response, and route metadata a typed metadata factory rejects.
+// This covers a module that reports an error, which is what the SDK does when the module panics,
+// a decision or a status Envoy does not know, a template selection that names an identifier that
+// is not declared, a template whose ``match`` does not hold for the request, an override recorded
+// without a template while route matching resolved no route, route entry overrides recorded for a
+// direct response, and route metadata a typed metadata factory rejects.
 enum FailurePolicy {
   // Must be set explicitly.
   FAILURE_POLICY_UNSPECIFIED = 0;
@@ -84,7 +85,7 @@ message RouteTemplate {
 // configuration load rather than constructed on the request path. An entry that replaces no
 // property is rejected. A property an entry leaves unset keeps the value of the route the decision
 // produced, so an entry can never remove a property that route configures.
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message RouteOverride {
   // The identifier the module selects this override with. Must be unique within the specifier.
   string override_id = 1 [(validate.rules).string = {min_len: 1}];
@@ -119,12 +120,24 @@ message RouteOverride {
   // CORS is not configured through per filter configuration.
   config.route.v3.CorsPolicy cors = 8;
 
-  // Regex rewrite of the request path, replacing the path the produced route sends upstream. The
+  // Regex rewrite of the request path, replacing the path the produced route sends upstream,
+  // unless the module records a path of its own, which wins. The
   // pattern is compiled once when the specifier is configured. It applies to the path without the
   // query string, which is preserved, and the result is capped at
   // :ref:`max_rewritten_path_bytes
   // <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.max_rewritten_path_bytes>`.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 9;
+
+  // Tracing configuration replacing the tracing settings of the produced route, overriding the
+  // connection manager defaults for the request. This is a route level property, so it applies to
+  // a direct response or a redirect route as well as a route entry.
+  config.route.v3.Tracing tracing = 10;
+
+  // Metadata layered onto the metadata of the produced route, per namespace, so consumers such as
+  // the rate limit ROUTE_ENTRY action, ext_authz and the METADATA(ROUTE) formatter observe it.
+  // Metadata the module records itself layers on top of it. It is a route level property. An
+  // empty message layers nothing.
+  config.core.v3.Metadata metadata = 11;
 }
 
 // Configuration for the dynamic modules route specifier.

@@ -5,13 +5,14 @@ use crate::{
   wrap_into_c_void_ptr, ClusterHostCount, EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId,
   NewNetworkFilterConfigFunction, NEW_NETWORK_FILTER_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::num::NonZero;
 
 /// The trait that represents the Envoy network filter configuration.
 /// This is used in [`NewNetworkFilterConfigFunction`] to pass the Envoy filter configuration
 /// to the dynamic module.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyNetworkFilterConfig {
   /// Define a new counter scoped to this filter config with the given name.
   fn define_counter(
@@ -202,7 +203,7 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
 
 /// The trait that represents the Envoy network filter.
 /// This is used in [`NetworkFilter`] to interact with the underlying Envoy network filter object.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyNetworkFilter {
   /// Get the read buffer chunks. This is valid after the first on_read callback for the lifetime
@@ -612,7 +613,7 @@ pub trait EnvoyNetworkFilter {
 /// the [`Box<dyn EnvoyNetworkFilterScheduler>`] can be sent across threads.
 ///
 /// It is also safe to be called concurrently, so it is marked as `Sync` as well.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyNetworkFilterScheduler: Send + Sync {
   /// Commit the scheduled event to the worker thread where [`NetworkFilter`] is running.
   ///
@@ -664,7 +665,7 @@ impl EnvoyNetworkFilterScheduler for Box<dyn EnvoyNetworkFilterScheduler> {
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
 /// Envoy network filter config on the main thread.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyNetworkFilterConfigScheduler: Send + Sync {
   /// Commit the scheduled event to the main thread.
   fn commit(&self, event_id: u64);

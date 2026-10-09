@@ -132,6 +132,8 @@ protected:
         {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.ext_proc_return_stop_iteration", "true"}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.ext_proc_not_send_empty_data_with_false_eos", "true"}});
     if (!client_) {
       client_ = std::make_unique<MockClient>();
     }
@@ -2106,30 +2108,40 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatency) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
+  last_request_.Clear();
+  Buffer::OwnedImpl req_data0("");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data0, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
+  EXPECT_FALSE(last_request_.has_request_body());
+
   const uint32_t chunk_number = 5;
-  Buffer::OwnedImpl req_data("foo");
+  Buffer::OwnedImpl req_data1("foo");
   // Latency 50 80 60 30 100.
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data1, false));
   EXPECT_TRUE(last_request_.has_protocol_config());
   processRequestBody(std::nullopt, false, std::chrono::microseconds(50));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data2("foo");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data2, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(std::nullopt, false, std::chrono::microseconds(80));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data3("foo");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data3, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(std::nullopt, false, std::chrono::microseconds(60));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data4("foo");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data4, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(std::nullopt, false, std::chrono::microseconds(30));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data5("foo");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data5, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(std::nullopt, false, std::chrono::microseconds(100));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
@@ -6432,30 +6444,40 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatencyReturnContinue) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
+  last_request_.Clear();
+  Buffer::OwnedImpl req_data0("");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data0, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
+  EXPECT_FALSE(last_request_.has_request_body());
+
   const uint32_t chunk_number = 5;
-  Buffer::OwnedImpl req_data("foo");
+  Buffer::OwnedImpl req_data1("foo");
   // Latency 50 80 60 30 100.
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data1, false));
   EXPECT_TRUE(last_request_.has_protocol_config());
   processRequestBody(std::nullopt, false, std::chrono::microseconds(50));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data2("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data2, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(std::nullopt, false, std::chrono::microseconds(80));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data3("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data3, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(std::nullopt, false, std::chrono::microseconds(60));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data4("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data4, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(std::nullopt, false, std::chrono::microseconds(30));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data5("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data5, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(std::nullopt, false, std::chrono::microseconds(100));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
@@ -6501,6 +6523,29 @@ TEST_F(HttpFilterTest, ClusterMissingLoggingInfo) {
   auto logging_info =
       stream_info_.filterState()->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name);
   EXPECT_EQ(logging_info->destination(), "ext_proc_server");
+}
+
+TEST_F(HttpFilterTest, LoggingInfoWithoutUpstreamInfo) {
+  initializeTestSendAll();
+
+  // Start the stream so that logStreamInfo() uses the async client stream's StreamInfo.
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Simulate an async client stream whose StreamInfo carries no upstream info. The const
+  // upstreamInfo() accessor then returns an empty OptRef (has_value() == false).
+  async_client_stream_info_.upstream_info_.reset();
+
+  // Should not crash even though there is no upstream info to read the upstream host from.
+  filter_->logStreamInfo();
+
+  ASSERT_TRUE(stream_info_.filterState()->hasData<ExtProcLoggingInfo>(filter_config_name));
+  auto logging_info =
+      stream_info_.filterState()->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name);
+  // No upstream host should have been recorded because upstream info was absent.
+  EXPECT_EQ(logging_info->upstreamHost(), nullptr);
+  EXPECT_EQ(logging_info->destination(), "ext_proc_server");
+
+  filter_->onDestroy();
 }
 
 TEST_F(HttpFilterTest, GoogleGrpcMissingLoggingInfo) {

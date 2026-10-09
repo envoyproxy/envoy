@@ -1,18 +1,27 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "redirect_extension_integration_test",
     size = "large",
     srcs = [
         "redirect_extension_integration_test.cc",
+    ],
+    extension_names = [
+        "envoy.internal_redirect_predicates.allow_listed_routes",
+        "envoy.internal_redirect_predicates.filter_state",
+        "envoy.internal_redirect_predicates.previous_routes",
+        "envoy.internal_redirect_predicates.safe_cross_scheme",
     ],
     rbe_pool = "linux_x64_small",
     deps = [

@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -50,10 +49,11 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "generic_secret_integration_test",
     size = "large",
     srcs = ["generic_secret_integration_test.cc"],
+    extension_names = ["envoy.formatter.generic_secret"],
     rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",

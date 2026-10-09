@@ -29,7 +29,7 @@ private:
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
       Server::Configuration::FactoryContext& context) override;
 
-  absl::Status validateConnLimit(
+  absl::Status validateConfig(
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config)
       const;
 };

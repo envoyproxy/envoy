@@ -294,6 +294,10 @@ void DynamicModuleCluster::startPreInit() {
 
 void DynamicModuleCluster::preInitComplete() { onPreInitComplete(); }
 
+void DynamicModuleCluster::usePersistentHostMap() {
+  priority_set_.usePersistentCrossPriorityHostMap();
+}
+
 void DynamicModuleCluster::onScheduled(uint64_t event_id) {
   if (in_module_cluster_ != nullptr && config_->on_cluster_scheduled_ != nullptr) {
     config_->on_cluster_scheduled_(this, in_module_cluster_, event_id);
@@ -435,7 +439,8 @@ bool DynamicModuleCluster::addHosts(
     }
 
     // Skip addresses already in the host set. This does not deduplicate within the batch.
-    if (existing_hosts != nullptr && existing_hosts->contains(resolved_address->asString())) {
+    if (existing_hosts != nullptr &&
+        existing_hosts->findHost(resolved_address->asString()) != nullptr) {
       continue;
     }
 
@@ -558,11 +563,7 @@ Upstream::HostSharedPtr DynamicModuleCluster::findHostByAddress(const std::strin
   if (host_map == nullptr) {
     return nullptr;
   }
-  const auto it = host_map->find(address);
-  if (it == host_map->end()) {
-    return nullptr;
-  }
-  return it->second;
+  return host_map->findHost(address);
 }
 
 Upstream::HostSharedPtr DynamicModuleCluster::findHost(void* raw_host_ptr) {
