@@ -9,6 +9,8 @@
 #include "envoy/ssl/tls_certificate_config.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/secret/sds_api.h"
 
 #include "absl/container/node_hash_map.h"
@@ -101,6 +103,10 @@ private:
         };
         secret_provider = SecretType::create(server_context, sds_config_source, config_name,
                                              unregister_secret_provider, warm);
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.sds_reuse_secret_across_providers")) {
+          seedFromExistingProvider(*secret_provider, sds_config_source, config_name);
+        }
         dynamic_secret_providers_[map_key] = secret_provider;
       }
       // It is important to add the init target to the manager regardless the secret provider is new
@@ -137,6 +143,33 @@ private:
     }
 
   private:
+    // A provider is keyed by its config source as well as the secret name, so a config source
+    // change (or a different warming mode) creates a new provider for a secret that may already
+    // be watched. Over ADS all of these share one watch on the mux, and the server will not send
+    // the secret again for the new provider, so reuse the secret an existing provider holds.
+    void seedFromExistingProvider(SecretType& secret_provider,
+                                  const envoy::config::core::v3::ConfigSource& sds_config_source,
+                                  const std::string& config_name) {
+      for (const auto& secret_entry : dynamic_secret_providers_) {
+        std::shared_ptr<SecretType> existing = secret_entry.second.lock();
+        if (existing == nullptr || existing->secretData().resource_name_ != config_name ||
+            !sameSubscriptionSource(existing->sdsConfig(), sds_config_source)) {
+          continue;
+        }
+        if (secret_provider.seedFrom(*existing)) {
+          return;
+        }
+      }
+    }
+
+    // Whether two config sources deliver the same resource for a given name. Config sources that
+    // both use ADS share the ADS mux; anything else must be identical.
+    static bool sameSubscriptionSource(const envoy::config::core::v3::ConfigSource& lhs,
+                                       const envoy::config::core::v3::ConfigSource& rhs) {
+      return (lhs.has_ads() && rhs.has_ads()) ||
+             Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
+    }
+
     // Removes dynamic secret provider which has been deleted.
     void removeDynamicSecretProvider(const std::string& map_key) {
       ENVOY_LOG(debug, "Unregister secret provider. hash key: {}", map_key);
