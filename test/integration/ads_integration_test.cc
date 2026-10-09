@@ -443,7 +443,7 @@ TEST_P(AdsIntegrationTest, ClusterSdsConfigChangeReusesSecret) {
   auto updated_cluster = build_cluster("{ ads: {}, initial_fetch_timeout: 0s }");
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {updated_cluster},
                                                              {updated_cluster}, {}, "2");
-  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_modified", Eq(1));
   test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 
   // The config dump is served on the main thread after the update, so it cannot observe the gap
