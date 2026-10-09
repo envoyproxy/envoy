@@ -49,13 +49,15 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
-                       Server::Configuration::FactoryContext& factory_context,
+                       Server::Configuration::ServerFactoryContext& factory_context,
+                       ProtobufMessage::ValidationVisitor& validation_visitor,
                        std::unique_ptr<RateLimitClient> local_client,
                        Grpc::GrpcServiceConfigWithHashKey config_with_hash_key,
                        Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher)
       : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
-        factory_context_(factory_context), matcher_(matcher), client_(std::move(local_client)),
-        time_source_(factory_context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
+        validation_visitor_(validation_visitor), matcher_(matcher),
+        client_(std::move(local_client)),
+        time_source_(factory_context.mainThreadDispatcher().timeSource()) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
   void onDestroy() override;
@@ -85,7 +87,7 @@ private:
 
   FilterConfigConstSharedPtr config_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
-  Server::Configuration::FactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;

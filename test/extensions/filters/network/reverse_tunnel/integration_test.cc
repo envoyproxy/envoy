@@ -21,10 +21,13 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::Eq;
 using testing::Ge;
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -284,13 +287,11 @@ void ReverseTunnelFilterIntegrationTest::completeReverseTunnelHandshake(
   std::string handshake_request;
   ASSERT_TRUE(connection.waitForData(FakeRawConnection::waitForInexactMatch("\r\n\r\n"),
                                      &handshake_request));
-  EXPECT_NE(handshake_request.find("GET /reverse_connections/request HTTP/1.1"), std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-node-id: e2e-node"), std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-cluster-id: e2e-cluster"),
-            std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-tenant-id: e2e-tenant"),
-            std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-initiation-time:"), std::string::npos);
+  EXPECT_THAT(handshake_request, HasSubstr("GET /reverse_connections/request HTTP/1.1"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-node-id: e2e-node"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-cluster-id: e2e-cluster"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-tenant-id: e2e-tenant"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-initiation-time:"));
 
   ASSERT_TRUE(connection.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"));
 }
@@ -510,47 +511,47 @@ TEST_P(ReverseTunnelFilterIntegrationTest, PartialRequestHandling) {
   addReverseTunnelFilter();
   initialize();
 
-  std::string http_request = createHttpRequestWithRtHeaders(
-      "GET", "/reverse_connections/request", "integration-test-node", "integration-test-cluster",
-      "integration-test-tenant", "abcdefghijklmno");
+  const std::string http_request =
+      createHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "integration-test-node",
+                                     "integration-test-cluster", "integration-test-tenant");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
 
-  // Send request in chunks but ensure the body only completes on the third chunk.
-  // Split the HTTP request into headers and body, then stream body in parts.
-  const std::string::size_type hdr_end = http_request.find("\r\n\r\n");
-  ASSERT_NE(hdr_end, std::string::npos);
-  const std::string headers = http_request.substr(0, hdr_end + 4);
-  const std::string body = http_request.substr(hdr_end + 4);
-  ASSERT_GT(body.size(), 8u);
+  // Stream the body-less handshake in two parts. The server must wait for the full request before
+  // responding.
+  const std::string::size_type split = http_request.size() / 2;
+  const std::string part1 = http_request.substr(0, split);
+  const std::string part2 = http_request.substr(split);
 
-  const size_t part = body.size() / 4; // Ensure first 2 parts are not enough to complete.
-  const std::string body1 = body.substr(0, part);
-  const std::string body2 = body.substr(part, part);
-  const std::string body3 = body.substr(2 * part);
-
-  // First write: headers + small part of body.
-  if (!tcp_client->write(headers + body1, /*end_stream=*/false)) {
-    // Server may have already processed and responded; validate response and exit.
+  if (!tcp_client->write(part1, /*end_stream=*/false)) {
     tcp_client->waitForData("HTTP/1.1 200 OK");
     return;
   }
-  // Second write: more body but still not complete. If the server already completed,.
-  // the write can fail due to disconnect; treat that as acceptable and verify response.
-  if (!tcp_client->write(body2, /*end_stream=*/false)) {
-    tcp_client->waitForData("HTTP/1.1 200 OK");
-    return;
-  }
-  // Third write: remaining body to complete the request. Same tolerance as above.
-  if (!tcp_client->write(body3, /*end_stream=*/false)) {
+  if (!tcp_client->write(part2, /*end_stream=*/false)) {
     tcp_client->waitForData("HTTP/1.1 200 OK");
     return;
   }
 
-  // Should receive complete HTTP response.
   tcp_client->waitForData("HTTP/1.1 200 OK");
-  // Server may keep connection open (auto_close_connections: false). Close client side.
   tcp_client->close();
+}
+
+// A handshake request that carries a body is rejected with 400.
+TEST_P(ReverseTunnelFilterIntegrationTest, HandshakeWithBodyRejected) {
+  addReverseTunnelFilter();
+  initialize();
+
+  const std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "integration-test-node", "integration-test-cluster",
+      "integration-test-tenant", "handshake-body");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  if (!tcp_client->write(http_request)) {
+    tcp_client->waitForData("HTTP/1.1 400 Bad Request");
+    return;
+  }
+  tcp_client->waitForData("HTTP/1.1 400 Bad Request");
+  tcp_client->waitForDisconnect();
 }
 
 TEST_P(ReverseTunnelFilterIntegrationTest, WrongPathReturns404) {
@@ -1641,14 +1642,15 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ConnectionLimitRejectsBeyondCap) {
   client1->waitForData("HTTP/1.1 200 OK");
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
-  // Second connection for the same node exceeds the cap (1 is not < 1) -> rejected with 403.
+  // Second connection for the same node exceeds the cap (1 is not < 1) -> rejected with 429.
   std::string req2 = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                     "capped-node", "test-cluster", "test-tenant");
   IntegrationTcpClientPtr client2 = makeTcpConnection(lookupPort("listener_0"));
   (void)client2->write(req2);
-  client2->waitForData("HTTP/1.1 403 Forbidden");
+  client2->waitForData("HTTP/1.1 429 Too Many Requests");
   client2->waitForDisconnect();
-  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.rejected", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Eq(0));
 
   // A different node has its own independent count and is still accepted.
   std::string req3 = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
@@ -1679,6 +1681,9 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ConnectionLimitAllowsWithinCap) {
       "GET", "/reverse_connections/request", "within-node", "test-cluster", "test-tenant")));
   client2->waitForData("HTTP/1.1 200 OK");
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2));
+
+  test_server_->waitForCounter("reverse_tunnel.handshake.rejected", Eq(0));
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Eq(0));
 
   client1->close();
   client2->close();
@@ -1735,9 +1740,10 @@ cluster_type:
   IntegrationTcpClientPtr client_a2 = makeTcpConnection(lookupPort("listener_0"));
   (void)client_a2->write(createHttpRequestWithRtHeaders(
       "GET", "/reverse_connections/request", "shared-node", "shared-cluster", "tenant-a"));
-  client_a2->waitForData("HTTP/1.1 403 Forbidden");
+  client_a2->waitForData("HTTP/1.1 429 Too Many Requests");
   client_a2->waitForDisconnect();
-  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.rejected", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Eq(0));
 
   // tenant-b on the same node is an independent scope -> accepted.
   IntegrationTcpClientPtr client_b1 = makeTcpConnection(lookupPort("listener_0"));

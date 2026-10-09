@@ -68,6 +68,23 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // 2. if the field value is empty, an empty ``Value`` will be set.
 //
+// **IMPORTANT**: All extracted values are stored as ``ListValue``, even for singular (non-repeated) fields.
+// Filters consuming this metadata (e.g., :ref:`ratelimit <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>`)
+// must use :ref:`MetadataKey <envoy_v3_api_msg_type.metadata.v3.MetadataKey>` with an ``index`` segment to access the value.
+//
+// Example: to access a singular ``string tenant_id`` field extracted to ``envoy.filters.http.grpc_field_extraction``:
+//
+// .. code-block:: yaml
+//
+//   metadata_key:
+//     key: envoy.filters.http.grpc_field_extraction
+//     path:
+//     - key: tenant_id
+//     - index: 0  # Required: unwrap the ListValue containing the singular value
+//
+// Omitting the ``index`` segment will cause the consumer to receive the ``ListValue`` itself rather than
+// its element, which typically results in empty or incorrect metadata descriptor values.
+//
 // Performance
 // -----------
 //

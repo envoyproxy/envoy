@@ -20,6 +20,8 @@
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_config_impl.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -56,6 +58,7 @@ public:
   InlineScopedRoutesConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,
                                    std::string name,
                                    Server::Configuration::ServerFactoryContext& factory_context,
+                                   Init::Manager& init_manager,
                                    ScopedRoutesConfigProviderManager& config_provider_manager,
                                    envoy::config::core::v3::ConfigSource rds_config_source);
 
@@ -110,7 +113,7 @@ class ScopedRdsConfigSubscription : public Envoy::Config::DeltaConfigSubscriptio
                                     public Envoy::Config::SubscriptionCallbacks {
 public:
   using ScopedRouteConfigurationMap =
-      std::map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>;
+      absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>;
 
   ScopedRdsConfigSubscription(
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
@@ -307,11 +310,15 @@ class ScopedRoutesConfigProviderManagerOptArg
 public:
   ScopedRoutesConfigProviderManagerOptArg(
       std::string scoped_routes_name,
-      const envoy::config::core::v3::ConfigSource& rds_config_source)
-      : scoped_routes_name_(std::move(scoped_routes_name)), rds_config_source_(rds_config_source) {}
+      const envoy::config::core::v3::ConfigSource& rds_config_source, Init::Manager& init_manager)
+      : scoped_routes_name_(std::move(scoped_routes_name)), rds_config_source_(rds_config_source),
+        init_manager_(init_manager) {}
 
   const std::string scoped_routes_name_;
   const envoy::config::core::v3::ConfigSource& rds_config_source_;
+  // The init manager of the owner of the scoped routes, i.e. of the HTTP connection manager. The
+  // inline route configurations of the inline scopes inherit it.
+  Init::Manager& init_manager_;
 };
 
 class SrdsFactoryDefault : public SrdsFactory {

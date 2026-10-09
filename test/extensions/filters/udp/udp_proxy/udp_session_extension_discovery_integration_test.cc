@@ -1,4 +1,5 @@
 #include <memory>
+#include <vector>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
@@ -291,11 +292,17 @@ typed_config:
     test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(active_sessions_));
   }
 
+  Network::Test::UdpSyncPeer& createUdpClient() {
+    udp_clients_.push_back(std::make_unique<Network::Test::UdpSyncPeer>(
+        version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE));
+    return *udp_clients_.back();
+  }
+
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address,
                                           std::string request, std::string expected_request,
                                           std::string response, std::string expected_response) {
     // Send datagram to be proxied.
-    Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
+    Network::Test::UdpSyncPeer& client = createUdpClient();
     client.write(request, listener_address);
 
     // Wait for the upstream datagram.
@@ -334,7 +341,7 @@ typed_config:
     const uint32_t port = lookupPort(port_name_);
     const auto listener_address = *Network::Utility::resolveUrl(
         fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
-    Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
+    Network::Test::UdpSyncPeer& client = createUdpClient();
     client.write("hello", *listener_address);
 
     // The new datagram is expected to create a session that will be destroyed, since the session
@@ -391,6 +398,10 @@ typed_config:
   const std::string filter_name_ = "foo";
   const std::string port_name_ = "udp";
   bool two_connections_{false};
+
+  // Each helper call is expected to create a new UDP session. Keep the client sockets open so the
+  // OS cannot reuse an earlier client's source port while its corresponding Envoy session exists.
+  std::vector<std::unique_ptr<Network::Test::UdpSyncPeer>> udp_clients_;
 
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
   FakeUpstream& getLdsFakeUpstream() const { return *fake_upstreams_[2]; }

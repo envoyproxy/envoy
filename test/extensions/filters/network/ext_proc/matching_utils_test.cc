@@ -4,10 +4,13 @@
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -82,8 +85,8 @@ TEST_F(ExpressionManagerTest, EvaluateAttributesValues) {
   auto activation = Filters::Common::Expr::createActivation(&context_.local_info_, stream_info,
                                                             nullptr, nullptr, nullptr);
   auto result = test_manager.evaluateConnectionAttributes(*activation);
-  EXPECT_EQ(result.fields().at("connection.mtls").bool_value(), false);
-  EXPECT_EQ(result.fields().at("connection.id").number_value(), 12345);
+  EXPECT_THAT(result.fields(), UnorderedElementsAre(IsStructBool("connection.mtls", false),
+                                                    IsStructNumber("connection.id", 12345)));
 }
 
 #else

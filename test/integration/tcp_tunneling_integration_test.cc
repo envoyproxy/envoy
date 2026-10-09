@@ -503,6 +503,14 @@ TEST_P(ConnectTerminationIntegrationTest, IgnoreH11HostField) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) {
+  // Hold CONNECT headers before the router until the first data frame is decoded. In HTTP/3,
+  // encodeHeaders() and encodeData() can be delivered in separate QUIC packets even when the client
+  // flushes them together, allowing the upstream connection to complete before the data arrives.
+  config_helper_.addFilter(R"EOF(
+    name: stop-in-headers-continue-in-body-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StopInHeadersContinueInBodyFilterConfig
+  )EOF");
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
@@ -522,11 +530,11 @@ TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) 
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // Send CONNECT request and immediately send some data without waiting for 200
-  // response from Envoy. Encode the CONNECT headers and the premature data into a single
-  // socket write so the data cannot race behind the synthesized 200 tunnel response.
+  // response from Envoy. The test filter releases the headers when it sees this data, ensuring the
+  // router processes both before the upstream connection can synthesize the 200 tunnel response.
   response_ = codec_client_->makeRequestWithBody(connect_headers_, "premature data", false);
 
-  // Envoy will try top open upstream connection before the premature CONNECT data is detected.
+  // Envoy will try to open an upstream connection before the premature CONNECT data is detected.
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
 
   response_->waitForHeaders();

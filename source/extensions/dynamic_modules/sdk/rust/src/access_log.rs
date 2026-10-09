@@ -7,9 +7,10 @@
 //! `logger_name`. The legacy [`crate::declare_access_logger!`] macro is preserved as a
 //! single-config shim over the same factory.
 
-use crate::{abi, EnvoyBuffer};
+pub use crate::timing::TimingInfo;
+use crate::{abi, ffi_export, EnvoyBuffer};
 use std::ffi::c_void;
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::num::NonZero;
 use std::ptr;
 
 // -----------------------------------------------------------------------------
@@ -306,27 +307,6 @@ pub trait AccessLogger: Send {
   fn flush(&mut self) {}
 }
 
-/// Timing information from the stream info.
-#[derive(Debug, Clone, Default)]
-pub struct TimingInfo {
-  /// Request start time as Unix timestamp in nanoseconds.
-  pub start_time_unix_ns: i64,
-  /// Duration from start to request complete in nanoseconds, or -1 if not available.
-  pub request_complete_duration_ns: i64,
-  /// Time of first upstream TX byte sent in nanoseconds, or -1 if not available.
-  pub first_upstream_tx_byte_sent_ns: i64,
-  /// Time of last upstream TX byte sent in nanoseconds, or -1 if not available.
-  pub last_upstream_tx_byte_sent_ns: i64,
-  /// Time of first upstream RX byte received in nanoseconds, or -1 if not available.
-  pub first_upstream_rx_byte_received_ns: i64,
-  /// Time of last upstream RX byte received in nanoseconds, or -1 if not available.
-  pub last_upstream_rx_byte_received_ns: i64,
-  /// Time of first downstream TX byte sent in nanoseconds, or -1 if not available.
-  pub first_downstream_tx_byte_sent_ns: i64,
-  /// Time of last downstream TX byte sent in nanoseconds, or -1 if not available.
-  pub last_downstream_tx_byte_sent_ns: i64,
-}
-
 /// Byte count information from the stream info.
 #[derive(Debug, Clone, Default)]
 pub struct BytesInfo {
@@ -334,10 +314,19 @@ pub struct BytesInfo {
   pub bytes_received: u64,
   /// Total bytes sent to downstream.
   pub bytes_sent: u64,
-  /// Wire bytes received (including TLS overhead).
+  /// Wire bytes received from upstream.
   pub wire_bytes_received: u64,
-  /// Wire bytes sent (including TLS overhead).
+  /// Wire bytes sent to upstream.
   pub wire_bytes_sent: u64,
+}
+
+/// Cumulative wire byte counts from the stream's downstream bytes meter.
+#[derive(Debug, Clone, Default)]
+pub struct DownstreamWireBytes {
+  /// Wire bytes received from downstream.
+  pub bytes_received: u64,
+  /// Wire bytes sent to downstream.
+  pub bytes_sent: u64,
 }
 
 /// Access log type indicating when the log was recorded.
@@ -539,29 +528,14 @@ impl LogContext {
 
   /// Get timing information.
   pub fn timing_info(&self) -> TimingInfo {
-    let mut info = abi::envoy_dynamic_module_type_timing_info {
-      start_time_unix_ns: 0,
-      request_complete_duration_ns: -1,
-      first_upstream_tx_byte_sent_ns: -1,
-      last_upstream_tx_byte_sent_ns: -1,
-      first_upstream_rx_byte_received_ns: -1,
-      last_upstream_rx_byte_received_ns: -1,
-      first_downstream_tx_byte_sent_ns: -1,
-      last_downstream_tx_byte_sent_ns: -1,
-    };
+    let mut info = crate::timing::unavailable_timing_info();
     unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_timing_info(self.envoy_ptr, &mut info);
+      abi::envoy_dynamic_module_callback_access_logger_get_timing_info_v2(
+        self.envoy_ptr,
+        &mut info,
+      );
     }
-    TimingInfo {
-      start_time_unix_ns: info.start_time_unix_ns,
-      request_complete_duration_ns: info.request_complete_duration_ns,
-      first_upstream_tx_byte_sent_ns: info.first_upstream_tx_byte_sent_ns,
-      last_upstream_tx_byte_sent_ns: info.last_upstream_tx_byte_sent_ns,
-      first_upstream_rx_byte_received_ns: info.first_upstream_rx_byte_received_ns,
-      last_upstream_rx_byte_received_ns: info.last_upstream_rx_byte_received_ns,
-      first_downstream_tx_byte_sent_ns: info.first_downstream_tx_byte_sent_ns,
-      last_downstream_tx_byte_sent_ns: info.last_downstream_tx_byte_sent_ns,
-    }
+    info.into()
   }
 
   /// Get byte count information.
@@ -583,6 +557,29 @@ impl LogContext {
     }
   }
 
+  /// Get cumulative downstream wire byte counts.
+  ///
+  /// These correspond to `DOWNSTREAM_WIRE_BYTES_RECEIVED` and `DOWNSTREAM_WIRE_BYTES_SENT` in
+  /// access logs. For HTTP streams, they include protocol overhead accounted for by the codec,
+  /// not just body bytes. They can be nonzero for locally generated responses with no upstream
+  /// connection. Both fields are zero if the downstream bytes meter is unavailable.
+  pub fn downstream_wire_bytes(&self) -> DownstreamWireBytes {
+    let mut info = abi::envoy_dynamic_module_type_downstream_wire_bytes {
+      bytes_received: 0,
+      bytes_sent: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(
+        self.envoy_ptr,
+        &mut info,
+      );
+    }
+    DownstreamWireBytes {
+      bytes_received: info.bytes_received,
+      bytes_sent: info.bytes_sent,
+    }
+  }
+
   /// Get the route name.
   pub fn route_name(&self) -> Option<EnvoyBuffer<'_>> {
     self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsRouteName)
@@ -590,7 +587,7 @@ impl LogContext {
 
   /// Get the virtual cluster name.
   pub fn virtual_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsVirtualHostName)
+    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsVirtualClusterName)
   }
 
   /// Check if this is a health check request.
@@ -610,11 +607,11 @@ impl LogContext {
     self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_host)
   }
 
-  /// Get the connection ID, or 0 if not available.
-  pub fn connection_id(&self) -> u64 {
+  /// Get the connection ID, or `None` if not available.
+  pub fn connection_id(&self) -> Option<NonZero<u64>> {
     self
       .get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId)
-      .unwrap_or(0)
+      .and_then(NonZero::new)
   }
 
   /// Check if mTLS was used for the connection.
@@ -1095,11 +1092,11 @@ impl LogContext {
     )
   }
 
-  /// Get the upstream connection ID, or 0 if not available.
-  pub fn upstream_connection_id(&self) -> u64 {
-    unsafe {
+  /// Get the upstream connection ID, or `None` if not available.
+  pub fn upstream_connection_id(&self) -> Option<NonZero<u64>> {
+    NonZero::new(unsafe {
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_connection_id(self.envoy_ptr)
-    }
+    })
   }
 
   /// Get the upstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
@@ -1280,26 +1277,16 @@ impl LogContext {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_headers_count(header_type);
-    if count == 0 {
-      return Vec::new();
-    }
-
-    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(count);
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_headers(
-        self.envoy_ptr,
-        header_type,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-      )
-    };
-    if !success {
-      return Vec::new();
-    }
-    unsafe {
-      headers.set_len(count);
-    }
-    headers
+    crate::utility::collect_headers(
+      || self.get_headers_count(header_type),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_access_logger_get_headers(
+          self.envoy_ptr,
+          header_type,
+          headers,
+        )
+      },
+    )
   }
 
   /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.
@@ -1368,17 +1355,16 @@ struct AccessLoggerConfigHandle {
 unsafe impl Send for AccessLoggerConfigHandle {}
 unsafe impl Sync for AccessLoggerConfigHandle {}
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_new(
-  config_envoy_ptr: *mut c_void,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> *const c_void {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_access_logger_config_new(
+    config_envoy_ptr: *mut c_void,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> *const c_void {
     // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
     // The helpers additionally tolerate `(nullptr, 0)` empty inputs, and `str_lossy_from_raw`
     // substitutes `U+FFFD` for any malformed UTF-8 rather than triggering UB.
@@ -1398,11 +1384,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_new(
         .expect("NEW_ACCESS_LOGGER_CONFIG_FUNCTION must be set"),
       config_envoy_ptr,
     )
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_config_new", panic);
-    ptr::null()
-  })
+  }
+  on_panic = ptr::null()
 }
 
 /// Testable wrapper for [`envoy_dynamic_module_on_access_logger_config_new`].
@@ -1426,94 +1409,71 @@ pub fn envoy_dynamic_module_on_access_logger_config_new_impl(
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_destroy(
-  config_ptr: *const c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_access_logger_config_destroy(
+    config_ptr: *const c_void,
+  ) {
     drop(Box::from_raw(config_ptr as *mut AccessLoggerConfigHandle));
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_access_logger_config_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_new(
-  config_ptr: *const c_void,
-  logger_envoy_ptr: *mut c_void,
-) -> *const c_void {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_access_logger_new(
+    config_ptr: *const c_void,
+    logger_envoy_ptr: *mut c_void,
+  ) -> *const c_void {
     let handle = &*(config_ptr as *const AccessLoggerConfigHandle);
     let metrics = MetricsContext::new(handle.config_envoy_ptr);
     let logger: Box<dyn AccessLogger> = handle.inner.create_logger(metrics, logger_envoy_ptr);
     crate::wrap_into_c_void_ptr!(logger)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_new", panic);
-    ptr::null()
-  })
+  }
+  on_panic = ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_log(
-  envoy_ptr: *mut c_void,
-  logger_ptr: *mut c_void,
-  log_type: abi::envoy_dynamic_module_type_access_log_type,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_access_logger_log(
+    envoy_ptr: *mut c_void,
+    logger_ptr: *mut c_void,
+    log_type: abi::envoy_dynamic_module_type_access_log_type,
+  ) {
     let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
     let access_log_type = AccessLogType::from_abi(log_type);
     let ctx = LogContext::new(envoy_ptr, access_log_type);
     logger.log(&ctx);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_log", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_destroy(logger_ptr: *mut c_void) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_access_logger_destroy(logger_ptr: *mut c_void) {
     crate::drop_wrapped_c_void_ptr!(logger_ptr, AccessLogger);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_destroy", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_flush(logger_ptr: *mut c_void) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_access_logger_flush(logger_ptr: *mut c_void) {
     let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
     logger.flush();
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_flush", panic);
-  });
+  }
 }
 
 /// Declare access-logger entry points for a single user-supplied config type.

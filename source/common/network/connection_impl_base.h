@@ -1,5 +1,9 @@
 #pragma once
 
+#include <optional>
+#include <string>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/common/logger.h"
@@ -23,7 +27,7 @@ public:
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void removeConnectionCallbacks(ConnectionCallbacks& cb) override;
-  void onDrain() override;
+  void onDrain(ConnectionDrainEvent drain_event) override;
 
   // Network::FilterManagerConnection
   void onFilterAboveHighWatermark() override;
@@ -34,6 +38,7 @@ public:
   void hashKey(std::vector<uint8_t>& hash) const override;
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
+  absl::Span<const std::string> localCloseReasons() const override { return local_close_reasons_; }
 
   // ScopeTrackedObject
   OptRef<const StreamInfo::StreamInfo> trackedStream() const override;
@@ -54,6 +59,7 @@ protected:
 
   absl::string_view localCloseReason() const override { return local_close_reason_; }
   virtual void setLocalCloseReason(absl::string_view local_close_reason) {
+    local_close_reasons_.emplace_back(local_close_reason);
     local_close_reason_ = std::string(local_close_reason);
   }
 
@@ -76,9 +82,14 @@ protected:
   std::chrono::milliseconds delayed_close_timeout_{0};
   // Should be set with setLocalCloseReason.
   std::string local_close_reason_;
+  // Every reason passed to setLocalCloseReason, in order.
+  std::vector<std::string> local_close_reasons_;
   Event::Dispatcher& dispatcher_;
   const uint64_t id_;
   std::list<ConnectionCallbacks*> callbacks_;
+  // Set once the connection has been notified of a drain sequence via onDrain(). Retained so that
+  // callbacks registered after the notification are replayed it (see addConnectionCallbacks()).
+  std::optional<ConnectionDrainEvent> drain_event_;
   std::unique_ptr<ConnectionStats> connection_stats_;
   // Number of sources above their high watermark. ConnectionCallbacks are notified on
   // transitions (0→1, 1→0).

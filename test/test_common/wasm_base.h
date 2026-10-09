@@ -80,8 +80,7 @@ public:
     std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
 
-    plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_);
+    plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(plugin_config, local_info_);
     plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities_;
     // Passes ownership of root_context_.
     Extensions::Common::Wasm::createWasm(
@@ -215,9 +214,8 @@ public:
 
   void setUp(const envoy::extensions::wasm::v3::PluginConfig plugin_config,
              bool singleton = false) {
-    plugin_config_ = std::make_shared<PluginConfig>(
-        plugin_config, server_, server_.scope(), server_.initManager(),
-        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, singleton);
+    plugin_config_ = std::make_shared<PluginConfig>(plugin_config, server_, server_.scope(),
+                                                    server_.initManager(), singleton);
   }
 
   void createStreamContext() {

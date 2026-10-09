@@ -10,6 +10,7 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -217,7 +218,8 @@ private:
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralHttpFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
-    return factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_);
+    return Server::Configuration::createHttpFilterFactory(*factory, message, getStatPrefix(),
+                                                          factory_context_);
   }
 
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -427,7 +429,7 @@ public:
          const std::string& filter_config_name,
          Server::Configuration::ServerFactoryContext& factory_context,
          Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-         FilterConfigProviderManagerImplBase& filter_config_provider_manager,
+         std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager,
          const std::string& subscription_id);
   ~FilterConfigSubscription() override;
 
@@ -442,13 +444,13 @@ public:
   void incrementConflictCounter();
 
 protected:
-  FilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
-                           const std::string& filter_config_name,
-                           Server::Configuration::ServerFactoryContext& factory_context,
-                           Upstream::ClusterManager& cluster_manager,
-                           const std::string& stat_prefix,
-                           FilterConfigProviderManagerImplBase& filter_config_provider_manager,
-                           const std::string& subscription_id, absl::Status& creation_status);
+  FilterConfigSubscription(
+      const envoy::config::core::v3::ConfigSource& config_source,
+      const std::string& filter_config_name,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
+      std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager,
+      const std::string& subscription_id, absl::Status& creation_status);
 
 private:
   struct ConfigVersion {
@@ -491,7 +493,7 @@ private:
   ExtensionConfigDiscoveryStats stats_;
 
   // FilterConfigProviderManagerImplBase maintains active subscriptions in a map.
-  FilterConfigProviderManagerImplBase& filter_config_provider_manager_;
+  std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager_;
   const std::string subscription_id_;
   absl::flat_hash_set<DynamicFilterConfigProviderImplBase*> filter_config_providers_;
   friend class DynamicFilterConfigProviderImplBase;
@@ -522,7 +524,9 @@ private:
 /**
  * Base class for a FilterConfigProviderManager.
  */
-class FilterConfigProviderManagerImplBase : Logger::Loggable<Logger::Id::filter> {
+class FilterConfigProviderManagerImplBase
+    : public std::enable_shared_from_this<FilterConfigProviderManagerImplBase>,
+      Logger::Loggable<Logger::Id::filter> {
 public:
   virtual ~FilterConfigProviderManagerImplBase() = default;
 

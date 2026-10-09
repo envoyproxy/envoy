@@ -4,6 +4,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/extension_config_provider.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/network/listen_socket.h"
@@ -199,6 +200,13 @@ public:
    *                   in the filter chain.
    */
   virtual void injectReadDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   * Returns the connection read buffer, or an empty optional when the callbacks are not backed by
+   * one. Unlike the buffer passed to onData, it stays valid for the connection lifetime and is
+   * never a transient injected buffer.
+   */
+  virtual OptRef<Buffer::Instance> readBuffer() PURE;
 
   /**
    * Return the currently selected upstream host, if any. This can be used for communication
@@ -704,7 +712,26 @@ public:
    */
   virtual const FilterChain* findFilterChain(const ConnectionSocket& socket,
                                              const StreamInfo::StreamInfo& info) const PURE;
+
+  /**
+   * @return the names of the filter chains this manager holds, including the default filter chain.
+   * Unnamed chains are omitted. The
+   * returned views point at manager-owned storage and are valid only for the duration of this call.
+   * The default returns empty for managers that do not index chains by name.
+   */
+  virtual std::vector<absl::string_view> filterChainNames() const { return {}; }
 };
+
+/**
+ * RAII handle for a session a filter has registered via
+ * UdpReadFilterCallbacks::registerHotRestartSession() to keep on this instance during a hot
+ * restart. Destroying it unregisters the session.
+ */
+class UdpHotRestartSessionHandle {
+public:
+  virtual ~UdpHotRestartSessionHandle() = default;
+};
+using UdpHotRestartSessionHandlePtr = std::unique_ptr<UdpHotRestartSessionHandle>;
 
 /**
  * Callbacks used by individual UDP listener read filter instances to communicate with the filter
@@ -718,6 +745,18 @@ public:
    * @return the udp listener that owns this read filter.
    */
   virtual UdpListener& udpListener() PURE;
+
+  /**
+   * Register a session the filter is serving. For the lifetime of the returned handle the listener
+   * keeps serving the session locally during hot restart drain, instead of forwarding it to the
+   * child instance.
+   * @param local_address the session's downstream local address.
+   * @param peer_address the session's downstream peer address.
+   * @return an RAII handle that unregisters the session when destroyed.
+   */
+  virtual UdpHotRestartSessionHandlePtr
+  registerHotRestartSession(const Address::InstanceConstSharedPtr& local_address,
+                            const Address::InstanceConstSharedPtr& peer_address) PURE;
 };
 
 /**

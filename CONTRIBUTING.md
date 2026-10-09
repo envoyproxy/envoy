@@ -344,6 +344,10 @@ extension mostly mirrors adding a normal extension above. Some differences are n
   and [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml).
 * An entrypoint should be added in `docs/root/api-v3/config/contrib/contrib.rst`
 
+Note that maintainers have the final say on whether a contrib extension is accepted into the project,
+and they may request changes or additional documentation before merging. One of the example criteria
+they may use is "the proposed contrib must be potentially useful more than just the contributor".
+
 # DCO: Sign your work
 
 Envoy ships commit hooks that allow you to auto-generate the DCO signoff line if

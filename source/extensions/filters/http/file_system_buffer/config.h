@@ -18,21 +18,16 @@ namespace FileSystemBuffer {
 
 // Config registration for the file system buffer filter. @see NamedHttpFilterConfigFactory.
 class FileSystemBufferFilterFactory
-    : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
+    : public Extensions::HttpFilters::Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig> {
 public:
   FileSystemBufferFilterFactory();
 
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig&
-          config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig&
           config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

@@ -23,6 +23,9 @@ using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -41,7 +44,6 @@ public:
 
   void expectBasicHttp() {
     EXPECT_CALL(callbacks_, connection())
-        .Times(2)
         .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -357,11 +359,11 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderAllowlist) {
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
 
-  EXPECT_TRUE(request_.attributes().request().http().headers().contains("allowed"));
+  EXPECT_THAT(request_.attributes().request().http().headers(), Contains(Key("allowed")));
   EXPECT_EQ("allowed value", request_.attributes().request().http().headers().at("allowed"));
 
   // No denylist was used.
-  EXPECT_TRUE(request_.attributes().request().http().headers().contains("allowed-dupe"));
+  EXPECT_THAT(request_.attributes().request().http().headers(), Contains(Key("allowed-dupe")));
   EXPECT_EQ("one,two", request_.attributes().request().http().headers().at("allowed-dupe"));
 
   EXPECT_FALSE(request_.attributes().request().http().headers().contains("not-allowed"));
@@ -642,7 +644,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                                  {":path", "/bar"}};
   EXPECT_CALL(callbacks_, connection())
-      .Times(2)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -721,7 +722,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerCertificate) {
 // Verify that the SNI is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
   EXPECT_CALL(callbacks_, connection())
-      .Times(3)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -745,7 +745,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
 // Verify that the SNI is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   EXPECT_CALL(callbacks_, connection())
-      .Times(3)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);

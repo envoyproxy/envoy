@@ -537,11 +537,21 @@ void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_vi
 
 std::optional<std::string> Utility::QueryParamsMulti::getFirstValue(absl::string_view key) const {
   auto it = this->data_.find(key);
-  if (it == this->data_.end()) {
+  if (it == this->data_.end() || it->second.empty()) {
     return std::nullopt;
   }
 
   return std::optional<std::string>{it->second.at(0)};
+}
+
+std::optional<absl::string_view>
+Utility::QueryParamsMulti::getFirstValueView(absl::string_view key) const {
+  auto it = this->data_.find(key);
+  if (it == this->data_.end() || it->second.empty()) {
+    return std::nullopt;
+  }
+
+  return absl::string_view{it->second.at(0)};
 }
 
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
@@ -560,8 +570,13 @@ std::string Utility::stripQueryString(const HeaderString& path) {
   return {path_str.data(), query_offset != path_str.npos ? query_offset : path_str.size()};
 }
 
+absl::string_view Utility::stripQueryStringView(absl::string_view path) {
+  size_t query_offset = path.find('?');
+  return {path.data(), query_offset != path.npos ? query_offset : path.size()};
+}
+
 std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) const {
-  std::string new_path{Http::Utility::stripQueryString(path)};
+  std::string new_path(Http::Utility::stripQueryStringView(path.getStringView()));
 
   if (!this->data_.empty()) {
     absl::StrAppend(&new_path, this->toString());
@@ -1249,7 +1264,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value,
     // We do checking for each char in the string. If the current char is included in the defined
     // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
     // to the returned string one by one) started from the current index.
-    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.contains(ch)) {
       return PercentEncoding::encode(value, i, reserved_char_set);
     }
   }
@@ -1265,7 +1280,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value, const size
 
   for (size_t i = index; i < value.size(); ++i) {
     const char& ch = value[i];
-    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.contains(ch)) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
       absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));
@@ -1508,6 +1523,10 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
 }
 
 bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
+  // TODO(guy-with-a-why): consider QUERY here. RFC 10008 Section 2 makes QUERY safe and
+  // idempotent, but callers of this function additionally rely on a safe request having no
+  // content: it gates sending a request over 0-RTT early data and auto-enables retry on 425.
+  // QUERY always has content, so adding it changes both behaviors and needs its own change.
   absl::string_view method = request_headers.getMethodValue();
   return method == Http::Headers::get().MethodValues.Get ||
          method == Http::Headers::get().MethodValues.Head ||

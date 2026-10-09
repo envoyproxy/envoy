@@ -86,11 +86,22 @@ public:
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
-  uint32_t minConcurrency() const {
+  uint32_t minRTTCalcConcurrency() const {
     return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyKey, min_concurrency_);
   }
 
+  uint32_t minConcurrencyLimit() const {
+    if (!min_concurrency_limit_configured_) {
+      return minRTTCalcConcurrency();
+    }
+    return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyLimitKey,
+                                          min_concurrency_limit_);
+  }
+
   std::chrono::milliseconds fixedValue() const { return fixed_value_; }
+
+  // True if minRTT is sampled.
+  bool isMinRTTSamplingEnabled() const { return fixedValue() <= std::chrono::milliseconds::zero(); }
 
   // The percentage is normalized to the range [0.0, 1.0].
   double minRTTBufferPercent() const {
@@ -115,6 +126,8 @@ private:
     const std::string JitterPercentKey = "adaptive_concurrency.gradient_controller.jitter";
     const std::string MinConcurrencyKey =
         "adaptive_concurrency.gradient_controller.min_concurrency";
+    const std::string MinConcurrencyLimitKey =
+        "adaptive_concurrency.gradient_controller.min_concurrency_limit";
     const std::string MinRTTBufferPercentKey =
         "adaptive_concurrency.gradient_controller.min_rtt_buffer";
   };
@@ -143,6 +156,12 @@ private:
 
   // The concurrency limit set while measuring the minRTT.
   const uint32_t min_concurrency_;
+
+  // The minimum allowed concurrency limit.
+  const uint32_t min_concurrency_limit_ = 0;
+
+  // True when min_concurrency_limit was explicitly configured.
+  const bool min_concurrency_limit_configured_ = false;
 
   // The fixed value of minRTT, if present.
   const std::chrono::milliseconds fixed_value_;
@@ -227,9 +246,7 @@ public:
   bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
 
   // True if minRTT is sampled.
-  bool isMinRTTSamplingEnabled() const {
-    return config_.fixedValue() <= std::chrono::milliseconds::zero();
-  }
+  bool isMinRTTSamplingEnabled() const { return config_.isMinRTTSamplingEnabled(); }
 
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;

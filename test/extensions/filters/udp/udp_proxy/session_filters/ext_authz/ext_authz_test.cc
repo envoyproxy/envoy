@@ -8,11 +8,13 @@
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/udp/udp_proxy/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Contains;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -157,7 +159,7 @@ TEST_F(ExtAuthzFilterTest, AllowedPublishesDynamicMetadata) {
   EXPECT_CALL(stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& value) {
         EXPECT_EQ("envoy.filters.udp.session.ext_authz", ns);
-        EXPECT_EQ("bar", value.fields().at("foo").string_value());
+        EXPECT_THAT(value.fields(), Contains(IsStructString("foo", "bar")));
       }));
   EXPECT_CALL(callbacks_, continueFilterChain()).WillOnce(Return(true));
   request_callbacks_->onComplete(makeResponse(CheckStatus::OK, metadata));

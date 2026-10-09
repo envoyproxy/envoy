@@ -302,6 +302,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   }
   histogram_set_.clear();
   sinked_histograms_.clear();
+  histograms_to_cleanup_.clear();
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
@@ -396,8 +397,10 @@ void ThreadLocalStoreImpl::releaseHistogramCrossThread(uint64_t histogram_id) {
     bool need_post = false;
     {
       Thread::LockGuard lock(hist_mutex_);
-      need_post = histograms_to_cleanup_.empty();
-      histograms_to_cleanup_.push_back(histogram_id);
+      if (!shutting_down_) {
+        need_post = histograms_to_cleanup_.empty();
+        histograms_to_cleanup_.push_back(histogram_id);
+      }
     }
     if (need_post) {
       main_thread_dispatcher_->post([this]() { clearHistogramsFromCaches(); });
@@ -662,6 +665,12 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     RefcountPtr<StatType> stat = make_stat(
         parent_.alloc_, full_stat_name, tag_helper.tagExtractedName(), tag_helper.statNameTags());
     ASSERT(stat != nullptr);
+    if (stat_name_tags.has_value() && !stat_name_tags->empty()) {
+      // The tags were supplied by the stat's creator rather than derived from the name, so tag
+      // extraction on the flat name cannot re-derive them. Hot restart stat export uses this to
+      // decide which stats need their tags transmitted to the child explicitly.
+      stat->markAsNoTagExtraction();
+    }
     central_ref = &central_cache_map[stat->statName()];
     *central_ref = stat;
   }
@@ -700,6 +709,26 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromTaggedName(
 
   // Determine the final name based on the prefix and the passed base_name.
   const TagUtility::TagStatNameJoiner joiner(prefix_, base_name, stat_name_tags, symbolTable());
+  return getOrCreateCounterBase(joiner);
+}
+
+Counter&
+ThreadLocalStoreImpl::ScopeImpl::counterFromMergedStatName(StatName tagged_name, StatName base_name,
+                                                           std::optional<StatNameTagSpan> tags) {
+  if (!tags.has_value() || tags->empty()) {
+    // Without tags the full name is the only meaningful component; derive tags from it as usual.
+    return counterFromTaggedName(tagged_name, std::nullopt, StatName());
+  }
+  if (scopeRejectsAll()) {
+    return parent_.null_counter_;
+  }
+  // Hot restart stat merging supplies fully-resolved components recovered from the parent
+  // process: the flat name (with tag values), the tag-extracted name and the tags. Unlike
+  // counterFromTaggedName, honor them as-is (via the tag-aware joiner; the merge scope has an
+  // empty prefix) rather than re-deriving tags from the flat name, which would drop the
+  // programmatic tags and poison the central-cache slot for the child's own tagged creation.
+  const TagUtility::TagStatNameJoiner joiner(prefix_, {}, prefix_, base_name, *tags, tagged_name,
+                                             symbolTable());
   return getOrCreateCounterBase(joiner);
 }
 
@@ -774,6 +803,25 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromTaggedName(
   // share this code so I'm leaving it largely duplicated for now.
   const TagUtility::TagStatNameJoiner joiner(prefix_, base_name, stat_name_tags, symbolTable());
 
+  return getOrCreateGaugeBase(joiner, import_mode);
+}
+
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromMergedStatName(StatName tagged_name,
+                                                                StatName base_name,
+                                                                std::optional<StatNameTagSpan> tags,
+                                                                Gauge::ImportMode import_mode) {
+  if (!tags.has_value() || tags->empty()) {
+    // Without tags the full name is the only meaningful component; derive tags from it as usual.
+    return gaugeFromTaggedName(tagged_name, std::nullopt, StatName(), import_mode);
+  }
+  // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
+  if (scopeRejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
+    return parent_.null_gauge_;
+  }
+  // See counterFromMergedStatName: honor the fully-resolved components recovered from the hot
+  // restart parent instead of re-deriving tags from the flat name.
+  const TagUtility::TagStatNameJoiner joiner(prefix_, {}, prefix_, base_name, *tags, tagged_name,
+                                             symbolTable());
   return getOrCreateGaugeBase(joiner, import_mode);
 }
 
@@ -1003,7 +1051,7 @@ HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogramLockHeld(Stat
   }
 
   RefcountPtr<Histogram> histogram_ref(iter->second);
-  return std::cref(*histogram_ref);
+  return makeOptRefFromPtr(histogram_ref.get());
 }
 
 TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName name) const {

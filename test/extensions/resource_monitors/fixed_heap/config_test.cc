@@ -31,8 +31,9 @@ TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
   testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
-  auto monitor = factory->createResourceMonitor(config, context);
-  EXPECT_NE(monitor, nullptr);
+  auto monitor_or_error = factory->createResourceMonitor(config, context);
+  EXPECT_TRUE(monitor_or_error.ok());
+  EXPECT_NE(monitor_or_error.value(), nullptr);
 }
 
 TEST(FixedHeapMonitorFactoryTest, CreateMonitorWithRuntimeOverride) {
@@ -53,8 +54,9 @@ TEST(FixedHeapMonitorFactoryTest, CreateMonitorWithRuntimeOverride) {
       .WillRepeatedly(testing::Return(2000));
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
-  auto monitor = factory->createResourceMonitor(config, context);
-  EXPECT_NE(monitor, nullptr);
+  auto monitor_or_error = factory->createResourceMonitor(config, context);
+  EXPECT_TRUE(monitor_or_error.ok());
+  EXPECT_NE(monitor_or_error.value(), nullptr);
 }
 
 TEST(FixedHeapMonitorFactoryTest, RejectNeitherSet) {
@@ -70,8 +72,10 @@ TEST(FixedHeapMonitorFactoryTest, RejectNeitherSet) {
   testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
-  EXPECT_THROW_WITH_REGEX(factory->createResourceMonitor(config, context), EnvoyException,
-                          "max heap size must be greater than 0");
+  auto status = factory->createResourceMonitor(config, context).status();
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(std::string(status.message()),
+              ::testing::HasSubstr("max heap size must be greater than 0"));
 }
 
 TEST(FixedHeapMonitorFactoryTest, RejectBothSet) {
@@ -93,9 +97,11 @@ TEST(FixedHeapMonitorFactoryTest, RejectBothSet) {
       .WillRepeatedly(testing::Return(2000));
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
-  EXPECT_THROW_WITH_REGEX(factory->createResourceMonitor(config, context), EnvoyException,
-                          "exactly one of max_heap_size_bytes or max_heap_size_bytes_runtime must "
-                          "be set");
+  auto status = factory->createResourceMonitor(config, context).status();
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(std::string(status.message()),
+              ::testing::HasSubstr("exactly one of max_heap_size_bytes or "
+                                   "max_heap_size_bytes_runtime must be set"));
 }
 
 TEST(FixedHeapMonitorFactoryTest, RejectRuntimeDefaultZero) {
@@ -116,8 +122,10 @@ TEST(FixedHeapMonitorFactoryTest, RejectRuntimeDefaultZero) {
       .WillRepeatedly(testing::Return(0));
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
-  EXPECT_THROW_WITH_REGEX(factory->createResourceMonitor(config, context), EnvoyException,
-                          "max heap size must be greater than 0");
+  auto status = factory->createResourceMonitor(config, context).status();
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(std::string(status.message()),
+              ::testing::HasSubstr("max heap size must be greater than 0"));
 }
 
 } // namespace

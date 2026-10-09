@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -58,7 +59,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op_no_optional_abi",
     ],
     # factory_context_mocks needs this.
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
@@ -68,7 +69,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
@@ -89,7 +90,7 @@ envoy_cc_test(
         "GODEBUG": "cgocheck=0",
     },
     # http_mocks needs this.
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -116,9 +117,11 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     # http_mocks needs this.
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//envoy/registry",
+        "//source/common/network:address_lib",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
@@ -128,6 +131,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
@@ -141,7 +145,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -159,9 +163,13 @@ envoy_cc_test(
     env = {
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/registry",
+        "//envoy/server:tracer_config_interface",
+        "//envoy/tracing:trace_driver_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",

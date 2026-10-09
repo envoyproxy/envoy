@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -30,7 +31,7 @@ struct ExtractedMessageMetadata {
   std::optional<std::string> target_resource;
   std::optional<std::string> target_resource_callback;
   std::optional<std::string> resource_location;
-  Protobuf::Struct extracted_message;
+  ArenaWrappedProto<Protobuf::Struct> extracted_message;
 };
 
 // A proto-extraction interface for extracting that converts a source message

@@ -914,10 +914,10 @@ TransactionRequest::create(Router& router, Common::Redis::RespValuePtr&& incomin
   // So if this is not a transaction command, a simple command or a custom command, it is an error.
   // We also support multi-key commands, but will leave it to the client to handle the case where
   // the keys provided are not from the same shard.
-  if (Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0 &&
-      Common::Redis::SupportedCommands::simpleCommands().count(command_name) == 0 &&
-      Common::Redis::SupportedCommands::multiKeyCommands().count(command_name) == 0 &&
-      custom_commands.count(command_name) == 0) {
+  if (!Common::Redis::SupportedCommands::transactionCommands().contains(command_name) &&
+      !Common::Redis::SupportedCommands::simpleCommands().contains(command_name) &&
+      !Common::Redis::SupportedCommands::multiKeyCommands().contains(command_name) &&
+      !custom_commands.contains(command_name)) {
     callbacks.onResponse(Common::Redis::Utility::makeError(
         fmt::format("'{}' command is not supported within transaction",
                     incoming_request->asArray()[0].asString())));
@@ -973,6 +973,11 @@ TransactionRequest::create(Router& router, Common::Redis::RespValuePtr&& incomin
   // If we do a WATCH command without having started a transaction, we send it upstream and save the
   // key, so we can support UNWATCH. We have to also set the connection details.
   if (command_name == "watch" && !transaction.active_) {
+    // WATCH requires at least one key argument. A bare WATCH must not index past the request array.
+    if (incoming_request->asArray().size() < 2) {
+      onWrongNumberOfArguments(callbacks, *incoming_request);
+      return nullptr;
+    }
     transaction.key_ = incoming_request->asArray()[1].asString();
   }
 
@@ -995,6 +1000,12 @@ TransactionRequest::create(Router& router, Common::Redis::RespValuePtr&& incomin
       return nullptr;
     }
 
+    // Deriving the transaction key requires a key argument; reject a request that has none rather
+    // than indexing past the request array.
+    if (incoming_request->asArray().size() < 2) {
+      onWrongNumberOfArguments(callbacks, *incoming_request);
+      return nullptr;
+    }
     transaction.key_ = incoming_request->asArray()[1].asString();
     route = router.upstreamPool(transaction.key_, stream_info);
     Common::Redis::RespValueSharedPtr multi_request =

@@ -16,29 +16,23 @@ using RouteConfigProto =
     envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute;
 
 class DynamicModuleConfigFactory
-    : public Extensions::HttpFilters::Common::DualFactoryBase<FilterConfig, RouteConfigProto> {
+    : public Extensions::HttpFilters::Common::UnifiedFactoryBase<FilterConfig, RouteConfigProto> {
 public:
-  DynamicModuleConfigFactory() : DualFactoryBase("envoy.extensions.filters.http.dynamic_modules") {}
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const FilterConfig& proto_config,
-                                    const std::string& stat_prefix, DualInfo dual_info,
-                                    Server::Configuration::ServerFactoryContext& context) override {
-    return createFilterFactory(proto_config, stat_prefix, context, dual_info.scope,
-                               dual_info.init_manager);
-  }
+  DynamicModuleConfigFactory()
+      : UnifiedFactoryBase("envoy.extensions.filters.http.dynamic_modules") {}
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
-      const FilterConfig& proto_config, const std::string& stat_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      const FilterConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const FilterConfig& proto_config, const std::string& stat_prefix,
                       Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
-                      OptRef<Init::Manager> init_manager = std::nullopt);
+                      OptRef<Init::Manager> init_manager);
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-  createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
-                                       Server::Configuration::ServerFactoryContext&,
-                                       ProtobufMessage::ValidationVisitor&) override;
+  createHttpFilterRouteConfigTyped(const RouteConfigProto&,
+                                   Server::Configuration::ServerFactoryContext&,
+                                   Server::Configuration::ExtraFactoryContext&) override;
 
   std::string name() const override { return "envoy.extensions.filters.http.dynamic_modules"; }
 

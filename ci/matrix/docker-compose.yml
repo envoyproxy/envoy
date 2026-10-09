@@ -40,7 +40,6 @@ services:
       <<: *common-env
       EXPECTED_NO_ARGS: clang-libc++
       EXPECTED_GCC: gcc-libstdc++
-      EXPECTED_CLANG: clang-libc++
       EXPECTED_GCC_ENV: clang-libc++
       EXPECTED_CLANG_ENV: clang-libc++
     command:
@@ -61,7 +60,6 @@ services:
       <<: *common-env
       EXPECTED_NO_ARGS: clang-libc++
       EXPECTED_GCC: fail
-      EXPECTED_CLANG: clang-libc++
       EXPECTED_GCC_ENV: clang-libc++
       EXPECTED_CLANG_ENV: clang-libc++
     command:
@@ -83,7 +81,6 @@ services:
       <<: *common-env
       EXPECTED_NO_ARGS: clang-libc++
       EXPECTED_GCC: gcc-libstdc++
-      EXPECTED_CLANG: clang-libc++
       EXPECTED_GCC_ENV: clang-libc++
       EXPECTED_CLANG_ENV: clang-libc++
     command:
@@ -102,7 +99,6 @@ services:
       <<: *common-env
       EXPECTED_NO_ARGS: clang-libc++
       EXPECTED_GCC: fail
-      EXPECTED_CLANG: clang-libc++
       EXPECTED_GCC_ENV: clang-libc++
       EXPECTED_CLANG_ENV: clang-libc++
     command:

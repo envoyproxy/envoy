@@ -1,7 +1,3 @@
-adisuissa:
-  maintainer: true
-  opsgenie: Adi
-  slack: UT17EMMTP
 agrawroh:
   maintainer: true
   opsgenie: Rohit
@@ -9,6 +5,9 @@ agrawroh:
 antoniovleonti:
   first-pass: true
   slack: U06DHAS4FDF
+basundhara-c:
+  first-pass: true
+  slack: U0APVQSN0PR
 botengyao:
   maintainer: true
   opsgenie: Boteng
@@ -105,6 +104,4 @@ yanjunxiang-google:
   opsgenie: Yanjun
   slack: U0210Q3SUKX
 zuercher:
-  maintainer: true
-  opsgenie: Stephan
   slack: U78J72Q82

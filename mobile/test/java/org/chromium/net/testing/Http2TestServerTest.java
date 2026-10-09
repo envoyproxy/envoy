@@ -151,8 +151,8 @@ public class Http2TestServerTest {
   @Test
   public void testSubjectAltNameErrorWithPlatformCertValidator() throws Exception {
     // Switch to a cert which doesn't have 127.0.0.1 in the SAN list.
-    serverCertPath = "../envoy/test/config/integration/certs/servercert.pem";
-    serverKeyPath = "../envoy/test/config/integration/certs/serverkey.pem";
+    serverCertPath = "../envoy+/test/config/integration/certs/servercert.pem";
+    serverKeyPath = "../envoy+/test/config/integration/certs/serverkey.pem";
     AndroidNetworkLibrary.addTestRootCertificate(CertTestUtil.pemToDer(serverCertPath));
     setUpEngine(true, TrustChainVerification.VERIFY_TRUST_CHAIN);
     RequestScenario requestScenario = new RequestScenario()
@@ -181,8 +181,8 @@ public class Http2TestServerTest {
   @Test
   public void testSubjectAltNameErrorAllowedWithPlatformCertValidator() throws Exception {
     // Switch to a cert which doesn't have 127.0.0.1 in the SAN list.
-    serverCertPath = "../envoy/test/config/integration/certs/servercert.pem";
-    serverKeyPath = "../envoy/test/config/integration/certs/serverkey.pem";
+    serverCertPath = "../envoy+/test/config/integration/certs/servercert.pem";
+    serverKeyPath = "../envoy+/test/config/integration/certs/serverkey.pem";
     AndroidNetworkLibrary.addTestRootCertificate(CertTestUtil.pemToDer(serverCertPath));
     getSchemeIsHttps(true, TrustChainVerification.ACCEPT_UNTRUSTED);
   }

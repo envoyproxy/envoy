@@ -28,7 +28,7 @@ TEST(SendTrailersTest, Success) {
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
       .enableLogger(false)
-      .setLogLevel(Logger::Logger::debug)
+      .setLogLevel(Logger::Levels::debug)
       .addNativeFilter("envoy.filters.http.assertion", typed_config)
 
       .setOnEngineRunning([&]() { engine_running.Notify(); });

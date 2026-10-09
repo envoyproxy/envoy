@@ -27,6 +27,7 @@ envoy_cc_library(
     ],
     deps = [
         ":http_formatter_context_interface",
+        "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",

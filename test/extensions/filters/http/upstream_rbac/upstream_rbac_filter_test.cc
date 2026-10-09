@@ -38,6 +38,8 @@ public:
   void setPausedForConnect(bool) override {}
   bool pausedForWebsocketUpgrade() const override { return false; }
   void setPausedForWebsocketUpgrade(bool) override {}
+  bool pausedForGenericUpgrade() const override { return false; }
+  void setPausedForGenericUpgrade(bool) override {}
   void disableRouteTimeoutForWebsocketUpgrade() override {}
   void disablePerTryTimeoutForWebsocketUpgrade() override {}
   const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
@@ -290,6 +292,30 @@ TEST_F(UpstreamRbacFilterTest, OnUpstreamConnectionEstablishedIsNoOp) {
   setup(envoy::config::rbac::v3::RBAC::DENY, "1.2.3.4");
   EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   filter_->onUpstreamConnectionEstablished();
+}
+
+// Router context: root scope with "http.<stat_prefix>." as stats_prefix.
+// RBAC counters must land under that prefix.
+TEST_F(UpstreamRbacFilterTest, RouterContextStatPrefixScopesStats) {
+  auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
+      envoy::extensions::filters::http::rbac::v3::RBAC{}, "http.ingress.",
+      *stats_store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
+
+  EXPECT_TRUE(stats_store_.findCounterByString("http.ingress.rbac.allowed").has_value());
+  EXPECT_TRUE(stats_store_.findCounterByString("http.ingress.rbac.denied").has_value());
+}
+
+// Cluster context: root scope with "cluster.<name>." as stats_prefix (as passed by
+// upstream_impl.cc). Stats must appear under "cluster.<name>.rbac.*" with no double-prefix.
+TEST_F(UpstreamRbacFilterTest, ClusterContextRootScopeWithClusterPrefix) {
+  auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
+      envoy::extensions::filters::http::rbac::v3::RBAC{}, "cluster.cluster_0.",
+      *stats_store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
+
+  EXPECT_TRUE(stats_store_.findCounterByString("cluster.cluster_0.rbac.allowed").has_value());
+  EXPECT_TRUE(stats_store_.findCounterByString("cluster.cluster_0.rbac.denied").has_value());
+  EXPECT_FALSE(stats_store_.findCounterByString("cluster.cluster_0.cluster.cluster_0.rbac.allowed")
+                   .has_value());
 }
 
 } // namespace

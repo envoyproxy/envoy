@@ -26,7 +26,16 @@ namespace Network {
 class NonDispatchedUdpPacketHandler {
 public:
   virtual ~NonDispatchedUdpPacketHandler() = default;
-  virtual void handle(uint32_t worker_index, const Network::UdpRecvData& packet) PURE;
+
+  /**
+   * @param worker_index the worker the packet was received on.
+   * @param listener_address the address the receiving listener is bound to, including its network
+   *        namespace if any. This may differ from the packet's local address, e.g. on transparent
+   *        sockets, and identifies the listener the packet belongs to.
+   * @param packet the received packet.
+   */
+  virtual void handle(uint32_t worker_index, const Network::Address::Instance& listener_address,
+                      const Network::UdpRecvData& packet) PURE;
 };
 
 // Additional options for ConnectionHandler::ActiveListener::shutdownListener.
@@ -104,16 +113,19 @@ public:
    * timer expires and connections are forcibly closed). It does not close connections.
    * @param listener_tag supplies the tag passed to addListener().
    * @param filter_chains supplies the filter chains whose connections should be notified.
+   * @param drain_event describes the drain sequence (start time and strategy).
    */
   virtual void onFilterChainDrain(uint64_t listener_tag,
-                                  const std::list<const FilterChain*>& filter_chains) PURE;
+                                  const std::list<const FilterChain*>& filter_chains,
+                                  ConnectionDrainEvent drain_event) PURE;
 
   /**
    * Notify all connections belonging to the listener with the given tag that they are being
    * drained. Does not close any connections.
    * @param listener_tag supplies the tag passed to addListener().
+   * @param drain_event describes the drain sequence (start time and strategy).
    */
-  virtual void onListenerDrain(uint64_t listener_tag) PURE;
+  virtual void onListenerDrain(uint64_t listener_tag, ConnectionDrainEvent drain_event) PURE;
 
   /**
    * Stop all listeners. This will not close any connections and is used for draining.
@@ -199,16 +211,19 @@ public:
      * should notify all owned connections that they are being drained (by invoking
      * Network::Connection::onDrain()) so that callbacks registered on those connections can
      * react to the drain (e.g. send GOAWAY). Connections are not closed by this call.
+     * @param drain_event describes the drain sequence (start time and strategy).
      */
-    virtual void onFilterChainDrainStart(
-        const std::list<const Network::FilterChain*>& draining_filter_chains) PURE;
+    virtual void
+    onFilterChainDrainStart(const std::list<const Network::FilterChain*>& draining_filter_chains,
+                            ConnectionDrainEvent drain_event) PURE;
 
     /**
      * Called at the start of the drain sequence for the listener as a whole. Implementations
      * should notify all owned connections that they are being drained. Connections are not
      * closed by this call.
+     * @param drain_event describes the drain sequence (start time and strategy).
      */
-    virtual void onListenerDrainStart() PURE;
+    virtual void onListenerDrainStart(ConnectionDrainEvent drain_event) PURE;
 
     // New method for handling idle connection closing
     virtual void onCloseIdleHttpConnections(bool /*is_saturated*/) {
@@ -362,8 +377,7 @@ public:
   findByAddress(const Address::InstanceConstSharedPtr& listen_address) PURE;
 };
 
-using InternalListenerManagerOptRef =
-    std::optional<std::reference_wrapper<InternalListenerManager>>;
+using InternalListenerManagerOptRef = OptRef<InternalListenerManager>;
 
 // The thread local registry.
 class LocalInternalListenerRegistry {

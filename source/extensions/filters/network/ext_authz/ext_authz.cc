@@ -9,6 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/tls/connection_info_impl_base.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
@@ -23,6 +24,19 @@ namespace ExtAuthz {
 namespace {
 
 using MetadataProto = ::envoy::config::core::v3::Metadata;
+using ExtAuthzDecisionProto = ::envoy::extensions::filters::network::ext_authz::ExtAuthzDecision;
+
+ExtAuthzDecisionProto::CheckResult toCheckResult(Filters::Common::ExtAuthz::CheckStatus status) {
+  switch (status) {
+  case Filters::Common::ExtAuthz::CheckStatus::OK:
+    return ExtAuthzDecisionProto::OK;
+  case Filters::Common::ExtAuthz::CheckStatus::Error:
+    return ExtAuthzDecisionProto::ERROR;
+  case Filters::Common::ExtAuthz::CheckStatus::Denied:
+    return ExtAuthzDecisionProto::DENIED;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
 
 void fillMetadataContext(const MetadataProto& source_metadata,
                          const std::vector<std::string>& metadata_context_namespaces,
@@ -51,6 +65,23 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
   const std::string final_prefix = fmt::format("ext_authz.{}.", name);
   return {ALL_TCP_EXT_AUTHZ_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
+}
+
+void ExtAuthzDecisionObject::populateProto(ExtAuthzDecisionProto& msg) const {
+  msg.set_check_result(check_result_);
+  msg.set_status_code(status_code_);
+}
+
+ProtobufTypes::MessagePtr ExtAuthzDecisionObject::serializeAsProto() const {
+  auto msg = std::make_unique<ExtAuthzDecisionProto>();
+  populateProto(*msg);
+  return msg;
+}
+
+std::optional<std::string> ExtAuthzDecisionObject::serializeAsString() const {
+  ExtAuthzDecisionProto msg;
+  populateProto(msg);
+  return MessageUtil::getJsonStringFromMessageOrError(msg);
 }
 
 void Filter::callCheck() {
@@ -140,6 +171,14 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
   }
 
+  // In shadow mode the connection is left open whatever the authorization service returned. The
+  // decision is recorded before the filter chain resumes so a subsequent filter can read it.
+  if (config_->shadowMode()) {
+    setShadowFilterState(*response);
+    continueFilterChain();
+    return;
+  }
+
   // Fail open only if configured to do so and if the check status was a error.
   if (response->status == Filters::Common::ExtAuthz::CheckStatus::Denied ||
       (response->status == Filters::Common::ExtAuthz::CheckStatus::Error &&
@@ -169,19 +208,29 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             ? Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied
             : Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
   } else {
-    // Let the filter chain continue.
-    filter_return_ = FilterReturn::Continue;
     if (config_->failureModeAllow() &&
         response->status == Filters::Common::ExtAuthz::CheckStatus::Error) {
       // Status is Error and yet we are configured to allow traffic. Click a counter.
       config_->stats().failure_mode_allowed_.inc();
     }
-
-    // We can get completion inline, so only call continue if that isn't happening.
-    if (!calling_check_) {
-      filter_callbacks_->continueReading();
-    }
+    continueFilterChain();
   }
+}
+
+void Filter::continueFilterChain() {
+  filter_return_ = FilterReturn::Continue;
+  // We can get completion inline, so only call continue if that isn't happening.
+  if (!calling_check_) {
+    filter_callbacks_->continueReading();
+  }
+}
+
+void Filter::setShadowFilterState(const Filters::Common::ExtAuthz::Response& response) {
+  filter_callbacks_->connection().streamInfo().filterState()->setData(
+      NetworkFilterNames::get().ExtAuthorization,
+      std::make_shared<ExtAuthzDecisionObject>(toCheckResult(response.status),
+                                               static_cast<uint32_t>(response.status_code)),
+      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 } // namespace ExtAuthz

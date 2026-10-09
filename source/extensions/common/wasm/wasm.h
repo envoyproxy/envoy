@@ -191,8 +191,7 @@ public:
   // the type of the plugin if needed.
   PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
                Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
-               Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
-               bool singleton);
+               Init::Manager& init_manager, bool singleton);
 
   std::shared_ptr<Context> createContext();
   Wasm* wasm();

@@ -15,6 +15,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/time/time.h"
 
@@ -88,7 +89,8 @@ private:
   void startVerify();
 
   // Copy the JWT Claim to HTTP Header. Returns true iff header is added.
-  bool addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name);
+  bool addJWTClaimToHeader(absl::Span<const absl::string_view> claim_path,
+                           const std::string& header_name);
 
   // The jwks cache object.
   JwksCache& jwks_cache_;
@@ -335,11 +337,12 @@ void AuthenticatorImpl::verifyKey() {
   handleGoodJwt(/*cache_hit=*/false);
 }
 
-bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
+bool AuthenticatorImpl::addJWTClaimToHeader(absl::Span<const absl::string_view> claim_path,
                                             const std::string& header_name) {
   StructUtils payload_getter(jwt_->payload_pb_);
   const Protobuf::Value* claim_value;
-  const auto status = payload_getter.GetValue(claim_name, claim_value);
+  const auto status = payload_getter.GetValueByPath(claim_path, claim_value);
+
   std::string str_claim_value;
   if (status == StructUtils::OK) {
     switch (claim_value->kind_case()) {
@@ -365,17 +368,22 @@ bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
       break;
     }
     default:
-      ENVOY_LOG(debug, "[jwt_auth] claim : {} is of an unknown type '{}'", claim_name,
-                static_cast<int>(claim_value->kind_case()));
+      ENVOY_LOG(debug, "[jwt_auth] claim : {} is of an unknown type '{}'",
+                absl::StrJoin(claim_path, "."), static_cast<int>(claim_value->kind_case()));
       break;
     }
 
     if (!str_claim_value.empty()) {
       headers_->addCopy(Http::LowerCaseString(header_name), str_claim_value);
       ENVOY_LOG(debug, "[jwt_auth] claim : {} with value : {} is added to the header : {}",
-                claim_name, str_claim_value, header_name);
+                absl::StrJoin(claim_path, "."), str_claim_value, header_name);
       return true;
     }
+  } else {
+    ENVOY_LOG(debug,
+              "[jwt_auth] claim : {} could not be resolved in the payload (status {}); the "
+              "header : {} is not added",
+              absl::StrJoin(claim_path, "."), static_cast<int>(status), header_name);
   }
   return false;
 }
@@ -398,9 +406,8 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
 
   // Copy JWT claim to header
   bool header_added = false;
-  for (const auto& header_and_claim : provider.claim_to_headers()) {
-    header_added |=
-        addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
+  for (const auto& claim_to_header : jwks_data_->claimsToHeaders()) {
+    header_added |= addJWTClaimToHeader(claim_to_header.claim_path_, claim_to_header.header_name_);
   }
   if (provider.clear_route_cache() && (header_added || !provider.payload_in_metadata().empty())) {
     clear_route_cache_ = true;

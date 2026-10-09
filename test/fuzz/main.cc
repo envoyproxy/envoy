@@ -91,6 +91,7 @@ int main(int argc, char** argv) {
   listeners.Append(new Envoy::TestListener(false));
   testing::InitGoogleTest(&argc, argv);
   testing::InitGoogleMock(&argc, argv);
+  Envoy::Thread::TestThread::registerTestThread();
   Envoy::Fuzz::Runner::setupEnvironment(argc, argv, spdlog::level::info);
 
   int status = RUN_ALL_TESTS();

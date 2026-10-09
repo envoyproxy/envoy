@@ -27,6 +27,7 @@ envoy_cc_contrib_extension(
         "//source/common/stream_info:utility_lib",
         "//source/extensions/filters/common/expr:context_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/grpc_stats:config",
         "@cel-cpp//eval/public:builtin_func_registrar",

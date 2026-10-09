@@ -21,8 +21,11 @@ namespace DynamicModules {
       config, context.messageValidationVisitor());
 
   const auto& module_config = proto_config.dynamic_module_config();
+  // The server context is passed so that a load failure increments module_load_error on a scope
+  // that outlives the rejected config update.
   auto dynamic_module_or_error = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
+      module_config.name(), module_config.do_not_close(), module_config.load_globally(),
+      context.serverFactoryContext(), proto_config.formatter_name());
   if (!dynamic_module_or_error.ok()) {
     throw EnvoyException("Failed to load dynamic module: " +
                          std::string(dynamic_module_or_error.status().message()));

@@ -23,9 +23,9 @@ ThriftHealthChecker::ThriftHealthChecker(
     const envoy::extensions::health_checkers::thrift::v3::Thrift& thrift_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
-    ClientFactory& client_factory)
+    ClientFactory& client_factory, Upstream::HealthFlagCallbacks& health_flag_callbacks)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
-                            std::move(event_logger)),
+                            std::move(event_logger), health_flag_callbacks),
       method_name_(thrift_config.method_name()),
       transport_(ProtoUtils::getTransportType(thrift_config.transport())),
       protocol_(ProtoUtils::getProtocolType(thrift_config.protocol())),
@@ -64,8 +64,14 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onInterval() {
     client_ = parent_.client_factory_.create(
         *this, parent_.transport_, parent_.protocol_, parent_.method_name_, host_,
         /* health checker seq id */ 0, /* fixed_seq_id */ true);
-    client_->start();
     expect_close_ = false;
+    // The underlying connection can fail to be created (e.g. a network namespace binding failure).
+    // Report a network failure and stop rather than crashing on a null dereference.
+    if (!client_->start()) {
+      handleFailure(envoy::data::core::v3::NETWORK);
+      client_.reset();
+      return;
+    }
   }
 
   client_->sendRequest();
