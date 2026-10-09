@@ -568,7 +568,7 @@ wasmtime:
   project_name: "wasmtime"
   project_desc: "A standalone runtime for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasmtime"
-  release_date: "2026-05-21"
+  release_date: "2026-06-15"
   use_category:
   - dataplane_ext
   extensions:
