@@ -22,11 +22,8 @@ genrule(
     srcs = ["//:API_VERSION.txt"],
     outs = ["api_version_number.h"],
     cmd = """
-    PYPATH=$$(realpath $$(dirname $(PYTHON3)))
-    export PATH=$$PYPATH:$$PATH
     ./$(location //tools/api_versioning:generate_api_version_header_bin) $< >$@
     """,
-    toolchains = ["@rules_python//python:current_py_toolchain"],
     tools = ["//tools/api_versioning:generate_api_version_header_bin"],
     visibility = ["//visibility:private"],
 )

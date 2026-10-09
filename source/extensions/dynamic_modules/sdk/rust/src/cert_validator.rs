@@ -242,19 +242,20 @@ pub trait CertValidatorConfig: Send + Sync {
 // FFI trampolines
 // =============================================================================
 
-use crate::{drop_wrapped_c_void_ptr, wrap_into_c_void_ptr, NEW_CERT_VALIDATOR_CONFIG_FUNCTION};
+use crate::{
+  drop_wrapped_c_void_ptr, ffi_export, wrap_into_c_void_ptr, NEW_CERT_VALIDATOR_CONFIG_FUNCTION,
+};
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_new(
-  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> abi::envoy_dynamic_module_type_cert_validator_config_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cert_validator_config_new(
+    _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_cert_validator_config_module_ptr {
     let name_str =
       unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
     let config_slice = unsafe {
@@ -267,11 +268,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_new(
         .get()
         .expect("NEW_CERT_VALIDATOR_CONFIG_FUNCTION must be set"),
     )
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cert_validator_config_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
 pub(crate) fn init_cert_validator_config(
@@ -285,39 +283,31 @@ pub(crate) fn init_cert_validator_config(
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_destroy(
-  config_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cert_validator_config_destroy(
+    config_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(config_ptr, CertValidatorConfig);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_cert_validator_config_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
-  config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
-  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
-  certs: *mut abi::envoy_dynamic_module_type_envoy_buffer,
-  certs_count: usize,
-  host_name: abi::envoy_dynamic_module_type_envoy_buffer,
-  is_server: bool,
-) -> abi::envoy_dynamic_module_type_cert_validator_validation_result {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+    config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+    config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+    certs: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+    certs_count: usize,
+    host_name: abi::envoy_dynamic_module_type_envoy_buffer,
+    is_server: bool,
+  ) -> abi::envoy_dynamic_module_type_cert_validator_validation_result {
     let config = {
       let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
       &**raw
@@ -359,44 +349,31 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_c
     }
 
     abi::envoy_dynamic_module_type_cert_validator_validation_result::from(&result)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_cert_validator_do_verify_cert_chain",
-      panic,
-    );
-    // Fail-closed: a panic during cert validation must not appear as success.
-    abi::envoy_dynamic_module_type_cert_validator_validation_result::from(
-      &ValidationResult::failed(ClientValidationStatus::Failed, None, None),
-    )
-  })
+  }
+  // Fail-closed: a panic during cert validation must not appear as success.
+  on_panic = abi::envoy_dynamic_module_type_cert_validator_validation_result::from(
+    &ValidationResult::failed(ClientValidationStatus::Failed, None, None),
+  )
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
-  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
-  handshaker_provides_certificates: bool,
-) -> std::os::raw::c_int {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
+    config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+    handshaker_provides_certificates: bool,
+  ) -> std::os::raw::c_int {
     let config = {
       let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
       &**raw
     };
     config.get_ssl_verify_mode(handshaker_provides_certificates)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode",
-      panic,
-    );
-    // Fail-closed: SSL_VERIFY_PEER (0x01) | SSL_VERIFY_FAIL_IF_NO_PEER_CERT (0x02) = 0x03,
-    // the strictest mode. A panic must not silently degrade to SSL_VERIFY_NONE (0x00).
-    0x03
-  })
+  }
+  // Fail-closed: SSL_VERIFY_PEER (0x01) | SSL_VERIFY_FAIL_IF_NO_PEER_CERT (0x02) = 0x03,
+  // the strictest mode. A panic must not silently degrade to SSL_VERIFY_NONE (0x00).
+  on_panic = 0x03
 }
 
 /// # Safety

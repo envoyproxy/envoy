@@ -92,6 +92,9 @@ public:
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
+  void setTypedTag(absl::string_view name, absl::string_view value,
+                   Tracing::TagValueType type) override;
+  void reserveTags(size_t size) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override;
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/,
@@ -160,6 +163,12 @@ public:
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
   }
 
+  /**
+   * Records whether the span's parent context was propagated from a remote parent. Used to
+   * populate the is_remote bits of the exported span's flags field.
+   */
+  void setParentContextIsRemote(bool is_remote) { parent_context_is_remote_ = is_remote; }
+
   absl::string_view tracestate() const { return span_.trace_state(); }
 
   /**
@@ -186,6 +195,7 @@ private:
   Envoy::TimeSource& time_source_;
   bool sampled_;
   bool use_local_decision_{false};
+  bool parent_context_is_remote_{false};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

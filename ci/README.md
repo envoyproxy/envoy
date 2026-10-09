@@ -43,12 +43,12 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository.
 
-The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests. This is configured with `--config=clang`. We have an additional Linux CI run with GCC which builds binary only, configured with `--config=gcc`.
+The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests and requires no configuration flag. We have an additional Linux CI run with GCC which builds binary only, configured with `--config=gcc`.
 
 # Supported compiler configurations
 
-Envoy supports two compiler toolchain configurations:
-* `--config=clang` - Clang compiler with libc++ standard library (default for CI)
+Envoy supports the following compiler toolchain configurations:
+* No configuration flag - Clang compiler with libc++ standard library (default)
 * `--config=gcc` - GCC compiler with libstdc++ standard library
 
 # C++ standard library
@@ -56,11 +56,12 @@ Envoy supports two compiler toolchain configurations:
 As of November 2019 after [#8859](https://github.com/envoyproxy/envoy/pull/8859) the official released binary is
 [linked against libc++ on Linux](https://github.com/envoyproxy/envoy/blob/main/bazel/README.md#linking-against-libc-on-linux).
 
-The standard library is tied to the compiler toolchain:
-* `--config=clang` - Uses libc++ (LLVM standard library)
-* `--config=gcc` - Uses libstdc++ (GNU standard library)
+The standard library is derived from the compiler toolchain:
+* Clang uses libc++ (LLVM standard library)
+* GCC uses libstdc++ (GNU standard library)
 
-These are the only supported configurations. If you need a different toolchain configuration, you must set it up in your `user.bazelrc` file.
+These are the only supported configurations. Other combinations, such as Clang with libstdc++, are not supported or tested;
+if you need one, you will need to set up your own `cc_toolchain`.
 
 # Building and running tests as a developer
 
@@ -192,6 +193,13 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
 * `check_and_fix_proto_format` &mdash; check and fix configuration, fomatting and build issues in API proto files.
 * `format`&mdash; run validation, linting and formatting tools.
+* `lockfiles`/`lockfiles.regenerate` &mdash; regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
+* `lockfiles.check` &mdash; regenerate all `MODULE.bazel.lock` files and fail with a diff summary if any lockfile changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
+* `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, and dependabot configuration.
+* `deps.report` &mdash; run the per-workspace bzlmod dependency report targets and print the current/latest version status for each workspace.
+* `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate all `MODULE.bazel.lock` files.
+* `registry` &mdash; run the per-workspace Bazel registry updater targets for `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate all `MODULE.bazel.lock` files. Set `ENVOY_REGISTRY_HASH` to request a specific hash, and set `ENVOY_REGISTRY_ALLOW_UNSAFE` to allow non-ancestor pins for testing.
+* `registry.check` &mdash; run the per-workspace Bazel registry status targets, verify they all report the same pinned hash, and require a tagged registry pin for non-`-dev` releases.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 ## On Windows

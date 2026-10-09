@@ -3,6 +3,7 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -12,11 +13,17 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
+envoy_proto_library(
+    name = "ext_authz_decision",
+    srcs = ["ext_authz_decision.proto"],
+)
+
 envoy_cc_library(
     name = "ext_authz",
     srcs = ["ext_authz.cc"],
     hdrs = ["ext_authz.h"],
     deps = [
+        ":ext_authz_decision_cc_proto",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//envoy/runtime:runtime_interface",
@@ -24,6 +31,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:matchers_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/tls:connection_info_impl_base_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",

@@ -41,6 +41,7 @@
 #include "source/common/upstream/host_utility.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Router {
@@ -65,7 +66,8 @@ constexpr uint64_t TimeoutPrecisionFactor = 100;
 } // namespace
 
 absl::StatusOr<std::unique_ptr<FilterConfig>>
-FilterConfig::create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+FilterConfig::create(Stats::StatName stat_prefix,
+                     Server::Configuration::GenericFactoryContext& context,
                      ShadowWriterPtr&& shadow_writer,
                      const envoy::extensions::filters::http::router::v3::Router& config) {
   absl::Status creation_status = absl::OkStatus();
@@ -76,7 +78,7 @@ FilterConfig::create(Stats::StatName stat_prefix, Server::Configuration::Factory
 }
 
 FilterConfig::FilterConfig(Stats::StatName stat_prefix,
-                           Server::Configuration::FactoryContext& context,
+                           Server::Configuration::GenericFactoryContext& context,
                            ShadowWriterPtr&& shadow_writer,
                            const envoy::extensions::filters::http::router::v3::Router& config,
                            absl::Status& creation_status)
@@ -113,7 +115,14 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     upstream_filter_config_provider_manager_ =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             server_factory_ctx);
-    std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
+    // With the correct-stats-prefix flag enabled (default), pass the HCM stat_prefix as the
+    // stats_prefix string so upstream filters emit stats under "http.<stat_prefix>.rbac.*".
+    // With the flag disabled (legacy behavior), the scope's prefix string is used instead;
+    // since the router scope has an empty prefix this produced unnamespaced stats.
+    std::string prefix = Runtime::runtimeFeatureEnabled(
+                             "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
+                             ? context.scope().symbolTable().toString(stat_prefix)
+                             : "";
     upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
@@ -252,7 +261,8 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
   const absl::string_view per_try_timeout_entry =
       request_headers.getEnvoyUpstreamRequestPerTryTimeoutMsValue();
   if (!per_try_timeout_entry.empty()) {
-    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout)) {
+    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout) &&
+        header_timeout <= static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -315,7 +325,8 @@ void FilterUtility::setTimeoutHeaders(uint64_t elapsed_time, const TimeoutData& 
 std::optional<std::chrono::milliseconds>
 FilterUtility::tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry) {
   uint64_t header_timeout;
-  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout)) {
+  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout) &&
+      header_timeout <= static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
     return std::chrono::milliseconds(header_timeout);
   }
   return std::nullopt;
@@ -904,6 +915,17 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     active_shadow_policies.clear();
   }
 
+  // Forward the downstream request's dynamic ``envoy.lb`` metadata so subset load balancing on the
+  // shadow cluster honors dynamically-set selectors, matching the main request path.
+  std::optional<envoy::config::core::v3::Metadata> shadow_metadata;
+  if (!active_shadow_policies.empty() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata")) {
+    if (auto metadata = shadowDynamicMetadata(); !metadata.filter_metadata().empty()) {
+      shadow_metadata = std::move(metadata);
+    }
+  }
+
   // Start the shadow streams.
   const size_t num_shadow_policies = active_shadow_policies.size();
   for (size_t i = 0; i < num_shadow_policies; ++i) {
@@ -913,8 +935,9 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     if (!shadow_cluster_name.has_value()) {
       continue;
     }
+    const bool last_policy = (i == num_shadow_policies - 1);
     std::unique_ptr<Http::RequestHeaderMapImpl> shadow_headers;
-    if (i == num_shadow_policies - 1) {
+    if (last_policy) {
       // For the last shadow policy, we can reuse the original headers to save a copy because
       // copy whole headers map is not cheap.
       shadow_headers = std::move(original_shadow_headers);
@@ -924,7 +947,7 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*original_shadow_headers);
     }
     applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
-    const auto options =
+    auto options =
         Http::AsyncClient::RequestOptions()
             .setTimeout(timeout_.global_timeout_)
             .setParentSpan(callbacks_->activeSpan())
@@ -943,6 +966,16 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
             .setDiscardResponseBody(true)
             .setFilterConfig(config_)
             .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
+
+    // The last policy can move the metadata since no later policy needs it.
+    if (shadow_metadata.has_value()) {
+      if (last_policy) {
+        options.setMetadata(std::move(*shadow_metadata));
+      } else {
+        options.setMetadata(*shadow_metadata);
+      }
+    }
+
     if (end_stream) {
       // This is a header-only request, and can be dispatched immediately to the shadow
       // without waiting.
@@ -1279,6 +1312,31 @@ std::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& po
   }
 }
 
+envoy::config::core::v3::Metadata Filter::shadowDynamicMetadata() const {
+  envoy::config::core::v3::Metadata metadata;
+
+  // Precedence matches metadataMatchCriteria(): connection metadata first, then request metadata
+  // merged on top so request-level values win.
+  const auto* downstream_conn = downstreamConnection();
+  if (downstream_conn != nullptr) {
+    const auto& connection_fm = downstream_conn->streamInfo().dynamicMetadata().filter_metadata();
+    if (const auto it = connection_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+        it != connection_fm.end()) {
+      (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+          it->second;
+    }
+  }
+
+  const auto& request_fm = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+  if (const auto it = request_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+      it != request_fm.end()) {
+    (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB].MergeFrom(
+        it->second);
+  }
+
+  return metadata;
+}
+
 void Filter::applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
                                       Http::RequestHeaderMap& headers) const {
   const Envoy::Formatter::Context formatter_context{&headers};
@@ -1538,7 +1596,7 @@ void Filter::onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag response_flags,
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -1810,6 +1868,17 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
   // but it's sketchy (as the subsequent upstream might not send a 100-Continue) and not worth
   // the complexity until someone asks for it.
   retry_state_.reset();
+
+  // Apply response_headers_to_remove to informational (1xx) responses so
+  // upstream-internal headers are stripped before forwarding downstream.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.response_headers_to_remove_on_1xx")) {
+    for (const Http::LowerCaseString& header :
+         route_entry_->responseHeaderTransforms(callbacks_->streamInfo(), false)
+             .headers_to_remove) {
+      headers->remove(header);
+    }
+  }
 
   callbacks_->encode1xxHeaders(std::move(headers));
 }
@@ -2119,7 +2188,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 
   Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
   if (tb_stats.has_value()) {
-    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 

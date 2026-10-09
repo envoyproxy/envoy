@@ -81,6 +81,9 @@ public:
   bool removeListener(const std::string&) override { return true; }
   absl::Status startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) override;
   void stopListeners(StopListenersType, const Network::ExtraShutdownListenerOptions&) override;
+  // API listeners own no downstream network connections, so there is nothing to notify when a
+  // server-wide drain sequence begins.
+  void onServerDrainStart(Network::DrainDirection, Network::ConnectionDrainEvent) override {}
   void stopWorkers() override;
   void beginListenerUpdate() override {}
   void endListenerUpdate(FailureStates&&) override {}

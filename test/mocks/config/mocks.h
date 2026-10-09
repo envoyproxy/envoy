@@ -100,7 +100,8 @@ public:
   MockOpaqueResourceDecoder();
   ~MockOpaqueResourceDecoder() override;
 
-  MOCK_METHOD(ProtobufTypes::MessagePtr, decodeResource, (const Protobuf::Any& resource));
+  MOCK_METHOD(ArenaWrappedProto<Protobuf::Message>, decodeResource,
+              (const Protobuf::Any& resource));
   MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource));
 };
 
@@ -131,6 +132,7 @@ public:
               (const absl::flat_hash_set<std::string>& update_to_these_names));
   MOCK_METHOD(void, requestOnDemandUpdate,
               (const absl::flat_hash_set<std::string>& add_these_names));
+  MOCK_METHOD(void, accept, (const absl::flat_hash_set<std::string>& patterns));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -187,10 +189,6 @@ public:
               (const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
                SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
                const SubscriptionOptions& options));
-
-  MOCK_METHOD(void, requestOnDemandUpdate,
-              (const std::string& type_url,
-               const absl::flat_hash_set<std::string>& add_these_names));
 
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
 

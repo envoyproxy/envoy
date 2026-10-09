@@ -130,7 +130,20 @@ message OAuth2Credentials {
   // This field is required unless :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
   // is set to ``TLS_CLIENT_AUTH``, in which case authentication is done via the client certificate.
   // When ``auth_type`` is ``PRIVATE_KEY_JWT``, this field must contain the PEM-encoded private key
-  // used to sign the JWT client assertion.
+  // used to sign the JWT client assertion. The key may be supplied in either of two forms:
+  //
+  // * As a single-value generic secret holding the PEM-encoded private key. No ``kid`` header
+  //   parameter is included in the client assertion.
+  // * As a multi-entry generic secret with a ``private_key`` entry holding the PEM-encoded private
+  //   key and an optional ``key_id`` entry. When present, the ``key_id`` value is set as the
+  //   ``kid`` header parameter of the client assertion, per
+  //   `RFC 7515 Section 4.1.4 <https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.4>`_.
+  //   Identity providers use it to select the correct verification key when more than one key is
+  //   registered for the client. Distributing both in one secret means the key ID is always
+  //   rotated together with the key it identifies.
+  //
+  // The multi-entry form is only read when ``auth_type`` is ``PRIVATE_KEY_JWT``. The other auth
+  // types read the single-value form only.
   transport_sockets.tls.v3.SdsSecretConfig token_secret = 2;
 
   // Configures how the secret token should be created.
@@ -184,6 +197,20 @@ message PrivateKeyJwtConfig {
   // The value is truncated to whole seconds, so it must be at least ``1s`` when set.
   // Default: ``60s``.
   google.protobuf.Duration assertion_lifetime = 2 [(validate.rules).duration = {gte {seconds: 1}}];
+
+  // The value to use as the ``aud`` (audience) claim in the JWT client assertion.
+  //
+  // `RFC 7523 Section 3 <https://datatracker.ietf.org/doc/html/rfc7523#section-3>`_ requires the
+  // ``aud`` claim to identify the authorization server, and allows the token endpoint URL to be
+  // used for this purpose.
+  // `RFC 9126 Section 2.1 <https://datatracker.ietf.org/doc/html/rfc9126#section-2.1>`_ recommends
+  // the authorization server's issuer identifier instead, and
+  // `FAPI 2.0 <https://openid.net/specs/fapi-security-profile-2_0-final.html>`_ requires it, as a
+  // single canonical value identifies the server regardless of which endpoint receives the
+  // assertion.
+  //
+  // If not set, defaults to the configured ``token_endpoint`` URI.
+  string assertion_audience = 3;
 }
 
 // Defines how an OAuth token is forwarded upstream.

@@ -245,23 +245,19 @@ protected:
         for (auto map_it = lazy_map_.begin(); map_it != lazy_map_.end();) {
           auto& values_vec = map_it->second;
           ASSERT(!values_vec.empty());
-          // The following call to std::remove_if removes the elements that satisfy the
-          // UnaryPredicate and shifts the vector elements, but does not resize the vector.
-          // The call to erase that follows erases the unneeded cells (from remove_pos to the
-          // end) and modifies the vector's size.
-          const auto remove_pos =
-              std::remove_if(values_vec.begin(), values_vec.end(), [&](HeaderNode it) {
-                if (p(*(it->entry_))) {
-                  // Remove the element from the list.
-                  if (pseudo_headers_end_ == it->entry_) {
-                    pseudo_headers_end_++;
-                  }
-                  headers_.erase(it);
-                  return true;
-                }
-                return false;
-              });
-          values_vec.erase(remove_pos, values_vec.end());
+          // The following call to absl::erase_if removes the elements that satisfy the
+          // UnaryPredicate and resizes the vector.
+          absl::erase_if(values_vec, [&](HeaderNode it) {
+            if (p(*(it->entry_))) {
+              // Remove the element from the list.
+              if (pseudo_headers_end_ == it->entry_) {
+                pseudo_headers_end_++;
+              }
+              headers_.erase(it);
+              return true;
+            }
+            return false;
+          });
 
           // If all elements were removed from the map entry, erase it.
           if (values_vec.empty()) {

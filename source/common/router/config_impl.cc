@@ -46,6 +46,8 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/header_cluster_specifier.h"
 #include "source/common/router/matcher_visitor.h"
+#include "source/common/router/path_rewrite_utility.h"
+#include "source/common/router/route_specifier_impl.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/custom_tag_impl.h"
@@ -68,34 +70,35 @@ public:
   createAndValidateRoute(const envoy::config::route::v3::Route& route_config,
                          const CommonVirtualHostSharedPtr& vhost,
                          Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator, bool validate_clusters) {
+                         ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                         bool validate_clusters) {
 
     absl::Status creation_status = absl::OkStatus();
     RouteEntryImplBaseConstSharedPtr route;
     switch (route_config.match().path_specifier_case()) {
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
       route = std::make_shared<PrefixRouteEntryImpl>(vhost, route_config, factory_context,
-                                                     validator, creation_status);
+                                                     validator, init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
       route = std::make_shared<PathRouteEntryImpl>(vhost, route_config, factory_context, validator,
-                                                   creation_status);
+                                                   init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex:
       route = std::make_shared<RegexRouteEntryImpl>(vhost, route_config, factory_context, validator,
-                                                    creation_status);
+                                                    init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher:
       route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, factory_context,
-                                                      validator, creation_status);
+                                                      validator, init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
       route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
-          vhost, route_config, factory_context, validator, creation_status);
+          vhost, route_config, factory_context, validator, init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy:
       route = std::make_shared<UriTemplateMatcherRouteEntryImpl>(
-          vhost, route_config, factory_context, validator, creation_status);
+          vhost, route_config, factory_context, validator, init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
       break; // return the error below.
@@ -123,6 +126,56 @@ public:
     return route;
   }
 };
+
+namespace {
+
+// Evaluates a route a specifier built the same way route matching evaluates a configured route.
+class MatchableRouteImpl : public MatchableRoute {
+public:
+  MatchableRouteImpl(RouteEntryImplBaseConstSharedPtr route, bool ignore_path_parameters)
+      : route_(std::move(route)), ignore_path_parameters_(ignore_path_parameters) {}
+
+  // Router::MatchableRoute
+  RouteConstSharedPtr match(const Http::RequestHeaderMap& headers,
+                            const StreamInfo::StreamInfo& stream_info,
+                            uint64_t random) const override {
+    if (headers.Path() == nullptr && !route_->supportsPathlessHeaders()) {
+      return nullptr;
+    }
+    RouteMatchContext context(headers, ignore_path_parameters_);
+    if (!route_->matches(context, stream_info, random)) {
+      return nullptr;
+    }
+    return route_->clusterEntry(headers, stream_info, random);
+  }
+
+private:
+  const RouteEntryImplBaseConstSharedPtr route_;
+  const bool ignore_path_parameters_;
+};
+
+} // namespace
+
+absl::StatusOr<MatchableRouteConstSharedPtr>
+RouteBuilderImpl::build(const envoy::config::route::v3::Route& route, bool validate_clusters) {
+  if (!route.route_specifiers().empty()) {
+    return absl::InvalidArgumentError("route_specifiers are not supported on a built route");
+  }
+  // Building a route runs the extensions it configures, which throw on configuration they reject,
+  // so the caller only has to handle a status.
+  absl::StatusOr<RouteEntryImplBaseConstSharedPtr> route_or_error =
+      absl::InvalidArgumentError("unreachable");
+  TRY_ASSERT_MAIN_THREAD {
+    route_or_error = RouteCreator::createAndValidateRoute(
+        route, vhost_, factory_context_, validator_, init_manager_, validate_clusters);
+  }
+  END_TRY
+  CATCH(const EnvoyException& e, { route_or_error = absl::InvalidArgumentError(e.what()); });
+  RETURN_IF_NOT_OK_REF(route_or_error.status());
+  return std::make_shared<MatchableRouteImpl>(
+      std::move(route_or_error.value()),
+      vhost_->globalRouteConfig().ignorePathParametersInPathMatching());
+}
 
 namespace {
 
@@ -210,40 +263,6 @@ createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine
     redirect_config->path_rewrite_formatter_ = std::move(formatter_or.value());
   }
   return redirect_config;
-}
-
-std::string generateNewPath(absl::string_view origin_path, absl::string_view path_to_strip,
-                            absl::string_view new_path_to_replace) {
-  ASSERT(path_to_strip.size() <= origin_path.size());
-
-  std::string result;
-  result.reserve(new_path_to_replace.size() + origin_path.size() - path_to_strip.size());
-  result.append(new_path_to_replace);
-  result.append(origin_path.substr(path_to_strip.size()));
-  return result;
-}
-
-std::string rewritePathByPrefixOrRegex(absl::string_view path, absl::string_view matched,
-                                       absl::string_view prefix_rewrite,
-                                       const Regex::CompiledMatcher* regex_rewrite,
-                                       absl::string_view regex_rewrite_substitution) {
-  if (!prefix_rewrite.empty()) {
-    ASSERT(absl::StartsWithIgnoreCase(path, matched));
-    return generateNewPath(path, matched, prefix_rewrite);
-  }
-
-  if (regex_rewrite != nullptr) {
-    absl::string_view path_only = Http::PathUtil::removeQueryAndFragment(path);
-    ASSERT(path_only.size() <= path.size());
-    const std::string new_path_only =
-        regex_rewrite->replaceAll(path_only, regex_rewrite_substitution);
-    // If regex rewrite fails then return nothing.
-    if (new_path_only.empty()) {
-      return {};
-    }
-    return generateNewPath(path, path_only, new_path_only);
-  }
-  return {};
 }
 
 } // namespace
@@ -446,6 +465,15 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
   }
 }
 
+absl::StatusOr<std::unique_ptr<RouteTracingImpl>>
+RouteTracingImpl::create(const envoy::config::route::v3::Tracing& tracing) {
+  absl::StatusOr<std::unique_ptr<RouteTracingImpl>> result;
+  TRY_NEEDS_AUDIT { result = std::make_unique<RouteTracingImpl>(tracing); }
+  END_TRY
+  CATCH(const EnvoyException& e, { result = absl::InvalidArgumentError(e.what()); });
+  return result;
+}
+
 const envoy::type::v3::FractionalPercent& RouteTracingImpl::getClientSampling() const {
   return client_sampling_;
 }
@@ -489,7 +517,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator,
-                                       absl::Status& creation_status)
+                                       Init::Manager& init_manager, absl::Status& creation_status)
     : path_matcher_(
           THROW_OR_RETURN_VALUE(buildPathMatcher(route, validator), PathMatcherSharedPtr)),
       prefix_rewrite_(route.route().prefix_rewrite()),
@@ -555,8 +583,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       match_grpc_(route.match().has_grpc()),
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
 
-  auto config_or_error =
-      PerFilterConfigs::create(route.typed_per_filter_config(), factory_context, validator);
+  auto config_or_error = PerFilterConfigs::create(route.typed_per_filter_config(), factory_context,
+                                                  validator, init_manager);
   SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
   per_filter_configs_ = std::move(config_or_error.value());
 
@@ -634,7 +662,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   if (route.route().has_weighted_clusters()) {
     cluster_specifier_plugin_ = std::make_shared<WeightedClusterSpecifierPlugin>(
         route.route().weighted_clusters(), metadata_match_criteria_.get(), route_name_,
-        factory_context, creation_status);
+        factory_context, init_manager, creation_status);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   } else if (route.route().has_inline_cluster_specifier_plugin()) {
     auto plugin_or_error = getClusterSpecifierPluginByTheProto(
@@ -801,6 +829,13 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   } else {
     early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
+
+  RouteBuilderImpl route_builder(vhost, factory_context, validator, init_manager);
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, route_builder);
+  auto route_specifiers_or_error =
+      createRouteSpecifiers(route.route_specifiers(), specifier_context);
+  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
+  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -811,16 +846,14 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
                                                  random_value);
 }
 
-absl::string_view
-RouteEntryImplBase::sanitizePathBeforePathMatching(const absl::string_view path) const {
-  absl::string_view ret = path;
+std::string RouteEntryImplBase::sanitizePathBeforePathMatching(const absl::string_view path) const {
   if (vhost_->globalRouteConfig().ignorePathParametersInPathMatching()) {
-    auto pos = ret.find_first_of(';');
-    if (pos != absl::string_view::npos) {
-      ret.remove_suffix(ret.length() - pos);
+    std::optional<std::string> modified_path = RouteMatchContext::stripPathParams(path);
+    if (modified_path.has_value()) {
+      return *modified_path;
     }
   }
-  return ret;
+  return std::string(path);
 }
 
 bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const {
@@ -927,17 +960,17 @@ void RouteEntryImplBase::finalizePathHeaderForRedirect(Http::RequestHeaderMap& h
   if (redirect_config_ == nullptr) {
     return;
   }
-  const std::string new_path = rewritePathByPrefixOrRegex(
+  const std::optional<std::string> new_path = rewritePathByPrefixOrRegex(
       headers.getPathValue(), matched_path, redirect_config_->prefix_rewrite_redirect_,
       redirect_config_->regex_rewrite_redirect_.get(),
-      redirect_config_->regex_rewrite_redirect_substitution_);
+      redirect_config_->regex_rewrite_redirect_substitution_, std::numeric_limits<size_t>::max());
 
-  // Empty new_path means there is no rewrite or the rewrite fails. Then we do nothing.
-  if (!new_path.empty()) {
+  // A missing new_path means there is no rewrite or the rewrite fails. Then we do nothing.
+  if (new_path.has_value()) {
     if (keep_old_path) {
       headers.setEnvoyOriginalPath(headers.getPathValue());
     }
-    headers.setPath(new_path);
+    headers.setPath(*new_path);
   }
 }
 
@@ -1093,7 +1126,11 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
       return {};
     }
     absl::string_view path_only = Http::PathUtil::removeQueryAndFragment(path_with_query);
-    return generateNewPath(path_with_query, path_only, new_path_only);
+    // path_only is a prefix of path_with_query, so a native rewrite is never out of range.
+    std::optional<std::string> new_path = generateNewPath(path_with_query, path_only, new_path_only,
+                                                          std::numeric_limits<size_t>::max());
+    ENVOY_BUG(new_path.has_value(), "native path rewrite produced no result");
+    return new_path.value_or(std::string{});
   }
 
   // Handle the case where path_rewrite_policy is configured.
@@ -1106,12 +1143,17 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
     if (!new_path_only.ok() || new_path_only->empty()) {
       return {};
     }
-    return generateNewPath(path_with_query, path_only, new_path_only.value());
+    std::optional<std::string> new_path = generateNewPath(
+        path_with_query, path_only, new_path_only.value(), std::numeric_limits<size_t>::max());
+    ENVOY_BUG(new_path.has_value(), "native path rewrite produced no result");
+    return new_path.value_or(std::string{});
   }
 
   // Handle the case where prefix_rewrite or regex_rewrite is configured.
   return rewritePathByPrefixOrRegex(path_with_query, matched_path, prefix_rewrite_,
-                                    regex_rewrite_.get(), regex_rewrite_substitution_);
+                                    regex_rewrite_.get(), regex_rewrite_substitution_,
+                                    std::numeric_limits<size_t>::max())
+      .value_or(std::string{});
 }
 
 std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers,
@@ -1393,8 +1435,9 @@ const Envoy::Config::TypedMetadata& RouteEntryImplBase::typedMetadata() const {
 UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       uri_template_(path_matcher_->uriTemplate()) {};
 
 void UriTemplateMatcherRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1409,22 +1452,22 @@ std::string UriTemplateMatcherRouteEntryImpl::currentUrlPathAfterRewrite(
                                                    path_matcher_->uriTemplate());
 }
 
-RouteConstSharedPtr
-UriTemplateMatcherRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                          const StreamInfo::StreamInfo& stream_info,
-                                          uint64_t random_value) const {
+bool UriTemplateMatcherRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                               const StreamInfo::StreamInfo& stream_info,
+                                               uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
       path_matcher_->match(route_match_context.path())) {
-    return clusterEntry(route_match_context.headers(), stream_info, random_value);
+    return true;
   }
-  return nullptr;
+  return false;
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive(),
                                                         factory_context)) {
   // The createPrefix function never returns nullptr.
@@ -1443,22 +1486,22 @@ PrefixRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& h
   return currentUrlPathAfterRewriteWithMatchedPath(headers, context, stream_info, matcher());
 }
 
-RouteConstSharedPtr PrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                                  const StreamInfo::StreamInfo& stream_info,
-                                                  uint64_t random_value) const {
+bool PrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
-    return clusterEntry(route_match_context.headers(), stream_info, random_value);
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
+    return true;
   }
-  return nullptr;
+  return false;
 }
 
 PathRouteEntryImpl::PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator,
-                                       absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+                                       Init::Manager& init_manager, absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive(),
                                                        factory_context)) {
   // The createExact function never returns nullptr.
@@ -1477,22 +1520,23 @@ PathRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& hea
   return currentUrlPathAfterRewriteWithMatchedPath(headers, context, stream_info, matcher());
 }
 
-RouteConstSharedPtr PathRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                                const StreamInfo::StreamInfo& stream_info,
-                                                uint64_t random_value) const {
+bool PathRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                 const StreamInfo::StreamInfo& stream_info,
+                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value) &&
-      path_matcher_->match(route_match_context.sanitizedPath())) {
-    return clusterEntry(route_match_context.headers(), stream_info, random_value);
+      path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
+    return true;
   }
 
-  return nullptr;
+  return false;
 }
 
 RegexRouteEntryImpl::RegexRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       path_matcher_(
           Matchers::PathMatcher::createSafeRegex(route.match().safe_regex(), factory_context)) {
   ASSERT(route.match().path_specifier_case() ==
@@ -1518,22 +1562,23 @@ RegexRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& he
   return currentUrlPathAfterRewriteWithMatchedPath(headers, context, stream_info, path);
 }
 
-RouteConstSharedPtr RegexRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                                 const StreamInfo::StreamInfo& stream_info,
-                                                 uint64_t random_value) const {
+bool RegexRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                  const StreamInfo::StreamInfo& stream_info,
+                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    if (path_matcher_->match(route_match_context.sanitizedPath())) {
-      return clusterEntry(route_match_context.headers(), stream_info, random_value);
+    if (path_matcher_->matchPathWithoutQuery(route_match_context.sanitizedPathWithoutQuery())) {
+      return true;
     }
   }
-  return nullptr;
+  return false;
 }
 
 ConnectRouteEntryImpl::ConnectRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status) {}
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status) {}
 
 void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                               bool insert_envoy_original_path) const {
@@ -1549,23 +1594,24 @@ ConnectRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& 
   return currentUrlPathAfterRewriteWithMatchedPath(headers, context, stream_info, path);
 }
 
-RouteConstSharedPtr ConnectRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                                   const StreamInfo::StreamInfo& stream_info,
-                                                   uint64_t random_value) const {
+bool ConnectRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    uint64_t random_value) const {
   const Http::RequestHeaderMap& headers = route_match_context.headers();
   if ((Http::HeaderUtility::isConnect(headers) ||
        Http::HeaderUtility::isConnectUdpRequest(headers)) &&
       RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    return clusterEntry(headers, stream_info, random_value);
+    return true;
   }
-  return nullptr;
+  return false;
 }
 
 PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().path_separated_prefix(),
                                                         !case_sensitive(), factory_context)) {
   // The createPrefix function never returns nullptr.
@@ -1583,34 +1629,34 @@ std::string PathSeparatedPrefixRouteEntryImpl::currentUrlPathAfterRewrite(
   return currentUrlPathAfterRewriteWithMatchedPath(headers, context, stream_info, matcher());
 }
 
-RouteConstSharedPtr
-PathSeparatedPrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
-                                           const StreamInfo::StreamInfo& stream_info,
-                                           uint64_t random_value) const {
+bool PathSeparatedPrefixRouteEntryImpl::matches(const RouteMatchContext& route_match_context,
+                                                const StreamInfo::StreamInfo& stream_info,
+                                                uint64_t random_value) const {
   if (!RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    return nullptr;
+    return false;
   }
   const absl::string_view sanitized_path = route_match_context.sanitizedPathWithoutQuery();
   const size_t sanitized_size = sanitized_path.size();
   const size_t matcher_size = matcher().size();
-  if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
+  if (sanitized_size >= matcher_size && path_matcher_->matchPathWithoutQuery(sanitized_path) &&
       (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
-    return clusterEntry(route_match_context.headers(), stream_info, random_value);
+    return true;
   }
-  return nullptr;
+  return false;
 }
 
 CommonVirtualHostImpl::CommonVirtualHostImpl(
     const envoy::config::route::v3::VirtualHost& virtual_host,
     const CommonConfigSharedPtr& global_route_config,
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
     : name_(virtual_host.name()),
       stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
       global_route_config_(global_route_config),
       per_filter_configs_(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
-                                                         factory_context, validator),
+                                                         factory_context, validator, init_manager),
                                 std::unique_ptr<PerFilterConfigs>)),
       per_request_buffer_limit_(
           PROTOBUF_GET_OPTIONAL_WRAPPED(virtual_host, per_request_buffer_limit_bytes)),
@@ -1757,10 +1803,12 @@ absl::StatusOr<std::shared_ptr<CommonVirtualHostImpl>>
 CommonVirtualHostImpl::create(const envoy::config::route::v3::VirtualHost& virtual_host,
                               const CommonConfigSharedPtr& global_route_config,
                               Server::Configuration::ServerFactoryContext& factory_context,
-                              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator) {
+                              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
+                              Init::Manager& init_manager) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::shared_ptr<CommonVirtualHostImpl>(new CommonVirtualHostImpl(
-      virtual_host, global_route_config, factory_context, scope, validator, creation_status));
+  auto ret = std::shared_ptr<CommonVirtualHostImpl>(
+      new CommonVirtualHostImpl(virtual_host, global_route_config, factory_context, scope,
+                                validator, init_manager, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -1769,10 +1817,11 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
                                  const CommonConfigSharedPtr& global_route_config,
                                  Server::Configuration::ServerFactoryContext& factory_context,
                                  Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
-                                 bool validate_clusters, absl::Status& creation_status) {
+                                 Init::Manager& init_manager, bool validate_clusters,
+                                 absl::Status& creation_status) {
 
-  auto host_or_error = CommonVirtualHostImpl::create(virtual_host, global_route_config,
-                                                     factory_context, scope, validator);
+  auto host_or_error = CommonVirtualHostImpl::create(
+      virtual_host, global_route_config, factory_context, scope, validator, init_manager);
   SET_AND_RETURN_IF_NOT_OK(host_or_error.status(), creation_status);
   shared_virtual_host_ = std::move(host_or_error.value());
 
@@ -1791,7 +1840,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
   ssl_redirect_route_ = std::make_shared<SslRedirectRoute>(shared_virtual_host_);
 
   if (virtual_host.has_matcher()) {
-    RouteActionContext context{shared_virtual_host_, factory_context};
+    RouteActionContext context{shared_virtual_host_, factory_context, init_manager};
     RouteActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Http::HttpMatchingData, RouteActionContext> factory(
         context, factory_context, validation_visitor);
@@ -1809,30 +1858,67 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
     routes_.reserve(virtual_host.routes().size());
     for (const auto& route : virtual_host.routes()) {
       auto route_or_error = RouteCreator::createAndValidateRoute(
-          route, shared_virtual_host_, factory_context, validator, validate_clusters);
+          route, shared_virtual_host_, factory_context, validator, init_manager, validate_clusters);
       SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
       routes_.emplace_back(route_or_error.value());
     }
   }
+
+  RouteBuilderImpl route_builder(shared_virtual_host_, factory_context, validator, init_manager);
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, route_builder);
+  auto route_specifiers_or_error =
+      createRouteSpecifiers(virtual_host.route_specifiers(), specifier_context);
+  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
+  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
-RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
+VirtualHostMatchResult VirtualHostImpl::getRouteFromRoutes(
     const RouteCallback& cb, const RouteMatchContext& route_match_context,
     const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
     absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const {
+  const Http::RequestHeaderMap& headers = route_match_context.headers();
+  const RouteSpecifierSpan config_specifiers =
+      shared_virtual_host_->globalRouteConfig().routeSpecifiers();
+
   for (auto route = routes.begin(); route != routes.end(); ++route) {
-    if (!route_match_context.headers().Path() && !(*route)->supportsPathlessHeaders()) {
+    if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
       continue;
     }
 
-    RouteConstSharedPtr route_entry =
-        (*route)->matches(route_match_context, stream_info, random_value);
+    if (!(*route)->matches(route_match_context, stream_info, random_value)) {
+      continue;
+    }
+
+    RouteConstSharedPtr route_entry = (*route)->clusterEntry(headers, stream_info, random_value);
     if (route_entry == nullptr) {
       continue;
     }
 
+    const RouteSpecifierSpan route_specifiers = (*route)->routeSpecifiers();
+    const bool has_route_specifiers =
+        !config_specifiers.empty() || !route_specifiers_.empty() || !route_specifiers.empty();
+    if (has_route_specifiers) {
+      const OnRouteInputStatus input_status = (std::next(route) == routes.end())
+                                                  ? OnRouteInputStatus::NoMoreRoutes
+                                                  : OnRouteInputStatus::HasMoreRoutes;
+      OnRouteResult result =
+          applyRouteSpecifiers(std::move(route_entry), config_specifiers, route_specifiers_,
+                               route_specifiers, headers, stream_info, random_value, input_status);
+      if (result.status == OnRouteStatus::StopIterationAndSkipRoute) {
+        // The specifiers turned this route down, carry on with the next one.
+        continue;
+      }
+      route_entry = std::move(result.route);
+      if (route_entry == nullptr) {
+        // The specifiers accepted the match and dropped the route, which leaves the request with
+        // no route. There is nothing for the callback to look at, and the specifiers of the
+        // levels above the route have had their say, so they do not run again.
+        return {nullptr, true};
+      }
+    }
+
     if (cb == nullptr) {
-      return route_entry;
+      return {std::move(route_entry), true};
     }
 
     RouteEvalStatus eval_status = (std::next(route) == routes.end())
@@ -1840,24 +1926,24 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
                                       : RouteEvalStatus::HasMoreRoutes;
     RouteMatchStatus match_status = cb(route_entry, eval_status);
     if (match_status == RouteMatchStatus::Accept) {
-      return route_entry;
+      return {std::move(route_entry), true};
     }
     if (match_status == RouteMatchStatus::Continue &&
         eval_status == RouteEvalStatus::NoMoreRoutes) {
       ENVOY_LOG(debug,
                 "return null when route match status is Continue but there is no more routes");
-      return nullptr;
+      return {};
     }
   }
 
   ENVOY_LOG(debug, "route was resolved but final route list did not match incoming request");
-  return nullptr;
+  return {};
 }
 
-RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb,
-                                                         const Http::RequestHeaderMap& headers,
-                                                         const StreamInfo::StreamInfo& stream_info,
-                                                         uint64_t random_value) const {
+VirtualHostMatchResult
+VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                     const StreamInfo::StreamInfo& stream_info,
+                                     uint64_t random_value) const {
   // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
   // connection), force a redirect based on underlying protocol, rather than URL
   // scheme, so don't force a redirect for a http:// url served over a TLS
@@ -1866,15 +1952,15 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
   if (scheme.empty()) {
     // No scheme header. This normally only happens when ActiveStream::decodeHeaders
     // bails early (as it rejects a request), or a buggy filter removes the :scheme header.
-    return nullptr;
+    return {};
   }
 
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::All && scheme != "https") {
-    return ssl_redirect_route_;
+    return {ssl_redirect_route_, {}};
   } else if (ssl_requirements_ == SslRequirements::ExternalOnly && scheme != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
-    return ssl_redirect_route_;
+    return {ssl_redirect_route_, {}};
   }
 
   // Constructed once per request; derived values (query params, cookies, etc.) are computed
@@ -1906,7 +1992,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     ENVOY_LOG(debug, "failed to match incoming request: {}",
               match_result.isNoMatch() ? "no match" : "insufficient data");
 
-    return nullptr;
+    return {};
   }
 
   // Check for a route that matches the request.
@@ -1938,27 +2024,30 @@ absl::StatusOr<std::unique_ptr<RouteMatcher>>
 RouteMatcher::create(const envoy::config::route::v3::RouteConfiguration& route_config,
                      const CommonConfigSharedPtr& global_route_config,
                      Server::Configuration::ServerFactoryContext& factory_context,
-                     ProtobufMessage::ValidationVisitor& validator, bool validate_clusters) {
+                     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                     bool validate_clusters) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<RouteMatcher>{new RouteMatcher(route_config, global_route_config,
-                                                            factory_context, validator,
-                                                            validate_clusters, creation_status)};
+  auto ret = std::unique_ptr<RouteMatcher>{
+      new RouteMatcher(route_config, global_route_config, factory_context, validator, init_manager,
+                       validate_clusters, creation_status)};
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& route_config,
                            const CommonConfigSharedPtr& global_route_config,
                            Server::Configuration::ServerFactoryContext& factory_context,
-                           ProtobufMessage::ValidationVisitor& validator, bool validate_clusters,
+                           ProtobufMessage::ValidationVisitor& validator,
+                           Init::Manager& init_manager, bool validate_clusters,
                            absl::Status& creation_status)
-    : vhost_scope_(factory_context.scope().scopeFromStatName(
+    : global_route_config_(global_route_config),
+      vhost_scope_(factory_context.scope().scopeFromStatName(
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()),
       vhost_header_(route_config.vhost_header()) {
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostImplSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
         virtual_host_config, global_route_config, factory_context, *vhost_scope_, validator,
-        validate_clusters, creation_status);
+        init_manager, validate_clusters, creation_status);
     SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const Http::LowerCaseString lower_case_domain_name(domain_name);
@@ -2064,10 +2153,34 @@ VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::Reques
                                      const StreamInfo::StreamInfo& stream_info,
                                      uint64_t random_value) const {
   VirtualHostRoute route_result;
+
+  RouteSpecifierSpan config_specifiers = global_route_config_->routeSpecifiers();
+  RouteSpecifierSpan vhost_specifiers;
+  VirtualHostMatchResult match_result;
+
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
     route_result.vhost = virtual_host->virtualHost();
-    route_result.route = virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
+    vhost_specifiers = virtual_host->routeSpecifiers();
+    match_result = virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
+  }
+
+  route_result.route = std::move(match_result.route);
+
+  if (!match_result.specifiers_applied) {
+    // This run happens outside the evaluation of a route list: either no virtual host or no
+    // route matched the request, so there is no next route a StopIterationAndSkipRoute could
+    // move on to, and the chain result stands whatever its status.
+    route_result.route =
+        applyRouteSpecifiers(std::move(route_result.route), config_specifiers, vhost_specifiers, {},
+                             headers, stream_info, random_value, OnRouteInputStatus::NoMoreRoutes)
+            .route;
+  }
+
+  if (route_result.route != nullptr) {
+    if (std::addressof(route_result.route->virtualHost()) != route_result.vhost.get()) {
+      route_result.vhost = route_result.route->virtualHostSharedPtr();
+    }
   }
 
   return route_result;
@@ -2096,10 +2209,11 @@ CommonVirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers)
 absl::StatusOr<std::shared_ptr<CommonConfigImpl>>
 CommonConfigImpl::create(const envoy::config::route::v3::RouteConfiguration& config,
                          Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator) {
+                         ProtobufMessage::ValidationVisitor& validator,
+                         Init::Manager& init_manager) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::shared_ptr<CommonConfigImpl>(
-      new CommonConfigImpl(config, factory_context, validator, creation_status));
+      new CommonConfigImpl(config, factory_context, validator, init_manager, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -2107,11 +2221,12 @@ CommonConfigImpl::create(const envoy::config::route::v3::RouteConfiguration& con
 CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    ProtobufMessage::ValidationVisitor& validator,
-                                   absl::Status& creation_status)
+                                   Init::Manager& init_manager, absl::Status& creation_status)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
-      per_filter_configs_(THROW_OR_RETURN_VALUE(
-          PerFilterConfigs::create(config.typed_per_filter_config(), factory_context, validator),
-          std::unique_ptr<PerFilterConfigs>)),
+      per_filter_configs_(
+          THROW_OR_RETURN_VALUE(PerFilterConfigs::create(config.typed_per_filter_config(),
+                                                         factory_context, validator, init_manager),
+                                std::unique_ptr<PerFilterConfigs>)),
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
@@ -2156,6 +2271,12 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
   if (config.has_metadata()) {
     metadata_ = std::make_unique<RouteMetadataPack>(config.metadata());
   }
+
+  RouteSpecifierFactoryContextImpl specifier_context(factory_context, {});
+  auto route_specifiers_or_error =
+      createRouteSpecifiers(config.route_specifiers(), specifier_context);
+  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
+  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
 absl::StatusOr<ClusterSpecifierPluginSharedPtr>
@@ -2184,8 +2305,8 @@ const Envoy::Config::TypedMetadata& CommonConfigImpl::typedMetadata() const {
 absl::StatusOr<std::shared_ptr<CommonConfigImpl>>
 create(const envoy::config::route::v3::RouteConfiguration& config,
        Server::Configuration::ServerFactoryContext& factory_context,
-       ProtobufMessage::ValidationVisitor& validator) {
-  auto config_or_error = CommonConfigImpl::create(config, factory_context, validator);
+       ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager) {
+  auto config_or_error = CommonConfigImpl::create(config, factory_context, validator, init_manager);
   RETURN_IF_NOT_OK(config_or_error.status());
   return config_or_error.value();
 }
@@ -2193,24 +2314,26 @@ create(const envoy::config::route::v3::RouteConfiguration& config,
 absl::StatusOr<std::shared_ptr<ConfigImpl>>
 ConfigImpl::create(const envoy::config::route::v3::RouteConfiguration& config,
                    Server::Configuration::ServerFactoryContext& factory_context,
-                   ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default) {
+                   ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                   bool validate_clusters_default) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::shared_ptr<ConfigImpl>(new ConfigImpl(
-      config, factory_context, validator, validate_clusters_default, creation_status));
+  auto ret =
+      std::shared_ptr<ConfigImpl>(new ConfigImpl(config, factory_context, validator, init_manager,
+                                                 validate_clusters_default, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                        Server::Configuration::ServerFactoryContext& factory_context,
-                       ProtobufMessage::ValidationVisitor& validator,
+                       ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
                        bool validate_clusters_default, absl::Status& creation_status) {
-  auto config_or_error = CommonConfigImpl::create(config, factory_context, validator);
+  auto config_or_error = CommonConfigImpl::create(config, factory_context, validator, init_manager);
   SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
   shared_config_ = std::move(config_or_error.value());
 
   auto matcher_or_error = RouteMatcher::create(
-      config, shared_config_, factory_context, validator,
+      config, shared_config_, factory_context, validator, init_manager,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
   SET_AND_RETURN_IF_NOT_OK(matcher_or_error.status(), creation_status);
   route_matcher_ = std::move(matcher_or_error.value());
@@ -2229,6 +2352,19 @@ const Envoy::Config::TypedMetadata& NullConfigImpl::typedMetadata() const {
   return DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
+std::optional<std::string> RouteMatchContext::stripPathParams(absl::string_view path) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.strip_path_parameters_per_segment")) {
+    return Http::PathUtil::removePathParameters(path);
+  }
+
+  const auto pos = path.find(';');
+  if (pos == absl::string_view::npos) {
+    return std::nullopt;
+  }
+  return std::string(path.substr(0, pos));
+}
+
 Matcher::ActionConstSharedPtr
 RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActionContext& context,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -2237,7 +2373,7 @@ RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActi
                                                                                validation_visitor);
   auto route = THROW_OR_RETURN_VALUE(
       RouteCreator::createAndValidateRoute(route_config, context.vhost, context.factory_context,
-                                           validation_visitor, false),
+                                           validation_visitor, context.init_manager, false),
       RouteEntryImplBaseConstSharedPtr);
   return route;
 }
@@ -2255,7 +2391,7 @@ RouteListMatchActionFactory::createAction(const Protobuf::Message& config,
   for (const auto& route : route_config.routes()) {
     routes.emplace_back(THROW_OR_RETURN_VALUE(
         RouteCreator::createAndValidateRoute(route, context.vhost, context.factory_context,
-                                             validation_visitor, false),
+                                             validation_visitor, context.init_manager, false),
         RouteEntryImplBaseConstSharedPtr));
   }
   return std::make_shared<RouteListMatchAction>(std::move(routes));

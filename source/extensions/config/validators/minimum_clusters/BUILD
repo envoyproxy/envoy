@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:config_validator_interface",
         "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/config/validators/minimum_clusters/v3:pkg_cc_proto",
     ],
 )

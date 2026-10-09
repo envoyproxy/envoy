@@ -16,8 +16,7 @@ envoy_cc_library(
         "libqat_impl.h",
     ],
     external_deps = ["ssl"],
-    repository = "@envoy",
-    deps = ["//contrib/qat:qatlib"],
+    deps = ["//bazel/deps:qatlib"],
 )
 
 envoy_cc_library(

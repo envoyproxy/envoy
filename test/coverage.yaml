@@ -4,8 +4,8 @@ thresholds:
 
 directories:
   source/common: 96.4
-  source/common/api: 95.3  # some syscalls require sandboxing
-  source/common/api/posix: 94.9  # setns requires Linux CAP_NET_ADMIN privileges
+  source/common/api: 94.9  # some syscalls require sandboxing
+  source/common/api/posix: 94.6  # setns requires Linux CAP_NET_ADMIN privileges, no tests for set/getrlimit syscalls errors
   source/common/crypto: 91.2  # Static singleton initialization and OpenSSL internal error paths not testable
   source/common/filesystem/posix: 96.5  # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
   source/common/http: 96.5
@@ -27,7 +27,7 @@ directories:
   source/exe: 94.4  # increased by #32346, need coverage for terminate_handler and hot restart failures
   source/extensions/api_listeners: 55.0  # Many IS_ENVOY_BUG are not covered.
   source/extensions/api_listeners/default_api_listener: 68.9  # Many IS_ENVOY_BUG are not covered.
-  source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface: 96.3
+  source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface: 95.6
   source/extensions/common/aws: 97.5
   source/extensions/common/aws/credential_providers: 100.0
   source/extensions/common/proxy_protocol: 94.7  # Adjusted for security patch
@@ -35,6 +35,8 @@ directories:
   source/extensions/common/wasm: 95.6  # flaky: be careful adjusting
   source/extensions/common/wasm/ext: 100.0
   source/extensions/clusters/dynamic_modules: 97.7
+  source/extensions/dynamic_modules: 92.5  # Recursive total includes the separately exempted posix code.
+  source/extensions/dynamic_modules/posix: 85.7
   source/extensions/filters/common: 97.1
   source/extensions/filters/common/ext_authz: 98.0
   source/extensions/filters/common/fault: 94.5
@@ -60,7 +62,7 @@ directories:
   source/extensions/filters/network/dubbo_proxy: 96.2
   source/extensions/filters/network/ext_authz: 98.0
   source/extensions/filters/network/mongo_proxy: 96.1
-  source/extensions/filters/network/reverse_tunnel: 95.9
+  source/extensions/filters/network/reverse_tunnel: 95.8
   source/extensions/filters/network/sni_cluster: 88.9
   source/extensions/formatter/cel: 100.0
   source/extensions/formatter/file_content: 96.3

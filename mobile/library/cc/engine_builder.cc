@@ -60,7 +60,7 @@ EngineBuilder& EngineBuilder::setBufferHighWatermark(size_t high_watermark) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
+EngineBuilder& EngineBuilder::setLogLevel(Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
 }

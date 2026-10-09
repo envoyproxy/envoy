@@ -361,8 +361,10 @@ TEST_F(FileSystemBufferFilterConfigTest, ValidConfigWithServerContext) {
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FileSystemBufferFilterFactory factory;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
+      factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

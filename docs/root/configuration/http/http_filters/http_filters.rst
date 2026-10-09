@@ -22,6 +22,7 @@ HTTP filters
   cache_v2_filter
   cdn_loop_filter
   checksum_filter
+  client_cert_filter
   compressor_filter
   composite_filter
   connect_grpc_bridge_filter
@@ -71,6 +72,7 @@ HTTP filters
   router_filter
   set_filter_state
   set_metadata_filter
+  body_size_limit_filter
   sse_to_metadata_filter
   stateful_session_filter
   sxg_filter

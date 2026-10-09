@@ -18,7 +18,6 @@ envoy_cc_library(
     name = "route_cache_reset_filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    repository = "@envoy",
     deps = [
         ":filter_cc_proto",
         "@envoy//envoy/http:filter_interface",
@@ -32,7 +31,6 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":route_cache_reset_filter_lib",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",

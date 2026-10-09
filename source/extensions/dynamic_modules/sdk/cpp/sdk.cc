@@ -31,6 +31,8 @@ HttpFilterHandle::~HttpFilterHandle() = default;
 
 HttpFilterConfigHandle::~HttpFilterConfigHandle() = default;
 
+CommonHandle::~CommonHandle() = default;
+
 namespace Utility {
 
 std::string getBodyContent(BodyBuffer& buffered, BodyBuffer& received, bool is_buffered) {

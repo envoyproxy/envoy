@@ -1,5 +1,6 @@
 #pragma once
 
+#include <format>
 #include <vector>
 
 #include "contrib/kafka/filters/network/source/serialization.h"
@@ -67,7 +68,7 @@ public:
     if (!length_consumed_) {
       required_ = length_deserializer_.get();
       if (required_ > MAX_TAGGED_FIELD_DATA_SIZE) {
-        throw EnvoyException(fmt::format("Tagged field data length {} exceeds maximum allowed {}",
+        throw EnvoyException(std::format("Tagged field data length {} exceeds maximum allowed {}",
                                          required_, MAX_TAGGED_FIELD_DATA_SIZE));
       }
       data_buffer_.reserve(required_);
@@ -147,7 +148,7 @@ public:
     if (!children_setup_) {
       const uint32_t field_count = count_deserializer_.get();
       if (field_count > MAX_TAGGED_FIELD_COUNT) {
-        throw EnvoyException(fmt::format("Tagged field count {} exceeds maximum allowed {}",
+        throw EnvoyException(std::format("Tagged field count {} exceeds maximum allowed {}",
                                          field_count, MAX_TAGGED_FIELD_COUNT));
       }
       children_ = std::vector<TaggedFieldDeserializer>(field_count);

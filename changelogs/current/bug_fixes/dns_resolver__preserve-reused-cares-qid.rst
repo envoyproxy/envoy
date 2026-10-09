@@ -1,0 +1,1 @@
+Fixed the c-ares resolver to preserve a reentrant query when it reuses the completing query's DNS transaction ID. Previously, the old query could remove the new query's ID mapping and permanently stall DNS refresh for the affected cluster.

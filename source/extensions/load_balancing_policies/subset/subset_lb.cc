@@ -878,13 +878,13 @@ void SubsetLoadBalancer::PriorityLbSubset::finalize(uint32_t priority) {
   HostVector removed;
 
   for (const auto& host : old_hosts) {
-    if (new_hosts.count(host) == 0) {
+    if (!new_hosts.contains(host)) {
       removed.emplace_back(host);
     }
   }
 
   for (const auto& host : new_hosts) {
-    if (old_hosts.count(host) == 0) {
+    if (!old_hosts.contains(host)) {
       added.emplace_back(host);
     }
   }

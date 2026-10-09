@@ -288,43 +288,6 @@ void CacheFilter::getTrailers() {
       &cancel_in_flight_callback_));
 }
 
-static AdjustedByteRange rangeFromHeaders(Http::ResponseHeaderMap& response_headers) {
-  if (Http::Utility::getResponseStatus(response_headers) !=
-      static_cast<uint64_t>(Envoy::Http::Code::PartialContent)) {
-    // Don't use content-length; we can just request *all the body* from
-    // the source and it will tell us when it gets to the end.
-    return {0, std::numeric_limits<uint64_t>::max()};
-  }
-  Http::HeaderMap::GetResult content_range_result =
-      response_headers.get(Envoy::Http::Headers::get().ContentRange);
-  if (content_range_result.empty()) {
-    return {0, std::numeric_limits<uint64_t>::max()};
-  }
-  absl::string_view content_range = content_range_result[0]->value().getStringView();
-  if (!absl::ConsumePrefix(&content_range, "bytes ")) {
-    return {0, std::numeric_limits<uint64_t>::max()};
-  }
-  if (absl::ConsumePrefix(&content_range, "*/")) {
-    uint64_t len;
-    if (absl::SimpleAtoi(content_range, &len)) {
-      return {0, len};
-    }
-    return {0, std::numeric_limits<uint64_t>::max()};
-  }
-  std::pair<absl::string_view, absl::string_view> range_of = absl::StrSplit(content_range, '/');
-  std::pair<absl::string_view, absl::string_view> range = absl::StrSplit(range_of.first, '-');
-  uint64_t begin, end;
-  if (!absl::SimpleAtoi(range.first, &begin)) {
-    begin = 0;
-  }
-  if (!absl::SimpleAtoi(range.second, &end)) {
-    end = std::numeric_limits<uint64_t>::max();
-  } else {
-    end++;
-  }
-  return {begin, end};
-}
-
 void CacheFilter::onHeaders(Http::ResponseHeaderMapPtr response_headers,
                             EndStream end_stream_enum) {
   ASSERT(lookup_result_, "onHeaders should not be called with no LookupResult");
@@ -355,7 +318,7 @@ void CacheFilter::onHeaders(Http::ResponseHeaderMapPtr response_headers,
   bool end_stream = ((end_stream_enum == EndStream::End) || is_head_request_);
 
   if (!end_stream) {
-    remaining_ranges_ = {rangeFromHeaders(*response_headers)};
+    remaining_ranges_ = {RangeUtils::rangeFromHeaders(*response_headers)};
     ENVOY_STREAM_LOG(debug, "CacheFilter requesting range {}-{} {}", *decoder_callbacks_,
                      remaining_ranges_[0].begin(), remaining_ranges_[0].end(), *response_headers);
   }

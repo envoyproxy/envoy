@@ -22,10 +22,15 @@ namespace ExtAuthz {
 
 absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   absl::Status creation_status = absl::OkStatus();
-  const auto filter_config = std::make_shared<FilterConfig>(
-      proto_config, server_context.scope(), stats_prefix, server_context, creation_status);
+  // Like the router, this filter charges response code stats to the scope it is given, under names
+  // of their own rather than under its stat prefix, so that scope stays the server's one and the
+  // prefix of the filter chain is carried in the stat prefix instead.
+  const auto filter_config =
+      std::make_shared<FilterConfig>(proto_config, server_context.scope(),
+                                     extra_context.stats_prefix, server_context, creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.
@@ -65,7 +70,7 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
                                      config_with_hash_key, server_context.scope(), true);
       RELEASE_ASSERT(client_or_error.ok(), "failed to create ext_authz gRPC client");
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          client_or_error.value(), timeout);
+          client_or_error.value(), timeout, filter_config->emitClientSpan());
       callbacks.addStreamFilter(
           std::make_shared<Filter>(filter_config, std::move(client), server_context));
     };

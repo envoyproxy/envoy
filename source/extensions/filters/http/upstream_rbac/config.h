@@ -17,18 +17,17 @@ namespace UpstreamRBACFilter {
  * `envoy.extensions.filters.http.rbac.v3.RBAC` configuration. @see UpstreamHttpFilterConfigFactory.
  */
 class UpstreamRoleBasedAccessControlFilterConfigFactory
-    : public Common::CommonFactoryBase<envoy::extensions::filters::http::rbac::v3::RBAC>,
-      public Server::Configuration::UpstreamHttpFilterConfigFactory {
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::rbac::v3::RBAC> {
 public:
   UpstreamRoleBasedAccessControlFilterConfigFactory()
-      : CommonFactoryBase("envoy.filters.http.upstream_rbac") {}
+      : UnifiedFactoryBase("envoy.filters.http.upstream_rbac") {}
 
   std::string category() const override { return "envoy.filters.http.upstream"; }
 
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::UpstreamFactoryContext& context) override;
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 DECLARE_FACTORY(UpstreamRoleBasedAccessControlFilterConfigFactory);

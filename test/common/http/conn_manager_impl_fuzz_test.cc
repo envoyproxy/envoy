@@ -54,12 +54,13 @@ class FuzzConfig : public ConnectionManagerConfig {
 public:
   FuzzConfig(envoy::extensions::filters::network::http_connection_manager::v3::
                  HttpConnectionManager::ForwardClientCertDetails forward_client_cert)
-      : stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
-                                        POOL_GAUGE(fake_stats_),
-                                        POOL_HISTOGRAM(*fake_stats_.rootScope()))},
-               "", *fake_stats_.rootScope()),
+      : stats_({ALL_HTTP_CONN_MAN_STATS(
+                   POOL_COUNTER(*fake_stats_.rootScope()), POOL_GAUGE(fake_stats_),
+                   POOL_HISTOGRAM(*fake_stats_.rootScope()), POOL_COUNTER(fake_stats_))},
+               *fake_stats_.rootScope()),
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
-        listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_))},
+        listener_stats_{
+            CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_), POOL_COUNTER(fake_stats_))},
         local_reply_(LocalReply::Factory::createDefault()) {
     ON_CALL(route_config_provider_, lastUpdated()).WillByDefault(Return(time_system_.systemTime()));
     ON_CALL(scoped_route_config_provider_, lastUpdated())
@@ -217,6 +218,7 @@ public:
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
   bool shouldStripTrailingHostDot() const override { return false; }
+  bool recordRouteResolutionStats() const override { return false; }
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -633,6 +635,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   NiceMock<Server::MockOverloadManager> overload_manager;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   bool connection_alive = true;
 
@@ -649,7 +652,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
                                      cluster_manager, overload_manager, config->time_system_,
-                                     envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+                                     envoy::config::core::v3::TrafficDirection::UNSPECIFIED,
+                                     server_factory_context);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;

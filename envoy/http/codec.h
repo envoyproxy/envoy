@@ -101,8 +101,7 @@ public:
   virtual void disableChunkEncoding() PURE;
 };
 
-using Http1StreamEncoderOptionsOptRef =
-    std::optional<std::reference_wrapper<Http1StreamEncoderOptions>>;
+using Http1StreamEncoderOptionsOptRef = OptRef<Http1StreamEncoderOptions>;
 
 /**
  * Encodes an HTTP stream. This interface contains methods common to both the request and response
@@ -558,6 +557,14 @@ public:
    * @param num_streams the number of streams now allowed to be opened.
    */
   virtual void onMaxStreamsChanged(uint32_t num_streams) { UNREFERENCED_PARAMETER(num_streams); }
+
+  /**
+   * Fires when the metadata is received from the peer.
+   * @param metadata_map supplies the metadata map.
+   * Only supported by HTTP/2 codec.
+   * TODO(aakugan): support HTTP/3 codec.
+   */
+  virtual void onMetadata(MetadataMapPtr&& metadata_map) { UNREFERENCED_PARAMETER(metadata_map); }
 };
 
 /**
@@ -668,6 +675,15 @@ public:
    * low watermark.
    */
   virtual void onUnderlyingConnectionBelowWriteBufferLowWatermark() PURE;
+
+  /**
+   * Send some connection metadata to the remote.
+   * @param metadata_map_vector supplies the metadata to send.
+   * Right now only supported by http2. TODO(aakugan): support http3.
+   */
+  virtual void encodeMetadata(const MetadataMapVector& metadata_map_vector) {
+    UNREFERENCED_PARAMETER(metadata_map_vector);
+  }
 };
 
 /**

@@ -187,6 +187,9 @@ public:
   bool trailersSentToServer() const { return trailers_sent_to_server_; }
   void setTrailersSentToServer(bool b) { trailers_sent_to_server_ = b; }
 
+  bool eosSentToServerWithBody() const { return eos_sent_to_server_with_body_; }
+  void setEosSentToServerWithBody(bool b) { eos_sent_to_server_with_body_ = b; }
+
   envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode bodyMode() const {
     return body_mode_;
   }
@@ -379,6 +382,8 @@ protected:
   bool complete_body_available_ : 1 = false;
   // If true, the trailers is already sent to the server.
   bool trailers_sent_to_server_ : 1 = false;
+  // If true, the end_of_stream is already sent to the server with body.
+  bool eos_sent_to_server_with_body_ : 1 = false;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
   bool body_replaced_ : 1 = false;
   // If true, some of the body data is received.
@@ -672,6 +677,14 @@ public:
   bool noExternalProcess() const override {
     return !local_response_started_ && ProcessorState::noExternalProcess();
   }
+
+  // Standalone mode override is only supported when Envoy is in the waiting for request
+  // header response state, and the old request body mode is STREAMED or NONE;
+  // and the new request body mode is FULL_DUPLEX_STREAMED, and the new request
+  // trailer mode is SEND.
+  bool handleStandaloneModeOverride(
+      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode
+          old_body_mode);
 
 private:
   void setProcessingModeInternal(

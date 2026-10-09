@@ -107,8 +107,8 @@ typed_config:
 
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("http"));
-    auto client_transport_socket_factory_ptr =
-        Ssl::createClientSslTransportSocketFactory(options, context_manager_, *api_);
+    auto client_transport_socket_factory_ptr = Ssl::createClientSslTransportSocketFactory(
+        options, context_manager_, *api_, &server_factory_context_.serverScope());
     return dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
         client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);

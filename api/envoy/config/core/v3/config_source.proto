@@ -157,9 +157,10 @@ message RateLimitSettings {
 
 // Local filesystem path configuration source.
 message PathConfigSource {
-  // Path on the filesystem to source and watch for configuration updates.
-  // When sourcing configuration for a :ref:`secret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.Secret>`,
-  // the certificate and key files are also watched for updates.
+  // Path on the filesystem from which to source configuration updates.
+  // When sourcing configuration for a
+  // :ref:`secret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.Secret>`, file-based secret
+  // data supported for SDS rotation is also monitored for updates.
   //
   // .. note::
   //
@@ -167,12 +168,14 @@ message PathConfigSource {
   //
   // .. note::
   //
-  //   If ``watched_directory`` is *not* configured, Envoy will watch the file path for *moves*.
-  //   This is because in general only moves are atomic. The same method of swapping files as is
-  //   demonstrated in the :ref:`runtime documentation <config_runtime_symbolic_link_swap>` can be
-  //   used here also. If ``watched_directory`` is configured, no watch will be placed directly on
-  //   this path. Instead, the configured ``watched_directory`` will be used to trigger reloads of
-  //   this path. This is required in certain deployment scenarios. See below for more information.
+  //   If neither ``poll_interval`` nor ``watched_directory`` is configured, Envoy will watch the
+  //   file path for *moves*. This is because in general only moves are atomic. The same method of
+  //   swapping files as is demonstrated in the
+  //   :ref:`runtime documentation <config_runtime_symbolic_link_swap>` can be used here also.
+  //   One of ``poll_interval`` and ``watched_directory`` can also be configured; the configuration
+  //   is rejected if both are set. With ``poll_interval``, the same path is reloaded periodically.
+  //   With ``watched_directory``, no watch is placed directly on this path; events in the
+  //   configured directory trigger this path to be reloaded.
   string path = 1 [(validate.rules).string = {min_len: 1}];
 
   // If configured, this directory will be watched for *moves*. When an entry in this directory is
@@ -188,7 +191,24 @@ message PathConfigSource {
   //
   // The above configuration will ensure that Envoy watches the owning directory for moves which is
   // required due to how Kubernetes manages ConfigMap symbolic links during atomic updates.
+  //
+  // This field cannot be used together with ``poll_interval``.
   WatchedDirectory watched_directory = 2;
+
+  // If configured, the ``path`` will be polled at this interval instead of watched for filesystem
+  // events on either the file or ``watched_directory``. This is useful when the underlying
+  // filesystem does not reliably provide change notifications, or when a custom deployment model
+  // does not generate the move or modification events handled by watching the path or directory.
+  // The file is read on every poll, but an update is delivered only when its parsed contents
+  // change.
+  //
+  // When this configuration source provides a
+  // :ref:`Secret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.Secret>`, the same secret
+  // files that are watched in event-based mode are polled at this interval. The last successfully
+  // loaded configuration or secret remains active when a poll fails.
+  //
+  // This field cannot be used together with ``watched_directory`` and must be at least 1ms.
+  google.protobuf.Duration poll_interval = 3 [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters

@@ -3,7 +3,7 @@ use envoy_proxy_dynamic_modules_rust_sdk::EnvoyBuffer;
 
 #[test]
 fn test_header_callbacks_filter_on_request_headers() {
-  let mut f = HeaderCallbacksFilter {};
+  let f = HeaderCallbacksFilter {};
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   envoy_filter
@@ -128,7 +128,7 @@ fn test_header_callbacks_filter_on_request_headers() {
 
 #[test]
 fn test_send_response_filter() {
-  let mut f = SendResponseFilter {};
+  let f = SendResponseFilter {};
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   envoy_filter
@@ -154,7 +154,7 @@ fn test_send_response_filter() {
 
 #[test]
 fn test_body_callbacks_filter_on_bodies() {
-  let mut f = BodyCallbacksFilter::default();
+  let f = BodyCallbacksFilter::default();
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   envoy_filter
@@ -280,7 +280,7 @@ fn test_buffer_limit_callbacks() {
 
 #[test]
 fn test_dynamic_metadata_callbacks_on_response_body() {
-  let mut f = DynamicMetadataCallbacksFilter {};
+  let f = DynamicMetadataCallbacksFilter {};
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   // on_request_headers expectations (number metadata).
@@ -344,6 +344,21 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
         && bytes == &[0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02]
     })
     .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_typed_metadata()
+    .withf(|source, ns| {
+      *source == abi::envoy_dynamic_module_type_metadata_source::Dynamic
+        && ns == "ns_req_header_typed"
+    })
+    .returning(|_, _| Some((EnvoyBuffer::new(b"t/x"), EnvoyBuffer::new(&[0x01, 0x02]))))
+    .once();
+  envoy_filter
+    .expect_get_typed_metadata()
+    .withf(|source, ns| {
+      *source == abi::envoy_dynamic_module_type_metadata_source::Dynamic && ns == "missing"
+    })
+    .returning(|_, _| None)
     .once();
   // Route/Cluster/Host metadata.
   envoy_filter
@@ -636,7 +651,7 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
 
 #[test]
 fn test_response_flags_callbacks_filter() {
-  let mut f = ResponseFlagsCallbacksFilter {};
+  let f = ResponseFlagsCallbacksFilter {};
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   // Craft a bitmask with NoHealthyUpstream (bit 1), UpstreamOverflow (bit 7) and
@@ -683,4 +698,127 @@ fn test_map_response_flags_none_when_unavailable() {
 
   let flags = map_response_flags(&envoy_filter);
   assert!(flags.as_headers().iter().all(|(_, is_set)| !is_set));
+}
+
+static FAKE_SPAN_SET_TAGS_CALLED: std::sync::atomic::AtomicBool =
+  std::sync::atomic::AtomicBool::new(false);
+
+struct FakeSpan;
+
+impl envoy_proxy_dynamic_modules_rust_sdk::EnvoySpan for FakeSpan {
+  fn set_tag(&self, _key: &str, _value: &str) {}
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    assert_eq!(tags.len(), 2);
+    assert_eq!(tags[0], ("batch.key1", "batch.value1"));
+    assert_eq!(tags[1], ("batch.key2", "batch.value2"));
+    FAKE_SPAN_SET_TAGS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+  fn set_operation(&self, _operation: &str) {}
+  fn log(&self, _event: &str) {}
+  fn set_sampled(&self, _sampled: bool) {}
+  fn disable_local_decision(&self) {}
+  fn get_baggage(&self, _key: &str) -> Option<String> {
+    None
+  }
+  fn set_baggage(&self, _key: &str, _value: &str) {}
+  fn get_trace_id(&self) -> Option<String> {
+    None
+  }
+  fn get_span_id(&self) -> Option<String> {
+    None
+  }
+  fn spawn_child(
+    &self,
+    _operation_name: &str,
+  ) -> Option<Box<dyn envoy_proxy_dynamic_modules_rust_sdk::EnvoyChildSpan>> {
+    None
+  }
+}
+
+#[test]
+fn test_span_callbacks_filter_calls_set_tags() {
+  FAKE_SPAN_SET_TAGS_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let f = SpanCallbacksFilter {};
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  envoy_filter.expect_get_active_span().returning(|| {
+    Some(Box::new(FakeSpan) as Box<dyn envoy_proxy_dynamic_modules_rust_sdk::EnvoySpan>)
+  });
+
+  envoy_filter
+    .expect_set_request_header()
+    .withf(|name, _| name == "x-span-callbacks")
+    .return_const(true)
+    .once();
+
+  let status = f.on_request_headers(&mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  );
+  assert!(FAKE_SPAN_SET_TAGS_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_filter_state_callbacks_on_request_headers() {
+  let f = FilterStateCallbacksFilter {};
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  envoy_filter
+    .expect_get_filter_state_typed()
+    .withf(|key| key == b"envoy.test.http_typed_object_for_rust")
+    .returning(|_| None)
+    .once();
+  envoy_filter
+    .expect_set_filter_state_typed()
+    .withf(|key, _| key == b"envoy.test.http_typed_object_for_rust")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_get_filter_state_typed()
+    .withf(|key| key == b"envoy.test.http_typed_object_for_rust")
+    .returning(|_| Some(EnvoyBuffer::new(b"typed_value")))
+    .once();
+  envoy_filter
+    .expect_set_filter_state_typed()
+    .withf(|key, _| key == b"no.such.factory")
+    .return_const(false)
+    .once();
+  envoy_filter
+    .expect_has_filter_state()
+    .withf(|key| key == b"envoy.test.http_typed_object_for_rust")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_has_filter_state()
+    .withf(|key| key == b"nonexistent_key")
+    .return_const(false)
+    .once();
+  envoy_filter
+    .expect_set_filter_state_bytes()
+    .withf(|key, value| key == b"req_header_key" && value == b"req_header_value")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_has_filter_state()
+    .withf(|key| key == b"req_header_key")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_get_filter_state_bytes()
+    .withf(|key| key == b"req_header_key")
+    .returning(|_| Some(EnvoyBuffer::new(b"req_header_value")))
+    .once();
+  envoy_filter
+    .expect_get_filter_state_bytes()
+    .withf(|key| key == b"key")
+    .returning(|_| None)
+    .once();
+
+  let status = f.on_request_headers(&mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  );
 }

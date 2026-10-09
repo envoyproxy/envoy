@@ -100,8 +100,8 @@ public:
     std::string string_to_sign =
         fmt::format(SigV4ASignatureConstants::SigV4AStringToSignFormat,
                     SigV4ASignatureConstants::SigV4AAlgorithm, long_date, credential_scope,
-                    Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
-    auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
+                    Hex::encode(crypto_util.getSha256Digest(canonical_request)));
+    auto hash = crypto_util.getSha256Digest(string_to_sign);
     std::vector<uint8_t> signature;
 
     if (query_string) {

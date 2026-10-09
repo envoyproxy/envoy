@@ -1,5 +1,6 @@
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/fetch.h"
 
+#include <format>
 #include <thread>
 
 #include "source/common/common/fmt.h"
@@ -131,7 +132,7 @@ CallbackReply FetchRequestHolder::receive(InboundRecordSharedPtr message) {
 }
 
 std::string FetchRequestHolder::toString() const {
-  return fmt::format("[Fetch id={}]", request_->request_header_.correlation_id_);
+  return std::format("[Fetch id={}]", request_->request_header_.correlation_id_);
 }
 
 void FetchRequestHolder::cleanup(bool unregister) {

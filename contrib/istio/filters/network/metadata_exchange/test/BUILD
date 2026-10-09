@@ -13,7 +13,6 @@ envoy_cc_test(
     srcs = [
         "metadata_exchange_test.cc",
     ],
-    repository = "@envoy",
     deps = [
         "//contrib/istio/filters/network/metadata_exchange/source:config",
         "//source/common/protobuf",

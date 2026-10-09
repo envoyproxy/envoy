@@ -60,6 +60,8 @@ public:
   bool used() const override { return original_.used(); }
   void markUnused() override {}
   bool hidden() const override { return original_.hidden(); }
+  bool noTagExtraction() const override { return original_.noTagExtraction(); }
+  void markAsNoTagExtraction() override {}
   Stats::SymbolTable& symbolTable() override {
     return const_cast<Stats::Counter&>(original_).symbolTable();
   }
@@ -116,6 +118,8 @@ public:
   bool used() const override { return original_.used(); }
   void markUnused() override {}
   bool hidden() const override { return original_.hidden(); }
+  bool noTagExtraction() const override { return original_.noTagExtraction(); }
+  void markAsNoTagExtraction() override {}
   Stats::SymbolTable& symbolTable() override {
     return const_cast<Stats::Gauge&>(original_).symbolTable();
   }
@@ -176,6 +180,8 @@ public:
   bool used() const override { return original_.used(); }
   void markUnused() override {}
   bool hidden() const override { return original_.hidden(); }
+  bool noTagExtraction() const override { return original_.noTagExtraction(); }
+  void markAsNoTagExtraction() override {}
   Stats::SymbolTable& symbolTable() override {
     return const_cast<Stats::ParentHistogram&>(original_).symbolTable();
   }
@@ -234,6 +240,8 @@ public:
   bool used() const override { return true; }
   void markUnused() override {}
   bool hidden() const override { return false; }
+  bool noTagExtraction() const override { return false; }
+  void markAsNoTagExtraction() override {}
   Stats::SymbolTable& symbolTable() override { return symbol_table_; }
   const Stats::SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
@@ -272,6 +280,8 @@ public:
   bool used() const override { return true; }
   void markUnused() override {}
   bool hidden() const override { return false; }
+  bool noTagExtraction() const override { return false; }
+  void markAsNoTagExtraction() override {}
   Stats::SymbolTable& symbolTable() override { return symbol_table_; }
   const Stats::SymbolTable& constSymbolTable() const override { return symbol_table_; }
 

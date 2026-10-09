@@ -1,0 +1,1 @@
+Updated MCP message parsing to preserve dots in ``_meta`` field names, enabling reserved metadata keys such as ``io.modelcontextprotocol/protocolVersion`` used by MCP 2026-07-28 to be parsed correctly.

@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/refcount_ptr.h"
@@ -25,10 +26,10 @@ class Scope;
 class Store;
 class TextReadout;
 
-using CounterOptConstRef = std::optional<std::reference_wrapper<const Counter>>;
-using GaugeOptConstRef = std::optional<std::reference_wrapper<const Gauge>>;
-using HistogramOptConstRef = std::optional<std::reference_wrapper<const Histogram>>;
-using TextReadoutOptConstRef = std::optional<std::reference_wrapper<const TextReadout>>;
+using CounterOptConstRef = OptRef<const Counter>;
+using GaugeOptConstRef = OptRef<const Gauge>;
+using HistogramOptConstRef = OptRef<const Histogram>;
+using TextReadoutOptConstRef = OptRef<const TextReadout>;
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
@@ -248,6 +249,32 @@ public:
   }
 
   /**
+   * Re-materializes a Counter during hot restart stat merging from a fully-resolved stat name
+   * together with the tag-extracted name and tags captured from the parent process, WITHOUT
+   * re-deriving tags from the name. Counters created with programmatic tags embed their tag
+   * values in the flat name; the parent transmits the tag metadata so the child can re-create
+   * the counter with identical labels instead of letting the merge create it with empty tags,
+   * which would otherwise win the central-cache slot and permanently strip the programmatic
+   * tags.
+   *
+   * Tag-aware scope implementations implement this by delegating to counterFromTaggedName,
+   * which retains the metadata. Legacy scope implementations intentionally drop tag metadata on
+   * that path (they cannot compose tag-extracted names with their prefix in general), so they
+   * instead honor the components, which arrive fully resolved.
+   *
+   * This assumes the parent and child processes use the same scope implementation across the hot
+   * restart: tagged_name is taken verbatim as the child's cache key rather than being re-derived,
+   * so a mismatch in how the two processes compose flat names is not supported.
+   * @param tagged_name the complete flat stat name (with tag values) recovered from the parent,
+   *                  matching what the child independently creates for the same stat.
+   * @param base_name the stat name with tag values removed.
+   * @param tags the tag name/value pairs.
+   * @return a counter within the scope's namespace.
+   */
+  virtual Counter& counterFromMergedStatName(StatName tagged_name, StatName base_name,
+                                             std::optional<StatNameTagSpan> tags) PURE;
+
+  /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
    * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
@@ -276,6 +303,21 @@ public:
                                    Gauge::ImportMode import_mode) {
     return gaugeFromTaggedName(name, toTagSpan(tags), StatName(), import_mode);
   }
+
+  /**
+   * Re-materializes a Gauge during hot restart stat merging from a fully-resolved stat name
+   * together with the tag-extracted name and tags captured from the parent process, WITHOUT
+   * re-deriving tags from the name. See counterFromMergedStatName for the rationale and the
+   * implementation contract.
+   * @param tagged_name the complete flat stat name (with tag values) recovered from the parent.
+   * @param base_name the stat name with tag values removed.
+   * @param tags the tag name/value pairs.
+   * @param import_mode Whether hot-restart should accumulate this value.
+   * @return a gauge within the scope's namespace.
+   */
+  virtual Gauge& gaugeFromMergedStatName(StatName tagged_name, StatName base_name,
+                                         std::optional<StatNameTagSpan> tags,
+                                         Gauge::ImportMode import_mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
@@ -430,7 +472,7 @@ public:
   // be used for the duration of the (synchronous) call.
   static std::optional<StatNameTagSpan> toTagSpan(StatNameTagVectorOptConstRef tags) {
     if (tags.has_value()) {
-      return StatNameTagSpan(tags->get());
+      return StatNameTagSpan(tags.ref());
     }
     return std::nullopt;
   }

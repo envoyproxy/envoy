@@ -46,7 +46,6 @@ static const struct KnownCurveCandidate kCurveCandidates[] = {
     {ossl_NID_ffdhe6144, 259, ""},
     {ossl_NID_ffdhe8192, 260, ""},
     {ossl_NID_undef, SSL_GROUP_X25519_MLKEM768, "X25519MLKEM768"},
-    {ossl_NID_undef, SSL_GROUP_X25519_KYBER768_DRAFT00, "X25519Kyber768Draft00"},
 };
 
 #define CANDIDATES_SIZE (sizeof(kCurveCandidates) / sizeof(kCurveCandidates[0]))

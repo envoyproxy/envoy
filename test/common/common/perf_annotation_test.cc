@@ -9,7 +9,10 @@
 
 #include "source/common/common/perf_annotation.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::HasSubstr;
 
 namespace Envoy {
 
@@ -37,16 +40,16 @@ TEST_F(PerfAnnotationTest, TestMacros) {
   }
 
   std::string report = PERF_TO_STRING();
-  EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 0 ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" beta ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 1 ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 2 ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" beta ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 3 ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" gamma ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 4 ") != std::string::npos) << report;
+  EXPECT_THAT(report, HasSubstr(" alpha "));
+  EXPECT_THAT(report, HasSubstr(" 0 "));
+  EXPECT_THAT(report, HasSubstr(" beta "));
+  EXPECT_THAT(report, HasSubstr(" 1 "));
+  EXPECT_THAT(report, HasSubstr(" alpha "));
+  EXPECT_THAT(report, HasSubstr(" 2 "));
+  EXPECT_THAT(report, HasSubstr(" beta "));
+  EXPECT_THAT(report, HasSubstr(" 3 "));
+  EXPECT_THAT(report, HasSubstr(" gamma "));
+  EXPECT_THAT(report, HasSubstr(" 4 "));
   PERF_DUMP();
 }
 

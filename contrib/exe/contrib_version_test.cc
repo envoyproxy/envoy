@@ -12,7 +12,7 @@ TEST(ContribVersionTest, VersionContainsSuffix) {
 TEST(ContribVersionTest, BuildVersionContainsSuffix) {
   auto build_version = VersionInfo::buildVersion();
   const auto& fields = build_version.metadata().fields();
-  ASSERT_NE(fields.find(BuildVersionMetadataKeys::get().BuildLabel), fields.end());
+  ASSERT_TRUE(fields.contains(BuildVersionMetadataKeys::get().BuildLabel));
   EXPECT_THAT(fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value(),
               testing::EndsWith("contrib"));
 }

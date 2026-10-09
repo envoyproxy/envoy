@@ -34,16 +34,10 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicForwardProxyFilterFactory::createFi
 }
 
 absl::StatusOr<Http::FilterFactoryCb>
-DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, context.serverFactoryContext());
-}
-
-absl::StatusOr<Http::FilterFactoryCb>
 DynamicForwardProxyFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
   return createFilterFactory(proto_config, context);
 }
 

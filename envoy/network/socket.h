@@ -446,6 +446,11 @@ public:
   virtual std::optional<Address::IpVersion> ipVersion() const PURE;
 
   /**
+   * Request RST on a subsequent close().
+   */
+  virtual void setAbortiveClose() PURE;
+
+  /**
    * Close the underlying socket.
    */
   virtual void close() PURE;
@@ -607,7 +612,7 @@ public:
 
 using SocketPtr = std::unique_ptr<Socket>;
 using SocketSharedPtr = std::shared_ptr<Socket>;
-using SocketOptRef = std::optional<std::reference_wrapper<Socket>>;
+using SocketOptRef = OptRef<Socket>;
 
 } // namespace Network
 } // namespace Envoy

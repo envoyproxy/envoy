@@ -64,6 +64,13 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
+  // Presents the leaf certificate issued by the intermediate CA without any intermediates, so
+  // the server can only build a chain from its own trust store.
+  ClientSslTransportOptions& setClientCertWithoutIntermediates(bool without_intermediates) {
+    client_cert_without_intermediates_ = without_intermediates;
+    return *this;
+  }
+
   ClientSslTransportOptions& setCustomCertValidatorConfig(
       envoy::config::core::v3::TypedExtensionConfig* custom_validator_config) {
     custom_validator_config_ = custom_validator_config;
@@ -81,6 +88,7 @@ struct ClientSslTransportOptions {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
   bool use_expired_spiffe_cert_{false};
   bool client_with_intermediate_cert_{false};
+  bool client_cert_without_intermediates_{false};
   bool no_cert_{false};
   // It is owned by the caller that invokes `setCustomCertValidatorConfig()`.
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
@@ -94,10 +102,12 @@ void initializeUpstreamTlsContextConfig(
 
 Network::UpstreamTransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
-                                      ContextManager& context_manager, Api::Api& api);
+                                      ContextManager& context_manager, Api::Api& api,
+                                      Stats::Scope* stats_scope = nullptr);
 
 Network::DownstreamTransportSocketFactoryPtr
-createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool use_http3 = false);
+createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool use_http3 = false,
+                         Stats::Scope* stats_scope = nullptr);
 
 Network::DownstreamTransportSocketFactoryPtr
 createFakeUpstreamSslContext(const std::string& upstream_cert_name, ContextManager& context_manager,

@@ -38,7 +38,8 @@ using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideH
 using ::Envoy::Http::HeaderMap;
 using ::Envoy::Server::Configuration::ServerFactoryContext;
 using ::Envoy::Upstream::HostConstSharedPtr;
-using ::Envoy::Upstream::HostMapConstSharedPtr;
+using ::Envoy::Upstream::HostLookupMapConstSharedPtr;
+using ::Envoy::Upstream::HostSharedPtr;
 using ::Envoy::Upstream::LoadBalancerConfig;
 using ::Envoy::Upstream::LoadBalancerContext;
 using ::Envoy::Upstream::LoadBalancerParams;
@@ -217,11 +218,12 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedHostKey(
   Protobuf::Struct* updated_metadata_ptr = &updated_metadata;
 
   for (size_t i = 0; i + 1 < metadata_key.path_.size(); i++) {
-    Protobuf::Value& current_val = (*updated_metadata_ptr->mutable_fields())[metadata_key.path_[i]];
+    Protobuf::Value& current_val =
+        (*updated_metadata_ptr->mutable_fields())[metadata_key.path_[i].key_];
     updated_metadata_ptr = current_val.mutable_struct_value();
   }
 
-  (*updated_metadata_ptr->mutable_fields())[metadata_key.path_.back()].set_string_value(
+  (*updated_metadata_ptr->mutable_fields())[metadata_key.path_.back().key_].set_string_value(
       selected_endpoint);
 
   // Set the value of the metadata key to be the host:port
@@ -292,22 +294,22 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext
 
 HostConstSharedPtr
 OverrideHostLoadBalancer::LoadBalancerImpl::findHost(absl::string_view endpoint) {
-  HostMapConstSharedPtr hosts = priority_set_.crossPriorityHostMap();
+  HostLookupMapConstSharedPtr hosts = priority_set_.crossPriorityHostMap();
   if (hosts == nullptr) {
     return nullptr;
   }
 
-  ENVOY_LOG(trace, "Looking up {} in {}", endpoint,
-            absl::StrJoin(*hosts, ", ",
-                          [](std::string* out, Envoy::Upstream::HostMap::const_reference entry) {
-                            absl::StrAppend(out, entry.first);
-                          }));
-
-  if (const auto host_iterator = hosts->find(endpoint); host_iterator != hosts->end()) {
-    // TODO(yanavlasov): Validate that host health status did not change.
-    return host_iterator->second;
+  if (ENVOY_LOG_CHECK_LEVEL(trace)) {
+    std::vector<absl::string_view> addresses;
+    addresses.reserve(hosts->size());
+    hosts->forEach([&addresses](absl::string_view address, const HostSharedPtr&) {
+      addresses.push_back(address);
+    });
+    ENVOY_LOG(trace, "Looking up {} in {}", endpoint, absl::StrJoin(addresses, ", "));
   }
-  return nullptr;
+
+  // TODO(yanavlasov): Validate that host health status did not change.
+  return hosts->findHost(endpoint);
 }
 
 HostConstSharedPtr OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(

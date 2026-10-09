@@ -110,7 +110,7 @@ public:
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   Ssl::ClientContextSharedPtr ssl_context_{new NiceMock<Ssl::MockClientContext>()};
-  Stats::IsolatedStoreImpl store_;
+  Stats::IsolatedStoreImpl store_{context_.server_context_.serverScope().symbolTable()};
   Quic::QuicStatNames quic_stat_names_{store_.symbolTable()};
   // Needs to out-live pool_;
   Quic::TestNetworkObserverRegistry observers_;

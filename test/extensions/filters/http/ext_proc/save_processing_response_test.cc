@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response.h"
 
 #include "test/mocks/stream_info/mocks.h"

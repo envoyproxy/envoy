@@ -1,0 +1,13 @@
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304
+
+common --noincompatible_disallow_empty_glob
+common --noincompatible_disallow_ctx_resolve_tools
+common --legacy_external_runfiles
+
+common --@rules_python//python/config_settings:bootstrap_impl=script
+common --@protobuf//bazel/flags:prefer_prebuilt_protoc=true
+common --incompatible_enable_proto_toolchain_resolution
+
+try-import %workspace%/../../../ci.bazelrc
+try-import %workspace%/../../../user.bazelrc

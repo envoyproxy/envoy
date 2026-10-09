@@ -14,8 +14,8 @@ wasm_rust_binary(
     srcs = ["logging_rust.rs"],
     wasi = True,
     deps = [
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 

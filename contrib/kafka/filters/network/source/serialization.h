@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <format>
 #include <memory>
 #include <optional>
 #include <string>
@@ -781,7 +782,7 @@ public:
       }
       if (required_ < NULL_ARRAY_LENGTH) {
         ExceptionUtil::throwEnvoyException(
-            fmt::format("invalid NULLABLE_ARRAY length: {}", required_));
+            std::format("invalid NULLABLE_ARRAY length: {}", required_));
       }
 
       length_consumed_ = true;

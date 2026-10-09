@@ -208,8 +208,10 @@ TEST(FactoryTest, FactoryTestWithServerContext) {
   // type (the base NamedHttpFilterConfigFactory pointer exposes only the Protobuf::Message
   // overload, which routes through the legacy path).
   HeaderMutationFactoryConfig header_mutation_factory;
+  Server::Configuration::ExtraFactoryContext extra_context{
+      mock_server_context.messageValidationVisitor(), "test"};
   auto cb = header_mutation_factory
-                .createHttpFilterFactoryFromProto(proto_config, "test", mock_server_context)
+                .createHttpFilterFactoryFromProto(proto_config, mock_server_context, extra_context)
                 .value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));

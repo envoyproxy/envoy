@@ -52,6 +52,12 @@ Api::IoCallUint64Result Win32SocketHandleImpl::write(Buffer::Instance& buffer) {
   return result;
 }
 
+Api::IoCallUint64Result Win32SocketHandleImpl::send(const void* buffer, size_t length) {
+  Api::IoCallUint64Result result = IoSocketHandleImpl::send(buffer, length);
+  reEnableEventBasedOnIOResult(result, Event::FileReadyType::Write);
+  return result;
+}
+
 Api::IoCallUint64Result Win32SocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                        uint64_t num_slice, int flags,
                                                        const Address::Ip* self_ip,

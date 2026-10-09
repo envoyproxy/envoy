@@ -1,0 +1,1 @@
+ext_proc: added :ref:`emit_client_span <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.emit_client_span>` and per-route :ref:`emit_client_span <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.emit_client_span>` to allow suppressing client-side egress spans for external processing calls while preserving trace context propagation.

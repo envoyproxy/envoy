@@ -18,9 +18,11 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -62,6 +64,7 @@ public:
       new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
   Stats::TestUtil::TestStore store_;
   Network::MockDrainDecision drain_decision_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Runtime::MockLoader runtime_;
   NiceMock<Api::MockApi> api_;
   Event::SimulatedTimeSystem time_source_;
@@ -80,7 +83,7 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_EQ("redis.foo.", config.stat_prefix_);
   EXPECT_TRUE(config.downstream_auth_username_.empty());
   EXPECT_TRUE(config.downstream_auth_passwords_.empty());
@@ -110,7 +113,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 1);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
 }
@@ -133,7 +136,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamMultipleAuthPasswordsSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 3);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword1");
@@ -156,7 +159,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamOnlyExraAuthPasswordsSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 2);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "newpassword1");
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword2");
@@ -179,7 +182,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 1);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
@@ -205,7 +208,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithMultiplePasswords) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 3);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
@@ -231,7 +234,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithOnlyExtraPasswords) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 2);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "newpassword1");
@@ -255,7 +258,7 @@ TEST_F(RedisProxyFilterConfigTest, ExternalAuthBasic) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_TRUE(config.external_auth_enabled_);
   EXPECT_FALSE(config.external_auth_expiration_enabled_);
 }
@@ -278,7 +281,7 @@ TEST_F(RedisProxyFilterConfigTest, ExternalAuthWithExpiration) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_TRUE(config.external_auth_enabled_);
   EXPECT_TRUE(config.external_auth_expiration_enabled_);
 }
@@ -299,7 +302,7 @@ TEST_F(RedisProxyFilterConfigTest, ProtocolVersionDefaultsToResp2) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp2, config.protocolVersion());
 }
 
@@ -319,7 +322,7 @@ TEST_F(RedisProxyFilterConfigTest, ProtocolVersionResp3IsHonored) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, server_context_);
   EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp3, config.protocolVersion());
 }
 
@@ -344,11 +347,16 @@ public:
     op_timeout: 0.01s
   )EOF";
 
-  RedisProxyFilterTest(const std::string& yaml_string) {
+  // `runtime_values` must be applied before the filter is built, since the filter latches the
+  // connection-level drain runtime guard when it is created.
+  RedisProxyFilterTest(const std::string& yaml_string,
+                       const absl::node_hash_map<std::string, std::string>& runtime_values = {}) {
+    scoped_runtime_.mergeValues(runtime_values);
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
         parseProtoFromYaml(yaml_string);
-    config_ = std::make_shared<ProxyFilterConfig>(
-        proto_config, *store_.rootScope(), drain_decision_, runtime_, api_, time_source_, *this);
+    config_ =
+        std::make_shared<ProxyFilterConfig>(proto_config, *store_.rootScope(), drain_decision_,
+                                            runtime_, api_, time_source_, *this, server_context_);
     time_source_.setSystemTime(std::chrono::seconds(0));
     buildFilter();
   }
@@ -398,9 +406,11 @@ public:
   NiceMock<Common::Redis::MockEncoder>* encoder_{new NiceMock<Common::Redis::MockEncoder>()};
   Common::Redis::MockDecoder* decoder_{new Common::Redis::MockDecoder()};
   Common::Redis::DecoderCallbacks* decoder_callbacks_{};
+  TestScopedRuntime scoped_runtime_;
   CommandSplitter::MockInstance splitter_;
   Stats::TestUtil::TestStore store_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Runtime::MockLoader> runtime_;
   ProxyFilterConfigSharedPtr config_;
   std::unique_ptr<ProxyFilter> filter_;
@@ -412,6 +422,10 @@ public:
 
 class RedisProxyFilterTestWithTwoCallbacks : public RedisProxyFilterTest {
 public:
+  explicit RedisProxyFilterTestWithTwoCallbacks(
+      const absl::node_hash_map<std::string, std::string>& runtime_values = {})
+      : RedisProxyFilterTest(DefaultConfig, runtime_values) {}
+
   CommandSplitter::MockSplitRequest* request_handle1_{new CommandSplitter::MockSplitRequest()};
   CommandSplitter::MockSplitRequest* request_handle2_{new CommandSplitter::MockSplitRequest()};
   CommandSplitter::SplitCallbacks* request_callbacks1_;
@@ -432,12 +446,21 @@ public:
   }
 };
 
-TEST_F(RedisProxyFilterTestWithTwoCallbacks, OutOfOrderResponseWithDrainClose) {
+// Same fixture, but with connection-level drain disabled so the legacy DrainDecision poll is used.
+class RedisProxyFilterTestWithLegacyDrainClose : public RedisProxyFilterTestWithTwoCallbacks {
+public:
+  RedisProxyFilterTestWithLegacyDrainClose()
+      : RedisProxyFilterTestWithTwoCallbacks(absl::node_hash_map<std::string, std::string>{
+            {"envoy.reloadable_features.use_connection_event_drain", "false"}}) {}
+};
+
+// This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+TEST_F(RedisProxyFilterTestWithLegacyDrainClose, OutOfOrderResponseWithDrainClose) {
   InSequence s;
 
   Buffer::OwnedImpl fake_data;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
-      .WillOnce(Invoke(this, &RedisProxyFilterTestWithTwoCallbacks::decodeHelper));
+      .WillOnce(Invoke(this, &RedisProxyFilterTestWithLegacyDrainClose::decodeHelper));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 
   EXPECT_EQ(2UL, config_->stats_.downstream_rq_total_.value());
@@ -452,6 +475,38 @@ TEST_F(RedisProxyFilterTestWithTwoCallbacks, OutOfOrderResponseWithDrainClose) {
   EXPECT_CALL(*encoder_, encode(Ref(*response2_ptr), _));
   EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
   EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("redis.drain_close_enabled", 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  request_callbacks1_->onResponse(std::move(response1));
+
+  EXPECT_EQ(1UL, config_->stats_.downstream_cx_drain_close_.value());
+}
+
+// Equivalent of OutOfOrderResponseWithDrainClose exercising the connection-level drain path: the
+// connection is notified via onDrain() (Immediate strategy) and the drain-close decision is derived
+// from that event instead of polling the DrainDecision, which must not be consulted. The
+// redis.drain_close_enabled runtime gate still applies on top.
+TEST_F(RedisProxyFilterTestWithTwoCallbacks, OutOfOrderResponseWithDrainCloseViaConnectionDrain) {
+  EXPECT_CALL(drain_decision_, drainClose(_)).Times(0);
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
+      .WillOnce(Invoke(this, &RedisProxyFilterTestWithTwoCallbacks::decodeHelper));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+
+  Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+  Common::Redis::RespValue* response2_ptr = response2.get();
+  request_callbacks2_->onResponse(std::move(response2));
+
+  Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+  EXPECT_CALL(*encoder_, encode(Ref(*response1), _));
+  EXPECT_CALL(*encoder_, encode(Ref(*response2_ptr), _));
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("redis.drain_close_enabled", 100))
       .WillOnce(Return(true));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
@@ -502,7 +557,7 @@ TEST_F(RedisProxyFilterTestWithTwoCallbacks, OutOfOrderResponseDownstreamDisconn
 
   Buffer::OwnedImpl fake_data;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
-      .WillOnce(Invoke(this, &RedisProxyFilterTestWithTwoCallbacks::decodeHelper));
+      .WillOnce(Invoke(this, &RedisProxyFilterTestWithLegacyDrainClose::decodeHelper));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 
   EXPECT_EQ(2UL, config_->stats_.downstream_rq_total_.value());

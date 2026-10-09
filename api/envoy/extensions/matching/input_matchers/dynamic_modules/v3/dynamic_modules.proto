@@ -26,6 +26,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // matching beyond what built-in matchers provide, such as JWT/OAuth token analysis, custom
 // routing decisions, or integration with external data sources.
 message DynamicModuleMatcher {
+  // The policy applied when the module cannot evaluate a match, for example after a panic in the
+  // module's match hook.
+  enum OnError {
+    // Treat an evaluation that could not complete as no match. This is the default.
+    NO_MATCH = 0;
+
+    // Treat an evaluation that could not complete as a match.
+    MATCH = 1;
+  }
+
   // Specifies the shared-object level configuration. This field is required.
   envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
       [(validate.rules).message = {required: true}];
@@ -47,8 +57,19 @@ message DynamicModuleMatcher {
   // ``matcher_name``, the module can decide which in-module matcher implementation to use and
   // fine-tune the behavior of the matcher.
   //
-  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.Struct`` and the ``value`` field of ``xds.type.v3.TypedStruct`` are
+  // serialized as JSON before passing them to the module.
   // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
   // without the wrapper.
   google.protobuf.Any matcher_config = 3;
+
+  // The result applied for an evaluation that the module could not complete, for example when the
+  // module's match hook panics. A panic is caught at the ABI boundary and cannot report a match
+  // result, so the matcher applies this policy for that single evaluation. If not specified,
+  // defaults to ``NO_MATCH``.
+  //
+  // ``NO_MATCH`` is safe for allow-on-match trees where a missed match denies the request.
+  // ``MATCH`` is safe for deny-on-match trees where a missed match would let a request bypass the
+  // rule.
+  OnError on_error = 4;
 }
