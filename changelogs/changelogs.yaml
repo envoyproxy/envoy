@@ -46,6 +46,8 @@ areas:
     title: api_key_auth
   attributes:
     title: attributes
+  aws:
+    title: aws
   build:
     title: build
   composite:
@@ -66,6 +68,8 @@ areas:
     title: jwt_authn
   load_report:
     title: load_report
+  local_ratelimit:
+    title: local_ratelimit
   logging:
     title: logging
   mysql_proxy:
@@ -82,6 +86,8 @@ areas:
     title: resource_monitors
   router:
     title: router
+  secret:
+    title: secret
   set_metadata_filter:
     title: set_metadata_filter
   spiffe_validator:
