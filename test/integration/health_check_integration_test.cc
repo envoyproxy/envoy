@@ -355,6 +355,83 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
 }
 
+// Active health checking with `incremental_health_transition` set explicitly, so health changes go
+// through applyHealthTransition when on and the full re-partition when off.
+class IncrementalHealthTransitionIntegrationTest : public HttpHealthCheckIntegrationTest {
+public:
+  void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.incremental_health_transition",
+                                      guardValue());
+    HttpHealthCheckIntegrationTest::initialize();
+  }
+
+  virtual std::string guardValue() const { return "true"; }
+
+  // The endpoint failing then recovering its health check drives membership_healthy 1 -> 0 -> 1.
+  void endpointUnhealthyThenHealthy();
+};
+
+class IncrementalHealthTransitionDisabledIntegrationTest
+    : public IncrementalHealthTransitionIntegrationTest {
+public:
+  std::string guardValue() const override { return "false"; }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpHttpVersions, IncrementalHealthTransitionIntegrationTest,
+    testing::ValuesIn(HttpHealthCheckIntegrationTest::getHttpHealthCheckIntegrationTestParams()),
+    HttpHealthCheckIntegrationTest::httpHealthCheckTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(
+    IpHttpVersions, IncrementalHealthTransitionDisabledIntegrationTest,
+    testing::ValuesIn(HttpHealthCheckIntegrationTest::getHttpHealthCheckIntegrationTestParams()),
+    HttpHealthCheckIntegrationTest::httpHealthCheckTestParamsToString);
+
+TEST_P(IncrementalHealthTransitionIntegrationTest, EndpointUnhealthyThenHealthy) {
+  endpointUnhealthyThenHealthy();
+}
+
+TEST_P(IncrementalHealthTransitionDisabledIntegrationTest, EndpointUnhealthyThenHealthy) {
+  endpointUnhealthyThenHealthy();
+}
+
+void IncrementalHealthTransitionIntegrationTest::endpointUnhealthyThenHealthy() {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initHttpHealthCheck(cluster_idx);
+
+  // Healthy on the first probe.
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(0, true);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", testing::Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", testing::Eq(1));
+
+  // Fail the next probe: the host leaves the healthy view.
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", testing::Eq(2));
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
+      *dispatcher_, clusters_[cluster_idx].host_stream_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(0, true);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", testing::Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", testing::Eq(0));
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+
+  // Recover: the host rejoins the healthy view.
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", testing::Eq(3));
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
+      *dispatcher_, clusters_[cluster_idx].host_stream_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(0, true);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", testing::Eq(2));
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", testing::Eq(1));
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+}
+
 // Tests that expected statuses takes precedence over retriable statuses
 TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointExpectedAndRetriablePrecedence) {
   const uint32_t cluster_idx = 0;

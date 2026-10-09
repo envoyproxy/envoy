@@ -1913,6 +1913,17 @@ bool excludeBasedOnHealthFlag(const Host& host) {
          host.healthFlagGet(Host::HealthFlag::EDS_STATUS_DRAINING);
 }
 
+// Makes `host` present in `hosts` iff `present`, by pointer identity. A newly included host is
+// appended, since partition order carries no meaning for host selection.
+void setHostPresence(HostVector& hosts, const HostSharedPtr& host, bool present) {
+  const auto it = std::find(hosts.begin(), hosts.end(), host);
+  if (present && it == hosts.end()) {
+    hosts.push_back(host);
+  } else if (!present && it != hosts.end()) {
+    hosts.erase(it);
+  }
+}
+
 } // namespace
 
 std::tuple<HealthyHostVectorConstSharedPtr, DegradedHostVectorConstSharedPtr,
@@ -1948,6 +1959,71 @@ ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
 
   return std::make_tuple(std::move(filtered_clones[0]), std::move(filtered_clones[1]),
                          std::move(filtered_clones[2]));
+}
+
+PrioritySet::UpdateHostsParams HostSetImpl::applyHealthTransition(const HostSet& host_set,
+                                                                  const HostSharedPtr& host) {
+  const Host::Health health = host->coarseHealth();
+  const bool healthy = health == Host::Health::Healthy;
+  const bool degraded = health == Host::Health::Degraded;
+  const bool excluded = excludeBasedOnHealthFlag(*host);
+
+  // Every per-locality view shares the all-hosts bucket order and a health change never moves a
+  // host between localities, so one bucket index finds the host in every view.
+  const std::vector<HostVector>& all_per_locality = host_set.hostsPerLocality().get();
+  std::optional<size_t> bucket;
+  for (size_t i = 0; i < all_per_locality.size(); ++i) {
+    if (std::find(all_per_locality[i].begin(), all_per_locality[i].end(), host) !=
+        all_per_locality[i].end()) {
+      bucket = i;
+      break;
+    }
+  }
+  // A host the set does not hold, or holds outside every locality bucket, cannot be moved between
+  // views, so re-partition the set instead.
+  const bool in_set =
+      std::find(host_set.hosts().begin(), host_set.hosts().end(), host) != host_set.hosts().end();
+  if (!in_set || (!all_per_locality.empty() && !bucket.has_value())) {
+    return partitionHosts(host_set.hostsPtr(), host_set.hostsPerLocalityPtr());
+  }
+
+  auto healthy_hosts = std::make_shared<HealthyHostVector>();
+  healthy_hosts->get() = host_set.healthyHosts();
+  setHostPresence(healthy_hosts->get(), host, healthy);
+
+  auto degraded_hosts = std::make_shared<DegradedHostVector>();
+  degraded_hosts->get() = host_set.degradedHosts();
+  setHostPresence(degraded_hosts->get(), host, degraded);
+
+  auto excluded_hosts = std::make_shared<ExcludedHostVector>();
+  excluded_hosts->get() = host_set.excludedHosts();
+  setHostPresence(excluded_hosts->get(), host, excluded);
+
+  const auto rebuild_per_locality = [&](const HostsPerLocality& current,
+                                        bool present) -> HostsPerLocalityConstSharedPtr {
+    std::vector<HostVector> buckets = current.get();
+    // The partition view can lag the all-hosts bucket count only when it is the empty sentinel,
+    // handled by the caller; otherwise the layouts match and the index is in range.
+    if (*bucket >= buckets.size()) {
+      buckets.resize(all_per_locality.size());
+    }
+    setHostPresence(buckets[*bucket], host, present);
+    return std::make_shared<HostsPerLocalityImpl>(std::move(buckets), current.hasLocalLocality());
+  };
+
+  HostsPerLocalityConstSharedPtr healthy_per_locality = host_set.healthyHostsPerLocalityPtr();
+  HostsPerLocalityConstSharedPtr degraded_per_locality = host_set.degradedHostsPerLocalityPtr();
+  HostsPerLocalityConstSharedPtr excluded_per_locality = host_set.excludedHostsPerLocalityPtr();
+  if (bucket.has_value()) {
+    healthy_per_locality = rebuild_per_locality(host_set.healthyHostsPerLocality(), healthy);
+    degraded_per_locality = rebuild_per_locality(host_set.degradedHostsPerLocality(), degraded);
+    excluded_per_locality = rebuild_per_locality(host_set.excludedHostsPerLocality(), excluded);
+  }
+
+  return updateHostsParams(host_set.hostsPtr(), host_set.hostsPerLocalityPtr(),
+                           std::move(healthy_hosts), std::move(healthy_per_locality),
+                           std::move(degraded_hosts), std::move(degraded_per_locality),
+                           std::move(excluded_hosts), std::move(excluded_per_locality));
 }
 
 bool ClusterInfoImpl::maintenanceMode() const {
@@ -2140,8 +2216,22 @@ void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   reloadHealthyHostsHelper(host);
 }
 
-void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
+void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr& host) {
   const auto& host_sets = prioritySet().hostSetsPerPriority();
+
+  // A health change re-partitions only the host's priority. A null host is a full reload (startup,
+  // overprovisioning change) and re-partitions every priority.
+  if (host != nullptr &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.incremental_health_transition")) {
+    const uint32_t priority = host->priority();
+    if (priority < host_sets.size()) {
+      const auto& host_set = host_sets[priority];
+      prioritySet().updateHosts(priority, HostSetImpl::applyHealthTransition(*host_set, host),
+                                host_set->localityWeights(), {}, {}, std::nullopt, std::nullopt);
+    }
+    return;
+  }
+
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
     // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
