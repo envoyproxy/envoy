@@ -276,6 +276,9 @@ public:
     Server::LoadShedPoint* tcpProxyOnDataLoadShedPoint() const {
       return tcp_proxy_on_data_loadshed_point_;
     }
+    Server::LoadShedPoint* tcpProxyUpstreamConnectLoadShedPoint() const {
+      return tcp_proxy_upstream_connect_loadshed_point_;
+    }
 
     // Evaluate dynamic TLV formatters and combine with static TLVs.
     Network::ProxyProtocolTLVVector
@@ -315,6 +318,7 @@ public:
         proxy_protocol_tlv_merge_policy_{
             envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT};
     Server::LoadShedPoint* tcp_proxy_on_data_loadshed_point_{nullptr};
+    Server::LoadShedPoint* tcp_proxy_upstream_connect_loadshed_point_{nullptr};
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -394,6 +398,9 @@ public:
   }
   Server::LoadShedPoint* tcpProxyOnDataLoadShedPoint() const {
     return shared_config_->tcpProxyOnDataLoadShedPoint();
+  }
+  Server::LoadShedPoint* tcpProxyUpstreamConnectLoadShedPoint() const {
+    return shared_config_->tcpProxyUpstreamConnectLoadShedPoint();
   }
 
 private:
@@ -600,6 +607,7 @@ public:
     void continueDecoding() override {}
     void addDecodedData(Buffer::Instance&, bool) override {}
     void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
+    void injectDecodedHeadersToFilterChain(bool) override {}
     Http::RequestTrailerMap& addDecodedTrailers() override { return *request_trailer_map_; }
     Http::MetadataMapVector& addDecodedMetadata() override {
       static Http::MetadataMapVector metadata_map_vector;

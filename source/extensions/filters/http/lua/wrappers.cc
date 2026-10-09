@@ -504,14 +504,14 @@ int VirtualHostWrapper::luaMetadata(lua_State* state) {
   return 1;
 }
 
-const Protobuf::Struct& RouteWrapper::getMetadata() const {
+const Protobuf::Struct& RouteWrapper::getMetadata(absl::string_view ns) const {
   const auto route = stream_info_.route();
   if (!route) {
     return Protobuf::Struct::default_instance();
   }
 
   const auto& metadata = route->metadata();
-  auto filter_it = metadata.filter_metadata().find(filter_config_name_);
+  auto filter_it = metadata.filter_metadata().find(ns.empty() ? filter_config_name_ : ns);
 
   if (filter_it != metadata.filter_metadata().end()) {
     return filter_it->second;
@@ -521,11 +521,14 @@ const Protobuf::Struct& RouteWrapper::getMetadata() const {
 }
 
 int RouteWrapper::luaMetadata(lua_State* state) {
-  if (metadata_wrapper_.get() != nullptr) {
-    metadata_wrapper_.pushStack();
+  const absl::string_view ns = lua_isnoneornil(state, 2)
+                                   ? absl::string_view()
+                                   : Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  if (auto it = metadata_wrappers_.find(ns); it != metadata_wrappers_.end()) {
+    it->second.pushStack();
   } else {
-    metadata_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata()),
-                            true);
+    const auto wrapper = Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata(ns));
+    metadata_wrappers_[ns].reset(wrapper, true);
   }
   return 1;
 }
@@ -625,12 +628,14 @@ int StatsScopeWrapper::luaHistogram(lua_State* state) {
       unit = Stats::Histogram::Unit::Bytes;
     } else if (unit_str == "microseconds") {
       unit = Stats::Histogram::Unit::Microseconds;
+    } else if (unit_str == "nanoseconds") {
+      unit = Stats::Histogram::Unit::Nanoseconds;
     } else if (unit_str == "unspecified") {
       unit = Stats::Histogram::Unit::Unspecified;
     } else {
       luaL_error(state,
                  "invalid histogram unit '%s', expected 'ms', 'milliseconds', 'microseconds', "
-                 "'bytes', or 'unspecified'",
+                 "'nanoseconds', 'bytes', or 'unspecified'",
                  std::string(unit_str).c_str());
     }
   }

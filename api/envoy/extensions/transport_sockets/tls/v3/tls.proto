@@ -365,6 +365,7 @@ message CommonTlsContext {
 
   // Custom TLS handshaker. If empty, defaults to native TLS handshaking
   // behavior.
+  // [#extension-category: envoy.tls_handshakers]
   config.core.v3.TypedExtensionConfig custom_handshaker = 13;
 
   // TLS key log configuration

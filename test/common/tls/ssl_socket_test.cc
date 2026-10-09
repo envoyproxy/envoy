@@ -3589,7 +3589,7 @@ TEST_P(SslSocketTest, GetValidatedPeerCertChainWithIntermediate) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
@@ -8167,6 +8167,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   // Trust chain contains:
   //  - Root authority certificate (i.e., ca_cert.pem)
   //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - End-entity certificate (i.e. san_dns*_cert.pem)
   //
   // Certificate revocation list contains:
   //  - Root authority certificate revocation list (i.e., ca_cert.crl)
@@ -8180,7 +8181,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.crl"
 )EOF";
@@ -8190,6 +8191,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   // Trust chain contains:
   //  - Root authority certificate (i.e., ca_cert.pem)
   //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - End-entity certificate (i.e. san_dns*_cert.pem)
   //
   // Certificate revocation list contains:
   //  - Root authority certificate revocation list (i.e., ca_cert.crl)
@@ -8205,7 +8207,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"
 )EOF";
@@ -8215,7 +8217,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
 )EOF";
@@ -8225,7 +8227,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_key.pem"
 )EOF";
@@ -8248,12 +8250,10 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-// Ensure that complete crl chains succeed with unrevoked certificates.
-#ifndef ENVOY_SSL_OPENSSL
+  // Ensure that complete crl chains succeed with unrevoked certificates.
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
-#endif
 }
 
 TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
@@ -8274,7 +8274,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_both_crls.pem"
 )EOF";
 
   // This should fail, since the crl chain is incomplete.
@@ -8295,7 +8295,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_intermediate_crl.pem"
 )EOF";
 
   // This should fail, since the certificate has been revoked.
@@ -8303,7 +8303,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
 )EOF";
@@ -8313,7 +8313,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_key.pem"
 )EOF";
@@ -8336,12 +8336,10 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-// Ensure that complete crl chains succeed with unrevoked certificates.
-#ifndef ENVOY_SSL_OPENSSL
+  // Ensure that complete crl chains succeed with unrevoked certificates.
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
-#endif
 }
 
 TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
@@ -8364,7 +8362,7 @@ TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_intermediate_crl.pem"
       only_verify_leaf_cert_crl: true
 )EOF";
 
@@ -8373,7 +8371,7 @@ TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_key.pem"
 )EOF";
@@ -8403,7 +8401,7 @@ TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_intermediate_crl.pem"
       only_verify_leaf_cert_crl: true
 )EOF";
 
@@ -8412,7 +8410,7 @@ TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
 )EOF";

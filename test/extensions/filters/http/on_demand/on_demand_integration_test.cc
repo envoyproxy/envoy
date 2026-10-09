@@ -343,6 +343,7 @@ key:
   test_server_->waitForCounter("http.config_test.rds.foo_route1.update_attempt", Ge(1));
   // Close the connection and destroy the active stream.
   cleanupUpstreamAndDownstream();
+  test_server_->waitForWorkerThreads();
   // Push rds update, on demand updated callback is post to worker thread.
   // There is no exception thrown even when active stream is dead because weak_ptr can't be
   // locked.
@@ -538,6 +539,8 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
 //  - A VHDS DiscoveryResponse received but contains no update for the domain (the management server
 //  couldn't resolve it)
 //  - Upstream receives a 404 response
+//  - A repeated request for the same domain on a new stream receives a 404 answered locally,
+//  without a new DeltaDiscoveryRequest
 TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
   // RDS exchange with a non-empty virtual_hosts field
   useRdsWithVhosts();
@@ -567,6 +570,38 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
 
   response->waitForHeaders();
   EXPECT_EQ("404", response->headers().getStatusValue());
+
+  // Consume the ack of the resolution failure, so that the wire is known to be empty afterwards.
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // A repeated request for the answered domain on a new stream is answered locally from the
+  // published route configuration: a 404 without a new DeltaDiscoveryRequest.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationStreamDecoderPtr repeated_response =
+      codec_client_->makeHeaderOnlyRequest(request_headers);
+  repeated_response->waitForHeaders();
+  EXPECT_EQ("404", repeated_response->headers().getStatusValue());
+
+  // Prove that the repeated request put nothing on the wire: the next DeltaDiscoveryRequest is
+  // the one of a request for a different unknown domain, alone.
+  Http::TestRequestHeaderMapImpl other_request_headers{{":method", "GET"},
+                                                       {":path", "/"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "vhost.fourth"},
+                                                       {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr other_response =
+      codec_client_->makeHeaderOnlyRequest(other_request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.fourth")}, {},
+                                           vhds_stream_.get()));
+  notifyAboutAliasResolutionFailure("5", vhds_stream_, {"my_route/vhost.fourth"});
+
+  other_response->waitForHeaders();
+  EXPECT_EQ("404", other_response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -822,6 +857,70 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsWildcardUpgradeOnReconnect) {
   // obtained through the on demand request earlier.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
                                            {"*", "my_route/vhost.first"}, {}, vhds_stream_.get()));
+}
+
+// End-to-end regression guard for on-demand VHDS after the switch to accept()-based routing: two
+// requests to two DIFFERENT unknown virtual hosts each trigger an on-demand VHDS fetch (via
+// requestOnDemandUpdate()/append()), and both must be routed and resolved. VHDS declares
+// accept("my_route/*") for routing, so on-demand virtual-host names under that route configuration
+// are delivered to the subscription and the requests succeed.
+TEST_P(OnDemandVhdsIntegrationTest, VhdsTwoOnDemandVirtualHostsRouteResponses) {
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // First on-demand virtual host: vhost.first.
+  {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"x-lyft-user-id", "123"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                             {vhdsRequestResourceName("vhost.first")}, {},
+                                             vhds_stream_.get()));
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "2", vhds_stream_.get(),
+        {"my_route/vhost.first"});
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+    waitForNextUpstreamRequest(1);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    response->waitForHeaders();
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    cleanupUpstreamAndDownstream();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+
+  // Second on-demand virtual host: vhost.second, a DIFFERENT name -> a second append() on the same
+  // subscription. Its response must also be routed for the request to succeed.
+  {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.second"},
+                                                   {"x-lyft-user-id", "123"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                             {vhdsRequestResourceName("vhost.second")}, {},
+                                             vhds_stream_.get()));
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost,
+        {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+            virtualHostYaml("my_route/vhost_2", "vhost.second"))},
+        {}, "3", vhds_stream_.get(), {"my_route/vhost.second"});
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+    waitForNextUpstreamRequest(1);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    response->waitForHeaders();
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    cleanupUpstreamAndDownstream();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
 }
 
 // Test class for VHDS on-demand updates with request bodies

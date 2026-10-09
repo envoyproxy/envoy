@@ -6,6 +6,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "execution_context_dual_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -291,6 +292,7 @@ envoy_cc_test(
     srcs = ["logger_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//source/common/common:minimal_logger_lib",
         "//source/common/version:version_string_lib",
         "//test/mocks/http:http_mocks",
@@ -425,6 +427,37 @@ envoy_cc_test(
     deps = [
         "//source/common/common:perf_annotation_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "persistent_hash_map_test",
+    srcs = ["persistent_hash_map_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/common:persistent_hash_map_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "persistent_hash_map_speed_test",
+    srcs = ["persistent_hash_map_speed_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/common:persistent_hash_map_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "persistent_hash_map_speed_test_benchmark_test",
+    benchmark_binary = "persistent_hash_map_speed_test",
 )
 
 envoy_cc_test(
@@ -726,12 +759,9 @@ envoy_benchmark_test(
     benchmark_binary = "linked_object_speed_test",
 )
 
-envoy_cc_test(
+execution_context_dual_test(
     name = "execution_context_test",
     srcs = ["execution_context_test.cc"],
-    copts = [
-        "-DENVOY_ENABLE_EXECUTION_CONTEXT",
-    ],
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:execution_context",

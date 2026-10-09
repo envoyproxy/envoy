@@ -64,6 +64,10 @@ public:
 
   absl::Status executeImpl() override {
     ASSERT(fileDescriptor() != -1);
+    // Materializing an anonymous file by linking /proc/self/fd/<fd> requires Linux-specific
+    // `procfs` and the `AT_FDCWD`/`AT_SYMLINK_FOLLOW` `linkat()` flags, none of which exist on
+    // Windows.
+#if defined(AT_FDCWD) && defined(AT_SYMLINK_FOLLOW)
     std::string procfile = absl::StrCat("/proc/self/fd/", fileDescriptor());
     auto result = posix().linkat(fileDescriptor(), procfile.c_str(), AT_FDCWD, filename_.c_str(),
                                  AT_SYMLINK_FOLLOW);
@@ -71,6 +75,9 @@ public:
       return statusAfterFileError(result);
     }
     return absl::OkStatus();
+#else
+    return absl::UnimplementedError("createHardLink is not supported on this platform");
+#endif
   }
 
   void onCancelledBeforeCallback() override {

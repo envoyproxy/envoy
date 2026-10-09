@@ -24,19 +24,13 @@ void QuicStatsGatherer::OnPacketRetransmitted(int retransmitted_bytes) {
 }
 
 void QuicStatsGatherer::maybeDoDeferredLog(bool record_ack_timing) {
-  if (!fix_defer_logging_miss_for_half_closed_stream_) {
-    logging_done_ = true;
-  }
   if (stream_info_ == nullptr) {
     return;
   }
-  if (fix_defer_logging_miss_for_half_closed_stream_) {
-    logging_done_ = true;
-  }
+  logging_done_ = true;
   if (time_source_ != nullptr && record_ack_timing) {
     stream_info_->downstreamTiming().onLastDownstreamAckReceived(*time_source_);
-  } else if (fix_defer_logging_miss_for_half_closed_stream_ &&
-             last_downstream_ack_timestamp_.has_value()) {
+  } else if (last_downstream_ack_timestamp_.has_value()) {
     stream_info_->downstreamTiming().last_downstream_ack_received_ = last_downstream_ack_timestamp_;
   }
   stream_info_->addBytesRetransmitted(retransmitted_bytes_);

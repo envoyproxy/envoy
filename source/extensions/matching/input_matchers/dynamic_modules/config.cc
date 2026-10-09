@@ -97,8 +97,17 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
       in_module_config, [shared_module, on_config_destroy = on_config_destroy.value()](
                             const void* config) { on_config_destroy(config); });
 
-  return [shared_module, on_match = on_match.value(), shared_config] {
-    return std::make_unique<DynamicModuleInputMatcher>(shared_module, on_match, shared_config);
+  // Map the on_error policy to the result the matcher returns when the module cannot complete an
+  // evaluation.
+  using DynamicModuleMatcherProto =
+      envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher;
+  const auto on_error_result = proto_config.on_error() == DynamicModuleMatcherProto::MATCH
+                                   ? ::Envoy::Matcher::MatchResult::Matched
+                                   : ::Envoy::Matcher::MatchResult::NoMatch;
+
+  return [shared_module, on_match = on_match.value(), shared_config, on_error_result] {
+    return std::make_unique<DynamicModuleInputMatcher>(shared_module, on_match, shared_config,
+                                                       on_error_result);
   };
 }
 

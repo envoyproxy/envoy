@@ -3,14 +3,13 @@ aio.core>=0.11.1
 aiohttp>=3.14.3
 aioquic>=1.3.0
 dependatool>=0.3.1
-envoy.base.utils>=0.6.9
+envoy.base.utils>=0.6.12
 envoy.ci.report>=0.1.1
-envoy.code.check>=0.6.7
+envoy.code.check>=0.6.9
 envoy.dependency.check>=0.2.1
 envoy.distribution.release>=0.1.2
 envoy.distribution.verify>=0.1.1
-envoy.gpg.sign>=0.3.1
-gitpython>=3.1.59
+gitpython>=3.1.62
 icalendar>=7.3.0
 orjson>=3.10.15
 pep8-naming
@@ -19,7 +18,7 @@ pep8-naming
 protobuf<7.36.0
 ply
 pygithub
-pyjwt[crypto]>=2.13.0
+pyjwt[crypto]>=2.15.1
 cryptography>49.0.0
 pyopenssl>=26.3.0
 pyyaml

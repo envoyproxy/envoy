@@ -317,7 +317,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       disable_immediate_response_(config.disable_immediate_response()), is_upstream_(is_upstream),
       graceful_grpc_close_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_graceful_grpc_close")),
-      allow_content_length_header_(config.allow_content_length_header()) {
+      allow_content_length_header_(config.allow_content_length_header()),
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
@@ -662,6 +663,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       failure_mode_allow_(config.overrides().has_failure_mode_allow()
                               ? std::optional<bool>(config.overrides().failure_mode_allow().value())
                               : std::nullopt),
+      emit_client_span_(config.overrides().has_emit_client_span()
+                            ? std::optional<bool>(config.overrides().emit_client_span().value())
+                            : std::nullopt),
       processing_request_modifier_factory_cb_(
           createProcessingRequestModifierCb(config.overrides(), builder, context)) {}
 
@@ -695,6 +699,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       failure_mode_allow_(more_specific.failureModeAllow().has_value()
                               ? more_specific.failureModeAllow()
                               : less_specific.failureModeAllow()),
+      emit_client_span_(more_specific.emitClientSpan().has_value()
+                            ? more_specific.emitClientSpan()
+                            : less_specific.emitClientSpan()),
       processing_request_modifier_factory_cb_(
           more_specific.processing_request_modifier_factory_cb_
               ? more_specific.processing_request_modifier_factory_cb_
@@ -798,7 +805,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
                        .setBufferBodyForRetry(grpc_service_.has_retry_policy())
-                       .setSampled(std::nullopt)
+                       .setSampled(emit_client_span_ ? std::nullopt : std::make_optional(false))
                        .setRemoteCloseTimeout(config_->remoteCloseTimeout());
 
     ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
@@ -984,6 +991,11 @@ FilterDataStatus Filter::handleDataBufferedMode(ProcessorState& state, Buffer::I
 
 FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
                                                     bool end_stream) {
+  // For empty data chunk with end_stream false, do not send it to the ext_proc server.
+  if (emptyDataWithFalseEos(data, end_stream)) {
+    return state.getBodyCallbackResultInStreamedMode(end_stream);
+  }
+
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterDataStatus::StopIterationNoBuffer;
@@ -1084,7 +1096,10 @@ FilterDataStatus Filter::handleDataBufferedPartialMode(ProcessorState& state,
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
-  state.setBodyReceived(true);
+  // Don't count empty body chunk with false end_stream.
+  if (!emptyDataWithFalseEos(data, end_stream)) {
+    state.setBodyReceived(true);
+  }
 
   if (config_->observabilityMode()) {
     return sendDataInObservabilityMode(data, state, end_stream);
@@ -1496,7 +1511,7 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
       logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
     }
     // Only set upstream host in logging info once.
-    if (logging_info_->upstreamHost() == nullptr) {
+    if (logging_info_->upstreamHost() == nullptr && stream_info->upstreamInfo().has_value()) {
       logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
     }
 
@@ -1877,6 +1892,9 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     return;
   }
 
+  ENVOY_STREAM_LOG(debug, "Received {} response {}", *decoder_callbacks_,
+                   responseCaseToString(response->response_case()), response->DebugString());
+
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
@@ -1894,16 +1912,24 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     if (config_->isAllowedOverrideMode(mode_override)) {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server for this request",
                        *decoder_callbacks_);
+      const auto old_decoding_body_mode = decoding_state_.bodyMode();
       decoding_state_.setProcessingMode(mode_override);
       encoding_state_.setProcessingMode(mode_override);
+
+      // If the response case is not set, this response message is for overriding the
+      // processing mode only.
+      if (response->response_case() == ProcessingResponse::ResponseCase::RESPONSE_NOT_SET) {
+        // If this function call returns false, it's a spurious response, and is handled
+        // by the default case of the switch statement below.
+        if (decoding_state_.handleStandaloneModeOverride(old_decoding_body_mode)) {
+          return;
+        }
+      }
     } else {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server is disallowed",
                        *decoder_callbacks_);
     }
   }
-
-  ENVOY_STREAM_LOG(debug, "Received {} response {}", *decoder_callbacks_,
-                   responseCaseToString(response->response_case()), response->DebugString());
 
   bool eos_seen_in_body = false;
   absl::Status processing_status;
@@ -2302,6 +2328,12 @@ void Filter::mergePerRouteConfig() {
     ENVOY_STREAM_LOG(trace, "Setting new failureModeAllow from per-route configuration",
                      *decoder_callbacks_);
     failure_mode_allow_ = merged_config->failureModeAllow().value();
+  }
+
+  if (merged_config->emitClientSpan().has_value()) {
+    ENVOY_STREAM_LOG(trace, "Setting new emitClientSpan from per-route configuration",
+                     *decoder_callbacks_);
+    emit_client_span_ = merged_config->emitClientSpan().value();
   }
 
   if (merged_config->hasProcessingRequestModifierConfig()) {

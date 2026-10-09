@@ -30,15 +30,15 @@ This repository uses **Bazel** as its primary build system.
 - `.bazelrc` - Repository-wide Bazel configuration with build flags and platform settings
 - `user.bazelrc` - Optional user-specific overrides (gitignored)
 - `.bazelversion` - Specifies the exact Bazel version to use
-- `MODULE.bazel` / `WORKSPACE` - Dependency definitions (using bzlmod and WORKSPACE modes)
+- `MODULE.bazel` / `MODULE.bazel.lock` - Dependency definitions (bzlmod)
 
 ### Compiler configuration
 
-Envoy supports multiple compiler configurations. **Use `--config=clang` by default** unless told otherwise:
+Envoy supports multiple compiler configurations. **Use the default toolchain** unless told otherwise:
 
 ```bash
 # Use Clang with libc++ (recommended, use by default)
-bazel build --config=clang //source/exe:envoy-static
+bazel build //source/exe:envoy-static
 
 # Use GCC with libstdc++ (only if explicitly requested)
 bazel build --config=gcc //source/exe:envoy-static
@@ -59,25 +59,25 @@ bazel build --config=gcc //source/exe:envoy-static
 
 ```bash
 # Run all tests
-bazel test --config=clang //test/...
+bazel test //test/...
 
 # Run tests in a specific directory
-bazel test --config=clang //test/common/http/...
+bazel test //test/common/http/...
 
 # Run a single test target
-bazel test --config=clang //test/common/http:async_client_impl_test
+bazel test //test/common/http:async_client_impl_test
 
 # Run tests with additional logging
-bazel test --config=clang --test_output=streamed //test/... --test_arg="--" --test_arg="-l trace"
+bazel test --test_output=streamed //test/... --test_arg="--" --test_arg="-l trace"
 
 # Run tests with IPv4 only
-bazel test --config=clang //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 # Run tests with IPv6 only
-bazel test --config=clang //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v6only
+bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v6only
 
 # Disable heap checker
-bazel test --config=clang //test/... --test_env=HEAPCHECK=
+bazel test //test/... --test_env=HEAPCHECK=
 ```
 
 ## Dependencies
@@ -86,7 +86,8 @@ bazel test --config=clang //test/... --test_env=HEAPCHECK=
 
 Dependencies are configured in `MODULE.bazel` and the Bazel registry; metadata is in `bazel/deps.yaml` and `api/bazel/deps.yaml`
 
-See `bazel/repositories.bzl` for setup - eg this is where any patching is controlled.
+Patching is controlled by the dependency's module entry in the Envoy Bazel registry
+(pinned via `--registry` in `.bazelrc`), not in this repo.
 
 If you need to create or update a patch - do the following:
 
@@ -95,8 +96,8 @@ If you need to create or update a patch - do the following:
 - make changes
 - diff the changes to the patch file
 
-Pay attention to how the patch_args are setup in repositories.bzl - some are p0, while others are p1. Prefer p1 when
-creating new patches.
+Pay attention to how patches are applied by the module's registry entry, and follow the existing
+convention there when creating new patches.
 
 
 ## Code formatting and linting
@@ -105,16 +106,16 @@ creating new patches.
 
 ```bash
 # Check and fix formatting (recommended for source/, test/, contrib/ changes)
-bazel run --config=clang //tools/code_format:check_format -- fix
+bazel run //tools/code_format:check_format -- fix
 
 # Quick format check (much faster, doesn't fix)
-bazel run --config=clang //tools/code:check
+bazel run //tools/code:check
 
 # Check format without fixing
-bazel run --config=clang //tools/code_format:check_format -- check
+bazel run //tools/code_format:check_format -- check
 
 # Format API files
-bazel run --config=clang //tools/proto_format:proto_format -- fix
+bazel run //tools/proto_format:proto_format -- fix
 ```
 
 ### Dependency validation
@@ -123,14 +124,14 @@ bazel run --config=clang //tools/proto_format:proto_format -- fix
 
 ```bash
 # Validate dependency metadata
-bazel run --config=clang //tools/dependency:validate
+bazel run //tools/dependency:validate
 
 # Run dependency tests
-bazel run --config=clang //tools/dependency:validate_test
+bazel run //tools/dependency:validate_test
 
 # Check for dependency setup/updates
 # -v warn: verbosity level, -c release_dates: check release dates, releases: check type
-bazel run --config=clang //tools/dependency:check -- -v warn -c release_dates releases
+bazel run //tools/dependency:check -- -v warn -c release_dates releases
 ```
 
 ## Development workflow
@@ -145,13 +146,13 @@ bazel run --config=clang //tools/dependency:check -- -v warn -c release_dates re
 2. **Build and test locally:**
    ```bash
    # Build Envoy (this is slow/expensive)
-   bazel build --config=clang //source/exe:envoy-static
+   bazel build //source/exe:envoy-static
 
    # Run relevant tests (often slow/expensive - depending on test)
-   bazel test --config=clang //test/path/to/relevant/tests/...
+   bazel test //test/path/to/relevant/tests/...
 
    # Quick format check
-   bazel run --config=clang //tools/code:check
+   bazel run //tools/code:check
    ```
 
 3. **Run Envoy locally:**
@@ -177,7 +178,7 @@ bazel run --config=clang //tools/dependency:check -- -v warn -c release_dates re
 3. **Always run dependency validation after changes:**
    ```bash
    # Validate dependency metadata and relationships
-   bazel run --config=clang //tools/dependency:validate
+   bazel run //tools/dependency:validate
 
    # Run all dependency checks (recommended)
    ./ci/do_ci.sh deps

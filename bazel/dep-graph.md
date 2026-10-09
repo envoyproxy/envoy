@@ -10,7 +10,7 @@ graph TD
     examples["envoy-examples"]
     filter_cc["envoy-example-filter-cc"]
     wasm_cc["envoy-example-wasm-cc"]
-    ext_test["bazel/tests/external<br/><i>(WORKSPACE, not bzlmod)</i>"]
+    ext_test["bazel/tests/external"]
 
     toolshed --> api
     toolshed --> envoy
@@ -33,8 +33,8 @@ graph TD
 
     classDef root fill:#e6f4ea,stroke:#137333,stroke-width:2px
     classDef core fill:#e8f0fe,stroke:#1a73e8,stroke-width:2px
-    classDef ws fill:#fff,stroke:#999,stroke-dasharray: 5 5
+    classDef consumer fill:#fff,stroke:#999,stroke-dasharray: 5 5
     class toolshed root
     class envoy,api core
-    class ext_test ws
+    class ext_test consumer
 ```

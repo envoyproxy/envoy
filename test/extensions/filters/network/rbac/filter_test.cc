@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/common/logger.h"
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
@@ -36,7 +37,7 @@ class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
   static void SetUpTestSuite() {
     // Set debug log level to ensure coverage of debug log statements
-    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+    Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
   }
 
   RoleBasedAccessControlNetworkFilterTest() = default;
@@ -713,7 +714,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, DebugLogLevel) {
   setRequestedServerName("www.cncf.io");
 
   // Force debug level on
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
   // Mock SSL setup
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();

@@ -55,19 +55,21 @@ public:
   virtual bool logEnabled(LogLevel level) = 0;
 
   /** Logs a message through Envoy's logging subsystem. */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
 /** Host interface exposed while a thread-safe early header mutation is being created. */
-class EarlyHeaderMutationConfigHandle {
+class EarlyHeaderMutationConfigHandle : public CommonHandle {
 public:
-  virtual ~EarlyHeaderMutationConfigHandle();
+  ~EarlyHeaderMutationConfigHandle() override;
 
   /** Returns whether Envoy logging is enabled for the supplied level. */
   virtual bool logEnabled(LogLevel level) = 0;
 
   /** Logs a message through Envoy's logging subsystem. */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
 /**

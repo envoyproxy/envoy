@@ -186,6 +186,7 @@ envoy_cc_test_library(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "@abseil-cpp//absl/flags:reflection",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

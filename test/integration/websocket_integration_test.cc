@@ -1055,10 +1055,6 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeFailedWithPrePayload) {
 
 // Test websocket upgrade per-try timeout
 TEST_P(WebsocketIntegrationTest, WebSocketUpgradePerTryTimeout) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.websocket_enable_timeout_on_upgrade_response", "true"}});
-
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1091,10 +1087,6 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradePerTryTimeout) {
 
 // Test websocket upgrade route timeout
 TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeout) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.websocket_enable_timeout_on_upgrade_response", "true"}});
-
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1126,10 +1118,6 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeout) {
 
 // Test websocket upgrade route timeout is maintained with retries
 TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeoutWithRetries) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.websocket_enable_timeout_on_upgrade_response", "true"}});
-
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(setRouteRetryOn5xxPolicy());
   config_helper_.addConfigModifier(
