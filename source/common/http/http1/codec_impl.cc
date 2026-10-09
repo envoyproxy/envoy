@@ -460,20 +460,6 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   bool is_connect = HeaderUtility::isConnect(headers);
   const Http::HeaderValues& header_values = Http::Headers::get();
 
-  if (method.empty()) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("missing or empty required header: ", header_values.Method.get()));
-  }
-  if (is_connect) {
-    if (host.empty()) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("missing or empty required header: ", header_values.Host.get()));
-    }
-  } else if (path.empty()) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("missing or empty required header: ", header_values.Path.get()));
-  }
-
   if (method == header_values.MethodValues.Head) {
     head_request_ = true;
   } else if (method == header_values.MethodValues.Connect) {
@@ -496,9 +482,9 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Scheme.get()));
     }
-    if (host.empty()) {
+    if (headers.Host() == nullptr) {
       return absl::InvalidArgumentError(
-          absl::StrCat("missing or empty required header: ", header_values.Host.get()));
+          absl::StrCat("missing required header: ", header_values.Host.get()));
     }
 
     std::string url = absl::StrCat(scheme->value().getStringView(), "://", host, path);
