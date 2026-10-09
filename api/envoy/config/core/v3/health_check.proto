@@ -83,7 +83,7 @@ message HealthCheck {
     }
   }
 
-  // [#next-free-field: 15]
+  // [#next-free-field: 16]
   message HttpHealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
