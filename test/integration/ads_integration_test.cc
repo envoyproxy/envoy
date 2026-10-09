@@ -387,6 +387,73 @@ TEST_P(AdsIntegrationTest, ClusterSharingSecretWarming) {
   test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 }
 
+// Make sure a cluster update that only changes the bytes of its sds_config reuses the secret that
+// is already watched over ADS. The server does not send the secret again for the new provider, so
+// without reuse the updated cluster would warm forever with a 0s initial fetch timeout.
+// This is a regression test of #47309.
+TEST_P(AdsIntegrationTest, ClusterSdsConfigChangeReusesSecret) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto sds_type_url =
+      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>();
+
+  auto build_cluster = [](const std::string& sds_config) {
+    envoy::config::core::v3::TransportSocket sds_transport_socket;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          common_tls_context:
+            validation_context_sds_secret_config:
+              name: validation_context
+              sds_config: {}
+    )EOF",
+                                          sds_config),
+                              sds_transport_socket);
+    auto cluster = ConfigHelper::buildStaticCluster("cluster_0", 8000, "127.0.0.1");
+    *cluster.mutable_transport_socket() = sds_transport_socket;
+    return cluster;
+  };
+
+  auto cluster = build_cluster("{ ads: {} }");
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster}, {cluster}, {},
+                                                             "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "", {"validation_context"},
+                                      {"validation_context"}, {}));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(1));
+
+  envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+    name: validation_context
+    validation_context:
+      trusted_ca:
+        filename: {}
+  )EOF",
+                                        TestEnvironment::runfilesPath(
+                                            "test/config/integration/certs/upstreamcacert.pem")),
+                            validation_context);
+  sendDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+      sds_type_url, {validation_context}, {validation_context}, {}, "1");
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+
+  // Update the cluster with a different sds_config for the same secret. The secret is not sent
+  // again, so the updated cluster can only become active by reusing the secret Envoy already has.
+  auto updated_cluster = build_cluster("{ ads: {}, initial_fetch_timeout: 0s }");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {updated_cluster},
+                                                             {updated_cluster}, {}, "2");
+  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+
+  // The config dump is served on the main thread after the update, so it cannot observe the gap
+  // between the counter and the warming gauge being updated.
+  const auto clusters_config_dump = getClustersConfigDump();
+  EXPECT_EQ(clusters_config_dump.dynamic_warming_clusters_size(), 0);
+  ASSERT_EQ(clusters_config_dump.dynamic_active_clusters_size(), 1);
+  EXPECT_EQ(clusters_config_dump.dynamic_active_clusters(0).version_info(), "2");
+}
+
 // Make sure two clusters with different secrets send only a single SDS request.
 // This is a regression test of #21518.
 TEST_P(AdsIntegrationTest, SecretsPausedDuringCDS) {
