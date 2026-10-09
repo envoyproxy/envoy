@@ -1953,7 +1953,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
 }
 
 uint64_t FilterConfigPerRoute::getPluginConfigId(uint64_t parent_id,
-                                                 std::string plugin_name) const {
+                                                 const std::string& plugin_name) const {
   auto it = plugins_config_.find(plugin_name);
   if (it != plugins_config_.end()) {
     return it->second->getMergedConfigId(parent_id);
