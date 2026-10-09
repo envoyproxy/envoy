@@ -13,6 +13,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/secret/sds_api.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
@@ -98,8 +100,8 @@ private:
       if (!secret_provider) {
         // SdsApi is owned by ListenerImpl and ClusterInfo which are destroyed before
         // SecretManagerImpl. It is safe to invoke this callback at the destructor of SdsApi.
-        std::function<void()> unregister_secret_provider = [map_key, this]() {
-          removeDynamicSecretProvider(map_key);
+        std::function<void()> unregister_secret_provider = [map_key, config_name, this]() {
+          removeDynamicSecretProvider(map_key, config_name);
         };
         secret_provider = SecretType::create(server_context, sds_config_source, config_name,
                                              unregister_secret_provider, warm);
@@ -108,6 +110,7 @@ private:
           seedFromExistingProvider(*secret_provider, sds_config_source, config_name);
         }
         dynamic_secret_providers_[map_key] = secret_provider;
+        map_keys_by_name_[config_name].insert(map_key);
       }
       // It is important to add the init target to the manager regardless the secret provider is new
       // or existing. Different clusters / listeners can share same secret so they have to be marked
@@ -150,9 +153,13 @@ private:
     void seedFromExistingProvider(SecretType& secret_provider,
                                   const envoy::config::core::v3::ConfigSource& sds_config_source,
                                   const std::string& config_name) {
-      for (const auto& secret_entry : dynamic_secret_providers_) {
-        std::shared_ptr<SecretType> existing = secret_entry.second.lock();
-        if (existing == nullptr || existing->secretData().resource_name_ != config_name ||
+      const auto map_keys = map_keys_by_name_.find(config_name);
+      if (map_keys == map_keys_by_name_.end()) {
+        return;
+      }
+      for (const std::string& map_key : map_keys->second) {
+        std::shared_ptr<SecretType> existing = dynamic_secret_providers_.at(map_key).lock();
+        if (existing == nullptr ||
             !sameSubscriptionSource(existing->sdsConfig(), sds_config_source)) {
           continue;
         }
@@ -171,14 +178,25 @@ private:
     }
 
     // Removes dynamic secret provider which has been deleted.
-    void removeDynamicSecretProvider(const std::string& map_key) {
+    void removeDynamicSecretProvider(const std::string& map_key, const std::string& config_name) {
       ENVOY_LOG(debug, "Unregister secret provider. hash key: {}", map_key);
 
       auto num_deleted = dynamic_secret_providers_.erase(map_key);
       ASSERT(num_deleted == 1, "");
+
+      auto map_keys = map_keys_by_name_.find(config_name);
+      if (map_keys != map_keys_by_name_.end()) {
+        map_keys->second.erase(map_key);
+        if (map_keys->second.empty()) {
+          map_keys_by_name_.erase(map_keys);
+        }
+      }
     }
 
     absl::node_hash_map<std::string, std::weak_ptr<SecretType>> dynamic_secret_providers_;
+    // Keys in dynamic_secret_providers_ for each secret name, so that providers for the same name
+    // can be found without scanning every provider.
+    absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>> map_keys_by_name_;
   };
 
   // Manages pairs of secret name and TlsCertificateConfigProviderSharedPtr.

@@ -1460,6 +1460,20 @@ TEST_F(SdsSecretReuseTest, DoesNotReuseSecretWhenRuntimeGuardDisabled) {
   new_provider.init_target_handle_->initialize(new_watcher);
 }
 
+// Once every provider for a name is gone, a new provider for that name waits for the server.
+TEST_F(SdsSecretReuseTest, DoesNotReuseSecretFromDestroyedProvider) {
+  WarmingProvider old_provider = createWarmingProvider(ads_config_source_);
+  Init::ExpectableWatcherImpl old_watcher;
+  old_provider.init_target_handle_->initialize(old_watcher);
+  deliver(*old_provider.callbacks_, secret_yaml_, "v1");
+  old_provider = {};
+
+  envoy::config::core::v3::ConfigSource new_config_source = ads_config_source_;
+  new_config_source.mutable_initial_fetch_timeout()->set_seconds(0);
+  WarmingProvider new_provider = createWarmingProvider(new_config_source);
+  EXPECT_EQ(new_provider.provider_->secret(), nullptr);
+}
+
 // If the reused secret cannot be applied, the new provider falls back to waiting for the server,
 // and applies the same secret when it is delivered.
 TEST_F(SdsSecretReuseTest, FailedReuseWaitsForServer) {

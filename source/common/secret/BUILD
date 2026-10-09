@@ -21,6 +21,8 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
