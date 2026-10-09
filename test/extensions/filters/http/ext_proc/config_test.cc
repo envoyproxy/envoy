@@ -9,6 +9,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -821,27 +822,100 @@ TEST(HttpExtProcConfigTest, PerRouteParsedGrpcInitialMetadataPassedToClient) {
                                  {route_config.get(), more_specific_config.get()}));
 }
 
-// A per-route grpc_initial_metadata override changes the initial metadata at request time, so the
-// initial metadata parsed on the main thread can't be used for it.
-TEST(HttpExtProcConfigTest, PerRouteGrpcInitialMetadataDropsParsedInitialMetadata) {
+// Stands in for a gRPC service's parsed initial metadata that sets `headers`.
+class SetHeadersEvaluator : public Http::HeaderEvaluator {
+public:
+  explicit SetHeadersEvaluator(std::vector<std::pair<std::string, std::string>> headers)
+      : headers_(std::move(headers)) {}
+
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context&,
+                       const StreamInfo::StreamInfo&) const override {
+    for (const auto& [key, value] : headers_) {
+      headers.setCopy(Http::LowerCaseString(key), value);
+    }
+  }
+
+private:
+  const std::vector<std::pair<std::string, std::string>> headers_;
+};
+
+// Returns the initial metadata that `initial_metadata` sets.
+Http::TestRequestHeaderMapImpl
+evaluateInitialMetadata(const Grpc::GrpcServiceInitialMetadataSharedPtr& initial_metadata) {
+  Http::TestRequestHeaderMapImpl headers;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  initial_metadata->evaluateHeaders(headers, {}, stream_info);
+  return headers;
+}
+
+// A per-route grpc_initial_metadata override is parsed when the route config is created, and
+// applied on top of the service's parsed initial metadata. A header that it sets replaces the
+// service's, even if its value is empty.
+TEST(HttpExtProcConfigTest, PerRouteGrpcInitialMetadataLayersOnParsedInitialMetadata) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_CALL(context.cluster_manager_.async_client_manager_,
               parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server"), _))
-      .WillOnce(testing::Return(std::make_shared<const NoopHeaderEvaluator>()));
+      .WillOnce(testing::Return(std::make_shared<const SetHeadersEvaluator>(
+          std::vector<std::pair<std::string, std::string>>{
+              {"x-filter", "filter"}, {"x-replaced", "filter"}, {"x-cleared", "filter"}})));
 
   auto route_config = createRouteConfig(R"EOF(
   overrides:
     grpc_initial_metadata:
     - key: x-route
       value: route
+    - key: x-replaced
+      value: route
+    - key: x-cleared
+      value: ""
   )EOF",
                                         context);
 
-  EXPECT_EQ(nullptr, formattersForRequest(FilterConfigYaml, context, {route_config.get()}));
+  const auto metadata = evaluateInitialMetadata(
+      formattersForRequest(FilterConfigYaml, context, {route_config.get()}));
+  EXPECT_EQ("filter", metadata.get_("x-filter"));
+  EXPECT_EQ("route", metadata.get_("x-route"));
+  EXPECT_EQ("route", metadata.get_("x-replaced"));
+  EXPECT_FALSE(metadata.has("x-cleared"));
 }
 
-// A per-route config can't combine a gRPC service with formatters and grpc_initial_metadata.
-TEST(HttpExtProcConfigTest, PerRouteRejectsFormattersWithGrpcInitialMetadata) {
+// More specific route configs' grpc_initial_metadata is applied on top of less specific ones'.
+TEST(HttpExtProcConfigTest, PerRouteGrpcInitialMetadataLayersFromLeastToMostSpecific) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server"), _))
+      .WillOnce(testing::Return(std::make_shared<const NoopHeaderEvaluator>()));
+
+  auto less_specific_config = createRouteConfig(R"EOF(
+  overrides:
+    grpc_initial_metadata:
+    - key: x-less-specific
+      value: less-specific
+    - key: x-replaced
+      value: less-specific
+    - key: x-cleared
+      value: less-specific
+  )EOF",
+                                                context);
+  auto more_specific_config = createRouteConfig(R"EOF(
+  overrides:
+    grpc_initial_metadata:
+    - key: x-replaced
+      value: more-specific
+    - key: x-cleared
+      value: ""
+  )EOF",
+                                                context);
+
+  const auto metadata = evaluateInitialMetadata(formattersForRequest(
+      FilterConfigYaml, context, {less_specific_config.get(), more_specific_config.get()}));
+  EXPECT_EQ("less-specific", metadata.get_("x-less-specific"));
+  EXPECT_EQ("more-specific", metadata.get_("x-replaced"));
+  EXPECT_FALSE(metadata.has("x-cleared"));
+}
+
+// A per-route config can combine a gRPC service with formatters and grpc_initial_metadata.
+TEST(HttpExtProcConfigTest, PerRouteAllowsFormattersWithGrpcInitialMetadata) {
   ExternalProcessingFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(R"EOF(
@@ -861,13 +935,32 @@ TEST(HttpExtProcConfigTest, PerRouteRejectsFormattersWithGrpcInitialMetadata) {
                             *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, parseGrpcServiceInitialMetadata(_, _))
-      .Times(0);
-  EXPECT_THAT(factory.createRouteSpecificFilterConfig(*proto_config, context,
-                                                      context.messageValidationVisitor()),
-              HasStatus(absl::StatusCode::kInvalidArgument,
-                        "ext_proc per-route overrides can't set grpc_initial_metadata when their "
-                        "grpc_service configures formatters"));
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("route_server"), _))
+      .WillOnce(testing::Return(std::make_shared<const NoopHeaderEvaluator>()));
+  EXPECT_TRUE(factory
+                  .createRouteSpecificFilterConfig(*proto_config, context,
+                                                   context.messageValidationVisitor())
+                  .ok());
+}
+
+// Per-route grpc_initial_metadata that fails to parse is rejected when the route config is created.
+TEST(HttpExtProcConfigTest, PerRouteInvalidGrpcInitialMetadataRejected) {
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(R"EOF(
+  overrides:
+    grpc_initial_metadata:
+    - key: x-route
+      value: "%NOT_A_COMMAND%"
+  )EOF",
+                            *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_FALSE(factory
+                   .createRouteSpecificFilterConfig(*proto_config, context,
+                                                    context.messageValidationVisitor())
+                   .ok());
 }
 
 TEST(HttpExtProcConfigTest, PerRouteParseGrpcInitialMetadataError) {

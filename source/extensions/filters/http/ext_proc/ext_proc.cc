@@ -9,6 +9,7 @@
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -226,6 +227,61 @@ void mergeHeaderValuesField(
     metadata.Add()->CopyFrom(header);
   }
 }
+
+std::vector<GrpcInitialMetadataLayerConstSharedPtr>
+mergeGrpcInitialMetadataLayers(const FilterConfigPerRoute& less_specific,
+                               const FilterConfigPerRoute& more_specific) {
+  std::vector<GrpcInitialMetadataLayerConstSharedPtr> layers(
+      less_specific.grpcInitialMetadataLayers());
+  layers.insert(layers.end(), more_specific.grpcInitialMetadataLayers().begin(),
+                more_specific.grpcInitialMetadataLayers().end());
+  return layers;
+}
+
+// A gRPC service's initial metadata, with per-route grpc_initial_metadata layered on top from least
+// to most specific. This gives the same result as merging the layers into the service's
+// initial_metadata and parsing that: a header that a layer sets replaces the header from the less
+// specific levels, even if its value is empty, which omits the header.
+class LayeredGrpcInitialMetadata : public Http::HeaderEvaluator {
+public:
+  LayeredGrpcInitialMetadata(Grpc::GrpcServiceInitialMetadataSharedPtr service_metadata,
+                             std::vector<GrpcInitialMetadataLayerConstSharedPtr> layers)
+      : service_metadata_(std::move(service_metadata)), layers_(std::move(layers)) {}
+
+  // Http::HeaderEvaluator
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
+                       const StreamInfo::StreamInfo& stream_info) const override {
+    if (service_metadata_ != nullptr) {
+      evaluateLevel(*service_metadata_, 0, headers, context, stream_info);
+    }
+    for (size_t i = 0; i < layers_.size(); ++i) {
+      evaluateLevel(*layers_[i]->parser, i + 1, headers, context, stream_info);
+    }
+  }
+
+private:
+  // Adds the headers that `evaluator` sets to `headers`, except those that the layers from
+  // `first_overriding_layer` on set.
+  void evaluateLevel(const Http::HeaderEvaluator& evaluator, size_t first_overriding_layer,
+                     Http::HeaderMap& headers, const Formatter::Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const {
+    Http::RequestHeaderMapPtr level_headers = Http::RequestHeaderMapImpl::create();
+    evaluator.evaluateHeaders(*level_headers, context, stream_info);
+    for (size_t i = first_overriding_layer; i < layers_.size(); ++i) {
+      for (const Http::LowerCaseString& key : layers_[i]->keys) {
+        level_headers->remove(key);
+      }
+    }
+    level_headers->iterate([&headers](const Http::HeaderEntry& header) {
+      headers.setCopy(Http::LowerCaseString(header.key().getStringView()),
+                      header.value().getStringView());
+      return Http::HeaderMap::Iterate::Continue;
+    });
+  }
+
+  const Grpc::GrpcServiceInitialMetadataSharedPtr service_metadata_;
+  const std::vector<GrpcInitialMetadataLayerConstSharedPtr> layers_;
+};
 
 template <typename ConfigType>
 std::function<std::unique_ptr<ProcessingRequestModifier>()> createProcessingRequestModifierCb(
@@ -646,16 +702,39 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   return {};
 }
 
+absl::StatusOr<GrpcInitialMetadataLayerConstSharedPtr> createGrpcInitialMetadataLayer(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& grpc_initial_metadata) {
+  if (grpc_initial_metadata.empty()) {
+    return nullptr;
+  }
+  auto parser_or_error = Router::HeaderParser::configure(
+      grpc_initial_metadata,
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  RETURN_IF_NOT_OK_REF(parser_or_error.status());
+  auto layer = std::make_shared<GrpcInitialMetadataLayer>();
+  layer->parser = std::move(*parser_or_error);
+  for (const auto& header : grpc_initial_metadata) {
+    layer->keys.emplace_back(header.key());
+  }
+  return layer;
+}
+
 FilterConfigPerRoute::FilterConfigPerRoute(
     const ExtProcPerRoute& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     Server::Configuration::CommonFactoryContext& context,
-    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata)
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata,
+    GrpcInitialMetadataLayerConstSharedPtr grpc_initial_metadata_layer)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
       grpc_service_(initGrpcService(config)),
       parsed_grpc_initial_metadata_(std::move(parsed_grpc_initial_metadata)),
       grpc_initial_metadata_(config.overrides().grpc_initial_metadata().begin(),
                              config.overrides().grpc_initial_metadata().end()),
+      grpc_initial_metadata_layers_(
+          grpc_initial_metadata_layer != nullptr
+              ? std::vector<GrpcInitialMetadataLayerConstSharedPtr>{std::move(
+                    grpc_initial_metadata_layer)}
+              : std::vector<GrpcInitialMetadataLayerConstSharedPtr>{}),
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
       untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)),
@@ -684,6 +763,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
                                         ? more_specific.parsedGrpcInitialMetadata()
                                         : less_specific.parsedGrpcInitialMetadata()),
       grpc_initial_metadata_(mergeGrpcInitialMetadata(less_specific, more_specific)),
+      grpc_initial_metadata_layers_(mergeGrpcInitialMetadataLayers(less_specific, more_specific)),
       untyped_forwarding_namespaces_(more_specific.untypedForwardingMetadataNamespaces().has_value()
                                          ? more_specific.untypedForwardingMetadataNamespaces()
                                          : less_specific.untypedForwardingMetadataNamespaces()),
@@ -2247,6 +2327,8 @@ void Filter::mergePerRouteConfig() {
   if (!merged_config->grpcInitialMetadata().empty()) {
     ENVOY_STREAM_LOG(trace, "Overriding grpc initial metadata from per-route configuration",
                      *decoder_callbacks_);
+    // The merged proto keys the gRPC client cache. The client applies the route configs' parsed
+    // grpc_initial_metadata on top of the service's, which gives the same initial metadata.
     envoy::config::core::v3::GrpcService config = config_with_hash_key_.config();
     auto ptr = config.mutable_initial_metadata();
     for (const auto& header : merged_config->grpcInitialMetadata()) {
@@ -2254,8 +2336,9 @@ void Filter::mergePerRouteConfig() {
                        header.key(), header.value());
       mergeHeaderValuesField(*ptr, header);
     }
-    // The merged initial metadata can't be parsed on the main thread.
-    config_with_hash_key_.setConfig(config, nullptr);
+    config_with_hash_key_.setConfig(config, std::make_shared<const LayeredGrpcInitialMetadata>(
+                                                config_with_hash_key_.initialMetadata(),
+                                                merged_config->grpcInitialMetadataLayers()));
   }
 
   // For metadata namespaces, we only override the existing value if we have a

@@ -81,27 +81,20 @@ ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
     ProtobufMessage::ValidationVisitor& validator) {
   Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata;
   if (proto_config.has_overrides() && proto_config.overrides().has_grpc_service()) {
-    const auto& overrides = proto_config.overrides();
-    // `grpc_initial_metadata` is merged into the service's initial metadata at request time, on a
-    // worker thread, where formatter extensions can't be used.
-    // TODO(ggreenway): allow this configuration by doing multiple passes of generating the set
-    // of initial metadata from least to most specific overwriting previous levels.
-    if (!overrides.grpc_service().formatters().empty() &&
-        !overrides.grpc_initial_metadata().empty()) {
-      return absl::InvalidArgumentError(
-          "ext_proc per-route overrides can't set grpc_initial_metadata when their grpc_service "
-          "configures formatters");
-    }
     Server::GenericFactoryContextImpl generic_context(server_context, validator);
     auto initial_metadata_or_error =
         server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
-            overrides.grpc_service(), generic_context);
+            proto_config.overrides().grpc_service(), generic_context);
     RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
     parsed_grpc_initial_metadata = std::move(*initial_metadata_or_error);
   }
+  auto grpc_initial_metadata_layer_or_error =
+      createGrpcInitialMetadataLayer(proto_config.overrides().grpc_initial_metadata());
+  RETURN_IF_NOT_OK_REF(grpc_initial_metadata_layer_or_error.status());
   return std::make_shared<FilterConfigPerRoute>(
       proto_config, Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context),
-      server_context, std::move(parsed_grpc_initial_metadata));
+      server_context, std::move(parsed_grpc_initial_metadata),
+      std::move(*grpc_initial_metadata_layer_or_error));
 }
 
 absl::StatusOr<Http::FilterFactoryCb>

@@ -67,7 +67,7 @@ failure_mode_allow: true)EOF";
 
   ExtProcPerRoute route_proto;
   route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(false);
-  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_, nullptr);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_, nullptr, nullptr);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(
           testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
@@ -99,7 +99,7 @@ failure_mode_allow: false)EOF";
 
   ExtProcPerRoute route_proto;
   route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(true);
-  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_, nullptr);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_, nullptr, nullptr);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(
           testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
@@ -183,7 +183,7 @@ failure_mode_allow: true)EOF";
   // This override does not set failure_mode_allow, so the filter's value should still apply.
   route_proto.mutable_overrides()->mutable_processing_mode()->set_response_header_mode(
       ProcessingMode::SKIP);
-  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_, nullptr);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_, nullptr, nullptr);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(
           testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
@@ -216,12 +216,12 @@ failure_mode_allow: true)EOF";
   ExtProcPerRoute route_proto_less_specific;
   route_proto_less_specific.mutable_overrides()->mutable_failure_mode_allow()->set_value(true);
   FilterConfigPerRoute route_config_less_specific(route_proto_less_specific, builder_,
-                                                  factory_context_, nullptr);
+                                                  factory_context_, nullptr, nullptr);
 
   ExtProcPerRoute route_proto_more_specific;
   route_proto_more_specific.mutable_overrides()->mutable_failure_mode_allow()->set_value(false);
   FilterConfigPerRoute route_config_more_specific(route_proto_more_specific, builder_,
-                                                  factory_context_, nullptr);
+                                                  factory_context_, nullptr, nullptr);
 
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs {

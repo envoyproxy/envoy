@@ -36,6 +36,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:header_parser_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/common/processing_effect:processing_effect_lib",

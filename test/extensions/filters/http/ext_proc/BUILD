@@ -27,6 +27,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:status_utility_lib",
     ],
 )
@@ -464,6 +465,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/match_delegate:config",
         "//source/extensions/filters/http/set_metadata:config",
         "//source/extensions/formatter/cel:config",
+        "//source/extensions/formatter/generic_secret:config",
         "//source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder:mapped_attribute_builder_lib",
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/retry/host/previous_hosts:config",
@@ -483,6 +485,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/formatter/generic_secret/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/retry/host/previous_hosts/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
