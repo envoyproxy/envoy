@@ -26,7 +26,7 @@ common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/741b0b5a4dafe4633f57c4110e425b8eb5511c84
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -82,6 +82,7 @@ build --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-deprecated-declarations
 build --per_file_copt=external/c-ares.*@-Wno-unused-function
 build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
 build --per_file_copt=external/libprotobuf-mutator.*@-Wno-unused-result
+build --per_file_copt=external/librdkafka.*@-Wno-unused-variable,-Wno-unused-but-set-variable,-Wno-sometimes-uninitialized,-Wno-uninitialized,-Wno-implicit-enum-enum-cast
 build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
 
 

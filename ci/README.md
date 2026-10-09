@@ -196,8 +196,10 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `lockfiles`/`lockfiles.regenerate` &mdash; regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
 * `lockfiles.check` &mdash; regenerate all `MODULE.bazel.lock` files and fail with a diff summary if any lockfile changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
 * `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, and dependabot configuration.
-* `registry` &mdash; update the Envoy bazel-registry hash in `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate all `MODULE.bazel.lock` files. Set `ENVOY_REGISTRY_HASH` to use a specific hash, `ENVOY_REGISTRY_REPO` to override the repository used for `git ls-remote`, or `ENVOY_REGISTRY_BRANCH` to override the branch used for the bump and checked by `deps`/`registry.check`.
-* `registry.check` &mdash; verify the pinned bazel-registry commit exists, is an ancestor of the target branch (`ENVOY_REGISTRY_BRANCH`, default `main`), and (for non-`-dev` versions) is tagged.
+* `deps.report` &mdash; run the per-workspace bzlmod dependency report targets and print the current/latest version status for each workspace.
+* `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate all `MODULE.bazel.lock` files.
+* `registry` &mdash; run the per-workspace Bazel registry updater targets for `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate all `MODULE.bazel.lock` files. Set `ENVOY_REGISTRY_HASH` to request a specific hash, and set `ENVOY_REGISTRY_ALLOW_UNSAFE` to allow non-ancestor pins for testing.
+* `registry.check` &mdash; run the per-workspace Bazel registry status targets, verify they all report the same pinned hash, and require a tagged registry pin for non-`-dev` releases.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 ## On Windows

@@ -484,6 +484,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_cluster_lb_get_member_update_host_
 WEAK_STUB_VOID(envoy_dynamic_module_callback_cluster_pre_init_complete,
                envoy_dynamic_module_type_cluster_envoy_ptr)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_cluster_use_persistent_host_map,
+               envoy_dynamic_module_type_cluster_envoy_ptr)
+
 WEAK_STUB(size_t, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count, 0,
           envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t)
 
@@ -3096,6 +3099,11 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_http_set_dynamic_typed_metadata,
                envoy_dynamic_module_type_http_filter_envoy_ptr,
                envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_typed_metadata, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_envoy_buffer*, envoy_dynamic_module_type_envoy_buffer*)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_string, false,
           envoy_dynamic_module_type_http_filter_envoy_ptr,
           envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
@@ -3402,6 +3410,18 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_http_filter_recreate_stream, false
 
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_clear_route_cluster_cache,
                envoy_dynamic_module_type_http_filter_envoy_ptr)
+
+WEAK_STUB(size_t, envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe, 0,
+          envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_filter_get_generic_secret, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr, size_t,
+          envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_filter_config_get_generic_secret, false,
+          envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+          envoy_dynamic_module_type_envoy_buffer*)
 
 WEAK_STUB_VOID(envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol,
                envoy_dynamic_module_type_listener_filter_envoy_ptr,

@@ -122,6 +122,25 @@ protected:
     lds_upstream_info_.stream_->sendGrpcMessage(response);
   }
 
+  // Close the LDS stream and connection before the fixture tears down. Envoy may still be sending
+  // discovery requests (e.g. a NACK) on the fake upstream thread, so destroying the FakeStream
+  // without this races with that thread.
+  void cleanupLdsConnection() {
+    if (lds_upstream_info_.stream_) {
+      lds_upstream_info_.stream_->finishGrpcStream(Grpc::Status::Ok);
+    }
+    if (lds_upstream_info_.connection_) {
+      AssertionResult result = lds_upstream_info_.connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_upstream_info_.connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+    // Allow worker threads time to process the stream closure before destroying objects.
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+    lds_upstream_info_.stream_.reset();
+    lds_upstream_info_.connection_.reset();
+  }
+
   // Helper function to configure reverse tunnel setup.
   using TunnelClusterModifier = std::function<void(envoy::config::cluster::v3::Cluster*)>;
   using TunnelListenerModifier = std::function<void(envoy::config::listener::v3::FilterChain*)>;
@@ -1234,22 +1253,7 @@ typed_config:
   ENVOY_LOG_MISC(info, "Initiator resilience test completed successfully!");
 
   // Cleanup LDS connection first to prevent race with FakeStream destruction.
-  // Finish the gRPC stream to ensure no more messages are being processed.
-  if (lds_upstream_info_.stream_) {
-    lds_upstream_info_.stream_->finishGrpcStream(Grpc::Status::Ok);
-  }
-  if (lds_upstream_info_.connection_) {
-    AssertionResult result = lds_upstream_info_.connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = lds_upstream_info_.connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-  }
-  // Allow worker threads time to process the stream closure before destroying objects.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
-
-  // Now reset the pointers.
-  lds_upstream_info_.stream_.reset();
-  lds_upstream_info_.connection_.reset();
+  cleanupLdsConnection();
 
   // Cleanup connections before server shutdown.
   cleanupUpstreamAndDownstream();
@@ -1515,6 +1519,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, OutOfRangeReverseConnectionListe
     HttpIntegrationTest::initialize();
     test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
   });
+
+  cleanupLdsConnection();
 }
 
 } // namespace

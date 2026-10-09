@@ -910,6 +910,20 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       "ns_req_header_typed",
       &[0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02],
     );
+    let (type_url, value) = envoy_filter
+      .get_typed_metadata(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_req_header_typed",
+      )
+      .unwrap();
+    assert_eq!(type_url.as_slice(), b"t/x");
+    assert_eq!(value.as_slice(), &[0x01, 0x02]);
+    assert!(envoy_filter
+      .get_typed_metadata(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "missing"
+      )
+      .is_none());
 
     // Try getting metadata from rotuer cluster and host.
     let metadata = envoy_filter.get_metadata_string(

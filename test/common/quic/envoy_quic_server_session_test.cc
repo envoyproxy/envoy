@@ -989,6 +989,56 @@ TEST_F(EnvoyQuicServerSessionTest, GoAway) {
   EXPECT_EQ(1U, stats_.goaway_sent_.value());
 }
 
+TEST_F(EnvoyQuicServerSessionTest, CreateIncomingStreamGoAwayOnDispatch) {
+  Server::MockLoadShedPoint go_away_lsp;
+  ON_CALL(overload_manager_,
+          getLoadShedPoint(Server::LoadShedPointName::get().H3ServerGoAwayOnDispatch))
+      .WillByDefault(Return(&go_away_lsp));
+  installReadFilter();
+
+  testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
+  envoy_quic_session_.set_debug_visitor(&debug_visitor);
+
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks1, stream_callbacks2;
+  setupRequestDecoderMock(request_decoder);
+  EXPECT_CALL(request_decoder, accessLogHandlers()).Times(2);
+
+  EXPECT_CALL(go_away_lsp, shouldShedLoad()).WillRepeatedly(Return(true));
+  EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+
+  auto* stream1 = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(4u, request_decoder, stream_callbacks1));
+  ASSERT_NE(nullptr, stream1);
+
+  // Subsequent stream creation should not send a duplicate GOAWAY frame.
+  auto* stream2 = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(8u, request_decoder, stream_callbacks2));
+  ASSERT_NE(nullptr, stream2);
+
+  EXPECT_CALL(stream_callbacks1, onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream1->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_CALL(stream_callbacks2, onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream2->resetStream(Http::StreamResetReason::LocalReset);
+}
+
+TEST_F(EnvoyQuicServerSessionTest, CreateIncomingStreamGoAwayAndCloseOnDispatch) {
+  Server::MockLoadShedPoint go_away_and_close_lsp;
+  ON_CALL(overload_manager_,
+          getLoadShedPoint(Server::LoadShedPointName::get().H3ServerGoAwayAndCloseOnDispatch))
+      .WillByDefault(Return(&go_away_and_close_lsp));
+  installReadFilter();
+
+  EXPECT_CALL(go_away_and_close_lsp, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_PEER_GOING_AWAY, _, "Server overloaded"));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+
+  EXPECT_EQ(nullptr, envoy_quic_session_.GetOrCreateStream(4u));
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+  EXPECT_FALSE(quic_connection_->connected());
+}
+
 TEST_F(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
   installReadFilter();
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));

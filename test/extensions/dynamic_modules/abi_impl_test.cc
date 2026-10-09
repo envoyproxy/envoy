@@ -722,6 +722,8 @@ WEAK_STUB(ClusterAddHostsWithHostnames,
 WEAK_STUB(ClusterRemoveHosts,
           envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, nullptr, 0))
 WEAK_STUB(ClusterPreInitComplete, envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr))
+WEAK_STUB(ClusterUsePersistentHostMap,
+          envoy_dynamic_module_callback_cluster_use_persistent_host_map(nullptr))
 WEAK_STUB(ClusterLbGetHealthyHostCount,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0))
 WEAK_STUB(ClusterLbGetHealthyHost,
@@ -1972,6 +1974,9 @@ WEAK_STUB(HttpSetDynamicMetadataStruct,
 WEAK_STUB(HttpSetDynamicTypedMetadata,
           envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(nullptr, {nullptr, 0},
                                                                         {nullptr, 0}))
+WEAK_STUB(HttpGetTypedMetadata, envoy_dynamic_module_callback_http_get_typed_metadata(
+                                    nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                    {nullptr, 0}, nullptr, nullptr))
 WEAK_STUB(HttpGetMetadataString, envoy_dynamic_module_callback_http_get_metadata_string(
                                      nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                      {nullptr, 0}, {nullptr, 0}, nullptr))

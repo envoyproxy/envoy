@@ -127,11 +127,11 @@ public:
   Buffer::Instance* current_request_body_ = nullptr;
   Buffer::Instance* current_response_body_ = nullptr;
 
-  // Scratch buffers for values returned by filter-state and host metadata getters. They must
+  // Scratch buffers for values returned by filter-state and metadata getters. They must
   // outlive the getter call so the module can read them until the current event hook returns. The
   // deque keeps stable element addresses, so appending a serialized value never invalidates an
-  // earlier view. Metadata is held by shared pointer, so its pointee stays valid regardless of
-  // vector growth.
+  // earlier view. Host metadata is held by shared pointer, so its pointee stays valid regardless
+  // of vector growth.
   std::deque<std::string> filter_state_scratch_;
   std::vector<Upstream::MetadataConstSharedPtr> metadata_scratch_;
 

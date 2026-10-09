@@ -256,6 +256,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "host_lookup_map_lib",
+    hdrs = ["host_lookup_map.h"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:macros",
+        "//source/common/common:persistent_hash_map_lib",
+        "@abseil-cpp//absl/functional:function_ref",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
+)
+
+envoy_cc_library(
     name = "host_utility_lib",
     srcs = ["host_utility.cc"],
     hdrs = ["host_utility.h"],
@@ -480,6 +493,7 @@ envoy_cc_library(
         "upstream_impl.h",
     ],
     deps = [
+        ":host_lookup_map_lib",
         ":load_balancer_context_base_lib",
         ":locality_pool_lib",
         ":resource_manager_lib",
@@ -522,6 +536,7 @@ envoy_cc_library(
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
+        "@abseil-cpp//absl/functional:function_ref",
         "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

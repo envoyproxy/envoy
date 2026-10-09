@@ -7,6 +7,8 @@
 #     changelog filenames in changelogs/current/<section>/<area>__<slug>.rst.
 #     In filenames, '/' MUST be encoded as '~'.
 #     Adding a new area requires a PR updating this file.
+#     Areas MUST be kept in alphabetical order, with a blank line between
+#     each initial-letter block.
 
 sections:
   changes:
@@ -58,10 +60,12 @@ areas:
     title: attributes
   aws:
     title: aws
+
   basic_auth:
     title: basic_auth
   build:
     title: build
+
   cache:
     title: cache
   cares:
@@ -78,10 +82,11 @@ areas:
     title: config
   contrib:
     title: contrib
-  credential_injector:
-    title: credential_injector
   cpu_utilization:
     title: cpu_utilization
+  credential_injector:
+    title: credential_injector
+
   dns:
     title: dns
   dns_resolver:
@@ -92,26 +97,30 @@ areas:
     title: dynamic_forward_proxy
   dynamic_modules:
     title: dynamic_modules
+
   ext_authz:
     title: ext_authz
   ext_proc:
     title: ext_proc
+
   filter_chain:
     title: filter_chain
   formatter:
     title: formatter
+
   gcp_authn:
     title: gcp_authn
-  geoip:
-    title: geoip
   generic_proxy:
     title: generic_proxy
+  geoip:
+    title: geoip
   golang:
     title: golang
   grpc_field_extraction:
     title: grpc_field_extraction
   grpc_http1_reverse_bridge:
     title: grpc_http1_reverse_bridge
+
   happy_eyeballs:
     title: happy_eyeballs
   http:
@@ -124,10 +133,13 @@ areas:
     title: http_compressor
   http_inspector:
     title: http_inspector
+
   ip_tagging:
     title: ip_tagging
+
   jwt_authn:
     title: jwt_authn
+
   listener:
     title: listener
   load_balancing:
@@ -140,6 +152,7 @@ areas:
     title: logging
   lua:
     title: lua
+
   matching:
     title: matching
   mcp:
@@ -152,8 +165,10 @@ areas:
     title: mcp_transcoder
   mysql_proxy:
     title: mysql_proxy
+
   network_ext_proc:
     title: network_ext_proc
+
   oauth2:
     title: oauth2
   on_demand:
@@ -166,12 +181,15 @@ areas:
     title: original_dst
   overload_manager:
     title: overload_manager
+
   postgres_proxy:
     title: postgres_proxy
   proxy_protocol:
     title: proxy_protocol
+
   quic:
     title: quic
+
   ratelimit:
     title: ratelimit
   ratelimit_descriptors:
@@ -188,6 +206,7 @@ areas:
     title: reverse_tunnel
   router:
     title: router
+
   safe_regex:
     title: safe_regex
   sds:
@@ -204,18 +223,20 @@ areas:
     title: stat_sinks
   stats:
     title: stats
+
   tap:
     title: tap
   tcp_proxy:
     title: tcp_proxy
+  thrift_proxy:
+    title: thrift_proxy
   tls:
     title: tls
   tls_inspector:
     title: tls_inspector
   tracing:
     title: tracing
-  thrift_proxy:
-    title: thrift_proxy
+
   udp:
     title: udp
   upstream:
@@ -224,14 +245,17 @@ areas:
     title: uri_template
   url_normalization:
     title: url_normalization
+
   vhds:
     title: vhds
-  watchdog:
-    title: watchdog
+
   wasm:
     title: wasm
+  watchdog:
+    title: watchdog
   websocket:
     title: websocket
+
   zipkin:
     title: zipkin
   zstd:

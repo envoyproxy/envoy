@@ -117,8 +117,15 @@ constexpr const char* envoy_dynamic_modules_abi_version = ENVOY_DYNAMIC_MODULES_
 
 extern "C" {
 #else
+#ifdef _MSC_VER
+// COFF weak definitions do not merge reliably across objects (e.g. when several modules are
+// statically linked into the same binary), so use a COMDAT instead.
+__declspec(selectany) const char* envoy_dynamic_modules_abi_version =
+    ENVOY_DYNAMIC_MODULES_ABI_VERSION;
+#else
 const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
     ENVOY_DYNAMIC_MODULES_ABI_VERSION;
+#endif
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -2424,6 +2431,26 @@ void envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns,
     envoy_dynamic_module_type_module_buffer serialized_any);
+
+/**
+ * Retrieves the type URL and value of the google.protobuf.Any in the given metadata namespace.
+ * Returns false if the metadata source or namespace is unavailable.
+ *
+ * The result buffers are owned by Envoy and are valid until the end of the current event hook
+ * unless a setter callback modifies the metadata.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the typed metadata.
+ * @param type_url receives the Any type_url.
+ * @param value receives the Any value, containing the serialized message payload.
+ * @return true if typed metadata was found, false otherwise. Empty fields are valid results.
+ */
+bool envoy_dynamic_module_callback_http_get_typed_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_envoy_buffer* type_url,
+    envoy_dynamic_module_type_envoy_buffer* value);
 
 /**
  * envoy_dynamic_module_callback_http_get_metadata_string is called by the module to get
@@ -10450,8 +10477,10 @@ bool envoy_dynamic_module_callback_cluster_update_host_health(
 
 /**
  * envoy_dynamic_module_callback_cluster_find_host_by_address looks up a host by its address string
- * across all priorities in the cluster and returns the host pointer. This provides O(1) lookup by
- * address using the cross-priority host map.
+ * across all priorities in the cluster and returns the host pointer. This uses the cross-priority
+ * host map internally, so the lookup is O(1) with the default flat host map, or O(log N) if the
+ * cluster selected the persistent host map via
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
  *
  * The address string must match the format ``ip:port`` (e.g., ``10.0.0.1:8080``).
  *
@@ -10474,6 +10503,22 @@ envoy_dynamic_module_callback_cluster_find_host_by_address(
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
  */
 void envoy_dynamic_module_callback_cluster_pre_init_complete(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map backs the cross-priority host map
+ * of the cluster with a persistent map instead of the default flat map. The flat map is copied in
+ * full on every host update, so clusters with many hosts and frequent updates can use this to make
+ * each update cost O(log N) instead. In exchange a lookup by address costs O(log N) rather than
+ * O(1).
+ *
+ * This is optional and must be called on the main thread during
+ * envoy_dynamic_module_on_cluster_init before any host is added. A call made after a host has
+ * been added or off the main thread has no effect and is reported as a bug.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ */
+void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
 
 /**
@@ -10617,7 +10662,9 @@ envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_cluster_lb_g
 /**
  * envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address looks up a host by its
  * address string across all priorities and returns the health status. This uses the cross-priority
- * host map internally, providing O(1) lookup by address.
+ * host map internally, so the lookup is O(1) with the default flat host map, or O(log N) if the
+ * cluster selected the persistent host map via
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
  *
  * The address string must match the format ``ip:port`` (e.g., ``10.0.0.1:8080``).
  *
@@ -10633,7 +10680,9 @@ bool envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
 /**
  * envoy_dynamic_module_callback_cluster_lb_find_host_by_address looks up a host by its address
  * string across all priorities in the cluster's priority set and returns the host pointer. This
- * uses the cross-priority host map internally, providing O(1) lookup by address.
+ * uses the cross-priority host map internally, so the lookup is O(1) with the default flat host
+ * map, or O(log N) if the cluster selected the persistent host map via
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
  *
  * Unlike envoy_dynamic_module_callback_cluster_find_host_by_address which operates on the
  * cluster_envoy_ptr (main thread), this operates on the lb_envoy_ptr and is safe to call from
@@ -11986,8 +12035,9 @@ envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_lb_get_host_
 /**
  * envoy_dynamic_module_callback_lb_get_host_health_by_address looks up a host by its address
  * string across all priorities and returns the health status. This uses the cross-priority host
- * map internally, providing O(1) lookup by address instead of requiring the caller to iterate
- * through all hosts by index.
+ * map internally instead of requiring the caller to iterate through all hosts by index. The lookup
+ * is O(1) with the default flat host map, or O(log N) if the cluster selected the persistent host
+ * map via envoy_dynamic_module_callback_cluster_use_persistent_host_map.
  *
  * The address string must match the format returned by host->address()->asStringView(), which is
  * typically "ip:port" (e.g., "10.0.0.1:8080").

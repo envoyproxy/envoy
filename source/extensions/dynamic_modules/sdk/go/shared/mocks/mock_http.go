@@ -1046,6 +1046,22 @@ func (mr *MockHttpFilterHandleMockRecorder) GetMetadataString(source, metadataNa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataString", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataString), source, metadataNamespace, key)
 }
 
+// GetTypedMetadata mocks base method.
+func (m *MockHttpFilterHandle) GetTypedMetadata(source shared.MetadataSourceType, metadataNamespace string) (shared.UnsafeEnvoyBuffer, shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTypedMetadata", source, metadataNamespace)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(shared.UnsafeEnvoyBuffer)
+	ret2, _ := ret[2].(bool)
+	return ret0, ret1, ret2
+}
+
+// GetTypedMetadata indicates an expected call of GetTypedMetadata.
+func (mr *MockHttpFilterHandleMockRecorder) GetTypedMetadata(source, metadataNamespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTypedMetadata", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetTypedMetadata), source, metadataNamespace)
+}
+
 // GetMostSpecificConfig mocks base method.
 func (m *MockHttpFilterHandle) GetMostSpecificConfig() any {
 	m.ctrl.T.Helper()
