@@ -973,6 +973,11 @@ TransactionRequest::create(Router& router, Common::Redis::RespValuePtr&& incomin
   // If we do a WATCH command without having started a transaction, we send it upstream and save the
   // key, so we can support UNWATCH. We have to also set the connection details.
   if (command_name == "watch" && !transaction.active_) {
+    // WATCH requires at least one key argument. A bare WATCH must not index past the request array.
+    if (incoming_request->asArray().size() < 2) {
+      onWrongNumberOfArguments(callbacks, *incoming_request);
+      return nullptr;
+    }
     transaction.key_ = incoming_request->asArray()[1].asString();
   }
 
@@ -995,6 +1000,12 @@ TransactionRequest::create(Router& router, Common::Redis::RespValuePtr&& incomin
       return nullptr;
     }
 
+    // Deriving the transaction key requires a key argument; reject a request that has none rather
+    // than indexing past the request array.
+    if (incoming_request->asArray().size() < 2) {
+      onWrongNumberOfArguments(callbacks, *incoming_request);
+      return nullptr;
+    }
     transaction.key_ = incoming_request->asArray()[1].asString();
     route = router.upstreamPool(transaction.key_, stream_info);
     Common::Redis::RespValueSharedPtr multi_request =
