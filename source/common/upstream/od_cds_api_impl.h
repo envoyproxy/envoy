@@ -11,6 +11,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/config/resource_type_helper.h"
@@ -19,6 +20,18 @@
 
 namespace Envoy {
 namespace Upstream {
+
+/**
+ * All ODCDS stats. @see stats_macros.h
+ */
+#define ALL_ODCDS_STATS(COUNTER) COUNTER(known_missing_answers)
+
+/**
+ * Struct definition for all ODCDS stats. @see stats_macros.h
+ */
+struct OdCdsStats {
+  ALL_ODCDS_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 enum class StartStatus {
   // No initial fetch started.
@@ -48,7 +61,7 @@ public:
   bool isKnownMissing(absl::string_view cluster_name) const override {
     return missing_names_.contains(cluster_name);
   }
-  void recordKnownMissingAnswer() override { known_missing_answers_.inc(); }
+  void recordKnownMissingAnswer() override { stats_.known_missing_answers_.inc(); }
 
 private:
   // Config::SubscriptionCallbacks
@@ -71,7 +84,7 @@ private:
   CdsApiHelper helper_;
   MissingClusterNotifier& notifier_;
   Stats::ScopeSharedPtr scope_;
-  Stats::Counter& known_missing_answers_;
+  OdCdsStats stats_;
   StartStatus status_{StartStatus::NotStarted};
   absl::flat_hash_set<std::string> awaiting_names_;
   // The names requested on demand through this instance. The delta subscription keeps the same

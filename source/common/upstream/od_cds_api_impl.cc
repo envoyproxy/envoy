@@ -32,7 +32,7 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
                            absl::Status& creation_status)
     : helper_(cm, xds_manager, "odcds"), notifier_(notifier),
       scope_(scope.createScope("cluster_manager.odcds.")),
-      known_missing_answers_(scope_->counterFromString("known_missing_answers")),
+      stats_({ALL_ODCDS_STATS(POOL_COUNTER(*scope_))}),
       resource_type_helper_(validation_visitor, "name") {
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
@@ -149,8 +149,7 @@ public:
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
       : xds_manager_(xds_manager), helper_(cm, xds_manager, "odcds-xdstp"), notifier_(notifier),
         scope_(scope.createScope("cluster_manager.odcds.")),
-        known_missing_answers_(scope_->counterFromString("known_missing_answers")),
-        validation_visitor_(validation_visitor) {}
+        stats_({ALL_ODCDS_STATS(POOL_COUNTER(*scope_))}), validation_visitor_(validation_visitor) {}
 
   absl::Status onResourceUpdate(absl::string_view resource_name,
                                 const Config::DecodedResourceRef& resource,
@@ -193,7 +192,7 @@ public:
     return it->second->isKnownMissing();
   }
 
-  void recordKnownMissingAnswer() { known_missing_answers_.inc(); }
+  void recordKnownMissingAnswer() { stats_.known_missing_answers_.inc(); }
 
   void addSubscription(absl::string_view resource_name, bool old_ads) {
     if (subscriptions_.contains(resource_name)) {
@@ -328,7 +327,7 @@ private:
   CdsApiHelper helper_;
   MissingClusterNotifier& notifier_;
   Stats::ScopeSharedPtr scope_;
-  Stats::Counter& known_missing_answers_;
+  OdCdsStats stats_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   // Maps a resource name to its subscription data.
   absl::flat_hash_map<std::string, PerSubscriptionDataPtr> subscriptions_;
