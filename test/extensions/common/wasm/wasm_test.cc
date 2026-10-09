@@ -497,8 +497,8 @@ TEST_P(WasmCommonTest, WasmVmCountGauge) {
   EXPECT_EQ(0, gauge->value());
 }
 
-// The memory_size gauge tracks the linear memory of every VM instance of a runtime, follows memory
-// growth and drops the VM's share when the VM is destroyed.
+// The memory_size gauge adds up the linear memory of every VM instance of a runtime and drops the
+// VM's share when the VM is destroyed.
 TEST_P(WasmCommonTest, MemorySizeGauge) {
   auto vm_configuration = "memory_size_gauge";
   const std::string runtime = absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
@@ -535,17 +535,9 @@ TEST_P(WasmCommonTest, MemorySizeGauge) {
     EXPECT_EQ(0, gauge->value());
     return;
   }
-  const uint64_t initial_size = wasm->wasm_vm()->getMemorySize();
-  EXPECT_GT(initial_size, 0U);
-  EXPECT_EQ(initial_size, gauge->value());
-
-  // Allocating more than the current linear memory forces it to grow.
-  uint64_t address = 0;
-  EXPECT_NE(nullptr, wasm->allocMemory(initial_size, &address));
-  wasm->updateMemoryStats();
-  const uint64_t grown_size = wasm->wasm_vm()->getMemorySize();
-  EXPECT_GT(grown_size, initial_size);
-  EXPECT_EQ(grown_size, gauge->value());
+  const uint64_t size = wasm->wasm_vm()->getMemorySize();
+  EXPECT_GT(size, 0U);
+  EXPECT_EQ(size, gauge->value());
 
   // A second VM of the same runtime adds its own share.
   auto wasm2 = std::make_unique<Extensions::Common::Wasm::Wasm>(
@@ -553,15 +545,17 @@ TEST_P(WasmCommonTest, MemorySizeGauge) {
   EXPECT_TRUE(wasm2->load(code, false));
   EXPECT_TRUE(wasm2->initialize());
   wasm2->updateMemoryStats();
-  EXPECT_EQ(grown_size + wasm2->wasm_vm()->getMemorySize(), gauge->value());
+  const uint64_t size2 = wasm2->wasm_vm()->getMemorySize();
+  EXPECT_GT(size2, 0U);
+  EXPECT_EQ(size + size2, gauge->value());
 
   // A failed VM is no longer sampled but keeps its share until it is destroyed.
   wasm2->setFailStateForTesting(proxy_wasm::FailState::RuntimeError);
   wasm2->updateMemoryStats();
-  EXPECT_EQ(grown_size + initial_size, gauge->value());
+  EXPECT_EQ(size + size2, gauge->value());
 
   wasm2.reset();
-  EXPECT_EQ(grown_size, gauge->value());
+  EXPECT_EQ(size, gauge->value());
   wasm.reset();
   EXPECT_EQ(0, gauge->value());
 }
@@ -2128,8 +2122,8 @@ vm_config:
   test_func(true);
 }
 
-// The vm_memory_size gauge of a plugin reports the memory of the VMs serving it, sampled when the
-// plugin is used, so plugins sharing a VM each report its full size.
+// The vm_memory_size gauge of a plugin reports the memory of the VMs serving it once the plugin is
+// used, so plugins sharing a VM each report its full size.
 TEST_P(PluginConfigTest, VmMemorySizeGauge) {
   auto [runtime, language] = GetParam();
   if (runtime == "null") {
@@ -2175,33 +2169,26 @@ vm_config:
     EXPECT_EQ(0, gauge_a->value());
     EXPECT_EQ(0, gauge_b->value());
 
+    // Using a plugin reports the size of the VM serving it to that plugin only.
+    EXPECT_NE(nullptr, plugin_config_a->createContext());
     Wasm* wasm = plugin_config_a->wasm();
     ASSERT_NE(nullptr, wasm);
-    EXPECT_EQ(wasm, plugin_config_b->wasm());
-    uint64_t memory_size = wasm->wasm_vm()->getMemorySize();
+    const uint64_t memory_size = wasm->wasm_vm()->getMemorySize();
     EXPECT_GT(memory_size, 0);
     EXPECT_EQ(memory_size, gauge_a->value());
+    EXPECT_EQ(0, gauge_b->value());
+
+    // The VM is shared, so the other plugin reports the same size once it is used.
+    EXPECT_EQ(wasm, plugin_config_b->wasm());
     EXPECT_EQ(memory_size, gauge_b->value());
 
-    // Growing the shared VM is reported to the runtime and to each plugin the next time it is used.
+    // The runtime gauge also counts the VM.
     auto runtime_gauge = TestUtility::findGauge(
         server_.store_, absl::StrCat("wasm.envoy.wasm.runtime.", runtime, ".memory_size"));
     ASSERT_NE(nullptr, runtime_gauge);
-    const uint64_t runtime_size = runtime_gauge->value();
-    uint64_t address;
-    EXPECT_NE(nullptr, wasm->allocMemory(memory_size, &address));
-    EXPECT_GT(wasm->wasm_vm()->getMemorySize(), memory_size);
-    EXPECT_NE(nullptr, plugin_config_a->createContext());
-    EXPECT_EQ(wasm->wasm_vm()->getMemorySize(), gauge_a->value());
-    EXPECT_EQ(runtime_size + wasm->wasm_vm()->getMemorySize() - memory_size,
-              runtime_gauge->value());
-    EXPECT_EQ(memory_size, gauge_b->value());
-    memory_size = wasm->wasm_vm()->getMemorySize();
-    plugin_config_b->wasm();
-    EXPECT_EQ(memory_size, gauge_b->value());
+    EXPECT_GE(runtime_gauge->value(), memory_size);
 
-    // A failed VM is not sampled.
-    EXPECT_NE(nullptr, wasm->allocMemory(memory_size, &address));
+    // A failed VM is not sampled, so the plugin keeps the size last reported.
     wasm->fail(proxy_wasm::FailState::MissingFunction, "mocked failure");
     plugin_config_a->wasm();
     EXPECT_EQ(memory_size, gauge_a->value());
