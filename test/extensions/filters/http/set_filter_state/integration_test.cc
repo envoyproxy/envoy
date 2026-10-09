@@ -291,6 +291,27 @@ TEST_F(SetMetadataIntegrationTest, RouteLevelLifeSpanOverride) {
   EXPECT_EQ(route->serializeAsString(), "route");
 }
 
+TEST_F(SetMetadataIntegrationTest, InvalidLifeSpan) {
+  const auto invalid_life_span =
+      static_cast<envoy::extensions::filters::http::set_filter_state::v3::Config::LifeSpan>(999);
+  auto status_or_life_span = SetFilterStateConfig::toFilterStateLifeSpan(invalid_life_span);
+  EXPECT_FALSE(status_or_life_span.ok());
+  EXPECT_EQ(status_or_life_span.status(), absl::InvalidArgumentError("Invalid LifeSpan"));
+
+  envoy::extensions::filters::http::set_filter_state::v3::Config proto_config;
+  proto_config.set_life_span(invalid_life_span);
+  SetFilterStateConfig factory;
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(proto_config, "", context_).IgnoreError(),
+      EnvoyException, "Proto constraint validation failed");
+  EXPECT_THROW_WITH_REGEX(
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context_.server_factory_context_,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .IgnoreError(),
+      EnvoyException, "Proto constraint validation failed");
+}
+
 } // namespace SetFilterState
 } // namespace HttpFilters
 } // namespace Extensions
