@@ -1142,9 +1142,8 @@ message Cluster {
   // plane) and you want to avoid stalling all other ADS updates.
   //
   // .. note::
-  //   This field only takes effect for clusters added dynamically via CDS after server startup.
-  //   Clusters loaded at server startup are placed directly in the active state and are never
-  //   subject to CDS pause gating.
+  //   Clusters added during server initialization are not subject to CDS pause gating; this
+  //   field only affects clusters added or updated via CDS after initialization completes.
   //
   // .. note::
   //   Setting this to ``false`` accepts a window where requests may receive 503 responses if

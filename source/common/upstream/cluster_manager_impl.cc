@@ -858,8 +858,12 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
   // Otherwise, applyUpdates() will fire with a dangling cluster reference.
   updates_map_.erase(cluster_name);
 
-  active_clusters_[cluster_name] = std::move(warming_it->second);
+  // Move the new ClusterData into active and erase from warming before destroying the old
+  // active ClusterData.
+  ClusterDataPtr new_data = std::move(warming_it->second);
   warming_clusters_.erase(warming_it);
+  ClusterDataPtr old_active = std::exchange(active_clusters_[cluster_name], std::move(new_data));
+  // old_active is destroyed here, after both maps are consistent.
 }
 
 bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const bool remove_ignored) {
