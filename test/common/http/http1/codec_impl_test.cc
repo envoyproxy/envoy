@@ -5445,7 +5445,7 @@ TEST_F(Http1ClientConnectionImplTest, EncodeHeadersEmptyMethod) {
 
   TestRequestHeaderMapImpl headers{{":method", ""}, {":path", "/"}};
   EXPECT_OK(request_encoder.encodeHeaders(headers, true));
-  // The empty method does not match any of the bodiless methods, so an explicit
+  // The empty method does not match any of the body-less methods, so an explicit
   // content-length is added.
   EXPECT_EQ(" / HTTP/1.1\r\ncontent-length: 0\r\n\r\n", output);
 }
