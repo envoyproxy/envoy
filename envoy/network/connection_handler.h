@@ -28,7 +28,16 @@ namespace Network {
 class NonDispatchedUdpPacketHandler {
 public:
   virtual ~NonDispatchedUdpPacketHandler() = default;
-  virtual void handle(uint32_t worker_index, const Network::UdpRecvData& packet) PURE;
+
+  /**
+   * @param worker_index the worker the packet was received on.
+   * @param listener_address the address the receiving listener is bound to, including its network
+   *        namespace if any. This may differ from the packet's local address, e.g. on transparent
+   *        sockets, and identifies the listener the packet belongs to.
+   * @param packet the received packet.
+   */
+  virtual void handle(uint32_t worker_index, const Network::Address::Instance& listener_address,
+                      const Network::UdpRecvData& packet) PURE;
 };
 
 // Additional options for ConnectionHandler::ActiveListener::shutdownListener.

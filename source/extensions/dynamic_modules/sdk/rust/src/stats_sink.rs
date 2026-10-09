@@ -6,6 +6,7 @@
 //! return a [`StatSink`] from it.
 
 use crate::{abi, ffi_export, EnvoyBuffer, EnvoyGaugeId, NewStatSinkConfigFunction};
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::ffi::{c_char, c_void};
 use std::marker::PhantomData;
@@ -719,7 +720,7 @@ impl EnvoyStatSinkConfig {
 /// [`EnvoyStatSinkConfigScheduler::commit`] to run [`StatSink::on_config_scheduled`] on the main
 /// thread. It is created by [`EnvoyStatSinkConfig::new_config_scheduler`] and releases the
 /// Envoy-side resource when dropped.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyStatSinkConfigScheduler: Send + Sync {
   /// Schedules [`StatSink::on_config_scheduled`] to run on the main thread with the given `event_id`.
   ///

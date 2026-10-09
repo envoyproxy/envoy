@@ -59,7 +59,7 @@ See `bazel/README.md` for full build documentation. Common commands:
 
 # Local (requires local dependencies)
 bazel test -c dbg //test/common/http/...                         # run tests
-bazel build --config=clang -c opt //source/exe:envoy-static      # optimized binary
+bazel build -c opt //source/exe:envoy-static                    # optimized binary
 ```
 
 Sanitizers, coverage, GDB debugging, and profiling are resource-intensive. Do **not** run

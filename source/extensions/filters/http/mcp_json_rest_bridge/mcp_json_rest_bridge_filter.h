@@ -63,6 +63,9 @@ public:
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
 
+  uint64_t serverDiscoveryCacheTtlMs() const { return server_discovery_cache_ttl_ms_; }
+  absl::string_view serverDiscoveryCacheScope() const { return server_discovery_cache_scope_; }
+
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::RequestStorageMode
   requestStorageMode() const {
     return proto_config_.request_storage_mode();
@@ -123,6 +126,9 @@ private:
   std::string max_supported_protocol_version_;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
+  uint64_t server_discovery_cache_ttl_ms_;
+
+  absl::string_view server_discovery_cache_scope_;
   bool clear_route_cache_;
 };
 
@@ -201,6 +207,12 @@ private:
   // Handles "method" field in the MCP request.
   void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
                        const McpJsonRestBridgePerRouteConfig* per_route_config);
+
+  // Validates the "MCP-Protocol-Version" request header against the JSON-RPC request body.
+  // Sends a local error response and returns an error status if validation fails.
+  absl::Status validateMcpProtocolVersionHeader(const nlohmann::json& json_rpc,
+                                                absl::string_view method,
+                                                Http::RequestHeaderMapOptConstRef request_headers);
 
   // Validates that the "Mcp-Method" request header is present and matches the JSON-RPC "method"
   // field. Returns true when the header is valid. Otherwise sends a local error response and
@@ -294,6 +306,8 @@ private:
     ToolsCall = 6,
     // MCP operation failed.
     OperationFailed = 7,
+    // Clients send a server/discover request that is handled locally.
+    ServerDiscover = 8,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   std::optional<nlohmann::json> session_id_;

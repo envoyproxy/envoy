@@ -9,6 +9,7 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/mocks/server/listener_update_callbacks_handle.h"
@@ -23,6 +24,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -2063,6 +2065,96 @@ TEST_F(BootstrapAbiImplTest, MetricsConcurrentIncrementCounterVecNoRace) {
   for (auto& th : threads) {
     th.join();
   }
+}
+
+// A transport socket match is observed only when present in every cluster that has matches, so a
+// match is reported only once it appears in all the clusters that carry per-endpoint matches.
+TEST_F(BootstrapAbiImplTest, TransportSocketMatchIntersection) {
+  using Config = DynamicModuleBootstrapExtensionConfig;
+  EXPECT_THAT(Config::transportSocketMatchIntersection({}), testing::IsEmpty());
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{"a", "b"}}),
+              testing::UnorderedElementsAre("a", "b"));
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{"a", "b", "c"}, {"b", "c"}, {"b", "d"}}),
+              testing::UnorderedElementsAre("b"));
+  // Clusters with no matches are skipped and do not zero the intersection.
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{"a", "b"}, {}, {"a"}}),
+              testing::UnorderedElementsAre("a"));
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{}, {}}), testing::IsEmpty());
+}
+
+// With the server initialized but no active objects, every valid resource kind emits nothing and
+// does not crash.
+TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesEmptyEmitsNothing) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+
+  // Mark the server initialized so the accessor proceeds past its guard to the kind switch.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
+
+  struct Recorder {
+    int calls = 0;
+  } recorder;
+  auto name_fn = [](envoy_dynamic_module_type_envoy_buffer, void* user_data) {
+    ++static_cast<Recorder*>(user_data)->calls;
+  };
+
+  for (auto kind : {envoy_dynamic_module_type_bootstrap_active_resource_kind_FilterChain,
+                    envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster,
+                    envoy_dynamic_module_type_bootstrap_active_resource_kind_TransportSocketMatch,
+                    envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret}) {
+    envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+        config.value()->thisAsVoidPtr(), kind, name_fn, &recorder);
+  }
+  EXPECT_EQ(recorder.calls, 0);
+}
+
+// A name reported more than once by the underlying manager is emitted once.
+TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesEmitsEachNameOnce) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
+
+  testing::NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context_, secretManager()).WillByDefault(testing::ReturnRef(secret_manager));
+  EXPECT_CALL(secret_manager, dynamicActiveSecretNames())
+      .WillOnce(testing::Return(std::vector<absl::string_view>{"a", "b", "a"}));
+
+  std::vector<std::string> names;
+  auto name_fn = [](envoy_dynamic_module_type_envoy_buffer name, void* user_data) {
+    static_cast<std::vector<std::string>*>(user_data)->emplace_back(name.ptr, name.length);
+  };
+  envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+      config.value()->thisAsVoidPtr(),
+      envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret, name_fn, &names);
+  EXPECT_THAT(names, testing::ElementsAre("a", "b"));
+}
+
+// Calling the accessor off the main thread is an ENVOY_BUG and emits nothing. The guard
+// short-circuits before any pointer dereference, so passing a null config is safe here.
+TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesOffMainThreadFailsClosed) {
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([] {
+          envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+              nullptr, envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster,
+              [](envoy_dynamic_module_type_envoy_buffer, void*) { FAIL(); }, nullptr);
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names must be called "
+      "on the main thread");
 }
 
 } // namespace DynamicModules

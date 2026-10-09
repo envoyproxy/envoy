@@ -149,7 +149,7 @@ class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig,
 public:
   FilterConfigPerRoute(const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute&,
                        Server::Configuration::ServerFactoryContext&);
-  uint64_t getPluginConfigId(uint64_t parent_id, std::string plugin_name) const;
+  uint64_t getPluginConfigId(uint64_t parent_id, const std::string& plugin_name) const;
 
   ~FilterConfigPerRoute() override { plugins_config_.clear(); }
 
@@ -215,7 +215,7 @@ public:
   }
 
   void setWeakFilter(std::weak_ptr<Filter> f) { filter_ = f; }
-  std::weak_ptr<Filter> weakFilter() { return filter_; }
+  const std::weak_ptr<Filter>& weakFilter() const { return filter_; }
 
   DecodingProcessorState& decodingState() { return decoding_state_; }
   EncodingProcessorState& encodingState() { return encoding_state_; }
@@ -357,6 +357,8 @@ private:
   const StreamInfo::StreamInfo& streamInfo() const { return decoding_state_.streamInfo(); }
   StreamInfo::StreamInfo& streamInfo() { return decoding_state_.streamInfo(); }
   bool isThreadSafe() { return decoding_state_.isThreadSafe(); };
+  // Lock for CAPI methods guarded by mutex_, null on the worker thread. See mutex_ below.
+  Thread::BasicLockable* offThreadMutex() { return isThreadSafe() ? nullptr : &mutex_; }
   Event::Dispatcher& getDispatcher() { return *dispatcher_; }
 
   bool doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers, bool end_stream);
@@ -431,6 +433,10 @@ private:
   //    and committed to the deref, so the lock acquisition in onDestroy is what actually
   //    serialises the two sides.
   //
+  // Only off-thread callers take mutex_ (see offThreadMutex()). On the worker thread, onDestroy()
+  // cannot run concurrently with a CAPI call, and the Go side already serialises every
+  // req_->strValue writer under httpRequest.mutex.
+  //
   // The bare destroy-flag check (`if (hasDestroyed()) return CAPIFilterIsDestroy;`) does
   // NOT require this mutex; see has_destroyed_ below. CAPI methods whose only Envoy-side
   // work is either Filter-owned (e.g. doDataList buffers) or runs on the worker thread
@@ -453,7 +459,7 @@ struct httpConfigInternal : httpConfig {
   std::weak_ptr<FilterConfig> config_;
   // NOLINTNEXTLINE(readability-identifier-naming)
   httpConfigInternal(std::weak_ptr<FilterConfig> c) { config_ = c; }
-  std::weak_ptr<FilterConfig> weakFilterConfig() { return config_; }
+  const std::weak_ptr<FilterConfig>& weakFilterConfig() const { return config_; }
 };
 
 } // namespace Golang

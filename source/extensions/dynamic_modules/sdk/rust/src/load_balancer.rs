@@ -3,6 +3,7 @@ use crate::{
   wrap_into_c_void_ptr, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
   EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId, NEW_LOAD_BALANCER_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::sync::Arc;
 
@@ -11,7 +12,7 @@ use std::sync::Arc;
 /// This trait provides access to both cluster/host information and request context.
 /// The cluster/host methods are always available, while the context methods are only
 /// valid during the [`LoadBalancer::choose_host`] callback.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyLoadBalancer {
   /// Returns the cluster name, or `None` if the name is empty.
   fn get_cluster_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
@@ -43,8 +44,8 @@ pub trait EnvoyLoadBalancer {
   ) -> abi::envoy_dynamic_module_type_host_health;
 
   /// Looks up a host by its address string across all priorities and returns its health status.
-  /// This provides O(1) lookup by address using the cross-priority host map, instead of requiring
-  /// iteration through all hosts by index.
+  /// This uses the cross-priority host map internally instead of requiring iteration through all
+  /// hosts by index.
   ///
   /// The address must match the format "ip:port" (e.g., "10.0.0.1:8080").
   fn get_host_health_by_address(
@@ -619,15 +620,15 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     if self.context_ptr.is_null() {
       return Vec::default();
     }
-    let size = self.context_get_downstream_headers_size();
-    crate::utility::collect_headers(size, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers(
-        self.context_ptr,
-        ptr,
-        capacity,
-        size_out,
-      )
-    })
+    crate::utility::collect_headers(
+      || self.context_get_downstream_headers_size(),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+          self.context_ptr,
+          headers,
+        )
+      },
+    )
   }
 
   fn context_get_downstream_header(
@@ -722,7 +723,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
 /// metrics. It can also be stored by the user and used at runtime (e.g., during host selection)
 /// to record metric values. The raw pointer is safe to store and use from any thread because the
 /// underlying C++ `DynamicModuleLbConfig` is thread-safe for metric operations.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyLbConfig: Send + Sync {
   // -------------------------------------------------------------------------

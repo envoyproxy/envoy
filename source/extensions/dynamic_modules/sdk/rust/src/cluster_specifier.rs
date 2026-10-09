@@ -10,6 +10,7 @@ use crate::{
   abi, ffi_export, ClusterHostCount, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
   EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::ffi::c_void;
 use std::ptr;
@@ -68,15 +69,15 @@ impl ClusterSpecifierContext {
   ///
   /// Returns an empty vector when there are no headers.
   pub fn get_all_request_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_request_headers_count();
-    crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
-        self.envoy_ptr,
-        ptr,
-        capacity,
-        size_out,
-      )
-    })
+    crate::utility::collect_headers(
+      || self.get_request_headers_count(),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
+          self.envoy_ptr,
+          headers,
+        )
+      },
+    )
   }
 
   /// Get the first value of the request header with the given key.
@@ -519,7 +520,7 @@ pub trait ClusterSpecifierConfig: Send + Sync {
 /// config creation and can be recorded at any point during selection.
 ///
 /// Implementations must be `Send + Sync` since they may be accessed from multiple threads.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyClusterSpecifierMetrics: Send + Sync {
   // -------------------------------------------------------------------------

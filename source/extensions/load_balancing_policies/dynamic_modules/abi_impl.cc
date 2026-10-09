@@ -201,12 +201,11 @@ bool envoy_dynamic_module_callback_lb_get_host_health_by_address(
   if (host_map == nullptr) {
     return false;
   }
-  std::string address_str(address.ptr, address.length);
-  const auto it = host_map->find(address_str);
-  if (it == host_map->end()) {
+  const auto& host = host_map->findHost(absl::string_view(address.ptr, address.length));
+  if (host == nullptr) {
     return false;
   }
-  switch (it->second->coarseHealth()) {
+  switch (host->coarseHealth()) {
   case Envoy::Upstream::Host::Health::Unhealthy:
     *result = envoy_dynamic_module_type_host_health_Unhealthy;
     break;
@@ -322,23 +321,16 @@ size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(
 
 bool envoy_dynamic_module_callback_lb_context_get_downstream_headers(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers, size_t capacity,
-    size_t* size_out) {
-  *size_out = 0;
-  if (context_envoy_ptr == nullptr) {
+    envoy_dynamic_module_type_envoy_http_header* result_headers) {
+  if (context_envoy_ptr == nullptr || result_headers == nullptr) {
     return false;
   }
   const auto* headers = getContext(context_envoy_ptr)->downstreamHeaders();
   if (headers == nullptr) {
     return false;
   }
-  const size_t count = headers->size();
-  *size_out = count;
-  if (count > capacity || (count > 0 && result_headers == nullptr)) {
-    return false;
-  }
   size_t i = 0;
-  headers->iterate([&i, result_headers](
+  headers->iterate([&i, &result_headers](
                        const Envoy::Http::HeaderEntry& header) -> Envoy::Http::HeaderMap::Iterate {
     auto& key = header.key();
     result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());

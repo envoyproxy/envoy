@@ -293,9 +293,24 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
 #if defined(__linux__)
   auto netns = address->networkNamespace();
   if (netns.has_value()) {
+    // A listen socket inherited from the hot restart parent is already bound inside the target
+    // network namespace, so ask the parent for it before entering the namespace. The namespace
+    // path may no longer open (e.g. it was removed after the parent bound the socket)
+    // while the parent's socket is still valid; entering the namespace first would fail the
+    // listener even though it could have been inherited.
+    if (bind_type != BindType::NoBind && address->type() == Network::Address::Type::Ip &&
+        &address->socketInterface() == &Network::SocketInterfaceSingleton::get()) {
+      Network::SocketSharedPtr parent_socket =
+          duplicateParentListenSocket(address, socket_type, options, worker_index);
+      if (parent_socket != nullptr) {
+        return parent_socket;
+      }
+    }
+
     auto fn = [&]() -> absl::StatusOr<Network::SocketSharedPtr> {
+      // The parent has already been asked for the socket above.
       return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
-                                        worker_index);
+                                        worker_index, /*try_parent_socket=*/false);
     };
 
     // Here we're running `fn` in a different network namespace. It will return a `absl::StatusOr`
@@ -318,13 +333,36 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
 #endif
 
   return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
-                                    worker_index);
+                                    worker_index, /*try_parent_socket=*/true);
+}
+
+Network::SocketSharedPtr ProdListenerComponentFactory::duplicateParentListenSocket(
+    const Network::Address::InstanceConstSharedPtr& address, Network::Socket::Type socket_type,
+    const Network::Socket::OptionsSharedPtr& options, uint32_t worker_index) {
+  const std::string scheme = (socket_type == Network::Socket::Type::Stream)
+                                 ? std::string(Network::Utility::TCP_SCHEME)
+                                 : std::string(Network::Utility::UDP_SCHEME);
+  const std::string addr = absl::StrCat(scheme, address->asString());
+  const int fd = server_.hotRestart().duplicateParentListenSocket(
+      addr, worker_index, address->networkNamespace().value_or(""));
+  if (fd == -1) {
+    return nullptr;
+  }
+  ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
+  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
+  if (socket_type == Network::Socket::Type::Stream) {
+    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
+  }
+  return std::make_shared<Network::UdpListenSocket>(
+      std::move(io_handle), address, options,
+      server_.hotRestart().parentDrainedCallbackRegistrar());
 }
 
 absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocketInternal(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
-    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index,
+    bool try_parent_socket) {
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
@@ -369,25 +407,11 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     return std::make_shared<Network::InternalListenSocket>(address);
   }
 
-  const std::string scheme = (socket_type == Network::Socket::Type::Stream)
-                                 ? std::string(Network::Utility::TCP_SCHEME)
-                                 : std::string(Network::Utility::UDP_SCHEME);
-  const std::string addr = absl::StrCat(scheme, address->asString());
-
-  if (bind_type != BindType::NoBind) {
-    const int fd = server_.hotRestart().duplicateParentListenSocket(
-        addr, worker_index, address->networkNamespace().value_or(""));
-    if (fd != -1) {
-      ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-      Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
-      if (socket_type == Network::Socket::Type::Stream) {
-        return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
-      } else {
-        auto socket = std::make_shared<Network::UdpListenSocket>(
-            std::move(io_handle), address, options,
-            server_.hotRestart().parentDrainedCallbackRegistrar());
-        return socket;
-      }
+  if (bind_type != BindType::NoBind && try_parent_socket) {
+    Network::SocketSharedPtr parent_socket =
+        duplicateParentListenSocket(address, socket_type, options, worker_index);
+    if (parent_socket != nullptr) {
+      return parent_socket;
     }
   }
 

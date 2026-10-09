@@ -16,6 +16,7 @@ envoy_extension_cc_dyn_module_test(
     srcs = ["route_specifier_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:route_specifier_continue_matching",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_missing_config_destroy",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_missing_config_new",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_missing_on_route",
@@ -23,12 +24,12 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_override",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_select_template",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_unknown_decision",
+        "//test/extensions/dynamic_modules/test_data/c:route_specifier_unknown_status",
     ],
     extension_names = ["envoy.router.route_specifiers.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:config_lib",
-        "//source/extensions/dynamic_modules:abi_context_accessors_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/router/route_specifiers/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",

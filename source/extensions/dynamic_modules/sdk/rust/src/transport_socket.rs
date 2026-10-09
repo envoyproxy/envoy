@@ -7,6 +7,7 @@
 use crate::{
   abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, wrap_into_c_void_ptr,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::cell::RefCell;
 
@@ -206,7 +207,7 @@ impl From<abi::envoy_dynamic_module_type_network_connection_event> for Connectio
 }
 
 /// Envoy-side operations available to an in-module transport socket implementation.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyTransportSocket {
   /// Reads raw bytes from the underlying socket into `buffer`. Returns the status and the number of
   /// bytes read. When `buffer` is non-empty, a `Success` status with zero bytes means the peer

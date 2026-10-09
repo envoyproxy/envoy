@@ -491,7 +491,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 0);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  EXPECT_CALL(mock_packet_forwarding, handle(_, _))
+  EXPECT_CALL(mock_packet_forwarding, handle(_, _, _))
       .Times(generateChloPacketsToSend(quic_version_, quic_config_, connection_id).size());
   sendCHLO(connection_id);
   dispatcher_->run(Event::Dispatcher::RunType::Block);

@@ -26,6 +26,7 @@ package(default_visibility = [
     "//test/extensions/tracers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/tls/handshakers/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
 
@@ -229,6 +230,10 @@ test_program(name = "route_specifier_config_new_fail")
 
 test_program(name = "route_specifier_unknown_decision")
 
+test_program(name = "route_specifier_unknown_status")
+
+test_program(name = "route_specifier_continue_matching")
+
 test_program(name = "route_specifier_select_template")
 
 test_program(name = "route_specifier_override")
@@ -298,6 +303,30 @@ test_program(name = "cert_validator_not_validated")
 test_program(name = "cert_validator_empty_digest")
 
 test_program(name = "cert_validator_filter_state")
+
+test_program(name = "tls_handshaker_no_op")
+
+test_program(name = "tls_handshaker_bad_result")
+
+test_program(name = "tls_handshaker_custom")
+
+test_program(name = "tls_handshaker_handshake_only")
+
+test_program(name = "tls_handshaker_manual")
+
+test_program(name = "tls_handshaker_manual_fail")
+
+test_program(name = "tls_handshaker_provides_certificates")
+
+test_program(name = "tls_handshaker_configure_fail")
+
+test_program(name = "tls_handshaker_config_new_fail")
+
+test_program(name = "tls_handshaker_no_config_destroy")
+
+test_program(name = "tls_handshaker_new_fail")
+
+test_program(name = "tls_handshaker_new_without_destroy")
 
 test_program(name = "upstream_bridge_no_op")
 

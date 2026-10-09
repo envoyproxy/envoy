@@ -15,11 +15,11 @@ bazel_dep(name = "aws-c-auth-testdata", version = "0.10.4.envoy")
 bazel_dep(name = "bazel-compdb", version = "0.0.0-20220906-4086479.envoy")
 bazel_dep(name = "bazel_features", version = "1.51.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
-bazel_dep(name = "boringssl", version = "0.20260813.0")
-bazel_dep(name = "boringssl-fips", version = "0.20260813.0.envoy")
-bazel_dep(name = "boringssl-source", version = "0.20260813.0.envoy")
+bazel_dep(name = "boringssl", version = "0.20260929.0")
+bazel_dep(name = "boringssl-fips", version = "0.20260929.0.envoy")
+bazel_dep(name = "boringssl-source", version = "0.20260929.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy")
-bazel_dep(name = "brotli", version = "1.2.0.bcr.3")
+bazel_dep(name = "brotli", version = "1.2.0-260930-42a2ed4.envoy")
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", repo_name = "buildifier")
 bazel_dep(name = "c-ares", version = "1.34.6.bcr.1")
 bazel_dep(name = "cel-cpp", version = "0.16.1.envoy")
@@ -29,8 +29,8 @@ bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.1.envoy")
-bazel_dep(name = "envoy_toolshed_jq", version = "0.5.1.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.3.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.3.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "fmt", version = "12.2.0")
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -81,7 +81,7 @@ bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.4-251205-5283e57.envoy")
 bazel_dep(name = "qat-zstd", version = "1.0.0.envoy")
 bazel_dep(name = "qatlib", version = "26.02.0.envoy")
 bazel_dep(name = "qatzip", version = "2.0.0.envoy")
-bazel_dep(name = "quiche", version = "0.0.0-260922-7f07dc4.envoy")
+bazel_dep(name = "quiche", version = "0.0.0-261006-9e60ac2.envoy")
 bazel_dep(name = "ragel", version = "7.0.4-211228-d4577c9.envoy")
 bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
 bazel_dep(name = "rules_apple", version = "5.1.0")
@@ -149,7 +149,7 @@ single_version_override(
 
 single_version_override(
     module_name = "boringssl",
-    version = "0.20260813.0",
+    version = "0.20260929.0",
 )
 
 single_version_override(
@@ -273,8 +273,8 @@ llvm_minimal_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llv
 llvm_minimal_ext.setup()
 use_repo(llvm_minimal_ext, "llvm_minimal_linux_arm64", "llvm_minimal_linux_x64", "llvm_minimal_macos_arm64")
 
-llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
-use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
+envoy_llvm_ext = use_extension("//bazel:extensions.bzl", "envoy_llvm_extension")
+use_repo(envoy_llvm_ext, "llvm_toolchain_llvm")
 
 cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
 use_repo(cc_configure, "local_config_cc", "local_config_cc_toolchains")
@@ -370,6 +370,7 @@ go_sdk.download(
         "linux_arm64": ("go1.27.1.linux-arm64.tar.gz", "3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec"),
         "darwin_arm64": ("go1.27.1.darwin-arm64.tar.gz", "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12"),
         "darwin_amd64": ("go1.27.1.darwin-amd64.tar.gz", "8f8f52c6649542cf027bbc9b9c68d1ec042f9f34808a40413f0b8b3f66f3caa4"),
+        "windows_amd64": ("go1.27.1.windows-amd64.zip", "a3911b5e0e1b1053f25ed0675f4c1c6aad1e2bfcf253df2b9be4caabd2edd95d"),
     },
     version = "1.27.1",
 )

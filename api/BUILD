@@ -5,6 +5,12 @@ load("@rules_proto//proto:defs.bzl", "proto_descriptor_set")
 
 licenses(["notice"])  # Apache 2
 
+exports_files([
+    ".bazelrc",
+    "MODULE.bazel",
+    "MODULE.bazel.lock",
+])
+
 proto_library(
     name = "v2_protos",
     visibility = ["//visibility:public"],
@@ -336,6 +342,8 @@ proto_library(
         "//envoy/extensions/health_checkers/thrift/v3:pkg",
         "//envoy/extensions/health_checkers/udp/v3:pkg",
         "//envoy/extensions/http/ai_filters/request_info/v3:pkg",
+        "//envoy/extensions/http/ai_filters/schema_validation/v3:pkg",
+        "//envoy/extensions/http/ai_filters/transcoder/v3:pkg",
         "//envoy/extensions/http/cache/file_system_http_cache/v3:pkg",
         "//envoy/extensions/http/cache/simple_http_cache/v3:pkg",
         "//envoy/extensions/http/cache_v2/file_system_http_cache/v3:pkg",
@@ -453,6 +461,7 @@ proto_library(
         "//envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3:pkg",
+        "//envoy/extensions/transport_sockets/tls/handshakers/dynamic_modules/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/v3:pkg",
         "//envoy/extensions/udp_packet_writer/v3:pkg",
         "//envoy/extensions/upstreams/http/dynamic_modules/v3:pkg",

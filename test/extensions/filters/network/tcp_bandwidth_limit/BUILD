@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -12,9 +11,10 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
+    extension_names = ["envoy.filters.network.tcp_bandwidth_limit"],
     deps = [
         "//source/extensions/filters/network/tcp_bandwidth_limit",
         "//test/mocks/event:event_mocks",
@@ -25,9 +25,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_names = ["envoy.filters.network.tcp_bandwidth_limit"],
     deps = [
         "//source/extensions/filters/network/tcp_bandwidth_limit:config",
         "//test/mocks/event:event_mocks",

@@ -833,6 +833,30 @@ TEST_F(CgroupCpuUtilTest, ConstructCgroupPath_PathOutsideCgroupNamespaceRoot) {
   EXPECT_FALSE(cgroup_info.has_value());
 }
 
+// =============================================================================
+// Test: getCurrentCgroupInfo
+// =============================================================================
+
+// In the host cgroup namespace the cgroup2 mount point is the cgroup root, so the process's own
+// cgroup path has to be appended to it.
+TEST_F(CgroupCpuUtilTest, GetCurrentCgroupInfo_HostCgroupNamespace) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 / /sys/fs/cgroup rw,nosuid,nodev,noexec - cgroup2 cgroup2 rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/kubepods.slice/pod.slice/container.scope\n");
+
+  auto cgroup_info = CgroupCpuUtil::getCurrentCgroupInfo(fs_);
+  ASSERT_TRUE(cgroup_info.has_value());
+  EXPECT_EQ(cgroup_info->full_path, "/sys/fs/cgroup/kubepods.slice/pod.slice/container.scope");
+  EXPECT_EQ(cgroup_info->version, "v2");
+}
+
+TEST_F(CgroupCpuUtilTest, GetCurrentCgroupInfo_NoCgroupMount) {
+  fs_.setFileContents("/proc/self/mountinfo", "20 22 0:19 / /proc rw - proc proc rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/kubepods.slice/pod.slice/container.scope\n");
+
+  EXPECT_FALSE(CgroupCpuUtil::getCurrentCgroupInfo(fs_).has_value());
+}
+
 TEST_F(CgroupCpuUtilTest, DetectorImpl_V1DetectedLimit) {
   fs_.setFileContents("/proc/self/mountinfo",
                       "56 22 0:40 / /sys/fs/cgroup/cpu rw - cgroup cgroup rw,cpu,cpuacct\n");

@@ -123,12 +123,13 @@ public:
     return !rate_limit_config_->empty();
   }
   void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
                            Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
                            bool on_stream_done) const {
     ASSERT(rate_limit_config_ != nullptr);
-    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors,
-                                            on_stream_done);
+    rate_limit_config_->populateDescriptors(headers, response_headers, info,
+                                            local_info_.clusterName(), descriptors, on_stream_done);
   }
 
 private:
@@ -207,12 +208,13 @@ public:
   }
 
   void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
                            Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
                            bool on_stream_done) const {
     ASSERT(rate_limit_config_ != nullptr);
-    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors,
-                                            on_stream_done);
+    rate_limit_config_->populateDescriptors(headers, response_headers, info,
+                                            local_info_.clusterName(), descriptors, on_stream_done);
   }
 
   std::string domain() const { return domain_; }
@@ -267,8 +269,12 @@ public:
 
 private:
   void initiateCall(const Http::RequestHeaderMap& headers);
+  // `headers` (request headers) is always present. `response_headers` is optional: it is only set
+  // on the stream-done path (captured in encodeHeaders()) and is nullptr on the request path.
   void populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                                    const Http::RequestHeaderMap& headers, bool on_stream_done);
+                                    const Http::RequestHeaderMap& headers,
+                                    const Http::ResponseHeaderMap* response_headers,
+                                    bool on_stream_done);
   void populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy& rate_limit_policy,
                                              std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                              const Http::RequestHeaderMap& headers,
@@ -294,6 +300,11 @@ private:
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
+  // Response headers captured at encodeHeaders() time so the stream-done
+  // (onDestroy) descriptor population can resolve %RESP()% in hits_addend.format.
+  // Stored as a raw pointer with the same lifetime guarantee as request_headers_:
+  // both header maps are owned by the ActiveStream and outlive destroyFilters().
+  Http::ResponseHeaderMap* response_headers_{};
   std::vector<Envoy::RateLimit::Descriptor> descriptors_;
 };
 

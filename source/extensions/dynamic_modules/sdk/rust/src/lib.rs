@@ -1507,12 +1507,12 @@ pub static NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION: OnceLock<NewRouteSpecifierConfig
 /// struct MyRouteSpecifierConfig {}
 ///
 /// impl RouteSpecifierConfig for MyRouteSpecifierConfig {
-///   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision {
-///     if ctx.select_template("canary") {
-///       RouteDecision::SelectTemplate
-///     } else {
-///       RouteDecision::PassThrough
-///     }
+///   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> OnRouteStatus {
+///     // With the decision left Unspecified, Envoy generates the final route from the selected
+///     // template, or leaves the route the specifier was given unchanged when the identifier is
+///     // not declared.
+///     let _ = ctx.select_template("canary");
+///     OnRouteStatus::StopIteration
 ///   }
 /// }
 ///

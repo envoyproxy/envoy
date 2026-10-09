@@ -302,7 +302,8 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
         for (const GENERAL_NAME* san : san_names.get()) {
           switch (san->type) {
           case GEN_IPADD:
-            rc = EVP_DigestUpdate(md.get(), san->d.iPAddress->data, san->d.iPAddress->length);
+            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(san->d.iPAddress),
+                                  ASN1_STRING_length(san->d.iPAddress));
             RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
             ++san_count;
             break;
