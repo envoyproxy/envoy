@@ -686,6 +686,7 @@ envoy_cc_test(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/queue_policy:queue_policy_base_lib",
+        "//source/common/upstream:host_lookup_map_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/eds:eds_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.

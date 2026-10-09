@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
@@ -11,6 +12,7 @@
 #include "envoy/secret/secret_provider.h"
 
 #include "absl/status/status.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 
@@ -174,6 +176,14 @@ public:
                                     const std::string& config_name,
                                     Server::Configuration::ServerFactoryContext& server_context,
                                     OptRef<Init::Manager> init_manager, bool warm) PURE;
+
+  /**
+   * @return the names of the dynamic secrets that are currently active (delivered, not warming):
+   * TLS certificates, certificate validation contexts, session ticket keys and generic secrets. A
+   * name used by more than one provider may appear more than once. The returned views point at
+   * provider-owned storage and are valid only for the duration of this call. Main thread only.
+   */
+  virtual std::vector<absl::string_view> dynamicActiveSecretNames() const PURE;
 };
 
 using SecretManagerPtr = std::unique_ptr<SecretManager>;

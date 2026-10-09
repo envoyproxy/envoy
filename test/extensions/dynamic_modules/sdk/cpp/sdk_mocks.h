@@ -127,6 +127,8 @@ public:
               (override));
   MOCK_METHOD(void, setTypedMetadata, (std::string_view ns, std::string_view serialized_any),
               (override));
+  MOCK_METHOD((std::optional<std::pair<std::string_view, std::string_view>>), getTypedMetadata,
+              (std::string_view ns), (override));
   MOCK_METHOD(bool, addMetadataList, (std::string_view ns, std::string_view key, double value),
               (override));
   MOCK_METHOD(bool, addMetadataList,
@@ -170,6 +172,7 @@ public:
               (override));
   MOCK_METHOD(bool, setFilterStateTyped, (std::string_view key, std::string_view value),
               (override));
+  MOCK_METHOD(bool, hasFilterState, (std::string_view key), (override));
   MOCK_METHOD(uint32_t, getWorkerIndex, (), (override));
   MOCK_METHOD(bool, setSocketOptionInt,
               (int64_t level, int64_t name, SocketOptionState state, SocketDirection direction,

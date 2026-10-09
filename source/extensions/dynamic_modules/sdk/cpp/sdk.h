@@ -498,6 +498,16 @@ public:
   virtual std::optional<bool> getMetadataBool(std::string_view ns, std::string_view key) = 0;
 
   /**
+   * Retrieves the type URL and serialized message payload of typed dynamic metadata.
+   * The returned views are valid until the end of the current event hook unless a setter modifies
+   * the metadata.
+   * @param ns The typed metadata namespace.
+   * @return The type URL and payload if found, otherwise nullopt. Empty fields are valid results.
+   */
+  virtual std::optional<std::pair<std::string_view, std::string_view>>
+  getTypedMetadata(std::string_view ns) = 0;
+
+  /**
    * Retrieves all keys in a metadata namespace.
    * @param ns The metadata namespace.
    * @return Vector of key strings.
@@ -776,6 +786,14 @@ public:
    * @return true if the value was stored successfully.
    */
   virtual bool setFilterStateTyped(std::string_view key, std::string_view value) = 0;
+
+  /**
+   * Checks whether a filter state entry with the given key exists, regardless of its type. Unlike
+   * the getter methods, this does not read or serialize the stored object.
+   * @param key The filter state key.
+   * @return true if the key exists.
+   */
+  virtual bool hasFilterState(std::string_view key) = 0;
 
   /**
    * Returns the worker index assigned to the current filter instance.
