@@ -39,6 +39,14 @@ void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resourc
 
   watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, options_);
 
+  // Apply any accept() patterns declared before start(). This happens before grpc_mux_->start()
+  // below (and delivery to a watch only ever happens via an async discovery response), so the
+  // routing filter is guaranteed to be in effect before any resource can be routed to this watch.
+  if (!deferred_accept_patterns_.empty()) {
+    watch_->accept(deferred_accept_patterns_);
+    deferred_accept_patterns_.clear();
+  }
+
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
   // "attempt" for a given xDS API combined by ADS is not really that meaningful.
@@ -59,8 +67,22 @@ void GrpcSubscriptionImpl::updateResourceInterest(
 
 void GrpcSubscriptionImpl::requestOnDemandUpdate(
     const absl::flat_hash_set<std::string>& for_update) {
-  grpc_mux_->requestOnDemandUpdate(type_url_, for_update);
+  // Additionally add the on-demand resources to this subscription's watch. This updates both the
+  // watch-map routing (so the response is delivered to our callbacks) and the subscription sent to
+  // the management server (so it is fetched). Without the watch-map update, a resource that was not
+  // named at start() time would match no watch and its update would be silently dropped.
+  watch_->append(for_update);
   stats_.update_attempt_.inc();
+}
+
+void GrpcSubscriptionImpl::accept(const absl::flat_hash_set<std::string>& patterns) {
+  if (watch_ == nullptr) {
+    // Called before start(): the watch does not exist yet. Remember the patterns; start() applies
+    // them before starting the stream, so the routing filter is in place before any delivery.
+    deferred_accept_patterns_ = patterns;
+    return;
+  }
+  watch_->accept(patterns);
 }
 
 // Config::SubscriptionCallbacks

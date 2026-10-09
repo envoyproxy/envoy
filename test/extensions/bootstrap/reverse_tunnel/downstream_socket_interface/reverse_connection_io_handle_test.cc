@@ -671,7 +671,8 @@ TEST_F(ReverseConnectionIOHandleTest, NoHostsInClusterCannotConnect) {
 
   // Set up empty cross priority host map.
   auto empty_host_map = std::make_shared<Upstream::HostMap>();
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(empty_host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(empty_host_map)));
 
   // Call maintainClusterConnections with empty cluster.
   RemoteClusterConnectionConfig cluster_config("empty-cluster", 2);
@@ -708,7 +709,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsValidHosts) {
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host1);
   (*host_map)["192.168.1.2"] = std::const_pointer_cast<Upstream::Host>(mock_host2);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Call maintainClusterConnections which will create HostConnectionInfo entries and call.
   // maybeUpdateHostsMappingsAndConnections
@@ -748,7 +750,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsNoNewHosts) {
   (*host_map)["192.168.1.2"] = std::const_pointer_cast<Upstream::Host>(mock_host2);
   (*host_map)["192.168.1.3"] = std::const_pointer_cast<Upstream::Host>(mock_host3);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Call maintainClusterConnections which will create HostConnectionInfo entries and call.
   // maybeUpdateHostsMappingsAndConnections
@@ -795,7 +798,8 @@ TEST_F(ReverseConnectionIOHandleTest, ShouldAttemptConnectionToHostValidHost) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Populate the host entry directly. A dial-based setup would install backoff on the null tcpConn
   // and defeat the fresh-host assertion below. cluster_config is reused for the disabled handle.
@@ -822,7 +826,8 @@ TEST_F(ReverseConnectionIOHandleTest, ShouldAttemptConnectionToHostValidHost) {
   // Set up the same thread local cluster for the new IO handle.
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
       .WillRepeatedly(Return(mock_thread_local_cluster.get()));
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Call maintainClusterConnections to create HostConnectionInfo entries in the new IO handle.
   maintainClusterConnections("test-cluster", cluster_config);
@@ -858,7 +863,8 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailurePutsHostInBackoff) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Populate the host entry directly. A dial-based setup would install backoff on the null tcpConn
   // and defeat the fresh-host assertion below.
@@ -920,7 +926,8 @@ TEST_F(ReverseConnectionIOHandleTest, ResetHostBackoff) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Populate the host entry directly. A dial-based setup would install backoff on the null tcpConn
   // and defeat the fresh-host assertion below.
@@ -998,7 +1005,8 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureExponentialBackoff) 
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Populate the host entry directly. A dial-based setup would install backoff on the null tcpConn
   // and start the exponential schedule from a non-zero failure count.
@@ -1131,7 +1139,8 @@ TEST_F(ReverseConnectionIOHandleTest, HostMappingAndBackoffIntegration) {
   (*host_map_a)["192.168.1.2"] = std::const_pointer_cast<Upstream::Host>(mock_host_a2);
   (*host_map_a)["192.168.1.3"] = std::const_pointer_cast<Upstream::Host>(mock_host_a3);
 
-  EXPECT_CALL(*mock_priority_set_a, crossPriorityHostMap()).WillRepeatedly(Return(host_map_a));
+  EXPECT_CALL(*mock_priority_set_a, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map_a)));
 
   // Set up mock thread local cluster for cluster-B.
   auto mock_thread_local_cluster_b = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
@@ -1150,7 +1159,8 @@ TEST_F(ReverseConnectionIOHandleTest, HostMappingAndBackoffIntegration) {
   (*host_map_b)["192.168.2.1"] = std::const_pointer_cast<Upstream::Host>(mock_host_b1);
   (*host_map_b)["192.168.2.2"] = std::const_pointer_cast<Upstream::Host>(mock_host_b2);
 
-  EXPECT_CALL(*mock_priority_set_b, crossPriorityHostMap()).WillRepeatedly(Return(host_map_b));
+  EXPECT_CALL(*mock_priority_set_b, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map_b)));
 
   // Steps 1 and 2 create initial host mappings directly without dialing. A dial-based setup would
   // install backoff on the null tcpConn and defeat the normal-host assertions below.
@@ -1229,7 +1239,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionFailure) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // First call maintainClusterConnections to create HostConnectionInfo entries.
   RemoteClusterConnectionConfig cluster_config("test-cluster", 2);
@@ -1278,7 +1289,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionSuccess) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entry using helper method.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
@@ -1353,7 +1365,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateReverseConnectionWithCustomScope) 
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entry using helper method.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
@@ -1404,7 +1417,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaintainClusterConnectionsSkipsHostsWithEn
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // First call maintainClusterConnections to create HostConnectionInfo entries.
   RemoteClusterConnectionConfig cluster_config("test-cluster", 1); // Only need 1 connection
@@ -1527,7 +1541,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateMultipleConnectionsMixedResults) {
   (*host_map)["192.168.1.2"] = std::const_pointer_cast<Upstream::Host>(mock_host2);
   (*host_map)["192.168.1.3"] = std::const_pointer_cast<Upstream::Host>(mock_host3);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entries for all hosts with target count of 3.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1); // Host 1
@@ -1708,7 +1723,8 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host1);
   (*host_map)["192.168.1.2"] = std::const_pointer_cast<Upstream::Host>(mock_host2);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Set up successful connections for both hosts.
   auto mock_connection1 = getDeletableConn();
@@ -1939,7 +1955,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccess) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entry.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
@@ -2017,7 +2034,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccessTriggerWriteFailure
   auto host_map = std::make_shared<Upstream::HostMap>();
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
@@ -2037,32 +2055,6 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccessTriggerWriteFailure
   EXPECT_EQ(getEstablishedConnectionsSize(), 1);
 }
 
-// Internal address with zero hosts should early fail and update CannotConnect state.
-TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionInternalAddressNoHosts) {
-  setupThreadLocalSlot();
-
-  auto config = createDefaultTestConfig();
-  io_handle_ = createTestIOHandle(config);
-  EXPECT_NE(io_handle_, nullptr);
-
-  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
-      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
-
-  // Provide non-null info and an empty host set to yield host_count == 0.
-  auto mock_cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(*mock_thread_local_cluster, info()).WillRepeatedly(Return(mock_cluster_info));
-  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
-  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
-      .WillRepeatedly(ReturnRef(*mock_priority_set));
-  std::vector<Upstream::HostSetPtr> host_sets; // empty
-  EXPECT_CALL(*mock_priority_set, hostSetsPerPriority()).WillRepeatedly(ReturnRef(host_sets));
-
-  auto mock_host = createMockPipeHost("/tmp/rev.sock");
-  bool ok = initiateOneReverseConnection("test-cluster", "envoy://internal", mock_host);
-  EXPECT_FALSE(ok);
-}
-
 // Pipe address host exercises the log branch that prints address without a port.
 TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionLogsWithoutPort) {
   setupThreadLocalSlot();
@@ -2078,7 +2070,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionLogsWithoutPor
   EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
       .WillRepeatedly(ReturnRef(*mock_priority_set));
   auto host_map = std::make_shared<Upstream::HostMap>();
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   auto mock_host = createMockPipeHost("/tmp/rev.sock");
   auto mock_connection = setupMockConnection();
@@ -2116,7 +2109,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entry.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
@@ -2280,7 +2274,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entry.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
@@ -2465,7 +2460,8 @@ TEST_F(ReverseConnectionIOHandleTest, SkipNewConnectionIfAttemptInProgress) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_)).Times(0);
 
@@ -3292,7 +3288,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionQuietShutdown
   auto host_map = std::make_shared<Upstream::HostMap>();
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
@@ -3377,7 +3374,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionDynamicCastFa
   auto host_map = std::make_shared<Upstream::HostMap>();
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
@@ -3904,6 +3902,32 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsDrainsEstablishedQueue) {
   io_handle_->resetFileEvents();
 
   EXPECT_EQ(getEstablishedConnectionsSize(), 0);
+}
+
+// An EnvoyInternal remote cluster address is rejected before dialing, since the user-space I/O
+// handle cannot be duplicated for the accepted tunnel. The rejection happens before any cluster
+// lookup and moves the host into the CannotConnect state.
+TEST_F(ReverseConnectionIOHandleTest, InitiateRejectsEnvoyInternalHost) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // The host is rejected before the cluster is ever resolved.
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  auto internal_address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener", "endpoint_id");
+  EXPECT_CALL(*mock_host, address()).WillRepeatedly(Return(internal_address));
+
+  EXPECT_FALSE(
+      initiateOneReverseConnection("test-cluster", "envoy://internal_listener", mock_host));
+
+  auto stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(
+      stat_map["test_scope.reverse_connections.host.envoy://internal_listener.cannot_connect"], 1);
 }
 
 } // namespace ReverseConnection

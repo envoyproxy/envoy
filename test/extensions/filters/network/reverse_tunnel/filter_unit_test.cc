@@ -435,6 +435,35 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowAccepts) {
   EXPECT_EQ(1, accepted->value());
 }
 
+// Identifiers at the 255-byte limit enforced by the initiator resolver are accepted here, so that
+// bound never produces a handshake header the acceptor would reject.
+TEST_F(ReverseTunnelFilterUnitTest, FullFlowAcceptsMaxLengthIdentifiers) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_OK(config_or_error);
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+
+  const std::string max_id(255, 'a');
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", max_id, max_id, max_id));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
+  ASSERT_NE(nullptr, accepted);
+  EXPECT_EQ(1, accepted->value());
+}
+
 TEST_F(ReverseTunnelFilterUnitTest, FullFlowMissingHeadersIsBadRequest) {
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
@@ -597,6 +626,25 @@ TEST_F(ReverseTunnelFilterUnitTest, AcceptanceCompletesAcrossSplitWrites) {
   // One more sub-response chunk carries the cumulative count past the full response, completing it.
   EXPECT_FALSE(bytes_sent_cb(chunk));
   EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.accepted"));
+}
+
+// Codec stats must outlive the onData() call that created the codec. Pipelined requests with
+// unread responses trip the codec's flood check, and so increment a codec stat, on a later
+// dispatch.
+TEST_F(ReverseTunnelFilterUnitTest, PipelinedRequestsUseCodecStatsAfterFirstDispatch) {
+  // Keep the responses queued, as a peer that never reads would.
+  Buffer::OwnedImpl unread;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(
+          testing::Invoke([&unread](Buffer::Instance& data, bool) { unread.move(data); }));
+
+  Buffer::OwnedImpl requests(makeHttpRequest("GET", "/health") + makeHttpRequest("GET", "/health") +
+                             makeHttpRequest("GET", "/health"));
+  // The codec parses one request per dispatch, so redeliver the remaining bytes.
+  for (int i = 0; i < 3 && requests.length() > 0; ++i) {
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(requests, false));
+  }
+  EXPECT_EQ(1, handshakeCounter(stats_store_, "http1.response_flood"));
 }
 
 // Exercise RequestDecoder interface methods by obtaining the decoder via

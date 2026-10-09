@@ -73,6 +73,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_not_send_empty_data_with_false_eos);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_report_client_creation_error);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
 // Notify the connections of a draining filter chain (an in-place listener filter chain update or
@@ -99,6 +100,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http2_flood_protection_active_streams);
 RUNTIME_GUARD(envoy_reloadable_features_http2_include_cookies_in_limits);
 RUNTIME_GUARD(envoy_reloadable_features_http2_reject_frames_after_end_stream);
 RUNTIME_GUARD(envoy_reloadable_features_http2_track_size_of_dropped_host_header);
+RUNTIME_GUARD(envoy_reloadable_features_http3_fix_goaway_loadshed_point);
 RUNTIME_GUARD(envoy_reloadable_features_http_inspector_fast_fail_invalid_method_bytes);
 RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http_pause_generic_upgrade_request_body);
@@ -133,6 +135,7 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth2_client_retries_respect_user_retry
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_legacy_cbc_decrypt_compat);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_cluster_no_recreate_stream);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_vhds_no_recreate_stream);
+RUNTIME_GUARD(envoy_reloadable_features_on_demand_vhds_require_route_match);
 RUNTIME_GUARD(envoy_reloadable_features_orca_accept_unpadded_base64);
 RUNTIME_GUARD(envoy_reloadable_features_orca_weight_manager_use_named_metrics_first);
 RUNTIME_GUARD(envoy_reloadable_features_pqc_default_ecdh_curves);
@@ -157,7 +160,9 @@ RUNTIME_GUARD(envoy_reloadable_features_rbac_match_headers_individually);
 RUNTIME_GUARD(envoy_reloadable_features_rbac_respect_ignore_path_parameters);
 RUNTIME_GUARD(envoy_reloadable_features_re2_use_latin1_mode);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_for_non_zero_stats);
+RUNTIME_GUARD(envoy_reloadable_features_response_headers_to_remove_on_1xx);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_html_stats_names);
+RUNTIME_GUARD(envoy_reloadable_features_sanitize_upstream_stream_duration_header);
 RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni);
 RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_dynamic_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
@@ -191,6 +196,10 @@ RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 // they read is empty, instead of passing that prefix as a string and relying on every filter to
 // prepend it to its stat names itself.
 RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
+// When an on-demand VHDS request asks for an alias the server has already answered (including
+// with an empty resource meaning the virtual host doesn't exist), answer it from the published
+// route configuration instead of sending another VHDS request and waiting for the response.
+RUNTIME_GUARD(envoy_reloadable_features_vhds_answered_alias_cache);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);

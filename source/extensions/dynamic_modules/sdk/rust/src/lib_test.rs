@@ -3182,6 +3182,15 @@ fn test_bootstrap_iterate_counters_continue_and_stop() {
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _kind: abi::envoy_dynamic_module_type_bootstrap_active_resource_kind,
+  _name_fn: abi::envoy_dynamic_module_type_bootstrap_active_resource_name_fn,
+  _user_data: *mut std::os::raw::c_void,
+) {
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   _name: abi::envoy_dynamic_module_type_module_buffer,
@@ -4776,6 +4785,31 @@ fn test_http_filter_state_object_round_trip() {
   assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
 }
 
+// Single-slot store backing the has_filter_state FFI stub below.
+static HAS_FILTER_STATE_RESULT: std::sync::atomic::AtomicBool =
+  std::sync::atomic::AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_has_filter_state(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  HAS_FILTER_STATE_RESULT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_has_filter_state() {
+  let envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  HAS_FILTER_STATE_RESULT.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(!envoy_filter.has_filter_state(b"key"));
+
+  HAS_FILTER_STATE_RESULT.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(envoy_filter.has_filter_state(b"key"));
+}
+
 // =========================================================================
 // Span ABI stubs
 // =========================================================================
@@ -5314,6 +5348,12 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_remove_hosts(
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_pre_init_complete(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_use_persistent_host_map(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
 ) {
 }
