@@ -497,6 +497,129 @@ TEST_P(WasmCommonTest, WasmVmCountGauge) {
   EXPECT_EQ(0, gauge->value());
 }
 
+// The memory_size gauge tracks the linear memory of every VM instance of a runtime, follows memory
+// growth and drops the VM's share when the VM is destroyed.
+TEST_P(WasmCommonTest, MemorySizeGauge) {
+  auto vm_configuration = "memory_size_gauge";
+  const std::string runtime = absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  *plugin_config.mutable_vm_config()->mutable_runtime() = runtime;
+  plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
+
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
+  } else {
+    // The name of the Null VM plugin.
+    code = "CommonWasmTestCpp";
+  }
+  EXPECT_FALSE(code.empty());
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(plugin_config, local_info_);
+  auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
+
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
+  EXPECT_NE(wasm, nullptr);
+  auto gauge =
+      TestUtility::findGauge(stats_store_, absl::StrCat("wasm.wasm.", runtime, ".memory_size"));
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(0, gauge->value());
+
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
+  wasm->updateMemoryStats();
+  if (std::get<0>(GetParam()) == "null") {
+    // The Null VM has no linear memory and is never accounted.
+    EXPECT_EQ(0, gauge->value());
+    return;
+  }
+  const uint64_t initial_size = wasm->wasm_vm()->getMemorySize();
+  EXPECT_GT(initial_size, 0U);
+  EXPECT_EQ(initial_size, gauge->value());
+
+  // Allocating more than the current linear memory forces it to grow.
+  uint64_t address = 0;
+  EXPECT_NE(nullptr, wasm->allocMemory(initial_size, &address));
+  wasm->updateMemoryStats();
+  const uint64_t grown_size = wasm->wasm_vm()->getMemorySize();
+  EXPECT_GT(grown_size, initial_size);
+  EXPECT_EQ(grown_size, gauge->value());
+
+  // A second VM of the same runtime adds its own share.
+  auto wasm2 = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
+  EXPECT_TRUE(wasm2->load(code, false));
+  EXPECT_TRUE(wasm2->initialize());
+  wasm2->updateMemoryStats();
+  EXPECT_EQ(grown_size + wasm2->wasm_vm()->getMemorySize(), gauge->value());
+
+  // A failed VM is no longer sampled but keeps its share until it is destroyed.
+  wasm2->setFailStateForTesting(proxy_wasm::FailState::RuntimeError);
+  wasm2->updateMemoryStats();
+  EXPECT_EQ(grown_size + initial_size, gauge->value());
+
+  wasm2.reset();
+  EXPECT_EQ(grown_size, gauge->value());
+  wasm.reset();
+  EXPECT_EQ(0, gauge->value());
+}
+
+// The memory_size gauge is updated when a base VM is created and when a thread-local plugin is
+// created on a cloned VM.
+TEST_P(WasmCommonTest, MemorySizeGaugeThreadLocalPlugin) {
+  NiceMock<Init::MockManager> init_manager;
+  auto vm_configuration = "memory_size_gauge";
+  const std::string runtime = absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto vm_config = plugin_config.mutable_vm_config();
+  vm_config->set_runtime(runtime);
+  Protobuf::StringValue vm_configuration_string;
+  vm_configuration_string.set_value(vm_configuration);
+  std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
+  } else {
+    // The name of the Null VM plugin.
+    code = "CommonWasmTestCpp";
+  }
+  EXPECT_FALSE(code.empty());
+  vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(plugin_config, local_info_);
+
+  WasmHandleSharedPtr wasm_handle;
+  createWasm(plugin, scope_, cluster_manager_, init_manager, *dispatcher_, *api_,
+             lifecycle_notifier_, remote_data_provider_,
+             [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
+  ASSERT_NE(wasm_handle, nullptr);
+  auto gauge =
+      TestUtility::findGauge(stats_store_, absl::StrCat("wasm.wasm.", runtime, ".memory_size"));
+  ASSERT_NE(nullptr, gauge);
+  const uint64_t base_size =
+      std::get<0>(GetParam()) == "null" ? 0 : wasm_handle->wasm()->wasm_vm()->getMemorySize();
+  EXPECT_EQ(base_size, gauge->value());
+
+  auto plugin_handle = getOrCreateThreadLocalPlugin(wasm_handle, plugin, *dispatcher_);
+  ASSERT_NE(plugin_handle, nullptr);
+  ASSERT_NE(plugin_handle->wasmHandle(), nullptr);
+  EXPECT_NE(plugin_handle->wasmHandle(), wasm_handle);
+  const uint64_t local_size = std::get<0>(GetParam()) == "null"
+                                  ? 0
+                                  : plugin_handle->wasmHandle()->wasm()->wasm_vm()->getMemorySize();
+  EXPECT_EQ(base_size + local_size, gauge->value());
+
+  plugin_handle.reset();
+  wasm_handle.reset();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->clearDeferredDeleteList();
+  proxy_wasm::clearWasmCachesForTesting();
+  EXPECT_EQ(0, gauge->value());
+}
+
 TEST_P(WasmCommonTest, Foreign) {
   auto vm_configuration = "foreign";
 
@@ -1999,6 +2122,96 @@ vm_config:
     EXPECT_NE(nullptr, latest_wasm);
     EXPECT_EQ(latest_wasm, initial_wasm);
     EXPECT_EQ(latest_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+  };
+
+  test_func(false);
+  test_func(true);
+}
+
+// The vm_memory_size gauge of a plugin reports the memory of the VMs serving it, sampled when the
+// plugin is used, so plugins sharing a VM each report its full size.
+TEST_P(PluginConfigTest, VmMemorySizeGauge) {
+  auto [runtime, language] = GetParam();
+  if (runtime == "null") {
+    return;
+  }
+
+  const std::string code =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+          "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+
+  auto test_func = [this, runtime, code](bool singleton) {
+    auto create_plugin_config = [&](absl::string_view name) {
+      const std::string plugin_config_yaml = fmt::format(
+          R"EOF(
+name: "{}"
+root_id: "panic during request processing"
+vm_config:
+  runtime: "envoy.wasm.runtime.{}"
+  configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "some configuration"
+  code:
+    local:
+      inline_bytes: "{}"
+)EOF",
+          name, runtime, Base64::encode(code.data(), code.size()));
+      envoy::extensions::wasm::v3::PluginConfig plugin_config;
+      TestUtility::loadFromYaml(plugin_config_yaml, plugin_config);
+      return std::make_shared<PluginConfig>(plugin_config, server_, server_.scope(),
+                                            server_.initManager(), singleton);
+    };
+
+    proxy_wasm::clearWasmCachesForTesting(); // clear the cache to make sure we get a new one wasm.
+
+    // Two plugins sharing the same VM.
+    auto plugin_config_a = create_plugin_config("plugin_a");
+    auto plugin_config_b = create_plugin_config("plugin_b");
+    auto gauge_a = TestUtility::findGauge(server_.store_, "wasm.plugin_a.vm_memory_size");
+    auto gauge_b = TestUtility::findGauge(server_.store_, "wasm.plugin_b.vm_memory_size");
+    ASSERT_NE(nullptr, gauge_a);
+    ASSERT_NE(nullptr, gauge_b);
+    // Nothing is reported until the plugins are used.
+    EXPECT_EQ(0, gauge_a->value());
+    EXPECT_EQ(0, gauge_b->value());
+
+    Wasm* wasm = plugin_config_a->wasm();
+    ASSERT_NE(nullptr, wasm);
+    EXPECT_EQ(wasm, plugin_config_b->wasm());
+    uint64_t memory_size = wasm->wasm_vm()->getMemorySize();
+    EXPECT_GT(memory_size, 0);
+    EXPECT_EQ(memory_size, gauge_a->value());
+    EXPECT_EQ(memory_size, gauge_b->value());
+
+    // Growing the shared VM is reported to the runtime and to each plugin the next time it is used.
+    auto runtime_gauge = TestUtility::findGauge(
+        server_.store_, absl::StrCat("wasm.envoy.wasm.runtime.", runtime, ".memory_size"));
+    ASSERT_NE(nullptr, runtime_gauge);
+    const uint64_t runtime_size = runtime_gauge->value();
+    uint64_t address;
+    EXPECT_NE(nullptr, wasm->allocMemory(memory_size, &address));
+    EXPECT_GT(wasm->wasm_vm()->getMemorySize(), memory_size);
+    EXPECT_NE(nullptr, plugin_config_a->createContext());
+    EXPECT_EQ(wasm->wasm_vm()->getMemorySize(), gauge_a->value());
+    EXPECT_EQ(runtime_size + wasm->wasm_vm()->getMemorySize() - memory_size,
+              runtime_gauge->value());
+    EXPECT_EQ(memory_size, gauge_b->value());
+    memory_size = wasm->wasm_vm()->getMemorySize();
+    plugin_config_b->wasm();
+    EXPECT_EQ(memory_size, gauge_b->value());
+
+    // A failed VM is not sampled.
+    EXPECT_NE(nullptr, wasm->allocMemory(memory_size, &address));
+    wasm->fail(proxy_wasm::FailState::MissingFunction, "mocked failure");
+    plugin_config_a->wasm();
+    EXPECT_EQ(memory_size, gauge_a->value());
+
+    // Removing a plugin removes its share.
+    plugin_config_a.reset();
+    EXPECT_EQ(0, gauge_a->value());
+    EXPECT_EQ(memory_size, gauge_b->value());
+    plugin_config_b.reset();
+    EXPECT_EQ(0, gauge_b->value());
   };
 
   test_func(false);
