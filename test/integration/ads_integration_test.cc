@@ -443,11 +443,12 @@ TEST_P(AdsIntegrationTest, ClusterSdsConfigChangeReusesSecret) {
   auto updated_cluster = build_cluster("{ ads: {}, initial_fetch_timeout: 0s }");
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {updated_cluster},
                                                              {updated_cluster}, {}, "2");
+  // cds.update_success is only incremented once the update has been applied, by which point the
+  // updated cluster is either warming or already active.
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Eq(2));
   test_server_->waitForCounter("cluster_manager.cluster_modified", Eq(1));
   test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 
-  // The config dump is served on the main thread after the update, so it cannot observe the gap
-  // between the counter and the warming gauge being updated.
   const auto clusters_config_dump = getClustersConfigDump();
   EXPECT_EQ(clusters_config_dump.dynamic_warming_clusters_size(), 0);
   ASSERT_EQ(clusters_config_dump.dynamic_active_clusters_size(), 1);
