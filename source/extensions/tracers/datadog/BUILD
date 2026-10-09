@@ -46,7 +46,6 @@ envoy_cc_library(
         "//source/common/tracing:common_values_lib",
         "//source/common/tracing:null_span_lib",
         "//source/common/tracing:trace_context_lib",
-        "//source/common/upstream:cluster_update_tracker_lib",
         "//source/common/version:version_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "@dd-trace-cpp//:dd_trace_cpp",

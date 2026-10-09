@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -28,6 +29,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
+
+class AgentHTTPClient;
 
 /**
  * Entry point for Datadog tracing. This class accepts configuration and runtime
@@ -62,16 +65,27 @@ public:
 
   struct ThreadLocalTracer : public ThreadLocal::ThreadLocalObject {
     /**
-     * Create a thread local tracer configured using the specified `config`.
+     * Create a thread local tracer configured using the specified `config`,
+     * whose collector sends requests using the specified `http_client`.
      */
-    explicit ThreadLocalTracer(const datadog::tracing::FinalizedTracerConfig& config);
+    ThreadLocalTracer(const datadog::tracing::FinalizedTracerConfig& config,
+                      std::shared_ptr<AgentHTTPClient> http_client);
 
     /**
      * Create a null (no-op) thread local tracer.
      */
     ThreadLocalTracer() = default;
 
+    /**
+     * Destroy `tracer`, then shut down `http_client`. A trace segment that
+     * outlives this object keeps the collector alive, and the collector flushes
+     * when the segment is destroyed, possibly while the thread local cluster
+     * manager is being torn down.
+     */
+    ~ThreadLocalTracer() override;
+
     datadog::tracing::Optional<datadog::tracing::Tracer> tracer;
+    std::shared_ptr<AgentHTTPClient> http_client;
   };
 
   // Tracing::Driver
