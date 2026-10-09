@@ -2974,6 +2974,38 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_CHAIN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::string expected_cert_chain = "<some cert chain>";
+    EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificateChain())
+        .WillRepeatedly(ReturnRef(expected_cert_chain));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(expected_cert_chain, formatForTest(upstream_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
+                ProtoEq(ValueUtil::stringValue(expected_cert_chain)));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_CHAIN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::string expected_cert_chain = "";
+    EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificateChain())
+        .WillRepeatedly(ReturnRef(expected_cert_chain));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(std::nullopt, formatForTest(upstream_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_CHAIN");
+    EXPECT_EQ(std::nullopt, formatForTest(upstream_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("UPSTREAM_TLS_SESSION_ID");
     EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(Return(nullptr));
 
