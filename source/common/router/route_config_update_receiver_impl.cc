@@ -131,11 +131,20 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
   // Now, the state is updated and previous warming update is aborted (if any), we can update the
   // VHDS subscription here. So the destruction of the previous subscription will not bring any
   // side effect.
+  // TODO(wbpcode): all previously requested on-demand VHDS resource IDs are lost when the
+  // subscription is replaced and won't be replayed on the new subscription, so still-queued
+  // requests remain queued until they time out. This is a known limitation that has existed
+  // since the initial implementation of on-demand VHDS requests; it could be addressed in the
+  // future if necessary.
   if (new_vhds_subscription != nullptr) {
     vhds_subscription_ = std::move(new_vhds_subscription);
+    // The new subscription holds none of the aliases the old one requested, so nothing
+    // guarantees pushes for them any more.
+    requested_vhds_resource_ids_.clear();
   } else if (!has_vhds) {
     // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
     vhds_subscription_.reset();
+    requested_vhds_resource_ids_.clear();
   }
   last_vhds_config_hash_ = new_vhds_config_hash;
   rds_virtual_hosts_ = std::move(rds_virtual_hosts);
@@ -188,6 +197,18 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   // before the update is published, because publishing runs the on-demand VHDS callbacks against
   // resourceIdsInLastVhdsUpdate().
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
+  // Only ids that were explicitly requested on demand enter the answered cache. The server may
+  // name a resource or attach aliases Envoy never asked for; Envoy holds no subscription
+  // interest in those, so nothing guarantees pushes for them after a stream reconnect, and
+  // answering them locally later would serve permanently stale data without ever subscribing.
+  // TODO(wbpcode): also take the removed_resources into account for marking requested VHDS resource
+  // IDs as answered.
+  for (absl::string_view resource_id : added_resource_ids) {
+    if (auto it = requested_vhds_resource_ids_.find(resource_id);
+        it != requested_vhds_resource_ids_.end()) {
+      it->second = true;
+    }
+  }
   resource_ids_in_last_update_ = std::move(added_resource_ids);
   base_.startWarming();
   return true;

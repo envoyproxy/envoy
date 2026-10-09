@@ -19,6 +19,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
 #include "source/common/router/vhds.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
@@ -80,9 +81,17 @@ absl::Status RdsRouteConfigProviderImpl::onConfigUpdate() {
     return status;
   }
 
-  const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
-  // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.
-  if (aliases.empty()) {
+  // Only queued on-demand callbacks are interested in a publish; most providers never have any.
+  if (config_update_callbacks_.empty()) {
+    return absl::OkStatus();
+  }
+
+  const bool check_answered_ids =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache");
+  const auto& aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
+  // Regular (non-VHDS) RDS updates don't populate aliases fields in resources, but any publish
+  // can resolve a queued callback whose alias an earlier update already answered.
+  if (aliases.empty() && !check_answered_ids) {
     return absl::OkStatus();
   }
 
@@ -92,8 +101,14 @@ absl::Status RdsRouteConfigProviderImpl::onConfigUpdate() {
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
   for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
-    auto found = aliases.find(it->alias_);
-    if (found != aliases.end()) {
+    // A callback is answered by this update if the update carries its alias, or by any earlier
+    // published update that did: the callback was then queued while that update was still
+    // warming, or the update that carried the alias was superseded before it was published and
+    // this update is the one delivering its merged result.
+    const bool answered =
+        aliases.contains(it->alias_) ||
+        (check_answered_ids && config_update_info_->vhdsResourceIdAnswered(it->alias_));
+    if (answered) {
       // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
       auto host_header = Http::RequestHeaderMapImpl::create();
       host_header->setHost(VhdsSubscription::aliasToDomainName(it->alias_));
@@ -122,20 +137,41 @@ ConfigConstSharedPtr RdsRouteConfigProviderImpl::configCast() const {
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
-  auto alias = VhdsSubscription::domainNameToAlias(
-      config_update_info_->protobufConfigurationCast().name(), for_domain);
   // The RdsRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
   // determine if the RdsRouteConfigProviderImpl instance is still valid.
   factory_context_.mainThreadDispatcher().post(
-      [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), alias, &thread_local_dispatcher,
-       route_config_updated_cb]() -> void {
-        if (maybe_still_alive.lock()) {
-          subscription().updateOnDemand(alias);
-          config_update_callbacks_.push_back(
-              {alias, thread_local_dispatcher, route_config_updated_cb});
+      [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), for_domain,
+       &thread_local_dispatcher, route_config_updated_cb]() -> void {
+        if (!maybe_still_alive.lock()) {
+          return;
         }
+        const std::string alias = VhdsSubscription::domainNameToAlias(
+            config_update_info_->protobufConfigurationCast().name(), for_domain);
+        // TODO(wbpcode): this local-answer block and the publish loop in onConfigUpdate() are
+        // duplicated and may could be refactored into a shared helper.
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache") &&
+            config_update_info_->vhdsResourceIdAnswered(alias)) {
+          // The server has already answered for this alias and the published route configuration
+          // reflects that answer, so the request can be answered locally. The delta subscription
+          // to the alias is persistent: if the virtual host appears or changes later, the server
+          // pushes an update on its own.
+          const auto config = std::static_pointer_cast<const ConfigImpl>(
+              config_update_info_->parsedConfiguration());
+          auto host_header = Http::RequestHeaderMapImpl::create();
+          host_header->setHost(VhdsSubscription::aliasToDomainName(alias));
+          const bool host_exists = config->virtualHostExists(*host_header);
+          thread_local_dispatcher.post([route_config_updated_cb, host_exists] {
+            if (auto cb = route_config_updated_cb.lock()) {
+              (*cb)(host_exists);
+            }
+          });
+          return;
+        }
+        subscription().updateOnDemand(alias);
+        config_update_callbacks_.push_back(
+            {alias, thread_local_dispatcher, route_config_updated_cb});
       });
 }
 RouteConfigProviderSharedPtr RdsFactoryImpl::createRdsRouteConfigProvider(

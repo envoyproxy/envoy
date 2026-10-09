@@ -8,6 +8,7 @@ use crate::{
   NewHttpFilterPerRouteConfigFunction, TimingInfo, NEW_HTTP_FILTER_CONFIG_FUNCTION,
   NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::any::Any;
 use std::ffi::c_void;
@@ -1033,7 +1034,7 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
 ///
 /// The Envoy filter object is inherently not thread-safe, and it is always recommended to
 /// access it from the same thread as the one that [`HttpFilter`] event hooks are called.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyHttpFilter {
   /// Get the value of the request header with the given key.
@@ -4538,7 +4539,7 @@ impl EnvoyHttpFilterImpl {
 /// the [`Box<dyn EnvoyHttpFilterScheduler>`] can be sent across threads.
 ///
 /// It is also safe to be called concurrently, so it is marked as `Sync` as well.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyHttpFilterScheduler: Send + Sync {
   /// Commit the scheduled event to the worker thread where [`HttpFilter`] is running.
   ///
@@ -4590,7 +4591,7 @@ impl EnvoyHttpFilterScheduler for Box<dyn EnvoyHttpFilterScheduler> {
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
 /// Envoy HTTP filter config on the main thread.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyHttpFilterConfigScheduler: Send + Sync {
   /// Commit the scheduled event to the main thread.
   fn commit(&self, event_id: u64);
