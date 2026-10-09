@@ -1426,6 +1426,7 @@ TEST_F(SdsSecretReuseTest, DoesNotReuseSecretAcrossDifferentNonAdsSources) {
   WarmingProvider old_provider = createWarmingProvider(config_source);
   Init::ExpectableWatcherImpl old_watcher;
   old_provider.init_target_handle_->initialize(old_watcher);
+  EXPECT_CALL(old_watcher, ready());
   deliver(*old_provider.callbacks_, secret_yaml_, "v1");
 
   config_source.mutable_api_config_source()
@@ -1448,6 +1449,7 @@ TEST_F(SdsSecretReuseTest, DoesNotReuseSecretWhenRuntimeGuardDisabled) {
   WarmingProvider old_provider = createWarmingProvider(ads_config_source_);
   Init::ExpectableWatcherImpl old_watcher;
   old_provider.init_target_handle_->initialize(old_watcher);
+  EXPECT_CALL(old_watcher, ready());
   deliver(*old_provider.callbacks_, secret_yaml_, "v1");
 
   envoy::config::core::v3::ConfigSource new_config_source = ads_config_source_;
@@ -1465,6 +1467,7 @@ TEST_F(SdsSecretReuseTest, DoesNotReuseSecretFromDestroyedProvider) {
   WarmingProvider old_provider = createWarmingProvider(ads_config_source_);
   Init::ExpectableWatcherImpl old_watcher;
   old_provider.init_target_handle_->initialize(old_watcher);
+  EXPECT_CALL(old_watcher, ready());
   deliver(*old_provider.callbacks_, secret_yaml_, "v1");
   old_provider = {};
 
@@ -1499,6 +1502,7 @@ tls_certificate:
   WarmingProvider old_provider = createWarmingProvider(ads_config_source_);
   Init::ExpectableWatcherImpl old_watcher;
   old_provider.init_target_handle_->initialize(old_watcher);
+  EXPECT_CALL(old_watcher, ready());
   deliver(*old_provider.callbacks_, yaml, "v1");
   ASSERT_NE(old_provider.provider_->secret(), nullptr);
 
