@@ -790,17 +790,17 @@ TEST(LeafAwaitableTest, SynchronousCompleteInsideOnStartResumesCleanly) {
   EXPECT_EQ(sum, 1000 * 1001 / 2);
 }
 
-Task<absl::StatusOr<std::vector<std::string>>>
+ABSL_ATTRIBUTE_NOINLINE Task<absl::StatusOr<std::vector<std::string>>>
 backtraceLevel2(absl::AnyInvocable<std::vector<std::string>()> f) {
   co_return std::move(f)();
 }
 
-Task<absl::StatusOr<std::vector<std::string>>>
+ABSL_ATTRIBUTE_NOINLINE Task<absl::StatusOr<std::vector<std::string>>>
 backtraceLevel1(absl::AnyInvocable<std::vector<std::string>()> f) {
   co_return co_await backtraceLevel2(std::move(f));
 }
 
-Task<absl::StatusOr<std::vector<std::string>>>
+ABSL_ATTRIBUTE_NOINLINE Task<absl::StatusOr<std::vector<std::string>>>
 backtraceLevel0(absl::AnyInvocable<std::vector<std::string>()> f) {
   co_return co_await backtraceLevel1(std::move(f));
 }

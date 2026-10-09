@@ -10,6 +10,7 @@
 #include "source/common/coroutine/context.h"
 #include "source/common/coroutine/status_macros.h"
 
+#include "absl/base/attributes.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 
@@ -176,7 +177,8 @@ inline void on_coroutine_resume(PromiseBase& promise) {
 struct PromiseBase {
   // Always lazy start: the frame suspends at creation so its context can be set
   // before it runs (a child inherits it at `co_await`; a root gets it from launch()).
-  auto initial_suspend() noexcept {
+  // Do not inline this method to allow getting correct caller address.
+  ABSL_ATTRIBUTE_NOINLINE auto initial_suspend() noexcept {
     struct InitialAwaiter : public std::suspend_always {
       PromiseBase& promise;
 
