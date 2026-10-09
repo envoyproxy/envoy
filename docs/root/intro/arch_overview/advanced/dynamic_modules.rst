@@ -18,6 +18,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`bootstrap extension <envoy_v3_api_msg_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension>`
   (:ref:`configuration <config_bootstrap_extensions_dynamic_modules>`).
 * As a :ref:`cluster <envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig>`.
+* As an :ref:`xDS config validator <envoy_v3_api_msg_extensions.config.validators.dynamic_modules.v3.DynamicModuleConfigValidator>`.
 * As a :ref:`listener filter <envoy_v3_api_msg_extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter>`.
 * As a :ref:`UDP listener filter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`
   (:ref:`configuration <config_udp_listener_filters_dynamic_modules>`).
@@ -29,9 +30,11 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
 * As an :ref:`HTTP early header mutation <envoy_v3_api_msg_extensions.http.early_header_mutation.dynamic_modules.v3.DynamicModuleEarlyHeaderMutation>`.
+* As an :ref:`HTTP/1 header formatter <envoy_v3_api_msg_extensions.http.header_formatters.dynamic_modules.v3.DynamicModuleHeaderFormatter>`.
 * As an :ref:`HTTP matching data input <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`.
 * As an :ref:`input matcher <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
 * As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
+* As a :ref:`TLS handshaker <envoy_v3_api_msg_extensions.transport_sockets.tls.handshakers.dynamic_modules.v3.DynamicModuleTlsHandshaker>`.
 * As a :ref:`transport socket <envoy_v3_api_msg_extensions.transport_sockets.dynamic_modules.v3.DynamicModuleTransportSocket>`.
 * As a :ref:`load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`.
 * As an :ref:`upstream HTTP TCP bridge <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
@@ -40,6 +43,8 @@ Currently, dynamic modules are supported at the following extension points:
   (:ref:`configuration <config_health_checkers_dynamic_modules>`).
 * As a :ref:`cluster specifier <envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier>`
   (:ref:`configuration <config_http_cluster_specifier_dynamic_modules>`).
+* As a :ref:`route specifier <envoy_v3_api_msg_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier>`
+  (:ref:`configuration <config_http_route_specifiers_dynamic_modules>`).
 * As a :ref:`DNS resolver <envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig>`
   (:ref:`architecture <arch_overview_dns_resolution>`). The Hickory resolver is implemented as a
   builtin dynamic module; the ABI and SDKs also support custom DNS resolvers.
@@ -49,6 +54,29 @@ There are a few design goals for the dynamic modules:
 1. **Performance**: The dynamic modules should have minimal overhead compared to the built-in C++ extensions. For example, the dynamic modules are able to access HTTP headers as well as body without copying them unlike any other extension mechanisms.
 2. **Ease of Use**: The SDK should provide a high-level API that abstracts the details of the Envoy internals.
 3. **Flexibility**: The dynamic modules should be able to implement any functionality that can be implemented by the built-in C++ extensions without performance penalty. This is work in progress and many features are not yet available.
+
+HTTP stream timing
+------------------
+
+HTTP filters can read stream timing through ``TimingInfo`` in the C++, Go, and Rust SDKs. The
+:repo:`ABI header <source/extensions/dynamic_modules/abi/abi.h>` lists the markers in
+``envoy_dynamic_module_type_timing_info_v2``. Access loggers can read these markers with
+``envoy_dynamic_module_callback_access_logger_get_timing_info_v2``. The original
+``envoy_dynamic_module_callback_access_logger_get_timing_info`` remains available without the new
+markers.
+
+``start_time_unix_ns`` is a Unix timestamp in nanoseconds. The other numeric timing fields are
+nanosecond offsets from the request's monotonic start time. Check the ``has_*`` fields in the C ABI
+or ``Has*`` fields in Go to distinguish recorded values from unavailable markers. When a flag is
+false, its numeric field contains ``-1``. C++ and Rust use optional values instead. Zero and
+negative offsets are valid.
+
+``last_downstream_header_rx_byte_received_ns`` marks receipt of all request headers, while
+``last_downstream_rx_byte_received_ns`` marks receipt of the full request. For a header-only
+request, the latter is recorded when the headers end the stream. Envoy records
+``downstream_connection_end_ns`` only if the request is active when the connection closes. It
+records ``last_downstream_ack_received_ns`` when it tracks the final ACK, currently for QUIC. The
+markers do not by themselves measure body buffering or processing.
 
 Compatibility
 --------------------------
@@ -145,8 +173,9 @@ The repository is available at `envoyproxy/dynamic-modules-examples <https://git
 Statistics
 ---------------------------
 
-All dynamic-module extension types emit the following statistics in the shared ``dynamic_modules.`` namespace.
-These stats track failures encountered while loading the extension's configuration. Each one is tagged with
+Dynamic-module extension types that receive a factory context emit the following statistics in the shared ``dynamic_modules.`` namespace.
+These stats track failures encountered while loading the extension's configuration. Extension points created without a factory context, such
+as config validators and the upstream HTTP TCP bridge, cannot emit these shared counters. Each one is tagged with
 ``config_name``, set to the configured name of the dynamic-module extension instance — for example the
 :ref:`filter_name
 <envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_name>`
@@ -163,8 +192,8 @@ load-balancing policy, ``tracer_name`` for the tracer or ``cluster_name`` for th
   remote_fetch_error, Counter, "Total failures fetching or loading a remote module source, including rejected cache misses when ``nack_on_cache_miss`` is set. Only the HTTP filter supports remote module sources."
   per_route_config_error, Counter, "Total per-route configurations that failed to load or initialize. Only emitted by the HTTP filter."
 
-In addition to the counters above, a module may define its own custom metrics. These are emitted
-under the configurable :ref:`metrics_namespace
+In addition to the counters above, a module can define its own custom metrics when its extension
+type receives a factory context. These are emitted under the configurable :ref:`metrics_namespace
 <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>`
 (``dynamicmodulescustom`` by default), separately from the ``dynamic_modules.`` namespace above.
 

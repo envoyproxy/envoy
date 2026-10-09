@@ -430,6 +430,7 @@ func (p *spanCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	if span := p.handle.GetActiveSpan(); span != nil {
 		span.SetTag("key", "value")
+		span.SetTags([][2]string{{"batch.key1", "batch.value1"}, {"batch.key2", "batch.value2"}})
 		span.SetOperation("operation")
 		span.Log("event")
 		span.SetSampled(true)
@@ -587,6 +588,12 @@ func (p *dynamicMetadataCallbacksFilter) OnRequestHeaders(headers shared.HeaderM
 	//   12 02 01 02        field 2 (value)    = 0x01 0x02
 	p.handle.SetTypedMetadata("ns_req_header_typed",
 		[]byte{0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02})
+	if typeURL, value, ok := p.handle.GetTypedMetadata(shared.MetadataSourceTypeDynamic, "ns_req_header_typed"); !ok || typeURL.ToUnsafeString() != "t/x" || value.ToUnsafeString() != "\x01\x02" {
+		panic("typed metadata mismatch")
+	}
+	if _, _, ok := p.handle.GetTypedMetadata(shared.MetadataSourceTypeDynamic, "missing"); ok {
+		panic("unexpected typed metadata")
+	}
 
 	// Try getting metadata from router, cluster, and host.
 	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeRoute,
@@ -757,6 +764,12 @@ func (p *filterStateCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	if val, ok := p.handle.GetFilterStateTyped("envoy.test.http_typed_object_for_rust"); !ok ||
 		val.ToUnsafeString() != "typed_value" {
 		panic(fmt.Sprintf("typed filter state mismatch: ok=%v val=%q", ok, val.ToUnsafeString()))
+	}
+	if !p.handle.HasFilterState("envoy.test.http_typed_object_for_rust") {
+		panic("expected HasFilterState to return true for existing key")
+	}
+	if p.handle.HasFilterState("nonexistent_key") {
+		panic("expected HasFilterState to return false for missing key")
 	}
 	return shared.HeadersStatusContinue
 }

@@ -45,11 +45,12 @@ public:
   };
 
   struct Property {
-    Property(std::string n, Schema s);
-    Property(const char* n, Schema s);
+    Property(std::string n, Schema s, std::vector<std::string> aliases = {});
+    Property(const char* n, Schema s, std::vector<std::string> aliases = {});
 
     std::string name;
     std::shared_ptr<Schema> schema;
+    std::vector<std::string> aliases;
   };
 
   using CustomValidator = std::function<absl::Status(const nlohmann::json&)>;
@@ -112,6 +113,11 @@ public:
   }
   bool allowsUnknownFields() const { return allow_unknown_fields_; }
 
+  Schema& atMostOneOf(std::initializer_list<std::string> property_names) {
+    at_most_one_of_.emplace_back(property_names);
+    return *this;
+  }
+
   Schema& customValidator(CustomValidator validator) {
     custom_validator_ = std::move(validator);
     return *this;
@@ -158,6 +164,7 @@ private:
   std::optional<int64_t> max_integer_;
 
   std::vector<Property> properties_;
+  std::vector<std::vector<std::string>> at_most_one_of_;
   std::shared_ptr<Schema> element_schema_;
   std::vector<Schema> one_of_candidates_;
   CustomValidator custom_validator_;

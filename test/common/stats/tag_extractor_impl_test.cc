@@ -174,6 +174,14 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("cluster.ratelimit.upstream_rq_timeout", "cluster.upstream_rq_timeout",
                          {cluster_tag});
 
+  // Health check name
+  Tag health_check_tag;
+  health_check_tag.name_ = tag_names.HEALTH_CHECK_NAME;
+  health_check_tag.value_ = "hc";
+
+  regex_tester.testRegex("cluster.ratelimit.health_check.name.hc.attempt",
+                         "cluster.health_check.attempt", {cluster_tag, health_check_tag});
+
   // Listener SSL
   Tag listener_address;
   listener_address.name_ = tag_names.LISTENER_ADDRESS;

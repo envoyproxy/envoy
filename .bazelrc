@@ -19,16 +19,14 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 # global
 #############################################################################
 
+try-import %workspace%/ci.bazelrc
+
 common --noincompatible_disallow_empty_glob
 common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
-fetch --color=yes
-run --color=yes
-build --color=yes
-
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/ea7d3f2e84c102cda5ad4db645dbe156c807a77f
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -36,18 +34,9 @@ common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/ea
 build --jobs=HOST_CPUS-1
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
-build --java_runtime_version=remotejdk_11
-build --tool_java_runtime_version=remotejdk_11
-build --java_language_version=11
-build --tool_java_language_version=11
-# TODO(jwendell): Remove after https://github.com/protocolbuffers/protobuf/issues/20760 is fixed.
-build --extra_toolchains=@envoy//bazel:envoy_java_toolchain_definition
 # silence absl logspam.
 build --copt=-DABSL_MIN_LOG_LEVEL=4
 # Global C++ standard and common warning suppressions
-build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
-build --copt=-Wno-deprecated-declarations
-build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
 build --experimental_cc_static_library
 build --enable_platform_specific_config
@@ -75,19 +64,8 @@ test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 # Allow tags to influence execution requirements
 common --incompatible_allow_tags_propagation
 
-# Python
-common --@rules_python//python/config_settings:bootstrap_impl=script
-build --incompatible_default_to_explicit_init_py
-
-# Protobuf
-common --@protobuf//bazel/flags:prefer_prebuilt_protoc=true
-common --incompatible_enable_proto_toolchain_resolution
-
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
-
-# Disable ICU linking for googleurl.
-build --@googleurl//build_config:system_icu=0
 
 # Test options
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
@@ -95,6 +73,17 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 # Coverage options
 coverage --config=coverage
 coverage --build_tests_only
+
+# Envoy deprecation
+common --@envoy//bazel:deprecated_repo_arg_allowed=false
+
+# BCR modules with no registry override — deprecated absl Mutex shims / TSA false positives / fuzz semantics.
+build --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-deprecated-declarations
+build --per_file_copt=external/c-ares.*@-Wno-unused-function
+build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
+build --per_file_copt=external/libprotobuf-mutator.*@-Wno-unused-result
+build --per_file_copt=external/librdkafka.*@-Wno-unused-variable,-Wno-unused-but-set-variable,-Wno-sometimes-uninitialized,-Wno-uninitialized,-Wno-implicit-enum-enum-cast
+build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
 
 
 #############################################################################
@@ -108,49 +97,20 @@ build --incompatible_default_to_explicit_init_py
 # Rust
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
-
-# grpc
-build --@grpc//third_party:ssl_lib=@envoy//bazel:ssl
-build --@grpc//third_party:crypto_lib=@envoy//bazel:crypto
+common --@rules_rust//rust/settings:skip_fission_for_rust=true
 
 # kafka
 build --@librdkafka//:with_ssl=false
 build --@librdkafka//:with_zlib=false
 build --per_file_copt=contrib/kafka/.*\.cc@-Wno-old-style-cast
 
-# protobuf
-common --incompatible_enable_proto_toolchain_resolution=true
-common --@protobuf//bazel/toolchains:prefer_prebuilt_protoc
-common --@protobuf//:zlib=@zlib-ng
+common --incompatible_enable_proto_toolchain_resolution
+
 # these are here to detect if the toolchain attempts to compile protoc
 common --per_file_copt=bazel-out/.*/bin/external/protobuf.*/protoc@--THIS_CC_TOOLCHAIN_IS_BROKEN
 
-# proxy-wasm-cpp-host
-common --@proxy-wasm-cpp-host//bazel:crypto_lib=@envoy//bazel:crypto
-
-# libsxg
-build --@libsxg//:crypto_lib=@envoy//bazel:crypto
-
-# quiche
-build --@quiche//:zlib=@envoy//bazel:zlib
-build --@quiche//:ssl_lib=@envoy//bazel:ssl
-
-# quiche — non-test platform impls
-build --@quiche//:quic_base_impl_lib=@envoy//source/common/quic/platform:quic_base_impl_lib
-build --@quiche//:quiche_export_impl_lib=@envoy//source/common/quic/platform:quiche_export_impl_lib
-build --@quiche//:quiche_flags_impl_lib=@envoy//source/common/quic/platform:quiche_flags_impl_lib
-build --@quiche//:quiche_logging_impl_lib=@envoy//source/common/quic/platform:quiche_logging_impl_lib
-build --@quiche//:quiche_lower_case_string_impl_lib=@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib
-build --@quiche//:quiche_platform_iovec_impl_lib=@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib
-build --@quiche//:quiche_stack_trace_impl_lib=@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib
-build --@quiche//:quiche_time_utils_impl_lib=@envoy//source/common/quic/platform:quiche_time_utils_impl_lib
-
-# quiche — test platform impls
-build --@quiche//:quiche_expect_bug_impl_lib=@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib
-build --@quiche//:quiche_test_impl_lib=@envoy//test/common/quic/platform:quiche_test_impl_lib
-build --@quiche//:quiche_test_helpers_impl_lib=@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib
-build --@quiche//:quiche_test_output_impl_lib=@envoy//test/common/quic/platform:quiche_test_output_impl_lib
-build --@quiche//:quiche_thread_impl_lib=@envoy//test/common/quic/platform:quiche_thread_impl_lib
+# TODO(phlax): Remove this once a proper fix for the deprecated enum lands
+build --per_file_copt=external/envoy_api.*/route_components\.pb\.cc@-Wno-deprecated-declarations
 
 
 #############################################################################
@@ -161,7 +121,6 @@ build:linux --copt=-fdebug-types-section
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
-build:linux --cxxopt=-fsized-deallocation --host_cxxopt=-fsized-deallocation
 build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt
 build:linux --features=per_object_debug_info
@@ -170,30 +129,12 @@ build:linux --features=per_object_debug_info
 build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
-build:macos --cxxopt=-Wno-nullability-completeness
-build:macos --@toolchains_llvm//toolchain/config:compiler-rt=false
-build:macos --@toolchains_llvm//toolchain/config:libunwind=false
+build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 
 
 #############################################################################
 # compiler
 #############################################################################
-
-# Common flags for Clang (shared between all clang variants)
-common:clang-common --linkopt=-fuse-ld=lld
-common:clang-common --cxxopt=-Wno-nullability-completeness
-common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
-common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
-
-# Clang with libc++ (default)
-common:clang --config=clang-common
-common:clang --config=libc++
-common:clang --host_platform=@clang_platform
-common:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-
-# Clang installed to non-standard location (ie not /opt/llvm/)
-common:clang-local --config=clang-common
-common:clang-local --config=libc++
 
 # Use gold linker for gcc compiler.
 build:gcc --config=libstdc++
@@ -223,13 +164,9 @@ common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
 common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
-common:libc++ --define force_libcpp=enabled
-common:libc++ --@envoy//bazel:libc++=true
 
 # libstdc++ - currently only used for gcc
 build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build:libstdc++ --@envoy//bazel:libc++=false
-build:libstdc++ --@envoy//bazel:libstdc++=true
 build:libstdc++ --repo_env=BAZEL_USE_LIBSTDCPP=True
 
 
@@ -286,6 +223,9 @@ build:compile-time-options --copt=-Wno-error=deprecated-enum-enum-conversion
 build:compile-time-options --test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true
 build:compile-time-options --@envoy//bazel:http3=False
 build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
+# This is a Protobuf feature which breaks dynamic casting of messages. Turn it
+# on here to prevent raw dynamic_casts from being added to Envoy.
+build:compile-time-options --copt=-DPROTOBUF_ENABLE_CUSTOM_VTABLES=1
 
 
 #############################################################################
@@ -300,7 +240,6 @@ common:fips-common --@envoy//bazel:fips=True
 common:boringssl-fips --config=fips-common
 common:boringssl-fips --@envoy//bazel:ssl=@boringssl-fips//:ssl
 common:boringssl-fips --@envoy//bazel:crypto=@boringssl-fips//:crypto
-common:boringssl-fips --@quiche//:ssl_lib=@boringssl-fips//:ssl
 
 # OpenSSL
 common:openssl --@envoy//bazel:openssl=True
@@ -310,7 +249,6 @@ common:openssl --@envoy//bazel:crypto=@envoy//compat/openssl:crypto
 # OpenSSL builds via non-QUIC features (e.g. HTTP datagram / CONNECT-UDP capsule
 # support), and must use the same SSL implementation as the rest of the binary
 # to avoid linking BoringSSL and OpenSSL together (symbol/ABI collisions).
-common:openssl --@quiche//:ssl_lib=@envoy//compat/openssl:ssl
 common:openssl --copt=-DENVOY_SSL_OPENSSL
 common:openssl --host_copt=-DENVOY_SSL_OPENSSL
 common:openssl --@envoy//bazel:http3=False
@@ -351,7 +289,7 @@ build:asan-common --build_tag_filters=-no_san
 build:asan-common --test_tag_filters=-no_san
 build:asan-common --copt -fsanitize=address,undefined
 build:asan-common --linkopt -fsanitize=address,undefined
-# vptr and function sanitizer are enabled in asan when using --config=clang.
+# vptr and function sanitizer are enabled in asan
 build:asan-common --copt -fno-sanitize=vptr,function
 build:asan-common --linkopt -fno-sanitize=vptr,function
 build:asan-common --copt -DADDRESS_SANITIZER=1
@@ -423,7 +361,6 @@ build:asan-fuzzer --config=asan
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
-build:asan-fuzzer --linkopt=-lc++
 
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
@@ -447,7 +384,6 @@ build:oss-fuzz --linkopt=-fno-sanitize=vptr
 build:oss-fuzz --define=tcmalloc=disabled
 build:oss-fuzz --define=signal_trace=disabled
 build:oss-fuzz --copt=-D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
-build:oss-fuzz --define=force_libcpp=enabled
 build:oss-fuzz --linkopt=-lc++
 build:oss-fuzz --linkopt=-pthread
 
@@ -490,51 +426,8 @@ build:sizeopt -c opt --copt -Os
 
 
 #############################################################################
-# remote: Setup for cache, BES, RBE, and Docker workers
+# remote: Docker workers
 #############################################################################
-
-build:remote --spawn_strategy=remote,sandboxed,local
-build:remote --strategy=Javac=remote,sandboxed,local
-build:remote --strategy=Closure=remote,sandboxed,local
-build:remote --strategy=Genrule=remote,sandboxed,local
-build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-# This flag may be more generally useful - it sets the openssl foreign_cc build -jauto.
-# It is only set here because if it were the default it risks OOMing on local builds.
-build:remote --@openssl//:parallel_builds
-
-## RBE (Engflow Envoy)
-
-# this is not included in the `--config=rbe` target - set it to publish to engflow ui
-common:bes --bes_backend=grpcs://mordenite.cluster.engflow.com/
-common:bes --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
-common:bes --bes_timeout=3600s
-common:bes --bes_upload_mode=fully_async
-common:bes --nolegacy_important_outputs
-
-common:engflow-common --google_default_credentials=false
-common:engflow-common --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-common:engflow-common --grpc_keepalive_time=60s
-common:engflow-common --grpc_keepalive_timeout=30s
-common:engflow-common --remote_cache_compression
-# Recover from transient gRPC failures (e.g. UNAVAILABLE: io exception) talking to engflow.
-common:engflow-common --remote_retries=10
-common:engflow-common --remote_retry_max_delay=60s
-# Recover when blobs are evicted from the CAS mid-build (common during patch releases).
-common:engflow-common --experimental_remote_cache_eviction_retries=5
-
-# this provides access to RBE+cache
-common:rbe --config=remote-cache
-common:rbe --config=remote-exec
-
-# this provides access to just cache
-common:remote-cache --config=engflow-common
-common:remote-cache --remote_cache=grpcs://mordenite.cluster.engflow.com
-common:remote-cache --experimental_remote_downloader=grpcs://mordenite.cluster.engflow.com
-common:remote-cache --remote_timeout=3600s
-
-common:remote-exec --remote_executor=grpcs://mordenite.cluster.engflow.com
-common:remote-exec --jobs=200
-common:remote-exec --define=engflow_rbe=true
 
 # Docker sandboxes
 build:docker-sandbox --spawn_strategy=docker
@@ -546,61 +439,19 @@ build:docker-sandbox --experimental_docker_verbose
 build:docker-sandbox --experimental_enable_docker_sandbox
 
 build:docker-clang --config=docker-sandbox
-build:docker-clang --config=clang
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=gcc
 
 build:docker-asan --config=docker-sandbox
-build:docker-asan --config=clang
 build:docker-asan --config=asan
 
 build:docker-msan --config=docker-sandbox
-build:docker-msan --config=clang
 build:docker-msan --config=msan
 
 build:docker-tsan --config=docker-sandbox
-build:docker-tsan --config=clang
 build:docker-tsan --config=tsan
 
-
-#############################################################################
-# ci
-#############################################################################
-
-# CI configurations
-build:remote-ci --config=ci
-build:remote-ci --remote_download_minimal
-
-# Note this config is used by mobile CI also.
-common:ci --noshow_progress
-common:ci --noshow_loading_progress
-common:ci --test_output=errors
-
-
-#############################################################################
-# debug: Various Bazel debugging flags
-#############################################################################
-# debug/bazel
-common:debug-bazel --announce_rc
-common:debug-bazel -s
-# debug/sandbox
-common:debug-sandbox --verbose_failures
-common:debug-sandbox --sandbox_debug
-# debug/coverage
-common:debug-coverage --action_env=VERBOSE_COVERAGE=true
-common:debug-coverage --test_env=VERBOSE_COVERAGE=true
-common:debug-coverage --test_env=DISPLAY_LCOV_CMD=true
-common:debug-coverage --config=debug-tests
-# debug/tests
-common:debug-tests --test_output=all
-# debug/everything
-common:debug --config=debug-bazel
-common:debug --config=debug-sandbox
-common:debug --config=debug-coverage
-common:debug --config=debug-tests
-
-try-import %workspace%/repo.bazelrc
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
 try-import %workspace%/local_tsan.bazelrc

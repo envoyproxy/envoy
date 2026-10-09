@@ -19,10 +19,9 @@ std::string SigV4SignerImpl::createStringToSign(absl::string_view canonical_requ
                                                 absl::string_view long_date,
                                                 absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  return fmt::format(
-      SigV4SignatureConstants::SigV4StringToSignFormat, SigV4SignatureConstants::SigV4Algorithm,
-      long_date, credential_scope,
-      Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
+  return fmt::format(SigV4SignatureConstants::SigV4StringToSignFormat,
+                     SigV4SignatureConstants::SigV4Algorithm, long_date, credential_scope,
+                     Hex::encode(crypto_util.getSha256Digest(canonical_request)));
 }
 
 std::string SigV4SignerImpl::createSignature(

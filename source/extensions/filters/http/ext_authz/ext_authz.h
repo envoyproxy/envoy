@@ -31,6 +31,8 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -204,6 +206,10 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
+  const absl::flat_hash_set<std::string>& clearRouteCacheHeaders() const {
+    return clear_route_cache_headers_;
+  }
+
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   uint32_t maxDeniedResponseBodyBytes() const { return max_denied_response_body_bytes_; }
@@ -321,6 +327,9 @@ private:
   const bool failure_mode_allow_header_add_;
   const bool shadow_mode_;
   const bool clear_route_cache_;
+  // Lower cased request header names the routes match on. Empty means clear the route cache on any
+  // request mutation.
+  const absl::flat_hash_set<std::string> clear_route_cache_headers_;
   const uint32_t max_request_bytes_;
   const uint32_t max_denied_response_body_bytes_;
   const bool pack_as_bytes_;

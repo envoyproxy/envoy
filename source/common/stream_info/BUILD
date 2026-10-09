@@ -31,6 +31,8 @@ envoy_cc_library(
     hdrs = ["filter_state_impl.h"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:compiled_string_map_lib",
+        "//source/common/common:macros",
     ],
 )
 

@@ -15,6 +15,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/server/resource_monitor_config_impl.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -23,7 +24,6 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-using TriggerPtr = std::unique_ptr<Trigger>;
 constexpr absl::string_view ReservedOverloadActionNamePrefix = "envoy.overload_actions.";
 
 class ThresholdTriggerImpl final : public Trigger {
@@ -31,10 +31,13 @@ public:
   ThresholdTriggerImpl(const envoy::config::overload::v3::ThresholdTrigger& config)
       : threshold_(config.value()), state_(OverloadActionState::inactive()) {}
 
+  OverloadActionState evaluate(double value) const override {
+    return value >= threshold_ ? OverloadActionState::saturated() : OverloadActionState::inactive();
+  }
+
   bool updateValue(double value) override {
     const OverloadActionState state = actionState();
-    state_ =
-        value >= threshold_ ? OverloadActionState::saturated() : OverloadActionState::inactive();
+    state_ = evaluate(value);
     // This is a floating point comparison, though state_ is always either
     // saturated or inactive so there's no risk due to floating point precision.
     return state.value() != actionState().value();
@@ -57,16 +60,20 @@ public:
     return std::unique_ptr<ScaledTriggerImpl>(new ScaledTriggerImpl(config));
   }
 
-  bool updateValue(double value) override {
-    const OverloadActionState old_state = actionState();
+  OverloadActionState evaluate(double value) const override {
     if (value <= scaling_threshold_) {
-      state_ = OverloadActionState::inactive();
+      return OverloadActionState::inactive();
     } else if (value >= saturated_threshold_) {
-      state_ = OverloadActionState::saturated();
+      return OverloadActionState::saturated();
     } else {
-      state_ = OverloadActionState(
+      return OverloadActionState(
           UnitFloat((value - scaling_threshold_) / (saturated_threshold_ - scaling_threshold_)));
     }
+  }
+
+  bool updateValue(double value) override {
+    const OverloadActionState old_state = actionState();
+    state_ = evaluate(value);
     // All values of state_ are produced via this same code path. Even if
     // old_state and state_ should be approximately equal, there's no harm in
     // signaling for a small change if they're not float::operator== equal.
@@ -85,6 +92,8 @@ private:
   const double saturated_threshold_;
   OverloadActionState state_;
 };
+
+} // namespace
 
 absl::StatusOr<TriggerPtr>
 createTriggerFromConfig(const envoy::config::overload::v3::Trigger& trigger_config) {
@@ -107,6 +116,8 @@ createTriggerFromConfig(const envoy::config::overload::v3::Trigger& trigger_conf
 
   return trigger;
 }
+
+namespace {
 
 Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view name_of_stat) {
   Stats::StatNameManagedStorage stat_name(name_of_stat, scope.symbolTable());
@@ -464,38 +475,47 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
 
 OverloadActionState OverloadAction::getState() const { return state_; }
 
-absl::StatusOr<std::unique_ptr<LoadShedPointImpl>>
-LoadShedPointImpl::create(const envoy::config::overload::v3::LoadShedPoint& config,
-                          Stats::Scope& stats_scope, Random::RandomGenerator& random_generator) {
+absl::StatusOr<std::unique_ptr<LoadShedPointImpl>> LoadShedPointImpl::create(
+    const envoy::config::overload::v3::LoadShedPoint& config, Stats::Scope& stats_scope,
+    Random::RandomGenerator& random_generator,
+    const SynchronousFeedbackResourceMonitorMap& synchronous_feedback_resources) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<LoadShedPointImpl>(
-      new LoadShedPointImpl(config, stats_scope, random_generator, creation_status));
+  auto ret = std::unique_ptr<LoadShedPointImpl>(new LoadShedPointImpl(
+      config, stats_scope, random_generator, synchronous_feedback_resources, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
-LoadShedPointImpl::LoadShedPointImpl(const envoy::config::overload::v3::LoadShedPoint& config,
-                                     Stats::Scope& stats_scope,
-                                     Random::RandomGenerator& random_generator,
-                                     absl::Status& creation_status)
-    : scale_percent_(makeGauge(stats_scope, config.name(), "scale_percent",
-                               Stats::Gauge::ImportMode::NeverImport)),
+LoadShedPointImpl::LoadShedPointImpl(
+    const envoy::config::overload::v3::LoadShedPoint& config, Stats::Scope& stats_scope,
+    Random::RandomGenerator& random_generator,
+    const SynchronousFeedbackResourceMonitorMap& synchronous_feedback_resources,
+    absl::Status& creation_status)
+    : name_(config.name()), scale_percent_(makeGauge(stats_scope, config.name(), "scale_percent",
+                                                     Stats::Gauge::ImportMode::NeverImport)),
       shed_load_counter_(makeCounter(stats_scope, config.name(), "shed_load_count")),
       random_generator_(random_generator) {
+  absl::flat_hash_set<absl::string_view> seen_triggers;
   for (const auto& trigger_config : config.triggers()) {
-    auto trigger_or_error = createTriggerFromConfig(trigger_config);
-    SET_AND_RETURN_IF_NOT_OK(trigger_or_error.status(), creation_status);
-    if (!triggers_.try_emplace(trigger_config.name(), std::move(*trigger_or_error)).second) {
+    if (!seen_triggers.insert(trigger_config.name()).second) {
       creation_status = absl::InvalidArgumentError(
           absl::StrCat("Duplicate trigger resource for LoadShedPoint ", config.name()));
       return;
+    }
+    auto trigger_or_error = createTriggerFromConfig(trigger_config);
+    SET_AND_RETURN_IF_NOT_OK(trigger_or_error.status(), creation_status);
+    if (auto it = synchronous_feedback_resources.find(trigger_config.name());
+        it != synchronous_feedback_resources.end()) {
+      synchronous_feedback_triggers_.emplace_back(std::move(*trigger_or_error), it->second);
+    } else {
+      periodic_triggers_.emplace(trigger_config.name(), std::move(*trigger_or_error));
     }
   }
 };
 
 void LoadShedPointImpl::updateResource(absl::string_view resource_name,
                                        double resource_utilization) {
-  auto it = triggers_.find(resource_name);
-  if (it == triggers_.end()) {
+  auto it = periodic_triggers_.find(resource_name);
+  if (it == periodic_triggers_.end()) {
     return;
   }
 
@@ -504,28 +524,29 @@ void LoadShedPointImpl::updateResource(absl::string_view resource_name,
 }
 
 void LoadShedPointImpl::updateProbabilityShedLoad() {
-  float max_unit_float = 0.0f;
-  for (const auto& trigger : triggers_) {
-    max_unit_float = std::max(trigger.second->actionState().value().value(), max_unit_float);
+  float max_periodic = 0.0f;
+  for (const auto& [name, trigger] : periodic_triggers_) {
+    max_periodic = std::max(max_periodic, trigger->actionState().value().value());
   }
-
-  probability_shed_load_.store(max_unit_float);
+  periodic_shed_probability_.store(max_periodic);
 
   // Update stats.
-  scale_percent_.set(100 * max_unit_float);
+  scale_percent_.set(100 * max_periodic);
 }
 
 bool LoadShedPointImpl::shouldShedLoad() {
-  float unit_float_probability_shed_load = probability_shed_load_.load();
-  // This should be ok as we're using unit float which saturates at 1.0f.
-  if (unit_float_probability_shed_load == 1.0f) {
+  float probability = periodic_shed_probability_.load(std::memory_order_relaxed);
+  for (const auto& trigger : synchronous_feedback_triggers_) {
+    probability = std::max(probability, trigger.shedProbability());
+  }
+
+  if (random_generator_.bernoulli(UnitFloat(probability))) {
     shed_load_counter_.inc();
     return true;
   }
 
-  if (random_generator_.bernoulli(UnitFloat(unit_float_probability_shed_load))) {
-    shed_load_counter_.inc();
-    return true;
+  for (const auto& trigger : synchronous_feedback_triggers_) {
+    trigger.onLoadAccepted(name_);
   }
   return false;
 }
@@ -559,6 +580,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
               absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>()) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, options, api,
                                                            validation_visitor, runtime);
+  SynchronousFeedbackResourceMonitorMap synchronous_feedback_resources;
   // We should hide impl details from users, for them there should be no distinction between
   // proactive and regular resource monitors in configuration API. But internally we will maintain
   // two distinct collections of proactive and regular resources. Proactive resources are not
@@ -595,9 +617,15 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
         creation_status = monitor_or_error.status();
         return;
       }
-      result = resources_
-                   .try_emplace(name, name, std::move(monitor_or_error.value()), *this, stats_scope)
-                   .second;
+      ResourceMonitorSharedPtr monitor = std::move(monitor_or_error.value());
+      result = resources_.try_emplace(name, name, monitor, *this, stats_scope).second;
+      if (result) {
+        if (auto sf_monitor =
+                std::dynamic_pointer_cast<SynchronousFeedbackResourceMonitor>(monitor);
+            sf_monitor != nullptr) {
+          synchronous_feedback_resources.emplace(name, std::move(sf_monitor));
+        }
+      }
     }
     if (!result) {
       creation_status =
@@ -706,8 +734,8 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       }
     }
 
-    auto load_shed_or_error =
-        LoadShedPointImpl::create(point, api.rootScope(), api.randomGenerator());
+    auto load_shed_or_error = LoadShedPointImpl::create(
+        point, api.rootScope(), api.randomGenerator(), synchronous_feedback_resources);
     SET_AND_RETURN_IF_NOT_OK(load_shed_or_error.status(), creation_status);
     const auto result = loadshed_points_.try_emplace(point.name(), *std::move(load_shed_or_error));
 
@@ -903,7 +931,7 @@ void OverloadManagerImpl::flushResourceUpdates() {
   callbacks_to_flush_.clear();
 }
 
-OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorPtr monitor,
+OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorSharedPtr monitor,
                                         OverloadManagerImpl& manager, Stats::Scope& stats_scope)
     : name_(name), monitor_(std::move(monitor)), manager_(manager),
       pressure_gauge_(

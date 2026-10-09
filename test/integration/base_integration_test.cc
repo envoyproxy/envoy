@@ -172,6 +172,10 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
+    // The fake upstream keeps a validation context for mTLS-capable tests, which now defaults
+    // resumption and early data off. Enable them so upstream 0-RTT tests still exercise early data.
+    quic_config.mutable_enable_resumption()->set_value(true);
+    quic_config.mutable_enable_early_data()->set_value(true);
 
     auto& config_factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(

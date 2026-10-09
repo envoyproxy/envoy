@@ -16,6 +16,6 @@ changes:
 - area: udp
   change: |
     fixed issue in which receiving truncated UDP datagrams would cause Envoy to crash.
-- area: vrp
+- area: build
   change: |
     allow supervisord to open its log file.

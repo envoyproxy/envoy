@@ -302,8 +302,7 @@ std::string generateCodeVerifier(Random::RandomGenerator& random) {
 // Generates a PKCE code challenge from a code verifier.
 std::string generateCodeChallenge(const std::string& code_verifier) {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  std::vector<uint8_t> sha256_digest =
-      crypto_util.getSha256Digest(Buffer::OwnedImpl(code_verifier));
+  std::vector<uint8_t> sha256_digest = crypto_util.getSha256Digest(code_verifier);
   std::string sha256_string(sha256_digest.begin(), sha256_digest.end());
   return Base64Url::encode(sha256_string.data(), sha256_string.size());
 }
@@ -810,7 +809,7 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
   id_token_ = findValue(cookies, cookie_names_.id_token_);
   refresh_token_ = findValue(cookies, cookie_names_.refresh_token_);
   hmac_ = findValue(cookies, cookie_names_.oauth_hmac_);
-  host_ = std::string(headers.Host()->value().getStringView());
+  host_ = std::string(headers.getHostValue());
 
   secret_ = std::string(secret);
 }
@@ -953,15 +952,17 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     headers.removeInline(authorization_handle.handle());
   }
 
-  // The following 2 headers are guaranteed for regular requests. The asserts are helpful when
-  // writing test code to not forget these important variables in mock requests
-  const Http::HeaderEntry* host_header = headers.Host();
-  ASSERT(host_header != nullptr);
-  host_ = std::string(host_header->value().getStringView());
+  host_ = std::string(headers.getHostValue());
 
-  const Http::HeaderEntry* path_header = headers.Path();
-  ASSERT(path_header != nullptr);
-  const absl::string_view path_str = path_header->value().getStringView();
+  // A request without a :path header (for example a plain CONNECT tunnel request, which the
+  // connection manager does not reject) cannot be processed by this filter. Fail closed with a bad
+  // request response.
+  if (headers.Path() == nullptr) {
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "", nullptr, std::nullopt,
+                                       "oauth_missing_path");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+  const absl::string_view path_str = headers.getPathValue();
   const bool redirect_from_auth_server = config_->redirectPathMatcher().match(path_str);
   // Remember the result so that the failure paths, which can run asynchronously, do not have to
   // run the path matcher again.
@@ -1291,7 +1292,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     return;
   }
 
-  const std::string original_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
+  const std::string original_url = absl::StrCat(base_path, headers.getPathValue());
 
   const CookieNames& cookie_names = config_->cookieNames();
 

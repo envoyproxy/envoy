@@ -16,12 +16,15 @@
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_context_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/utility.h"
 
 #include "test/common/tls/ocsp/test_data/good_ocsp_resp_info.h"
 #include "test/common/tls/ssl_certs_test.h"
 #include "test/common/tls/ssl_test_utility.h"
+#include "test/common/tls/test_data/ca_cert_info.h"
+#include "test/common/tls/test_data/fake_ca_cert_info.h"
 #include "test/common/tls/test_data/no_san_cert_info.h"
 #include "test/common/tls/test_data/san_dns3_cert_info.h"
 #include "test/common/tls/test_data/san_ip_cert_info.h"
@@ -135,6 +138,41 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   ContextManagerImpl manager_{server_factory_context_};
 };
+
+// The session context id binds resumption to the certificate validation configuration. Two contexts
+// that differ only in the trust anchor produce different ids, and an identical configuration
+// reproduces the same id.
+TEST_F(SslContextImplTest, SessionContextIdReflectsValidationConfig) {
+  auto session_context_id = [this](const std::string& trusted_ca) -> std::vector<uint8_t> {
+    const std::string yaml = fmt::format(R"EOF(
+common_tls_context:
+  tls_certificates:
+    certificate_chain:
+      filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/unittest_cert.pem"
+    private_key:
+      filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/unittest_key.pem"
+  validation_context:
+    trusted_ca:
+      filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/{}"
+require_client_certificate: true
+)EOF",
+                                         trusted_ca);
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+    auto config = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+    Ssl::ServerContextSharedPtr context =
+        *manager_.createSslServerContext(*store_.rootScope(), *config, nullptr);
+    auto cleanup = cleanUpHelper(context);
+    const absl::Span<const uint8_t> id =
+        dynamic_cast<ServerContextImpl&>(*context).sessionContextId();
+    return {id.begin(), id.end()};
+  };
+
+  const std::vector<uint8_t> id = session_context_id("ca_cert.pem");
+  EXPECT_FALSE(id.empty());
+  EXPECT_NE(id, session_context_id("intermediate_ca_cert.pem"));
+  EXPECT_EQ(id, session_context_id("ca_cert.pem"));
+}
 
 TEST_F(SslContextImplTest, TestCipherSuites) {
   const std::string yaml = R"EOF(
@@ -483,7 +521,8 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
   EXPECT_TRUE(
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
@@ -539,7 +578,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
   EXPECT_TRUE(
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
@@ -595,7 +635,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithIPSAN) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
   EXPECT_TRUE(
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
@@ -648,7 +689,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
 }
 
 TEST_F(SslContextImplTest, TestNoCert) {
@@ -657,8 +699,59 @@ TEST_F(SslContextImplTest, TestNoCert) {
   Envoy::Ssl::ClientContextSharedPtr context(
       *manager_.createSslClientContext(*store_.rootScope(), *cfg));
   auto cleanup = cleanUpHelper(context);
-  EXPECT_EQ(nullptr, context->getCaCertInformation());
+  EXPECT_TRUE(context->getCaCertInformation().empty());
   EXPECT_TRUE(context->getCertChainInformation().empty());
+}
+
+TEST_F(SslContextImplTest, TestGetCertInformationWithMultipleCaCerts) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+
+  Envoy::Ssl::ClientContextSharedPtr context(
+      *manager_.createSslClientContext(*store_.rootScope(), *cfg));
+  auto cleanup = cleanUpHelper(context);
+
+  auto ca_certs = context->getCaCertInformation();
+  ASSERT_EQ(2, ca_certs.size());
+
+  // The bundle is fake_ca + ca, so the first entry should be fake_ca_cert and the second ca_cert.
+  std::string fake_ca_json = absl::StrCat(R"EOF({
+ "path": "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem",
+ "serial_number": ")EOF",
+                                          TEST_FAKE_CA_CERT_SERIAL, R"EOF(",
+ "subject_alt_names": []
+ }
+)EOF");
+
+  std::string ca_json = absl::StrCat(R"EOF({
+ "path": "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem",
+ "serial_number": ")EOF",
+                                     TEST_CA_CERT_SERIAL, R"EOF(",
+ "subject_alt_names": []
+ }
+)EOF");
+
+  envoy::admin::v3::CertificateDetails fake_ca_details, ca_details;
+  TestUtility::loadFromJson(TestEnvironment::substitute(fake_ca_json), fake_ca_details);
+  TestUtility::loadFromJson(TestEnvironment::substitute(ca_json), ca_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(fake_ca_details, *ca_certs[0]));
+  EXPECT_TRUE(message_differencer.Compare(ca_details, *ca_certs[1]));
 }
 
 // Multiple RSA certificates with the same exact DNS SAN are allowed.
@@ -1934,7 +2027,7 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
     Stats::CounterOptConstRef stat =
         store_.findCounterByString(absl::StrCat("ssl.ciphers.", cipher));
     ASSERT_TRUE(stat.has_value());
-    EXPECT_EQ(1, stat->get().value());
+    EXPECT_EQ(1, stat->value());
   }
 
   // Incrementing a stat for a random unknown cipher does not work. A
@@ -1951,7 +2044,7 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
 #ifdef NDEBUG
   Stats::CounterOptConstRef stat = store_.findCounterByString("ssl.ciphers.fallback");
   ASSERT_TRUE(stat.has_value());
-  EXPECT_EQ(1, stat->get().value());
+  EXPECT_EQ(1, stat->value());
 #endif
 }
 
@@ -2059,7 +2152,7 @@ common_tls_context:
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
+  EXPECT_EQ(gauge_opt->value(), expected_expiry);
 }
 
 TEST_F(CertificateExpirationMetricsTest, ClientCertificateExpirationMetrics) {
@@ -2096,7 +2189,7 @@ common_tls_context:
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
+  EXPECT_EQ(gauge_opt->value(), expected_expiry);
 }
 
 // Certificate-level min > context max produces an effective range that can never negotiate.
