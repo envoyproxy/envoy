@@ -13,6 +13,7 @@
 
 using testing::_;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -826,6 +827,40 @@ TEST_F(LocalRateLimiterDescriptorImplTest, IsNegativeRefillsTokens) {
   EXPECT_TRUE(result.allowed);
   // 1 + 1 (refill) = 2 tokens remaining.
   EXPECT_EQ(result.token_bucket_context->remainingTokens(), 2);
+}
+
+// The share provider manager releases its cluster membership callback handle inline when it is
+// destroyed on the main thread, which also covers destruction during main dispatcher teardown where
+// a post would never run, and posts the handle to the main thread otherwise.
+TEST(ShareProviderManagerTest, ReleasesCallbackHandleOnMainThread) {
+  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  Singleton::ManagerImpl manager;
+
+  NiceMock<Upstream::MockPrioritySet> priority_set;
+  cm.local_cluster_name_ = "local_cluster";
+  cm.initializeClusters({"local_cluster"}, {});
+
+  const auto* mock_local_cluster = cm.active_clusters_.at("local_cluster").get();
+  EXPECT_CALL(*mock_local_cluster, prioritySet()).WillRepeatedly(ReturnRef(priority_set));
+
+  // Destroyed on the main thread: nothing is posted.
+  {
+    ShareProviderManagerSharedPtr share_provider_manager =
+        ShareProviderManager::singleton(dispatcher, cm, manager);
+    ASSERT_NE(share_provider_manager, nullptr);
+    EXPECT_CALL(dispatcher, post(_)).Times(0);
+  }
+  testing::Mock::VerifyAndClearExpectations(&dispatcher);
+
+  // Destroyed off the main thread: the handle is posted to the main dispatcher.
+  {
+    ShareProviderManagerSharedPtr share_provider_manager =
+        ShareProviderManager::singleton(dispatcher, cm, manager);
+    ASSERT_NE(share_provider_manager, nullptr);
+    EXPECT_CALL(dispatcher, isThreadSafe()).WillOnce(Return(false));
+    EXPECT_CALL(dispatcher, post(_)).WillOnce([](Event::PostCb callback) { callback(); });
+  }
 }
 
 } // Namespace LocalRateLimit
