@@ -25,6 +25,11 @@ Per-Route Configuration
 
 Per-route overrides may be supplied via :ref:`HeaderMutationPerRoute <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute>`. If per-route configuration is applied at multiple route levels, all configured mutations are evaluated. By default, evaluation proceeds from most specific (route entry) to least specific (route configuration), and later mutations may override earlier ones. This order can be changed by setting :ref:`most_specific_header_mutations_wins <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.HeaderMutation.most_specific_header_mutations_wins>` to ``true``, causing the most specific level to be evaluated last.
 
+:ref:`Formatter configurations
+<envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.formatters>` apply only to
+mutation values in the same ``Mutations`` message. They are not inherited from the filter
+configuration or from other route configuration levels.
+
 Execution and Local Replies
 ---------------------------
 

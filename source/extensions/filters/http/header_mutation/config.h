@@ -25,9 +25,10 @@ private:
       Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-  createRouteSpecificFilterConfigTyped(const PerRouteProtoConfig& proto_config,
-                                       Server::Configuration::ServerFactoryContext&,
-                                       ProtobufMessage::ValidationVisitor&) override;
+  createHttpFilterRouteConfigTyped(
+      const PerRouteProtoConfig& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 } // namespace HeaderMutation

@@ -15,7 +15,6 @@ envoy_cc_library(
     hdrs = ["header_mutation.h"],
     deps = [
         "//envoy/server:filter_config_interface",
-        "//source/common/config:utility_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_mutation_lib",
         "//source/common/protobuf:utility_lib",
@@ -34,8 +33,10 @@ envoy_cc_extension(
     deps = [
         ":header_mutation_lib",
         "//envoy/registry",
+        "//source/common/formatter:substitution_format_string_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/http/header_mutation/v3:pkg_cc_proto",
     ],
 )

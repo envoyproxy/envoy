@@ -72,13 +72,13 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
-  HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+  HeaderMutationConfigSharedPtr global_config = std::make_shared<HeaderMutationConfig>(
+      proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   {
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -186,13 +186,13 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
-  HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+  HeaderMutationConfigSharedPtr global_config = std::make_shared<HeaderMutationConfig>(
+      proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   // Case where the decodeHeaders() is not called and the encodeHeaders() is called.
   {
@@ -364,13 +364,13 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
-  HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+  HeaderMutationConfigSharedPtr global_config = std::make_shared<HeaderMutationConfig>(
+      proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   // Case where the decodeHeaders() is not called and the encodeHeaders() is called.
   {
@@ -544,13 +544,13 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
-  HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+  HeaderMutationConfigSharedPtr global_config = std::make_shared<HeaderMutationConfig>(
+      proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   {
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -676,13 +676,13 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
-  HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+  HeaderMutationConfigSharedPtr global_config = std::make_shared<HeaderMutationConfig>(
+      proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   {
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -790,13 +790,13 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
+  PerRouteHeaderMutationSharedPtr config = std::make_shared<PerRouteHeaderMutation>(
+      per_route_proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
-  HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+  HeaderMutationConfigSharedPtr global_config = std::make_shared<HeaderMutationConfig>(
+      proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   // Case where the decodeHeaders() is not called and the encodeHeaders() is called.
   {
@@ -924,8 +924,8 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationUrlEncodingTest) {
   TestUtility::loadFromYaml(config_yaml, proto_config);
 
   absl::Status creation_status = absl::OkStatus();
-  HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+  HeaderMutationConfigSharedPtr global_config = std::make_shared<HeaderMutationConfig>(
+      proto_config, context, Formatter::CommandParserPtrVector{}, creation_status);
 
   {
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;

@@ -83,6 +83,7 @@ public:
   using HeaderMutations = Http::HeaderMutations;
 
   Mutations(const MutationsProto& config, Server::Configuration::ServerFactoryContext& context,
+            const Formatter::CommandParserPtrVector& command_parsers,
             absl::Status& creation_status);
 
   void mutateRequestHeaders(Http::RequestHeaderMap& headers, const Formatter::Context& context,
@@ -107,6 +108,7 @@ class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {
 public:
   PerRouteHeaderMutation(const PerRouteProtoConfig& config,
                          Server::Configuration::ServerFactoryContext& context,
+                         const Formatter::CommandParserPtrVector& command_parsers,
                          absl::Status& creation_status);
 
   const Mutations& mutations() const { return mutations_; }
@@ -120,6 +122,7 @@ class HeaderMutationConfig {
 public:
   HeaderMutationConfig(const ProtoConfig& config,
                        Server::Configuration::ServerFactoryContext& context,
+                       const Formatter::CommandParserPtrVector& command_parsers,
                        absl::Status& creation_status);
 
   const Mutations& mutations() const { return mutations_; }
