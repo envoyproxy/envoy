@@ -190,6 +190,13 @@ void RpcStream::initRecvBufIfNewMessage() {
   }
 }
 
+// Resets all of our receive-buffering state back to empty, to await a new message.
+void RpcStream::resetReceiveState() {
+  recv_buf_.resize(0);
+  cur_msg_recvd_bytes_ = 0;
+  expected_proto_length_.reset();
+}
+
 // Must only be called when recv_buf_ contains a full proto. Returns that proto, and resets all of
 // our receive-buffering state back to empty, to await a new message.
 std::unique_ptr<HotRestartMessage> RpcStream::parseProtoAndResetState() {
@@ -197,9 +204,7 @@ std::unique_ptr<HotRestartMessage> RpcStream::parseProtoAndResetState() {
   RELEASE_ASSERT(
       ret->ParseFromArray(recv_buf_.data() + sizeof(uint64_t), expected_proto_length_.value()),
       "failed to parse a HotRestartMessage.");
-  recv_buf_.resize(0);
-  cur_msg_recvd_bytes_ = 0;
-  expected_proto_length_.reset();
+  resetReceiveState();
   return ret;
 }
 
@@ -246,6 +251,21 @@ std::unique_ptr<HotRestartMessage> RpcStream::receiveHotRestartMessage(Blocking 
       RELEASE_ASSERT(recv_result.return_value_ >= 8, "received a brokenly tiny message fragment.");
 
       expected_proto_length_ = be64toh(*reinterpret_cast<uint64_t*>(recv_buf_.data()));
+      // A length prefix within sizeof(uint64_t) of UINT64_MAX would overflow the size
+      // computation below, wrapping it to a near-zero value; the next recvmsg() would
+      // then write past the end of the buffer. Such a datagram cannot be a legitimate
+      // hot restart message: drop it and reset state to await the next datagram, rather
+      // than aborting the process (see #45872). In blocking mode the loop then blocks
+      // for the next datagram; in non-blocking mode the next recvmsg() fails with
+      // EAGAIN and returns no message.
+      if (expected_proto_length_.value() >
+          std::numeric_limits<uint64_t>::max() - sizeof(uint64_t)) {
+        ENVOY_LOG_MISC(warn, "Hot restart IPC: dropping datagram with invalid length ({}).",
+                       expected_proto_length_.value());
+        resetReceiveState();
+        initRecvBufIfNewMessage();
+        continue;
+      }
       // Expand the buffer from its default 4096 if this message is going to be longer.
       if (expected_proto_length_.value() > MaxSendmsgSize - sizeof(uint64_t)) {
         recv_buf_.resize(expected_proto_length_.value() + sizeof(uint64_t));
