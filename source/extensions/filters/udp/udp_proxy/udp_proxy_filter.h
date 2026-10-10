@@ -5,10 +5,12 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/http/header_evaluator.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/udp_packet_writer_handler.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/stream_info/uint32_accessor.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -133,6 +135,7 @@ public:
   virtual UdpProxyDownstreamStats& stats() const PURE;
   virtual TimeSource& timeSource() const PURE;
   virtual const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const PURE;
+  virtual Network::UdpPacketWriterFactory* upstreamPacketWriterFactory() const PURE;
   virtual const AccessLog::InstanceSharedPtrVector& sessionAccessLogs() const PURE;
   virtual const AccessLog::InstanceSharedPtrVector& proxyAccessLogs() const PURE;
   virtual const UdpSessionFilterChainFactory& sessionFilterFactory() const PURE;
@@ -697,6 +700,7 @@ protected:
     bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
+    void onSessionComplete() override;
 
     // Network::UdpPacketProcessor
     void processPacket(Network::Address::InstanceConstSharedPtr local_address,
@@ -726,12 +730,17 @@ protected:
 
   private:
     void onReadReady();
+    Api::IoCallUint64Result writeUpstreamDatagram(const Buffer::Instance& buffer);
+    void flushUpstream();
+    void updateUpstreamWriter(const Api::IoCallUint64Result& result);
     bool createUdpSocket(const Upstream::HostConstSharedPtr& host);
 
     // The socket is used for writing packets to the selected upstream host as well as receiving
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
     // write to the upstream host.
     Network::SocketPtr udp_socket_;
+    Network::UdpPacketWriterPtr upstream_writer_;
+    Event::SchedulableCallbackPtr upstream_flush_cb_;
     // The socket has been connected to avoid port exhaustion.
     bool connected_{};
     Upstream::UdpSourceAddressPolicy source_address_policy_;
@@ -884,6 +893,7 @@ protected:
     Upstream::ThreadLocalCluster& cluster_;
     Upstream::ClusterInfoConstSharedPtr cluster_info_;
     UdpProxyUpstreamStats cluster_stats_;
+    Stats::ScopeSharedPtr upstream_writer_scope_;
     absl::flat_hash_set<ActiveSession*> sessions_;
 
   private:

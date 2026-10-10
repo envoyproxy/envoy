@@ -2,6 +2,7 @@
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
+#include "envoy/network/udp_packet_writer_factory_factory.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/hash.h"
@@ -471,6 +472,382 @@ use_original_src_ip: true
   NiceMock<Upstream::MockHostDescription> upstream_host_;
 };
 
+class TestUpstreamWriterFactory : public Network::UdpPacketWriterFactoryFactory {
+public:
+  std::string name() const override { return "test.upstream_writer"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  Network::UdpPacketWriterFactoryPtr
+  createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig&,
+                               Server::Configuration::ListenerFactoryContext&) override {
+    auto factory = std::make_unique<NiceMock<Network::MockUdpPacketWriterFactory>>();
+    factory_ = factory.get();
+    return factory;
+  }
+  Network::MockUdpPacketWriterFactory* factory_{};
+};
+
+class UdpProxyUpstreamWriterTest : public UdpProxyFilterTest {
+public:
+  struct WriterState {
+    StrictMock<Network::MockUdpPacketWriter>* writer_{};
+    Event::MockSchedulableCallback* flush_{};
+    bool blocked_{false};
+  };
+
+  ~UdpProxyUpstreamWriterTest() override { filter_.reset(); }
+
+  auto writerConfig() {
+    return readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+upstream_packet_writer_config:
+  name: test.upstream_writer
+  typed_config:
+    '@type': type.googleapis.com/google.protobuf.Struct
+)EOF");
+  }
+
+  WriterState& expectWriterSession(bool transparent = false,
+                                   Network::Address::InstanceConstSharedPtr address = nullptr) {
+    expectSessionCreate(address != nullptr ? address : upstream_address_);
+    auto& session = test_sessions_.back();
+    auto& state = *writers_.emplace_back(std::make_unique<WriterState>());
+    state.writer_ = new StrictMock<Network::MockUdpPacketWriter>();
+    state.flush_ = new Event::MockSchedulableCallback(&callbacks_.udp_listener_.dispatcher_);
+    EXPECT_CALL(*state.flush_, cancel()).Times(testing::AnyNumber());
+    EXPECT_CALL(*session.socket_->io_handle_, resetFileEvents());
+    EXPECT_CALL(*state.writer_, isWriteBlocked())
+        .WillRepeatedly(testing::ReturnPointee(&state.blocked_));
+    EXPECT_CALL(*state.writer_, setWritable())
+        .Times(testing::AnyNumber())
+        .WillRepeatedly(Invoke([&state] { state.blocked_ = false; }));
+    EXPECT_CALL(*state.writer_, isBatchMode()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*state.writer_, flush()).Times(testing::AnyNumber()).WillRepeatedly(Invoke([] {
+      return makeNoError(0);
+    }));
+    EXPECT_CALL(*session.idle_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+    EXPECT_CALL(*session.socket_->io_handle_, localAddress())
+        .Times(testing::AnyNumber())
+        .WillRepeatedly(
+            Return(Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:12345")));
+    testing::ExpectationSet socket_setup;
+    if (transparent) {
+      session.expectSetIpTransparentSocketOption();
+      const auto bind_address =
+          session.upstream_address_->ip()->version() == Network::Address::IpVersion::v4
+              ? Network::Utility::getIpv4AnyAddress()
+              : Network::Utility::getIpv6AnyAddress();
+      socket_setup += EXPECT_CALL(*session.socket_, bind(bind_address))
+                          .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+      EXPECT_CALL(*session.socket_->io_handle_, connect(_)).Times(0);
+    } else {
+      EXPECT_CALL(*session.socket_->io_handle_, connect(_))
+          .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    }
+    EXPECT_CALL(*factory_.factory_,
+                createUdpPacketWriter(testing::Ref(*session.socket_->io_handle_), _, _, _))
+        .After(socket_setup)
+        .WillOnce(Return(ByMove(Network::UdpPacketWriterPtr(state.writer_))));
+    return state;
+  }
+
+  void expectPacket(WriterState& state, absl::string_view payload) {
+    EXPECT_CALL(*state.writer_, writePacket(_, nullptr, testing::Ref(*upstream_address_)))
+        .WillOnce(Invoke([payload](const Buffer::Instance& buffer, const Network::Address::Ip*,
+                                   const Network::Address::Instance&) {
+          EXPECT_EQ(payload, buffer.toString());
+          return makeNoError(buffer.length());
+        }));
+  }
+
+  void send(absl::string_view payload) {
+    recvDataFromDownstream(peer_ip_address_, "10.0.0.2:80", std::string(payload));
+  }
+
+  uint64_t upstreamCounter(absl::string_view name) {
+    return TestUtility::findCounter(factory_context_.server_factory_context_.cluster_manager_
+                                        .thread_local_cluster_.cluster_.info_->stats_store_,
+                                    std::string(name))
+        ->value();
+  }
+
+  TestUpstreamWriterFactory factory_;
+  Registry::InjectFactory<Network::UdpPacketWriterFactoryFactory> registration_{factory_};
+  std::vector<std::unique_ptr<WriterState>> writers_;
+};
+
+TEST_F(UdpProxyUpstreamWriterTest, BuffersAndFlushesAtEndOfIteration) {
+  setup(writerConfig());
+  auto& state = expectWriterSession();
+  const std::vector<std::string> payloads{"hello", "world", "", std::string(2000, 'x')};
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration()).Times(payloads.size());
+  for (const auto& payload : payloads) {
+    expectPacket(state, payload);
+    send(payload);
+  }
+  EXPECT_TRUE(state.flush_->enabled_);
+  EXPECT_EQ(payloads.size(), upstreamCounter("udp.sess_tx_datagrams"));
+  EXPECT_EQ(2010, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                      .cluster_.info_->traffic_stats_->upstream_cx_tx_bytes_total_.value());
+  EXPECT_CALL(*state.writer_, flush()).WillOnce(Return(makeNoError(0))).RetiresOnSaturation();
+  state.flush_->invokeCallback();
+  EXPECT_FALSE(state.flush_->enabled_);
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, BufferedBlockedWriteWaitsForWritableEvent) {
+  setup(writerConfig());
+  auto& state = expectWriterSession();
+  EXPECT_CALL(*state.writer_, writePacket(_, _, _))
+      .WillOnce(Invoke([&state](const Buffer::Instance& buffer, const Network::Address::Ip*,
+                                const Network::Address::Instance&) {
+        state.blocked_ = true;
+        return makeNoError(buffer.length());
+      }));
+  EXPECT_CALL(*test_sessions_[0].socket_->io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  send("hello");
+  EXPECT_FALSE(state.flush_->enabled_);
+  send("later");
+  EXPECT_EQ(1, upstreamCounter("udp.sess_tx_datagrams"));
+  EXPECT_EQ(1, upstreamCounter("udp.sess_tx_errors"));
+  EXPECT_CALL(*test_sessions_[0].socket_->io_handle_, enableFileEvents(Event::FileReadyType::Read));
+  EXPECT_CALL(*state.writer_, flush()).WillOnce(Return(makeNoError(0))).RetiresOnSaturation();
+  EXPECT_OK(test_sessions_[0].file_event_cb_(Event::FileReadyType::Write));
+  EXPECT_FALSE(state.blocked_);
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration());
+  expectPacket(state, "after");
+  send("after");
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, ScheduledFlushRetriesAfterWritableNotification) {
+  setup(writerConfig());
+  auto& state = expectWriterSession();
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration());
+  expectPacket(state, "hello");
+  send("hello");
+  EXPECT_CALL(*state.writer_, flush())
+      .WillOnce(Invoke([&state] {
+        state.blocked_ = true;
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      }))
+      .RetiresOnSaturation();
+  EXPECT_CALL(*test_sessions_[0].socket_->io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  state.flush_->invokeCallback();
+  EXPECT_FALSE(state.flush_->enabled_);
+  EXPECT_CALL(*test_sessions_[0].socket_->io_handle_, enableFileEvents(Event::FileReadyType::Read));
+  EXPECT_CALL(*state.writer_, flush()).WillOnce(Return(makeNoError(0))).RetiresOnSaturation();
+  EXPECT_OK(test_sessions_[0].file_event_cb_(Event::FileReadyType::Write));
+  EXPECT_FALSE(state.blocked_);
+  EXPECT_FALSE(state.flush_->enabled_);
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, PermanentFlushErrorSwitchesToOrdinarySends) {
+  setup(writerConfig());
+  auto& state = expectWriterSession();
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration());
+  expectPacket(state, "hello");
+  send("hello");
+  EXPECT_CALL(*state.writer_, flush())
+      .WillOnce(Return(makeError(SOCKET_ERROR_INVAL)))
+      .RetiresOnSaturation();
+  state.flush_->invokeCallback();
+  EXPECT_EQ(1, upstreamCounter("udp.sess_tx_errors"));
+  EXPECT_FALSE(state.flush_->enabled_);
+  test_sessions_[0].expectWriteToUpstream("later");
+  send("later");
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, PermanentWriteErrorSwitchesToOrdinarySends) {
+  setup(writerConfig());
+  auto& state = expectWriterSession();
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration()).Times(0);
+  EXPECT_CALL(*state.writer_, writePacket(_, _, _)).WillOnce(Return(makeError(SOCKET_ERROR_INVAL)));
+  send("hello");
+  EXPECT_EQ(1, upstreamCounter("udp.sess_tx_errors"));
+  test_sessions_[0].expectWriteToUpstream("later");
+  send("later");
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, TransparentSourceAddressIsPreserved) {
+  auto config = writerConfig();
+  config.set_use_original_src_ip(true);
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
+  setup(config);
+  auto& state = expectWriterSession(true);
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration());
+  EXPECT_CALL(*test_sessions_[0].socket_->io_handle_, localAddress())
+      .WillOnce(Return(Network::Utility::parseInternetAddressAndPortNoThrow("0.0.0.0:12345")));
+  EXPECT_CALL(*state.writer_, writePacket(_, _, _))
+      .WillOnce(Invoke([this](const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
+                              const Network::Address::Instance& peer) {
+        ASSERT(local_ip != nullptr);
+        EXPECT_EQ(peer_address_->ip()->addressAsString(), local_ip->addressAsString());
+        EXPECT_EQ(*upstream_address_, peer);
+        return makeNoError(buffer.length());
+      }));
+  send("hello");
+  auto session = *filter_->activeSessions().begin();
+  ASSERT_NE(nullptr, session->streamInfo().upstreamInfo()->upstreamLocalAddress());
+  EXPECT_EQ(12345, session->streamInfo().upstreamInfo()->upstreamLocalAddress()->ip()->port());
+  state.flush_->invokeCallback();
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, TransparentIpv6SourceAddressIsPreserved) {
+  // Address construction may probe IPv6 support once per process.
+  EXPECT_CALL(os_sys_calls_, socket(AF_INET6, SOCK_STREAM, 0))
+      .Times(testing::AtMost(1))
+      .WillOnce(Return(Api::SysCallSocketResult{42, 0}));
+  EXPECT_CALL(os_sys_calls_, close(42))
+      .Times(testing::AtMost(1))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  auto config = writerConfig();
+  config.set_use_original_src_ip(true);
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
+  setup(config);
+  const auto upstream = Network::Utility::parseInternetAddressAndPortNoThrow("[2001:db8::1]:443");
+  const auto peer = Network::Utility::parseInternetAddressAndPortNoThrow("[2001:db8::2]:1000");
+  auto host = createHost(upstream);
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
+              chooseHost(_))
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{host})));
+  auto& state = expectWriterSession(true, upstream);
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration());
+  EXPECT_CALL(*state.writer_, writePacket(_, _, testing::Ref(*upstream)))
+      .WillOnce(Invoke([&peer](const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
+                               const Network::Address::Instance&) {
+        EXPECT_NE(nullptr, local_ip);
+        if (local_ip != nullptr) {
+          EXPECT_EQ(peer->ip()->addressAsString(), local_ip->addressAsString());
+        }
+        return makeNoError(buffer.length());
+      }));
+  recvDataFromDownstream(peer->asString(), "[2001:db8::3]:80", "hello");
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, TransparentBindFailureDoesNotCreateWriterOrRetry) {
+  auto config = writerConfig();
+  config.set_use_original_src_ip(true);
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
+  setup(config);
+  expectSessionCreate(upstream_address_);
+  auto& session = test_sessions_.back();
+  session.expectSetIpTransparentSocketOption();
+  EXPECT_CALL(*session.socket_, bind(Network::Utility::getIpv4AnyAddress()))
+      .WillOnce(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_ADDR_IN_USE}));
+  EXPECT_CALL(*session.socket_->io_handle_, enableFileEvents(_)).Times(0);
+  EXPECT_CALL(*session.socket_->io_handle_, connect(_)).Times(0);
+  EXPECT_CALL(*factory_.factory_, createUdpPacketWriter(_, _, _, _)).Times(0);
+  send("hello");
+  EXPECT_TRUE(filter_->activeSessions().empty());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+  EXPECT_EQ(0, upstreamCounter("udp.sess_tx_datagrams"));
+  EXPECT_EQ(1, upstreamCounter("udp.sess_tx_errors"));
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, ConfiguredSourceBindingIsPreserved) {
+  setup(writerConfig());
+  const auto source = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.2:12345");
+  auto& host =
+      *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_;
+  EXPECT_CALL(*host.cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_, _))
+      .WillOnce(Return(Upstream::UpstreamLocalAddress{source, nullptr}));
+  auto& state = expectWriterSession();
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration());
+  EXPECT_CALL(*test_sessions_[0].socket_, bind(source))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  expectPacket(state, "hello");
+  send("hello");
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, SessionCleanupCancelsPendingFlushEvenWhenRetained) {
+  setup(writerConfig());
+  auto& state = expectWriterSession();
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration());
+  expectPacket(state, "hello");
+  send("hello");
+  auto retained = *filter_->activeSessions().begin();
+  EXPECT_CALL(*state.flush_, cancel()).Times(AtLeast(1));
+  cluster_update_callbacks_->onClusterRemoval("fake_cluster");
+  EXPECT_TRUE(filter_->activeSessions().empty());
+  retained.reset();
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, PerPacketLoadBalancingUsesIndependentWriters) {
+  auto config = writerConfig();
+  config.set_use_per_packet_load_balancing(true);
+  setup(config);
+  factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->resetResourceManager(2, 0, 0, 0, 0);
+  auto& first = expectWriterSession();
+  EXPECT_CALL(*first.flush_, scheduleCallbackCurrentIteration());
+  expectPacket(first, "hello");
+  send("hello");
+  const auto address = Network::Utility::parseInternetAddressAndPortNoThrow("20.0.0.2:443");
+  auto host = createHost(address);
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
+              chooseHost(_))
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{host})));
+  auto& second = expectWriterSession(false, address);
+  EXPECT_CALL(*second.flush_, scheduleCallbackCurrentIteration());
+  EXPECT_CALL(*second.writer_, writePacket(_, nullptr, testing::Ref(*address)))
+      .WillOnce(Return(makeNoError(5)));
+  send("world");
+  EXPECT_TRUE(first.flush_->enabled_);
+  EXPECT_TRUE(second.flush_->enabled_);
+  first.flush_->invokeCallback();
+  EXPECT_FALSE(first.flush_->enabled_);
+  EXPECT_TRUE(second.flush_->enabled_);
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, UnbufferedBlockedWriteIsNotCountedAsAccepted) {
+  setup(writerConfig());
+  auto& state = expectWriterSession();
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration()).Times(0);
+  EXPECT_CALL(*test_sessions_[0].socket_->io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  EXPECT_CALL(*state.writer_, writePacket(_, _, _)).WillOnce(InvokeWithoutArgs([&state] {
+    state.blocked_ = true;
+    return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+  }));
+  send("hello");
+  EXPECT_EQ(0, upstreamCounter("udp.sess_tx_datagrams"));
+  EXPECT_EQ(1, upstreamCounter("udp.sess_tx_errors"));
+  EXPECT_FALSE(state.flush_->enabled_);
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, NonBatchWriterDoesNotScheduleFlushes) {
+  setup(writerConfig());
+  auto& state = expectWriterSession();
+  EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration()).Times(0);
+  EXPECT_CALL(*state.writer_, isBatchMode()).WillRepeatedly(Return(false));
+  expectPacket(state, "hello");
+  send("hello");
+  EXPECT_FALSE(state.flush_->enabled_);
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, UnknownWriterIsRejected) {
+  auto config = writerConfig();
+  config.mutable_upstream_packet_writer_config()->mutable_typed_config()->set_type_url(
+      "type.googleapis.com/nonexistent.Writer");
+  EXPECT_THROW(UdpProxyFilterConfigImpl(factory_context_, config), EnvoyException);
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, RejectsWriterWithHttpTunneling) {
+  auto config = writerConfig();
+  config.mutable_tunneling_config()->set_proxy_host("proxy.example");
+  EXPECT_THROW_WITH_MESSAGE(UdpProxyFilterConfigImpl(factory_context_, config), EnvoyException,
+                            "upstream_packet_writer_config cannot be used with tunneling_config.");
+}
+
 class UdpProxyFilterIpv6Test : public UdpProxyFilterTest {
 public:
   UdpProxyFilterIpv6Test()
@@ -562,6 +939,7 @@ upstream_socket_config:
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  const uint64_t first_session_id = (*filter_->activeSessions().begin())->sessionId();
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
@@ -589,17 +967,27 @@ upstream_socket_config:
   test_sessions_[1].recvDataFromUpstream("world4");
   checkTransferStats(23 /*rx_bytes*/, 4 /*rx_datagrams*/, 23 /*tx_bytes*/, 4 /*tx_datagrams*/);
 
+  uint64_t second_session_id = first_session_id;
+  for (const auto& session : filter_->activeSessions()) {
+    if (session->sessionId() != first_session_id) {
+      second_session_id = session->sessionId();
+    }
+  }
+  ASSERT_NE(first_session_id, second_session_id);
+
   filter_.reset();
   EXPECT_EQ(output_.size(), 3);
   EXPECT_EQ(output_[2], "23 4 23 4 0 2 0");
 
   const std::string session_access_log_regex =
-      "(17 3 17 3 0|6 1 6 1 1) 10.0.0.(1|3):1000 10.0.0.2:80 20.0.0.1:443 "
+      "(17 3 17 3 " + std::to_string(first_session_id) + " 10.0.0.1|6 1 6 1 " +
+      std::to_string(second_session_id) +
+      " 10.0.0.3):1000 10.0.0.2:80 20.0.0.1:443 "
       "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12} " +
       AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd);
 
-  EXPECT_TRUE(std::regex_match(output_[0], std::regex(session_access_log_regex)));
-  EXPECT_TRUE(std::regex_match(output_[1], std::regex(session_access_log_regex)));
+  EXPECT_TRUE(std::regex_match(output_[0], std::regex(session_access_log_regex))) << output_[0];
+  EXPECT_TRUE(std::regex_match(output_[1], std::regex(session_access_log_regex))) << output_[1];
 }
 
 // The non-tunneling UDP proxy session records the upstream remote and local addresses so they are

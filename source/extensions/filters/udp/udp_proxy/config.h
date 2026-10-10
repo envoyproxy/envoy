@@ -140,6 +140,9 @@ public:
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const override {
     return upstream_socket_config_;
   }
+  Network::UdpPacketWriterFactory* upstreamPacketWriterFactory() const override {
+    return upstream_packet_writer_factory_.get();
+  }
   const AccessLog::InstanceSharedPtrVector& sessionAccessLogs() const override {
     return session_access_logs_;
   }
@@ -195,6 +198,7 @@ private:
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
+  Network::UdpPacketWriterFactoryPtr upstream_packet_writer_factory_;
   AccessLog::InstanceSharedPtrVector session_access_logs_;
   AccessLog::InstanceSharedPtrVector proxy_access_logs_;
   UdpTunnelingConfigPtr tunneling_config_;
