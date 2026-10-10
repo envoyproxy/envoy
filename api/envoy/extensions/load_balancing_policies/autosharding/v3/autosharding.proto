@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.autosharding.v3;
+
+import "envoy/config/core/v3/grpc_service.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.autosharding.v3";
+option java_outer_classname = "AutoshardingProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/autosharding/v3;autoshardingv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Autosharding Load Balancing Policy]
+// [#not-implemented-hide:]
+// [#extension: envoy.load_balancing_policies.autosharding]
+
+// Configuration for the autosharding LB policy.
+// [#not-implemented-hide:]
+// [#next-free-field: 6]
+message Autosharding {
+  // Configuration for the gRPC service that the LB policy will communicate with
+  // to receive sharding assignments from.
+  config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+
+  // A unique ID sent to the sharding service to locate assignments.
+  //
+  // Can optionally contain a "%s" token that will be replaced with the
+  // "Locality" before sending. If a "%s" token is present, but the "Locality"
+  // information is not available to the LB policy, the token will be replaced
+  // with an empty string.
+  string autosharding_target = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Name of the request header containing the application-defined key. This key
+  // is used to look up the matching key-range assigned by the sharding service.
+  string key_header_name = 3 [(validate.rules).string = {min_len: 1}];
+
+  // If true, fallback mechanism is enabled.
+  bool enable_fallback = 4;
+
+  // How long to wait for the initial assignment from the sharding service. If
+  // no assignment is received before the timer fires, the LB policy  will either
+  // go into fallback mode (if enable_fallback is true) or fail RPCs.
+  // Defaults to 60 seconds if not specified.
+  google.protobuf.Duration initial_assignment_timeout = 5 [(validate.rules).duration = {gt {}}];
+}
