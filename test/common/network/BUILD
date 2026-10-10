@@ -272,8 +272,11 @@ envoy_cc_test(
     srcs = ["raw_buffer_socket_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/buffer:buffer_lib",
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/network:transport_socket_options_lib",
+        "//test/mocks/network:io_handle_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
     ],
 )

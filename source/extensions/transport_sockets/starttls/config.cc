@@ -1,5 +1,6 @@
 #include "source/extensions/transport_sockets/starttls/config.h"
 
+#include "source/common/network/raw_buffer_socket.h"
 #include "source/extensions/transport_sockets/starttls/starttls_socket.h"
 
 namespace Envoy {
@@ -15,18 +16,20 @@ DownstreamStartTlsSocketFactory::createTransportSocketFactory(
       const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig&>(
       message, context.messageValidationVisitor());
 
-  auto& raw_socket_config_factory = rawSocketConfigFactory();
   auto& tls_socket_config_factory = tlsSocketConfigFactory();
 
-  auto raw_or_error = raw_socket_config_factory.createTransportSocketFactory(
-      outer_config.cleartext_socket_config(), context, server_names);
-  RETURN_IF_NOT_OK_REF(raw_or_error.status());
+  const std::optional<uint64_t> max_cleartext_read_buffer_size =
+      outer_config.has_max_cleartext_read_buffer_size()
+          ? std::make_optional<uint64_t>(outer_config.max_cleartext_read_buffer_size().value())
+          : std::nullopt;
+  auto raw_socket_factory =
+      std::make_unique<Network::RawBufferSocketFactory>(max_cleartext_read_buffer_size);
 
   auto factory_or_error = tls_socket_config_factory.createTransportSocketFactory(
       outer_config.tls_socket_config(), context, server_names);
   RETURN_IF_NOT_OK_REF(factory_or_error.status());
 
-  return std::make_unique<StartTlsDownstreamSocketFactory>(std::move(raw_or_error.value()),
+  return std::make_unique<StartTlsDownstreamSocketFactory>(std::move(raw_socket_factory),
                                                            std::move(factory_or_error.value()));
 }
 
