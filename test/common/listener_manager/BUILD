@@ -79,6 +79,7 @@ envoy_cc_test(
     shard_count = 10,
     deps = [
         ":listener_manager_impl_test_lib",
+        "//envoy/network:parent_drained_callback_registrar_interface",
         "//envoy/network:socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:cpu_affinity_lib",

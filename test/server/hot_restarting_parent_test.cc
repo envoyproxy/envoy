@@ -9,15 +9,22 @@
 #include "source/server/hot_restarting_child.h"
 #include "source/server/hot_restarting_parent.h"
 
+#include "test/mocks/api/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
+#include "test/server/hot_restart_udp_forwarding_test_helper.h"
 #include "test/server/utility.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 
+using testing::AnyNumber;
 using testing::InSequence;
+using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -611,6 +618,170 @@ TEST_F(HotRestartingParentTest, UdpPacketIsForwardedWithListenerAddressAndNamesp
   expected_packet->set_network_namespace("/run/netns/pod");
   EXPECT_CALL(message_sender_, sendHotRestartMessage(ProtoEq(expected_msg)));
   hot_restarting_parent_.handle(worker_index, *listener_address, packet);
+}
+
+// The parent's side of the hot restart deadlock: forwarding a UDP packet to the child must never
+// block the parent's main thread on the child's socket, since that thread also has to answer the
+// child's requests, which the child's main thread waits for.
+class HotRestartingParentUdpForwardingTest : public testing::Test {
+public:
+  void SetUp() override {
+    EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(2);
+    EXPECT_CALL(os_sys_calls_, close(_)).Times(2);
+    EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, _, _, _)).Times(AnyNumber());
+    parent_ = std::make_unique<HotRestartingParent>(0, 0, socket_path_, 0);
+    helper_ = std::make_unique<HotRestartParentUdpForwardingTestHelper>(*parent_);
+    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, Event::FileReadyType::Read))
+        .WillOnce(Return(nullptr));
+    retry_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+    parent_->initialize(dispatcher_, server_);
+  }
+  void TearDown() override { parent_.reset(); }
+
+  envoy::HotRestartMessage forwardedPacket(uint64_t payload_size) {
+    envoy::HotRestartMessage msg;
+    auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
+    packet->set_local_addr("udp://127.0.0.1:1234");
+    packet->set_peer_addr("udp://127.0.0.1:4321");
+    packet->set_payload(std::string(payload_size, 'x'));
+    return msg;
+  }
+  bool socketIsNonBlocking() const {
+    return (fcntl(helper_->udpForwardingSocketFd(), F_GETFL) & O_NONBLOCK) != 0;
+  }
+  uint64_t counter(absl::string_view name) {
+    return server_.stats_store_.counterFromString(std::string(name)).value();
+  }
+  uint64_t forwarded() { return counter("server.hot_restart_udp_forwarding_datagrams"); }
+  uint64_t retries() { return counter("server.hot_restart_udp_forwarding_retries"); }
+  uint64_t dropped() { return counter("server.hot_restart_udp_forwarding_dropped"); }
+
+  std::string socket_path_ = testDomainSocketName();
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<MockInstance> server_;
+  NiceMock<Event::MockTimer>* retry_timer_{};
+  std::unique_ptr<HotRestartingParent> parent_;
+  std::unique_ptr<HotRestartParentUdpForwardingTestHelper> helper_;
+};
+
+TEST_F(HotRestartingParentUdpForwardingTest, ForwardsWithoutBlockingWhenChildSocketHasRoom) {
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int flags) {
+    EXPECT_EQ(flags & MSG_DONTWAIT, MSG_DONTWAIT);
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  parent_->sendHotRestartMessage(forwardedPacket(100));
+  EXPECT_EQ(helper_->queuedDatagrams(), 0);
+  EXPECT_TRUE(socketIsNonBlocking());
+  EXPECT_EQ(forwarded(), 1);
+  EXPECT_EQ(retries(), 0);
+  EXPECT_EQ(dropped(), 0);
+}
+
+TEST_F(HotRestartingParentUdpForwardingTest, QueuesWhenChildSocketIsFullAndRetriesOnTimer) {
+  // The child's socket is full: the datagram is kept and retried shortly, without waiting.
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  EXPECT_CALL(*retry_timer_, enableTimer(HotRestartingParent::UDP_FORWARDING_RETRY_INTERVAL, _));
+  parent_->sendHotRestartMessage(forwardedPacket(100));
+  EXPECT_EQ(helper_->queuedDatagrams(), 1);
+  EXPECT_TRUE(socketIsNonBlocking());
+
+  // A second packet queues behind the first; the flush attempt sends neither yet.
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  EXPECT_CALL(*retry_timer_, enableTimer(HotRestartingParent::UDP_FORWARDING_RETRY_INTERVAL, _));
+  parent_->sendHotRestartMessage(forwardedPacket(200));
+  EXPECT_EQ(helper_->queuedDatagrams(), 2);
+
+  // The child drained its socket: the retry sends both, in order.
+  std::vector<size_t> sent_sizes;
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _))
+      .Times(2)
+      .WillRepeatedly([&sent_sizes](int, const msghdr* msg, int) {
+        sent_sizes.push_back(msg->msg_iov[0].iov_len);
+        return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+      });
+  retry_timer_->invokeCallback();
+  EXPECT_EQ(helper_->queuedDatagrams(), 0);
+  ASSERT_EQ(sent_sizes.size(), 2);
+  EXPECT_LT(sent_sizes[0], sent_sizes[1]);
+  EXPECT_EQ(forwarded(), 2);
+  EXPECT_EQ(retries(), 2);
+  EXPECT_EQ(dropped(), 0);
+}
+
+TEST_F(HotRestartingParentUdpForwardingTest, QueuesAMultiDatagramMessageWhole) {
+  // A payload longer than one datagram is sent as a chain of datagrams that must not be split
+  // by a would-block: the child cannot recover from a partial message.
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  parent_->sendHotRestartMessage(forwardedPacket(5000));
+  EXPECT_EQ(helper_->queuedDatagrams(), 2);
+
+  // The first datagram goes, the second would block: it stays queued for the next retry.
+  {
+    InSequence s;
+    EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+      EXPECT_EQ(msg->msg_iov[0].iov_len, 4096);
+      return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+    });
+    EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+      return Api::SysCallSizeResult{-1, EAGAIN};
+    });
+  }
+  retry_timer_->invokeCallback();
+  EXPECT_EQ(helper_->queuedDatagrams(), 1);
+
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    EXPECT_LT(msg->msg_iov[0].iov_len, 4096);
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  retry_timer_->invokeCallback();
+  EXPECT_EQ(helper_->queuedDatagrams(), 0);
+}
+
+TEST_F(HotRestartingParentUdpForwardingTest, DropsTheQueueWhenChildIsGone) {
+  // ECONNREFUSED means the child's socket no longer exists: nothing to retry, and above all
+  // nothing to sleep or crash for on the parent's main thread.
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  parent_->sendHotRestartMessage(forwardedPacket(100));
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, ECONNREFUSED};
+  });
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _)).Times(0);
+  EXPECT_LOG_CONTAINS("error", "hot restart non-blocking sendmsg() failed",
+                      parent_->sendHotRestartMessage(forwardedPacket(100)));
+  EXPECT_EQ(helper_->queuedDatagrams(), 0);
+  EXPECT_EQ(helper_->queuedBytes(), 0);
+  EXPECT_EQ(forwarded(), 0);
+  EXPECT_EQ(dropped(), 2);
+}
+
+TEST_F(HotRestartingParentUdpForwardingTest, DropsNewPacketsWhenTheQueueIsFull) {
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillRepeatedly([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  const uint64_t payload_size = 60000;
+  uint64_t accepted = 0;
+  while (helper_->queuedBytes() + payload_size <= RpcStream::MAX_SEND_QUEUE_BYTES) {
+    parent_->sendHotRestartMessage(forwardedPacket(payload_size));
+    accepted++;
+  }
+  EXPECT_GT(accepted, 1);
+  const uint64_t queued_before = helper_->queuedDatagrams();
+  EXPECT_LOG_CONTAINS("warning", "hot restart udp forwarding queue is full",
+                      parent_->sendHotRestartMessage(forwardedPacket(payload_size)));
+  EXPECT_EQ(helper_->queuedDatagrams(), queued_before);
+  EXPECT_LE(helper_->queuedBytes(), RpcStream::MAX_SEND_QUEUE_BYTES);
+  EXPECT_EQ(dropped(), 1);
+  EXPECT_EQ(forwarded(), 0);
 }
 
 } // namespace
