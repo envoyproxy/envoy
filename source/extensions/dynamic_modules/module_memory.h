@@ -19,11 +19,12 @@ namespace DynamicModules {
 /**
  * Reads the heap memory allocated by dynamic modules.
  *
- * The heap memory of a module is estimated from the samples of the heap profile. A sample belongs
- * to the module that owns the innermost frame of its allocation stack within the code of any
- * loaded module, unless that frame called an Envoy ABI callback, which then allocated the memory
- * on behalf of the module. This relies on the frames of ABI callbacks, which abi.h keeps on the
- * stack when Envoy is built with clang.
+ * A module that implements envoy_dynamic_module_on_program_get_memory_usage reports its heap
+ * memory itself. The heap memory of any other module is estimated from the samples of the heap
+ * profile. A sample belongs to the module that owns the innermost frame of its allocation stack
+ * within the code of any loaded module, unless that frame called an Envoy ABI callback, which then
+ * allocated the memory on behalf of the module. This relies on the frames of ABI callbacks, which
+ * abi.h keeps on the stack when Envoy is built with clang.
  *
  * This class is not thread-safe.
  */
@@ -40,8 +41,8 @@ public:
 
   /**
    * @param module_name the name the modules were loaded with.
-   * @return the estimated heap bytes allocated by the modules loaded with the given name. Zero if
-   * no such module is loaded, or an error if the estimate is not available for one of them.
+   * @return the heap bytes allocated by the modules loaded with the given name. Zero if no such
+   * module is loaded, or an error if the estimate is not available for one of them.
    */
   absl::StatusOr<uint64_t> allocatedBytes(absl::string_view module_name);
 

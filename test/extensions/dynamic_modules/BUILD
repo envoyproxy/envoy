@@ -66,6 +66,7 @@ envoy_cc_dyn_module_test(
     srcs = ["module_memory_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:memory_allocator",
+        "//test/extensions/dynamic_modules/test_data/c:memory_usage_reporter",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     rbe_pool = "linux_x64_small",
@@ -75,6 +76,7 @@ envoy_cc_dyn_module_test(
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules:module_memory_lib",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
+        "//test/extensions/dynamic_modules/test_data/c:memory_usage_reporter_static",
         "//test/test_common:status_utility_lib",
     ],
 )

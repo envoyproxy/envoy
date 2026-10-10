@@ -35,6 +35,8 @@ test_program(name = "blocking_program_init")
 
 test_program(name = "memory_allocator")
 
+test_program(name = "memory_usage_reporter")
+
 test_program(name = "no_op")
 
 test_program(name = "no_op_no_optional_abi")

@@ -47,7 +47,10 @@ envoy_extension_cc_test(
 envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
-    data = ["//test/extensions/dynamic_modules/test_data/rust:memory_integration_test"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/rust:memory_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:memory_tracking_integration_test",
+    ],
     extension_names = ["envoy.resource_monitors.dynamic_module_memory"],
     rbe_pool = "linux_x64_small",
     deps = [

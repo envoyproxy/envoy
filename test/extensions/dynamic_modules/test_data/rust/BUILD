@@ -45,6 +45,8 @@ test_program(name = "http_integration_test")
 
 test_program(name = "memory_integration_test")
 
+test_program(name = "memory_tracking_integration_test")
+
 test_program(name = "http_stream_callouts_test")
 
 test_program(name = "bootstrap_integration_test")

@@ -6,6 +6,7 @@
 #endif
 
 #include <algorithm>
+#include <optional>
 #include <vector>
 
 #include "envoy/common/exception.h"
@@ -54,11 +55,11 @@ ModuleMemoryReader::ModuleMemoryReader(HeapSampleSource heap_sample_source)
     : heap_sample_source_(std::move(heap_sample_source)) {}
 
 absl::StatusOr<uint64_t> ModuleMemoryReader::allocatedBytes(absl::string_view module_name) {
-  // A shared object loaded under several names appears in both lists and is counted as the measured
-  // module.
+  // A shared object loaded under several names can appear in both lists, and its samples then count
+  // for the measured module.
   std::vector<AddressRange> measured_code;
   std::vector<AddressRange> other_code;
-  bool loaded = false;
+  uint64_t allocated_bytes = 0;
   absl::Status status;
   forEachLoadedModule([&](const DynamicModule& module) {
     const std::vector<AddressRange>& ranges = module.codeRanges();
@@ -66,7 +67,13 @@ absl::StatusOr<uint64_t> ModuleMemoryReader::allocatedBytes(absl::string_view mo
       other_code.insert(other_code.end(), ranges.begin(), ranges.end());
       return;
     }
-    loaded = true;
+    if (const std::optional<uint64_t> reported_bytes = module.reportedMemoryUsage();
+        reported_bytes.has_value()) {
+      allocated_bytes += *reported_bytes;
+      // The module counts its own allocations, so its frames must not be attributed again.
+      other_code.insert(other_code.end(), ranges.begin(), ranges.end());
+      return;
+    }
     if (ranges.empty()) {
       status = absl::UnimplementedError(
           absl::StrCat("Cannot estimate the heap memory of dynamic module ", module_name));
@@ -74,11 +81,10 @@ absl::StatusOr<uint64_t> ModuleMemoryReader::allocatedBytes(absl::string_view mo
     measured_code.insert(measured_code.end(), ranges.begin(), ranges.end());
   });
   RETURN_IF_NOT_OK_REF(status);
-  if (!loaded) {
-    return 0;
+  if (measured_code.empty()) {
+    return allocated_bytes;
   }
 
-  uint64_t allocated_bytes = 0;
   RETURN_IF_NOT_OK(
       heap_sample_source_([&](absl::Span<void* const> stack, uint64_t requested_bytes) {
         for (size_t i = 0; i < stack.size(); ++i) {

@@ -229,6 +229,17 @@ its own with a unique name. The following configuration reports the pressure of 
         module_name: my_module
         max_heap_size_bytes: 1073741824
 
+By default the heap memory of a module is estimated from the tcmalloc heap profile. A module can
+instead report its heap memory itself by implementing
+``envoy_dynamic_module_on_program_get_memory_usage``. In the Rust SDK, a module does so by declaring
+an allocator that counts the memory allocated through it, which keeps the module loaded as if
+:ref:`do_not_close
+<envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.do_not_close>` were set.
+
+.. code-block:: rust
+
+  envoy_proxy_dynamic_modules_rust_sdk::declare_tracking_allocator!();
+
 Secrets
 ---------------------------
 

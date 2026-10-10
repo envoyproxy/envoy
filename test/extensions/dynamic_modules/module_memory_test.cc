@@ -101,6 +101,42 @@ TEST(ModuleMemoryReaderTest, HeapProfileError) {
 }
 #endif
 
+TEST(ModuleMemoryReaderTest, ModuleReportsMemoryUsage) {
+  DynamicModulePtr module = loadModule("memory_usage_reporter", "reporting");
+  module->getFunctionPointer<void (*)(uint64_t)>("set_memory_usage").value()(4096);
+  ModuleMemoryReader reader([](absl::FunctionRef<void(absl::Span<void* const>, uint64_t)>) {
+    ADD_FAILURE() << "the heap profile must not be read for a module that reports its usage";
+    return absl::OkStatus();
+  });
+  EXPECT_THAT(reader.allocatedBytes("reporting"), StatusHelpers::IsOkAndHolds(uint64_t{4096}));
+}
+
+#if defined(__linux__)
+TEST(ModuleMemoryReaderTest, AddsReportedAndEstimatedMemoryUsage) {
+  DynamicModulePtr reporting = loadModule("memory_usage_reporter", "mixed");
+  DynamicModulePtr estimated = loadModule("memory_allocator", "mixed");
+  reporting->getFunctionPointer<void (*)(uint64_t)>("set_memory_usage").value()(100);
+  void* const envoy_frame = returnAddressIn(&envoyFunction);
+  void* const reporting_frame = returnAddressInModule(*reporting);
+  void* const estimated_frame = returnAddressInModule(*estimated);
+
+  ModuleMemoryReader reader(fakeHeapProfile({
+      {{envoy_frame, estimated_frame}, 10},
+      {{envoy_frame, reporting_frame, estimated_frame}, 20},
+  }));
+  EXPECT_THAT(reader.allocatedBytes("mixed"), StatusHelpers::IsOkAndHolds(uint64_t{100 + 10}));
+}
+#endif
+
+TEST(ModuleMemoryReaderTest, StaticModuleReportsMemoryUsage) {
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleByName("memory_usage_reporter_static", false);
+  ASSERT_TRUE(module.ok()) << module.status();
+  ModuleMemoryReader reader(fakeHeapProfile({}));
+  EXPECT_THAT(reader.allocatedBytes("memory_usage_reporter_static"),
+              StatusHelpers::IsOkAndHolds(uint64_t{1234}));
+}
+
 TEST(ModuleMemoryReaderTest, StaticModuleIsNotSupported) {
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("matcher_no_op_static", false);
   ASSERT_TRUE(module.ok()) << module.status();

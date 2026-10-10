@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -14,6 +15,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/extensions/common/wasm/remote_async_datasource.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "absl/functional/function_ref.h"
 #include "absl/status/statusor.h"
@@ -66,6 +68,17 @@ public:
   const std::vector<AddressRange>& codeRanges() const { return code_ranges_; }
 
   /**
+   * @return the heap memory that the module reports through
+   * envoy_dynamic_module_on_program_get_memory_usage, or std::nullopt if it does not implement it.
+   */
+  std::optional<uint64_t> reportedMemoryUsage() const {
+    if (get_memory_usage_ == nullptr) {
+      return std::nullopt;
+    }
+    return get_memory_usage_();
+  }
+
+  /**
    * Get a function pointer from the dynamic module with a specific type.
    * @param T the function pointer type to cast the symbol to.
    * @param symbol_ref the symbol to look up.
@@ -99,6 +112,10 @@ private:
   // "<name_>_<symbol>" via dlsym(RTLD_DEFAULT) instead of using handle_.
   const std::string name_;
   const std::vector<AddressRange> code_ranges_;
+  const decltype(&envoy_dynamic_module_on_program_get_memory_usage) get_memory_usage_ =
+      getFunctionPointer<decltype(&envoy_dynamic_module_on_program_get_memory_usage)>(
+          "envoy_dynamic_module_on_program_get_memory_usage")
+          .value_or(nullptr);
 };
 
 using DynamicModulePtr = std::unique_ptr<DynamicModule>;
