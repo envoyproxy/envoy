@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.header_mutation.v3;
 
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -17,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Mutate HTTP headers and trailers in requests and responses.
 // [#extension: envoy.filters.http.header_mutation]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Mutations {
   // The request mutations are applied before the request is forwarded to the upstream cluster.
   repeated config.common.mutation_rules.v3.HeaderMutation request_mutations = 1;
@@ -34,6 +35,15 @@ message Mutations {
 
   // The request trailer mutations are applied before the request is sent to the upstream cluster.
   repeated config.common.mutation_rules.v3.HeaderMutation request_trailers_mutations = 5;
+
+  // Specifies a collection of Formatter plugins that can be used in substitution formatters
+  // in this message.
+  // If not specified, only the built-in command operators are available.
+  // Configured plugins take precedence over the built-in command operators.
+  // The plugins apply only to this message and are not inherited from other configuration levels.
+  // See the formatters extensions documentation for details.
+  // [#extension-category: envoy.formatter]
+  repeated config.core.v3.TypedExtensionConfig formatters = 6;
 }
 
 // Per route configuration for the header mutation filter.
