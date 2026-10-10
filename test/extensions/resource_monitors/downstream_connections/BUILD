@@ -49,6 +49,7 @@ envoy_extension_cc_test(
         "cpu:3",
     ],
     deps = [
+        "//envoy/network:connection_balancer_interface",
         "//envoy/network:filter_interface",
         "//envoy/registry",
         "//source/extensions/filters/network/tcp_proxy:config",
