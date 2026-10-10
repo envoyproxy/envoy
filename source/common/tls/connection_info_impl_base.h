@@ -35,6 +35,7 @@ public:
   const std::string& subjectLocalCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   const std::string& pemEncodedPeerCertificate() const override;
+  const std::string& urlEncodedPemEncodedLocalCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
   absl::Span<const std::string> pemEncodedPeerCertificateChain() const override;
   absl::Span<const std::string> pemEncodedValidatedPeerCertificateChain() const override;
@@ -116,6 +117,7 @@ private:
     OthernameSansPeerCertificate,
     UrlEncodedPemEncodedPeerCertificate,
     PemEncodedPeerCertificate,
+    UrlEncodedPemEncodedLocalCertificate,
     UrlEncodedPemEncodedPeerCertificateChain,
     PemEncodedValidatedPeerCertificateChain,
     PemEncodedPeerCertificateChain,

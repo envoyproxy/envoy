@@ -791,6 +791,9 @@ void testUtil(const TestUtilOptions& options) {
                   server_connection->ssl()->subjectLocalCertificate());
         EXPECT_EQ(options.expectedLocalSubject(),
                   server_connection->ssl()->subjectLocalCertificate());
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_FALSE(server_connection->ssl()->urlEncodedPemEncodedLocalCertificate().empty());
+        EXPECT_FALSE(server_connection->ssl()->urlEncodedPemEncodedLocalCertificate().empty());
       }
       if (!options.expectedPeerOids().empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
@@ -2145,6 +2148,7 @@ TEST_P(SslSocketTest, NoLocalCert) {
   EXPECT_EQ(std::vector<std::string>{}, client_connection->ssl()->othernameSansLocalCertificate());
   EXPECT_EQ(std::vector<std::string>{}, client_connection->ssl()->oidsLocalCertificate());
   EXPECT_EQ(EMPTY_STRING, client_connection->ssl()->subjectLocalCertificate());
+  EXPECT_EQ(EMPTY_STRING, client_connection->ssl()->urlEncodedPemEncodedLocalCertificate());
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   client_connection->close(Network::ConnectionCloseType::NoFlush);
