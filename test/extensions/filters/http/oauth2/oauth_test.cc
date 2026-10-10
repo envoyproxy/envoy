@@ -984,6 +984,32 @@ TEST_F(OAuth2ClientLogTagsTest, NoRequestIdTagWhenProviderAbsent) {
                           { client_->asyncGetAccessToken("a", "b", "c", "d", "e"); });
 }
 
+// A response without a :status header must not crash and must be handled as a failure.
+TEST_F(OAuth2ClientTest, RequestAccessTokenNoStatus) {
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
+  EXPECT_EQ(1, callbacks_.size());
+  EXPECT_CALL(*mock_callbacks_, handleOAuthFailure(_, _))
+      .WillOnce(Return(Http::FilterHeadersStatus::StopIteration));
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+}
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions

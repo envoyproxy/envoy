@@ -4,6 +4,7 @@
 #include "source/extensions/http/injected_credentials/oauth2/token_provider.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -165,6 +166,59 @@ TEST(TokenProvider, TokenProviderTlsClientAuthNullSecretReader) {
   EXPECT_NO_THROW(token_provider->onGetAccessTokenSuccess("token", std::chrono::seconds(10)));
   EXPECT_NO_THROW(
       token_provider->onGetAccessTokenFailure(FilterCallbacks::FailureReason::StreamReset));
+}
+
+// A token endpoint response without a :status header must not crash and must be treated as a
+// failed token fetch.
+TEST(TokenProvider, TokenFetchResponseWithoutStatus) {
+  const std::string yaml_string = R"EOF(
+      token_fetch_retry_interval: 5s
+      token_endpoint:
+        cluster: token-cluster
+        timeout: 0.5s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: "client-id"
+        client_secret: {}
+  )EOF";
+
+  envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2 proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  cluster_manager.initializeThreadLocalClusters({"token-cluster"});
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  auto secret_reader = std::make_shared<MockSecretReader>("client-secret");
+
+  Envoy::Http::MockAsyncClientRequest request(&cluster_manager.thread_local_cluster_.async_client_);
+  Envoy::Http::AsyncClient::Callbacks* callbacks = nullptr;
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_,
+              send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::Invoke([&](Envoy::Http::RequestMessagePtr&,
+                                    Envoy::Http::AsyncClient::Callbacks& cb,
+                                    const Envoy::Http::AsyncClient::RequestOptions&)
+                                    -> Envoy::Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      }));
+
+  // The TokenProvider constructor dispatches the initial token fetch.
+  auto token_provider =
+      std::make_shared<TokenProvider>(secret_reader, tls, cluster_manager, proto_config, dispatcher,
+                                      "stats_prefix", context.serverFactoryContext().scope());
+  ASSERT_NE(callbacks, nullptr);
+
+  // Respond without a :status header. The fetch must fail without crashing, so no credential is
+  // available for injection.
+  Envoy::Http::ResponseMessagePtr response(new Envoy::Http::ResponseMessageImpl(
+      Envoy::Http::ResponseHeaderMapPtr{new Envoy::Http::TestResponseHeaderMapImpl{}}));
+  EXPECT_NO_THROW(callbacks->onSuccess(request, std::move(response)));
+
+  auto injector = std::make_shared<OAuth2ClientCredentialTokenInjector>(token_provider);
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  absl::Status status = injector->inject(headers, false);
+  EXPECT_TRUE(absl::IsNotFound(status));
 }
 
 } // namespace OAuth2
