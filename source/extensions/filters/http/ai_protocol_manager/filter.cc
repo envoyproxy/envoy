@@ -447,7 +447,9 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
     ASSERT(request_headers_ != nullptr);
     const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
                                   request_protocol_, decode_manager_->length(),
-                                  route_response_protocol_};
+                                  route_response_protocol_,
+                                  /*route_actions_supported=*/
+                                  decoder_callbacks_->downstreamCallbacks().has_value()};
     std::vector<AiFilterSharedPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());
     for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
@@ -469,10 +471,28 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
           decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
                                              "ai_protocol_manager_filter_rejected");
         },
-        config_->alwaysSerializeRequest(), request_protocol_);
+        config_->alwaysSerializeRequest(), request_protocol_,
+        [this](bool refresh_route_cluster) {
+          if (refresh_route_cluster) {
+            refreshRouteCluster();
+          }
+        });
   } else {
     decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
   }
+}
+
+void AiProtocolManagerFilter::refreshRouteCluster() {
+  OptRef<Http::DownstreamStreamFilterCallbacks> downstream =
+      decoder_callbacks_->downstreamCallbacks();
+  if (!downstream.has_value()) {
+    ENVOY_LOG(debug,
+              "ai_protocol_manager: ignoring route cluster refresh: no downstream filter chain");
+    config_->stats().route_cluster_refresh_ignored_.inc();
+    return;
+  }
+  downstream->refreshRouteCluster();
+  config_->stats().route_cluster_refreshed_.inc();
 }
 
 Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseHeaderMap& headers,

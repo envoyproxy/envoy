@@ -1429,6 +1429,123 @@ TEST_F(AiProtocolManagerFilterTest, AiFilterContextCarriesTotalPayloadBytes) {
   EXPECT_EQ(seen[0].payload_bytes, first.size() + second.size());
 }
 
+// Asks for the route cluster to be picked again, then passes the request on.
+class RefreshRequestingAiFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    request->requestRouteAction(AiRouteAction::RefreshCluster);
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+};
+
+class RejectingAiFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request, AiRequestPropagator,
+                                       LocalReplier reply_locally) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    std::move(reply_locally)(Http::Code::Forbidden, "rejected");
+    co_return absl::OkStatus();
+  }
+};
+
+AiFilterSharedPtr makeRefreshRequestingAiFilter(const AiFilterContext&) {
+  return std::make_unique<RefreshRequestingAiFilter>();
+}
+
+// The cluster is picked again before the replay releases the held headers to the router.
+TEST_F(AiProtocolManagerFilterTest, RefreshesRouteClusterWhenAnAiFilterAsks) {
+  bool route_actions_supported = false;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) {
+    route_actions_supported = context.route_actions_supported;
+    return makeRefreshRequestingAiFilter(context);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).WillOnce([this]() {
+    EXPECT_EQ(inject_calls_, 0);
+  });
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_TRUE(route_actions_supported);
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_GT(inject_calls_, 0);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(counterValue("route_cluster_refreshed"), 1);
+}
+
+TEST_F(AiProtocolManagerFilterTest, RefreshesRouteClusterOnceWhenAskedTwice) {
+  createFilterWithAiFilters({makeRefreshRequestingAiFilter, makeRefreshRequestingAiFilter});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster());
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(counterValue("route_cluster_refreshed"), 1);
+}
+
+TEST_F(AiProtocolManagerFilterTest, KeepsRouteClusterWhenNoAiFilterAsks) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_unique<PassThroughAiFilter>();
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(counterValue("route_cluster_refreshed"), 0);
+}
+
+TEST_F(AiProtocolManagerFilterTest, KeepsRouteClusterWhenALaterAiFilterRejects) {
+  createFilterWithAiFilters(
+      {makeRefreshRequestingAiFilter, [](const AiFilterContext&) -> AiFilterSharedPtr {
+         return std::make_unique<RejectingAiFilter>();
+       }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::Forbidden);
+  EXPECT_EQ(inject_calls_, 0);
+}
+
+// Without downstream callbacks, as in an upstream filter chain, there is no route to act on.
+TEST_F(AiProtocolManagerFilterTest, IgnoresRouteClusterRefreshWithoutDownstreamCallbacks) {
+  ON_CALL(callbacks_, downstreamCallbacks())
+      .WillByDefault(testing::Return(OptRef<Http::DownstreamStreamFilterCallbacks>{}));
+  bool route_actions_supported = true;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) {
+    route_actions_supported = context.route_actions_supported;
+    return makeRefreshRequestingAiFilter(context);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  EXPECT_FALSE(route_actions_supported);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(counterValue("route_cluster_refreshed"), 0);
+  EXPECT_EQ(counterValue("route_cluster_refresh_ignored"), 1);
+}
+
 class AiProtocolManagerFilterStateTest : public AiProtocolManagerFilterTest {
 public:
   // What the AI filters see on a Chat Completions route when filter state names `named`.

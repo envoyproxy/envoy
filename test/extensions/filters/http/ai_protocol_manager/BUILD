@@ -362,6 +362,30 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "ai_filter_route_cluster_integration_test",
+    size = "large",
+    srcs = ["ai_filter_route_cluster_integration_test.cc"],
+    extension_names = [
+        "envoy.filters.http.ai_protocol_manager",
+        "envoy.matching.inputs.filter_state",
+        "envoy.router.cluster_specifier_plugin.matcher",
+    ],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:config",
+        "//source/extensions/matching/network/common:inputs_lib",
+        "//source/extensions/router/cluster_specifiers/matcher:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:registry_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "response_filter_manager_test",
     srcs = ["response_filter_manager_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],

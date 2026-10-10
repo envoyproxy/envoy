@@ -706,6 +706,8 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   sse_event_too_large, Counter, Pending or complete SSE event data exceeded ``max_sse_event_size``; that entire event was skipped.
   unsupported_content_encoding, Counter, The response carried a non-identity ``content-encoding``; extraction skipped.
   usage_trailers_synthesized, Counter, Empty response trailers were synthesized at end of stream to carry token usage to a downstream consumer.
+  route_cluster_refreshed, Counter, "AI filters asked to pick the route's cluster again, and the route was asked once, after the last AI filter. Only cluster specifiers that support it, such as the matcher plugin, change the cluster."
+  route_cluster_refresh_ignored, Counter, "AI filters asked to pick the route's cluster again where the route cannot be changed, such as in an upstream filter chain; the refresh was ignored and the request forwarded."
   request_info.published, Counter, The request info AI filter published an ``envoy.data.ai.v3.RequestInfo`` record.
   request_info.partial, Counter, A published request info record ignored at least one value Envoy could not use.
   request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.
