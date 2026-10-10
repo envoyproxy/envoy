@@ -1,15 +1,18 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
@@ -20,6 +23,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/rust:network_integration_test",
     ],
+    extension_names = ["envoy.filters.network.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:message_lib",
@@ -37,7 +41,7 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
@@ -45,6 +49,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
+    extension_names = ["envoy.filters.network.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
@@ -58,12 +63,13 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
     ],
+    extension_names = ["envoy.filters.network.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
@@ -80,7 +86,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -90,6 +96,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:network_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
+    extension_names = ["envoy.filters.network.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
