@@ -90,6 +90,72 @@ TEST(RequestModelFactoryTest, RejectsEmptyModel) {
   EXPECT_EQ(factory->createFromBytes(""), nullptr);
 }
 
+TEST(ResponseLlmProtocolTest, FactoryBuildsFromEnumValueNameAndRejectsUnknown) {
+  const auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
+          FilterStateKeys::LlmProtocolResponse);
+  ASSERT_NE(factory, nullptr);
+  const auto object = factory->createFromBytes("GEMINI_GENERATE_CONTENT");
+  ASSERT_NE(object, nullptr);
+  const auto* typed = dynamic_cast<const ResponseLlmProtocol*>(object.get());
+  ASSERT_NE(typed, nullptr);
+  EXPECT_EQ(typed->protocol(), LLMProtocol::GeminiGenerateContent);
+  EXPECT_EQ(object->serializeAsString(), "GEMINI_GENERATE_CONTENT");
+  EXPECT_EQ(factory->createFromBytes("NOT_AN_API"), nullptr);
+}
+
+// The request and response keys are read independently: setting one leaves the other unset.
+TEST(ResponseLlmProtocolTest, ReadsItsOwnKeyOnly) {
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(ResponseLlmProtocol::fromFilterState(filter_state), LLMProtocol::Unspecified);
+
+  filter_state.setData(FilterStateKeys::LlmProtocolResponse,
+                       std::make_shared<ResponseLlmProtocol>(LLMProtocol::AnthropicMessages),
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(ResponseLlmProtocol::fromFilterState(filter_state), LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(RequestLlmProtocol::fromFilterState(filter_state), LLMProtocol::Unspecified);
+}
+
+class StringKeyFactoryTest : public testing::TestWithParam<absl::string_view> {};
+
+INSTANTIATE_TEST_SUITE_P(StringKeys, StringKeyFactoryTest,
+                         testing::Values(FilterStateKeys::UriPatternRequest,
+                                         FilterStateKeys::UriPatternResponse,
+                                         FilterStateKeys::ModelResolved));
+
+TEST_P(StringKeyFactoryTest, BuildsStringAccessorAndRejectsEmpty) {
+  const auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(GetParam());
+  ASSERT_NE(factory, nullptr) << GetParam();
+  const auto object = factory->createFromBytes("/v1beta/models/{model}:{method}");
+  const auto* value = dynamic_cast<const Router::StringAccessor*>(object.get());
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->asString(), "/v1beta/models/{model}:{method}");
+  EXPECT_EQ(factory->createFromBytes(""), nullptr);
+}
+
+TEST(StringFromFilterStateTest, ReadsStringAccessorAtKey) {
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_FALSE(stringFromFilterState(filter_state, FilterStateKeys::ModelResolved).has_value());
+
+  const auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
+          FilterStateKeys::ModelResolved);
+  ASSERT_NE(factory, nullptr);
+  filter_state.setData(FilterStateKeys::ModelResolved,
+                       std::shared_ptr<StreamInfo::FilterState::Object>(
+                           factory->createFromBytes("claude-sonnet-4-5")),
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(stringFromFilterState(filter_state, FilterStateKeys::ModelResolved),
+            "claude-sonnet-4-5");
+  // A non-string object at the key does not read as a string.
+  filter_state.setData(FilterStateKeys::LlmProtocolResponse,
+                       std::make_shared<ResponseLlmProtocol>(LLMProtocol::AnthropicMessages),
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_FALSE(
+      stringFromFilterState(filter_state, FilterStateKeys::LlmProtocolResponse).has_value());
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

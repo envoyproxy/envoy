@@ -11,6 +11,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 #include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
+#include "source/extensions/filters/http/ai_protocol_manager/uri_pattern.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -537,6 +538,19 @@ struct TranscodeContext {
   // The request's `:path`, from which a request `ToIr` leg reads what its dialect names in the path
   // rather than the body (see `DialectTranscodePack::envelope`).
   absl::string_view request_path{};
+  // Instructions a filter ahead of the transcoder set for this request (see
+  // `FilterStateKeys`); each is followed when set, and the dialect's own layout applies otherwise.
+  //
+  // The pattern `request_path` follows, which a request `ToIr` leg lifts the model and streaming
+  // mode from.
+  const UriPattern* request_uri_pattern{nullptr};
+  // The pattern of the path the upstream expects, which a request `FromIr` leg renders into
+  // `rewritten_path`.
+  const UriPattern* response_uri_pattern{nullptr};
+  // The model to send upstream in place of the one the request names. A request `FromIr` leg
+  // writes it into the IR `model` before converting, so it reaches the body and the rewritten
+  // path alike.
+  absl::string_view resolved_model{};
   // The model the request named, for a response that does not name its own (see
   // `TranscodeRule::ContextField::RequestModel`).
   absl::string_view request_model{};
@@ -551,10 +565,15 @@ struct TranscodeContext {
   // Set by request legs to the request's IR `model` (read after a `ToIr` leg and before a
   // `FromIr` one), so the caller can hand it back as the fallback model on the response legs.
   std::string ir_model{};
-  // Set by a successful request `FromIr` leg whose dialect names request members in the path (see
-  // `DialectTranscodePack::envelope`): the `:path` the request must be sent to, which the caller
-  // applies along with the body. Every other request leg clears it.
+  // Set by a successful request `FromIr` leg that has a path to render, from `response_uri_pattern`
+  // or the dialect's own layout (see `DialectTranscodePack::envelope`): the `:path` the request
+  // must be sent to, which the caller applies along with the body. Every other request leg clears
+  // it.
   std::optional<std::string> rewritten_path{};
+  // Set by a request `ToIr` leg: whether `request_path` matched the pattern the leg followed
+  // (`request_uri_pattern` or the dialect's own layout), and so had its model and streaming mode
+  // lifted. False when there was no pattern, or on any other leg.
+  bool request_path_matched{false};
 };
 
 // The rule sets for one payload kind of a dialect: `to_ir` converts the dialect into the IR
@@ -676,28 +695,6 @@ struct StreamGrammars {
   StreamGrammar from_ir{};
 };
 
-// Where a dialect's API names request members in the request path rather than the body. Gemini
-// names the model and the streaming mode there, calling a custom method on the model:
-// `/v1beta/models/{model}:generateContent`, or `:streamGenerateContent` to stream the response.
-//
-// A request `ToIr` leg lifts what `TranscodeContext::request_path` names into the IR body, unless
-// the body names it itself. A request `FromIr` leg moves it out of the body into
-// `TranscodeContext::rewritten_path`: `{prefix}{model}{unary_method}` or
-// `{prefix}{model}{stream_method}`.
-struct PathTemplate {
-  // What a rendered path puts before the model. A parsed path need only end its own prefix with
-  // this one's last segment (`/models/`), since Vertex AI nests Gemini's models under a project and
-  // a location.
-  std::string prefix{};
-  // The custom method (`:verb`) that follows the model, for a unary and for a streamed response.
-  // A rendered path keeps any query a method ends with; a parsed path's query is ignored.
-  std::string unary_method{};
-  std::string stream_method{};
-  // The IR members the path carries: the model, and whether the response is streamed.
-  std::string model_field{"model"};
-  std::string stream_field{"stream"};
-};
-
 // Declarative dialect pack: every rule needed to move one dialect's payloads to and from the IR.
 //
 // `dialect_schema` is the protocol's own `PayloadSchema`; it is what a request converted out of
@@ -712,8 +709,16 @@ struct DialectTranscodePack {
   LegRules response{};
   // Streamed response events.
   StreamGrammars stream{};
-  // Request members the dialect's API names in the request path, if any.
-  std::optional<PathTemplate> envelope{};
+  // Where the dialect's API names the request's `model` and `stream` in the request path rather
+  // than the body, if it does. Gemini calls a custom method on the model:
+  // `/v1beta/models/{model}:generateContent`, or `:streamGenerateContent` to stream the response.
+  //
+  // A request `ToIr` leg lifts what `TranscodeContext::request_path` names into the body, unless
+  // the body names it itself. A request `FromIr` leg moves it out of the body into
+  // `TranscodeContext::rewritten_path`. An instruction set ahead of the transcoder
+  // (`TranscodeContext::request_uri_pattern` / `response_uri_pattern`) takes the envelope's place
+  // for one request.
+  std::optional<UriPattern> envelope{};
   const PayloadSchema* dialect_schema{nullptr};
   const PayloadSchema* ir_schema{nullptr};
 };
@@ -802,10 +807,11 @@ public:
   absl::StatusOr<std::vector<SseEventPtr>> finishStream(const TranscodeLeg& leg,
                                                         TranscodeContext& ctx) const;
 
-  // The model that `path`, a request path of `dialect`'s API, names: empty unless the dialect
-  // names its model in the path (`DialectTranscodePack::envelope`) and `path` is one of its model
-  // methods. For a caller that needs the model without running a request leg.
-  std::string modelFromRequestPath(LLMProtocol dialect, absl::string_view path) const;
+  // The model that `path`, a request path of `dialect`'s API, names: empty unless `path` matches
+  // `pattern`, or the dialect's own layout (`DialectTranscodePack::envelope`) when `pattern` is
+  // null, and that names a model. For a caller that needs the model without running a request leg.
+  std::string modelFromRequestPath(LLMProtocol dialect, absl::string_view path,
+                                   const UriPattern* pattern = nullptr) const;
 
 private:
   absl::StatusOr<const DialectTranscodePack*> findPack(LLMProtocol dialect) const;

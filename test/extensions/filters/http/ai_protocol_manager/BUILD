@@ -206,6 +206,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "uri_pattern_test",
+    srcs = ["uri_pattern_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:uri_pattern_lib",
+        "//test/test_common:status_utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "ai_filter_state_test",
     srcs = ["ai_filter_state_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],

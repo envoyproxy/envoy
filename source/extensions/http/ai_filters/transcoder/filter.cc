@@ -8,8 +8,10 @@
 #include <vector>
 
 #include "source/common/coroutine/status_macros.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -28,14 +30,18 @@ using HttpFilters::AiProtocolManager::FlattenJsonField;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::PayloadKind;
+using HttpFilters::AiProtocolManager::ResponseLlmProtocol;
 using HttpFilters::AiProtocolManager::SseEventPtr;
 using HttpFilters::AiProtocolManager::SseStreamPropagator;
 using HttpFilters::AiProtocolManager::SseStreamReceiver;
+using HttpFilters::AiProtocolManager::stringFromFilterState;
 using HttpFilters::AiProtocolManager::TranscodeContext;
 using HttpFilters::AiProtocolManager::TranscodeDirection;
 using HttpFilters::AiProtocolManager::TranscodeLeg;
 using HttpFilters::AiProtocolManager::TranscodeStreamState;
 using HttpFilters::AiProtocolManager::TranscodingEngine;
+using HttpFilters::AiProtocolManager::UriPattern;
+namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 using TranscoderProto = envoy::extensions::http::ai_filters::transcoder::v3::Transcoder;
 
 namespace {
@@ -114,6 +120,7 @@ TranscoderFilter::TranscoderFilter(TranscoderFilterConfigSharedPtr config,
                                    const AiFilterContext& context)
     : config_(std::move(config)), source_protocol_(context.request_protocol),
       target_protocol_(context.response_protocol), request_headers_(context.request_headers),
+      filter_state_(context.stream_info.filterState()),
       created_(std::chrono::duration_cast<std::chrono::seconds>(
                    context.stream_info.startTime().time_since_epoch())
                    .count()),
@@ -125,11 +132,23 @@ Coroutine::Task<absl::Status> TranscoderFilter::decode(AiRequestReceiver receive
                                                        LocalReplier reply_locally) {
   ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
 
+  // Read even when this instance transcodes no request: the backend's dialect the instructions
+  // name is the one its response legs convert from.
+  absl::StatusOr<Instructions> instructions = readInstructions();
+  if (!instructions.ok()) {
+    // An instruction that cannot be followed is the proxy's configuration at fault, not the
+    // client's request.
+    ENVOY_LOG(debug, "transcoder: rejecting request: {}", instructions.status().message());
+    std::move(reply_locally)(Http::Code::InternalServerError,
+                             std::string(instructions.status().message()));
+    co_return absl::OkStatus();
+  }
+
   if (config_->requestHandling() == TranscoderProto::DIRECTION_UNSPECIFIED) {
     co_return co_await std::move(propagate_request)(std::move(request));
   }
 
-  const absl::Status status = transcodeRequest(request->json());
+  const absl::Status status = transcodeRequest(request->json(), *instructions);
   if (!status.ok()) {
     // A partially transcoded payload must never reach the next filter or the upstream: the rules
     // mutate the document in place, so a mid-rule failure leaves a document that is neither the
@@ -239,7 +258,49 @@ Coroutine::Task<absl::Status> TranscoderFilter::encodeSSE(SseStreamReceiver rece
   co_return absl::OkStatus();
 }
 
-absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json) {
+absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstructions() {
+  const StreamInfo::FilterState& filter_state = *filter_state_;
+  if (const LLMProtocol declared = ResponseLlmProtocol::fromFilterState(filter_state);
+      declared != LLMProtocol::Unspecified) {
+    target_protocol_ = declared;
+  }
+
+  Instructions instructions;
+  // The two patterns, each read from its key into its slot.
+  for (const auto& [key, into] :
+       {std::pair{&FilterStateKeys::UriPatternRequest, &instructions.request_uri_pattern},
+        std::pair{&FilterStateKeys::UriPatternResponse, &instructions.response_uri_pattern}}) {
+    const std::optional<absl::string_view> source = stringFromFilterState(filter_state, *key);
+    if (!source.has_value()) {
+      continue;
+    }
+    absl::StatusOr<UriPattern> pattern = UriPattern::parse(*source);
+    if (!pattern.ok()) {
+      config_->stats().unresolved_.inc();
+      return absl::FailedPreconditionError(
+          absl::StrCat("transcoder: filter state `", *key, "`: ", pattern.status().message()));
+    }
+    *into = *std::move(pattern);
+  }
+  if (const std::optional<absl::string_view> model =
+          stringFromFilterState(filter_state, FilterStateKeys::ModelResolved);
+      model.has_value()) {
+    instructions.resolved_model = std::string(*model);
+  }
+
+  // The model the client's path names is read again under the pattern it actually follows, for
+  // a response that needs it when no request leg of this instance reports the IR's. The pattern
+  // replaces the dialect's own layout outright, as it does in the engine: a path it does not
+  // match names no model.
+  if (instructions.request_uri_pattern.has_value()) {
+    request_model_ = config_->engine().modelFromRequestPath(
+        source_protocol_, request_headers_.getPathValue(), &*instructions.request_uri_pattern);
+  }
+  return instructions;
+}
+
+absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
+                                                const Instructions& instructions) {
   absl::StatusOr<TranscodeLeg> leg = resolveLeg(config_->requestHandling(), PayloadKind::Request);
   if (!leg.ok()) {
     return leg.status();
@@ -249,10 +310,25 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json) {
   // upstream would reject fails here rather than over the network.
   TranscodeContext ctx;
   ctx.request_path = request_headers_.getPathValue();
+  if (instructions.request_uri_pattern.has_value()) {
+    ctx.request_uri_pattern = &*instructions.request_uri_pattern;
+  }
+  if (instructions.response_uri_pattern.has_value()) {
+    ctx.response_uri_pattern = &*instructions.response_uri_pattern;
+  }
+  ctx.resolved_model = instructions.resolved_model;
   const absl::Status status = config_->engine().transcode(*leg, ctx, json);
   if (!status.ok()) {
     config_->stats().failed_.inc();
     return status;
+  }
+  if (instructions.request_uri_pattern.has_value() && leg->direction == TranscodeDirection::ToIr &&
+      !ctx.request_path_matched) {
+    // The instruction was set on purpose, so a path it does not match is more likely a
+    // misconfiguration than intent. The request still goes through on what the body says.
+    ENVOY_LOG(debug, "transcoder: {} `{}` does not match the request path `{}`",
+              FilterStateKeys::UriPatternRequest, instructions.request_uri_pattern->source(),
+              ctx.request_path);
   }
   if (!ctx.ir_model.empty()) {
     request_model_ = std::move(ctx.ir_model);

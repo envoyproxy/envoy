@@ -1327,16 +1327,12 @@ TEST(TranscodingEngineTest, IrRequestToGeminiRefusesAModelThatIsNotAModelId) {
 // treatment, with its own layout.
 TEST(TranscodingEngineTest, RequestEnvelopeIsDataInThePack) {
   TranscodingEngine engine;
-  ASSERT_THAT(engine.registerPack(DialectTranscodePack{
-                  .protocol = LLMProtocol::OpenAiResponses,
-                  .envelope =
-                      PathTemplate{
-                          .prefix = "/v2/engines/",
-                          .unary_method = ":predict",
-                          .stream_method = ":streamPredict?stream=1",
-                      },
-              }),
-              IsOk());
+  ASSERT_THAT(
+      engine.registerPack(DialectTranscodePack{
+          .protocol = LLMProtocol::OpenAiResponses,
+          .envelope = *UriPattern::parse("/v2/engines/{model}:{predict|streamPredict?stream=1}"),
+      }),
+      IsOk());
   const TranscodeLeg to_ir{PayloadKind::Request, TranscodeDirection::ToIr,
                            LLMProtocol::OpenAiResponses};
   const TranscodeLeg from_ir{PayloadKind::Request, TranscodeDirection::FromIr,
@@ -1381,6 +1377,178 @@ TEST(TranscodingEngineTest, ModelFromRequestPathReadsTheDialectsEnvelope) {
   EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::OpenAiResponses,
                                         "/v1beta/models/gemini-2.5-pro:generateContent"),
             "");
+}
+
+// ---------------------------------------------------------------------------
+// Transcoding instructions: what a filter ahead of the transcoder sets through `TranscodeContext`
+// takes the place of the dialect's own layout for one request.
+
+constexpr TranscodeLeg kAnthropicRequestToIr{PayloadKind::Request, TranscodeDirection::ToIr,
+                                             LLMProtocol::AnthropicMessages};
+constexpr TranscodeLeg kIrRequestToAnthropic{PayloadKind::Request, TranscodeDirection::FromIr,
+                                             LLMProtocol::AnthropicMessages};
+
+// A request pattern says where the client's path names the model and streaming mode, for a
+// dialect that names them in the path (Gemini, in place of its own layout) and for one that names
+// them in the body (Anthropic, which otherwise never reads the path).
+TEST(TranscodingEngineTest, RequestUriPatternLiftsFromTheClientsPath) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const absl::StatusOr<UriPattern> gateway =
+      UriPattern::parse("/gateway/{model}/{chat|chat-stream}");
+  ASSERT_THAT(gateway.status(), IsOk());
+  nlohmann::json gemini =
+      nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
+  TranscodeContext ctx;
+  ctx.request_path = "/gateway/gemini-2.5-flash/chat-stream?key=x";
+  ctx.request_uri_pattern = &*gateway;
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, gemini), IsOk());
+  EXPECT_TRUE(ctx.request_path_matched);
+  EXPECT_EQ(gemini["model"], "gemini-2.5-flash");
+  EXPECT_EQ(gemini["stream"], true);
+  EXPECT_EQ(ctx.ir_model, "gemini-2.5-flash");
+
+  // The dialect's own layout no longer applies to that request.
+  nlohmann::json own_layout =
+      nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
+  ctx.request_path = "/v1beta/models/gemini-2.5-flash:generateContent";
+  ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, own_layout), IsOk());
+  EXPECT_FALSE(ctx.request_path_matched);
+  EXPECT_FALSE(own_layout.contains("model"));
+
+  const absl::StatusOr<UriPattern> vertex =
+      UriPattern::parse("/v1/projects/p/locations/l/publishers/anthropic/models/"
+                        "{model}:{rawPredict|streamRawPredict}");
+  ASSERT_THAT(vertex.status(), IsOk());
+  nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ctx.request_path =
+      "/v1/projects/p/locations/l/publishers/anthropic/models/claude-sonnet-4-5:streamRawPredict";
+  ctx.request_uri_pattern = &*vertex;
+  ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, ctx, anthropic), IsOk());
+  EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
+  EXPECT_EQ(anthropic["stream"], true);
+  EXPECT_EQ(ctx.ir_model, "claude-sonnet-4-5");
+
+  // The body still wins over the path.
+  nlohmann::json named = nlohmann::json::parse(R"({
+    "model": "claude-opus-4-1", "max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, ctx, named), IsOk());
+  EXPECT_EQ(named["model"], "claude-opus-4-1");
+
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::AnthropicMessages, ctx.request_path, &*vertex),
+            "claude-sonnet-4-5");
+}
+
+// A response pattern says what path the upstream expects. A dialect that names the model in the
+// body keeps it there, and only gains the path; one that names it in the path loses it from the
+// body as it always does.
+TEST(TranscodingEngineTest, ResponseUriPatternRendersTheUpstreamPath) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const absl::StatusOr<UriPattern> vertex_claude =
+      UriPattern::parse("/v1/projects/p/locations/l/publishers/anthropic/models/"
+                        "{model}:{rawPredict|streamRawPredict}");
+  ASSERT_THAT(vertex_claude.status(), IsOk());
+  nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5", "stream": true, "max_completion_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext ctx;
+  ctx.response_uri_pattern = &*vertex_claude;
+  ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, anthropic), IsOk());
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(std::string("/v1/projects/p/locations/l/publishers/anthropic/"
+                                            "models/claude-sonnet-4-5:streamRawPredict")));
+  EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
+  EXPECT_EQ(anthropic["stream"], true);
+
+  // A pattern that names the model needs one in the body, like the dialect's own layout would.
+  nlohmann::json no_model = nlohmann::json::parse(R"({
+    "max_completion_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  const absl::Status status = engine.transcode(kIrRequestToAnthropic, ctx, no_model);
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(status.message(), testing::HasSubstr("model id"));
+  EXPECT_FALSE(ctx.rewritten_path.has_value());
+
+  // A fixed path has nothing to take from the body.
+  const absl::StatusOr<UriPattern> fixed = UriPattern::parse("/anthropic/v1/messages");
+  ASSERT_THAT(fixed.status(), IsOk());
+  nlohmann::json unary = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5", "max_completion_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ctx.response_uri_pattern = &*fixed;
+  ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, unary), IsOk());
+  EXPECT_THAT(ctx.rewritten_path, testing::Optional(std::string("/anthropic/v1/messages")));
+  EXPECT_EQ(unary["model"], "claude-sonnet-4-5");
+
+  const absl::StatusOr<UriPattern> vertex_gemini =
+      UriPattern::parse("/v1/projects/p/locations/l/publishers/google/models/"
+                        "{model}:{generateContent|streamGenerateContent?alt=sse}");
+  ASSERT_THAT(vertex_gemini.status(), IsOk());
+  nlohmann::json gemini = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-flash", "stream": false, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ctx.response_uri_pattern = &*vertex_gemini;
+  ASSERT_THAT(engine.transcode(kIrRequestToGemini, ctx, gemini), IsOk());
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(std::string("/v1/projects/p/locations/l/publishers/google/models/"
+                                            "gemini-2.5-flash:generateContent")));
+  EXPECT_FALSE(gemini.contains("model"));
+  EXPECT_FALSE(gemini.contains("stream"));
+}
+
+// The resolved model replaces the one the request named, wherever the dialect carries it: the
+// body, the path, or both, and it is what the leg reports as the request's model.
+TEST(TranscodingEngineTest, ResolvedModelReplacesTheRequestedOne) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const absl::StatusOr<UriPattern> vertex_claude =
+      UriPattern::parse("/v1/projects/p/locations/l/publishers/anthropic/models/"
+                        "{model}:{rawPredict|streamRawPredict}");
+  ASSERT_THAT(vertex_claude.status(), IsOk());
+  nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "model": "claude-sonnet", "max_completion_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext ctx;
+  ctx.resolved_model = "claude-sonnet-4-5@20250929";
+  ctx.response_uri_pattern = &*vertex_claude;
+  ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, anthropic), IsOk());
+  EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5@20250929");
+  EXPECT_EQ(ctx.ir_model, "claude-sonnet-4-5@20250929");
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(std::string("/v1/projects/p/locations/l/publishers/anthropic/"
+                                            "models/claude-sonnet-4-5@20250929:rawPredict")));
+
+  // It fills in a model the request never named, too.
+  nlohmann::json gemini =
+      nlohmann::json::parse(R"({"stream": true, "messages": [{"role": "user", "content": "Hi"}]})");
+  ctx.response_uri_pattern = nullptr;
+  ctx.resolved_model = "gemini-2.5-pro";
+  ASSERT_THAT(engine.transcode(kIrRequestToGemini, ctx, gemini), IsOk());
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(
+                  std::string("/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse")));
+  EXPECT_FALSE(gemini.contains("model"));
+
+  // A `ToIr` leg leaves the request's own model alone: the resolution applies on the way out.
+  nlohmann::json to_ir = nlohmann::json::parse(R"({
+    "model": "claude-sonnet", "max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, ctx, to_ir), IsOk());
+  EXPECT_EQ(to_ir["model"], "claude-sonnet");
+  EXPECT_EQ(ctx.ir_model, "claude-sonnet");
 }
 
 // ---------------------------------------------------------------------------

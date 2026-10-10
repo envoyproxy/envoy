@@ -99,6 +99,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "uri_pattern_lib",
+    srcs = ["uri_pattern.cc"],
+    hdrs = ["uri_pattern.h"],
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "token_usage_lib",
     srcs = ["token_usage.cc"],
     hdrs = [
@@ -203,6 +214,7 @@ envoy_cc_library(
         ":llm_protocol_adapters_lib",
         ":schema_lib",
         ":token_usage_lib",
+        ":uri_pattern_lib",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
