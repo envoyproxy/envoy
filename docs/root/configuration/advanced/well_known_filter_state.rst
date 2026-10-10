@@ -97,7 +97,18 @@ The following lists the filter state object keys used by the Envoy extensions to
   * ``anon_tor``: TOR exit node check result (``true`` or ``false``);
   * ``anon_proxy``: public proxy check result (``true`` or ``false``);
   * ``isp``: ISP name;
-  * ``apple_private_relay``: iCloud Private Relay check result (``true`` or ``false``).
+  * ``apple_private_relay``: iCloud Private Relay check result (``true`` or ``false``);
+  * ``city_geoname_id``: GeoNames ID of the city;
+  * ``latitude``: approximate WGS84 latitude (4 decimal places);
+  * ``longitude``: approximate WGS84 longitude (4 decimal places);
+  * ``time_zone``: IANA time zone (e.g. ``Europe/London``);
+  * ``postal_code``: postal code;
+  * ``region_name``: English name of the region;
+  * ``region_geoname_id``: GeoNames ID of the region;
+  * ``subregion_geoname_id``: GeoNames ID of the subregion;
+  * ``country_geoname_id``: GeoNames ID of the country;
+  * ``continent_geoname_id``: GeoNames ID of the continent;
+  * ``metro_code``: metro/DMA code (US only).
 
 ``envoy.filters.http.mcp.request``
   :ref:`MCP filter <config_http_filters_mcp>` stores parsed MCP (Model Context Protocol) JSON-RPC
