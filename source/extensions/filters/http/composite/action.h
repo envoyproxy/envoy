@@ -122,7 +122,8 @@ private:
     HttpExtensionConfigProviderSharedPtr provider =
         provider_manager->createDynamicFilterConfigProvider(
             config_discovery, name, server_factory_context, factory_context,
-            server_factory_context.clusterManager(), false, filter_chain_type, nullptr);
+            server_factory_context.clusterManager(), false, filter_chain_type, nullptr,
+            context.stat_prefix_);
 
     Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
 
