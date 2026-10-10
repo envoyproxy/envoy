@@ -361,6 +361,78 @@ TEST_P(UdpProxyIntegrationTest, UpstreamBindConfigSourceAddress) {
   EXPECT_EQ(listener_address->asString(), response_datagram.addresses_.peer_->asString());
 }
 
+#if defined(__linux__) && defined(ENVOY_ENABLE_QUIC)
+TEST_P(UdpProxyIntegrationTest, UpstreamGsoPreservesDatagramsAndReplies) {
+  if (!Api::OsSysCallsSingleton::get().supportsUdpGso()) {
+    GTEST_SKIP() << "UDP GSO is not supported";
+  }
+  setup(1, std::nullopt, R"EOF(
+  upstream_packet_writer_config:
+    name: envoy.udp_packet_writer.gso
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+)EOF");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                  lookupPort("listener_0")));
+  Network::Test::UdpSyncPeer client(version_);
+  const std::vector<std::string> payloads{"packet-1", "packet-2", "", "", "short", "packet-3"};
+  uint64_t total_bytes = 0;
+  for (const auto& payload : payloads) {
+    client.write(payload, *listener_address);
+    total_bytes += payload.length();
+  }
+  for (const auto& payload : payloads) {
+    Network::UdpRecvData request;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request));
+    EXPECT_EQ(payload, request.buffer_->toString());
+    fake_upstreams_[0]->sendUdpDatagram(payload, request.addresses_.peer_);
+    Network::UdpRecvData response;
+    client.recv(response);
+    EXPECT_EQ(payload, response.buffer_->toString());
+  }
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tx_datagrams", Eq(payloads.size()));
+  test_server_->waitForCounter("cluster.cluster_0.udp.upstream.total_bytes_sent", Eq(total_bytes));
+  test_server_->waitForGauge("cluster.cluster_0.udp.upstream.internal_buffer_size", Eq(0));
+}
+
+TEST_P(UdpProxyIntegrationTest, UpstreamGsoPreservesOriginalSourceIp) {
+  if (!Api::OsSysCallsSingleton::get().supportsUdpGso() ||
+      !Api::OsSysCallsSingleton::get().supportsIpTransparent(version_)) {
+    GTEST_SKIP() << "UDP GSO and transparent sockets are required.";
+  }
+  setup(1, std::nullopt, R"EOF(
+  use_original_src_ip: true
+  upstream_packet_writer_config:
+    name: envoy.udp_packet_writer.gso
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+)EOF");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                  lookupPort("listener_0")));
+  const auto client_address = Network::Utility::parseInternetAddressAndPortNoThrow(
+      version_ == Network::Address::IpVersion::v4 ? "127.0.0.2:0" : "[::1]:0");
+  Network::UdpListenSocket client(client_address, nullptr, true);
+  const Buffer::OwnedImpl request("hello");
+  const auto result =
+      Network::Utility::writeToSocket(client.ioHandle(), request, nullptr, *listener_address);
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(request.length(), result.return_value_);
+
+  Network::UdpRecvData received;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(received));
+  EXPECT_EQ(request.toString(), received.buffer_->toString());
+  ASSERT_NE(nullptr, received.addresses_.peer_->ip());
+  EXPECT_EQ(client_address->ip()->addressAsString(),
+            received.addresses_.peer_->ip()->addressAsString());
+  EXPECT_NE(0, received.addresses_.peer_->ip()->port());
+  test_server_->waitForCounter("cluster.cluster_0.udp.upstream.total_bytes_sent",
+                               Eq(request.length()));
+  test_server_->waitForGauge("cluster.cluster_0.udp.upstream.internal_buffer_size", Eq(0));
+}
+#endif
+
 // Verify downstream drops are handled correctly with stats.
 TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
   setup(1);

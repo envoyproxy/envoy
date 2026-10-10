@@ -32,7 +32,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -275,4 +275,10 @@ message UdpProxyConfig {
 
   // Additional access log options for UDP Proxy.
   UdpAccessLogOptions access_log_options = 13;
+
+  // Configuration for the upstream UDP packet writer. If unset, datagrams are sent individually.
+  // Independent of the downstream writer and incompatible with
+  // :ref:`tunneling_config <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.tunneling_config>`.
+  // [#extension-category: envoy.udp_packet_writer]
+  config.core.v3.TypedExtensionConfig upstream_packet_writer_config = 14;
 }

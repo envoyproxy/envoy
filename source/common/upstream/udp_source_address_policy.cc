@@ -26,12 +26,14 @@ UdpSourceAddressPolicy::fromUpstreamLocalAddress(UpstreamLocalAddress upstream_l
 }
 
 UdpSourceAddressPolicy
-UdpSourceAddressPolicy::transparent(Network::Address::InstanceConstSharedPtr source_address) {
+UdpSourceAddressPolicy::transparent(Network::Address::InstanceConstSharedPtr source_address,
+                                    Network::Address::InstanceConstSharedPtr bind_address) {
   ASSERT(source_address != nullptr);
   ASSERT(source_address->ip() != nullptr);
   Network::Socket::OptionsSharedPtr socket_options =
       Network::SocketOptionFactory::buildIpTransparentOptions();
-  return UdpSourceAddressPolicy(Mode::Transparent, {nullptr, std::move(socket_options)},
+  return UdpSourceAddressPolicy(Mode::Transparent,
+                                {std::move(bind_address), std::move(socket_options)},
                                 std::move(source_address));
 }
 
