@@ -83,6 +83,38 @@ SecretManager::SecretManager(const ConfigProto& config,
 void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
                                          OptRef<Init::Manager> init_manager) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+  constexpr size_t MAX_ON_DEMAND_CERTS = 10000;
+  auto it = cache_.find(secret_name);
+  if (it == cache_.end() && cache_.size() >= MAX_ON_DEMAND_CERTS) {
+    // Attempt to evict entries that have no active TLS context and no pending handles.
+    for (auto cache_it = cache_.begin(); cache_it != cache_.end(); ) {
+      if (cache_it->second.cert_context_ == nullptr) {
+        bool has_active = false;
+        for (const auto& cb : cache_it->second.callbacks_) {
+          if (!cb.expired()) {
+            has_active = true;
+            break;
+          }
+        }
+        if (!has_active) {
+          stats_->cert_active_.dec();
+          cache_it = cache_.erase(cache_it);
+          continue;
+        }
+      }
+      ++cache_it;
+    }
+
+    if (cache_.size() >= MAX_ON_DEMAND_CERTS) {
+      if (handle) {
+        handle->notify(nullptr);
+      }
+      ENVOY_LOG_EVERY_POW_2(warn, "On-demand certificate cache is full. Rejecting new secret fetch for '{}'", secret_name);
+      return;
+    }
+  }
+
   CacheEntry& entry = cache_[secret_name];
   if (handle) {
     if (entry.cert_context_) {
