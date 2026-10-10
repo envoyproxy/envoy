@@ -9,6 +9,7 @@
 #include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
@@ -1111,6 +1112,62 @@ TEST(SymbolTableTest, Memory) {
   // symbol_table_mem_used:  1726056 (3.9x) -- does not seem to depend on STL sizes.
   EXPECT_MEMORY_LE(symbol_table_mem_used, string_mem_used / 3);
   EXPECT_MEMORY_EQ(symbol_table_mem_used, 1726056);
+}
+
+TEST_F(StatNameTest, StringCache) {
+  StatName a = makeStat("cluster.service_foo.upstream_rq_200");
+  StatName b = makeStat("cluster.service_foo.upstream_rq_500");
+  StatName c = makeStat("200");
+  StatName empty = makeStat("");
+
+  StatNameStringCache cache(&table_);
+  EXPECT_TRUE(cache.empty());
+  EXPECT_EQ(0, cache.size());
+
+  // Decoding empty StatName
+  EXPECT_EQ("", cache.decode(empty));
+  EXPECT_EQ("", cache.decode(StatName()));
+
+  // First decode populates cache
+  EXPECT_EQ("cluster.service_foo.upstream_rq_200", cache.decode(a));
+  EXPECT_EQ(1, cache.size());
+  EXPECT_FALSE(cache.empty());
+
+  // Subsequent decode hits cache
+  EXPECT_EQ("cluster.service_foo.upstream_rq_200", cache.decode(a));
+  EXPECT_EQ(1, cache.size());
+
+  // DecodeView returns string_view
+  EXPECT_EQ("cluster.service_foo.upstream_rq_200", cache.decodeView(a));
+
+  // Decode other stat names
+  EXPECT_EQ("cluster.service_foo.upstream_rq_500", cache.decode(b, table_));
+  EXPECT_EQ("200", cache.decode(c));
+  EXPECT_EQ(3, cache.size());
+
+  // Decode tag
+  Tag tag = cache.decodeTag(a, c);
+  EXPECT_EQ("cluster.service_foo.upstream_rq_200", tag.name_);
+  EXPECT_EQ("200", tag.value_);
+
+  // Clear cache
+  cache.clear();
+  EXPECT_TRUE(cache.empty());
+  EXPECT_EQ(0, cache.size());
+}
+
+TEST_F(StatNameTest, StringCacheDisabled) {
+  StatName a = makeStat("cluster.service_foo.upstream_rq_200");
+  StatName c = makeStat("200");
+
+  StatNameStringCache cache(&table_, /*enabled=*/false);
+  EXPECT_FALSE(cache.enabled());
+  Tag tag = cache.decodeTag(a, c);
+  EXPECT_EQ("cluster.service_foo.upstream_rq_200", tag.name_);
+  EXPECT_EQ("200", tag.value_);
+
+  cache.setEnabled(true);
+  EXPECT_TRUE(cache.enabled());
 }
 
 // A joiner holds the joined bytes in its own footprint, so relocating it would dangle any
