@@ -466,11 +466,25 @@ FakeHttpConnection::FakeHttpConnection(
   // while the connection is guaranteed to still be alive and before waitForDisconnect() can wake
   // the test thread.
   shared_connection_.setDisconnectCallback([this]() { codec_.reset(); });
-  shared_connection_.connection().addReadFilter(
-      Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+  read_filter_ = std::make_shared<ReadFilter>(*this);
+  shared_connection_.connection().addReadFilter(read_filter_);
 }
 
-FakeHttpConnection::~FakeHttpConnection() { shared_connection_.clearDisconnectCallback(); }
+FakeHttpConnection::~FakeHttpConnection() {
+  shared_connection_.clearDisconnectCallback();
+  if (read_filter_ != nullptr) {
+    if (shared_connection_.dispatcher().isThreadSafe()) {
+      if (shared_connection_.connected()) {
+        shared_connection_.connection().removeReadFilter(read_filter_);
+      }
+    } else {
+      EXPECT_TRUE(shared_connection_.executeOnDispatcher(
+          [filter = std::move(read_filter_)](Network::Connection& connection) {
+            connection.removeReadFilter(filter);
+          }));
+    }
+  }
+}
 
 AssertionResult FakeHttpConnection::halfCloseForCleanup(std::chrono::milliseconds timeout) {
   ENVOY_LOG(trace, "FakeHttpConnection half-close for cleanup");
