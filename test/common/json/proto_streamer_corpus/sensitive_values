@@ -1,0 +1,9 @@
+value {
+}
+sensitive {
+  sensitive_any {
+    [type.googleapis.com/google.protobuf.Value] {
+      number_value: 0.25
+    }
+  }
+}

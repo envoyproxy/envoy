@@ -1,0 +1,6 @@
+duration {
+  seconds: -9223372036854775808
+}
+timestamp {
+  seconds: 9223372036854775807
+}

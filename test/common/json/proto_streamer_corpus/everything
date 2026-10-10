@@ -1,0 +1,125 @@
+int64_value: -9223372036854775808
+uint64_value: 18446744073709551615
+double_value: 0.1
+float_value: 0.25
+bool_value: true
+string_value: "\"quoted\"\n"
+bytes_value: "\001\002\377"
+enum_value: BETA
+repeated_int64: 9007199254740993
+repeated_strings: "a"
+string_keyed {
+  key: "k"
+  value: "v"
+}
+int64_keyed {
+  key: -1
+  value: "int64"
+}
+wrapped_int64 {
+  value: 1
+}
+wrapped_bytes {
+  value: "wrapped"
+}
+duration {
+  seconds: 3
+  nanos: 1234
+}
+timestamp {
+  seconds: 1755561600
+}
+structured {
+  fields {
+    key: "k"
+    value {
+      number_value: 1.5
+    }
+  }
+}
+value {
+  string_value: "bare"
+}
+list_value {
+  values {
+    bool_value: true
+  }
+  values {
+    null_value: NULL_VALUE
+  }
+}
+nested {
+  name: "n"
+}
+repeated_nested {
+  name: "first"
+}
+sensitive {
+  sensitive_string: "secret"
+  insensitive_string: "public"
+  sensitive_int: 1
+  sensitive_string_map {
+    key: "a"
+    value: "secret"
+  }
+  sensitive_wrapped_string {
+    value: "secret"
+  }
+  sensitive_any {
+    [type.googleapis.com/google.protobuf.Duration] {
+      seconds: 1
+    }
+  }
+  sensitive_repeated_any {
+    [type.googleapis.com/test.common.json.TestMessage] {
+      string_value: "under a sensitive any"
+      int64_value: 7
+      nested {
+        name: "deep"
+      }
+      duration {
+        seconds: 2
+      }
+    }
+  }
+  insensitive_typed_struct {
+    type_url: "type.googleapis.com/envoy.test.Sensitive"
+    value {
+      fields {
+        key: "sensitive_string"
+        value {
+          string_value: "secret"
+        }
+      }
+    }
+  }
+}
+any {
+  [type.googleapis.com/test.common.json.TestNested] {
+    name: "inner"
+  }
+}
+repeated_any {
+  [type.googleapis.com/google.protobuf.Duration] {
+    seconds: 3
+  }
+}
+repeated_any {
+  [type.googleapis.com/envoy.test.Sensitive] {
+    sensitive_string: "secret"
+    insensitive_string: "public"
+  }
+}
+repeated_any {
+  [type.googleapis.com/test.common.json.TestMessage] {
+    string_value: "recursed"
+    nested {
+      name: "deep"
+    }
+    any {
+      [type.googleapis.com/test.common.json.TestNested] {
+        name: "deeper"
+      }
+    }
+  }
+}
