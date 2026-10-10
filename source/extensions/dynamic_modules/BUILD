@@ -36,6 +36,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/config:remote_data_fetcher_lib",
         "//source/common/runtime:runtime_features_lib",
@@ -43,12 +44,32 @@ envoy_cc_library(
         "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/dynamic_modules/abi",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/functional:function_ref",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/types:span",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "module_memory_lib",
+    srcs = ["module_memory.cc"],
+    hdrs = ["module_memory.h"],
+    deps = [
+        ":dynamic_modules_lib",
+        "//envoy/common:exception_lib",
+        "//source/common/profiler:profiler_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/functional:function_ref",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 

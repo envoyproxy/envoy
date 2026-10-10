@@ -1,16 +1,23 @@
+#include <dlfcn.h>
+
 #include <fstream>
+#include <thread>
 
 #include "envoy/extensions/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/init/manager_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/worker_index.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/logging.h"
@@ -19,6 +26,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/ascii.h"
+#include "absl/time/clock.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -216,10 +224,10 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
       TestEnvironment::substitute("{{ test_rundir }}/libwhatever.so");
   std::filesystem::copy(test_lib, staged_lib);
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("whatever", false);
-  EXPECT_OK(module) << "Failed to load module";
-
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
   std::filesystem::remove(staged_lib);
+  ASSERT_OK(module) << "Failed to load module";
+  EXPECT_EQ("whatever", (*module)->name());
 }
 
 TEST(StaticModule, LoadSuccess) {
@@ -247,6 +255,91 @@ TEST(StaticModule, ProgramInitFail) {
                             HasStatus(absl::StatusCode::kInvalidArgument,
                                       testing::HasSubstr("Failed to initialize static module:")));
                       });
+}
+
+TEST(StaticModule, NameAndNoCodeRanges) {
+  absl::StatusOr<DynamicModulePtr> module = newStaticModule("matcher_no_op_static");
+  ASSERT_OK(module);
+  EXPECT_EQ("matcher_no_op_static", (*module)->name());
+  EXPECT_TRUE((*module)->codeRanges().empty());
+}
+
+TEST(DynamicModuleTestGeneral, ConcurrentLoadWaitsForProgramInit) {
+  const std::filesystem::path path = testSharedObjectPath("blocking_program_init", "c");
+  absl::StatusOr<DynamicModulePtr> first;
+  std::thread first_load([&path, &first] { first = newDynamicModule(path, false); });
+  // The shared object is opened before its init runs, so the test can reach its functions.
+  void* handle = nullptr;
+  while ((handle = dlopen(path.c_str(), RTLD_NOLOAD | RTLD_NOW)) == nullptr) {
+    std::this_thread::yield();
+  }
+  const auto get_init_entered = reinterpret_cast<bool (*)()>(dlsym(handle, "get_init_entered"));
+  while (!get_init_entered()) {
+    std::this_thread::yield();
+  }
+  bool init_finished_when_loaded_again = false;
+  std::thread second_load([&path, &handle, &init_finished_when_loaded_again] {
+    const absl::StatusOr<DynamicModulePtr> second = newDynamicModule(path, false);
+    init_finished_when_loaded_again =
+        second.ok() && reinterpret_cast<bool (*)()>(dlsym(handle, "get_init_finished"))();
+  });
+  // Gives a load that does not wait for the init time to return.
+  absl::SleepFor(absl::Milliseconds(100));
+  reinterpret_cast<void (*)()>(dlsym(handle, "release_init"))();
+  second_load.join();
+  first_load.join();
+  dlclose(handle);
+  ASSERT_OK(first);
+  EXPECT_TRUE(init_finished_when_loaded_again);
+}
+
+#if defined(__linux__)
+TEST(DynamicModuleTestGeneral, CodeRangesContainModuleCode) {
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  ASSERT_OK(module);
+  const auto init_function =
+      (*module)->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
+          "envoy_dynamic_module_on_program_init");
+  ASSERT_OK(init_function);
+  const std::vector<AddressRange>& ranges = (*module)->codeRanges();
+  const auto in_ranges = [&ranges](const void* address) {
+    const uintptr_t value = reinterpret_cast<uintptr_t>(address);
+    return std::any_of(ranges.begin(), ranges.end(), [value](const AddressRange& range) {
+      return value >= range.begin && value < range.end;
+    });
+  };
+  EXPECT_TRUE(in_ranges(reinterpret_cast<const void*>(*init_function)));
+  EXPECT_FALSE(in_ranges(reinterpret_cast<const void*>(&testSharedObjectPath)));
+}
+#endif
+
+TEST(LoadedModules, VisitsEachModuleOncePerName) {
+  const auto visits = [](absl::string_view name) {
+    int count = 0;
+    forEachLoadedModule([&](const DynamicModule& module) { count += module.name() == name; });
+    return count;
+  };
+  const std::string path = testSharedObjectPath("no_op", "c");
+  absl::StatusOr<DynamicModulePtr> first = newDynamicModule(path, false, false, "first");
+  absl::StatusOr<DynamicModulePtr> first_again = newDynamicModule(path, false, false, "first");
+  absl::StatusOr<DynamicModulePtr> second = newDynamicModule(path, false, false, "second");
+  absl::StatusOr<DynamicModulePtr> static_module = newStaticModule("matcher_no_op_static");
+  ASSERT_OK(first);
+  ASSERT_OK(first_again);
+  ASSERT_OK(second);
+  ASSERT_OK(static_module);
+  EXPECT_EQ(1, visits("first"));
+  EXPECT_EQ(1, visits("second"));
+  EXPECT_EQ(1, visits("matcher_no_op_static"));
+
+  first->reset();
+  EXPECT_EQ(1, visits("first"));
+  first_again->reset();
+  static_module->reset();
+  EXPECT_EQ(0, visits("first"));
+  EXPECT_EQ(1, visits("second"));
+  EXPECT_EQ(0, visits("matcher_no_op_static"));
 }
 
 TEST(StaticModule, MultipleLoads) {
@@ -297,8 +390,9 @@ TEST(NewDynamicModuleFromBytes, Success) {
   std::filesystem::remove(temp_path);
 
   absl::StatusOr<DynamicModulePtr> module =
-      newDynamicModuleFromBytes(module_bytes, sha256, false, false);
-  EXPECT_OK(module) << "Failed to load module from bytes";
+      newDynamicModuleFromBytes(module_bytes, sha256, false, false, "from_bytes");
+  ASSERT_OK(module) << "Failed to load module from bytes";
+  EXPECT_EQ("from_bytes", (*module)->name());
   EXPECT_TRUE(std::filesystem::exists(temp_path));
 
   // Cleanup.
@@ -503,7 +597,8 @@ TEST_F(NewDynamicModuleByConfigTest, ByNameSuccess) {
   config.set_name("no_op");
   auto result = newDynamicModuleByConfig(config, "test_module");
   ASSERT_OK(result);
-  EXPECT_NE(result->loaded, nullptr);
+  ASSERT_NE(result->loaded, nullptr);
+  EXPECT_EQ("no_op", result->loaded->name());
   EXPECT_EQ(result->async, nullptr);
 }
 
@@ -524,8 +619,20 @@ TEST_F(NewDynamicModuleByConfigTest, LocalFileSuccess) {
   config.mutable_module()->mutable_local()->set_filename(testSharedObjectPath("no_op", "c"));
   auto result = newDynamicModuleByConfig(config, "test_module");
   ASSERT_OK(result);
-  EXPECT_NE(result->loaded, nullptr);
+  ASSERT_NE(result->loaded, nullptr);
+  EXPECT_EQ("", result->loaded->name());
   EXPECT_EQ(result->async, nullptr);
+}
+
+// A module loaded from a local file takes the name of its configuration.
+TEST_F(NewDynamicModuleByConfigTest, LocalFileWithName) {
+  ProtoDynamicModuleConfig config;
+  config.set_name("local_module");
+  config.mutable_module()->mutable_local()->set_filename(testSharedObjectPath("no_op", "c"));
+  auto result = newDynamicModuleByConfig(config, "test_module");
+  ASSERT_OK(result);
+  ASSERT_NE(result->loaded, nullptr);
+  EXPECT_EQ("local_module", result->loaded->name());
 }
 
 // Local-file loading of a missing path reports a load error.
@@ -561,9 +668,12 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitLoads) {
   std::filesystem::copy_file(module_path, cached,
                              std::filesystem::copy_options::overwrite_existing);
 
-  auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
+  ProtoDynamicModuleConfig config = makeRemoteConfig(sha);
+  config.set_name("remote_module");
+  auto result = newDynamicModuleByConfig(config, "test_module", context_);
   ASSERT_OK(result);
-  EXPECT_NE(result->loaded, nullptr);
+  ASSERT_NE(result->loaded, nullptr);
+  EXPECT_EQ("remote_module", result->loaded->name());
   EXPECT_EQ(result->async, nullptr);
 
   std::filesystem::remove(cached);
@@ -659,6 +769,45 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteAsyncReturnsAsyncState) {
   EXPECT_NE(result->async->remote_provider, nullptr);
   // The fetch has not been initialized, so the callback has not run yet.
   EXPECT_FALSE(on_loaded_called);
+}
+
+// A module fetched asynchronously takes the name of its configuration.
+TEST_F(NewDynamicModuleByConfigTest, RemoteAsyncLoadsWithName) {
+  const std::string module_bytes = readModuleBytes(testSharedObjectPath("no_op", "c"));
+  const std::string sha = sha256Hex(module_bytes);
+  std::filesystem::remove(moduleTempPath(sha));
+  context_.cluster_manager_.initializeThreadLocalClusters({"cluster_1"});
+  Http::MockAsyncClient& async_client =
+      context_.cluster_manager_.thread_local_cluster_.async_client_;
+  NiceMock<Http::MockAsyncClientRequest> request(&async_client);
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+            response->body().add(module_bytes);
+            callbacks.onSuccess(request, std::move(response));
+            return nullptr;
+          }));
+
+  ProtoDynamicModuleConfig config = makeRemoteConfig(sha);
+  config.set_name("remote_module");
+  Init::ManagerImpl init_manager("test");
+  DynamicModulePtr loaded;
+  auto result =
+      newDynamicModuleByConfig(config, "test_module", context_, init_manager,
+                               [&loaded](DynamicModulePtr module) { loaded = std::move(module); });
+  ASSERT_OK(result);
+  Init::ExpectableWatcherImpl watcher;
+  EXPECT_CALL(watcher, ready());
+  init_manager.initialize(watcher);
+  ASSERT_NE(nullptr, loaded);
+  EXPECT_EQ("remote_module", loaded->name());
+
+  loaded.reset();
+  std::filesystem::remove(moduleTempPath(sha));
 }
 
 } // namespace

@@ -18,6 +18,7 @@ package(default_visibility = [
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
     "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
+    "//test/extensions/resource_monitors/dynamic_module_memory:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
@@ -41,6 +42,8 @@ test_program(name = "abi_version_mismatch")
 test_program(name = "http")
 
 test_program(name = "http_integration_test")
+
+test_program(name = "memory_integration_test")
 
 test_program(name = "http_stream_callouts_test")
 
