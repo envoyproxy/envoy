@@ -272,7 +272,7 @@ message McpServerInfo {
   string host = 2;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ToolConfig {
   // Unique identifier of the tool. Used both for tools/list and tools/call transcoding.
   string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -306,6 +306,66 @@ message ToolConfig {
   // [#not-implemented-hide:]
   // Path and host of the MCP server that hosts this tool.
   repeated McpServerInfo server_info = 5;
+
+  // ``Mcp-Param-{name}`` request headers to validate against the arguments of a tools/call request
+  // for this tool. These mappings are the filter's only source for parameter header validation:
+  // the ``x-mcp-header`` annotations in ``tool_list_config.input_schema`` are not inspected.
+  //
+  // Validation applies only to requests that use the MCP ``2026-07-28`` stateless protocol. Request
+  // headers that are not configured here are not validated.
+  repeated McpParamHeader mcp_param_headers = 6;
+}
+
+// Validation of an ``Mcp-Param-{name}`` request header against a value in the arguments of a
+// tools/call request.
+//
+// The header is validated only, never added, removed or modified. A request is rejected with an
+// HTTP ``400`` and a JSON-RPC ``-32020`` (``HeaderMismatch``) error when:
+//
+// - the argument has a value but the header is missing,
+// - the header is present but the argument is missing or ``null``,
+// - the header is sent more than once, regardless of the argument,
+// - the raw header value contains a character other than visible ASCII, space or horizontal tab,
+// - the header value is not valid ``=?base64?...?=`` Base64, or
+// - the decoded header value does not equal the argument value under the configured ``type``.
+message McpParamHeader {
+  // The type of the argument value.
+  enum Type {
+    // Unspecified type. Not allowed.
+    TYPE_UNSPECIFIED = 0;
+
+    // The argument must be a JSON string that is exactly equal to the decoded header value.
+    STRING = 1;
+
+    // The argument must be a JSON number that is integral, e.g. ``42`` or ``42.0`` but not ``42.5``,
+    // and within ``-(2^53 - 1)`` and ``2^53 - 1``. The decoded header value must be a decimal number
+    // that is numerically equal to it, so the header values ``42`` and ``42.0`` both match the
+    // argument ``42``, but ``+42``, ``4.2e1`` and ``0x2a`` do not.
+    INTEGER = 2;
+
+    // The argument must be a JSON boolean, and the decoded header value must be ``true`` or
+    // ``false``.
+    BOOLEAN = 3;
+  }
+
+  // The ``{name}`` part of the ``Mcp-Param-{name}`` header name. This is the value of the
+  // ``x-mcp-header`` annotation that clients read from the tool's input schema. For example,
+  // ``Region`` refers to the ``Mcp-Param-Region`` header.
+  //
+  // Header names are case-insensitive, so names within a tool must be unique ignoring case.
+  string name = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+
+  // The chain of property names from the ``arguments`` object to the validated value. Each element
+  // is one literal property name; dots are not separators. For example, ``["user", "region"]``
+  // refers to ``{"user": {"region": ...}}``, while ``["user.region"]`` refers to
+  // ``{"user.region": ...}``.
+  //
+  // The argument is missing when a property on the path is missing, when the value is ``null``, or
+  // when an intermediate value is not an object.
+  repeated string property_path = 2 [(validate.rules).repeated = {min_items: 1}];
+
+  // The type of the argument value.
+  Type type = 3 [(validate.rules).enum = {defined_only: true not_in: 0}];
 }
 
 // Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
