@@ -33,9 +33,11 @@ public:
   virtual ~FragmentBuilderBase() = default;
 
   // Returns a fragment if the fragment rule applies, a nullptr indicates no fragment could be
-  // generated from the headers.
+  // generated. Builders sourcing their value from the stream produce none when `stream_info` is
+  // absent.
   virtual std::unique_ptr<ScopeKeyFragmentBase>
-  computeFragment(const Http::HeaderMap& headers) const PURE;
+  computeFragment(const Http::HeaderMap& headers,
+                  OptRef<const StreamInfo::StreamInfo> stream_info = std::nullopt) const PURE;
 
 protected:
   const ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config_;
@@ -46,11 +48,26 @@ public:
   explicit HeaderValueExtractorImpl(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config);
 
   std::unique_ptr<ScopeKeyFragmentBase>
-  computeFragment(const Http::HeaderMap& headers) const override;
+  computeFragment(const Http::HeaderMap& headers,
+                  OptRef<const StreamInfo::StreamInfo> stream_info = std::nullopt) const override;
 
 private:
   const ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor&
       header_value_extractor_config_;
+};
+
+// Extracts a string fragment from a filter state object, reading through the ancestor chain so
+// connection life span objects are visible.
+class FilterStateExtractorImpl : public FragmentBuilderBase {
+public:
+  explicit FilterStateExtractorImpl(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config);
+
+  std::unique_ptr<ScopeKeyFragmentBase>
+  computeFragment(const Http::HeaderMap& headers,
+                  OptRef<const StreamInfo::StreamInfo> stream_info = std::nullopt) const override;
+
+private:
+  const std::string key_;
 };
 
 /**
@@ -69,7 +86,9 @@ class ScopeKeyBuilderImpl : public ScopeKeyBuilderBase {
 public:
   explicit ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config);
 
-  ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
+  ScopeKeyPtr
+  computeScopeKey(const Http::HeaderMap& headers,
+                  OptRef<const StreamInfo::StreamInfo> stream_info = std::nullopt) const override;
 
 private:
   std::vector<std::unique_ptr<FragmentBuilderBase>> fragment_builders_;
