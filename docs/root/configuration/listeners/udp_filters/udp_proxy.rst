@@ -53,6 +53,32 @@ enabled, transparent source binding takes precedence over ``upstream_bind_config
 Envoy uses the downstream peer IP for each upstream datagram and does not bind the configured source
 address.
 
+Upstream batching
+-----------------
+
+Use :ref:`upstream_packet_writer_config
+<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.upstream_packet_writer_config>`
+to select a writer per upstream UDP socket. For GSO, use a Linux build with the GSO writer extension
+and configure:
+
+.. code-block:: yaml
+
+  upstream_packet_writer_config:
+    name: envoy.udp_packet_writer.gso
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+
+Batches flush at event-loop iteration end. Oversized, multi-slice and empty datagrams are sent
+separately after flushing older packets. Blocked writers drop new datagrams as send errors and retry
+buffered packets when writable. Permanent errors discard the batch and switch the session to
+individual sends. Teardown attempts a final flush, then discards any remaining data.
+
+Upstream send counters include buffered datagrams and do not guarantee delivery. Writer statistics
+use ``cluster.<name>.udp.upstream.``; ``internal_buffer_size`` sums buffered bytes across sessions.
+
+This setting is independent of the downstream writer and upstream GRO, and cannot be combined with
+UDP-over-HTTP tunneling. If unset, upstream datagrams are sent individually.
+
 Load balancing and unhealthy host handling
 ------------------------------------------
 

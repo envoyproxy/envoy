@@ -3,6 +3,7 @@
 #include "envoy/network/listener.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
 #include "source/common/network/socket_option_factory.h"
 
 namespace Envoy {
@@ -213,7 +214,11 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
                                          Upstream::ThreadLocalCluster& cluster,
                                          absl::flat_hash_set<ActiveSession*>&& sessions)
     : filter_(filter), cluster_(cluster), cluster_info_(cluster.info()),
-      cluster_stats_(generateStats(cluster.info()->statsScope())), sessions_(std::move(sessions)),
+      cluster_stats_(generateStats(cluster.info()->statsScope())),
+      upstream_writer_scope_(filter.config_->upstreamPacketWriterFactory() != nullptr
+                                 ? cluster.info()->statsScope().createScope("udp.upstream.")
+                                 : nullptr),
+      sessions_(std::move(sessions)),
       member_update_cb_handle_(cluster.prioritySet().addMemberUpdateCb(
           [this](const Upstream::HostVector&, const Upstream::HostVector& hosts_removed) {
             for (const auto& host : hosts_removed) {
@@ -545,7 +550,7 @@ void UdpProxyFilter::UdpActiveSession::writeUpstream(Network::UdpRecvData& data)
   }
   ASSERT(cluster_);
 
-  // NOTE: On the first write, a local ephemeral port is bound, and thus this write can fail due to
+  // NOTE: Unbound sockets acquire a local ephemeral port on the first write, which can fail due to
   //       port exhaustion. To avoid exhaustion, UDP sockets will be connected and associated with
   //       a 4-tuple including the local IP, and the UDP port may be reused for multiple
   //       connections unless transparent source binding is configured. A transparent socket is
@@ -570,9 +575,7 @@ void UdpProxyFilter::UdpActiveSession::writeUpstream(Network::UdpRecvData& data)
             tx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_->address()->asStringView());
 
-  Api::IoCallUint64Result rc =
-      Network::Utility::writeToSocket(udp_socket_->ioHandle(), *data.buffer_,
-                                      source_address_policy_.packetSourceIp(), *host_->address());
+  Api::IoCallUint64Result rc = writeUpstreamDatagram(*data.buffer_);
 
   if (!rc.ok()) {
     cluster_->cluster_stats_.sess_tx_errors_.inc();
@@ -589,6 +592,67 @@ void UdpProxyFilter::UdpActiveSession::writeUpstream(Network::UdpRecvData& data)
       }
     }
   }
+}
+
+Api::IoCallUint64Result
+UdpProxyFilter::UdpActiveSession::writeUpstreamDatagram(const Buffer::Instance& buffer) {
+  if (upstream_writer_ == nullptr) {
+    return Network::Utility::writeToSocket(udp_socket_->ioHandle(), buffer,
+                                           source_address_policy_.packetSourceIp(),
+                                           *host_->address());
+  }
+  if (upstream_writer_->isWriteBlocked()) {
+    return {0, Network::IoSocketError::getIoSocketEagainError()};
+  }
+
+  auto result = upstream_writer_->writePacket(buffer, source_address_policy_.packetSourceIp(),
+                                              *host_->address());
+  updateUpstreamWriter(result);
+  if (upstream_writer_ != nullptr && !upstream_writer_->isWriteBlocked() &&
+      upstream_writer_->isBatchMode()) {
+    upstream_flush_cb_->scheduleCallbackCurrentIteration();
+  }
+  return result;
+}
+
+void UdpProxyFilter::UdpActiveSession::updateUpstreamWriter(const Api::IoCallUint64Result& result) {
+  if (!result.ok() && result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+    // A failed batch may still contain data. Discard it before resuming ordinary sends.
+    upstream_flush_cb_->cancel();
+    upstream_writer_.reset();
+  } else if (upstream_writer_->isWriteBlocked()) {
+    upstream_flush_cb_->cancel();
+    udp_socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read |
+                                             Event::FileReadyType::Write);
+  }
+}
+
+void UdpProxyFilter::UdpActiveSession::flushUpstream() {
+  if (upstream_writer_ == nullptr) {
+    return;
+  }
+  upstream_flush_cb_->cancel();
+  if (upstream_writer_->isWriteBlocked()) {
+    return;
+  }
+  const auto result = upstream_writer_->flush();
+  updateUpstreamWriter(result);
+  if (upstream_writer_ == nullptr) {
+    cluster_->cluster_stats_.sess_tx_errors_.inc();
+  }
+}
+
+void UdpProxyFilter::UdpActiveSession::onSessionComplete() {
+  if (upstream_flush_cb_ != nullptr) {
+    // Session filters can retain the session beyond cluster removal. Release callbacks and the
+    // writer while their socket, dispatcher and statistics scope are still alive.
+    flushUpstream();
+    upstream_flush_cb_->cancel();
+    upstream_flush_cb_.reset();
+    udp_socket_->ioHandle().resetFileEvents();
+    upstream_writer_.reset();
+  }
+  ActiveSession::onSessionComplete();
 }
 
 bool UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filter) {
@@ -657,6 +721,13 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
     source_address_policy_ = Upstream::UdpSourceAddressPolicy::fromUpstreamLocalAddress(
         source_address_selector->getUpstreamLocalAddress(
             host_->address(), /*socket_options=*/nullptr, /*transport_socket_options=*/{}));
+  } else if (filter_.config_->upstreamPacketWriterFactory() != nullptr) {
+    // Allocate a source port before buffering; writable events do not signal port availability.
+    const auto bind_address = host_->address()->ip()->version() == Network::Address::IpVersion::v4
+                                  ? Network::Utility::getIpv4AnyAddress()
+                                  : Network::Utility::getIpv6AnyAddress();
+    source_address_policy_ =
+        Upstream::UdpSourceAddressPolicy::transparent(addresses_.peer_, bind_address);
   }
 
   if (!createUdpSocket(host_)) {
@@ -669,14 +740,21 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
 
 bool UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConstSharedPtr& host) {
   ASSERT(cluster_);
-  // NOTE: The socket call can only fail due to memory/fd exhaustion. A configured local address
-  //       is bound below; otherwise no local ephemeral port is bound until the first packet is
-  //       sent to the upstream host.
+  // NOTE: The socket call can only fail due to memory/fd exhaustion. The source address policy
+  //       binds configured addresses and transparent sockets with a writer below. Other sockets
+  //       acquire a local ephemeral port when connected or first sent on.
   udp_socket_ = filter_.createUdpSocket(host);
   udp_socket_->ioHandle().initializeFileEvent(
       filter_.read_callbacks_->udpListener().dispatcher(),
-      [this](uint32_t) {
-        onReadReady();
+      [this](uint32_t events) {
+        if ((events & Event::FileReadyType::Write) != 0 && upstream_writer_ != nullptr) {
+          udp_socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read);
+          upstream_writer_->setWritable();
+          flushUpstream();
+        }
+        if ((events & Event::FileReadyType::Read) != 0) {
+          onReadReady();
+        }
         return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
@@ -704,6 +782,14 @@ bool UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConst
   if (source_address_policy_.mode() == Upstream::UdpSourceAddressPolicy::Mode::Transparent) {
     ENVOY_LOG(debug, "The original src is enabled for address {}.",
               addresses_.peer_->asStringView());
+  }
+
+  if (auto* factory = filter_.config_->upstreamPacketWriterFactory()) {
+    auto& dispatcher = filter_.read_callbacks_->udpListener().dispatcher();
+    upstream_flush_cb_ = dispatcher.createSchedulableCallback([this] { flushUpstream(); });
+    upstream_writer_ = factory->createUdpPacketWriter(
+        udp_socket_->ioHandle(), *cluster_->upstream_writer_scope_, dispatcher,
+        [this] { udp_socket_->ioHandle().activateFileEvents(Event::FileReadyType::Write); });
   }
 
   // TODO(mattklein123): Enable dropped packets socket option. In general the Socket abstraction

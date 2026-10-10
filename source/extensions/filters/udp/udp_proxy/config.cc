@@ -1,5 +1,7 @@
 #include "source/extensions/filters/udp/udp_proxy/config.h"
 
+#include "envoy/network/udp_packet_writer_factory_factory.h"
+
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/formatter/substitution_format_string.h"
 
@@ -144,6 +146,16 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
     throw EnvoyException(
         "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
         "is not running with the CAP_NET_ADMIN capability.");
+  }
+
+  if (config.has_upstream_packet_writer_config()) {
+    if (config.has_tunneling_config()) {
+      throw EnvoyException("upstream_packet_writer_config cannot be used with tunneling_config.");
+    }
+    auto& factory = Config::Utility::getAndCheckFactory<Network::UdpPacketWriterFactoryFactory>(
+        config.upstream_packet_writer_config());
+    upstream_packet_writer_factory_ =
+        factory.createUdpPacketWriterFactory(config.upstream_packet_writer_config(), context);
   }
 
   session_access_logs_.reserve(config.access_log_size());
