@@ -933,7 +933,7 @@ private:
       return socket_->connectionInfoProvider().localAddress();
     }
     Network::SocketSharedPtr getListenSocket(uint32_t) override { return socket_; }
-    Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
+    Network::ListenSocketFactoryPtr clone(uint32_t) const override { return nullptr; }
     void closeAllSockets() override {}
     absl::Status doFinalPreWorkerInit() override;
 
