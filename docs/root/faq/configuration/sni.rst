@@ -13,60 +13,12 @@ configuration/API <config_overview>`.
 
 The following is a YAML example of the above requirement.
 
-.. code-block:: yaml
-
-  address:
-    socket_address: { address: 127.0.0.1, port_value: 1234 }
-  listener_filters:
-  - name: "envoy.filters.listener.tls_inspector"
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
-  filter_chains:
-  - filter_chain_match:
-      server_names: ["example.com", "www.example.com"]
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-        common_tls_context:
-          tls_certificates:
-          - certificate_chain: { filename: "example_com_cert.pem" }
-            private_key: { filename: "example_com_key.pem" }
-    filters:
-    - name: envoy.filters.network.http_connection_manager
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-        stat_prefix: ingress_http
-        route_config:
-          virtual_hosts:
-          - name: default
-            domains: "*"
-            routes:
-            - match: { prefix: "/" }
-              route: { cluster: service_foo }
-  - filter_chain_match:
-      server_names: "api.example.com"
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-        common_tls_context:
-          tls_certificates:
-          - certificate_chain: { filename: "api_example_com_cert.pem" }
-            private_key: { filename: "api_example_com_key.pem" }
-    filters:
-    - name: envoy.filters.network.http_connection_manager
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-        stat_prefix: ingress_http
-        route_config:
-          virtual_hosts:
-          - name: default
-            domains: "*"
-            routes:
-            - match: { prefix: "/" }
-              route: { cluster: service_foo }
-
+.. literalinclude:: _include/sni-routing.yaml
+    :language: yaml
+    :lines: 2-67
+    :lineno-start: 2
+    :linenos:
+    :caption: :download:`sni-routing.yaml <_include/sni-routing.yaml>`
 
 How do I configure SNI for clusters?
 ====================================
