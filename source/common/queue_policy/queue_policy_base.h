@@ -37,8 +37,9 @@ public:
   virtual const ItemType& peek() const PURE;
   virtual ItemType& peek() PURE;
 
-  // Removes the next item from the queue without destroying it.
-  virtual void pop() PURE;
+  // Removes and returns the next item from the queue without destroying it. The caller retains
+  // ownership of the returned item.
+  virtual ItemType& pop() PURE;
 
   // Removes a specific item from the queue without destroying it.
   virtual void remove(ItemType& item) PURE;
