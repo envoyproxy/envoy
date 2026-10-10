@@ -56,6 +56,7 @@ envoy_cc_test(
     deps = [
         ":tcp_proxy_test_base",
         "//envoy/common:hashable_interface",
+        "//source/common/upstream:od_cds_api_lib",
     ],
 )
 
