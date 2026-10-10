@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "test/integration/http_integration.h"
@@ -42,6 +43,8 @@ public:
 protected:
   void addStringMatcher(envoy::type::matcher::v3::StringMatcher const& matcher);
   bool allow_expired_cert_{};
+  void testClientCertificateRequired(bool allow_optional_client_certificate);
+  std::optional<bool> require_client_certificate_{false};
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr}; // server config
   envoy::config::core::v3::TypedExtensionConfig* client_validator_config_{nullptr};
   std::unique_ptr<ContextManager> context_manager_;

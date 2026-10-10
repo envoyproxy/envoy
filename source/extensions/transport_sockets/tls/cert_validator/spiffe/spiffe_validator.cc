@@ -156,6 +156,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
                                ProtobufMessage::getStrictValidationVisitor(), message),
                            creation_status);
 
+  allow_optional_client_certificate_ = message.allow_optional_client_certificate();
+
   if (!config->subjectAltNameMatchers().empty()) {
     for (const auto& matcher : config->subjectAltNameMatchers()) {
       if (matcher.san_type() ==
@@ -247,7 +249,12 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   initializeCertExpirationStats(scope, config->caCertName());
 }
 
-absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
+absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool require_client_cert) {
+  require_client_certificate_ = !allow_optional_client_certificate_ || require_client_cert;
+  if (!require_client_certificate_) {
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
+  }
+
   // When suppressed, CAs are still used for validation (loaded via the trust bundle
   // in initializeSslContexts) but their names are not advertised in the TLS
   // CertificateRequest. Skip building the name stack entirely — this is the common
@@ -297,6 +304,16 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
   if (suppress_client_ca_list_) {
     bool suppress = true;
     rc = EVP_DigestUpdate(md.get(), &suppress, sizeof(suppress));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+  }
+  // Hash the effective requirement so anonymous sessions cannot resume where certificates are
+  // required. Keep the digest unchanged for existing deployments that have not opted in.
+  if (allow_optional_client_certificate_) {
+    constexpr absl::string_view option = "allow_optional_client_certificate";
+    rc = EVP_DigestUpdate(md.get(), option.data(), option.size());
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    rc = EVP_DigestUpdate(md.get(), &require_client_certificate_,
+                          sizeof(require_client_certificate_));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 }
