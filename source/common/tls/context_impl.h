@@ -126,6 +126,7 @@ public:
   void logHandshake(SSL* ssl) const;
 
   SslStats& stats() { return stats_; }
+  uint32_t readAheadBufferSize() const { return read_ahead_buffer_size_; }
 
   /**
    * The global SSL-library index used for storing a pointer to the SslExtendedSocketInfo
@@ -206,6 +207,7 @@ protected:
   std::string cert_chain_file_path_;
   Server::Configuration::CommonFactoryContext& factory_context_;
   const unsigned tls_max_version_;
+  const uint32_t read_ahead_buffer_size_;
   // Server-wide shared TLS stat name builtins, kept alive for this context's lifetime.
   const std::shared_ptr<TlsBuiltinStatNames> builtin_stat_names_;
   const Ssl::HandshakerCapabilities capabilities_;
