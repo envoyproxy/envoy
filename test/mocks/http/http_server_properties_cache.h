@@ -35,6 +35,8 @@ public:
   MOCK_METHOD(HttpServerPropertiesCacheSharedPtr, getCache,
               (const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
                Event::Dispatcher& dispatcher));
+  MOCK_METHOD(absl::Status, validateOptions,
+              (const envoy::config::core::v3::AlternateProtocolsCacheOptions& config));
   MOCK_METHOD(void, forEachThreadLocalCache, (HttpServerPropertiesCacheManager::CacheFn));
 };
 
