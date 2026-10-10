@@ -132,8 +132,8 @@ TEST(NetworkExtProcConfigFactoryTest, MissingGrpcService) {
                             EnvoyException, "A grpc_service must be configured");
 }
 
-// Test the config with both SKIP modes.
-TEST(NetworkExtProcConfigFactoryTest, BothModesSkipped) {
+// Test the config with all modes skipped.
+TEST(NetworkExtProcConfigFactoryTest, AllModesSkipped) {
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
   proto_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
   proto_config.set_stat_prefix("test_ext_proc");
@@ -143,13 +143,35 @@ TEST(NetworkExtProcConfigFactoryTest, BothModesSkipped) {
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
   processing_mode->set_process_write(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+  processing_mode->set_process_new_connection(
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::NONE);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   NetworkExtProcConfigFactory factory;
 
-  EXPECT_THROW_WITH_MESSAGE(auto cb = factory.createFilterFactoryFromProto(proto_config, context),
-                            EnvoyException,
-                            "both read and write paths are skipped, at least one must be enabled.");
+  EXPECT_THROW_WITH_MESSAGE(
+      auto cb = factory.createFilterFactoryFromProto(proto_config, context), EnvoyException,
+      "read, write and new_connection paths are all skipped, at least one must be enabled.");
+}
+
+// Test when only process_new_connection is SEND and read/write are SKIP.
+TEST(NetworkExtProcConfigFactoryTest, OnlyNewConnectionEnabled) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
+  proto_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  proto_config.set_stat_prefix("test_ext_proc");
+
+  auto* processing_mode = proto_config.mutable_processing_mode();
+  processing_mode->set_process_read(
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+  processing_mode->set_process_write(
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+  processing_mode->set_process_new_connection(
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NetworkExtProcConfigFactory factory;
+
+  EXPECT_NO_THROW(auto cb = factory.createFilterFactoryFromProto(proto_config, context));
 }
 
 // Test the configs with default processing modes.
