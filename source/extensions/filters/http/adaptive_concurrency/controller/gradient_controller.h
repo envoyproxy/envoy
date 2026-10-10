@@ -101,7 +101,15 @@ public:
   std::chrono::milliseconds fixedValue() const { return fixed_value_; }
 
   // True if minRTT is sampled.
-  bool isMinRTTSamplingEnabled() const { return fixedValue() <= std::chrono::milliseconds::zero(); }
+  bool isMinRTTSamplingEnabled() const {
+    return !ewmaEnabled() && fixedValue() <= std::chrono::milliseconds::zero();
+  }
+
+  bool ewmaEnabled() const { return ewma_enabled_; }
+  std::chrono::microseconds ewmaHalfLife() const { return ewma_half_life_; }
+  uint32_t ewmaWarmupWindows() const { return ewma_warmup_windows_; }
+  uint32_t ewmaInitialConcurrency() const { return ewma_initial_concurrency_; }
+  std::chrono::microseconds minLatencyDelta() const { return min_latency_delta_; }
 
   // The percentage is normalized to the range [0.0, 1.0].
   double minRTTBufferPercent() const {
@@ -168,6 +176,12 @@ private:
 
   // The amount added to the measured minRTT as a hedge against natural variability in latency.
   const double min_rtt_buffer_pct_;
+
+  const std::chrono::microseconds min_latency_delta_;
+  const bool ewma_enabled_;
+  const std::chrono::microseconds ewma_half_life_;
+  const uint32_t ewma_warmup_windows_;
+  const uint32_t ewma_initial_concurrency_;
 };
 using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConfig>;
 
@@ -178,6 +192,11 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  *
  * This is used to control the allowed request concurrency limit in the adaptive concurrency control
  * filter.
+ *
+ * The default LEGACY mode uses the minRTT sampling windows described below. Optional EWMA mode
+ * instead compares the mean latency of each nonempty sample window with a continuously learned
+ * baseline, inspired by Netflix Gradient2Limit. It never enters a minRTT measurement window. Both
+ * modes use the greater of the relative and optional absolute latency buffers in the numerator.
  *
  * The algorithm:
  * ==============
@@ -263,6 +282,7 @@ private:
   uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void enterMinRTTSamplingWindow();
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  void resetEwmaWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void updateConcurrencyLimit(const uint32_t new_limit)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   std::chrono::milliseconds applyJitter(std::chrono::milliseconds interval,
@@ -287,6 +307,13 @@ private:
   // Stores the expected upstream latency value under ideal conditions with the added buffer to
   // account for variable latencies. This is the numerator in the gradient value.
   std::chrono::nanoseconds min_rtt_;
+
+  // Window means give each nonempty window equal weight regardless of request volume.
+  double ewma_window_mean_us_ ABSL_GUARDED_BY(sample_mutation_mtx_) = 0;
+  uint64_t ewma_window_count_ ABSL_GUARDED_BY(sample_mutation_mtx_) = 0;
+  double ewma_baseline_ns_ ABSL_GUARDED_BY(sample_mutation_mtx_) = 0;
+  uint32_t ewma_warmup_count_ ABSL_GUARDED_BY(sample_mutation_mtx_) = 0;
+  MonotonicTime ewma_window_start_ ABSL_GUARDED_BY(sample_mutation_mtx_);
 
   // Stores the aggregated sampled latencies for use in the gradient calculation.
   std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(sample_mutation_mtx_);
