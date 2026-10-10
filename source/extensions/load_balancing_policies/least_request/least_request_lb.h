@@ -14,9 +14,10 @@ namespace Upstream {
  * is based on http://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf and is known as P2C
  * (power of two choices).
  *
- * When hosts have different weights, an RR EDF schedule is used. Host weight is scaled
- * by the number of active requests at pick/insert time. Thus, hosts will never fully drain as
- * they would in normal P2C, though they will get picked less and less often. In the future, we
+ * When hosts have different weights, or when `active_request_bias` is explicitly configured, an RR
+ * EDF schedule is used. Host weight is scaled by the number of active requests at pick/insert
+ * time. Thus, hosts will never fully drain as they would in normal P2C, though they will get
+ * picked less and less often. In the future, we
  * can consider two alternate algorithms:
  * 1) Expand out all hosts by weight (using more memory) and do standard P2C.
  * 2) Use a weighted Maglev table, and perform P2C on two random hosts selected from the table.
@@ -61,12 +62,18 @@ protected:
     count_pending_requests_ = Runtime::runtimeFeatureEnabled(
         "envoy.reloadable_features.least_request_lb_count_pending_requests");
 
+    always_use_weighted_selection_ =
+        active_request_bias_runtime_ != std::nullopt &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.least_request_lb_active_request_bias_forces_weighted");
+
     EdfLoadBalancerBase::refresh(priority);
   }
 
 private:
   void refreshHostSource(const HostsSource&) override {}
   double hostWeight(const Host& host) const override;
+  bool alwaysUseWeightedSelection() const override { return always_use_weighted_selection_; }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
@@ -86,6 +93,12 @@ private:
   // consistency reasons and refreshed in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
   // whenever a `HostSet` is updated.
   bool count_pending_requests_{};
+
+  // Whether to use weighted selection even when all host weights are equal. True when
+  // `active_request_bias` is explicitly configured. Cached for performance and consistency reasons
+  // and refreshed in `LeastRequestLoadBalancer::refresh(uint32_t priority)` whenever a `HostSet`
+  // is updated.
+  bool always_use_weighted_selection_{};
 
   const std::optional<Runtime::Double> active_request_bias_runtime_;
   const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod
