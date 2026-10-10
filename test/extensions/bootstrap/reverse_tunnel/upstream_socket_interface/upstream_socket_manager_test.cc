@@ -871,6 +871,9 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseValidResponse) {
       .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(ping_response);
         return Api::IoCallUint64Result{ping_response.size(), Api::IoError::none()};
+      })
+      .WillRepeatedly([](Buffer::Instance&, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
       });
 
   socket_manager_->onPingResponse(*mock_io_handle);
@@ -879,11 +882,35 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseValidResponse) {
   EXPECT_TRUE(verifyFDToClusterMap(123));
 }
 
+// A would-block read is a spurious edge-triggered wake. The tunnel is kept rather than closed.
+TEST_F(TestUpstreamSocketManager, OnPingResponseSpuriousWakeDoesNotClose) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::milliseconds ping_interval(30000);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+
+  EXPECT_CALL(*mock_io_handle, read(_, _))
+      .WillRepeatedly([](Buffer::Instance&, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      });
+
+  socket_manager_->onPingResponse(*mock_io_handle);
+
+  EXPECT_TRUE(verifyFDToNodeMap(123));
+  EXPECT_TRUE(verifyFDToClusterMap(123));
+}
+
+// A hard read error closes the tunnel.
 TEST_F(TestUpstreamSocketManager, OnPingResponseReadError) {
   auto socket = createMockSocket(123);
   const std::string node_id = "test-node";
   const std::string cluster_id = "test-cluster";
-  const std::chrono::seconds ping_interval(30);
+  const std::chrono::milliseconds ping_interval(30000);
 
   socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
 
@@ -892,7 +919,7 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseReadError) {
 
   EXPECT_CALL(*mock_io_handle, read(_, _))
       .WillOnce(
-          Return(Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()}));
+          Return(Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEbadfError()}));
 
   socket_manager_->onPingResponse(*mock_io_handle);
 
@@ -931,23 +958,221 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseInvalidData) {
   auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
   EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
 
-  const std::string invalid_response = "INVALID_DATA";
+  const std::string invalid_response = "HELLO";
   EXPECT_CALL(*mock_io_handle, read(_, _))
       .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(invalid_response);
         return Api::IoCallUint64Result{invalid_response.size(), Api::IoError::none()};
       });
 
-  // First invalid response should increment miss count but not immediately remove the fd.
+  // A non-RPING byte on an idle keepalive socket closes the tunnel immediately rather than leaking
+  // into the client codec.
+  socket_manager_->onPingResponse(*mock_io_handle);
+  EXPECT_FALSE(verifyFDToNodeMap(123));
+  EXPECT_FALSE(verifyFDToClusterMap(123));
+}
+
+// A partial write of the five byte keepalive cannot be retried, so the tunnel is closed.
+TEST_F(TestUpstreamSocketManager, SendPingForConnectionPartialWriteCloses) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::milliseconds ping_interval(30000);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+
+  auto& sockets = getSocketsForNode(node_id);
+  auto* mock_io_handle =
+      dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets.front()->ioHandle());
+  EXPECT_CALL(*mock_io_handle, write(_))
+      .WillOnce(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        buffer.drain(3);
+        return Api::IoCallUint64Result{3, Api::IoError::none()};
+      }));
+
+  socket_manager_->sendPingForConnection(123);
+
+  EXPECT_FALSE(verifyFDToNodeMap(123));
+  EXPECT_FALSE(verifyFDToClusterMap(123));
+}
+
+// Coalesced echoes delivered in one edge-triggered wake are all drained and the tunnel stays open.
+TEST_F(TestUpstreamSocketManager, OnPingResponseDrainsCoalescedEchoes) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::milliseconds ping_interval(30000);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+  EXPECT_CALL(*mock_io_handle, read(_, _))
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        buffer.add("RPING");
+        return Api::IoCallUint64Result{5, Api::IoError::none()};
+      })
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        buffer.add("RPING");
+        return Api::IoCallUint64Result{5, Api::IoError::none()};
+      })
+      .WillRepeatedly([](Buffer::Instance&, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      });
+
+  socket_manager_->onPingResponse(*mock_io_handle);
+
+  EXPECT_TRUE(verifyFDToNodeMap(123));
+  EXPECT_TRUE(verifyFDToClusterMap(123));
+}
+
+// A split echo is retained in the scratch across wakes and completes on the next wake.
+TEST_F(TestUpstreamSocketManager, OnPingResponseRetainsSplitEcho) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::milliseconds ping_interval(30000);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+
+  // First wake delivers a partial echo. It is retained and the tunnel stays open.
+  EXPECT_CALL(*mock_io_handle, read(_, _))
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        buffer.add("RPI");
+        return Api::IoCallUint64Result{3, Api::IoError::none()};
+      })
+      .WillRepeatedly([](Buffer::Instance&, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      });
+  socket_manager_->onPingResponse(*mock_io_handle);
+  EXPECT_TRUE(verifyFDToNodeMap(123));
+
+  // Second wake delivers the rest. The echo completes and the tunnel stays open.
+  EXPECT_CALL(*mock_io_handle, read(_, _))
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        buffer.add("NG");
+        return Api::IoCallUint64Result{2, Api::IoError::none()};
+      })
+      .WillRepeatedly([](Buffer::Instance&, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      });
   socket_manager_->onPingResponse(*mock_io_handle);
   EXPECT_TRUE(verifyFDToNodeMap(123));
   EXPECT_TRUE(verifyFDToClusterMap(123));
+}
 
-  // Simulate two more timeouts to cross the default threshold (3).
-  socket_manager_->onPingTimeout(123);
-  socket_manager_->onPingTimeout(123);
+// A sub-RPING-length non-RPING prefix is closed rather than retained in the scratch and seeded into
+// the client codec at checkout.
+TEST_F(TestUpstreamSocketManager, OnPingResponseClosesOnNonRpingPartial) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::milliseconds ping_interval(30000);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+  EXPECT_CALL(*mock_io_handle, read(_, _))
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        buffer.add("XY");
+        return Api::IoCallUint64Result{2, Api::IoError::none()};
+      })
+      .WillRepeatedly([](Buffer::Instance&, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      });
+
+  socket_manager_->onPingResponse(*mock_io_handle);
   EXPECT_FALSE(verifyFDToNodeMap(123));
   EXPECT_FALSE(verifyFDToClusterMap(123));
+}
+
+// A keepalive flood is bounded by the per-wake byte cap and closed with the distinct flood reason,
+// rather than draining indefinitely and spinning the worker.
+TEST_F(TestUpstreamSocketManager, OnPingResponseClosesOnKeepaliveFlood) {
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::milliseconds ping_interval(30000);
+
+  // Expect tunnel_setup on add.
+  EXPECT_CALL(*access_log, log(_, _)).Times(1).RetiresOnSaturation();
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+
+  // A RPING-aligned 1020-byte chunk returned on every read keeps the socket readable with no
+  // EAGAIN, so only the per-wake byte cap can terminate the drain.
+  std::string flood_chunk;
+  for (int i = 0; i < 204; i++) {
+    flood_chunk += "RPING";
+  }
+  int read_count = 0;
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+  EXPECT_CALL(*mock_io_handle, read(_, _))
+      .WillRepeatedly(
+          [&read_count, flood_chunk](Buffer::Instance& buffer,
+                                     std::optional<uint64_t>) -> Api::IoCallUint64Result {
+            ++read_count;
+            buffer.add(flood_chunk);
+            return Api::IoCallUint64Result{flood_chunk.size(), Api::IoError::none()};
+          });
+
+  // The tunnel closes with the distinct flood reason, so a flood is alert-able apart from a single
+  // stray non-RPING byte.
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_THAT(metadata.fields(),
+                    IsSupersetOf(StructMatchers(
+                        IsStructString("event", std::string(kLifecycleEventTunnelClosed)),
+                        IsStructString("close_reason",
+                                       std::string(kLifecycleCloseReasonIdleKeepaliveFlood)))));
+      }));
+
+  socket_manager_->onPingResponse(*mock_io_handle);
+
+  // The drain is bounded by the 64KB per-wake cap (64 * 1024 / 1020 rounds up to 65 reads), not
+  // unbounded.
+  EXPECT_LE(read_count, 65);
+  EXPECT_GT(read_count, 0);
+  EXPECT_FALSE(verifyFDToNodeMap(123));
+  EXPECT_FALSE(verifyFDToClusterMap(123));
+  extension_->setTestOnlyAccessLogs({});
+}
+
+// A partial echo retained while idle is handed to the caller at checkout so the new handle can
+// strip the completing bytes.
+TEST_F(TestUpstreamSocketManager, GetConnectionSocketReturnsRetainedPingPrefix) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::milliseconds ping_interval(30000);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+  EXPECT_CALL(*mock_io_handle, read(_, _))
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        buffer.add("RPI");
+        return Api::IoCallUint64Result{3, Api::IoError::none()};
+      })
+      .WillRepeatedly([](Buffer::Instance&, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      });
+  socket_manager_->onPingResponse(*mock_io_handle);
+
+  std::string retained_ping_prefix;
+  auto checked_out = socket_manager_->getConnectionSocket(node_id, &retained_ping_prefix);
+  EXPECT_NE(checked_out, nullptr);
+  EXPECT_EQ(retained_ping_prefix, "RPI");
 }
 
 TEST_F(TestUpstreamSocketManager, NodeToActiveFdCountTracking) {
@@ -2014,6 +2239,9 @@ TEST_F(TestUpstreamSocketManager, PingAckEmitsIdlePingAckEvent) {
       .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(ping_response);
         return Api::IoCallUint64Result{ping_response.size(), Api::IoError::none()};
+      })
+      .WillRepeatedly([](Buffer::Instance&, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
       });
 
   EXPECT_CALL(*access_log, log(_, _))
