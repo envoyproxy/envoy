@@ -1735,9 +1735,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
       *request_headers_, *connection_manager_.config_, localPort());
   if (optional_port.has_value() &&
       requestWasConnect(request_headers_, connection_manager_.codec_->protocol())) {
-    filter_manager_.streamInfo().filterState()->setData(
-        Router::OriginalConnectPort::key(),
-        std::make_unique<Router::OriginalConnectPort>(optional_port.value()),
+    filter_manager_.streamInfo().filterState()->setIndexedData(
+        StreamInfo::FilterStateIndex::OriginalConnectPort, Router::OriginalConnectPort::key(),
+        std::make_shared<Router::OriginalConnectPort>(optional_port.value()),
         StreamInfo::FilterState::LifeSpan::Request);
   }
 
