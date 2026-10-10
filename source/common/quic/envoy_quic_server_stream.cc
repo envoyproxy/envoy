@@ -128,7 +128,7 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     // before FIN or RESET received, it resets the steam with QUIC_STREAM_NO_ERROR.
     StopReading();
   } else {
-    Reset(envoyResetReasonToQuicRstError(reason));
+    maybeReliableReset(envoyResetReasonToQuicRstError(reason));
   }
   // Run reset callbacks once because HCM calls resetStream() without tearing
   // down its own ActiveStream. It might be no-op if it has been called already
