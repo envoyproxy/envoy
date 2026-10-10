@@ -82,6 +82,13 @@ envoy.access_loggers.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.access_loggers.wasm.v3.WasmAccessLog
+envoy.ai_protocol_manager.external_buffer.in_memory:
+  categories:
+  - envoy.ai_protocol_manager.external_buffer
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.ai_protocol_manager.external_buffer.in_memory.v3.InMemory
 envoy.bootstrap.internal_listener:
   categories:
   - envoy.bootstrap

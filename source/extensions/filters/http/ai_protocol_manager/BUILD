@@ -22,14 +22,18 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "external_buffer_impl_lib",
     srcs = ["external_buffer_impl.cc"],
     hdrs = ["external_buffer_impl.h"],
     deps = [
         ":external_buffer_interface",
+        "//envoy/registry",
+        "//envoy/server:factory_context_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/extensions/ai_protocol_manager/external_buffer/in_memory/v3:pkg_cc_proto",
     ],
 )
 
@@ -463,9 +467,11 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":external_buffer_impl_lib",
+        ":external_buffer_interface",
         ":filter_lib",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@abseil-cpp//absl/status",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
     ],
 )
