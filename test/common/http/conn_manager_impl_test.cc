@@ -4799,6 +4799,13 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
 TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainCloseViaConnectionDrain) {
   setup(SetupOpts().setTracing(false));
 
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(Http::okStatus()));
+  Buffer::OwnedImpl empty_input;
+  conn_manager_->onData(empty_input, false);
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*codec_, shutdownNotice());
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
   EXPECT_CALL(drain_close_, drainClose(_)).Times(0);
   filter_callbacks_.connection_.raiseConnectionDrain(
       Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
@@ -4856,6 +4863,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainCloseViaConnectionDrain) {
 
   EXPECT_CALL(*filter, onStreamComplete());
   EXPECT_CALL(*filter, onDestroy());
+  EXPECT_CALL(*drain_timer, disableTimer());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -4961,8 +4969,15 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
 // not be consulted).
 TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithCloseViaConnectionDrain) {
   setup();
-  // Notify of drain before the request/response so the drain-close decision uses the connection
-  // event. Declared outside the sequence below since the notification is not an ordered mock call.
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(Http::okStatus()));
+  Buffer::OwnedImpl empty_input;
+  conn_manager_->onData(empty_input, false);
+
+  // The codec already exists, so the drain event starts the drain sequence before the request.
+  // Keep the notification outside the ordered mock sequence below.
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*codec_, shutdownNotice());
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
   EXPECT_CALL(drain_close_, drainClose(_)).Times(0);
   filter_callbacks_.connection_.raiseConnectionDrain(
       Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
@@ -4987,9 +5002,6 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithCloseViaConnectionDrain)
   conn_manager_->onData(fake_input, false);
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-  EXPECT_CALL(*codec_, shutdownNotice());
-  Event::MockTimer* drain_timer = setUpTimer();
-  EXPECT_CALL(*drain_timer, enableTimer(_, _));
   expectOnDestroy();
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");

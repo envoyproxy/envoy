@@ -686,8 +686,8 @@ private:
   // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
-  // Armed in onDrain() to fire at a random point near the end of the drain sequence, so that a
-  // connection that sent no response in the meantime is still drained before it is torn down.
+  Event::TimerPtr drain_no_codec_close_timer_;
+  // Armed for active streams that may not send another response before the drain window ends.
   Event::TimerPtr proactive_drain_timer_;
   // Set once proactive_drain_timer_ has fired. From then on tunneling streams are reset as soon as
   // the connection is closing, see resetTunnelingStreams().
@@ -714,6 +714,7 @@ private:
   TimeSource& time_source_;
   bool go_away_sent_{false};
   bool remote_close_{};
+  bool connection_close_started_{};
   // Hop by hop headers should always be cleared for Envoy-as-a-proxy but will
   // not be for Envoy-mobile.
   bool clear_hop_by_hop_response_headers_{true};

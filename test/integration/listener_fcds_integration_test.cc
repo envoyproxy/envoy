@@ -812,8 +812,9 @@ TEST_P(ListenerFcdsIntegrationTest, LdsRemovalWithSharedFcds) {
   // Use HTTP2 to test GOAWAY behavior.
   downstream_protocol_ = Http::CodecType::HTTP2;
 
-  // Set a very short drain time so the test doesn't take long.
-  setDrainTime(std::chrono::seconds(2));
+  // Drain deterministically on the first response after listener removal.
+  setDrainTime(std::chrono::seconds(5));
+  drain_strategy_ = Server::DrainStrategy::Immediate;
 
   two_listeners_ = true;
   on_server_init_function_ = [&]() {
@@ -860,16 +861,13 @@ TEST_P(ListenerFcdsIntegrationTest, LdsRemovalWithSharedFcds) {
   // So only Listener A goes to draining.
   test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(1));
 
-  // Make a second request on Listener A's connection.
-  // Without the fix, this request should succeed and we should NOT see GOAWAY
-  // because the FCDS filter chain's shared context is not set to draining.
+  // Listener A is draining: its existing connection can complete the response, but receives GOAWAY.
   IntegrationStreamDecoderPtr response_a2 = codec_client_a->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response_a2->waitForEndStream());
   EXPECT_EQ("200", response_a2->headers().getStatusValue());
-  EXPECT_FALSE(codec_client_a->sawGoAway());
+  EXPECT_TRUE(codec_client_a->sawGoAway());
 
-  // Eventually, after 2s drain timeout, the listener is destroyed and connection is closed.
-  // We wait up to 10s to be safe.
+  // The removed listener's connection eventually closes.
   ASSERT_TRUE(codec_client_a->waitForDisconnect(std::chrono::seconds(10)));
 
   // Make a second request on Listener B's connection.
