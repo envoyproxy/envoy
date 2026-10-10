@@ -886,6 +886,15 @@ public:
     if (!typed_after.has_value() || *typed_after != "typed_value") {
       std::abort();
     }
+    if (!handle_.setFilterStateValue("shared_filter_state_key", "shared_filter_state_value",
+                                     FilterStateLifeSpan::Connection,
+                                     FilterStateStreamSharing::SharedWithUpstreamConnection)) {
+      std::abort();
+    }
+    if (auto val = handle_.getFilterState("shared_filter_state_key");
+        !val || *val != "shared_filter_state_value") {
+      std::abort();
+    }
     testFilterState("req_header_key", "req_header_value");
     return HeadersStatus::Continue;
   }

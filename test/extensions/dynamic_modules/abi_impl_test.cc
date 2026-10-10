@@ -2001,6 +2001,10 @@ WEAK_STUB(HttpGetMetadataNamespaces,
 WEAK_STUB(HttpSetFilterStateBytes,
           envoy_dynamic_module_callback_http_set_filter_state_bytes(nullptr, {nullptr, 0},
                                                                     {nullptr, 0}))
+WEAK_STUB(HttpSetFilterStateValue, envoy_dynamic_module_callback_http_set_filter_state_value(
+                                       nullptr, {nullptr, 0}, {nullptr, 0},
+                                       envoy_dynamic_module_type_filter_state_life_span_FilterChain,
+                                       envoy_dynamic_module_type_filter_state_stream_sharing_None))
 WEAK_STUB(HttpGetFilterStateBytes,
           envoy_dynamic_module_callback_http_get_filter_state_bytes(nullptr, {nullptr, 0}, nullptr))
 WEAK_STUB(HttpSetFilterStateTyped,

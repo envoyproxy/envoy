@@ -1244,6 +1244,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
     let filter_state = envoy_filter.get_filter_state_bytes(b"req_header_key");
     assert!(filter_state.is_some());
     assert_eq!(filter_state.unwrap().as_slice(), b"req_header_value");
+    let ok = envoy_filter.set_filter_state_value(
+      b"shared_filter_state_key",
+      b"shared_filter_state_value",
+      abi::envoy_dynamic_module_type_filter_state_life_span::Connection,
+      abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection,
+    );
+    assert!(ok);
+    let shared_state = envoy_filter.get_filter_state_bytes(b"shared_filter_state_key");
+    assert!(shared_state.is_some());
+    assert_eq!(
+      shared_state.unwrap().as_slice(),
+      b"shared_filter_state_value"
+    );
     let filter_state = envoy_filter.get_filter_state_bytes(b"key");
     assert!(filter_state.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue

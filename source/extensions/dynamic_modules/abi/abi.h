@@ -2836,6 +2836,35 @@ typedef enum envoy_dynamic_module_type_filter_state_life_span {
   envoy_dynamic_module_type_filter_state_life_span_Connection = 2,
 } envoy_dynamic_module_type_filter_state_life_span;
 
+// Upstream connection sharing options for a filter state entry. Mirrors
+// StreamInfo::StreamSharingMayImpactPooling.
+typedef enum envoy_dynamic_module_type_filter_state_stream_sharing {
+  envoy_dynamic_module_type_filter_state_stream_sharing_None = 0,
+  envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnection = 1,
+  envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnectionOnce = 2,
+} envoy_dynamic_module_type_filter_state_stream_sharing;
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_value is called by the module to set the
+ * bytes value of the filter state with the given key, lifespan, and upstream sharing options. If
+ * the filter state is not accessible, this returns false. If the key does not exist, it will be
+ * created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param value is the bytes value of the filter state to be set.
+ * @param life_span is the lifespan of the filter state entry.
+ * @param stream_sharing is the upstream connection sharing option of the filter state entry.
+ * @return true if the operation is successful, false otherwise. Different from setting metadata,
+ * this could fail if the same key already exists at a conflicting life_span.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_value(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_filter_state_life_span life_span,
+    envoy_dynamic_module_type_filter_state_stream_sharing stream_sharing);
+
 // OWNERSHIP: module-owned opaque object stored in filter state. Envoy never dereferences it; it
 // calls the supplied destructor exactly once when the entry is destroyed. THREADING: created and
 // accessed on the worker thread owning the stream.
