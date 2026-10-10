@@ -324,6 +324,12 @@ func (p *HeaderCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	// Test remove
 	headers.Remove("new")
 	assertEq(headers.GetOne("new").ToUnsafeString(), "", "new header removed")
+
+	// Test empty values: they must be kept, not treated as a removal.
+	headers.Set("x-empty-set", "")
+	assertEq(len(headers.Get("x-empty-set")), 1, "x-empty-set header count")
+	headers.Add("x-empty-add", "")
+	assertEq(len(headers.Get("x-empty-add")), 1, "x-empty-add header count")
 	return shared.HeadersStatusContinue
 }
 
