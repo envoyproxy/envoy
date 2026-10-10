@@ -3,6 +3,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/on_demand/on_demand_update.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -28,7 +29,8 @@ using StatusHelpers::IsOk;
 class OnDemandFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    auto config = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::rds());
+    auto config =
+        std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::rds(), *store_.rootScope());
     odcds_ = nullptr;
     setupWithConfig(std::move(config));
   }
@@ -37,7 +39,8 @@ public:
     auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
     odcds_ = mock_odcds.get();
     auto config = std::make_shared<OnDemandFilterConfig>(
-        DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)));
+        DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)),
+        *store_.rootScope());
     setupWithConfig(std::move(config));
   }
 
@@ -46,6 +49,7 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
+  Stats::TestUtil::TestStore store_;
   Upstream::MockOdCdsApiHandle* odcds_;
   std::unique_ptr<OnDemandRouteUpdate> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -512,6 +516,41 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRedirectWithI
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+}
+
+TEST_F(OnDemandFilterTest, TestOdCdsStats) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  auto counter = store_.findCounterByString("cluster.fake_cluster.on_demand.cds_rq_total");
+  ASSERT_TRUE(counter.has_value());
+  EXPECT_EQ(1, counter->value());
+  EXPECT_EQ("cluster.fake_cluster.on_demand.cds_rq_total", counter->name());
+
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+  EXPECT_EQ(1, store_.histogramValues("cluster.fake_cluster.on_demand.cds_rq_time", false).size());
+}
+
+TEST_F(OnDemandFilterTest, TestOdCdsStatsAfterDestroy) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  auto counter = store_.findCounterByString("cluster.fake_cluster.on_demand.cds_rq_total");
+  ASSERT_TRUE(counter.has_value());
+  EXPECT_EQ(1, counter->value());
+  EXPECT_EQ("cluster.fake_cluster.on_demand.cds_rq_total", counter->name());
+
+  filter_->onDestroy();
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+  EXPECT_FALSE(store_.histogramRecordedValues("cluster.fake_cluster.on_demand.cds_rq_time"));
 }
 
 TEST(OnDemandConfigTest, Basic) {
