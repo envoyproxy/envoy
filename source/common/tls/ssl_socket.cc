@@ -1,5 +1,7 @@
 #include "source/common/tls/ssl_socket.h"
 
+#include <algorithm>
+
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
@@ -48,10 +50,8 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx,
                      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options)
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
-      read_ahead_buffer_size_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_io_handle_read_ahead")
-              ? ctx_->readAheadBufferSize()
-              : 0) {}
+      read_ahead_allowed_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_io_handle_read_ahead")) {}
 
 absl::Status SslSocket::initialize(InitialState state,
                                    Ssl::HandshakerFactoryCb handshaker_factory_cb,
@@ -90,11 +90,24 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   SSL_set_ex_data(rawSsl(), ContextImpl::sslSocketIndex(), static_cast<void*>(callbacks_));
 }
 
-SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
+SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice,
+                                                  uint64_t reservation_remaining) {
   ReadResult result;
   uint8_t* mem = static_cast<uint8_t*>(slice.mem_);
   size_t remaining = slice.len_;
   while (remaining > 0) {
+    if (read_ahead_allowed_) {
+      // TLS must authenticate an entire record even when little plaintext space remains.
+      const uint64_t plaintext_length =
+          std::max<uint64_t>(SSL3_RT_MAX_PLAIN_LENGTH, reservation_remaining - result.bytes_read_);
+      const uint64_t records =
+          (plaintext_length + SSL3_RT_MAX_PLAIN_LENGTH - 1) / SSL3_RT_MAX_PLAIN_LENGTH;
+      // Estimate framing for full records. Smaller records and control messages can require
+      // additional refills, and any unread ciphertext survives a smaller reservation.
+      read_ahead_enabled_ = setIoHandleBioReadAheadSize(
+          SSL_get_rbio(rawSsl()),
+          plaintext_length + records * (SSL3_RT_HEADER_LENGTH + SSL3_RT_MAX_ENCRYPTED_OVERHEAD));
+    }
     int rc = SSL_read(rawSsl(), mem, remaining);
     ENVOY_CONN_LOG(trace, "ssl read returns: {}", callbacks_->connection(), rc);
     if (rc > 0) {
@@ -130,7 +143,8 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     uint64_t bytes_read_this_iteration = 0;
     Buffer::Reservation reservation = read_buffer.reserveForRead();
     for (uint64_t i = 0; i < reservation.numSlices(); i++) {
-      auto result = sslReadIntoSlice(reservation.slices()[i]);
+      auto result = sslReadIntoSlice(reservation.slices()[i],
+                                     reservation.length() - bytes_read_this_iteration);
       bytes_read_this_iteration += result.bytes_read_;
       if (result.error_.has_value()) {
         keep_reading = false;
@@ -200,11 +214,6 @@ void SslSocket::resumeHandshake() {
 Network::Connection& SslSocket::connection() const { return callbacks_->connection(); }
 
 void SslSocket::onSuccess(SSL* ssl) {
-  if (read_ahead_buffer_size_ > 0) {
-    // Do not prefetch while certificate selection/verification or private-key work can suspend
-    // the handshake.
-    read_ahead_enabled_ = enableIoHandleBioReadAhead(SSL_get_rbio(ssl), read_ahead_buffer_size_);
-  }
   ctx_->logHandshake(ssl);
   if (callbacks_->connection().streamInfo().upstreamInfo()) {
     callbacks_->connection()

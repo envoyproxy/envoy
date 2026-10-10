@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -18,6 +19,7 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/connection_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
@@ -8231,17 +8233,11 @@ TEST_P(SslSocketTest, AsyncCertSelectionCallbackWhenNotBlocked) {
 
 class SslReadBufferLimitTest : public SslSocketTest {
 protected:
-  void readAheadResumeTest(std::optional<uint32_t> buffer_size, bool runtime_enabled,
-                           bool expect_buffered);
+  void readAheadResumeTest(bool runtime_enabled);
 
-  void initialize(std::optional<uint32_t> read_ahead_buffer_size = std::nullopt) {
+  void initialize() {
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
                               downstream_tls_context_);
-    if (read_ahead_buffer_size.has_value()) {
-      downstream_tls_context_.mutable_common_tls_context()
-          ->mutable_read_ahead_buffer_size()
-          ->set_value(*read_ahead_buffer_size);
-    }
     auto server_cfg =
         *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_, {}, false);
     manager_ = std::make_unique<ContextManagerImpl>(factory_context_.serverFactoryContext());
@@ -8256,11 +8252,6 @@ protected:
                                overload_state, *dispatcher_);
 
     TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
-    if (read_ahead_buffer_size.has_value()) {
-      upstream_tls_context_.mutable_common_tls_context()
-          ->mutable_read_ahead_buffer_size()
-          ->set_value(*read_ahead_buffer_size);
-    }
     auto client_cfg = *ClientContextConfigImpl::create(upstream_tls_context_, factory_context_);
 
     client_ssl_socket_factory_ = *ClientSslSocketFactory::create(std::move(client_cfg), *manager_,
@@ -8276,9 +8267,8 @@ protected:
   }
 
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
-                           uint32_t write_size, uint32_t num_writes, bool reserve_write_space,
-                           std::optional<uint32_t> read_ahead_buffer_size = std::nullopt) {
-    initialize(read_ahead_buffer_size);
+                           uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
+    initialize();
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -8481,24 +8471,149 @@ TEST_P(SslReadBufferLimitTest, SomeLimit) {
   readBufferLimitTest(32 * 1024, 32 * 1024, 256 * 1024, 1, false);
 }
 
-TEST_P(SslReadBufferLimitTest, ReadAheadDefaultDisabled) {
-  readAheadResumeTest(std::nullopt, true, false);
-}
+TEST_P(SslReadBufferLimitTest, ReadAheadRuntimeDisabled) { readAheadResumeTest(false); }
 
-TEST_P(SslReadBufferLimitTest, ReadAheadDisabled) { readAheadResumeTest(0, true, false); }
+TEST_P(SslReadBufferLimitTest, ReadAheadFollowsBufferReservation) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_io_handle_read_ahead", "true"}});
+  initialize();
 
-TEST_P(SslReadBufferLimitTest, CustomReadAheadBufferSize) {
-  readBufferLimitTest(32 * 1024, 32 * 1024, 256 * 1024, 1, false, 128 * 1024);
-}
+  SslSocket* server_transport = nullptr;
+  auto on_unexpected_event = [this](Network::ConnectionEvent event) {
+    ADD_FAILURE() << "Unexpected connection event during handshake: " << static_cast<int>(event);
+    dispatcher_->exit();
+  };
+  EXPECT_CALL(client_callbacks_, onEvent(_)).WillRepeatedly(Invoke(on_unexpected_event));
+  EXPECT_CALL(server_callbacks_, onEvent(_)).WillRepeatedly(Invoke(on_unexpected_event));
+  uint32_t connected = 0;
+  auto on_connected = [&](Network::ConnectionEvent) {
+    if (++connected == 2) {
+      dispatcher_->exit();
+    }
+  };
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke(on_connected));
+  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke(on_connected));
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) {
+        auto transport = server_ssl_socket_factory_->createDownstreamTransportSocket();
+        server_transport = dynamic_cast<SslSocket*>(transport.get());
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), std::move(transport), stream_info_);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+      }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  ASSERT_EQ(2, connected);
+  ASSERT_NE(nullptr, server_transport);
+  server_connection_->readDisable(true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-TEST_P(SslReadBufferLimitTest, ReadAheadRuntimeDisabled) {
-  readAheadResumeTest(64 * 1024, false, false);
+  auto* client_transport = dynamic_cast<SslSocket*>(client_transport_socket_);
+  ASSERT_NE(nullptr, client_transport);
+  auto* server_connection = dynamic_cast<Network::ConnectionImpl*>(server_connection_.get());
+  ASSERT_NE(nullptr, server_connection);
+  BIO* output = BIO_new(BIO_s_mem());
+  ASSERT_NE(nullptr, output);
+  SSL_set0_wbio(client_transport->rawSslForTest(), output);
+  const std::string first_record(SSL3_RT_MAX_PLAIN_LENGTH - 1, 'a');
+  const std::string second_record(SSL3_RT_MAX_PLAIN_LENGTH, 'b');
+  ASSERT_EQ(first_record.size(),
+            SSL_write(client_transport->rawSslForTest(), first_record.data(), first_record.size()));
+  const uint8_t* ciphertext = nullptr;
+  size_t first_ciphertext_length = 0;
+  ASSERT_EQ(1, BIO_mem_contents(output, &ciphertext, &first_ciphertext_length));
+  ASSERT_EQ(second_record.size(), SSL_write(client_transport->rawSslForTest(), second_record.data(),
+                                            second_record.size()));
+  size_t ciphertext_length = 0;
+  ASSERT_EQ(1, BIO_mem_contents(output, &ciphertext, &ciphertext_length));
+
+  StrictMock<Network::MockIoHandle> receiver_io;
+  SSL_set0_rbio(server_transport->rawSslForTest(), BIO_new_io_handle(&receiver_io));
+  Buffer::WatermarkBuffer read_buffer([] {}, [] {}, [] {});
+  auto expect_read_size = [&](uint64_t expected_size) {
+    EXPECT_CALL(receiver_io, readv(expected_size, _, 1))
+        .WillOnce(Invoke([expected_size](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+          EXPECT_EQ(expected_size, slices[0].len_);
+          return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+        }));
+    const uint64_t original_length = read_buffer.length();
+    const auto result = server_transport->doRead(read_buffer);
+    EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
+    EXPECT_FALSE(result.end_stream_read_);
+    EXPECT_EQ(0, result.bytes_processed_);
+    EXPECT_EQ(original_length, read_buffer.length());
+  };
+
+  constexpr uint64_t record_overhead = SSL3_RT_HEADER_LENGTH + SSL3_RT_MAX_ENCRYPTED_OVERHEAD;
+  read_buffer.setWatermarks(64 * 1024);
+  expect_read_size(64 * 1024 + 4 * record_overhead);
+  {
+    auto reservation = read_buffer.reserveForRead();
+    for (uint64_t i = 0; i < reservation.numSlices(); ++i) {
+      auto& slice = reservation.slices()[i];
+      memset(slice.mem_, 'a', slice.len_);
+    }
+    reservation.commit(48 * 1024);
+  }
+  expect_read_size(16 * 1024 + record_overhead);
+  read_buffer.drain(read_buffer.length());
+  read_buffer.setWatermarks(256 * 1024);
+  expect_read_size(128 * 1024 + 8 * record_overhead);
+
+  // The first record leaves one byte in the reservation, but the next record still needs a full
+  // ciphertext read before TLS can authenticate it and return that byte.
+  const uint64_t full_record_read_size = SSL3_RT_MAX_PLAIN_LENGTH + record_overhead;
+  EXPECT_CALL(receiver_io, readv(_, _, 1))
+      .WillOnce(Invoke([&](uint64_t max_length, Buffer::RawSlice* slices, uint64_t) {
+        EXPECT_EQ(full_record_read_size, max_length);
+        EXPECT_EQ(max_length, slices[0].len_);
+        const uint64_t length = std::min<uint64_t>(max_length, first_ciphertext_length);
+        EXPECT_EQ(first_ciphertext_length, length);
+        memcpy(slices[0].mem_, ciphertext, length);
+        return Api::IoCallUint64Result{length, Api::IoError::none()};
+      }))
+      .WillOnce(Invoke([&](uint64_t max_length, Buffer::RawSlice* slices, uint64_t) {
+        EXPECT_EQ(full_record_read_size, max_length);
+        EXPECT_EQ(max_length, slices[0].len_);
+        const uint64_t remaining = ciphertext_length - first_ciphertext_length;
+        const uint64_t length = std::min<uint64_t>(max_length, remaining);
+        EXPECT_EQ(remaining, length);
+        memcpy(slices[0].mem_, ciphertext + first_ciphertext_length, length);
+        return Api::IoCallUint64Result{length, Api::IoError::none()};
+      }))
+      .WillRepeatedly(Invoke([](uint64_t, Buffer::RawSlice*, uint64_t) {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      }));
+  server_connection_->setBufferLimits(SSL3_RT_MAX_PLAIN_LENGTH);
+  auto& connection_read_buffer = server_connection->getReadBuffer().buffer;
+  const auto first_result = server_transport->doRead(connection_read_buffer);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, first_result.action_);
+  EXPECT_FALSE(first_result.end_stream_read_);
+  EXPECT_EQ(SSL3_RT_MAX_PLAIN_LENGTH, first_result.bytes_processed_);
+  EXPECT_EQ(first_record + "b", connection_read_buffer.toString());
+  connection_read_buffer.drain(connection_read_buffer.length());
+  const auto second_result = server_transport->doRead(connection_read_buffer);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, second_result.action_);
+  EXPECT_FALSE(second_result.end_stream_read_);
+  EXPECT_EQ(second_record.size() - 1, second_result.bytes_processed_);
+  EXPECT_EQ(second_record.substr(1), connection_read_buffer.toString());
+  connection_read_buffer.drain(connection_read_buffer.length());
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  server_connection_->close(Network::ConnectionCloseType::NoFlush);
+  client_connection_->close(Network::ConnectionCloseType::NoFlush);
+  // The replacement input BIO borrows receiver_io, so destroy its connection before the mock.
+  server_connection_.reset();
 }
 
 TEST_P(SslReadBufferLimitTest, ReadAheadAcrossTls13KeyUpdate) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_io_handle_read_ahead", "true"}});
-  initialize(16384);
+  initialize();
   auto* client_transport = dynamic_cast<SslSocket*>(client_transport_socket_);
   ASSERT_NE(nullptr, client_transport);
   SSL* client_ssl = client_transport->rawSslForTest();
@@ -8561,7 +8676,7 @@ TEST_P(SslReadBufferLimitTest, ReadAheadAcrossTls13KeyUpdate) {
   ASSERT_LE(ciphertext_length, 16384);
 
   NiceMock<Network::MockIoHandle> receiver_io;
-  EXPECT_CALL(receiver_io, readv(16384, _, 1))
+  EXPECT_CALL(receiver_io, readv(_, _, 1))
       .WillOnce(Invoke([&](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, ciphertext, ciphertext_length);
         return Api::IoCallUint64Result{ciphertext_length, Api::IoError::none()};
@@ -8570,7 +8685,6 @@ TEST_P(SslReadBufferLimitTest, ReadAheadAcrossTls13KeyUpdate) {
         return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
       }));
   BIO* input = BIO_new_io_handle(&receiver_io);
-  ASSERT_TRUE(enableIoHandleBioReadAhead(input, 16384));
   SSL_set0_rbio(server_ssl, input);
 
   Buffer::OwnedImpl first_read;
@@ -8609,15 +8723,14 @@ TEST_P(SslReadBufferLimitTest, ReadAheadAcrossTls13KeyUpdate) {
 }
 
 TEST_P(SslReadBufferLimitTest, ReadAheadResumesBufferedCiphertextAfterReadDisable) {
-  readAheadResumeTest(64 * 1024, true, true);
+  readAheadResumeTest(true);
 }
 
-void SslReadBufferLimitTest::readAheadResumeTest(std::optional<uint32_t> buffer_size,
-                                                 bool runtime_enabled, bool expect_buffered) {
+void SslReadBufferLimitTest::readAheadResumeTest(bool runtime_enabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.tls_io_handle_read_ahead", runtime_enabled ? "true" : "false"}});
-  initialize(buffer_size);
+  initialize();
   auto* client_transport = dynamic_cast<SslSocket*>(client_transport_socket_);
   ASSERT_NE(nullptr, client_transport);
   // Pin TLS 1.2 so the receiver-side barrier below can identify the final close_notify record.
@@ -8722,16 +8835,12 @@ void SslReadBufferLimitTest::readAheadResumeTest(std::optional<uint32_t> buffer_
         if (!paused) {
           paused = true;
           EXPECT_FALSE(end_stream);
-          EXPECT_EQ(expect_buffered,
+          EXPECT_EQ(runtime_enabled,
                     BIO_pending(SSL_get_rbio(server_transport->rawSslForTest())) > 0);
-          // Only read-ahead drains the queued records into the BIO. The disabled cases must
-          // leave them on the socket, even after the runtime guard has changed.
+          // Read-ahead follows the small reservation instead of consuming the whole payload.
           char byte;
           auto peek = server_io_handle->recv(&byte, 1, MSG_PEEK);
-          EXPECT_EQ(!expect_buffered, peek.ok());
-          if (expect_buffered && !peek.ok()) {
-            EXPECT_EQ(Api::IoError::IoErrorCode::Again, peek.err_->getErrorCode());
-          }
+          EXPECT_TRUE(peek.ok());
           server_connection_->readDisable(true);
           dispatcher_->post([&] { server_connection_->readDisable(false); });
         }
@@ -8856,7 +8965,6 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
 BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
-    read_ahead_buffer_size: 16384
     tls_certificates:
       certificate_chain:
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
@@ -8877,7 +8985,6 @@ BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
 )EOF";
   const std::string successful_client_ctx_yaml = R"EOF(
   common_tls_context:
-    read_ahead_buffer_size: 16384
     tls_params:
       cipher_suites:
       - ECDHE-RSA-AES128-GCM-SHA256
@@ -9796,7 +9903,6 @@ TEST_P(SslSocketTest, Sni) {
 BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
-    read_ahead_buffer_size: 16384
     tls_certificates:
       certificate_chain:
         filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
@@ -9812,7 +9918,6 @@ BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
 
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
-    read_ahead_buffer_size: 16384
     tls_certificates:
       certificate_chain:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"

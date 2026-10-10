@@ -25,8 +25,6 @@ MockClientContextConfig::MockClientContextConfig() {
   capabilities_.provides_ciphers_and_curves = true;
   capabilities_.provides_sigalgs = true;
 
-  ON_CALL(*this, readAheadBufferSize()).WillByDefault(testing::Return(0));
-
   ON_CALL(*this, serverNameIndication()).WillByDefault(testing::ReturnRef(sni_));
   ON_CALL(*this, cipherSuites()).WillByDefault(testing::ReturnRef(ciphers_));
   ON_CALL(*this, ecdhCurves()).WillByDefault(testing::ReturnRef(curves_));
@@ -45,8 +43,6 @@ MockClientContextConfig::~MockClientContextConfig() = default;
 MockServerContextConfig::MockServerContextConfig() {
   capabilities_.provides_ciphers_and_curves = true;
   capabilities_.provides_sigalgs = true;
-
-  ON_CALL(*this, readAheadBufferSize()).WillByDefault(testing::Return(0));
 
   ON_CALL(*this, cipherSuites()).WillByDefault(testing::ReturnRef(ciphers_));
   ON_CALL(*this, ecdhCurves()).WillByDefault(testing::ReturnRef(curves_));

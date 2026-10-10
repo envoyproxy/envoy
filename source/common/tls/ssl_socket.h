@@ -93,7 +93,7 @@ private:
     uint64_t bytes_read_{0};
     std::optional<int> error_;
   };
-  ReadResult sslReadIntoSlice(Buffer::RawSlice& slice);
+  ReadResult sslReadIntoSlice(Buffer::RawSlice& slice, uint64_t reservation_remaining);
 
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
@@ -104,7 +104,7 @@ private:
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
-  const uint32_t read_ahead_buffer_size_;
+  const bool read_ahead_allowed_;
   bool read_ahead_enabled_{false};
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;

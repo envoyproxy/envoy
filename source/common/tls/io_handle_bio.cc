@@ -34,9 +34,18 @@ struct IoHandleBioState {
 
   uint64_t pending() const { return end_ - begin_; }
 
+  void releaseReadAhead() {
+    ASSERT(pending() == 0);
+    read_ahead_.reset();
+    read_ahead_capacity_ = 0;
+    begin_ = 0;
+    end_ = 0;
+  }
+
   Network::IoHandle& io_handle_;
   std::unique_ptr<char[]> read_ahead_;
-  uint32_t read_ahead_size_{0};
+  uint64_t read_ahead_size_{0};
+  uint64_t read_ahead_capacity_{0};
   uint64_t begin_{0};
   uint64_t end_{0};
 };
@@ -58,29 +67,36 @@ int io_handle_read(BIO* b, char* out, int outl) {
     const uint64_t size = std::min<uint64_t>(outl, state.pending());
     std::copy_n(state.read_ahead_.get() + state.begin_, size, out);
     state.begin_ += size;
+    if (state.pending() == 0 && state.read_ahead_size_ == 0) {
+      state.releaseReadAhead();
+    }
     return size;
   }
 
-  if (state.read_ahead_size_ > 0 && !state.read_ahead_) {
-    state.read_ahead_ = std::make_unique<char[]>(state.read_ahead_size_);
+  if (state.read_ahead_size_ > state.read_ahead_capacity_) {
+    state.read_ahead_.reset(new char[state.read_ahead_size_]);
+    state.read_ahead_capacity_ = state.read_ahead_size_;
   }
 
   Envoy::Buffer::RawSlice slice;
   slice.mem_ = state.read_ahead_ ? state.read_ahead_.get() : out;
-  // Some socket APIs, including Winsock recv(), take a signed int length.
-  slice.len_ = state.read_ahead_
-                   ? std::min<uint64_t>(state.read_ahead_size_, std::numeric_limits<int>::max())
-                   : static_cast<uint64_t>(outl);
+  slice.len_ = state.read_ahead_ ? state.read_ahead_size_ : static_cast<uint64_t>(outl);
   auto* io_handle = bio_io_handle(b);
   auto result = io_handle->readv(slice.len_, &slice, 1);
   if (!result.ok()) {
     auto err = result.err_->getErrorCode();
+    if (err != Api::IoError::IoErrorCode::Interrupt) {
+      state.releaseReadAhead();
+    }
     if (err == Api::IoError::IoErrorCode::Again || err == Api::IoError::IoErrorCode::Interrupt) {
       BIO_set_retry_read(b);
     } else {
       ERR_put_error(ERR_LIB_SYS, 0, result.err_->getSystemErrorCode(), __FILE__, __LINE__);
     }
     return -1;
+  }
+  if (result.return_value_ == 0) {
+    state.releaseReadAhead();
   }
   // On EOF (readv returned 0 successfully), check SO_ERROR for a pending TCP RST.
   // Some peers tear the connection down with RST instead of FIN; readv returns 0
@@ -180,14 +196,15 @@ BIO* BIO_new_io_handle(Envoy::Network::IoHandle* io_handle) {
   return b;
 }
 
-bool enableIoHandleBioReadAhead(BIO* bio, uint32_t size) {
+bool setIoHandleBioReadAheadSize(BIO* bio, uint64_t size) {
   if (bio == nullptr || BIO_method_type(bio) != ioHandleBioType()) {
     return false;
   }
   auto& state = bioState(bio);
-  ASSERT(state.read_ahead_size_ == 0 || state.read_ahead_size_ == size);
-  if (state.read_ahead_size_ == 0) {
-    state.read_ahead_size_ = size;
+  // Some socket APIs, including Winsock recv(), take a signed int length.
+  state.read_ahead_size_ = std::min<uint64_t>(size, std::numeric_limits<int>::max());
+  if (state.read_ahead_size_ == 0 && state.pending() == 0) {
+    state.releaseReadAhead();
   }
   return true;
 }

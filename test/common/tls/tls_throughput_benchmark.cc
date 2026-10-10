@@ -18,6 +18,7 @@
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -230,6 +231,7 @@ private:
 
 // Measure the production TLS transport socket's receive path with a full batch already queued.
 // Encryption, sending, handshakes, and payload verification are excluded from the timed region.
+// Receiving through EAGAIN includes read-ahead allocation and release for each batch in timing.
 static void testReceiveThroughput(benchmark::State& state) {
   std::string error;
   std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles(
@@ -250,8 +252,11 @@ static void testReceiveThroughput(benchmark::State& state) {
   }
 
   const int tls_version = state.range(0) == 12 ? TLS1_2_VERSION : TLS1_3_VERSION;
-  const size_t record_size = state.range(1);
-  const uint32_t read_ahead_size = state.range(2);
+  const size_t batch_size = state.range(1);
+  const size_t record_size = state.range(2);
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_io_handle_read_ahead", state.range(3) ? "true" : "false"}});
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   if (!Event::Libevent::Global::initialized()) {
@@ -266,7 +271,6 @@ static void testReceiveThroughput(benchmark::State& state) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   auto& common_context = *tls_context.mutable_common_tls_context();
-  common_context.mutable_read_ahead_buffer_size()->set_value(read_ahead_size);
   using TlsParameters = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
   const auto protocol = state.range(0) == 12 ? TlsParameters::TLSv1_2 : TlsParameters::TLSv1_3;
   common_context.mutable_tls_params()->set_tls_minimum_protocol_version(protocol);
@@ -328,7 +332,7 @@ static void testReceiveThroughput(benchmark::State& state) {
   BIO* output = BIO_new(BIO_s_mem());
   RELEASE_ASSERT(output != nullptr, "BIO_new");
   SSL_set0_wbio(client_ssl.get(), output);
-  const std::string plaintext(256 * 1024, 'a');
+  const std::string plaintext(batch_size, 'a');
 
   const auto queue_batch = [&]() {
     for (size_t offset = 0; offset < plaintext.size(); offset += record_size) {
@@ -360,7 +364,6 @@ static void testReceiveThroughput(benchmark::State& state) {
            result.bytes_processed_ == plaintext.size();
   };
 
-  // Warm up the lazy read-ahead allocation before measuring steady-state receive cost.
   if (!queue_batch()) {
     state.SkipWithError("Cannot queue a full ciphertext batch; check socket send buffer capacity");
     return;
@@ -391,11 +394,16 @@ static void testReceiveThroughput(benchmark::State& state) {
 }
 
 static void receiveParams(benchmark::internal::Benchmark* b) {
-  b->ArgNames({"tls_version", "record_bytes", "read_ahead_bytes"});
+  b->ArgNames({"tls_version", "batch_bytes", "record_bytes", "read_ahead"});
   for (const int tls_version : {12, 13}) {
-    for (const int record_size : {1024, 16 * 1024}) {
-      for (const int read_ahead_size : {0, 16 * 1024, 64 * 1024, 256 * 1024}) {
-        b->Args({tls_version, record_size, read_ahead_size});
+    for (const int batch_size : {1024, 16 * 1024, 256 * 1024}) {
+      for (const int record_size : {1024, 16 * 1024}) {
+        if (record_size > batch_size) {
+          continue;
+        }
+        for (const bool read_ahead : {false, true}) {
+          b->Args({tls_version, batch_size, record_size, read_ahead});
+        }
       }
     }
   }

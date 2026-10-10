@@ -20,13 +20,14 @@ namespace Tls {
 BIO* BIO_new_io_handle(Envoy::Network::IoHandle* io_handle);
 
 /**
- * Enables bounded ciphertext read-ahead on a BIO created by BIO_new_io_handle(). Call only after
- * the TLS handshake completes. Zero preserves direct reads without allocating a buffer. Once
- * enabled, subsequent calls must specify the same size.
+ * Sets the ciphertext read-ahead target on a BIO created by BIO_new_io_handle(). Call only after
+ * the TLS handshake completes. Buffered input is preserved when the target changes. Zero disables
+ * further read-ahead after buffered input drains. Allocation is deferred until a socket read and
+ * released when the socket is exhausted.
  *
  * Returns true for an IoHandle BIO. Returns false without changes for null or other BIO types.
  */
-bool enableIoHandleBioReadAhead(BIO* bio, uint32_t size);
+bool setIoHandleBioReadAheadSize(BIO* bio, uint64_t size);
 
 } // namespace Tls
 } // namespace TransportSockets
