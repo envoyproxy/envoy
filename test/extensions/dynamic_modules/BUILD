@@ -6,6 +6,8 @@ load(
 )
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_dyn_module_binary",
     "envoy_cc_dyn_module_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
@@ -21,6 +23,7 @@ envoy_cc_dyn_module_test(
     srcs = ["dynamic_modules_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:abi_version_mismatch",
+        "//test/extensions/dynamic_modules/test_data/c:blocking_program_init",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_program_init",
         "//test/extensions/dynamic_modules/test_data/c:program_child",
@@ -40,18 +43,57 @@ envoy_cc_dyn_module_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
+        "//source/common/http:message_lib",
+        "//source/common/init:manager_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
         "//test/extensions/dynamic_modules/test_data/c:program_init_fail_static",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
+        "@abseil-cpp//absl/time",
         "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_dyn_module_test(
+    name = "module_memory_test",
+    srcs = ["module_memory_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/c:memory_allocator",
+        "//test/extensions/dynamic_modules/test_data/c:no_op",
+    ],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":util",
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:module_memory_lib",
+        "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
+        "//test/test_common:status_utility_lib",
+    ],
+)
+
+envoy_cc_benchmark_dyn_module_binary(
+    name = "module_memory_speed_test",
+    srcs = ["module_memory_speed_test.cc"],
+    data = ["//test/extensions/dynamic_modules/test_data/c:memory_allocator"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:module_memory_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "module_memory_speed_test_benchmark_test",
+    benchmark_binary = "module_memory_speed_test",
 )
 
 envoy_cc_test(

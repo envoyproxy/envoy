@@ -21,6 +21,7 @@ package(default_visibility = [
     "//test/extensions/matching/http/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
+    "//test/extensions/resource_monitors/dynamic_module_memory:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
@@ -29,6 +30,10 @@ package(default_visibility = [
     "//test/extensions/transport_sockets/tls/handshakers/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
+
+test_program(name = "blocking_program_init")
+
+test_program(name = "memory_allocator")
 
 test_program(name = "no_op")
 

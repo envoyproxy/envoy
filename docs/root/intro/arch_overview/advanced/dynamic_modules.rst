@@ -207,6 +207,28 @@ factory context and therefore cannot increment the ``module_load_error`` counter
 only signal when a module referenced from the bootstrap configuration fails to load, because Envoy
 exits before its statistics can be scraped.
 
+Memory
+---------------------------
+
+Modules allocate memory from the heap of the Envoy process, except for the heap of the Go runtime of
+a module written in Go. The :ref:`dynamic module memory resource monitor
+<envoy_v3_api_msg_extensions.resource_monitors.dynamic_module_memory.v3.DynamicModuleMemoryConfig>`
+reports the heap memory of a module to the :ref:`overload manager <config_overload_manager>`, which
+can then act when the module exceeds its budget. Each monitored module needs a resource monitor of
+its own with a unique name. The following configuration reports the pressure of the module
+``my_module`` against a budget of 1 GiB in the ``overload.my_module_memory.pressure`` gauge.
+
+.. code-block:: yaml
+
+  overload_manager:
+    refresh_interval: 1s
+    resource_monitors:
+    - name: my_module_memory
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.resource_monitors.dynamic_module_memory.v3.DynamicModuleMemoryConfig
+        module_name: my_module
+        max_heap_size_bytes: 1073741824
+
 Secrets
 ---------------------------
 

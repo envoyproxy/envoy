@@ -15,6 +15,8 @@ envoy_cc_library(
     tcmalloc_dep = 1,
     deps = [
         "//source/common/common:thread_lib",
+        "@abseil-cpp//absl/functional:function_ref",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:span",
     ],
 )
