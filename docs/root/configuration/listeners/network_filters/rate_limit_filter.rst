@@ -26,6 +26,7 @@ following statistics:
   total, Counter, Total requests to the rate limit service
   error, Counter, Total errors contacting the rate limit service
   over_limit, Counter, Total over limit responses from the rate limit service
+  shadow_over_limit, Counter, Total responses from the rate limit service with a descriptor over limit in shadow mode
   ok, Counter, Total under limit responses from the rate limit service
   cx_closed, Counter, Total connections closed due to an over limit response from the rate limit service
   active, Gauge, Total active requests to the rate limit service

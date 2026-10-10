@@ -56,7 +56,7 @@ message RateLimitRequest {
 }
 
 // A response from a ShouldRateLimit call.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message RateLimitResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.ratelimit.v2.RateLimitResponse";
@@ -233,4 +233,8 @@ message RateLimitResponse {
   // the request will be treated as OVER_LIMIT.
   // [#not-implemented-hide:]
   Quota quota = 7;
+
+  // Whether any descriptor exceeded its limit but was not enforced because it is in shadow mode.
+  // Informational only and independent of ``overall_code``.
+  bool shadow_over_limit = 8;
 }

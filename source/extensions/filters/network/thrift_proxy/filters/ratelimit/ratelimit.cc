@@ -62,7 +62,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
                       Http::RequestHeaderMapPtr&& request_headers_to_add, const std::string&,
-                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
+                      bool shadow_over_limit) {
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over
   // limit or error) is a matter of modifying the callbacks to allow it. Adding them to an upstream
   // response requires either response (aka encoder) filters or some other mechanism.
@@ -77,6 +78,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   state_ = State::Complete;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
+
+  if (shadow_over_limit) {
+    cluster_->statsScope().counterFromStatName(stat_names.shadow_over_limit_).inc();
+  }
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
