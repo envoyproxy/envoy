@@ -1,0 +1,92 @@
+admin:
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
+
+static_resources:
+  listeners:
+  - name: udp_listener
+    address:
+      socket_address: { protocol: UDP, address: 0.0.0.0, port_value: 10000 }
+    udp_listener_config:
+      downstream_socket_config:
+        max_rx_datagram_size: 4096
+    listener_filters:
+    - name: envoy.filters.udp_listener.udp_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+        stat_prefix: udp_routing
+        matcher:
+          on_no_match:
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                cluster: room_dynamic
+        session_filters:
+        - name: envoy.filters.udp.session.header_routing
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.session.header_routing.v3.HeaderRouting
+            magic: 85
+            version: 1
+            # forward_header 控制 8B 协议头是否原样转发给上游：
+            #  - true（默认）：解析选路后保留头部，8B 头连同游戏数据一起原样转发给上游；
+            #  - false：剥离 8B 头，仅转发游戏数据（当前测试显式 false，与 client/game-server
+            #    的"确认前带头、确认后停"契约配套；验证头部剥离正确性）。
+            forward_header: false
+        - name: envoy.filters.udp.session.dynamic_forward_proxy
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig
+            stat_prefix: dfp
+            dns_cache_config:
+              name: header_routing_cache
+              dns_lookup_family: V4_ONLY
+            # 首次解析（IP 字面量也走异步 Loading）期间，用缓冲保存首包，
+            # 避免 DNS 完成前首包被丢弃（确认前带头的首包自愈依赖此缓冲）。
+            buffer_options:
+              max_buffered_datagrams: 1024
+              max_buffered_bytes: 16384
+
+  - name: tcp_listener
+    address:
+      socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10001 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.header_routing
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.header_routing.v3.HeaderRouting
+          magic: 85
+          version: 1
+          # forward_header 控制 8B 协议头是否原样转发给上游：
+          #  - true（默认）：解析选路后保留头部，8B 头连同游戏数据一起原样转发给上游；
+          #  - false：剥离 8B 头，仅转发游戏数据（当前测试显式 false，与 client/game-server
+          #    的"确认前带头、确认后停"契约配套；验证头部剥离正确性）。
+          forward_header: false
+      - name: envoy.filters.network.sni_dynamic_forward_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
+          dns_cache_config:
+            name: header_routing_cache
+            dns_lookup_family: V4_ONLY
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_routing
+          cluster: room_dynamic
+          # 启用 receive_before_connect 模式：构造时不再 readDisable(true) 禁用下游读，
+          # 否则 header_routing 永远读不到头部（read_disable_count_ != 0 时 onRead 不触发），
+          # 后续 sni_dynamic_forward_proxy / tcp_proxy 永远不会被初始化，TCP 全链路超时。
+          max_early_data_bytes: 16384
+
+  clusters:
+  - name: room_dynamic
+    connect_timeout: 5s
+    # dynamic_forward_proxy 是 cluster 自带 LB 类型，必须显式声明 CLUSTER_PROVIDED，
+    # 否则 cluster manager 校验报 "cluster provided LB not specified"。
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.dynamic_forward_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+        dns_cache_config:
+          name: header_routing_cache
+          dns_lookup_family: V4_ONLY
