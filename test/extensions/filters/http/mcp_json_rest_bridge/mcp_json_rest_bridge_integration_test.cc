@@ -2678,5 +2678,45 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallIgnoresRestrictedHeaders) {
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
 }
 
+class McpJsonRestBridgeHttp1IntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  McpJsonRestBridgeHttp1IntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeFilter(const std::string& config) {
+    config_helper_.prependFilter(config);
+    initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, McpJsonRestBridgeHttp1IntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(McpJsonRestBridgeHttp1IntegrationTest, InitializedAckHasContentLengthZero) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"jsonrpc": "2.0", "method": "notifications/initialized"})");
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("202"));
+  EXPECT_THAT(response->headers().getContentLengthValue(), StrEq("0"));
+  EXPECT_THAT(response->body(), IsEmpty());
+}
+
 } // namespace
 } // namespace Envoy
