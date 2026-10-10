@@ -1981,11 +1981,14 @@ TEST(ABIImpl, filter_state_value_unknown_enums) {
   const std::string key2 = "key_unknown_sharing";
   const std::string val = "val";
 
+  // A value outside the 2-bit enum range [0, 3] would be undefined behavior to load in C++, so use
+  // one past the last enumerator (3).
   EXPECT_ENVOY_BUG(
       {
         EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
             &filter, {key1.data(), key1.size()}, {val.data(), val.size()},
-            static_cast<envoy_dynamic_module_type_filter_state_life_span>(99),
+            static_cast<envoy_dynamic_module_type_filter_state_life_span>(
+                envoy_dynamic_module_type_filter_state_life_span_Connection + 1),
             envoy_dynamic_module_type_filter_state_stream_sharing_None));
       },
       "unknown filter state life_span");
@@ -1995,7 +1998,9 @@ TEST(ABIImpl, filter_state_value_unknown_enums) {
         EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
             &filter, {key2.data(), key2.size()}, {val.data(), val.size()},
             envoy_dynamic_module_type_filter_state_life_span_FilterChain,
-            static_cast<envoy_dynamic_module_type_filter_state_stream_sharing>(99)));
+            static_cast<envoy_dynamic_module_type_filter_state_stream_sharing>(
+                envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnectionOnce +
+                1)));
       },
       "unknown filter state stream_sharing");
 }
