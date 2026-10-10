@@ -859,10 +859,15 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_(_))
       .WillOnce(Invoke([&](StreamInfo::StreamInfo& info) -> Network::ServerConnection* {
-        const auto* obj =
-            info.filterState()->getDataReadOnlyGeneric("envoy.network.network_namespace");
+        EXPECT_TRUE(
+            info.filterState()->hasIndexedData(StreamInfo::FilterStateIndex::NetworkNamespace));
+        const auto* obj = info.filterState()->getIndexedDataReadOnlyGeneric(
+            StreamInfo::FilterStateIndex::NetworkNamespace);
         EXPECT_NE(nullptr, obj);
         EXPECT_EQ(netns, obj->serializeAsString());
+        // Verify backward compatibility: string-based lookup also resolves the indexed data.
+        EXPECT_EQ(obj,
+                  info.filterState()->getDataReadOnlyGeneric("envoy.network.network_namespace"));
         return connection;
       }));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));

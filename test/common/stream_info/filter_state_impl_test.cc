@@ -558,6 +558,12 @@ TEST_F(FilterStateImplTest, IndexedFilterStateUtilities) {
 
   // nameToIndex direct checks for invalid keys
   EXPECT_FALSE(FilterState::nameToIndex("non_existent_key").has_value());
+
+  // nameToIndex and indexToName mapping checks for NetworkNamespace
+  EXPECT_EQ(FilterStateIndex::NetworkNamespace,
+            FilterState::nameToIndex("envoy.network.network_namespace"));
+  EXPECT_EQ("envoy.network.network_namespace",
+            FilterState::indexToName(FilterStateIndex::NetworkNamespace));
 }
 
 } // namespace StreamInfo
