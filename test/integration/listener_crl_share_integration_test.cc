@@ -9,14 +9,17 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
+#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -131,6 +134,48 @@ public:
     new_config.setLds(version);
   }
 
+  // The server's process-wide parsed PEM caches.
+  struct PemCaches {
+    std::shared_ptr<Extensions::TransportSockets::Tls::CrlCache> crl;
+    std::shared_ptr<Extensions::TransportSockets::Tls::CaCertCache> ca;
+    std::shared_ptr<Extensions::TransportSockets::Tls::CertChainCache> cert_chain;
+    std::shared_ptr<Extensions::TransportSockets::Tls::PrivateKeyCache> private_key;
+
+    bool allHaveSize(size_t expected) const {
+      return crl->size() == expected && ca->size() == expected && cert_chain->size() == expected &&
+             private_key->size() == expected;
+    }
+  };
+
+  // Looks up the server's caches on its main thread, where the singleton manager lives. Their
+  // sizes can then be read from the test thread.
+  PemCaches serverPemCaches() {
+    PemCaches caches;
+    absl::Notification done;
+    test_server_->server().dispatcher().post([this, &caches, &done]() {
+      Singleton::Manager& manager = test_server_->server().singletonManager();
+      caches.crl = Extensions::TransportSockets::Tls::getCrlCache(manager);
+      caches.ca = Extensions::TransportSockets::Tls::getCaCertCache(manager);
+      caches.cert_chain = Extensions::TransportSockets::Tls::getCertChainCache(manager);
+      caches.private_key = Extensions::TransportSockets::Tls::getPrivateKeyCache(manager);
+      done.Notify();
+    });
+    done.WaitForNotification();
+    return caches;
+  }
+
+  // Waits until every cache holds `expected` entries. A removed listener's TLS contexts are
+  // released asynchronously, possibly on a worker thread.
+  void waitForCacheSizes(const PemCaches& caches, size_t expected) {
+    for (int i = 0; i < 1000 && !caches.allHaveSize(expected); ++i) {
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    }
+    EXPECT_EQ(caches.crl->size(), expected);
+    EXPECT_EQ(caches.ca->size(), expected);
+    EXPECT_EQ(caches.cert_chain->size(), expected);
+    EXPECT_EQ(caches.private_key->size(), expected);
+  }
+
   const std::string listener_a_{"crl_listener_a"};
   const std::string listener_b_{"crl_listener_b"};
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
@@ -225,6 +270,85 @@ TEST_P(ListenerCrlShareIntegrationTest, SharedCrlSurvivesListenerCrlChange) {
   // Tear everything down; releasing both CRLs must not crash.
   keepOnlyListeners({}, "2");
   test_server_->waitForGauge("listener_manager.total_listeners_active", testing::Eq(0));
+}
+
+// The two listeners share one parsed CRL, CA bundle, certificate chain and private key. Each shared
+// entry stays cached while any listener references it and is erased from its cache as soon as the
+// last listener using it is removed. Re-adding the listeners parses and caches the material again.
+TEST_P(ListenerCrlShareIntegrationTest, SharedPemEntriesReleasedWithLastListener) {
+  setDrainTime(std::chrono::seconds(1));
+  initialize();
+  test_server_->waitForGauge("listener_manager.total_listeners_active", testing::Eq(2));
+
+  auto revoked_client = makeClientSslFactory("test/common/tls/test_data/san_dns_cert.pem",
+                                             "test/common/tls/test_data/san_dns_key.pem");
+  auto valid_client = makeClientSslFactory("test/common/tls/test_data/san_dns2_cert.pem",
+                                           "test/common/tls/test_data/san_dns2_key.pem");
+
+  const PemCaches caches = serverPemCaches();
+  waitForCacheSizes(caches, 1);
+  EXPECT_TRUE(handshakeConnected(listener_a_, valid_client));
+  EXPECT_TRUE(handshakeConnected(listener_b_, valid_client));
+
+  // Removing one listener keeps every entry cached for the other, which still enforces the CRL.
+  keepOnlyListeners({listener_b_}, "1");
+  test_server_->waitForGauge("listener_manager.total_listeners_active", testing::Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", testing::Eq(0));
+  waitForCacheSizes(caches, 1);
+  EXPECT_FALSE(handshakeConnected(listener_b_, revoked_client));
+  EXPECT_TRUE(handshakeConnected(listener_b_, valid_client));
+
+  // Removing the last listener releases every entry, which erases it from its cache.
+  EXPECT_LOG_CONTAINS("debug", "tls: released parsed PEM entry, 0 entries", {
+    keepOnlyListeners({}, "2");
+    test_server_->waitForGauge("listener_manager.total_listeners_active", testing::Eq(0));
+    test_server_->waitForGauge("listener_manager.total_listeners_draining", testing::Eq(0));
+    waitForCacheSizes(caches, 0);
+  });
+
+  // Re-adding both listeners parses the material once more and shares it between them.
+  EXPECT_LOG_CONTAINS("debug", "tls: cached parsed PEM entry, 1 entries", {
+    ConfigHelper new_config(version_, config_helper_.bootstrap());
+    new_config.setLds("3");
+    test_server_->waitForGauge("listener_manager.total_listeners_active", testing::Eq(2));
+  });
+  waitForCacheSizes(caches, 1);
+  // The re-added listeners are bound to new ports.
+  registerTestServerPorts({listener_a_, listener_b_});
+  EXPECT_FALSE(handshakeConnected(listener_a_, revoked_client));
+  EXPECT_TRUE(handshakeConnected(listener_a_, valid_client));
+  EXPECT_TRUE(handshakeConnected(listener_b_, valid_client));
+}
+
+// A connection that is still open when its listener is removed holds a reference to the shared
+// entries through its TLS socket. The drain closes the connection on its worker before the listener
+// is destroyed, after which every entry is erased.
+TEST_P(ListenerCrlShareIntegrationTest, SharedPemEntriesReleasedAfterOpenConnectionDrains) {
+  setDrainTime(std::chrono::seconds(1));
+  initialize();
+  test_server_->waitForGauge("listener_manager.total_listeners_active", testing::Eq(2));
+
+  auto valid_client = makeClientSslFactory("test/common/tls/test_data/san_dns2_cert.pem",
+                                           "test/common/tls/test_data/san_dns2_key.pem");
+  const PemCaches caches = serverPemCaches();
+  waitForCacheSizes(caches, 1);
+
+  Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
+      Ssl::getSslAddress(version_, lookupPort(listener_b_)),
+      Network::Address::InstanceConstSharedPtr(),
+      valid_client->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(connection), std::nullopt);
+  ASSERT_TRUE(codec->connected());
+  test_server_->waitForGauge("listener." + listener_b_ + ".downstream_cx_active", testing::Eq(1));
+
+  EXPECT_LOG_CONTAINS("debug", "tls: released parsed PEM entry, 0 entries", {
+    keepOnlyListeners({}, "1");
+    test_server_->waitForGauge("listener_manager.total_listeners_active", testing::Eq(0));
+    test_server_->waitForGauge("listener_manager.total_listeners_draining", testing::Eq(0));
+    // The listener's removal closes the connection.
+    ASSERT_TRUE(codec->waitForDisconnect());
+    waitForCacheSizes(caches, 0);
+  });
 }
 
 } // namespace
