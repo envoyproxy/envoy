@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "source/common/common/statusor.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -59,6 +61,9 @@ public:
    * @return whether the context was propagated from a remote parent.
    */
   bool isRemote() const { return is_remote_; }
+
+  void setTraceId(std::string trace_id) { trace_id_ = std::move(trace_id); }
+  void setSpanId(std::string span_id) { span_id_ = std::move(span_id); }
 
 private:
   std::string version_;

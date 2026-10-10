@@ -101,6 +101,7 @@ public:
                      const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
+  void updateParent(const Tracing::TraceContext& trace_context) override;
 
   /**
    * Set the span's sampled flag.
@@ -176,6 +177,10 @@ public:
    */
   void setTracestate(absl::string_view tracestate) {
     span_.set_trace_state(std::string{tracestate});
+  }
+
+  absl::string_view getTracestate() const {
+    return span_.trace_state();
   }
 
   /**
