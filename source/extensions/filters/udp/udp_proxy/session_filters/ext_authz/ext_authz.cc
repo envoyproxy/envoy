@@ -21,7 +21,7 @@ constexpr uint32_t DefaultMaxBufferedDatagrams = 1024;
 constexpr uint64_t DefaultMaxBufferedBytes = 16384;
 
 Config::Config(const FilterConfig& config, Stats::Scope& scope,
-               Server::Configuration::ServerFactoryContext& context)
+               Server::Configuration::GenericFactoryContext& context)
     : stats_scope_(
           scope.createScope(absl::StrCat("udp.session.ext_authz.", config.stat_prefix(), "."))),
       stats_(generateStats(*stats_scope_)), failure_mode_allow_(config.failure_mode_allow()),
@@ -42,9 +42,14 @@ Config::Config(const FilterConfig& config, Stats::Scope& scope,
 
 Grpc::AsyncClientFactoryPtr
 Config::createAsyncClientFactory(const FilterConfig& config, Stats::Scope& scope,
-                                 Server::Configuration::ServerFactoryContext& context) {
-  auto factory_or_error = context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-      config.grpc_service(), scope, true);
+                                 Server::Configuration::GenericFactoryContext& context) {
+  Grpc::AsyncClientManager& async_client_manager =
+      context.serverFactoryContext().clusterManager().grpcAsyncClientManager();
+  auto initial_metadata = THROW_OR_RETURN_VALUE(
+      async_client_manager.parseGrpcServiceInitialMetadata(config.grpc_service(), context),
+      Grpc::GrpcServiceInitialMetadataSharedPtr);
+  auto factory_or_error = async_client_manager.factoryForGrpcService(
+      config.grpc_service(), scope, true, std::move(initial_metadata));
   THROW_IF_NOT_OK_REF(factory_or_error.status());
   return std::move(factory_or_error.value());
 }

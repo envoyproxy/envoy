@@ -45,6 +45,7 @@ envoy_cc_extension(
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],

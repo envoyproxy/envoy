@@ -54,7 +54,8 @@ GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
 
   absl::StatusOr<Grpc::AsyncClientFactoryPtr> rlqs_stream_client_factory =
       context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-          config_with_hash_key.config(), context.scope(), true);
+          config_with_hash_key.config(), context.scope(), true,
+          config_with_hash_key.initialMetadata());
   if (!rlqs_stream_client_factory.ok()) {
     creation_status = rlqs_stream_client_factory.status();
     return;

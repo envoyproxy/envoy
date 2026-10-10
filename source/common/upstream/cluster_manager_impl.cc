@@ -525,8 +525,13 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
                                                                    /*xdstp_config_source*/ false);
       RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
       if (maybe_grpc_service.value().has_value()) {
+        auto initial_metadata = async_client_manager_->parseGrpcServiceInitialMetadataForServer(
+            *maybe_grpc_service.value());
+        RETURN_IF_NOT_OK_REF(initial_metadata.status());
         client_or_error = async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
-            Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value()), *stats_.rootScope(),
+            Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value(),
+                                               std::move(*initial_metadata)),
+            *stats_.rootScope(),
             /*skip_cluster_check*/ false);
       } else {
         return absl::InvalidArgumentError("Invalid grpc service.");

@@ -10,6 +10,7 @@
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
+#include "envoy/extensions/formatter/generic_secret/v3/generic_secret.pb.h"
 #include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
 #include "envoy/extensions/retry/host/previous_hosts/v3/previous_hosts.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
@@ -3125,6 +3126,89 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcMetadata) {
   EXPECT_EQ(
       "c",
       processor_stream_->headers().get(Http::LowerCaseString("c"))[0]->value().getStringView());
+  handleUpstreamRequest();
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+#if defined(USE_CEL_PARSER)
+// Per-route grpc_initial_metadata is parsed on the main thread when the route config is loaded, so
+// the built-in %CEL()% command can be used in it, even though the gRPC client is created on the
+// worker thread handling the request.
+TEST_P(ExtProcIntegrationTest, PerRouteGrpcMetadataWithCel) {
+  initializeConfig();
+
+  config_helper_.addConfigModifier([this](HttpConnectionManager& cm) {
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/foo");
+    ExtProcPerRoute per_route;
+    *per_route.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+        makeHeaderValue("x-cel", "%CEL('cel-value')%");
+    setPerRouteConfig(route, per_route);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response =
+      sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
+  EXPECT_EQ(
+      "cel-value",
+      processor_stream_->headers().get(Http::LowerCaseString("x-cel"))[0]->value().getStringView());
+  handleUpstreamRequest();
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+#endif
+
+// The filter's gRPC service's initial metadata uses a formatter extension, and a per-route config
+// adds grpc_initial_metadata. The route's metadata is applied on top of the service's parsed
+// initial metadata, so both are sent.
+TEST_P(ExtProcIntegrationTest, PerRouteGrpcMetadataWithFilterFormatters) {
+  auto* grpc_service = proto_config_.mutable_grpc_service();
+  auto* initial_metadata = grpc_service->add_initial_metadata();
+  initial_metadata->set_key("authorization");
+  initial_metadata->set_value("Bearer %SECRET(api-token)%");
+  envoy::extensions::formatter::generic_secret::v3::GenericSecret generic_secret;
+  (*generic_secret.mutable_secret_configs())["api-token"].set_name("api-token");
+  auto* formatter = grpc_service->add_formatters();
+  formatter->set_name("envoy.formatter.generic_secret");
+  std::ignore = formatter->mutable_typed_config()->PackFrom(generic_secret);
+  initializeConfig();
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("api-token");
+    secret->mutable_generic_secret()->mutable_secret()->set_inline_string("s3cret");
+  });
+  config_helper_.addConfigModifier([this](HttpConnectionManager& cm) {
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/foo");
+    ExtProcPerRoute per_route;
+    *per_route.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+        makeHeaderValue("x-route-id", "my-route");
+    setPerRouteConfig(route, per_route);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response =
+      sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
+  EXPECT_EQ("Bearer s3cret", processor_stream_->headers()
+                                 .get(Http::LowerCaseString("authorization"))[0]
+                                 ->value()
+                                 .getStringView());
+  EXPECT_EQ("my-route", processor_stream_->headers()
+                            .get(Http::LowerCaseString("x-route-id"))[0]
+                            ->value()
+                            .getStringView());
   handleUpstreamRequest();
 
   processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);

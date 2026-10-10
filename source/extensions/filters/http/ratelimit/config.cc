@@ -11,6 +11,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
 #include "source/extensions/filters/http/ratelimit/ratelimit.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,11 +20,13 @@ namespace RateLimitFilter {
 
 absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createFilterFactory(
     const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
-    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::GenericFactoryContext& generic_context) {
   ASSERT(!proto_config.domain().empty());
   absl::Status status = absl::OkStatus();
-  FilterConfigSharedPtr filter_config(new FilterConfig(proto_config, context.localInfo(), scope,
-                                                       context.runtime(), context, status));
+  FilterConfigSharedPtr filter_config(new FilterConfig(proto_config, context.localInfo(),
+                                                       generic_context.scope(), context.runtime(),
+                                                       context, status));
   RETURN_IF_NOT_OK_REF(status);
   // A timeout of 0 means infinite (no timeout). Convert to nullopt in that case.
   const uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
@@ -33,8 +36,12 @@ absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createFilterFactory
           : std::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
 
   RETURN_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config.rate_limit_service()));
-  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-      Grpc::GrpcServiceConfigWithHashKey(proto_config.rate_limit_service().grpc_service());
+  auto initial_metadata_or_error =
+      context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+          proto_config.rate_limit_service().grpc_service(), generic_context);
+  RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(
+      proto_config.rate_limit_service().grpc_service(), std::move(*initial_metadata_or_error));
   return [config_with_hash_key, &context, timeout,
           filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(
@@ -47,7 +54,9 @@ absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createHttpFilterFac
     const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(proto_config, context, extra_context.scopeOr(context));
+  Server::GenericFactoryContextImpl generic_context(
+      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
+  return createFilterFactory(proto_config, context, generic_context);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

@@ -51,12 +51,19 @@ Network::FilterFactoryCb NetworkExtProcConfigFactory::createFilterFactoryFromPro
   if (!creation_status.ok()) {
     throw EnvoyException(std::string(creation_status.message()));
   }
+  auto parsed_grpc_initial_metadata = THROW_OR_RETURN_VALUE(
+      context.serverFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .parseGrpcServiceInitialMetadata(proto_config.grpc_service(), context),
+      Grpc::GrpcServiceInitialMetadataSharedPtr);
 
-  return [ext_proc_config, &context](Network::FilterManager& filter_manager) -> void {
+  return [ext_proc_config, parsed_grpc_initial_metadata,
+          &context](Network::FilterManager& filter_manager) -> void {
     auto client = createExternalProcessorClient(
         context.serverFactoryContext().clusterManager().grpcAsyncClientManager(), context.scope());
-    filter_manager.addFilter(
-        std::make_shared<NetworkExtProcFilter>(ext_proc_config, std::move(client)));
+    filter_manager.addFilter(std::make_shared<NetworkExtProcFilter>(
+        ext_proc_config, std::move(client), parsed_grpc_initial_metadata));
   };
 }
 

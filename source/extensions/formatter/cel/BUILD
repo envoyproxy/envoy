@@ -20,6 +20,7 @@ envoy_cc_library(
         ],
     }),
     deps = [
+        "//source/common/common:thread_lib",
         "//source/common/formatter:serializer_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/protobuf:utility_lib",

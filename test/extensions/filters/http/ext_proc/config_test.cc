@@ -1,12 +1,15 @@
 // Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
 // generally should not change or remove existing tests.
 
+#include "envoy/http/header_evaluator.h"
+
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/config.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -678,6 +681,306 @@ TEST(HttpExtProcConfigTest, GrpcClientIsCreatedWithServerScope) {
   EXPECT_NE(client_scope, cluster_scope.get());
 
   filter->onDestroy();
+}
+
+// Stands in for a gRPC service's initial metadata parsed by parseGrpcServiceInitialMetadata().
+class NoopHeaderEvaluator : public Http::HeaderEvaluator {
+public:
+  void evaluateHeaders(Http::HeaderMap&, const Formatter::Context&,
+                       const StreamInfo::StreamInfo&) const override {}
+};
+
+// Matches a GrpcService by its google_grpc target_uri.
+auto grpcServiceWithTarget(const std::string& target_uri) {
+  return testing::Truly([target_uri](const envoy::config::core::v3::GrpcService& grpc_service) {
+    return grpc_service.google_grpc().target_uri() == target_uri;
+  });
+}
+
+// A filter-level gRPC service, whose initial metadata is parsed as "filter_server".
+constexpr char FilterConfigYaml[] = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: filter_server
+      stat_prefix: google
+  failure_mode_allow: true
+  )EOF";
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+createRouteConfig(const std::string& yaml,
+                  testing::NiceMock<Server::Configuration::MockServerFactoryContext>& context) {
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  return factory
+      .createRouteSpecificFilterConfig(*proto_config, context, context.messageValidationVisitor())
+      .value();
+}
+
+// Creates the filter from `filter_yaml`, sends a request with `route_configs` as its per-route
+// configs, and returns the parsed initial metadata sent with the gRPC service to create the gRPC
+// client.
+Grpc::GrpcServiceInitialMetadataSharedPtr
+formattersForRequest(const std::string& filter_yaml,
+                     testing::NiceMock<Server::Configuration::MockServerFactoryContext>& context,
+                     Router::RouteSpecificFilterConfigs route_configs = {}) {
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(filter_yaml, *proto_config);
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
+
+  Http::StreamFilterSharedPtr filter;
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_)).WillOnce(testing::SaveArg<0>(&filter));
+  cb(filter_callback);
+
+  // Fail the client creation, to keep the test to the handle check.
+  Grpc::GrpcServiceInitialMetadataSharedPtr formatters;
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              getOrCreateRawAsyncClientWithHashKey(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&formatters](const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                        Stats::Scope&, bool) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+            formatters = config_with_hash_key.initialMetadata();
+            return absl::InternalError("no client for this test");
+          }));
+
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  ON_CALL(decoder_callbacks, perFilterConfigs()).WillByDefault(testing::Return(route_configs));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  filter->decodeHeaders(headers, true);
+  filter->onDestroy();
+  return formatters;
+}
+
+// The filter's gRPC service's initial metadata is parsed when the filter config is created, and
+// passed along with the service when the gRPC client is created.
+TEST(HttpExtProcConfigTest, ParsedGrpcInitialMetadataPassedToClient) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto filter_formatters = std::make_shared<const NoopHeaderEvaluator>();
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server"), _))
+      .WillOnce(testing::Return(filter_formatters));
+
+  EXPECT_EQ(filter_formatters, formattersForRequest(FilterConfigYaml, context));
+}
+
+TEST(HttpExtProcConfigTest, ParseGrpcInitialMetadataError) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, parseGrpcServiceInitialMetadata(_, _))
+      .WillOnce(testing::Return(absl::InvalidArgumentError("bad formatters")));
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(FilterConfigYaml, *proto_config);
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
+  EXPECT_THAT(factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context),
+              HasStatus(absl::StatusCode::kInvalidArgument, "bad formatters"));
+}
+
+// A per-route gRPC service override's initial metadata is parsed when the route config is
+// created, and used instead of the filter's.
+TEST(HttpExtProcConfigTest, PerRouteParsedGrpcInitialMetadataPassedToClient) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto filter_formatters = std::make_shared<const NoopHeaderEvaluator>();
+  auto route_formatters = std::make_shared<const NoopHeaderEvaluator>();
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server"), _))
+      .WillOnce(testing::Return(filter_formatters));
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("route_server"), _))
+      .WillOnce(testing::Return(route_formatters));
+
+  auto route_config = createRouteConfig(R"EOF(
+  overrides:
+    grpc_service:
+      google_grpc:
+        target_uri: route_server
+        stat_prefix: google
+  )EOF",
+                                        context);
+  EXPECT_EQ(route_formatters,
+            dynamic_cast<const FilterConfigPerRoute&>(*route_config).parsedGrpcInitialMetadata());
+
+  // A more specific config without a gRPC service override keeps the less specific config's
+  // service, and its parsed initial metadata.
+  auto more_specific_config = createRouteConfig(R"EOF(
+  overrides:
+    failure_mode_allow: true
+  )EOF",
+                                                context);
+
+  // Per-route configs are ordered from least to most specific.
+  EXPECT_EQ(route_formatters,
+            formattersForRequest(FilterConfigYaml, context,
+                                 {route_config.get(), more_specific_config.get()}));
+}
+
+// Stands in for a gRPC service's parsed initial metadata that sets `headers`.
+class SetHeadersEvaluator : public Http::HeaderEvaluator {
+public:
+  explicit SetHeadersEvaluator(std::vector<std::pair<std::string, std::string>> headers)
+      : headers_(std::move(headers)) {}
+
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context&,
+                       const StreamInfo::StreamInfo&) const override {
+    for (const auto& [key, value] : headers_) {
+      headers.setCopy(Http::LowerCaseString(key), value);
+    }
+  }
+
+private:
+  const std::vector<std::pair<std::string, std::string>> headers_;
+};
+
+// Returns the initial metadata that `initial_metadata` sets.
+Http::TestRequestHeaderMapImpl
+evaluateInitialMetadata(const Grpc::GrpcServiceInitialMetadataSharedPtr& initial_metadata) {
+  Http::TestRequestHeaderMapImpl headers;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  initial_metadata->evaluateHeaders(headers, {}, stream_info);
+  return headers;
+}
+
+// A per-route grpc_initial_metadata override is parsed when the route config is created, and
+// applied on top of the service's parsed initial metadata. A header that it sets replaces the
+// service's, even if its value is empty.
+TEST(HttpExtProcConfigTest, PerRouteGrpcInitialMetadataLayersOnParsedInitialMetadata) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server"), _))
+      .WillOnce(testing::Return(std::make_shared<const SetHeadersEvaluator>(
+          std::vector<std::pair<std::string, std::string>>{
+              {"x-filter", "filter"}, {"x-replaced", "filter"}, {"x-cleared", "filter"}})));
+
+  auto route_config = createRouteConfig(R"EOF(
+  overrides:
+    grpc_initial_metadata:
+    - key: x-route
+      value: route
+    - key: x-replaced
+      value: route
+    - key: x-cleared
+      value: ""
+  )EOF",
+                                        context);
+
+  const auto metadata = evaluateInitialMetadata(
+      formattersForRequest(FilterConfigYaml, context, {route_config.get()}));
+  EXPECT_EQ("filter", metadata.get_("x-filter"));
+  EXPECT_EQ("route", metadata.get_("x-route"));
+  EXPECT_EQ("route", metadata.get_("x-replaced"));
+  EXPECT_FALSE(metadata.has("x-cleared"));
+}
+
+// More specific route configs' grpc_initial_metadata is applied on top of less specific ones'.
+TEST(HttpExtProcConfigTest, PerRouteGrpcInitialMetadataLayersFromLeastToMostSpecific) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("filter_server"), _))
+      .WillOnce(testing::Return(std::make_shared<const NoopHeaderEvaluator>()));
+
+  auto less_specific_config = createRouteConfig(R"EOF(
+  overrides:
+    grpc_initial_metadata:
+    - key: x-less-specific
+      value: less-specific
+    - key: x-replaced
+      value: less-specific
+    - key: x-cleared
+      value: less-specific
+  )EOF",
+                                                context);
+  auto more_specific_config = createRouteConfig(R"EOF(
+  overrides:
+    grpc_initial_metadata:
+    - key: x-replaced
+      value: more-specific
+    - key: x-cleared
+      value: ""
+  )EOF",
+                                                context);
+
+  const auto metadata = evaluateInitialMetadata(formattersForRequest(
+      FilterConfigYaml, context, {less_specific_config.get(), more_specific_config.get()}));
+  EXPECT_EQ("less-specific", metadata.get_("x-less-specific"));
+  EXPECT_EQ("more-specific", metadata.get_("x-replaced"));
+  EXPECT_FALSE(metadata.has("x-cleared"));
+}
+
+// A per-route config can combine a gRPC service with formatters and grpc_initial_metadata.
+TEST(HttpExtProcConfigTest, PerRouteAllowsFormattersWithGrpcInitialMetadata) {
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(R"EOF(
+  overrides:
+    grpc_service:
+      google_grpc:
+        target_uri: route_server
+        stat_prefix: google
+      formatters:
+      - name: envoy.formatter.test
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+    grpc_initial_metadata:
+    - key: x-route
+      value: route
+  )EOF",
+                            *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              parseGrpcServiceInitialMetadata(grpcServiceWithTarget("route_server"), _))
+      .WillOnce(testing::Return(std::make_shared<const NoopHeaderEvaluator>()));
+  EXPECT_TRUE(factory
+                  .createRouteSpecificFilterConfig(*proto_config, context,
+                                                   context.messageValidationVisitor())
+                  .ok());
+}
+
+// Per-route grpc_initial_metadata that fails to parse is rejected when the route config is created.
+TEST(HttpExtProcConfigTest, PerRouteInvalidGrpcInitialMetadataRejected) {
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(R"EOF(
+  overrides:
+    grpc_initial_metadata:
+    - key: x-route
+      value: "%NOT_A_COMMAND%"
+  )EOF",
+                            *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_FALSE(factory
+                   .createRouteSpecificFilterConfig(*proto_config, context,
+                                                    context.messageValidationVisitor())
+                   .ok());
+}
+
+TEST(HttpExtProcConfigTest, PerRouteParseGrpcInitialMetadataError) {
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(R"EOF(
+  overrides:
+    grpc_service:
+      google_grpc:
+        target_uri: route_server
+        stat_prefix: google
+  )EOF",
+                            *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, parseGrpcServiceInitialMetadata(_, _))
+      .WillOnce(testing::Return(absl::InvalidArgumentError("bad formatters")));
+  EXPECT_THAT(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                      context.messageValidationVisitor()),
+              HasStatus(absl::StatusCode::kInvalidArgument, "bad formatters"));
 }
 
 } // namespace

@@ -116,6 +116,8 @@ areas:
     title: geoip
   golang:
     title: golang
+  grpc:
+    title: grpc
   grpc_field_extraction:
     title: grpc_field_extraction
   grpc_http1_reverse_bridge:
