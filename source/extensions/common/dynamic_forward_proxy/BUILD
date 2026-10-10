@@ -83,3 +83,16 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
+
+envoy_cc_library(
+    name = "dynamic_host_candidates_lib",
+    srcs = ["dynamic_host_candidates.cc"],
+    hdrs = ["dynamic_host_candidates.h"],
+    deps = [
+        "//envoy/registry",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+        "//source/common/http:utility_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
