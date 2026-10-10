@@ -27,7 +27,7 @@ using TlsStore = GlobalTlsStores::TlsStore;
 absl::StatusOr<std::shared_ptr<TlsStore>>
 initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
              Server::Configuration::ServerFactoryContext& context, absl::string_view target_address,
-             absl::string_view domain) {
+             absl::string_view domain, std::chrono::milliseconds reporting_interval) {
   // Quota bucket & global client TLS objects are created with the config and
   // kept alive via shared_ptr to a storage struct. The local rate limit client
   // in each filter instance assumes that the slot will outlive them.
@@ -41,8 +41,7 @@ initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
 
   // TODO(bsurber): Implement report timing & usage aggregation based on each
   // bucket's reporting_interval field. Currently this is not supported and all
-  // usage is reported on a hardcoded interval.
-  std::chrono::milliseconds reporting_interval(5000);
+  // usage is reported on the filter-level interval passed in here.
 
   // Create the global client resource to be shared via TLS to all worker
   // threads (accessed through a filter-specific LocalRateLimitClient).
@@ -59,7 +58,8 @@ initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
 absl::StatusOr<std::shared_ptr<TlsStore>>
 GlobalTlsStores::getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                              Server::Configuration::ServerFactoryContext& context,
-                             absl::string_view target_address, absl::string_view domain) {
+                             absl::string_view target_address, absl::string_view domain,
+                             std::chrono::milliseconds reporting_interval) {
   TlsStoreIndex index = std::make_pair(std::string(target_address), std::string(domain));
   // Find existing TlsStore or initialize a new one.
   auto it = stores().find(index);
@@ -70,7 +70,8 @@ GlobalTlsStores::getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_wi
   }
   ENVOY_LOG(debug, "Creating a new cache & RLQS client for target ({}) and domain ({}).",
             index.first, index.second);
-  auto tls_store_or = initTlsStore(config_with_hash_key, context, index.first, index.second);
+  auto tls_store_or =
+      initTlsStore(config_with_hash_key, context, index.first, index.second, reporting_interval);
   RETURN_IF_NOT_OK_REF(tls_store_or.status());
   std::shared_ptr<TlsStore> tls_store = std::move(tls_store_or.value());
   // Save weak_ptr as an unowned reference.
