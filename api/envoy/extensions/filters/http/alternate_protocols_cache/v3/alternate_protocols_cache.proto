@@ -22,4 +22,23 @@ message FilterConfig {
   // cache for the cluster the request is routed to.
   config.core.v3.AlternateProtocolsCacheOptions alternate_protocols_cache_options = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // If true, the ``alt-svc`` response header is removed after the filter has recorded it into
+  // the alternate protocols cache, so it is not forwarded to the downstream client.
+  //
+  // This is intended for reverse proxy deployments, where an ``alt-svc`` header from the upstream
+  // describes alternatives relative to the upstream host, but a downstream client would interpret
+  // it as relative to the proxy. Note that route-level
+  // :ref:`response_headers_to_add <envoy_v3_api_field_config.route.v3.Route.response_headers_to_add>`
+  // and
+  // :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
+  // are applied before the response reaches this filter, so a route-level removal would prevent
+  // the header from being recorded, and a route-added ``alt-svc`` would be removed along with the
+  // upstream one. To advertise the proxy's own alternative services downstream, add the header in
+  // a filter that runs after this one in the response path, such as the
+  // :ref:`header mutation filter <config_http_filters_header_mutation>`.
+  //
+  // The header is removed whenever it is present, including when the request was routed to a
+  // cluster without an alternate protocols cache or when the header could not be parsed.
+  bool strip_alt_svc = 2;
 }

@@ -44,8 +44,9 @@ protected:
 name: alternate_protocols_cache
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig
+  strip_alt_svc: {}
 )EOF",
-                                           filename);
+                                           strip_alt_svc_);
     config_helper_.prependFilter(filter);
 
     // Set resource tracking on connection pools so we can explicitly check when
@@ -119,6 +120,9 @@ typed_config:
     }
     throw EnvoyException("Failed to find a port after 10 tries");
   }
+  // If this is set to true, the filter removes the alt-svc header from the response
+  // after recording it.
+  bool strip_alt_svc_ = false;
   // If this is set to true, it pre-fills the alt-svc cache, setting up HTTP/3
   // support and pointing at the HTTP/3 upstream.
   bool write_alt_svc_to_file_ = false;
@@ -145,6 +149,9 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                 response_size, 0, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response.get());
+  // By default the header is passed through to the downstream.
+  EXPECT_EQ(alt_svc,
+            response->headers().get(Http::LowerCaseString("alt-svc"))[0]->value().getStringView());
 
   // Close the connection so the HTTP/2 connection will not be used.
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(1));
@@ -158,6 +165,42 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   auto response2 = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                  response_size, 1, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response2.get());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
+}
+
+// With strip_alt_svc the upstream alt-svc header is recorded, so the second request still
+// goes out over HTTP/3, but the header is not forwarded to the downstream client.
+TEST_P(FilterIntegrationTest, AltSvcStripped) {
+  const uint64_t request_size = 0;
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  strip_alt_svc_ = true;
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},       {":path", "/test/long/url"},
+      {":scheme", "http"},       {":authority", "sni.lyft.com"},
+      {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
+  int port = fake_upstreams_[1]->localAddress()->ip()->port();
+  std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
+                                                response_size, 0, timeout);
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("alt-svc")).empty());
+
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(1));
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  fake_upstream_connection_.reset();
+
+  auto response2 = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
+                                                 response_size, 1, timeout);
+  checkSimpleRequestSuccess(request_size, response_size, response2.get());
+  EXPECT_TRUE(response2->headers().get(Http::LowerCaseString("alt-svc")).empty());
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
 }
 
