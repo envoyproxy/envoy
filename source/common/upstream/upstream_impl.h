@@ -1059,6 +1059,7 @@ public:
     return connection_pool_per_downstream_connection_;
   }
   bool warmHosts() const override { return warm_hosts_; }
+  bool waitForWarmOnInit() const override { return wait_for_warm_on_init_; }
   bool setLocalInterfaceNameOnUpstreamConnections() const override {
     return set_local_interface_name_on_upstream_connections_;
   }
@@ -1227,6 +1228,7 @@ private:
   const bool drain_connections_on_host_removal_ : 1;
   const bool connection_pool_per_downstream_connection_ : 1;
   const bool warm_hosts_ : 1;
+  const bool wait_for_warm_on_init_ : 1;
   const bool set_local_interface_name_on_upstream_connections_ : 1;
   const bool added_via_api_ : 1;
   const bool per_endpoint_stats_ : 1;
@@ -1346,7 +1348,6 @@ protected:
                                    // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
-  const bool wait_for_warm_on_init_;
 
   Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
 
