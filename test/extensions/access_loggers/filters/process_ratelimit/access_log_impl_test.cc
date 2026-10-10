@@ -167,6 +167,85 @@ typed_config:
                EnvoyException);
 }
 
+TEST_F(AccessLogImplTestWithRateLimitFilter, InvalidConfigWithNoConfigType) {
+  const std::string access_log = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+  EXPECT_THROW(
+      AccessLog::AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(access_log), context_),
+      EnvoyException);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, InvalidConfigWithBothConfigTypes) {
+  const std::string access_log = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter
+      token_bucket:
+        max_tokens: 1
+        tokens_per_fill: 1
+        fill_interval:
+          seconds: 1
+      dynamic_config:
+        resource_name: "token_bucket_name"
+        config_source:
+          ads: {}
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+  EXPECT_THROW(
+      AccessLog::AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(access_log), context_),
+      EnvoyException);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, InlineTokenBucket) {
+  const std::string access_log = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter
+      token_bucket:
+        max_tokens: 1
+        tokens_per_fill: 1
+        fill_interval:
+          seconds: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  AccessLog::InstanceSharedPtr log =
+      AccessLog::AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(access_log), context_);
+
+  // No subscription should be created for inline config.
+  ASSERT_EQ(subscriptions_.size(), 0);
+
+  // First log is written, second is rate limited.
+  expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
+  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.allowed").value(), 1);
+  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 1);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  // After refill.
+  expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
+  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.allowed").value(), 2);
+  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 2);
+}
+
 TEST_F(AccessLogImplTestWithRateLimitFilter, FilterDestructedBeforeCallback) {
   AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
