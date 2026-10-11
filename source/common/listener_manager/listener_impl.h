@@ -289,6 +289,12 @@ public:
   // Check whether a new listener has duplicated listening address this listener.
   bool hasDuplicatedAddress(const ListenerImpl& other) const;
 
+  // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
+  // Must be called only after this listener's children entities registered their targets with their
+  // parent's initManager, which happens either during construction or in
+  // ListenerManagerImpl::addOrUpdateListenerInternal.
+  void registerInitTargetIfWorkersNotStarted();
+
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }

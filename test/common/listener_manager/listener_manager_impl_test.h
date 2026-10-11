@@ -57,7 +57,8 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class ListenerManagerImplTest : public testing::TestWithParam<bool> {
+// Parameterized on (use_matcher, defer_worker_routing_init).
+class ListenerManagerImplTest : public testing::TestWithParam<std::tuple<bool, bool>> {
 public:
   // reuse_port is the default on Linux for TCP. On other platforms even if set it is disabled
   // and the user is warned. For UDP it's always the default even if not effective.
@@ -72,18 +73,24 @@ protected:
   ListenerManagerImplTest()
       : listener_factory_ptr_(std::make_unique<NiceMock<MockListenerComponentFactory>>()),
         listener_factory_(*listener_factory_ptr_),
-        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()),
+        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(std::get<0>(GetParam())),
         network_config_provider_manager_(
             std::make_shared<Filter::NetworkFilterConfigProviderManagerImpl>()),
         tcp_listener_config_provider_manager_(
             std::make_shared<Filter::TcpListenerFilterConfigProviderManagerImpl>()),
         quic_listener_config_provider_manager_(
-            std::make_shared<Filter::QuicListenerFilterConfigProviderManagerImpl>()) {}
+            std::make_shared<Filter::QuicListenerFilterConfigProviderManagerImpl>()) {
+    // Once the envoy.restart_features.defer_worker_routing_init flag is deprecated, this suite
+    // should no longer be parameterized on it.
+    scoped_runtime_.mergeValues({{"envoy.restart_features.defer_worker_routing_init",
+                                  std::get<1>(GetParam()) ? "true" : "false"}});
+  }
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
-    EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
+    // Retires so that a fixture running at concurrency > 1 can supply the remaining workers.
+    EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_)).RetiresOnSaturation();
     // Drain notifications are scheduled whenever a listener or its filter chains begin draining.
     // They are not the focus of these tests, so allow them in any number.
     EXPECT_CALL(*worker_, onListenerDrain(_, _)).Times(::testing::AnyNumber());
@@ -503,6 +510,7 @@ protected:
   NiceMock<testing::MockFunction<void()>> callback_;
   // Test parameter indicating whether the unified filter chain matcher is enabled.
   bool use_matcher_;
+  TestScopedRuntime scoped_runtime_;
   std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
   std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
       tcp_listener_config_provider_manager_;
