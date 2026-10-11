@@ -216,6 +216,10 @@ message ServerInfo {
 
 // Configuration for sending locally-generated responses to tools/list requests.
 message ToolsListLocal {
+  // Cache configuration advertised in locally-generated ``tools/list`` responses.
+  //
+  // If not provided: the response advertises ``ttlMs: 0`` and ``cacheScope: public``.
+  CacheConfig cache_config = 1;
 }
 
 // Configuration for the MCP tool capability of the server.

@@ -181,6 +181,37 @@ TEST(McpJsonRestBridgeFilterConfigTest, MaxSupportedProtocolVersionBehavior) {
   }
 }
 
+TEST(McpJsonRestBridgeFilterConfigTest, InvalidToolListLocalCacheConfigTtl) {
+  {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+    proto_config.mutable_tool_config()
+        ->mutable_tool_list_local()
+        ->mutable_cache_config()
+        ->mutable_ttl()
+        ->set_seconds(-1);
+    EXPECT_THAT(McpJsonRestBridgeFilterConfig::create(proto_config),
+                HasStatus(absl::StatusCode::kOutOfRange, HasSubstr("Expected positive duration")));
+
+    McpJsonRestBridgeFilterConfigFactory factory;
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    EXPECT_THROW_WITH_REGEX(
+        factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
+        Envoy::ProtoValidationException, "Expected positive duration");
+  }
+
+  {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+        per_route_config;
+    per_route_config.add_tool_config()
+        ->mutable_tool_list_local()
+        ->mutable_cache_config()
+        ->mutable_ttl()
+        ->set_seconds(-1);
+    EXPECT_THAT(McpJsonRestBridgePerRouteConfig::create(per_route_config),
+                HasStatus(absl::StatusCode::kOutOfRange, HasSubstr("Expected positive duration")));
+  }
+}
+
 } // namespace
 } // namespace McpJsonRestBridge
 } // namespace HttpFilters
