@@ -793,18 +793,57 @@ TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRedirected) {
 TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRejectedIfGRPC) {
   // This test is slightly weird as it sends gRPC "request" over H/1 client of the
   // HttpConnectionManagerImplTest. However it is sufficient to test the behavior of path
-  // normalization as it is determined by the content type only.
+  // normalization as it is determined by the content type only. The POST method is used because
+  // only a POST request gets a gRPC-style local reply.
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::UNESCAPE_AND_REDIRECT;
   testPathNormalization(TestRequestHeaderMapImpl{{":authority", "host"},
                                                  {":path", "/abc%2fdef"},
-                                                 {":method", "GET"},
+                                                 {":method", "POST"},
                                                  {"content-type", "application/grpc"}},
                         TestResponseHeaderMapImpl{{":status", "200"},
                                                   {"connection", "close"},
                                                   {"grpc-status", "13"},
                                                   {"content-type", "application/grpc"}});
   EXPECT_EQ(1U, stats_.named_.downstream_rq_failed_path_normalization_.value());
+}
+
+// A GET with a gRPC content type is still rejected rather than redirected (the check keys on the
+// content type), but it is not a gRPC request, so the local reply is a plain 400
+// (https://github.com/envoyproxy/envoy/issues/48070).
+TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRejectedIfGRPCContentTypeOnGet) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_REDIRECT;
+  testPathNormalization(TestRequestHeaderMapImpl{{":authority", "host"},
+                                                 {":path", "/abc%2fdef"},
+                                                 {":method", "GET"},
+                                                 {"content-type", "application/grpc"}},
+                        TestResponseHeaderMapImpl{{":status", "400"}, {"connection", "close"}});
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_failed_path_normalization_.value());
+}
+
+// The grpc_local_reply_requires_post runtime guard is latched when the connection manager is
+// created: flipping it afterwards does not change the behavior of an existing connection manager.
+TEST_F(HttpConnectionManagerImplTest, GrpcLocalReplyRequiresPostLatchedAtConstruction) {
+  TestScopedRuntime scoped_runtime;
+  setup();
+  setupFilterChain(1, 0);
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_local_reply_requires_post", "false"}});
+
+  // Still the behavior latched at construction: a GET with a gRPC content type gets a plain 503.
+  sendGetWithGrpcContentTypeAndExpectLocalReply("503", /*expect_grpc_status=*/false);
+}
+
+// A connection manager created after the guard was disabled uses the legacy classification.
+TEST_F(HttpConnectionManagerImplTest, GrpcLocalReplyRequiresPostDisabledAtConstruction) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_local_reply_requires_post", "false"}});
+  setup();
+  setupFilterChain(1, 0);
+
+  sendGetWithGrpcContentTypeAndExpectLocalReply("200", /*expect_grpc_status=*/true);
 }
 
 // Test that requests with escaped slashes are redirected when configured. Redirection

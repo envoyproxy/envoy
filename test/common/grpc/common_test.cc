@@ -311,6 +311,26 @@ TEST(GrpcContextTest, IsGrpcRequestHeader) {
   EXPECT_FALSE(Common::isGrpcRequestHeaders(is_not));
 }
 
+TEST(GrpcContextTest, IsGrpcPostRequestHeader) {
+  Http::TestRequestHeaderMapImpl post{
+      {":method", "POST"}, {":path", "/"}, {"content-type", "application/grpc"}};
+  EXPECT_TRUE(Common::isGrpcPostRequestHeaders(post));
+  Http::TestRequestHeaderMapImpl post_proto{
+      {":method", "POST"}, {":path", "/"}, {"content-type", "application/grpc+proto"}};
+  EXPECT_TRUE(Common::isGrpcPostRequestHeaders(post_proto));
+  Http::TestRequestHeaderMapImpl get{
+      {":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
+  EXPECT_FALSE(Common::isGrpcPostRequestHeaders(get));
+  Http::TestRequestHeaderMapImpl head{
+      {":method", "HEAD"}, {":path", "/"}, {"content-type", "application/grpc"}};
+  EXPECT_FALSE(Common::isGrpcPostRequestHeaders(head));
+  Http::TestRequestHeaderMapImpl no_path{{":method", "POST"}, {"content-type", "application/grpc"}};
+  EXPECT_FALSE(Common::isGrpcPostRequestHeaders(no_path));
+  Http::TestRequestHeaderMapImpl grpc_web{
+      {":method", "POST"}, {":path", "/"}, {"content-type", "application/grpc-web"}};
+  EXPECT_FALSE(Common::isGrpcPostRequestHeaders(grpc_web));
+}
+
 TEST(GrpcContextTest, IsGrpcResponseHeader) {
   Http::TestResponseHeaderMapImpl grpc_status_only{{":status", "500"}, {"grpc-status", "14"}};
   EXPECT_TRUE(Common::isGrpcResponseHeaders(grpc_status_only, true));

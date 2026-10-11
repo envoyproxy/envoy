@@ -86,6 +86,13 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_chain_drain_uses_configured_strat
 // lost. See https://github.com/envoyproxy/envoy/issues/46841
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_continue);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
+// When enabled, a request is only treated as gRPC for the purpose of local replies if it uses the
+// POST method, as the gRPC over HTTP/2 protocol requires. A GET or HEAD request that carries a gRPC
+// content type then gets an ordinary HTTP local reply (e.g. 503) instead of a trailers-only 200.
+// The gRPC HTTP/1.1 reverse bridge applies the same rule and does not bridge such requests.
+// The value is latched when an HTTP connection manager is created.
+// See https://github.com/envoyproxy/envoy/issues/48070.
+RUNTIME_GUARD(envoy_reloadable_features_grpc_local_reply_requires_post);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
 RUNTIME_GUARD(envoy_reloadable_features_happy_eyeballs_sort_non_ip_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_header_mutation_url_encode_query_params);
