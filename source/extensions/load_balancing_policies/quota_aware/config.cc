@@ -27,17 +27,18 @@ QuotaAwareLoadBalancerFactory::loadConfig(Server::Configuration::ServerFactoryCo
   return QuotaAwareLbConfig::make(quota_aware_config, context);
 }
 
-Upstream::ThreadAwareLoadBalancerPtr QuotaAwareLoadBalancerFactory::create(
-    OptRef<const Upstream::LoadBalancerConfig> lb_config, const ClusterInfo& cluster_info,
-    const PrioritySet& priority_set, Loader& runtime, RandomGenerator& random,
-    TimeSource& time_source) {
+Upstream::ThreadAwareLoadBalancerPtr
+QuotaAwareLoadBalancerFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
+                                      const ClusterInfo& cluster_info,
+                                      const PrioritySet& priority_set, Loader& runtime,
+                                      RandomGenerator& random, TimeSource& time_source) {
   ASSERT(lb_config.has_value());
   const auto& quota_aware_lb_config = dynamic_cast<const QuotaAwareLbConfig&>(lb_config.ref());
   Upstream::ThreadAwareLoadBalancerPtr fallback_lb =
       quota_aware_lb_config.create(cluster_info, priority_set, runtime, random, time_source);
   ASSERT(fallback_lb != nullptr);
   return std::make_unique<QuotaAwareLoadBalancer>(quota_aware_lb_config, std::move(fallback_lb),
-                                                 cluster_info.statsScope());
+                                                  cluster_info.statsScope());
 }
 
 REGISTER_FACTORY(QuotaAwareLoadBalancerFactory, Upstream::TypedLoadBalancerFactory);

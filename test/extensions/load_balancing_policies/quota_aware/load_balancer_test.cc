@@ -48,10 +48,10 @@ public:
   void SetUp() override {
     ON_CALL(load_balancer_context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
     ON_CALL(load_balancer_context_, determinePriorityLoad(_, _, _))
-        .WillByDefault(
-            Invoke([](const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad& original,
-                      const Upstream::RetryPriority::PriorityMappingFunc&)
-                       -> const Upstream::HealthyAndDegradedLoad& { return original; }));
+        .WillByDefault(Invoke([](const Upstream::PrioritySet&,
+                                 const Upstream::HealthyAndDegradedLoad& original,
+                                 const Upstream::RetryPriority::PriorityMappingFunc&)
+                                  -> const Upstream::HealthyAndDegradedLoad& { return original; }));
     ON_CALL(load_balancer_context_, shouldSelectAnotherHost(_)).WillByDefault(Return(false));
     ON_CALL(load_balancer_context_, hostSelectionRetryCount()).WillByDefault(Return(1));
   }
@@ -70,10 +70,10 @@ protected:
 
   void createLoadBalancer(const QuotaAware& config) {
     lb_config_ = factory_.loadConfig(server_factory_context_, config).value();
-    thread_aware_lb_ = factory_.create(
-        *lb_config_, *cluster_info_, main_thread_priority_set_,
-        server_factory_context_.runtime_loader_, server_factory_context_.api_.random_,
-        server_factory_context_.time_system_);
+    thread_aware_lb_ =
+        factory_.create(*lb_config_, *cluster_info_, main_thread_priority_set_,
+                        server_factory_context_.runtime_loader_,
+                        server_factory_context_.api_.random_, server_factory_context_.time_system_);
     ASSERT_OK(thread_aware_lb_->initialize());
     load_balancer_ = thread_aware_lb_->factory()->create(lb_params_);
     for (uint32_t i = 0; i < thread_local_priority_set_.host_sets_.size(); ++i) {
@@ -81,10 +81,11 @@ protected:
     }
   }
 
-  envoy::config::core::v3::Metadata
-  hostMetadata(absl::string_view id, absl::string_view secondary = "",
-               absl::string_view ns = "envoy.lb", absl::string_view id_key = "id",
-               absl::string_view secondary_key = "secondary_id") {
+  envoy::config::core::v3::Metadata hostMetadata(absl::string_view id,
+                                                 absl::string_view secondary = "",
+                                                 absl::string_view ns = "envoy.lb",
+                                                 absl::string_view id_key = "id",
+                                                 absl::string_view secondary_key = "secondary_id") {
     envoy::config::core::v3::Metadata metadata;
     Config::Metadata::mutableMetadataValue(metadata, std::string(ns), std::string(id_key))
         .set_string_value(std::string(id));

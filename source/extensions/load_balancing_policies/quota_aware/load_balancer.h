@@ -81,8 +81,7 @@ private:
   QuotaAwareLbConfig(std::string metadata_namespace, std::string candidates_key,
                      std::string host_metadata_namespace, std::string host_id_key,
                      std::string host_secondary_id_key, std::string candidate_id_field,
-                     std::string candidate_secondary_id_field,
-                     bool fail_closed_on_missing_metadata,
+                     std::string candidate_secondary_id_field, bool fail_closed_on_missing_metadata,
                      TypedLoadBalancerFactory* fallback_load_balancer_factory,
                      LoadBalancerConfigPtr&& fallback_load_balancer_config);
 

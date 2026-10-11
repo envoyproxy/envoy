@@ -1320,6 +1320,7 @@ quantiles
 querydetails
 quiesce
 quitquitquit
+quota
 qvalue
 radix
 radixtree
@@ -1375,6 +1376,7 @@ rele
 releasor
 reloadable
 remoting
+renormalize
 renderers
 reparse
 repeatability

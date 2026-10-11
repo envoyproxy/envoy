@@ -9,8 +9,8 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/common/optref.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/upstream/load_balancer.h"
@@ -125,9 +125,8 @@ std::string structFieldString(const Protobuf::Struct& fields, const std::string&
 }
 
 // nullopt: key missing or not a list. value: parsed set, possibly empty.
-std::optional<PassedCandidates>
-parseCandidates(const envoy::config::core::v3::Metadata& metadata,
-                const QuotaAwareLbConfig& config) {
+std::optional<PassedCandidates> parseCandidates(const envoy::config::core::v3::Metadata& metadata,
+                                                const QuotaAwareLbConfig& config) {
   const Protobuf::Value& value = Config::Metadata::metadataValue(
       &metadata, config.metadataNamespace(), config.candidatesKey());
   if (!value.has_list_value()) {
@@ -197,7 +196,8 @@ void redistributeLoad(HealthyAndDegradedLoad& load,
     if (healthy[i] != 0 && first < 0) {
       first = static_cast<int>(i);
     }
-    const uint32_t scaled = static_cast<uint32_t>((static_cast<uint64_t>(healthy[i]) * 100) / total);
+    const uint32_t scaled =
+        static_cast<uint32_t>((static_cast<uint64_t>(healthy[i]) * 100) / total);
     healthy[i] = scaled;
     assigned += scaled;
   }
@@ -257,8 +257,8 @@ public:
     filtered_load_ = inner_load;
 
     const auto& host_sets = priority_set.hostSetsPerPriority();
-    // ponytail: priorities are P0/P1/P2 in practice. 8 stays on the stack;
-    // InlinedVector heap-falls if someone has more.
+    // Typical clusters have 2-3 priorities. Capacity 8 stays on the stack;
+    // InlinedVector allocates if a cluster has more.
     absl::InlinedVector<uint8_t, 8> healthy_ok(host_sets.size(), 0);
     absl::InlinedVector<uint8_t, 8> degraded_ok(host_sets.size(), 0);
     for (size_t i = 0; i < host_sets.size(); ++i) {
@@ -355,9 +355,8 @@ bool anyQuotaAvailableHost(const PrioritySet& priority_set, const QuotaAwareLbCo
 QuotaAwareLoadBalancer::QuotaAwareLoadBalancer(const QuotaAwareLbConfig& config,
                                                ThreadAwareLoadBalancerPtr fallback_picker_lb,
                                                Stats::Scope& scope)
-    : config_(config),
-      stats_(std::make_shared<QuotaAwareStats>(
-          QuotaAwareStats{ALL_QUOTA_AWARE_STATS(POOL_COUNTER_PREFIX(scope, "quota_aware"))})),
+    : config_(config), stats_(std::make_shared<QuotaAwareStats>(QuotaAwareStats{
+                           ALL_QUOTA_AWARE_STATS(POOL_COUNTER_PREFIX(scope, "quota_aware"))})),
       fallback_picker_lb_(std::move(fallback_picker_lb)) {}
 
 QuotaAwareLbConfig::QuotaAwareLbConfig(std::string metadata_namespace, std::string candidates_key,
@@ -416,10 +415,11 @@ QuotaAwareLbConfig::make(const QuotaAwareProto& config, ServerFactoryContext& co
       absl::StrJoin(missing_policies, ", ")));
 }
 
-Upstream::ThreadAwareLoadBalancerPtr
-QuotaAwareLbConfig::create(const ClusterInfo& cluster_info, const PrioritySet& priority_set,
-                           Loader& runtime, RandomGenerator& random,
-                           TimeSource& time_source) const {
+Upstream::ThreadAwareLoadBalancerPtr QuotaAwareLbConfig::create(const ClusterInfo& cluster_info,
+                                                                const PrioritySet& priority_set,
+                                                                Loader& runtime,
+                                                                RandomGenerator& random,
+                                                                TimeSource& time_source) const {
   return fallback_picker_lb_config_.load_balancer_factory->create(
       makeOptRefFromPtr<const Upstream::LoadBalancerConfig>(
           fallback_picker_lb_config_.load_balancer_config.get()),
@@ -433,14 +433,13 @@ absl::Status QuotaAwareLoadBalancer::initialize() {
 
 LoadBalancerFactorySharedPtr QuotaAwareLoadBalancer::factory() {
   if (!factory_) {
-    factory_ = std::make_shared<LoadBalancerFactoryImpl>(config_, fallback_picker_lb_->factory(),
-                                                         stats_);
+    factory_ =
+        std::make_shared<LoadBalancerFactoryImpl>(config_, fallback_picker_lb_->factory(), stats_);
   }
   return factory_;
 }
 
-LoadBalancerPtr
-QuotaAwareLoadBalancer::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
+LoadBalancerPtr QuotaAwareLoadBalancer::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
   return std::make_unique<LoadBalancerImpl>(config_, fallback_picker_lb_factory_, stats_, params);
 }
 

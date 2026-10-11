@@ -65,15 +65,15 @@ public:
 
   void initializeCluster(absl::string_view policy_yaml, bool two_priority = true) {
     const auto ip_version = GetParam();
-    config_helper_.addConfigModifier(
-        [policy_yaml, two_priority, ip_version](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
-          ASSERT_EQ(cluster_0->name(), "cluster_0");
-          const std::string local_address = Network::Test::getLoopbackAddressString(ip_version);
-          auto* assignment = cluster_0->mutable_load_assignment();
-          assignment->clear_endpoints();
-          if (two_priority) {
-            TestUtility::loadFromYaml(fmt::format(R"EOF(
+    config_helper_.addConfigModifier([policy_yaml, two_priority, ip_version](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+      ASSERT_EQ(cluster_0->name(), "cluster_0");
+      const std::string local_address = Network::Test::getLoopbackAddressString(ip_version);
+      auto* assignment = cluster_0->mutable_load_assignment();
+      assignment->clear_endpoints();
+      if (two_priority) {
+        TestUtility::loadFromYaml(fmt::format(R"EOF(
 cluster_name: cluster_0
 endpoints:
 - priority: 0
@@ -99,10 +99,10 @@ endpoints:
         envoy.lb:
           id: "dc1/svc-b/shard/0/member/1"
 )EOF",
-                                                  local_address, local_address),
-                                      *assignment);
-          } else {
-            TestUtility::loadFromYaml(fmt::format(R"EOF(
+                                              local_address, local_address),
+                                  *assignment);
+      } else {
+        TestUtility::loadFromYaml(fmt::format(R"EOF(
 cluster_name: cluster_0
 endpoints:
 - lb_endpoints:
@@ -117,12 +117,12 @@ endpoints:
           address: {}
           port_value: 0
 )EOF",
-                                                  local_address, local_address),
-                                      *assignment);
-          }
-          TestUtility::loadFromYaml(std::string(policy_yaml),
-                                    *cluster_0->mutable_load_balancing_policy());
-        });
+                                              local_address, local_address),
+                                  *assignment);
+      }
+      TestUtility::loadFromYaml(std::string(policy_yaml),
+                                *cluster_0->mutable_load_balancing_policy());
+    });
     HttpIntegrationTest::initialize();
   }
 
