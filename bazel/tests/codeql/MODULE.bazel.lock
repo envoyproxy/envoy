@@ -442,7 +442,8 @@
     "https://bcr.bazel.build/modules/protoc-gen-validate/1.3.3.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/proxy-wasm-cpp-host/0.0.0-260704-f2db56a.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/proxy-wasm-cpp-sdk/0.0.0-250925-e5256b0.envoy/MODULE.bazel": "not found",
-    "https://bcr.bazel.build/modules/proxy-wasm-rust-sdk/0.2.4-251205-5283e57.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/proxy-wasm-rust-sdk/0.2.5/MODULE.bazel": "c44116b797e7f37fa3dcd379befe5b29753add6d16d7c6a02af84522960072e7",
+    "https://bcr.bazel.build/modules/proxy-wasm-rust-sdk/0.2.5/source.json": "a3efa79635a285eb2c9d36e3c69e138881932e03de3e240662eb7bbbd330b675",
     "https://bcr.bazel.build/modules/pybind11_bazel/2.11.1.bzl.1/MODULE.bazel": "1ef2994c097ee88f8f7ae8fbf991aaefb0603b2540fe575eca14943bc9f220a6",
     "https://bcr.bazel.build/modules/pybind11_bazel/2.11.1.bzl.3/MODULE.bazel": "a1b973f5bfa6df193ec17010c461494fae18a2b4477ff3dc8086846ca806683d",
     "https://bcr.bazel.build/modules/pybind11_bazel/2.11.1/MODULE.bazel": "88af1c246226d87e65be78ed49ecd1e6f5e98648558c14ce99176da041dc378e",
@@ -656,6 +657,7 @@
     "https://bcr.bazel.build/modules/rules_rust/0.66.0/MODULE.bazel": "86ef763a582f4739a27029bdcc6c562258ed0ea6f8d58294b049e215ceb251b3",
     "https://bcr.bazel.build/modules/rules_rust/0.68.1/MODULE.bazel": "8d3332ef4079673385eb81f8bd68b012decc04ac00c9d5a01a40eff90301732c",
     "https://bcr.bazel.build/modules/rules_rust/0.69.0/MODULE.bazel": "4326fec48f2fef0d514de46346f7f77e200c82936dd08b91c9ef039fbdad5c10",
+    "https://bcr.bazel.build/modules/rules_rust/0.70.0/MODULE.bazel": "5b1407b11c305bc2522e204e7f170faf8399e836e49b6afef9074dfe532e6c3f",
     "https://bcr.bazel.build/modules/rules_rust/0.74.0.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/rules_shell/0.1.2/MODULE.bazel": "66e4ca3ce084b04af0b9ff05ff14cab4e5df7503973818bb91cbc6cda08d32fc",
     "https://bcr.bazel.build/modules/rules_shell/0.2.0/MODULE.bazel": "fda8a652ab3c7d8fee214de05e7a9916d8b28082234e8d2c0094505c5268ed3c",
@@ -845,8 +847,6 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304/modules/proxy-wasm-cpp-host/0.0.0-260704-f2db56a.envoy/source.json": "39721bf8eee5b6543a959c5a7271524d9b42b6f5618875a10064ba257ed747bf",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304/modules/proxy-wasm-cpp-sdk/0.0.0-250925-e5256b0.envoy/MODULE.bazel": "dfc7349d5177a6d63cceac9710e2b00b4ea069973235031c45eb0e8c6a466fd7",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304/modules/proxy-wasm-cpp-sdk/0.0.0-250925-e5256b0.envoy/source.json": "59ba8d0658f8da92d73259baf75e419dc23c25fa4909357a3ba784806ebfcf8a",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304/modules/proxy-wasm-rust-sdk/0.2.4-251205-5283e57.envoy/MODULE.bazel": "7b779ac2018298b3d0e9ae29473613af4a4c95eb3c2d1c8a51ab7055ad47cac9",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304/modules/proxy-wasm-rust-sdk/0.2.4-251205-5283e57.envoy/source.json": "f2b2a4f6ed9bd676bd866f6dfe75aae69f60d91f5af2e21bfdb9e5dbf492b920",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304/modules/qat-zstd/1.0.0.envoy/MODULE.bazel": "9c46bd2cd0752e70de76ce0c1c36811b14448a4dbbc3ff8b0f4f95c343bbb6c4",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304/modules/qat-zstd/1.0.0.envoy/source.json": "7aaf3a82884e4e603f76568ca98009fb4769fdd5f66c430054f47b4d82820c16",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/20dc7c2578669f36e7c18510e65c7178cf5bb304/modules/qatlib/26.02.0.envoy/MODULE.bazel": "45e6093e2bd42ef8128bd93a168028a9d2926ce223a43694650359997a046f5f",
@@ -1775,171 +1775,6 @@
               "minimum_python_version": "3.9"
             }
           }
-        }
-      }
-    },
-    "@@proxy-wasm-rust-sdk+//bazel:extensions.bzl%crates_deps": {
-      "general": {
-        "bzlTransitiveDigest": "2H2PMKVKLkLRlPcq2OuGHbQEsf0Ww+HPAsb0O1c1d1A=",
-        "usagesDigest": "DoeyjeHdit/bqF+1HIB6+05yHVIdzQU1NCYHuH53F8s=",
-        "recordedInputs": [
-          "REPO_MAPPING:proxy-wasm-rust-sdk+,bazel_skylib bazel_skylib+",
-          "REPO_MAPPING:proxy-wasm-rust-sdk+,bazel_tools bazel_tools",
-          "REPO_MAPPING:proxy-wasm-rust-sdk+,crates_vendor proxy-wasm-rust-sdk++crates_deps+crates_vendor",
-          "REPO_MAPPING:proxy-wasm-rust-sdk+,proxy_wasm_rust_sdk proxy-wasm-rust-sdk+",
-          "REPO_MAPPING:proxy-wasm-rust-sdk+,rules_rust rules_rust+",
-          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
-        ],
-        "generatedRepoSpecs": {
-          "crates_vendor": {
-            "repoRuleId": "@@rules_rust+//crate_universe/private:crates_vendor.bzl%crates_vendor_remote_repository",
-            "attributes": {
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.bazel",
-              "defs_module": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:defs.bzl"
-            }
-          },
-          "crates_vendor__allocator-api2-0.2.21": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/allocator-api2/0.2.21/download"
-              ],
-              "strip_prefix": "allocator-api2-0.2.21",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.allocator-api2-0.2.21.bazel"
-            }
-          },
-          "crates_vendor__equivalent-1.0.2": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/equivalent/1.0.2/download"
-              ],
-              "strip_prefix": "equivalent-1.0.2",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.equivalent-1.0.2.bazel"
-            }
-          },
-          "crates_vendor__foldhash-0.2.0": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/foldhash/0.2.0/download"
-              ],
-              "strip_prefix": "foldhash-0.2.0",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.foldhash-0.2.0.bazel"
-            }
-          },
-          "crates_vendor__hashbrown-0.16.0": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/hashbrown/0.16.0/download"
-              ],
-              "strip_prefix": "hashbrown-0.16.0",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.hashbrown-0.16.0.bazel"
-            }
-          },
-          "crates_vendor__log-0.4.27": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/log/0.4.27/download"
-              ],
-              "strip_prefix": "log-0.4.27",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.log-0.4.27.bazel"
-            }
-          },
-          "crates_vendor__mockalloc-0.1.2": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "5a6c93486116b2ab028d2a2c5f5ff42020407d1c7048b77ca0b196a511a12a94",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/mockalloc/0.1.2/download"
-              ],
-              "strip_prefix": "mockalloc-0.1.2",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.mockalloc-0.1.2.bazel"
-            }
-          },
-          "crates_vendor__mockalloc-macros-0.1.0": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "23565dcdaedab64115f722c31d84e5bdb7125724097dcafce160a64806d6fb65",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/mockalloc-macros/0.1.0/download"
-              ],
-              "strip_prefix": "mockalloc-macros-0.1.0",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.mockalloc-macros-0.1.0.bazel"
-            }
-          },
-          "crates_vendor__proc-macro2-1.0.101": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "89ae43fd86e4158d6db51ad8e2b80f313af9cc74f5c0e03ccb87de09998732de",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/proc-macro2/1.0.101/download"
-              ],
-              "strip_prefix": "proc-macro2-1.0.101",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.proc-macro2-1.0.101.bazel"
-            }
-          },
-          "crates_vendor__quote-1.0.41": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "ce25767e7b499d1b604768e7cde645d14cc8584231ea6b295e9c9eb22c02e1d1",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/quote/1.0.41/download"
-              ],
-              "strip_prefix": "quote-1.0.41",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.quote-1.0.41.bazel"
-            }
-          },
-          "crates_vendor__syn-1.0.109": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/syn/1.0.109/download"
-              ],
-              "strip_prefix": "syn-1.0.109",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.syn-1.0.109.bazel"
-            }
-          },
-          "crates_vendor__unicode-ident-1.0.19": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "sha256": "f63a545481291138910575129486daeaf8ac54aee4387fe7906919f7830c7d9d",
-              "type": "tar.gz",
-              "urls": [
-                "https://static.crates.io/crates/unicode-ident/1.0.19/download"
-              ],
-              "strip_prefix": "unicode-ident-1.0.19",
-              "build_file": "@@proxy-wasm-rust-sdk+//bazel/cargo/remote:BUILD.unicode-ident-1.0.19.bazel"
-            }
-          }
-        },
-        "moduleExtensionMetadata": {
-          "explicitRootModuleDirectDeps": [
-            "crates_vendor",
-            "crates_vendor__hashbrown-0.16.0",
-            "crates_vendor__log-0.4.27"
-          ],
-          "explicitRootModuleDirectDevDeps": [],
-          "useAllRepos": "NO",
-          "reproducible": false
         }
       }
     },

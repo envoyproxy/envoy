@@ -1,5 +1,5 @@
 {
-  "checksum": "6d1a2b97daba079ad8763f20580a00d3d1fd5e90ea7501cf5a210045ce778f80",
+  "checksum": "9d535d30688f98b4402b9ec935b9491b875a733005af938d4b20b2f2b502b69c",
   "conditions": {
     "aarch64-apple-darwin": [
       "aarch64-apple-darwin"
@@ -1232,7 +1232,7 @@
       "common_attrs": {
         "deps": [
           {
-            "id": "hickory-resolver 0.26.1",
+            "id": "hickory-resolver 0.26.3",
             "target": "hickory_resolver"
           },
           {
@@ -1278,13 +1278,17 @@
         ]
       },
       "common_attrs": {
+        "crate_features": [
+          "default",
+          "mock"
+        ],
         "deps": [
           {
-            "id": "mockall 0.13.1",
+            "id": "mockall 0.15.0",
             "target": "mockall"
           },
           {
-            "id": "smallvec 1.15.1",
+            "id": "smallvec 1.16.3",
             "target": "smallvec"
           }
         ],
@@ -2155,7 +2159,7 @@
       ],
       "version": "0.5.0"
     },
-    "hickory-net 0.26.1": {
+    "hickory-net 0.26.3": {
       "common_attrs": {
         "crate_features": [
           "__dnssec",
@@ -2202,7 +2206,7 @@
               "target": "h2"
             },
             {
-              "id": "hickory-proto 0.26.1",
+              "id": "hickory-proto 0.26.3",
               "target": "hickory_proto"
             },
             {
@@ -2234,7 +2238,7 @@
               "target": "ring"
             },
             {
-              "id": "rustls 0.23.37",
+              "id": "rustls 0.23.45",
               "target": "rustls"
             },
             {
@@ -2302,8 +2306,8 @@
       "package_url": "https://github.com/hickory-dns/hickory-dns",
       "repository": {
         "Http": {
-          "sha256": "e2295ed2f9c31e471e1428a8f88a3f0e1f4b27c15049592138d1eebe9c35b183",
-          "url": "https://static.crates.io/crates/hickory-net/0.26.1/download"
+          "sha256": "c480823ed7c2c5d0f09c41020cb6b7c28029ce60ec42dc942158dcf22f8e0a4d",
+          "url": "https://static.crates.io/crates/hickory-net/0.26.3/download"
         }
       },
       "targets": [
@@ -2314,9 +2318,9 @@
           }
         }
       ],
-      "version": "0.26.1"
+      "version": "0.26.3"
     },
-    "hickory-proto 0.26.1": {
+    "hickory-proto 0.26.3": {
       "common_attrs": {
         "crate_features": [
           "__dnssec",
@@ -2347,7 +2351,7 @@
               "target": "once_cell"
             },
             {
-              "id": "prefix-trie 0.8.3",
+              "id": "prefix-trie 0.8.4",
               "target": "prefix_trie"
             },
             {
@@ -2405,8 +2409,8 @@
       "package_url": "https://github.com/hickory-dns/hickory-dns",
       "repository": {
         "Http": {
-          "sha256": "0bab31817bfb44672a252e97fe81cd0c18d1b2cf892108922f6818820df8c643",
-          "url": "https://static.crates.io/crates/hickory-proto/0.26.1/download"
+          "sha256": "12b92608f679a6fa515dd1d15c1ff89443026e391200a2c840c7afcba482893d",
+          "url": "https://static.crates.io/crates/hickory-proto/0.26.3/download"
         }
       },
       "targets": [
@@ -2417,9 +2421,9 @@
           }
         }
       ],
-      "version": "0.26.1"
+      "version": "0.26.3"
     },
-    "hickory-resolver 0.26.1": {
+    "hickory-resolver 0.26.3": {
       "common_attrs": {
         "crate_features": [
           "__dnssec",
@@ -2444,11 +2448,11 @@
               "target": "futures_util"
             },
             {
-              "id": "hickory-net 0.26.1",
+              "id": "hickory-net 0.26.3",
               "target": "hickory_net"
             },
             {
-              "id": "hickory-proto 0.26.1",
+              "id": "hickory-proto 0.26.3",
               "target": "hickory_proto"
             },
             {
@@ -2476,11 +2480,11 @@
               "target": "resolv_conf"
             },
             {
-              "id": "rustls 0.23.37",
+              "id": "rustls 0.23.45",
               "target": "rustls"
             },
             {
-              "id": "smallvec 1.15.1",
+              "id": "smallvec 1.16.3",
               "target": "smallvec"
             },
             {
@@ -2532,8 +2536,8 @@
       "package_url": "https://github.com/hickory-dns/hickory-dns",
       "repository": {
         "Http": {
-          "sha256": "f0d58d28879ceecde6607729660c2667a081ccdc082e082675042793960f178c",
-          "url": "https://static.crates.io/crates/hickory-resolver/0.26.1/download"
+          "sha256": "3f3da5255c95d5a716857d54b5b8f4e8d67c3484d3beaaaae2ce25063b3ba981",
+          "url": "https://static.crates.io/crates/hickory-resolver/0.26.3/download"
         }
       },
       "targets": [
@@ -2544,7 +2548,7 @@
           }
         }
       ],
-      "version": "0.26.1"
+      "version": "0.26.3"
     },
     "http 1.4.0": {
       "common_attrs": {
@@ -2715,7 +2719,7 @@
             "target": "icu_provider"
           },
           {
-            "id": "smallvec 1.15.1",
+            "id": "smallvec 1.16.3",
             "target": "smallvec"
           },
           {
@@ -2991,7 +2995,7 @@
             "target": "idna_adapter"
           },
           {
-            "id": "smallvec 1.15.1",
+            "id": "smallvec 1.16.3",
             "target": "smallvec"
           },
           {
@@ -3995,7 +3999,8 @@
       ],
       "version": "1.1.1"
     },
-    "mockall 0.13.1": {
+    "mockall 0.15.0": {
+      "build_script_attrs": {},
       "common_attrs": {
         "deps": [
           {
@@ -4020,9 +4025,12 @@
           }
         ],
         "edition": "2021",
+        "extra_deps": [
+          ":build_script_build"
+        ],
         "proc_macro_deps": [
           {
-            "id": "mockall_derive 0.13.1",
+            "id": "mockall_derive 0.15.0",
             "target": "mockall_derive"
           }
         ]
@@ -4038,8 +4046,8 @@
       "package_url": "https://github.com/asomers/mockall",
       "repository": {
         "Http": {
-          "sha256": "39a6bfcc6c8c7eed5ee98b9c3e33adc726054389233e201c95dab2d41a3839d2",
-          "url": "https://static.crates.io/crates/mockall/0.13.1/download"
+          "sha256": "1a6ceddfe3ce334925e96bf420fdb2dcee5bed6c632a168ece622676dadeaf8a",
+          "url": "https://static.crates.io/crates/mockall/0.15.0/download"
         }
       },
       "targets": [
@@ -4048,11 +4056,17 @@
             "crate_name": "mockall",
             "crate_root": "src/lib.rs"
           }
+        },
+        {
+          "BuildScript": {
+            "crate_name": "build_script_build",
+            "crate_root": "build.rs"
+          }
         }
       ],
-      "version": "0.13.1"
+      "version": "0.15.0"
     },
-    "mockall_derive 0.13.1": {
+    "mockall_derive 0.15.0": {
       "build_script_attrs": {},
       "common_attrs": {
         "deps": [
@@ -4089,8 +4103,8 @@
       "package_url": "https://github.com/asomers/mockall",
       "repository": {
         "Http": {
-          "sha256": "25ca3004c2efe9011bd4e461bd8256445052b9615405b4f7ea43fc8ca5c20898",
-          "url": "https://static.crates.io/crates/mockall_derive/0.13.1/download"
+          "sha256": "9cfe16fbe8a314aeec0b861ac24e60b1e123e97634bab045475b9d6a18416fd8",
+          "url": "https://static.crates.io/crates/mockall_derive/0.15.0/download"
         }
       },
       "targets": [
@@ -4107,7 +4121,7 @@
           }
         }
       ],
-      "version": "0.13.1"
+      "version": "0.15.0"
     },
     "moka 0.12.15": {
       "common_attrs": {
@@ -4141,7 +4155,7 @@
             "target": "portable_atomic"
           },
           {
-            "id": "smallvec 1.15.1",
+            "id": "smallvec 1.16.3",
             "target": "smallvec"
           },
           {
@@ -4428,7 +4442,7 @@
               "target": "cfg_if"
             },
             {
-              "id": "smallvec 1.15.1",
+              "id": "smallvec 1.16.3",
               "target": "smallvec"
             }
           ],
@@ -4767,7 +4781,7 @@
       ],
       "version": "1.0.13"
     },
-    "prefix-trie 0.8.3": {
+    "prefix-trie 0.8.4": {
       "common_attrs": {
         "crate_features": [
           "default",
@@ -4800,8 +4814,8 @@
       "package_url": "https://github.com/tiborschneider/prefix-trie",
       "repository": {
         "Http": {
-          "sha256": "90f561214012d3fc240a1f9c817cc4d57f5310910d066069c1b093f766bb5966",
-          "url": "https://static.crates.io/crates/prefix-trie/0.8.3/download"
+          "sha256": "4cf6e3177f0684016a5c209b00882e15f8bdd3f3bb48f0491df10cd102d0c6e7",
+          "url": "https://static.crates.io/crates/prefix-trie/0.8.4/download"
         }
       },
       "targets": [
@@ -4812,7 +4826,7 @@
           }
         }
       ],
-      "version": "0.8.3"
+      "version": "0.8.4"
     },
     "prettyplease 0.2.37": {
       "build_script_attrs": {
@@ -5419,7 +5433,7 @@
       ],
       "version": "0.4.1"
     },
-    "rustls 0.23.37": {
+    "rustls 0.23.45": {
       "build_script_attrs": {
         "link_deps": [
           {
@@ -5455,7 +5469,7 @@
             "target": "rustls_pki_types"
           },
           {
-            "id": "rustls-webpki 0.103.13",
+            "id": "rustls-webpki 0.103.15",
             "target": "webpki"
           },
           {
@@ -5484,8 +5498,8 @@
       "package_url": "https://github.com/rustls/rustls",
       "repository": {
         "Http": {
-          "sha256": "758025cb5fccfd3bc2fd74708fd4682be41d99e5dff73c377c0646c6012c73a4",
-          "url": "https://static.crates.io/crates/rustls/0.23.37/download"
+          "sha256": "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634",
+          "url": "https://static.crates.io/crates/rustls/0.23.45/download"
         }
       },
       "targets": [
@@ -5502,7 +5516,7 @@
           }
         }
       ],
-      "version": "0.23.37"
+      "version": "0.23.45"
     },
     "rustls-pki-types 1.14.0": {
       "common_attrs": {
@@ -5544,7 +5558,7 @@
       ],
       "version": "1.14.0"
     },
-    "rustls-webpki 0.103.13": {
+    "rustls-webpki 0.103.15": {
       "common_attrs": {
         "crate_features": [
           "alloc",
@@ -5578,8 +5592,8 @@
       "package_url": "https://github.com/rustls/webpki",
       "repository": {
         "Http": {
-          "sha256": "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e",
-          "url": "https://static.crates.io/crates/rustls-webpki/0.103.13/download"
+          "sha256": "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2",
+          "url": "https://static.crates.io/crates/rustls-webpki/0.103.15/download"
         }
       },
       "targets": [
@@ -5590,7 +5604,7 @@
           }
         }
       ],
-      "version": "0.103.13"
+      "version": "0.103.15"
     },
     "rustversion 1.0.22": {
       "build_script_attrs": {},
@@ -6168,7 +6182,7 @@
       ],
       "version": "0.4.12"
     },
-    "smallvec 1.15.1": {
+    "smallvec 1.16.3": {
       "common_attrs": {
         "crate_features": [
           "const_generics"
@@ -6186,8 +6200,8 @@
       "package_url": "https://github.com/servo/rust-smallvec",
       "repository": {
         "Http": {
-          "sha256": "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03",
-          "url": "https://static.crates.io/crates/smallvec/1.15.1/download"
+          "sha256": "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b",
+          "url": "https://static.crates.io/crates/smallvec/1.16.3/download"
         }
       },
       "targets": [
@@ -6198,7 +6212,7 @@
           }
         }
       ],
-      "version": "1.15.1"
+      "version": "1.16.3"
     },
     "socket2 0.6.3": {
       "common_attrs": {
@@ -7031,7 +7045,7 @@
         ],
         "deps": [
           {
-            "id": "rustls 0.23.37",
+            "id": "rustls 0.23.45",
             "target": "rustls"
           },
           {
@@ -9499,11 +9513,11 @@
   },
   "direct_deps": [
     "bindgen 0.73.2",
-    "hickory-resolver 0.26.1",
-    "mockall 0.13.1",
+    "hickory-resolver 0.26.3",
+    "mockall 0.15.0",
     "serde 1.0.228",
     "serde_json 1.0.149",
-    "smallvec 1.15.1",
+    "smallvec 1.16.3",
     "time 0.3.47",
     "tokio 1.50.0",
     "url 2.5.8"

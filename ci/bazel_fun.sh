@@ -8,7 +8,7 @@
 ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
 ENVOY_DOCS_PATH="$(_realpath "$ENVOY_DOCS_PATH")"
 LOCKFILES_DIFF_OUTPUT="${LOCKFILES_DIFF_OUTPUT:-/build/fix_lockfiles.diff}"
-readonly LOCKFILE_PATHSPEC=':(glob)**/MODULE.bazel.lock'
+readonly -a LOCKFILE_PATHSPECS=(':(glob)**/MODULE.bazel.lock' Cargo.lock Cargo.Bazel.envoy.lock)
 readonly -a REGISTRY_BAZELRC_FILES=(
     ".bazelrc"
     "api/.bazelrc"
@@ -91,13 +91,13 @@ workspace_bazel_run() {
 
 lockfiles_check() {
     lockfiles_generate
-    if [[ -z "$(git status --porcelain -- "$LOCKFILE_PATHSPEC")" ]]; then
+    if [[ -z "$(git status --porcelain -- "${LOCKFILE_PATHSPECS[@]}")" ]]; then
         return 0
     fi
-    git --no-pager diff --stat -- "$LOCKFILE_PATHSPEC"
+    git --no-pager diff --stat -- "${LOCKFILE_PATHSPECS[@]}"
     echo >&2
     echo "FAIL: Lockfiles are not in sync, please run: ci/do_ci.sh lockfiles" >&2
-    if { git --no-pager diff -- "$LOCKFILE_PATHSPEC" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
+    if { git --no-pager diff -- "${LOCKFILE_PATHSPECS[@]}" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
         echo "  Full diff written to ${LOCKFILES_DIFF_OUTPUT}" >&2
     fi
     echo >&2
@@ -105,7 +105,15 @@ lockfiles_check() {
 }
 
 lockfiles_generate() {
+    cargo_lockfile_generate
     run_in_nested_mods _lockfiles_generate_mod
+}
+
+# Bazel never compares the crate_universe lockfile with Cargo.toml and Cargo.lock, so it is always
+# repinned. The crate extension does not track CARGO_BAZEL_REPIN, so a new server must evaluate it.
+cargo_lockfile_generate() {
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
+    CARGO_BAZEL_REPIN=true bazel fetch "${BAZEL_GLOBAL_OPTIONS[@]}" --config=ci --repo=@envoy_rust_crate_index
 }
 
 _lockfiles_generate_mod() {

@@ -193,12 +193,12 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
 * `check_and_fix_proto_format` &mdash; check and fix configuration, fomatting and build issues in API proto files.
 * `format`&mdash; run validation, linting and formatting tools.
-* `lockfiles`/`lockfiles.regenerate` &mdash; regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
-* `lockfiles.check` &mdash; regenerate all `MODULE.bazel.lock` files and fail with a diff summary if any lockfile changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
-* `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, and dependabot configuration.
+* `lockfiles`/`lockfiles.regenerate` &mdash; repin `Cargo.Bazel.envoy.lock` from `Cargo.toml` and `Cargo.lock` with `CARGO_BAZEL_REPIN=true`, then regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
+* `lockfiles.check` &mdash; regenerate the lockfiles as `lockfiles` does and fail with a diff summary if any lockfile, including `Cargo.lock`, changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
+* `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, lockfile sync, and dependabot configuration.
 * `deps.report` &mdash; run the per-workspace bzlmod dependency report targets and print the current/latest version status for each workspace.
-* `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate all `MODULE.bazel.lock` files.
-* `registry` &mdash; run the per-workspace Bazel registry updater targets for `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate all `MODULE.bazel.lock` files. Set `ENVOY_REGISTRY_HASH` to request a specific hash, and set `ENVOY_REGISTRY_ALLOW_UNSAFE` to allow non-ancestor pins for testing.
+* `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate the lockfiles as `lockfiles` does.
+* `registry` &mdash; run the per-workspace Bazel registry updater targets for `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate the lockfiles as `lockfiles` does. Set `ENVOY_REGISTRY_HASH` to request a specific hash, and set `ENVOY_REGISTRY_ALLOW_UNSAFE` to allow non-ancestor pins for testing.
 * `registry.check` &mdash; run the per-workspace Bazel registry status targets, verify they all report the same pinned hash, and require a tagged registry pin for non-`-dev` releases.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 

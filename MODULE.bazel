@@ -77,7 +77,7 @@ bazel_dep(name = "proto-field-extraction", version = "0.0.0-240710-d5d39f0.envoy
 bazel_dep(name = "proto-processing", version = "0.0.0-250110-279353c.envoy")
 bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
 bazel_dep(name = "proxy-wasm-cpp-sdk", version = "0.0.0-250925-e5256b0.envoy")
-bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.4-251205-5283e57.envoy")
+bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.5")
 bazel_dep(name = "qat-zstd", version = "1.0.0.envoy")
 bazel_dep(name = "qatlib", version = "26.02.0.envoy")
 bazel_dep(name = "qatzip", version = "2.0.0.envoy")
@@ -409,7 +409,7 @@ rust.repository_set(
     name = "rust_linux_s390x",
     edition = "2018",
     exec_triple = "s390x-unknown-linux-gnu",
-    versions = ["1.88.0"],
+    versions = ["1.97.1"],
 )
 rust.toolchain(
     edition = "2018",
@@ -419,8 +419,8 @@ rust.toolchain(
         "x86_64-unknown-linux-gnu",
         "aarch64-unknown-linux-gnu",
     ],
-    rustfmt_version = "1.88.0",
-    versions = ["1.88.0"],
+    rustfmt_version = "1.97.1",
+    versions = ["1.97.1"],
 )
 use_repo(rust, "rust_toolchains")
 
@@ -438,17 +438,7 @@ crate.from_cargo(
     lockfile = "//:Cargo.Bazel.envoy.lock",
     manifests = ["//:Cargo.toml"],
 )
-crate.from_cargo(
-    name = "dynamic_modules_rust_sdk_crate_index",
-    cargo_lockfile = "//:Cargo.lock",
-    lockfile = "//:Cargo.Bazel.dynamic_modules.lock",
-    manifests = ["//:Cargo.toml"],
-)
-use_repo(
-    crate,
-    "dynamic_modules_rust_sdk_crate_index",
-    "envoy_rust_crate_index",
-)
+use_repo(crate, "envoy_rust_crate_index")
 
 wasm_cargo = use_extension("//bazel:extensions.bzl", "wasm_cargo")
 use_repo(
@@ -461,9 +451,13 @@ crates_deps = use_extension("@proxy-wasm-rust-sdk//bazel:extensions.bzl", "crate
 use_repo(
     crates_deps,
     "crates_vendor",
-    "crates_vendor__hashbrown-0.16.0",
-    "crates_vendor__log-0.4.27",
+    "crates_vendor__hashbrown-0.16.1",
+    "crates_vendor__log-0.4.29",
 )
+
+# The vendored crate BUILD files of @proxy-wasm-rust-sdk reference @platforms, which the module
+# does not depend on.
+inject_repo(crates_deps, "platforms")
 
 # Proto/buf
 buf = use_extension("@rules_buf//buf:extensions.bzl", "buf")
