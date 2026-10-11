@@ -113,6 +113,11 @@ public:
    */
   bool emitClientSpan() const { return emit_client_span_; }
 
+  /**
+   * Returns whether or not to strip query params from the path when sending to the auth server.
+   */
+  bool stripQueryParams() const { return strip_query_params_; }
+
 private:
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                                            Server::Configuration::CommonFactoryContext& context);
@@ -141,6 +146,7 @@ private:
   const bool encode_raw_headers_;
   const Router::RetryPolicyConstSharedPtr retry_policy_;
   const bool emit_client_span_;
+  const bool strip_query_params_;
 };
 
 using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;

@@ -176,15 +176,15 @@ TEST(HttpUtility, stripQueryString) {
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/?x=1&y=2")), "/foo/bar/");
 }
 
-TEST(HttpUtility, stripQueryStringView) {
-  EXPECT_EQ(Utility::stripQueryStringView(""), "");
-  EXPECT_EQ(Utility::stripQueryStringView("?"), "");
-  EXPECT_EQ(Utility::stripQueryStringView("/"), "/");
-  EXPECT_EQ(Utility::stripQueryStringView("/?"), "/");
-  EXPECT_EQ(Utility::stripQueryStringView("/?x=1"), "/");
-  EXPECT_EQ(Utility::stripQueryStringView("/foo"), "/foo");
-  EXPECT_EQ(Utility::stripQueryStringView("/foo/bar?a=b&b=c"), "/foo/bar");
-  EXPECT_EQ(Utility::stripQueryStringView("/foo/bar/?x=1&y=2"), "/foo/bar/");
+TEST(HttpUtility, stripQueryStringStringView) {
+  EXPECT_EQ(Utility::stripQueryString(""), "");
+  EXPECT_EQ(Utility::stripQueryString("?"), "");
+  EXPECT_EQ(Utility::stripQueryString("/"), "/");
+  EXPECT_EQ(Utility::stripQueryString("/?"), "/");
+  EXPECT_EQ(Utility::stripQueryString("/?x=1"), "/");
+  EXPECT_EQ(Utility::stripQueryString("/foo"), "/foo");
+  EXPECT_EQ(Utility::stripQueryString("/foo/bar?a=b&b=c"), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryString("/foo/bar/?x=1&y=2"), "/foo/bar/");
 }
 
 TEST(HttpUtility, replaceQueryString) {
