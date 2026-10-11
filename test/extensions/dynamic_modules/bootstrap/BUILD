@@ -28,6 +28,8 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_listener_add_or_update",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_listener_removal",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_secret_add_or_update",
+        "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_secret_removal",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_server_initialized",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_shutdown",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_timer_fired",
@@ -39,10 +41,14 @@ envoy_cc_dyn_module_test(
         "//source/extensions/bootstrap/dynamic_modules:extension_config_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -133,6 +139,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_iterate_panic_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_listener_lifecycle_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_secret_lifecycle_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_shared_data_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_timer_test",
@@ -146,5 +153,6 @@ envoy_cc_dyn_module_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
