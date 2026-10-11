@@ -4277,9 +4277,6 @@ TEST_F(RouterTest, RetryAsyncHostSelectionClusterRemovedBeforeCompletion) {
 }
 
 TEST_F(RouterTest, RetryUpstreamReset) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -4290,7 +4287,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  EXPECT_CALL(callbacks_, addDecodedData(_, _));
   Buffer::OwnedImpl body("test body");
   router_->decodeData(body, true);
   EXPECT_EQ(1U,
@@ -4353,9 +4350,6 @@ TEST_F(RouterTest, RetryUpstreamReset) {
 }
 
 TEST_F(RouterTest, RetryHttp3UpstreamReset) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   router_->retry_425_response_ = true;
@@ -4366,7 +4360,7 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  EXPECT_CALL(callbacks_, addDecodedData(_, _));
   Buffer::OwnedImpl body("test body");
   router_->decodeData(body, true);
   EXPECT_EQ(1U,
@@ -4421,8 +4415,7 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
 TEST_F(RouterTest, NoRetryWithBodyLimit) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"},
-       {"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
 
   recreateFilter();
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -4457,8 +4450,7 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
 TEST_F(RouterTest, EnableRedirectAndRetryButNoRetryWithBodyLimit) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"},
-       {"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
 
   recreateFilter();
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -4501,8 +4493,7 @@ TEST_F(RouterTest, NoRetryWithBodyLimitWithUpstreamHalfCloseEnabled) {
   // when allow_multiplexed_upstream_half_close is false.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"},
-       {"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
   recreateFilter();
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -5192,9 +5183,6 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
 }
 
 TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
@@ -5209,7 +5197,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
+  EXPECT_CALL(callbacks_, addDecodedData(_, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -5290,9 +5278,6 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
 // Test retry with 2 attempts before success: 503 -> 503 -> 200
 TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
@@ -5307,7 +5292,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
+  EXPECT_CALL(callbacks_, addDecodedData(_, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -5461,9 +5446,6 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
 // Verifies that the initial host is select with max host count of one, but during retries
 // RetryPolicy will be consulted.
 TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   router_->reject_all_hosts_ = true;
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -5485,7 +5467,7 @@ TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
+  EXPECT_CALL(callbacks_, addDecodedData(_, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -5537,9 +5519,6 @@ TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
 // Verifies that the initial request accepts any host, but during retries
 // RetryPolicy will be consulted.
 TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.router_use_private_retry_buffer", "true"}});
   router_->reject_all_hosts_ = true;
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -5561,7 +5540,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
+  EXPECT_CALL(callbacks_, addDecodedData(_, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};

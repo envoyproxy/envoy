@@ -1154,6 +1154,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
               payload_length, effective_buffer_limit);
     cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
+    retry_buffer_.reset();
     ENVOY_LOG(debug, "retry or redirect buffer overflow: skipping buffering");
     buffering = false;
     request_buffer_overflowed_ = true;
@@ -1201,7 +1202,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     if (use_private_retry_buffer) {
       // Buffer into our own retry_buffer_.
       if (!retry_buffer_) {
-        retry_buffer_ = std::make_unique<Buffer::OwnedImpl>();
+        retry_buffer_ = std::make_unique<Buffer::OwnedImpl>(callbacks_->account());
       }
       retry_buffer_->move(data);
     } else {

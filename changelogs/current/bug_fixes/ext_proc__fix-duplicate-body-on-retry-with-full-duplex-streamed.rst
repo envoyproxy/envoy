@@ -1,0 +1,3 @@
+ext_proc: fixed duplicate request body being sent to upstream when using ``FULL_DUPLEX_STREAMED`` mode with retries enabled. 
+When the ext_proc filter forwarded body chunks and then continued decoding after a trailer response, the filter manager replayed the already-forwarded body to the router, causing it to be sent twice on retry. 
+The router now buffers body chunks in a private retry buffer instead of the shared filter-chain buffer, preventing the double-send. This fix is controlled by the runtime guard ``envoy.reloadable_features.router_use_private_retry_buffer`` which defaults to ``false`` for safety, set it to ``true`` to enable the new behavior.
